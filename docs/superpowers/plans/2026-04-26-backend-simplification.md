@@ -4,7 +4,11 @@
 
 **Goal:** Reduce interior pipeline complexity (currently V7/V8/V9, ~6,500 LOC) **WITHOUT losing accuracy on P1–P5 vs. rangovo's `_pasiulymas.pdf` ground truth**. Simplification is conditional — if a single Vision call cannot match the current V8 accuracy bar, we KEEP V8's complexity (multi-pass, self-validation, eksplikacija fallback, aggregation) and only delete code that is provably orphaned.
 
-**Hard rule (from user 2026-04-26):** *"main thing is accuracy, design and everything comes after."* — Never trade accuracy for cleaner code. The bar is **V8's measured accuracy on P1–P5**, not the brief's nominal "≥85%". If V8 hits 92% and the new pipeline hits 85%, that is an ABORT — not a "good enough refactor."
+**Hard rule 1 (accuracy):** *"main thing is accuracy, design and everything comes after."* — Never trade accuracy for cleaner code. The bar is **V8's measured accuracy on P1–P5**, not the brief's nominal "≥85%". If V8 hits 92% and the new pipeline hits 85%, that is an ABORT — not a "good enough refactor."
+
+**Hard rule 2 (universalumas):** *"rangovas yra tik vienas rangovas o rangovų yra labai daug... mums reikia universalumo ir tikslumo, personalizacija po to."* — rangovo `_pasiulymas.pdf` yra **reference**, ne ground truth. Sąmatų AI turi būti universalus: tikslumo šaltiniai yra (1) brėžinio matematika — eksplikacija, mm matmenys, perimetrai, (2) LT industry formulės — CLAUDE.md NRM2/STR/RICS, (3) sutartiniai ženklai brėžiniuose, (4) sutartinės spalvos, (5) bet kas tiesiogiai brėžinyje parašyta. rangovo skaičiai gali būti orientyras "kokias pozicijas paprastai įtraukia rangovas", bet ne tikslumo gate.
+
+**Hard rule 3 (kokybė):** *"visada naudok geriausius įrankius, geriausius promptus ir logiką ir visada testuok."* — Default to Opus-class Vision; comprehensive prompts with embedded formulas + few-shot examples; research subagents when uncertain; test + stress-test at edges (small rooms, open-plan, mansardos, multi-floor, mixed-language drawings, corrupted PDFs).
 
 **Architecture (target, conditional on accuracy gate):** New `backend/extractor/` package with one Vision call (Anthropic Opus 4.7) consuming PDF→images, returning a comprehensive structured JSON takeoff (rooms + global positions). LT formulas live in `extractor/universal_rules.py` (from `universal_engine.UNIVERSAL_RULES`/`ROOM_TYPE_RULES`) and `extractor/lt_rules.py` (from `lt_area_calculator.py` + `lt_sanity.py`). The new endpoint replaces `/extract-interior-v8`; old V8/V9 interior pipelines are deleted **only after the new pipeline matches or beats V8 accuracy**; symbol-detection V9 files needed by frontend's `SymbolCounter` are preserved.
 
@@ -297,6 +301,31 @@ results, run the new pipeline 3× and take the median.
 - [ ] **Step 2: Commit**
 
 Run: `git add backend/scripts/baseline_output/ACCURACY_GATE.md && git commit -m "docs: define explicit accuracy gate for refactor"`
+
+---
+
+## Phase 0.5 — Research (parallel, runs in background)
+
+Goal: Before crafting the new Vision prompt, gather authoritative knowledge that the prompt should embed. Research dispatched as parallel subagents — runs in background while we prep Phase 1 scaffolding.
+
+### Task 0.5.1: Industry takeoff tools research (subagent)
+- Compare togal.ai, Kreo, STACK, Bluebeam, PlanSwift on: pipeline architecture (single-call vs multi-pass), output schema, accuracy benchmarks if public, what fields they extract from drawings.
+- Output: `docs/superpowers/research/industry-takeoff-tools.md` — 1-page summary + best-practice patterns we should adopt.
+
+### Task 0.5.2: Lithuanian construction symbol & convention research (subagent)
+- Authoritative LT/EU symbols: doors (lankas), windows (paralelinės dvigubos linijos), eksplikacija lentelės layout, sutartinės spalvos (raudona = LED niche; mėlyna = ?; geltona = ?), hatching patterns (plytelės vs PVC vs parketas), wall_thickness on plans, door/window labels (D1, L1).
+- Source: STR (Statybos Techniniai Reglamentai), LST EN architectural drawing conventions, EU drawing standards.
+- Output: `docs/superpowers/research/lt-drawing-conventions.md` — symbol catalog + interpretation rules.
+
+### Task 0.5.3: Vision prompting best practices for technical drawings (subagent)
+- Anthropic Claude Vision capabilities for measurement, multi-page reasoning, JSON schema adherence, role/system prompt structure for technical extraction. Sources: Anthropic docs, prompt engineering papers, eval results from similar takeoff tasks if available online.
+- Output: `docs/superpowers/research/vision-prompting-techniques.md` — concrete prompt patterns we should use.
+
+### Task 0.5.4: LT formula validation against authoritative sources (subagent)
+- Cross-check every formula in CLAUDE.md against authoritative LT/EU/RICS NRM2 sources. Surface any errors, missing items, or LT-specific exceptions (eg. STR rules for mansardiniai svoris, atviros erdvės). Identify any common LT positions missing from CLAUDE.md.
+- Output: `docs/superpowers/research/formula-validation.md` — confirmed | corrected | new formula additions.
+
+These four run in parallel as background agents. Phase 1 prompt is built using their findings.
 
 ---
 
@@ -1535,6 +1564,39 @@ git commit -m "docs: PR description for backend simplification"
 git tag post-simplification
 git log --oneline pre-simplification..HEAD
 ```
+
+---
+
+## Phase 6.5 — Stress Tests (after accuracy gate, before merge)
+
+Run AFTER Phase 3 accuracy gate passes, BEFORE marking work as done. Goal: catch edge-case regressions that the 5-project test set wouldn't expose.
+
+### Task 6.5.1: Edge-case input matrix
+- **Tiny rooms**: room <2 m² (eg. WC). Verify pipeline doesn't drop it.
+- **Open-plan / merged spaces**: living+kitchen+dining as one polygon. Verify it's not split into 3 phantom rooms or merged-and-lost.
+- **Mansardos / sloped ceilings**: STR 1.05.06 svoris pritaikomas (h<1.5m excluded, 1.5-2.0m at 0.5×).
+- **Multi-floor**: 2-aukštas + rūsys. Verify floors aren't conflated.
+- **Mixed-language annotations**: LT + EN (eg. import projects with EN dimensions). Pipeline shouldn't crash on EN.
+- **Rotated PDFs**: pages oriented landscape vs portrait, some upside-down.
+- **Low-DPI scanned PDFs**: 150 DPI scans, photocopied artifacts.
+
+For each: build a synthetic test or use real-world examples if available in `training-data/`. Capture output, compare to expected behavior. Document failures in `docs/superpowers/research/stress-test-results.md`.
+
+### Task 6.5.2: Repeated-run determinism
+Run new pipeline 3× on each of P1–P5, compare metrics. Vision is non-deterministic; flag metrics with >10% variance run-to-run. Those metrics need post-processing stabilization (averaging, voting) or schema constraints.
+
+### Task 6.5.3: Adversarial drawings
+- Project with deliberately ambiguous dimensions (mm without unit label).
+- Eksplikacija on page 5 instead of page 1.
+- PDF with security restrictions (no copy/no extract).
+- PDF page count >50 (we currently cap at 20 — does Vision get the right pages?).
+
+### Task 6.5.4: Performance / cost stress
+- 50-page PDF: total tokens, total cost, total runtime.
+- Document p50/p95 latency per project size class.
+- Identify pareto cost-vs-accuracy frontier (lower DPI = cheaper but less accurate?).
+
+Outputs from all stress tests aggregated into `docs/superpowers/research/stress-test-results.md`. Any blocking failures (crashes, severe regressions) re-open Phase 3.
 
 ---
 
