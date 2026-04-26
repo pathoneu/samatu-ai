@@ -1,0 +1,994 @@
+{
+  "status": "ok",
+  "projektas": "Interjero projektas",
+  "tipas": "interjeras",
+  "scope_type": "full_project",
+  "confidence": "high",
+  "projekto_info": {
+    "bendras_plotas_m2": 0.0,
+    "patalpu_skaicius": 0,
+    "patalpu_saltinis": "vision",
+    "duru_skaicius": 0,
+    "langu_skaicius": 0,
+    "nisu_skaicius": 0,
+    "ai_detected_symbol_types": 6
+  },
+  "skaiciavimai": {
+    "dazomas_plotas": {
+      "sienos_m2": 0,
+      "lubos_m2": 0.0,
+      "viso_m2": 0.0,
+      "pastaba": null,
+      "confidence": "v8_universal"
+    },
+    "glaistymo_kampai": {
+      "kampai_vnt": 0,
+      "isoriniu_kampu_vnt": 0,
+      "vidutinis_aukstis_m": 2.82,
+      "viso_m": 0.0,
+      "skaiciavimo_budas": "v5_archetipas"
+    },
+    "angokrasciai": {
+      "langu_vnt": 0,
+      "duru_vnt": 0,
+      "viso_m": 0.0,
+      "viso_m_x2": 0.0,
+      "area_m2": 0.0,
+      "details": []
+    },
+    "lubu_perimetras": {
+      "viso_m": 0
+    },
+    "grindjuostes": {
+      "viso_m": 0.0
+    },
+    "uzuolaidu_nisos": {
+      "viso_m": 0,
+      "details": []
+    },
+    "dazai": {
+      "sienos_l": 0.0,
+      "lubos_l": 0.0,
+      "gruntas_l": 0.0,
+      "viso_l": 0.0
+    },
+    "gk_lapai": {
+      "vnt": 0
+    },
+    "glaistas": {
+      "lygis": "Q2",
+      "kg": 0,
+      "maisai_25kg": 0
+    },
+    "validation_notes": [],
+    "plyteles_m2": 0.0,
+    "_v5_breakdown": {
+      "gkp_lubu_standart_m2": 0.0,
+      "gkp_lubu_virs_3m_m2": 0.0,
+      "angokrasciai_gkp_m": 0.0,
+      "dazymo_plotas_standart_m2": 0.0,
+      "kampai_m": 0.0,
+      "pasleptu_duru_staktu_m": 0.0,
+      "nisu_metrai": 0,
+      "hidroizoliacijos_vnt": 0,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "grindjuostes_m": 0,
+      "lubu_perimetras_m": 0
+    }
+  },
+  "darbu_sarasas": [
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "aprasymas": "Smulkūs papildomi darbai",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 1,
+      "skyrius_enum": "gkp",
+      "skyrius_label": "Gipso kartono montavimas",
+      "pavadinimas": "Smulkūs papildomi darbai",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Kondicionieriaus sifono įrengimas",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 2,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Kondicionieriaus sifono įrengimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Trasų kondicionieriams įrengimas",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 3,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Trasų kondicionieriams įrengimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Santechnikos taškų koregavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 4,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Santechnikos taškų koregavimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Rozetės/jungiklio komutavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 0,
+      "eil_nr": 5,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Rozetės/jungiklio komutavimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Skylių šviestuvams gręžimas",
+      "mato_vnt": "vnt",
+      "kiekis": 20,
+      "eil_nr": 6,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Skylių šviestuvams gręžimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Smulkūs el. darbai",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 7,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Smulkūs el. darbai",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Statybvietės išlaidos",
+      "aprasymas": "Šiukšlių išvežimas",
+      "mato_vnt": "m³",
+      "kiekis": 8,
+      "eil_nr": 8,
+      "skyrius_enum": "site_overhead",
+      "skyrius_label": "Statybvietės išlaidos",
+      "pavadinimas": "Šiukšlių išvežimas",
+      "vnt": "m³",
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Šiukšlių/atliekų išvežimas: bendras plotas 0.0m² × vidurkis 0.05 m³/m² = 8m³"
+    },
+    {
+      "skyrius": "Statybvietės išlaidos",
+      "aprasymas": "Drėgmės surinkėjo nuoma",
+      "mato_vnt": "d.d.",
+      "kiekis": 25,
+      "eil_nr": 9,
+      "skyrius_enum": "site_overhead",
+      "skyrius_label": "Statybvietės išlaidos",
+      "pavadinimas": "Drėgmės surinkėjo nuoma",
+      "vnt": "d.d.",
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Skaičiavimas pagal universal industries formulę ()"
+    },
+    {
+      "eil_nr": 10,
+      "skyrius": "Ventiliacija",
+      "aprasymas": "Difūzorių apdirbimas (ventiliacijos taškai)",
+      "mato_vnt": "vnt",
+      "kiekis": 10,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas) + ASHRAE 62.2",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "counted",
+      "trace_links": [
+        {
+          "page_nr": 2,
+          "x_pct": 0.345,
+          "y_pct": 0.225,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.395,
+          "y_pct": 0.225,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.455,
+          "y_pct": 0.225,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.505,
+          "y_pct": 0.225,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.495,
+          "y_pct": 0.305,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.555,
+          "y_pct": 0.305,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.345,
+          "y_pct": 0.47,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.45,
+          "y_pct": 0.47,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.48,
+          "y_pct": 0.58,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.395,
+          "y_pct": 0.64,
+          "confidence": "medium"
+        }
+      ],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 11,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "Lubinių priglaistomų šviestuvų apdirbimas",
+      "mato_vnt": "vnt",
+      "kiekis": 17,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "counted",
+      "trace_links": [
+        {
+          "page_nr": 2,
+          "x_pct": 0.3,
+          "y_pct": 0.29,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.4,
+          "y_pct": 0.29,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.305,
+          "y_pct": 0.51,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.42,
+          "y_pct": 0.535,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.56,
+          "y_pct": 0.45,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.605,
+          "y_pct": 0.45,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.605,
+          "y_pct": 0.51,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.52,
+          "y_pct": 0.68,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.58,
+          "y_pct": 0.68,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.645,
+          "y_pct": 0.68,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.52,
+          "y_pct": 0.77,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.58,
+          "y_pct": 0.77,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.645,
+          "y_pct": 0.77,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.73,
+          "y_pct": 0.33,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.735,
+          "y_pct": 0.47,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.86,
+          "y_pct": 0.33,
+          "confidence": "low"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.86,
+          "y_pct": 0.47,
+          "confidence": "low"
+        }
+      ],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 12,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "Pakabinamų šviestuvų montavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 2,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "counted",
+      "trace_links": [
+        {
+          "page_nr": 2,
+          "x_pct": 0.385,
+          "y_pct": 0.665,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.42,
+          "y_pct": 0.7,
+          "confidence": "high"
+        }
+      ],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 13,
+      "skyrius": "GKP",
+      "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui)",
+      "mato_vnt": "m",
+      "kiekis": 6,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas — LED nišos)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 14,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "LED juostos komutavimas",
+      "mato_vnt": "m",
+      "kiekis": 6,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas — LED juostos)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    }
+  ],
+  "skyriu_suvestinis": {
+    "Gipso kartono montavimas": 1,
+    "Santechnikos darbai / kondicionavimo darbai": 3,
+    "Elektros instaliacijos darbai": 3,
+    "Statybvietės išlaidos": 2
+  },
+  "patalpos": [],
+  "warnings": [],
+  "raw_calc_data": {
+    "patalpos": [],
+    "bendras_plotas_m2": 0,
+    "lubu_aukstis_m": 2.82,
+    "scope_type": "full_project",
+    "meta": {
+      "doors": [],
+      "windows": [],
+      "niches": []
+    },
+    "sekcijos": {}
+  },
+  "v8_engine": true,
+  "v8_totals": {
+    "bendras_plotas_m2": 0.0,
+    "dazymo_plotas_m2": 0.0,
+    "gkp_lubu_standart_m2": 0.0,
+    "gkp_lubu_virs_3m_m2": 0.0,
+    "kampai_m": 0.0,
+    "plyteles_sienos_m2": 0.0,
+    "plyteles_grindys_m2": 0.0,
+    "pvc_grindys_m2": 0.0,
+    "isliginamasis_m2": 0.0,
+    "grindjuostes_m": 0.0,
+    "hidroizoliacijos_vnt": 0
+  },
+  "v8_rooms": [],
+  "v8_scale": {
+    "scale_ratio": 75,
+    "mm_per_unit": 75.0,
+    "confidence": "high",
+    "source": "text+dimensions",
+    "votes": [
+      {
+        "scale_ratio": 75,
+        "mm_per_unit": 75.0,
+        "confidence": "high",
+        "source": "text+dimensions",
+        "match_count": 2
+      },
+      {
+        "scale_ratio": 75,
+        "mm_per_unit": 26.457352483720364,
+        "expected_for_ratio": 26.458333333333332,
+        "confidence": "high",
+        "source": "dimensions",
+        "match_count": 62
+      }
+    ],
+    "warnings": [],
+    "sanity": null
+  },
+  "v8_pages": [
+    {
+      "type": "floor_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "2a"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 1,
+      "text_length": 5905
+    },
+    {
+      "type": "ceiling_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "apšvietimo planas"
+      ],
+      "label": "Lubų / apšvietimo planas",
+      "page": 2,
+      "text_length": 6859
+    }
+  ],
+  "v8_pages_summary": {
+    "total_pages": 2,
+    "by_type": {
+      "floor_plan": [
+        1
+      ],
+      "ceiling_plan": [
+        2
+      ]
+    },
+    "ceiling_pages": [
+      2
+    ],
+    "wall_elevations": [],
+    "floor_plans": [
+      1
+    ],
+    "facades": [],
+    "sections": [],
+    "electrical": [],
+    "plumbing": [],
+    "specs": [],
+    "unknown_pages": []
+  },
+  "v8_archetipas": "standart",
+  "interior_subtype": "naujas",
+  "lt_sanity": {
+    "warnings": [
+      {
+        "level": "WARNING",
+        "field": "rooms_count",
+        "value": 0,
+        "message": "Tik 0 patalp(os) atpažintos. Tipiniam butui min 3, namui min 5. Galimai AI praleido kambarius."
+      }
+    ],
+    "summary": {
+      "rooms_count": 0,
+      "total_area_m2": 0,
+      "warnings_count": 1,
+      "errors": 0,
+      "warnings": 1,
+      "info": 0
+    }
+  },
+  "detected_symbols": {
+    "by_type": {
+      "durys": {
+        "total": 9,
+        "pages": [
+          {
+            "page": 1,
+            "count": 9,
+            "symbols": [
+              {
+                "x_pct": 0.232,
+                "y_pct": 0.345,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.305,
+                "y_pct": 0.345,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.232,
+                "y_pct": 0.495,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.395,
+                "y_pct": 0.495,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.475,
+                "y_pct": 0.345,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.555,
+                "y_pct": 0.495,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.628,
+                "y_pct": 0.255,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.628,
+                "y_pct": 0.495,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.435,
+                "y_pct": 0.605,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "langai": {
+        "total": 10,
+        "pages": [
+          {
+            "page": 1,
+            "count": 10,
+            "symbols": [
+              {
+                "x_pct": 0.155,
+                "y_pct": 0.345,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.155,
+                "y_pct": 0.495,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.265,
+                "y_pct": 0.255,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.395,
+                "y_pct": 0.255,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.475,
+                "y_pct": 0.255,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.555,
+                "y_pct": 0.255,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.305,
+                "y_pct": 0.835,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.435,
+                "y_pct": 0.835,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.555,
+                "y_pct": 0.835,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.628,
+                "y_pct": 0.605,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "difuzoriai": {
+        "total": 10,
+        "pages": [
+          {
+            "page": 2,
+            "count": 10,
+            "symbols": [
+              {
+                "x_pct": 0.345,
+                "y_pct": 0.225,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.395,
+                "y_pct": 0.225,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.455,
+                "y_pct": 0.225,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.505,
+                "y_pct": 0.225,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.495,
+                "y_pct": 0.305,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.555,
+                "y_pct": 0.305,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.345,
+                "y_pct": 0.47,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.45,
+                "y_pct": 0.47,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.48,
+                "y_pct": 0.58,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.395,
+                "y_pct": 0.64,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "sviestuvai": {
+        "total": 17,
+        "pages": [
+          {
+            "page": 2,
+            "count": 17,
+            "symbols": [
+              {
+                "x_pct": 0.3,
+                "y_pct": 0.29,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.4,
+                "y_pct": 0.29,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.305,
+                "y_pct": 0.51,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.535,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.56,
+                "y_pct": 0.45,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.605,
+                "y_pct": 0.45,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.605,
+                "y_pct": 0.51,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.52,
+                "y_pct": 0.68,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.58,
+                "y_pct": 0.68,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.645,
+                "y_pct": 0.68,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.52,
+                "y_pct": 0.77,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.58,
+                "y_pct": 0.77,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.645,
+                "y_pct": 0.77,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.73,
+                "y_pct": 0.33,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.735,
+                "y_pct": 0.47,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.86,
+                "y_pct": 0.33,
+                "confidence": "low",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.86,
+                "y_pct": 0.47,
+                "confidence": "low",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "pakabinami_sviestuvai": {
+        "total": 2,
+        "pages": [
+          {
+            "page": 2,
+            "count": 2,
+            "symbols": [
+              {
+                "x_pct": 0.385,
+                "y_pct": 0.665,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.7,
+                "confidence": "high",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "led_juostos": {
+        "total": 6,
+        "pages": [
+          {
+            "page": 2,
+            "count": 6,
+            "symbols": [
+              {
+                "x_pct": 0.295,
+                "y_pct": 0.23,
+                "confidence": "medium",
+                "length_m": 1.5
+              },
+              {
+                "x_pct": 0.53,
+                "y_pct": 0.205,
+                "confidence": "medium",
+                "length_m": 2.0
+              },
+              {
+                "x_pct": 0.625,
+                "y_pct": 0.38,
+                "confidence": "medium",
+                "length_m": 2.5
+              },
+              {
+                "x_pct": 0.29,
+                "y_pct": 0.585,
+                "confidence": "medium",
+                "length_m": 1.5
+              },
+              {
+                "x_pct": 0.355,
+                "y_pct": 0.745,
+                "confidence": "medium",
+                "length_m": 1.5
+              },
+              {
+                "x_pct": 0.31,
+                "y_pct": 0.77,
+                "confidence": "low",
+                "length_m": 1.0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "stats": {
+      "api_calls": 2,
+      "pages_processed": 2,
+      "ms_total": 17178,
+      "method": "bundled+parallel"
+    }
+  },
+  "detected_symbols_summary": {
+    "durys": 9,
+    "langai": 10,
+    "difuzoriai": 10,
+    "sviestuvai": 17,
+    "pakabinami_sviestuvai": 2,
+    "led_juostos": 6
+  },
+  "_elapsed_s": 48.1
+}

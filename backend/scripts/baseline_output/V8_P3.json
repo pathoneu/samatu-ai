@@ -1,0 +1,2061 @@
+{
+  "status": "ok",
+  "projektas": "Interjero projektas",
+  "tipas": "interjeras",
+  "scope_type": "full_project",
+  "confidence": "high",
+  "projekto_info": {
+    "bendras_plotas_m2": 240.05,
+    "patalpu_skaicius": 18,
+    "patalpu_saltinis": "eksplikacija",
+    "duru_skaicius": 0,
+    "langu_skaicius": 0,
+    "nisu_skaicius": 0,
+    "ai_detected_symbol_types": 2
+  },
+  "skaiciavimai": {
+    "dazomas_plotas": {
+      "sienos_m2": 543.8,
+      "lubos_m2": 190.81,
+      "viso_m2": 734.6,
+      "pastaba": null,
+      "confidence": "v8_universal"
+    },
+    "glaistymo_kampai": {
+      "kampai_vnt": 0,
+      "isoriniu_kampu_vnt": 0,
+      "vidutinis_aukstis_m": 2.82,
+      "viso_m": 583.7,
+      "skaiciavimo_budas": "v5_archetipas"
+    },
+    "angokrasciai": {
+      "langu_vnt": 0,
+      "duru_vnt": 0,
+      "viso_m": 0.0,
+      "viso_m_x2": 0.0,
+      "area_m2": 0.0,
+      "details": []
+    },
+    "lubu_perimetras": {
+      "viso_m": 260.6
+    },
+    "grindjuostes": {
+      "viso_m": 181.7
+    },
+    "uzuolaidu_nisos": {
+      "viso_m": 0,
+      "details": []
+    },
+    "dazai": {
+      "sienos_l": 121.7,
+      "lubos_l": 48.0,
+      "gruntas_l": 118.2,
+      "viso_l": 293.2
+    },
+    "gk_lapai": {
+      "vnt": 201
+    },
+    "glaistas": {
+      "lygis": "Q2",
+      "kg": 985,
+      "maisai_25kg": 40
+    },
+    "validation_notes": [],
+    "plyteles_m2": 143.3,
+    "_v5_breakdown": {
+      "gkp_lubu_standart_m2": 240.05,
+      "gkp_lubu_virs_3m_m2": 0.0,
+      "angokrasciai_gkp_m": 0.0,
+      "dazymo_plotas_standart_m2": 787.76,
+      "kampai_m": 301.38,
+      "pasleptu_duru_staktu_m": 0.0,
+      "nisu_metrai": 0,
+      "hidroizoliacijos_vnt": 6,
+      "pvc_grindys_m2": 213.15,
+      "plyteles_grindys_m2": 26.9,
+      "plyteles_sienos_m2": 116.4,
+      "grindjuostes_m": 192.8,
+      "lubu_perimetras_m": 260.6
+    }
+  },
+  "darbu_sarasas": [
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "aprasymas": "GKP montavimas ant lubų (standart aukščio)",
+      "mato_vnt": "m²",
+      "kiekis": 190.81,
+      "eil_nr": 1,
+      "skyrius_enum": "gkp",
+      "skyrius_label": "Gipso kartono montavimas",
+      "pavadinimas": "GKP montavimas ant lubų (standart aukščio)",
+      "vnt": "m²",
+      "v8_atnaujinta": true,
+      "trace_type": "area",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "aprasymas": "Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti",
+      "mato_vnt": "vnt",
+      "kiekis": 6,
+      "eil_nr": 2,
+      "skyrius_enum": "gkp",
+      "skyrius_label": "Gipso kartono montavimas",
+      "pavadinimas": "Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "aprasymas": "Smulkūs papildomi darbai",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 3,
+      "skyrius_enum": "gkp",
+      "skyrius_label": "Gipso kartono montavimas",
+      "pavadinimas": "Smulkūs papildomi darbai",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų, lubų glaistymas/dažymas",
+      "mato_vnt": "m²",
+      "kiekis": 734.56,
+      "eil_nr": 4,
+      "skyrius_enum": "paint",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "pavadinimas": "Sienų, lubų glaistymas/dažymas",
+      "vnt": "m²",
+      "v8_atnaujinta": true,
+      "trace_type": "area",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Dažymo kampų montavimas",
+      "mato_vnt": "m",
+      "kiekis": 583.66,
+      "eil_nr": 5,
+      "skyrius_enum": "paint",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "pavadinimas": "Dažymo kampų montavimas",
+      "vnt": "m",
+      "v8_atnaujinta": true,
+      "trace_type": "linear",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Plytelių klijavimas ant sienų ir grindų (standartinio formato)",
+      "mato_vnt": "m²",
+      "kiekis": 116.03,
+      "eil_nr": 6,
+      "skyrius_enum": "tiles",
+      "skyrius_label": "Plytelių klijavimas",
+      "pavadinimas": "Plytelių klijavimas ant sienų ir grindų (standartinio formato)",
+      "vnt": "m²",
+      "v8_atnaujinta": true,
+      "trace_type": "area",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Hidroizoliacijos įrengimas",
+      "mato_vnt": "vnt",
+      "kiekis": 5,
+      "eil_nr": 7,
+      "skyrius_enum": "tiles",
+      "skyrius_label": "Plytelių klijavimas",
+      "pavadinimas": "Hidroizoliacijos įrengimas",
+      "vnt": "vnt",
+      "v8_atnaujinta": true,
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Skylių gręžimas plytelėse",
+      "mato_vnt": "vnt",
+      "kiekis": 60,
+      "eil_nr": 8,
+      "skyrius_enum": "tiles",
+      "skyrius_label": "Plytelių klijavimas",
+      "pavadinimas": "Skylių gręžimas plytelėse",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Kampų silikonavimas",
+      "mato_vnt": "m",
+      "kiekis": 120,
+      "eil_nr": 9,
+      "skyrius_enum": "tiles",
+      "skyrius_label": "Plytelių klijavimas",
+      "pavadinimas": "Kampų silikonavimas",
+      "vnt": "m",
+      "trace_type": "linear",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Kondicionieriaus sifono įrengimas",
+      "mato_vnt": "vnt",
+      "kiekis": 2,
+      "eil_nr": 10,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Kondicionieriaus sifono įrengimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Trasų kondicionieriams įrengimas",
+      "mato_vnt": "vnt",
+      "kiekis": 2,
+      "eil_nr": 11,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Trasų kondicionieriams įrengimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Santechnikos darbai / kondicionavimo darbai",
+      "aprasymas": "Santechnikos taškų koregavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 12,
+      "skyrius_enum": "plumbing",
+      "skyrius_label": "Santechnikos darbai / kondicionavimo darbai",
+      "pavadinimas": "Santechnikos taškų koregavimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Rozetės/jungiklio komutavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 126,
+      "eil_nr": 13,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Rozetės/jungiklio komutavimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Skylių šviestuvams gręžimas",
+      "mato_vnt": "vnt",
+      "kiekis": 90,
+      "eil_nr": 14,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Skylių šviestuvams gręžimas",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Smulkūs el. darbai",
+      "mato_vnt": "vnt",
+      "kiekis": 1,
+      "eil_nr": 15,
+      "skyrius_enum": "electrical",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "pavadinimas": "Smulkūs el. darbai",
+      "vnt": "vnt",
+      "trace_type": "counted",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Grindų durų montavimas",
+      "aprasymas": "PVC grindų įrengimas (ne eglute)",
+      "mato_vnt": "m²",
+      "kiekis": 153.18,
+      "eil_nr": 16,
+      "skyrius_enum": "floors",
+      "skyrius_label": "Grindų durų montavimas",
+      "pavadinimas": "PVC grindų įrengimas (ne eglute)",
+      "vnt": "m²",
+      "v8_atnaujinta": true,
+      "trace_type": "area",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Grindų durų montavimas",
+      "aprasymas": "Grindjuosčių montavimas",
+      "mato_vnt": "m",
+      "kiekis": 181.7,
+      "eil_nr": 17,
+      "skyrius_enum": "floors",
+      "skyrius_label": "Grindų durų montavimas",
+      "pavadinimas": "Grindjuosčių montavimas",
+      "vnt": "m",
+      "v8_atnaujinta": true,
+      "trace_type": "linear",
+      "trace_links": []
+    },
+    {
+      "skyrius": "Statybvietės išlaidos",
+      "aprasymas": "Šiukšlių išvežimas",
+      "mato_vnt": "m³",
+      "kiekis": 20,
+      "eil_nr": 18,
+      "skyrius_enum": "site_overhead",
+      "skyrius_label": "Statybvietės išlaidos",
+      "pavadinimas": "Šiukšlių išvežimas",
+      "vnt": "m³",
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Šiukšlių/atliekų išvežimas: bendras plotas 240.1m² × vidurkis 0.05 m³/m² = 20m³"
+    },
+    {
+      "skyrius": "Statybvietės išlaidos",
+      "aprasymas": "Drėgmės surinkėjo nuoma",
+      "mato_vnt": "d.d.",
+      "kiekis": 25,
+      "eil_nr": 19,
+      "skyrius_enum": "site_overhead",
+      "skyrius_label": "Statybvietės išlaidos",
+      "pavadinimas": "Drėgmės surinkėjo nuoma",
+      "vnt": "d.d.",
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Skaičiavimas pagal universal industries formulę ()"
+    },
+    {
+      "eil_nr": 20,
+      "skyrius": "Sienų paruošimas",
+      "aprasymas": "Sienų lyginimas (paruošiamasis sluoksnis, mūro pertvaroms)",
+      "mato_vnt": "m2",
+      "kiekis": 135.9,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "DIN 18363 § 3.4 (Q1 Vorspachtelung)",
+      "confidence": "medium",
+      "detected": false,
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Sienų lyginimas: 25% nuo dažomo sienų ploto (DIN 18363 § 3.4)"
+    },
+    {
+      "eil_nr": 21,
+      "skyrius": "GKP",
+      "aprasymas": "Angokraščių apdirbimas GKP (sustorintų sienų durims)",
+      "mato_vnt": "m",
+      "kiekis": 90.0,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "NRM2 29.10 (door reveals)",
+      "confidence": "medium",
+      "detected": false,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 22,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "Lubinių priglaistomų šviestuvų apdirbimas",
+      "mato_vnt": "vnt",
+      "kiekis": 21,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "CSI MasterFormat 26 50 00",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 23,
+      "skyrius": "Plytelių darbai",
+      "aprasymas": "Skylių gręžimas plytelėse (santechnikos taškams)",
+      "mato_vnt": "vnt",
+      "kiekis": 30,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "ANSI A108 (wet area penetrations)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 24,
+      "skyrius": "Plytelių darbai",
+      "aprasymas": "Kampų silikonavimas (drėgnose patalpose)",
+      "mato_vnt": "m",
+      "kiekis": 60.2,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "NRM2 29.13 (sealant in wet rooms)",
+      "confidence": "medium",
+      "detected": false,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 25,
+      "skyrius": "Plytelių darbai",
+      "aprasymas": "Nuolydžio formavimas dušo kabinoje",
+      "mato_vnt": "vnt",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "ANSI A118.10 (shower floor slope)",
+      "confidence": "medium",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 26,
+      "skyrius": "Bendrai",
+      "aprasymas": "Šiukšlių išvežimas (statybvietės atliekos)",
+      "mato_vnt": "m3",
+      "kiekis": 12.0,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "STR 2.07.01:2003 + S-W waste calculator",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "formula",
+      "trace_links": [],
+      "formula_explanation": "Šiukšlių/atliekų išvežimas: bendras plotas 240.1m² × vidurkis 0.05 m³/m² = 12.0m³"
+    },
+    {
+      "eil_nr": 27,
+      "skyrius": "Ventiliacija",
+      "aprasymas": "Difūzorių apdirbimas (ventiliacijos taškai)",
+      "mato_vnt": "vnt",
+      "kiekis": 16,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 per gyvenamąją (AI nerado lubų plano)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 28,
+      "skyrius": "Santechnika",
+      "aprasymas": "Klozeto montavimas",
+      "mato_vnt": "vnt",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 per drėgną patalpą (AI nerado santech.plano)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 29,
+      "skyrius": "Santechnika",
+      "aprasymas": "WC rėmo montavimas (paslėptas)",
+      "mato_vnt": "vnt",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 per drėgną patalpą (AI nerado santech.plano)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 30,
+      "skyrius": "GKP",
+      "aprasymas": "GKP dėžučių formavimas (paslėptiems vamzdžiams)",
+      "mato_vnt": "vnt",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 per drėgną patalpą (AI nerado santech.plano)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 31,
+      "skyrius": "Plytelių darbai",
+      "aprasymas": "Plytelių supjovimas 45° kampu",
+      "mato_vnt": "m",
+      "kiekis": 8.5,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 išorinis kampas per vonią · ANSI A108",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 32,
+      "skyrius": "Santechnika",
+      "aprasymas": "Revizinių durelių apdirbimas (santechnikos)",
+      "mato_vnt": "vnt",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "FALLBACK: 1 per drėgną patalpą (santech. dureles retai pažymėtos)",
+      "confidence": "low",
+      "detected": false,
+      "trace_type": "counted",
+      "trace_links": [],
+      "formula_explanation": null
+    }
+  ],
+  "skyriu_suvestinis": {
+    "Gipso kartono montavimas": 3,
+    "Sienų lubų glaistymas dažymas": 2,
+    "Plytelių klijavimas": 4,
+    "Santechnikos darbai / kondicionavimo darbai": 3,
+    "Elektros instaliacijos darbai": 3,
+    "Grindų durų montavimas": 2,
+    "Statybvietės išlaidos": 2
+  },
+  "patalpos": [
+    {
+      "nr": 1,
+      "pavadinimas": "Holas",
+      "paskirtis": "koridorius",
+      "plotas_m2": 11.55,
+      "perimetras_m": 14.2,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 2,
+      "pavadinimas": "Katilinė",
+      "paskirtis": "katiline",
+      "plotas_m2": 5.9,
+      "perimetras_m": 10.2,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 2,
+      "pavadinimas": "Skalbykla",
+      "paskirtis": "skalbykla",
+      "plotas_m2": 7.7,
+      "perimetras_m": 11.6,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 3,
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "plotas_m2": 12.05,
+      "perimetras_m": 14.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 3,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "plotas_m2": 12.9,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 4,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "plotas_m2": 4.1,
+      "perimetras_m": 8.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 4,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "plotas_m2": 12.85,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 5,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "plotas_m2": 15.4,
+      "perimetras_m": 16.4,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 6,
+      "pavadinimas": "Sandėliukas",
+      "paskirtis": "sandeliukas",
+      "plotas_m2": 5.76,
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 6,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "plotas_m2": 4.63,
+      "perimetras_m": 9.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 7,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "plotas_m2": 12.32,
+      "perimetras_m": 14.7,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 7,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "plotas_m2": 4.57,
+      "perimetras_m": 8.9,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 8,
+      "pavadinimas": "Virtuvė",
+      "paskirtis": "virtuve",
+      "plotas_m2": 24.03,
+      "perimetras_m": 20.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 8,
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "plotas_m2": 20.72,
+      "perimetras_m": 19.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 9,
+      "pavadinimas": "Valgomasis",
+      "paskirtis": "valgomasis",
+      "plotas_m2": 11.18,
+      "perimetras_m": 14.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 9,
+      "pavadinimas": "Drabužinė",
+      "paskirtis": "drabuzine",
+      "plotas_m2": 6.01,
+      "perimetras_m": 10.2,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 10,
+      "pavadinimas": "Svetainė",
+      "paskirtis": "gyvenamoji",
+      "plotas_m2": 32.44,
+      "perimetras_m": 23.8,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    },
+    {
+      "nr": 11,
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "plotas_m2": 35.94,
+      "perimetras_m": 25.1,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp"
+    }
+  ],
+  "warnings": [],
+  "raw_calc_data": {
+    "patalpos": [
+      {
+        "nr": 1,
+        "pavadinimas": "Holas",
+        "paskirtis": "koridorius",
+        "plotas_m2": 11.55,
+        "perimetras_m": 14.2,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 2,
+        "pavadinimas": "Katilinė",
+        "paskirtis": "katiline",
+        "plotas_m2": 5.9,
+        "perimetras_m": 10.2,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 2,
+        "pavadinimas": "Skalbykla",
+        "paskirtis": "skalbykla",
+        "plotas_m2": 7.7,
+        "perimetras_m": 11.6,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 3,
+        "pavadinimas": "Koridorius",
+        "paskirtis": "koridorius",
+        "plotas_m2": 12.05,
+        "perimetras_m": 14.5,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 3,
+        "pavadinimas": "Kambarys",
+        "paskirtis": "miegamoji",
+        "plotas_m2": 12.9,
+        "perimetras_m": 15.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 4,
+        "pavadinimas": "San. Mazgas",
+        "paskirtis": "san",
+        "plotas_m2": 4.1,
+        "perimetras_m": 8.5,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 4,
+        "pavadinimas": "Kambarys",
+        "paskirtis": "miegamoji",
+        "plotas_m2": 12.85,
+        "perimetras_m": 15.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 5,
+        "pavadinimas": "Kambarys",
+        "paskirtis": "miegamoji",
+        "plotas_m2": 15.4,
+        "perimetras_m": 16.4,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 6,
+        "pavadinimas": "Sandėliukas",
+        "paskirtis": "sandeliukas",
+        "plotas_m2": 5.76,
+        "perimetras_m": 10.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 6,
+        "pavadinimas": "San. Mazgas",
+        "paskirtis": "san",
+        "plotas_m2": 4.63,
+        "perimetras_m": 9.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 7,
+        "pavadinimas": "Kambarys",
+        "paskirtis": "miegamoji",
+        "plotas_m2": 12.32,
+        "perimetras_m": 14.7,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 7,
+        "pavadinimas": "San. Mazgas",
+        "paskirtis": "san",
+        "plotas_m2": 4.57,
+        "perimetras_m": 8.9,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 8,
+        "pavadinimas": "Virtuvė",
+        "paskirtis": "virtuve",
+        "plotas_m2": 24.03,
+        "perimetras_m": 20.5,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 8,
+        "pavadinimas": "Miegamasis",
+        "paskirtis": "miegamoji",
+        "plotas_m2": 20.72,
+        "perimetras_m": 19.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 9,
+        "pavadinimas": "Valgomasis",
+        "paskirtis": "valgomasis",
+        "plotas_m2": 11.18,
+        "perimetras_m": 14.0,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 9,
+        "pavadinimas": "Drabužinė",
+        "paskirtis": "drabuzine",
+        "plotas_m2": 6.01,
+        "perimetras_m": 10.2,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 10,
+        "pavadinimas": "Svetainė",
+        "paskirtis": "gyvenamoji",
+        "plotas_m2": 32.44,
+        "perimetras_m": 23.8,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      },
+      {
+        "nr": 11,
+        "pavadinimas": "Garažas",
+        "paskirtis": "garazas",
+        "plotas_m2": 35.94,
+        "perimetras_m": 25.1,
+        "lubu_aukstis_m": 2.82,
+        "lubu_tipas": "gkp"
+      }
+    ],
+    "bendras_plotas_m2": 240.05,
+    "lubu_aukstis_m": 2.82,
+    "scope_type": "full_project",
+    "meta": {
+      "doors": [],
+      "windows": [],
+      "niches": []
+    },
+    "sekcijos": {}
+  },
+  "v8_engine": true,
+  "v8_totals": {
+    "bendras_plotas_m2": 240.05,
+    "dazymo_plotas_m2": 734.56,
+    "gkp_lubu_standart_m2": 190.81,
+    "gkp_lubu_virs_3m_m2": 0.0,
+    "kampai_m": 583.66,
+    "plyteles_sienos_m2": 65.1,
+    "plyteles_grindys_m2": 50.93,
+    "pvc_grindys_m2": 153.18,
+    "isliginamasis_m2": 204.11,
+    "grindjuostes_m": 181.7,
+    "hidroizoliacijos_vnt": 5
+  },
+  "v8_rooms": [
+    {
+      "nr": 1,
+      "pavadinimas": "Holas",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 11.55,
+      "perimetras_m": 14.2,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 40.04,
+      "walls_paintable_m2": 36.79,
+      "ceiling_paintable_m2": 11.55,
+      "dazymo_plotas_m2": 48.34,
+      "gkp_lubu_standart_m2": 11.55,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 34.68,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 11.55,
+      "isliginamasis_m2": 11.55,
+      "grindjuostes_m": 13.35,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 2,
+      "pavadinimas": "Katilinė",
+      "paskirtis": "katiline",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 5.9,
+      "perimetras_m": 10.2,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 28.76,
+      "walls_paintable_m2": 25.51,
+      "ceiling_paintable_m2": 5.9,
+      "dazymo_plotas_m2": 31.41,
+      "gkp_lubu_standart_m2": 5.9,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 30.68,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 5.9,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 5.9,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 2,
+      "pavadinimas": "Skalbykla",
+      "paskirtis": "skalbykla",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 7.7,
+      "perimetras_m": 11.6,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 32.71,
+      "walls_paintable_m2": 29.46,
+      "ceiling_paintable_m2": 7.7,
+      "dazymo_plotas_m2": 37.16,
+      "gkp_lubu_standart_m2": 7.7,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 32.08,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 7.7,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 7.7,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 3,
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 12.05,
+      "perimetras_m": 14.5,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 40.89,
+      "walls_paintable_m2": 37.64,
+      "ceiling_paintable_m2": 12.05,
+      "dazymo_plotas_m2": 49.69,
+      "gkp_lubu_standart_m2": 12.05,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 34.98,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 12.05,
+      "isliginamasis_m2": 12.05,
+      "grindjuostes_m": 13.65,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 3,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 12.9,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 39.05,
+      "ceiling_paintable_m2": 12.9,
+      "dazymo_plotas_m2": 51.95,
+      "gkp_lubu_standart_m2": 12.9,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 35.48,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 12.9,
+      "isliginamasis_m2": 12.9,
+      "grindjuostes_m": 14.15,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 4,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 4.1,
+      "perimetras_m": 8.5,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "pakabinamos",
+      "walls_gross_m2": 23.97,
+      "walls_paintable_m2": 3.72,
+      "ceiling_paintable_m2": 0,
+      "dazymo_plotas_m2": 3.72,
+      "gkp_lubu_standart_m2": 0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 28.98,
+      "plyteles_sienos_m2": 17.0,
+      "plyteles_grindys_m2": 4.1,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.1,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 4,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 12.85,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 39.05,
+      "ceiling_paintable_m2": 12.85,
+      "dazymo_plotas_m2": 51.9,
+      "gkp_lubu_standart_m2": 12.85,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 35.48,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 12.85,
+      "isliginamasis_m2": 12.85,
+      "grindjuostes_m": 14.15,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 5,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 15.4,
+      "perimetras_m": 16.4,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 46.25,
+      "walls_paintable_m2": 43.0,
+      "ceiling_paintable_m2": 15.4,
+      "dazymo_plotas_m2": 58.4,
+      "gkp_lubu_standart_m2": 15.4,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 36.88,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 15.4,
+      "isliginamasis_m2": 15.4,
+      "grindjuostes_m": 15.55,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 6,
+      "pavadinimas": "Sandėliukas",
+      "paskirtis": "sandeliukas",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 5.76,
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 28.2,
+      "walls_paintable_m2": 24.95,
+      "ceiling_paintable_m2": 5.76,
+      "dazymo_plotas_m2": 30.71,
+      "gkp_lubu_standart_m2": 5.76,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 30.48,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 5.76,
+      "isliginamasis_m2": 5.76,
+      "grindjuostes_m": 9.15,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 6,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 4.63,
+      "perimetras_m": 9.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "pakabinamos",
+      "walls_gross_m2": 25.38,
+      "walls_paintable_m2": 4.13,
+      "ceiling_paintable_m2": 0,
+      "dazymo_plotas_m2": 4.13,
+      "gkp_lubu_standart_m2": 0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 29.48,
+      "plyteles_sienos_m2": 18.0,
+      "plyteles_grindys_m2": 4.63,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.63,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 7,
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 12.32,
+      "perimetras_m": 14.7,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 41.45,
+      "walls_paintable_m2": 38.2,
+      "ceiling_paintable_m2": 12.32,
+      "dazymo_plotas_m2": 50.52,
+      "gkp_lubu_standart_m2": 12.32,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 35.18,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 12.32,
+      "isliginamasis_m2": 12.32,
+      "grindjuostes_m": 13.85,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 7,
+      "pavadinimas": "San. Mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 4.57,
+      "perimetras_m": 8.9,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "pakabinamos",
+      "walls_gross_m2": 25.1,
+      "walls_paintable_m2": 4.05,
+      "ceiling_paintable_m2": 0,
+      "dazymo_plotas_m2": 4.05,
+      "gkp_lubu_standart_m2": 0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 29.38,
+      "plyteles_sienos_m2": 17.8,
+      "plyteles_grindys_m2": 4.57,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.57,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 8,
+      "pavadinimas": "Virtuvė",
+      "paskirtis": "virtuve",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 24.03,
+      "perimetras_m": 20.5,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 57.81,
+      "walls_paintable_m2": 42.26,
+      "ceiling_paintable_m2": 24.03,
+      "dazymo_plotas_m2": 66.29,
+      "gkp_lubu_standart_m2": 24.03,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 40.98,
+      "plyteles_sienos_m2": 12.3,
+      "plyteles_grindys_m2": 24.03,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 24.03,
+      "grindjuostes_m": 0,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 8,
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 20.72,
+      "perimetras_m": 19.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 53.58,
+      "walls_paintable_m2": 50.33,
+      "ceiling_paintable_m2": 20.72,
+      "dazymo_plotas_m2": 71.05,
+      "gkp_lubu_standart_m2": 20.72,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 39.48,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 20.72,
+      "isliginamasis_m2": 20.72,
+      "grindjuostes_m": 18.15,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 9,
+      "pavadinimas": "Valgomasis",
+      "paskirtis": "valgomasis",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 11.18,
+      "perimetras_m": 14.0,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 39.48,
+      "walls_paintable_m2": 36.23,
+      "ceiling_paintable_m2": 11.18,
+      "dazymo_plotas_m2": 47.41,
+      "gkp_lubu_standart_m2": 11.18,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 34.48,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 11.18,
+      "isliginamasis_m2": 11.18,
+      "grindjuostes_m": 13.15,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 9,
+      "pavadinimas": "Drabužinė",
+      "paskirtis": "drabuzine",
+      "puslapio_nr": 6,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 6.01,
+      "perimetras_m": 10.2,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 28.76,
+      "walls_paintable_m2": 25.51,
+      "ceiling_paintable_m2": 6.01,
+      "dazymo_plotas_m2": 31.52,
+      "gkp_lubu_standart_m2": 6.01,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 30.68,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 6.01,
+      "isliginamasis_m2": 6.01,
+      "grindjuostes_m": 9.35,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 10,
+      "pavadinimas": "Svetainė",
+      "paskirtis": "gyvenamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 32.44,
+      "perimetras_m": 23.8,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 67.12,
+      "walls_paintable_m2": 63.87,
+      "ceiling_paintable_m2": 32.44,
+      "dazymo_plotas_m2": 96.31,
+      "gkp_lubu_standart_m2": 32.44,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 44.28,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 32.44,
+      "isliginamasis_m2": 32.44,
+      "grindjuostes_m": 22.95,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    },
+    {
+      "nr": 11,
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "puslapio_nr": 5,
+      "bbox_pct": null,
+      "is_open_space": false,
+      "mansard_correction_m2": 0,
+      "plotas_m2": 35.94,
+      "perimetras_m": 25.1,
+      "lubu_aukstis_m": 2.82,
+      "ceiling_type": "betonas",
+      "walls_gross_m2": 70.78,
+      "walls_paintable_m2": 0.0,
+      "ceiling_paintable_m2": 0,
+      "dazymo_plotas_m2": 0.0,
+      "gkp_lubu_standart_m2": 0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 0,
+      "grindjuostes_m": 24.25,
+      "doors_deducted_m2": 1.85,
+      "windows_deducted_m2": 1.4
+    }
+  ],
+  "v8_scale": {
+    "scale_ratio": 200,
+    "mm_per_unit": 73.16609654123914,
+    "confidence": "high",
+    "source": "dimensions",
+    "votes": [
+      {
+        "scale_ratio": 200,
+        "mm_per_unit": 73.16609654123914,
+        "expected_for_ratio": 70.55555555555554,
+        "confidence": "high",
+        "source": "dimensions",
+        "match_count": 77
+      }
+    ],
+    "warnings": [],
+    "sanity": {
+      "logical": true,
+      "warnings": [],
+      "anomaly_count": 0,
+      "anomaly_pct": 0.0,
+      "suggested_scale_multiplier": null
+    }
+  },
+  "v8_pages": [
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 1,
+      "text_length": 716
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 2,
+      "text_length": 1312
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 3,
+      "text_length": 1258
+    },
+    {
+      "type": "section",
+      "confidence": "high",
+      "matched_keywords": [
+        "pjūvis"
+      ],
+      "label": "Pjūvis",
+      "page": 4,
+      "text_length": 1432
+    },
+    {
+      "type": "specification",
+      "confidence": "high",
+      "matched_keywords": [
+        "specifikacija",
+        "grindų planas"
+      ],
+      "label": "Specifikacija",
+      "page": 5,
+      "text_length": 2565
+    },
+    {
+      "type": "specification",
+      "confidence": "high",
+      "matched_keywords": [
+        "specifikacija",
+        "grindų planas"
+      ],
+      "label": "Specifikacija",
+      "page": 6,
+      "text_length": 1870
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 7,
+      "text_length": 477
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "medium",
+      "matched_keywords": [
+        "<2 floor indicators>"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 8,
+      "text_length": 1629
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "medium",
+      "matched_keywords": [
+        "<2 floor indicators>"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 9,
+      "text_length": 1561
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 10,
+      "text_length": 733
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 11,
+      "text_length": 1583
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 12,
+      "text_length": 1452
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 13,
+      "text_length": 1462
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 14,
+      "text_length": 1369
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "sienų išklotinė",
+        "sienų išklotinės",
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 15,
+      "text_length": 1716
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "pirmo aukšto"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 16,
+      "text_length": 1241
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 17,
+      "text_length": 1010
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 18,
+      "text_length": 893
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 19,
+      "text_length": 1122
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 20,
+      "text_length": 1213
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 21,
+      "text_length": 1346
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 22,
+      "text_length": 1165
+    },
+    {
+      "type": "specification",
+      "confidence": "high",
+      "matched_keywords": [
+        "specifikacija",
+        "apšvietimo planas",
+        "santechnikos"
+      ],
+      "label": "Specifikacija",
+      "page": 23,
+      "text_length": 6348
+    },
+    {
+      "type": "specification",
+      "confidence": "high",
+      "matched_keywords": [
+        "specifikacija",
+        "apšvietimo planas",
+        "santechnikos"
+      ],
+      "label": "Specifikacija",
+      "page": 24,
+      "text_length": 5873
+    },
+    {
+      "type": "specification",
+      "confidence": "high",
+      "matched_keywords": [
+        "specifikacija"
+      ],
+      "label": "Specifikacija",
+      "page": 25,
+      "text_length": 601
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 26,
+      "text_length": 1311
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 27,
+      "text_length": 1243
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 28,
+      "text_length": 1668
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 29,
+      "text_length": 1265
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 30,
+      "text_length": 1590
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 31,
+      "text_length": 1286
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 32,
+      "text_length": 597
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "medium",
+      "matched_keywords": [
+        "<2 floor indicators>"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 33,
+      "text_length": 1800
+    },
+    {
+      "type": "wall_elevation",
+      "confidence": "high",
+      "matched_keywords": [
+        "išklotinė"
+      ],
+      "label": "Sienų išklotinė",
+      "page": 34,
+      "text_length": 1549
+    },
+    {
+      "type": "ceiling_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "lubų planas"
+      ],
+      "label": "Lubų / apšvietimo planas",
+      "page": 35,
+      "text_length": 1817
+    },
+    {
+      "type": "ceiling_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "lubų planas"
+      ],
+      "label": "Lubų / apšvietimo planas",
+      "page": 36,
+      "text_length": 1588
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 37,
+      "text_length": 392
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "1a"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 38,
+      "text_length": 478
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 39,
+      "text_length": 406
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 40,
+      "text_length": 481
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 41,
+      "text_length": 493
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 42,
+      "text_length": 422
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 43,
+      "text_length": 1426
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 44,
+      "text_length": 1633
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 45,
+      "text_length": 1519
+    }
+  ],
+  "v8_pages_summary": {
+    "total_pages": 45,
+    "by_type": {
+      "unknown": [
+        1,
+        2,
+        3,
+        7,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        37,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "section": [
+        4
+      ],
+      "specification": [
+        5,
+        6,
+        23,
+        24,
+        25
+      ],
+      "floor_plan": [
+        8,
+        9,
+        16,
+        33,
+        38
+      ],
+      "wall_elevation": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        34
+      ],
+      "ceiling_plan": [
+        35,
+        36
+      ]
+    },
+    "ceiling_pages": [
+      35,
+      36
+    ],
+    "wall_elevations": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      34
+    ],
+    "floor_plans": [
+      8,
+      9,
+      16,
+      33,
+      38
+    ],
+    "facades": [],
+    "sections": [
+      4
+    ],
+    "electrical": [],
+    "plumbing": [],
+    "specs": [
+      5,
+      6,
+      23,
+      24,
+      25
+    ],
+    "unknown_pages": [
+      1,
+      2,
+      3,
+      7,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      37,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45
+    ]
+  },
+  "v8_archetipas": "standart",
+  "interior_subtype": "naujas",
+  "lt_sanity": {
+    "warnings": [
+      {
+        "level": "INFO",
+        "field": "duplicate",
+        "message": "„Koridorius ir „Holas gali būti tas pats kambarys (vienoda paskirtis + plotas)."
+      },
+      {
+        "level": "INFO",
+        "field": "duplicate",
+        "message": "„San. Mazgas ir „San. Mazgas gali būti tas pats kambarys (vienoda paskirtis + plotas)."
+      }
+    ],
+    "summary": {
+      "rooms_count": 18,
+      "total_area_m2": 240.1,
+      "warnings_count": 2,
+      "errors": 0,
+      "warnings": 0,
+      "info": 2
+    }
+  },
+  "detected_symbols": {
+    "by_type": {
+      "durys": {
+        "total": 1,
+        "pages": [
+          {
+            "page": 1,
+            "count": 1,
+            "symbols": [
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.13,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          },
+          {
+            "page": 4,
+            "count": 1,
+            "symbols": [
+              {
+                "x_pct": 0.74,
+                "y_pct": 0.36,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "langai": {
+        "total": 1,
+        "pages": [
+          {
+            "page": 1,
+            "count": 1,
+            "symbols": [
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.5,
+                "confidence": "low",
+                "length_m": null
+              }
+            ]
+          },
+          {
+            "page": 4,
+            "count": 1,
+            "symbols": [
+              {
+                "x_pct": 0.79,
+                "y_pct": 0.55,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "stats": {
+      "api_calls": 6,
+      "pages_processed": 6,
+      "ms_total": 6679,
+      "method": "bundled+parallel"
+    }
+  },
+  "detected_symbols_summary": {
+    "durys": 1,
+    "langai": 1
+  },
+  "_elapsed_s": 39.0
+}
