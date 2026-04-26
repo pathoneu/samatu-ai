@@ -1,0 +1,828 @@
+[
+  {
+    "nr": "1",
+    "aprasymas": "Esamos, šaligatvio plytelių nuogrindos, išardymas.",
+    "mato_vnt": "m2",
+    "kiekis": 64.8,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "1200 mm gylio ir 800 mm pločio tranšėjos kasimas rankiniu būdu, neišvežant grunto.",
+    "mato_vnt": "m3",
+    "kiekis": 125.5,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Tranšėjos užpylimas nukastu gruntu, sutankinant.",
+    "mato_vnt": "m3",
+    "kiekis": 108.6,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Vejos bortų betono C12/15 pagrindo įrengimas.",
+    "mato_vnt": "m3",
+    "kiekis": 2.0,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Smėlio - žvyro pagrindo sluoksnio įrengimas, t=200 mm.",
+    "mato_vnt": "m3",
+    "kiekis": 12.9,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Skaldos atsijų sluoksnio įrengimas, t=30 mm.",
+    "mato_vnt": "m3",
+    "kiekis": 2.0,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Betoninių trinkelių nuogrindos įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 62.5,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Akmenukų sluoksnio, po I aukšto balkonais, įrengimas.",
+    "mato_vnt": "m3",
+    "kiekis": 6.5,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "11",
+    "aprasymas": "Nukasto grunto išvežimas.",
+    "mato_vnt": "m3",
+    "kiekis": 16.9,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "12",
+    "aprasymas": "Betoninės laiptų aikštelės, laiptų – pakopų, pabetonavimas.",
+    "mato_vnt": "m3",
+    "kiekis": 1.0,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "13",
+    "aprasymas": "Betoninės laiptų aikštelės, laiptų - pakopų aptaisymas, betoninėmis trinkelėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 9.5,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "14",
+    "aprasymas": "Batų valymo grotelių (600x400 mm), įrengimas.",
+    "mato_vnt": "vnt.",
+    "kiekis": 2.0,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "15",
+    "aprasymas": "ŽN, įpėjamojo paviršiaus, įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 4.5,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "16",
+    "aprasymas": "Vejos, atstatymas.",
+    "mato_vnt": "m2",
+    "kiekis": 190.0,
+    "skyrius": "NUOGRINDOS ĮRENGIMAS, KITI DARBAI"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Rūsio sienų - cokolinės dalies nuvalymas iki tvirto pagrindo.",
+    "mato_vnt": "m2",
+    "kiekis": 260.0,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Plyšių, ištrupėjimų užtaisymas, cementiniu skiediniu.",
+    "mato_vnt": "m2",
+    "kiekis": 14.0,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Rūsio sienų – cokolio teptinės hidroizoliacijos (2 sluoksniai) įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 178.3,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Rūsio sienų šiltinimas, 190 mm storio, polistireninio putplasčio (XPS 300) plokštėmis, klijuojant.",
+    "mato_vnt": "m2",
+    "kiekis": 152.8,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "Cokolio sienų šiltinimas, 190 mm storio, polistireninio putplasčio (XPS 300) plokštėmis, klijuojant, tvirtinant smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 107.2,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "Apsauginės membranos įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 178.3,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Apsauginė membranos, užbaigimo elemento įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 127.4,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Rūsio langų angokraščių šiltinimas, 20 -30 mm storio, polistireninio putplasčio (XPS 300) plokštėmis, klijuojant.",
+    "mato_vnt": "m2",
+    "kiekis": 20.8,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Rūsio langų angoraščių apdailos įrengimas. Apdaila - akmens masės plytelės.",
+    "mato_vnt": "m2",
+    "kiekis": 20.8,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Cokolio sienų apdailos įrengimas. Apdaila - akmens masės plytelės.",
+    "mato_vnt": "m2",
+    "kiekis": 107.2,
+    "skyrius": "COKOLIO – RŪSIO SIENŲ ŠILTINIMAS, ĮRENGIANT TINKUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Fasadinių inventorinių pastolių montavimas / demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 1638.1,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Lauko palangių – nuolajų demontavimas.",
+    "mato_vnt": "m",
+    "kiekis": 64.5,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Perforuoto cokolinio profilio,",
+    "mato_vnt": "m",
+    "kiekis": 127.4,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Sienų ventiliuojamo fasado karkaso, įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 1020.7,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "Angokraščių ventiliuojamo fasado karkaso, įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 98.5,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "Sienų šiltinimas, 200 mm storio, fasadinės akmens vatos, plokštėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 946.3,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Sienų šiltinimas 30 mm storio, akmens vatos plokštėmis - vėjo izoliacija.",
+    "mato_vnt": "m2",
+    "kiekis": 946.3,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Angokraščių šiltinimas 30 mm storio akmens vatos plokštėmis – vėjo izoliacija.",
+    "mato_vnt": "m2",
+    "kiekis": 98.5,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Balkonų sienų, besiribojančių su išore, šiltinimas 100 mm storio, fasadinės akmens vatos plokštėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 74.4,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Balkonų sienų, besiribojančių su išore, šiltinimas 30 mm storio, akmens vatos plokštėmis – vėjo izoliacija.",
+    "mato_vnt": "m2",
+    "kiekis": 74.4,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "11",
+    "aprasymas": "Ventiliuojamo fasado metalinės konstrukcijos aptaisymas – akmens masės plytelėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 1020.7,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Lauko angokraščių, metalinės konstrukcijos aptaisymas, poliesteriu dengta skarda.",
+    "mato_vnt": "m2",
+    "kiekis": 76.5,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "11",
+    "aprasymas": "Poliesteriu dengtos skardos, palangių – nuolajų, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 64.5,
+    "skyrius": "LAUKO SIENŲ TARP PATALPŲ IR IŠORĖS ŠILTINIMAS, ĮRENGIANT VENTILIUOJAMĄ FASADĄ"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Medinių balkonų įstiklinimų, demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 45.5,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Tarpo, ties g/b balkono plokštės ir apatinės atitvaros briaunos užtaisymas.",
+    "mato_vnt": "m3",
+    "kiekis": 2.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Balkonų atitvarų ventiliuojamo fasado karkaso, įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 126.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "Balkonų atitvarų „nišos“ šiltinimas, 100 mm storio, akmens vatos plokštėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 126.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "Balkonų atitvarų šiltinimas 100 mm storio, akmens vatos plokštėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 126.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Balkonų atitvarų šiltinimas 30 mm storio, akmens vatos plokštėmis - vėjo izoliacija.",
+    "mato_vnt": "m2",
+    "kiekis": 126.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Balkonų atitvarų metalinės konstrukcijos aptaisymas – akmens masės plytelėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 126.0,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Perforuoto skardos lankstinio, ties apatine balkono atitvaros dalimi, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 90.5,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Lauko palangių – nuolajų, ties balkono įstiklinimo jungtimi su atitvara, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 90.5,
+    "skyrius": "G/B BALKONŲ ATITVARŲ ŠILTINIMAS"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Lauko palangių – nuolajų demontavimas.",
+    "mato_vnt": "m",
+    "kiekis": 30.5,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Sienos tarp patalpų ir balkonų šiltinimas 100 mm storio, polistireninio putplasčio (EPS 70) plokštėmis, klijuojant, tvirtinant smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 186.1,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Angokraščių šiltinimas 30 mm storio, polistireninio putplasčio (EPS 70) plokštėmis, klijuojant, tvirtinant smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 43.7,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Sienos tarp patalpų ir balkono armavimas. Tinkavimas. Apdaila – plonasluoksnis dekoratyvinis tinkas.",
+    "mato_vnt": "m2",
+    "kiekis": 229.8,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Balkonų durų slenksčio aptaisymas, akmens masės plytelėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 4.0,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "I aukšto g/b balkono plokštės apačios šiltinimas, 100 mm storio, polistireninio putplasčio (EPS 70) plokštėmis. Klijavimas. Tvirtinimas smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 31.6,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "I aukšto g/b balkono plokštės apačios armavimas. Tinkavimas. Apdaila – plonasluoksnis dekoratyvinis tinkas.",
+    "mato_vnt": "m2",
+    "kiekis": 31.6,
+    "skyrius": "SIENŲ, TARP PATALPŲ IR BALKONO, ŠILTINIMAS, TINKUOJAMAS FASADAS"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Parapetų apskardinimų demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 67.4,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Vėdinimo šachtų betoninių stogelių demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 13.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Vėdinimo šachtų, paaukštinimas silikatinių plytų mūru.",
+    "mato_vnt": "m3",
+    "kiekis": 9.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "Vėdinimo šachtų kanalų pravalymas ir dezinfekavimas.",
+    "mato_vnt": "kompl.",
+    "kiekis": 20.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "Vėdinimo šachtų apšiltinimas, 40 mm storio, apkrovas laikančia akmens vata. Klijuojant, tvirtinant smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 49.1,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Stogo konstrukcijos sandūrose su ventiliacijos kanalais įrengiamas akmens vatos bortelis 100x100 mm – apvadas, skirtas tolygiam dangos perėjimui.",
+    "mato_vnt": "m",
+    "kiekis": 54.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Vėjo turbinų (stoginių deflektorių) įrengimas ant vėdinimo šachtų. Papildomai įrengiant, cinkuotos skardos „dėžes“.",
+    "mato_vnt": "vnt.",
+    "kiekis": 13.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Stogo dangos pūslių remontas.",
+    "mato_vnt": "m2",
+    "kiekis": 16.3,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Parapeto paaukštinimas, įrengiant lengvų konstrukcijų mūrą.",
+    "mato_vnt": "m3",
+    "kiekis": 27.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "12",
+    "aprasymas": "Naujai įrengiamas apatinis 200 mm storio, plokštiems stogams skirto polistireninio putplasčio (EPS 100) sluoksnis.",
+    "mato_vnt": "m2",
+    "kiekis": 352.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "13",
+    "aprasymas": "Naujai įrengiamas viršutinis 40 mm storio kietos apkrovas laikančios akmens vatos sluoksnis.",
+    "mato_vnt": "m2",
+    "kiekis": 352.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "14",
+    "aprasymas": "Parapetų apšiltinimas 40 mm storio akmens vatos plokštėmis klijuojant ir tvirtinant smeigėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 76.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "15",
+    "aprasymas": "Stogo konstrukcijos sandūrose su parapetais įrengiamas akmens vatos bortelis 100x100 mm – apvadas, skirtas tolygiam dangos perėjimui.",
+    "mato_vnt": "m",
+    "kiekis": 100.4,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "16",
+    "aprasymas": "Stogo konstrukcijos vėdinimo kaminėlių įrengimas.",
+    "mato_vnt": "vnt.",
+    "kiekis": 12.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "17",
+    "aprasymas": "Įlajų keitimas ir sandarinimas.",
+    "mato_vnt": "vnt.",
+    "kiekis": 2.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "18",
+    "aprasymas": "Apatinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 429.1,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "19",
+    "aprasymas": "Viršutinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 429.1,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "20",
+    "aprasymas": "Papildomo bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 171.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "21",
+    "aprasymas": "Parapetų apskardinimas poliesteriu dengta skarda, įrengiant metalinius laikiklius.",
+    "mato_vnt": "m2",
+    "kiekis": 91.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "22",
+    "aprasymas": "Apsauginės tvorelės, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 96.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "23",
+    "aprasymas": "Išlipimo ant stogo liuko, keitimas.",
+    "mato_vnt": "kompl.",
+    "kiekis": 1.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "24",
+    "aprasymas": "Metalinių kopetėlių, ties stogo liuku, atnajinimas.",
+    "mato_vnt": "kompl.",
+    "kiekis": 1.0,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "26",
+    "aprasymas": "IV- aukšto, g/b balkono stogelio šiltinimas, 100 mm storio, polistiteninio putplasčio (EPS 100) plokštėmis.",
+    "mato_vnt": "m2",
+    "kiekis": 31.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "27",
+    "aprasymas": "IV- aukšto, g/b balkono stogelio šiltinimas, 40 mm storio, kieta apkrovas laikančia akmens vata.",
+    "mato_vnt": "m2",
+    "kiekis": 31.6,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "28",
+    "aprasymas": "Stogelio, sandūroje su vertikaliu paviršiumi (siena), apšiltinimas 100 mm storio, polistireninio putplasčio (EPS 70) plokštėmis. Klyjavimas. Smeigavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 11.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "29",
+    "aprasymas": "Stogelio, sandūroje su vertikaliu paviršiumi (siena), apšiltinimas 40 mm storio, kieta, apkrovas laikančia akmens vata. Klyjavimas. Smeigavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 11.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "30",
+    "aprasymas": "Stogelių konstrukcijos sandūrose su vertikaliu paviršiumi, įrengiamas akmens vatos bortelis 100x100 mm – apvadas, skirtas tolygiam dangos perėjimui.",
+    "mato_vnt": "m",
+    "kiekis": 36.9,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "31",
+    "aprasymas": "Apatinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 43.1,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "32",
+    "aprasymas": "Viršutinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 43.1,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "33",
+    "aprasymas": "Papildomo bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 17.5,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "34",
+    "aprasymas": "IV- aukšto, g/b balkono stogelio, šoninių briaunų apskardinimas, poliesteriu dengta skarda.",
+    "mato_vnt": "m2",
+    "kiekis": 4.7,
+    "skyrius": "SUTAPDINTO STOGO ŠILTINIMAS"
+  },
+  {
+    "nr": "1",
+    "aprasymas": "Senų medinių langų ir durų demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 67.97,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Medinių palangių, demontavimas.",
+    "mato_vnt": "m2",
+    "kiekis": 23.7,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "PVC virtuvės langas. L1 3 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 5.4,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "PVC kambario langas. L2 7 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 15.75,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "PVC kambario langas. L3 4 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 7.2,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "PVC kambario langas su balkono durimis. L4 1 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 3.56,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "PVC kambario langas su balkono durimis. L5 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 7.12,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "PVC rūsio langas. L6 1 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 0.54,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "PVC rūsio langas. L7 12 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 5.76,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "PVC rūsio langas. L8 1 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 0.8,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "11",
+    "aprasymas": "PVC laiptinės langas. L9 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 4.42,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "12",
+    "aprasymas": "PVC balkono įstiklinimas. BS1 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 11.4,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "13",
+    "aprasymas": "PVC balkono įstiklinimas. BS2 4 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 37.8,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "14",
+    "aprasymas": "PVC balkono įstiklinimas. BS3 6 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 34.2,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "15",
+    "aprasymas": "PVC balkono įstiklinimas. BS4 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 11.4,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "16",
+    "aprasymas": "Metalinės įėjimo į laiptinę durys. D1 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 5.04,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "17",
+    "aprasymas": "Metalinės rūsio durys. D2 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 3.78,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "18",
+    "aprasymas": "PVC tambūro durys. D3 2 vnt.",
+    "mato_vnt": "m2",
+    "kiekis": 5.04,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "19",
+    "aprasymas": "Vidaus angokraščių tinkavimas, glaistymas, emulsinis dažymas.",
+    "mato_vnt": "m2",
+    "kiekis": 83.5,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "20",
+    "aprasymas": "Vidaus palangių keitimas naujomis LMDP palangėmis.",
+    "mato_vnt": "m",
+    "kiekis": 23.7,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "21",
+    "aprasymas": "PVC palangių įrengimas",
+    "mato_vnt": "m",
+    "kiekis": 30.5,
+    "skyrius": "LANGŲ IR DURŲ KEITIMAS, BALKONŲ ĮSTIKLINIMAS"
+  },
+  {
+    "nr": "2",
+    "aprasymas": "Stogelio, ties pagrindiniu įėjimu, apšiltinimas 50 mm storio, polistireninio putplasčio (EPS 100) plokštėmis + 40 mm storio, kieta, apkrovas laikančia, stogine akmens vata.",
+    "mato_vnt": "m2",
+    "kiekis": 9.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "3",
+    "aprasymas": "Stogelio, sandūros su vertikaliais paviršiais, apšiltinimas 100 mm storio, polistireninio putplasčio (EPS 70) plokštėmis + 40 mm storio, kieta, apkrovas laikančia, stogine akmens vata.",
+    "mato_vnt": "m2",
+    "kiekis": 3.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "4",
+    "aprasymas": "Stogelio konstrukcijos sandūrose su vertikaliu paviršiumi, akmens vatos bortelio 100x100 mm, įrengiamas .",
+    "mato_vnt": "m",
+    "kiekis": 10.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "5",
+    "aprasymas": "Stogelio, ties pagrindiniu įėjimu, apatinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 12.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "6",
+    "aprasymas": "Stogelio, ties pagrindiniu įėjimu, viršutinio bituminės ritininės prilydomosios hidroizoliacijos sluoksnio",
+    "mato_vnt": "m2",
+    "kiekis": 12.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "7",
+    "aprasymas": "Stogelio, ties pagrindiniu įėjimu, papildomo bituminės ritininės prilydomosios hidroizoliacijos sluoksnio įrengimas.",
+    "mato_vnt": "m2",
+    "kiekis": 4.8,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "8",
+    "aprasymas": "Stogelio briaunų šiltinimas, 30 mm storio, polistireninio putplasčio (EPS 100) plokštėmis. Klijavimas. Smeigiavimas. Apdaila – plonasluoksnis pigmentinis dekoratyvinis tinkas.",
+    "mato_vnt": "m2",
+    "kiekis": 11.5,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "9",
+    "aprasymas": "Stogelio, šoninių briaunų apskardinimas, poliesteriu dengta skarda.",
+    "mato_vnt": "m2",
+    "kiekis": 1.5,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "10",
+    "aprasymas": "Lietlatakio, ties stogeliu, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 10.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "11",
+    "aprasymas": "Lietvamzdžio, ties stogeliu, įrengimas.",
+    "mato_vnt": "m",
+    "kiekis": 5.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "12",
+    "aprasymas": "Namo numerio, gatvės pavadinimo, įrengimas.",
+    "mato_vnt": "vnt.",
+    "kiekis": 1.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "13",
+    "aprasymas": "Namo vėliavos laikiklio, įrengimas.",
+    "mato_vnt": "vnt.",
+    "kiekis": 1.0,
+    "skyrius": "KITI DARBAI"
+  },
+  {
+    "nr": "14",
+    "aprasymas": "Dujotiekio atitraukimas.",
+    "mato_vnt": "Vnt.",
+    "kiekis": 2.0,
+    "skyrius": "KITI DARBAI"
+  }
+]

@@ -1,0 +1,695 @@
+[
+  {
+    "nr": "1.1",
+    "aprasymas": "Langų demontavimas",
+    "mato_vnt": "m2",
+    "kiekis": 17.90,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.2",
+    "aprasymas": "Lodžijų stiklinimo demontavimas",
+    "mato_vnt": "m2",
+    "kiekis": 76.50,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.3",
+    "aprasymas": "Durų demontavimas",
+    "mato_vnt": "m2",
+    "kiekis": 13.30,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.4",
+    "aprasymas": "Palangių demontavimas",
+    "mato_vnt": "m",
+    "kiekis": 406.35,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.5",
+    "aprasymas": "Metalinių turėklų demontavimas",
+    "mato_vnt": "m",
+    "kiekis": 18.45,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.6",
+    "aprasymas": "Namo adreso, numerio, vėliavos laikiklio, išorinių signalizacijos blokų, vazido kamerų nuėmimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 12,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.8",
+    "aprasymas": "Šviestuvų nuėmimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 3,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.9",
+    "aprasymas": "Pastolių įrengimas",
+    "mato_vnt": "m2",
+    "kiekis": 2700.60,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.10",
+    "aprasymas": "Pastolių išardymas",
+    "mato_vnt": "m2",
+    "kiekis": 2700.60,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.11",
+    "aprasymas": "Fasadinių sienų paruošimas šiltinimui: plovimas anti-pelėsiniais preparatais, sienų plovimas aukšto slėgio aparatu, gruntavimas, tarpblokinių sujungimų remontas, užtaisymas",
+    "mato_vnt": "m2",
+    "kiekis": 2434.60,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.12",
+    "aprasymas": "Cokolio sienų paruošimas šiltinimui: plovimas anti-pelėsiniais preparatais, sienų plovimas aukšto slėgio aparatu, gruntavimas, tarpblokinių sujungimų remontas, užtaisymas - antžeminė dalis",
+    "mato_vnt": "m2",
+    "kiekis": 135.30,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.13",
+    "aprasymas": "Cokolio sienų paruošimas šiltinimui: plovimas anti-pelėsiniais preparatais, sienų plovimas aukšto slėgio aparatu, gruntavimas, tarpblokinių sujungimų remontas, užtaisymas - požeminė dalis",
+    "mato_vnt": "m2",
+    "kiekis": 117.50,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "1.14",
+    "aprasymas": "Statybinių šiukšlių išvežimas",
+    "mato_vnt": "t",
+    "kiekis": null,
+    "skyrius": "ARDYMO - DEMONTAVIMO IR FASADŲ PARUOŠIMO DARBAI"
+  },
+  {
+    "nr": "2.1",
+    "aprasymas": "Cokolio šiltinimas 150 mm storio polistireninio EPS100 putplasčio sluoksniu – antžeminė dalis arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 138.50,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.2",
+    "aprasymas": "Cokolio šiltinimas 150 mm storio polistireninio EPS100 putplasčio sluoksniu – požeminė dalis arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 117.50,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.3",
+    "aprasymas": "Rūsio langų angokraščių šiltinimas 30mm storio polistireniniu putplasčiu",
+    "mato_vnt": "m2",
+    "kiekis": 1.70,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.4",
+    "aprasymas": "Teptinė hidroizoliacija (3-4 mm) - antžemine dalis",
+    "mato_vnt": "m2",
+    "kiekis": 138.50,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.5",
+    "aprasymas": "Teptinė hidroizoliacija (3-4 mm) – požemine dalis",
+    "mato_vnt": "m2",
+    "kiekis": 119.60,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.6",
+    "aprasymas": "Membraninė hidroizoliacija - požemine dalis",
+    "mato_vnt": "m2",
+    "kiekis": 119.60,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.7",
+    "aprasymas": "Rūsio angokraščių apdaila dekoratyvinis silikatinis - silikoninis tinkas, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 1.70,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "2.8",
+    "aprasymas": "Cokolio apdaila – akmens masės plytelės 300x600 mm, PARADYZ INTERO _ arba analogas (spalva - _ )",
+    "mato_vnt": "m2",
+    "kiekis": 138.50,
+    "skyrius": "COKOLIS - PAMATAI"
+  },
+  {
+    "nr": "3.1",
+    "aprasymas": "Įėjimo stogelio viršaus apšiltinimas, 40 mm kieta akmens vata",
+    "mato_vnt": "m2",
+    "kiekis": 11.60,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.2",
+    "aprasymas": "Įėjimo stogelių apačios ir šonų apšiltinimas, 50 mm polistireninis putplastis EPS70 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 13.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.3",
+    "aprasymas": "Įėjimo stogelių viršus - 2 sl. ruloninė bituminė danga",
+    "mato_vnt": "m2",
+    "kiekis": 12.00,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.4",
+    "aprasymas": "Įėjimo stogelių apačia ir šonai - stuktūrinis tinkas, RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 13.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.5",
+    "aprasymas": "Įėjimo stogelio skardinimas poliesteriu dengta skarda, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 2.20,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.6",
+    "aprasymas": "Įėjimo kolonos ir atitvaros sutvarkymas, apdaila klijuojamos akmens masės plytelės 300x600 mm, PARADYZ INTERO _ arba analogas (spalva - _ )",
+    "mato_vnt": "m2",
+    "kiekis": 12.40,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.7",
+    "aprasymas": "Išorinė įlaja",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.8",
+    "aprasymas": "Lietvamzdis",
+    "mato_vnt": "m",
+    "kiekis": 3.20,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.9",
+    "aprasymas": "Lietlovių keitimas, ne mažesni kaip d-120mm, spalva RAL_",
+    "mato_vnt": "m",
+    "kiekis": 3.30,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.10",
+    "aprasymas": "Vėdinamo fasado karkaso montavimas",
+    "mato_vnt": "m2",
+    "kiekis": 1730.40,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.11",
+    "aprasymas": "Išorės sienų apšiltinimas 175 mm mineraline vata, ISOVER STANDARD 35 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 1730.40,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.12",
+    "aprasymas": "Išorės sienų apšiltinimas 30 mm priešvėjine vata, ISOVER SKL arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 1730.40,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.13",
+    "aprasymas": "Išorės sienų apšiltinimas 100 mm poliuretano plokštėmis FF-PIR arba analogas, klijuojamos akmens masės plytelės PARADYZ INTERO _ arba analogas (spalva - _)",
+    "mato_vnt": "m2",
+    "kiekis": 15.50,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.14",
+    "aprasymas": "Lodžijų atitvarų apšiltinimas 150 mm polistirenis putplastis EPS100 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 84.60,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.15",
+    "aprasymas": "Lodžijų atitvarų apšilitnimas 30 mm polistirenis putplastis EPS100 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 155.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.16",
+    "aprasymas": "Lodžijos atitvarų sutvarkymas - OSB dažyta plokštė arba durelis, 15 mm",
+    "mato_vnt": "m2",
+    "kiekis": 155.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.17",
+    "aprasymas": "Lodžijų atitvarų klijuojamos apdaila - akmens masės plytelės 300x600 mm, PARADYZ INTERO _ arba analogas (spalva - _ )",
+    "mato_vnt": "m2",
+    "kiekis": 191.20,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.18",
+    "aprasymas": "I aukšto lodžijų apatinės dalies šiltinimas EPS70 100 mm arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 23.90,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.19",
+    "aprasymas": "Lodžijų perdangų šiltinimas iš priekio 50 mm kieta akmens vata",
+    "mato_vnt": "m2",
+    "kiekis": 36.00,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.20",
+    "aprasymas": "Lodžijų apatinės dalies armavimas, struktūrinis tinkas RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 23.90,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.21",
+    "aprasymas": "Fasado apdaila - iki pirmo aukšto viršaus kompozitinė akmens masės plytelė 300x600 mm, PARADYZ INTERO _ arba analogas (spalva - _ )",
+    "mato_vnt": "m2",
+    "kiekis": 187.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.22",
+    "aprasymas": "Fasado apdaila - akmens masės plytelės 300x600 mm, PARADYZ INTERO _ arba analogas (spalva - _ )",
+    "mato_vnt": "m2",
+    "kiekis": 1542.70,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.23",
+    "aprasymas": "Langų angokraščių šiltinimas 30 mm storio vėjo ir šilumos izoliacija",
+    "mato_vnt": "m2",
+    "kiekis": 160.90,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.24",
+    "aprasymas": "Lodžijų angokraščių šiltinimas 30 mm storio vėjo ir šilumos izoliacija",
+    "mato_vnt": "m2",
+    "kiekis": 99.30,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.25",
+    "aprasymas": "Išorės angokraščių aptaisymas skarda, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 160.90,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.26",
+    "aprasymas": "Išorės lodžijų angokraščių aptaisymas skarda, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 99.30,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.27",
+    "aprasymas": "Vidinės lodžijų sienos šiltinimas EPS70 50 mm su armuoto tinko apdaila, arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 407.50,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "3.28",
+    "aprasymas": "Vidinės bendro naudojimo tambūrų sienų šiltinimas ties 30 mm kieta akmens vata su armuoto tinko apdaila, arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 19.20,
+    "skyrius": "FASADŲ ŠILTINIMO DARBAI"
+  },
+  {
+    "nr": "4.1",
+    "aprasymas": "Esamos stogo dangos paruošimas",
+    "mato_vnt": "m2",
+    "kiekis": 317.90,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.2",
+    "aprasymas": "Stogo dangos pūslių remontas (10%)",
+    "mato_vnt": "m2",
+    "kiekis": 317.90,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.3",
+    "aprasymas": "Stogo šiltinimas 200mm EPS80 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 317.90,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.4",
+    "aprasymas": "Stogo šiltinimas 40mm kieta akmens vata Paroc ROC50 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 317.90,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.5",
+    "aprasymas": "Stogo parapeto šiltinimas 50mm kieta akmens vata Paroc ROC50 arba analogas",
+    "mato_vnt": "m2",
+    "kiekis": 104.50,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.6",
+    "aprasymas": "Lodžijų stogelių viršaus šiltinimas 40mm kieta akmens vata",
+    "mato_vnt": "m2",
+    "kiekis": 18.10,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.7",
+    "aprasymas": "Lodžijų stogelių šonų šiltinimas 50 mm polistireniniu putplasčiu su armuoto tinko apdaila, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 3.40,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.8",
+    "aprasymas": "Dviejų sluoksnių hidroizoliacijos - ruloninės bituminės dangos įrengimas, įskaitant parapetus",
+    "mato_vnt": "m2",
+    "kiekis": 432.30,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.9",
+    "aprasymas": "Lodžijų stogelių 2 sl. ruloninės bituminės dangos įrengimas",
+    "mato_vnt": "m2",
+    "kiekis": 21.50,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.10",
+    "aprasymas": "Apsauginės tvorelės įrengimas, h=0,60m",
+    "mato_vnt": "m",
+    "kiekis": 120.90,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.11",
+    "aprasymas": "Parapetų skardinimas poliesteriu dengta skarda, spalva RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 102.70,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.12",
+    "aprasymas": "Įlajų remontas iki pravalos",
+    "mato_vnt": "vnt.",
+    "kiekis": 2,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.13",
+    "aprasymas": "Alsuokių sutvarkymas",
+    "mato_vnt": "vnt.",
+    "kiekis": 6,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.14",
+    "aprasymas": "Stogo vėdinimo kaminėliai",
+    "mato_vnt": "vnt.",
+    "kiekis": 8,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.15",
+    "aprasymas": "Ventiliacinių kanalų skardinimas poliesteriu padengta skarda RAL_",
+    "mato_vnt": "m2",
+    "kiekis": 7.00,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "4.16",
+    "aprasymas": "Statybinių šiukšlių išvežimas",
+    "mato_vnt": "t",
+    "kiekis": null,
+    "skyrius": "STOGO DARBAI"
+  },
+  {
+    "nr": "5.1",
+    "aprasymas": "PVC lango montavimas 1600x1500 (3 varstymo padėtys) (L-1)",
+    "mato_vnt": "m2",
+    "kiekis": 2.40,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.1",
+    "aprasymas": "PVC lango montavimas 1600x1500 (3 varstymo padėtys) (L-1)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.2",
+    "aprasymas": "PVC lango montavimas 2400x1500 (3 varstymo padėtys) (L-2)",
+    "mato_vnt": "m2",
+    "kiekis": 3.60,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.2",
+    "aprasymas": "PVC lango montavimas 2400x1500 (3 varstymo padėtys) (L-2)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.3",
+    "aprasymas": "PVC lango montavimas 1500x1500 (3 varstymo padėtys) (L-3)",
+    "mato_vnt": "m2",
+    "kiekis": 2.25,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.3",
+    "aprasymas": "PVC lango montavimas 1500x1500 (3 varstymo padėtys) (L-3)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.4",
+    "aprasymas": "PVC langų montavimas 3200x2300 ir 2000x2300 (3 varstymo padėtys) (LLD-1) Lodžijos langų ir durų montavimas",
+    "mato_vnt": "m2",
+    "kiekis": 9.62,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.4",
+    "aprasymas": "PVC langų montavimas 3200x2300 ir 2000x2300 (3 varstymo padėtys) (LLD-1) Lodžijos langų ir durų montavimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.5",
+    "aprasymas": "PVC langų montavimas 2330x1400 (3 varstymo padėtys) (LS-1) Lodžijų stiklinimas",
+    "mato_vnt": "m2",
+    "kiekis": 29.34,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.5",
+    "aprasymas": "PVC langų montavimas 2330x1400 (3 varstymo padėtys) (LS-1) Lodžijų stiklinimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 8,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.6",
+    "aprasymas": "PVC langų montavimas 2050x2500 (3 varstymo padėtys) (LS-2) Lodžijų stiklinimas",
+    "mato_vnt": "m2",
+    "kiekis": 82.08,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.6",
+    "aprasymas": "PVC langų montavimas 2050x2500 (3 varstymo padėtys) (LS-2) Lodžijų stiklinimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 16,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.7",
+    "aprasymas": "PVC langų montavimas 5500x1400 (3 varstymo padėtys) (LS-3) Lodžijų stiklinimas",
+    "mato_vnt": "m2",
+    "kiekis": 115.50,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.7",
+    "aprasymas": "PVC langų montavimas 5500x1400 (3 varstymo padėtys) (LS-3) Lodžijų stiklinimas",
+    "mato_vnt": "vnt.",
+    "kiekis": 13,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.8",
+    "aprasymas": "Tambūro durys 2100x1000 (TD-1)",
+    "mato_vnt": "m2",
+    "kiekis": 2.10,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.8",
+    "aprasymas": "Tambūro durys 2100x1000 (TD-1)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.9",
+    "aprasymas": "Lauko durys (Įėjimo į sandėliuką su spyna) 2100x1100 (D-1)",
+    "mato_vnt": "m2",
+    "kiekis": 2.31,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.9",
+    "aprasymas": "Lauko durys (Įėjimo į sandėliuką su spyna) 2100x1100 (D-1)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.10",
+    "aprasymas": "Lauko durys (Įėjimo į laiptinę su elektronine spyna) 2100x950 (D-2)",
+    "mato_vnt": "m2",
+    "kiekis": 1.99,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.10",
+    "aprasymas": "Lauko durys (Įėjimo į laiptinę su elektronine spyna) 2100x950 (D-2)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.11",
+    "aprasymas": "Lauko durys (Įėjimo į rūsį su spyna) 1100x2100 (D-3)",
+    "mato_vnt": "m2",
+    "kiekis": 2.31,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.11",
+    "aprasymas": "Lauko durys (Įėjimo į rūsį su spyna) 1100x2100 (D-3)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.12",
+    "aprasymas": "Lauko durys (Įėjimo į laiptinę su elektronine spyna) 1260x2100 (D-4)",
+    "mato_vnt": "m2",
+    "kiekis": 2.65,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.12",
+    "aprasymas": "Lauko durys (Įėjimo į laiptinę su elektronine spyna) 1260x2100 (D-4)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.13",
+    "aprasymas": "Lauko durys (Išėjimo ant stogo su spyna) 1260x2100 (D-5)",
+    "mato_vnt": "m2",
+    "kiekis": 1.90,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.13",
+    "aprasymas": "Lauko durys (Išėjimo ant stogo su spyna) 1260x2100 (D-5)",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.14",
+    "aprasymas": "Palangių montavimas (skarda dengta poliesteriu), spalva RAL_, palangės plotis 0,39m",
+    "mato_vnt": "m",
+    "kiekis": 204.55,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.15",
+    "aprasymas": "Balkonų palangių montavimas (skarda dengta poliesteriu), spalva RAL_ palangės plotis 0,15m",
+    "mato_vnt": "m",
+    "kiekis": 173.80,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.16",
+    "aprasymas": "Rūsio langų palanagių montavimas (skarda dengta poliesteriu), spalva RAL_ palangės plotis 0,32m",
+    "mato_vnt": "m",
+    "kiekis": 3.20,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.17",
+    "aprasymas": "Laiptinių langų palangių montavinmas (skarda dengta poliesteriu), spalva RAL_, palangės plotis 0,39m",
+    "mato_vnt": "m",
+    "kiekis": 40.80,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.18",
+    "aprasymas": "Namo adreso, numerio, vėliavos laikiklio, išorinių signalizacijos blokų, vaizdo kamerų atstatymas po apšiltinimo",
+    "mato_vnt": "vnt.",
+    "kiekis": 12,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.19",
+    "aprasymas": "Šviestuvų atsatymas po apšiltinimo",
+    "mato_vnt": "vnt.",
+    "kiekis": 3,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.20",
+    "aprasymas": "Panduso ir laiptų įrengimas:",
+    "mato_vnt": "vnt.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  },
+  {
+    "nr": "5.21",
+    "aprasymas": "Liftas ir įrengimas. Demontuojami seni ir įrengiami nuaji.",
+    "mato_vnt": "kompl.",
+    "kiekis": 1,
+    "skyrius": "GAMINIAI"
+  }
+]

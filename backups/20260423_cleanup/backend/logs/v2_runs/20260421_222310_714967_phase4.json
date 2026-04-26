@@ -1,0 +1,156 @@
+{
+  "materials": {
+    "dazai_standart_l": 0.0,
+    "dazai_virs_3m_l": 0.0,
+    "dazai_benjamin_moore_l": 11.8,
+    "gruntas_l": 8.0,
+    "glaistas_q2_kg": 66.3,
+    "glaistas_maisai_25kg": 3,
+    "gk_lapai_vnt": 83,
+    "plyteliu_klijai_kg": 0.0,
+    "hidroizoliacija_kg": 0.0,
+    "stiklo_audinys_bruto_m2": 0.0,
+    "total_paintable_m2": 53.1,
+    "total_gkp_m2": 224.0,
+    "total_tiles_m2": 0
+  },
+  "line_items": [
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "kategorija": "premium_benjamin_moore_sienos_lubos",
+      "kiekis": 13.78,
+      "unit": "m2",
+      "unit_price_eur": 14.0,
+      "total_eur": 192.92,
+      "notes": null
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "kategorija": "nisu_glaistymas_dazymas",
+      "kiekis": 5.62,
+      "unit": "m",
+      "unit_price_eur": 8.0,
+      "total_eur": 44.96,
+      "notes": null
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "kategorija": "premium_benjamin_moore_sienos_lubos",
+      "kiekis": 24.3,
+      "unit": "m2",
+      "unit_price_eur": 14.0,
+      "total_eur": 340.2,
+      "notes": null
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "kategorija": "duru_angos_beapvadines_paruosimas",
+      "kiekis": 16.8,
+      "unit": "m",
+      "unit_price_eur": 12.0,
+      "total_eur": 201.6,
+      "notes": null
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "kategorija": "premium_benjamin_moore_sienos_lubos",
+      "kiekis": 15.0,
+      "unit": "m2",
+      "unit_price_eur": 14.0,
+      "total_eur": 210.0,
+      "notes": null
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "lubos_standart_aukstis",
+      "kiekis": 180.0,
+      "unit": "m2",
+      "unit_price_eur": 18.0,
+      "total_eur": 3240.0,
+      "notes": "Total apartment area, ceiling height 2.8m - standard"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "nisu_formavimas_led_apsvietimui",
+      "kiekis": 60.0,
+      "unit": "m",
+      "unit_price_eur": 15.0,
+      "total_eur": 900.0,
+      "notes": "LED niches per MAZGAS A/B/C details - svetainė 250mm atitraukimas el. užuolaidoms, kiti 100-200mm"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "lubos_virs_3m",
+      "kiekis": 44.0,
+      "unit": "m2",
+      "unit_price_eur": 24.0,
+      "total_eur": 1056.0,
+      "notes": "Svetainės/valgomojo/virtuvės dalis virš 3m (dvigubo aukščio erdvė)"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "laidu_apsiuvimas_garaze",
+      "kiekis": 12.0,
+      "unit": "m",
+      "unit_price_eur": 12.0,
+      "total_eur": 144.0,
+      "notes": "Laidų apsiuvimas garaže"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "difuzoriu_montavimas_apvalus",
+      "kiekis": 8.0,
+      "unit": "vnt",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": "Apvalūs difuzoriai vonios/wc/tech patalpoms"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "difuzoriu_montavimas_plysiniai",
+      "kiekis": 10.0,
+      "unit": "vnt",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": "Plyšiniai difuzoriai gyvenamosiose patalpose"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "sviestuvu_montavimas",
+      "kiekis": 55.0,
+      "unit": "vnt",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": "Įleidžiami taškiniai šviestuvai"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "sviestuvu_led_profiliu_montavimas",
+      "kiekis": 45.0,
+      "unit": "m",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": "LED profiliai nišose"
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "reviziniu_dureliu_montavimas_600x600",
+      "kiekis": 2.0,
+      "unit": "vnt",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": null
+    },
+    {
+      "skyrius": "Gipso kartono montavimas",
+      "kategorija": "reviziniu_dureliu_montavimas_300x300",
+      "kiekis": 4.0,
+      "unit": "vnt",
+      "unit_price_eur": 0.0,
+      "total_eur": 0.0,
+      "notes": "Vonios/wc/tech patalpos"
+    }
+  ],
+  "total_darbo_kaina_eur": 6329.68,
+  "total_su_pvm_eur": 7658.91
+}

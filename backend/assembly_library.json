@@ -1,0 +1,83 @@
+{
+  "_comment": "Real material consumption ratios derived from 5 Lithuanian interior renovation projects (2024). Ground truth = contractor pasiūlymas quantities.",
+  "_version": "1.0",
+  "_projects": {
+    "P1": {"location": "Bacevičiaus g., Kaunas", "area_m2": 108, "note": "molio tinkas – kampai outlier"},
+    "P2": {"location": "unknown", "area_m2": 90, "note": "standard plaster"},
+    "P3": {"location": "Romainiuose, Kaunas", "area_m2": 95, "note": "Rotband plaster"},
+    "P4": {"location": "unknown", "area_m2": 132, "note": "Rotband plaster"},
+    "P5": {"location": "unknown", "area_m2": 41, "note": "small apartment"}
+  },
+
+  "glaistymo_kampai": {
+    "_description": "Corner bead strips (kampų profiliai) — measured in linear meters",
+    "_unit": "m per m² of total paintable area (walls + ceilings)",
+    "ground_truth": {
+      "P1": {"dazymas_m2": 493, "kampai_m": 580.54, "ratio": 1.18, "note": "outlier – molio tinkas adds many extra corner beads"},
+      "P2": {"dazymas_m2": 388, "kampai_m": 201.86, "ratio": 0.52},
+      "P3": {"dazymas_m2": 420, "kampai_m": 329.77, "ratio": 0.79},
+      "P4": {"dazymas_m2": 461, "kampai_m": 303.25, "ratio": 0.66},
+      "P5": {"dazymas_m2": 151, "kampai_m": 123.59, "ratio": 0.82}
+    },
+    "recommended_ratio": 0.70,
+    "recommended_ratio_note": "m kampų per m² dažymo (P1 excluded as outlier). Use when Vision corner count unavailable.",
+    "outer_to_total_multiplier": 3.5,
+    "outer_to_total_note": "Multiply isoriniu_kampu_vnt by 3.5 to estimate total corner count when Vision only reports outer corners."
+  },
+
+  "gkp_lubos": {
+    "_description": "GKP (gipskartonio plokštės) luboms — drywall for ceilings",
+    "_unit": "m² of GKP vs m² of ceiling area",
+    "ground_truth": {
+      "P1": {"gkp_m2": 143.19, "lubos_m2": 108},
+      "P2": {"gkp_m2": 111.84, "lubos_m2": 90},
+      "P5": {"gkp_m2": 41.28,  "lubos_m2": 41}
+    },
+    "gkp_to_ceiling_ratio": 1.32,
+    "note": "GKP area ~1.32× ceiling area due to 10% material waste + dropped sections + niche fascias. Formula: sheets = CEILING(ceiling_m2 × 1.32 / 3.0)"
+  },
+
+  "glaistymas_dazomas": {
+    "_description": "Glaistymas (skimming putty) and dažymas (painting) — measured in m²",
+    "_unit": "m² of treated surface vs m² of floor area",
+    "ground_truth": {
+      "P1": {"glaistymas_m2": 493, "floor_m2": 108, "ratio": 4.56},
+      "P2": {"glaistymas_m2": 388, "floor_m2": 90,  "ratio": 4.31},
+      "P3": {"glaistymas_m2": 420, "floor_m2": 95,  "ratio": 4.42},
+      "P4": {"glaistymas_m2": 461, "floor_m2": 132, "ratio": 3.49},
+      "P5": {"glaistymas_m2": 151, "floor_m2": 41,  "ratio": 3.68}
+    },
+    "recommended_ratio_walls_to_floor": 3.5,
+    "note": "Walls+ceilings paintable area ≈ 3.5–4.5× floor area. Use 3.8 as default. Lower for open-plan, higher for many small rooms."
+  },
+
+  "hidroizoliacija": {
+    "_description": "Waterproofing in wet rooms",
+    "_unit": "count of wet zones per apartment size",
+    "ground_truth": {
+      "P1": {"vnt": 3, "floor_m2": 108, "note": "2 bathrooms + 1 WC"},
+      "P2": {"vnt": 2, "floor_m2": 90,  "note": "1 bathroom + 1 WC"},
+      "P4": {"vnt": 2, "floor_m2": 132, "note": "2 wet zones"},
+      "P5": {"vnt": 1, "floor_m2": 41,  "note": "implied 1 bathroom"}
+    },
+    "per_100m2": 2.0,
+    "note": "Expect ~1 wet zone per 50 m² floor area. Each zone: floor full + wall splash 0.3m + shower full height."
+  },
+
+  "rotband_tinkas": {
+    "_description": "Rotband (gypsum plaster) for walls — where used instead of GKP",
+    "_unit": "m² plastered vs floor area",
+    "ground_truth": {
+      "P3": {"rotband_m2": 95,  "floor_m2": 95,  "ratio": 1.0},
+      "P4": {"rotband_m2": 132, "floor_m2": 132, "ratio": 1.0}
+    },
+    "note": "Rotband area ≈ floor area (used on one layer of walls in some zones). Not all projects use Rotband."
+  },
+
+  "validation_checks": {
+    "walls_to_floor_ratio": {"min": 2.5, "max": 5.0, "typical": 3.8},
+    "kampai_to_dazymas_ratio": {"min": 0.40, "max": 1.30, "typical": 0.70},
+    "gkp_to_floor_ratio": {"min": 0.9, "max": 1.6, "typical": 1.32},
+    "wet_zones_per_100m2": {"min": 1, "max": 4, "typical": 2}
+  }
+}

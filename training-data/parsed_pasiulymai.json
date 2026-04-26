@@ -1,0 +1,2819 @@
+{
+  "P1": {
+    "skyriai": [
+      {
+        "pavadinimas": "Gipso kartono montavimas",
+        "eilutes": [
+          {
+            "nr": 1,
+            "aprasymas": "GKP monatavimas ant lubų, įrengiant dvigubą karkasą",
+            "vnt": "m2",
+            "kiekis": 74.91,
+            "darbo_kaina_vnt": 14.0,
+            "darbo_kaina_viso": 1048.74,
+            "medz_kaina_vnt": 18.0,
+            "medz_kaina_viso": 1348.38,
+            "viso_be_pvm": 2397.12
+          },
+          {
+            "nr": 2,
+            "aprasymas": "GKP monatavimas ant lubų, įrengiant dvigubą karkasą ( kai aukštis virš 3m)",
+            "vnt": "m2",
+            "kiekis": 68.28,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 1024.2,
+            "medz_kaina_vnt": 18.0,
+            "medz_kaina_viso": 1229.04,
+            "viso_be_pvm": 2253.24
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Laidų apsiuvimas garaže",
+            "vnt": "b/m; m2",
+            "kiekis": 26.57,
+            "darbo_kaina_vnt": 14.0,
+            "darbo_kaina_viso": 371.98,
+            "medz_kaina_vnt": 15.0,
+            "medz_kaina_viso": 398.55,
+            "viso_be_pvm": 770.53
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)",
+            "vnt": "b/m",
+            "kiekis": 54.98,
+            "darbo_kaina_vnt": 12.0,
+            "darbo_kaina_viso": 659.76,
+            "medz_kaina_vnt": 16.0,
+            "medz_kaina_viso": 879.68,
+            "viso_be_pvm": 1539.44
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Pertvaros įrengimas tarp miegamojo ir WC",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 380.0,
+            "darbo_kaina_viso": 380.0,
+            "medz_kaina_vnt": 75.0,
+            "medz_kaina_viso": 75.0,
+            "viso_be_pvm": 455.0
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Dėžutės iš GKP formavimas WC mechanizmams paslėpti (miegamojo vonia)",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 300.0,
+            "darbo_kaina_viso": 300.0,
+            "medz_kaina_vnt": 55.0,
+            "medz_kaina_viso": 55.0,
+            "viso_be_pvm": 355.0
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Pertvarėlės lentynoms įrengimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 220.0,
+            "darbo_kaina_viso": 220.0,
+            "medz_kaina_vnt": 55.0,
+            "medz_kaina_viso": 55.0,
+            "viso_be_pvm": 275.0
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Dėžutės iš GKP formavimas WC mechanizmams paslėpti (bendras WC)",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 220.0,
+            "darbo_kaina_viso": 220.0,
+            "medz_kaina_vnt": 55.0,
+            "medz_kaina_viso": 55.0,
+            "viso_be_pvm": 275.0
+          },
+          {
+            "nr": 9,
+            "aprasymas": "Priglaistomų gipsinių difūzorių montavimas apvalių",
+            "vnt": "vnt",
+            "kiekis": 7.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 105.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 105.0
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Priglaistomų plyšinių difūzorių montavimas",
+            "vnt": "vnt",
+            "kiekis": 13.0,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 455.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 455.0
+          },
+          {
+            "nr": 11,
+            "aprasymas": "Lubinių priglaistomų šviestuvų montavimas",
+            "vnt": "vnt",
+            "kiekis": 69.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 1035.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1035.0
+          },
+          {
+            "nr": 12,
+            "aprasymas": "Revizinių durelių 600*600 įrengimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 60.0,
+            "darbo_kaina_viso": 180.0,
+            "medz_kaina_vnt": 78.65,
+            "medz_kaina_viso": 235.95,
+            "viso_be_pvm": 415.95
+          },
+          {
+            "nr": 13,
+            "aprasymas": "Revizinių durelių 1500*500 įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 120.0,
+            "darbo_kaina_viso": 120.0,
+            "medz_kaina_vnt": 181.5,
+            "medz_kaina_viso": 181.5,
+            "viso_be_pvm": 301.5
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Revizinių durelių 300*300 įrengimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 75.0,
+            "medz_kaina_vnt": 22.93,
+            "medz_kaina_viso": 68.79,
+            "viso_be_pvm": 143.79000000000002
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Angokraščių apdirbimas GKP",
+            "vnt": "m",
+            "kiekis": 94.02,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 1410.3,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 470.1,
+            "viso_be_pvm": 1880.4
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Sienų lubų glaistymas dažymas",
+        "eilutes": [
+          {
+            "nr": 15,
+            "aprasymas": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+            "vnt": "m2",
+            "kiekis": 138.69,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 970.8,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 832.14,
+            "viso_be_pvm": 1802.94
+          },
+          {
+            "nr": 16,
+            "aprasymas": "Sienų/ lubų glaistymas/dažymas",
+            "vnt": "m2",
+            "kiekis": 424.75,
+            "darbo_kaina_vnt": 14.0,
+            "darbo_kaina_viso": 5946.5,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 2973.25,
+            "viso_be_pvm": 8919.75
+          },
+          {
+            "nr": 17,
+            "aprasymas": "Lubų glaistymas/dažymas (virš 3m aukščio)",
+            "vnt": "m2",
+            "kiekis": 68.28,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 1024.2,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 477.96,
+            "viso_be_pvm": 1502.16
+          },
+          {
+            "nr": 18,
+            "aprasymas": "Sienų dekoravimas molio tinku",
+            "vnt": "m2",
+            "kiekis": 160.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 2400.0,
+            "medz_kaina_vnt": 10.0,
+            "medz_kaina_viso": 1600.0,
+            "viso_be_pvm": 4000.0
+          },
+          {
+            "nr": 19,
+            "aprasymas": "Durų angų paruošimas beapvasdinėms durims",
+            "vnt": "m",
+            "kiekis": 55.52,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 832.8,
+            "medz_kaina_vnt": 2.5,
+            "medz_kaina_viso": 138.8,
+            "viso_be_pvm": 971.5999999999999
+          },
+          {
+            "nr": 20,
+            "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m",
+            "kiekis": 580.54,
+            "darbo_kaina_vnt": 4.0,
+            "darbo_kaina_viso": 2322.2,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 2322.2
+          },
+          {
+            "nr": 21,
+            "aprasymas": "Priglaistomų gipsinių šviestuvų apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 69.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 1035.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1035.0
+          },
+          {
+            "nr": 22,
+            "aprasymas": "Priglaistomų gipsinių difūzorių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 7.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 105.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 105.0
+          },
+          {
+            "nr": 23,
+            "aprasymas": "Priglaistomų plyšinių difūzorių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 13.0,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 390.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 390.0
+          },
+          {
+            "nr": 24,
+            "aprasymas": "Revizinių durelių 600*600 apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 75.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 75.0
+          },
+          {
+            "nr": 25,
+            "aprasymas": "Revizinių durelių 1500*500 apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 50.0,
+            "darbo_kaina_viso": 50.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 50.0
+          },
+          {
+            "nr": 26,
+            "aprasymas": "Revizinių durelių 300*300 apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 45.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 45.0
+          },
+          {
+            "nr": 27,
+            "aprasymas": "Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+            "vnt": "m",
+            "kiekis": 54.98,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 714.7,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 714.7
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Plytelių klijavimas",
+        "eilutes": [
+          {
+            "nr": 28,
+            "aprasymas": "Plytelių klijavimas ant sienų ir grindų 1200*1200*6",
+            "vnt": "m2",
+            "kiekis": 157.34,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 5506.9,
+            "medz_kaina_vnt": 15.0,
+            "medz_kaina_viso": 2360.1,
+            "viso_be_pvm": 7867.0
+          },
+          {
+            "nr": 29,
+            "aprasymas": "Plytelių klijavimas ant sienų 1200*1200*6 (nišos angokraščiai)",
+            "vnt": "b/m",
+            "kiekis": 34.49,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 1034.7,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 172.45,
+            "viso_be_pvm": 1207.15
+          },
+          {
+            "nr": 30,
+            "aprasymas": "Plytelių klijavimas ant sienų ir grindų 1200*600*9",
+            "vnt": "m2",
+            "kiekis": 52.59,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 1314.8,
+            "medz_kaina_vnt": 15.0,
+            "medz_kaina_viso": 788.85,
+            "viso_be_pvm": 2103.65
+          },
+          {
+            "nr": 31,
+            "aprasymas": "Didžiaformačių plytelių klijavimas",
+            "vnt": "m2",
+            "kiekis": 7.52,
+            "darbo_kaina_vnt": 110.0,
+            "darbo_kaina_viso": 827.2,
+            "medz_kaina_vnt": 18.0,
+            "medz_kaina_viso": 135.36,
+            "viso_be_pvm": 962.5600000000001
+          },
+          {
+            "nr": 32,
+            "aprasymas": "Didžiaformačių plytelių klijavimas (nišos angokraščiai)",
+            "vnt": "m2",
+            "kiekis": 10.49,
+            "darbo_kaina_vnt": 95.0,
+            "darbo_kaina_viso": 996.6,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 52.45,
+            "viso_be_pvm": 1049.05
+          },
+          {
+            "nr": 33,
+            "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 60.0,
+            "darbo_kaina_viso": 180.0,
+            "medz_kaina_vnt": 18.0,
+            "medz_kaina_viso": 54.0,
+            "viso_be_pvm": 234.0
+          },
+          {
+            "nr": 34,
+            "aprasymas": "Nuolydžio formavimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 150.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 150.0
+          },
+          {
+            "nr": 35,
+            "aprasymas": "Hidroizoliacijos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 180.0,
+            "darbo_kaina_viso": 540.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 540.0
+          },
+          {
+            "nr": 36,
+            "aprasymas": "Skylių gręžimas plytelėse",
+            "vnt": "vnt",
+            "kiekis": 109.0,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 763.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 763.0
+          },
+          {
+            "nr": 37,
+            "aprasymas": "Kampų silikonavimas",
+            "vnt": "m",
+            "kiekis": 128.97,
+            "darbo_kaina_vnt": 2.5,
+            "darbo_kaina_viso": 322.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 322.4
+          },
+          {
+            "nr": 38,
+            "aprasymas": "Plytelių supjovimas 45⁰ kampu, kampo apdirbimas epoksidu",
+            "vnt": "m",
+            "kiekis": 45.72,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 1600.2,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 228.6,
+            "viso_be_pvm": 1828.8
+          },
+          {
+            "nr": 39,
+            "aprasymas": "Išlyginamojo pylimas",
+            "vnt": "m2",
+            "kiekis": 39.43,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 236.6,
+            "medz_kaina_vnt": 9.8,
+            "medz_kaina_viso": 386.41,
+            "viso_be_pvm": 623.01
+          },
+          {
+            "nr": 40,
+            "aprasymas": "Laiptų garaže įrengimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 300.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 300.0
+          },
+          {
+            "nr": 41,
+            "aprasymas": "Plytelių pripjovimas prie trapo garaže",
+            "vnt": "m",
+            "kiekis": 9.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 225.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 225.0
+          },
+          {
+            "nr": 42,
+            "aprasymas": "Aliuminio apdailinio kampo montavimas ant plytelių garaže",
+            "vnt": "m",
+            "kiekis": 17.77,
+            "darbo_kaina_vnt": 10.0,
+            "darbo_kaina_viso": 177.7,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 177.7
+          },
+          {
+            "nr": 43,
+            "aprasymas": "Garažo plytelės",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 694.32,
+            "medz_kaina_viso": 694.32,
+            "viso_be_pvm": 694.32
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Rekuperacijos įrengimas",
+        "eilutes": [
+          {
+            "nr": 44,
+            "aprasymas": "Montavimo darbai",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 1000.0,
+            "darbo_kaina_viso": 1000.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1000.0
+          },
+          {
+            "nr": 45,
+            "aprasymas": "Skylių gręžimo darbai",
+            "vnt": "vnt",
+            "kiekis": 22.0,
+            "darbo_kaina_vnt": 45.0,
+            "darbo_kaina_viso": 990.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 990.0
+          },
+          {
+            "nr": 46,
+            "aprasymas": "Pūsto polistirolio vamzdis su mova \"Optiflex BLACK ISO\" Ø160mm 1m.",
+            "vnt": "komp",
+            "kiekis": 16.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 22.81,
+            "medz_kaina_viso": 364.96,
+            "viso_be_pvm": 364.96
+          },
+          {
+            "nr": 47,
+            "aprasymas": "Pūsto polistirolio alkunė su mova \"Optiflex BLACK ISO\" Ø160mm",
+            "vnt": "komp",
+            "kiekis": 9.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 19.97,
+            "medz_kaina_viso": 179.73,
+            "viso_be_pvm": 179.73
+          },
+          {
+            "nr": 48,
+            "aprasymas": "Ortakis SPIRO Ø160mm, c.s.",
+            "vnt": "m",
+            "kiekis": 45.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 6.01,
+            "medz_kaina_viso": 270.45,
+            "viso_be_pvm": 270.45
+          },
+          {
+            "nr": 49,
+            "aprasymas": "Ortakis SPIRO Ø125mm, c.s.",
+            "vnt": "m",
+            "kiekis": 23.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.57,
+            "medz_kaina_viso": 105.11,
+            "viso_be_pvm": 105.11
+          },
+          {
+            "nr": 50,
+            "aprasymas": "Ortakis SPIRO Ø100mm, c.s.",
+            "vnt": "m",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.63,
+            "medz_kaina_viso": 27.78,
+            "viso_be_pvm": 27.78
+          },
+          {
+            "nr": 51,
+            "aprasymas": "Alkūnė pres. su g.t. 90° Ø160mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 7.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 8.5,
+            "medz_kaina_viso": 59.5,
+            "viso_be_pvm": 59.5
+          },
+          {
+            "nr": 52,
+            "aprasymas": "Alkūnė pres. su g.t. 90° Ø125mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 5.66,
+            "medz_kaina_viso": 22.64,
+            "viso_be_pvm": 22.64
+          },
+          {
+            "nr": 53,
+            "aprasymas": "Alkūnė pres. su g.t. 90° Ø100mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.72,
+            "medz_kaina_viso": 18.88,
+            "viso_be_pvm": 18.88
+          },
+          {
+            "nr": 54,
+            "aprasymas": "Alkūnė pres. su g.t. 45° Ø160mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 6.37,
+            "medz_kaina_viso": 19.11,
+            "viso_be_pvm": 19.11
+          },
+          {
+            "nr": 55,
+            "aprasymas": "Mova su g.t. Ø160mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 11.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 2.13,
+            "medz_kaina_viso": 23.43,
+            "viso_be_pvm": 23.43
+          },
+          {
+            "nr": 56,
+            "aprasymas": "Mova su g.t. Ø125mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 1.89,
+            "medz_kaina_viso": 11.34,
+            "viso_be_pvm": 11.34
+          },
+          {
+            "nr": 57,
+            "aprasymas": "Mova su g.t. Ø100mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 1.65,
+            "medz_kaina_viso": 3.3,
+            "viso_be_pvm": 3.3
+          },
+          {
+            "nr": 58,
+            "aprasymas": "Pereiga pres. su g.t. 160-125mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 5.03,
+            "medz_kaina_viso": 30.18,
+            "viso_be_pvm": 30.18
+          },
+          {
+            "nr": 59,
+            "aprasymas": "Pereiga pres. su g.t. 125-100mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.24,
+            "medz_kaina_viso": 4.24,
+            "viso_be_pvm": 4.24
+          },
+          {
+            "nr": 60,
+            "aprasymas": "Trišakis su g.t. 125-125mm, c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 9.73,
+            "medz_kaina_viso": 38.92,
+            "viso_be_pvm": 38.92
+          },
+          {
+            "nr": 61,
+            "aprasymas": "Trišakis su g.t. 100-100mm, c.s.",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 7.99,
+            "medz_kaina_viso": 7.99,
+            "viso_be_pvm": 7.99
+          },
+          {
+            "nr": 62,
+            "aprasymas": "Lankstus akustinis izoliuotas ortakis SONODUCT D127mm",
+            "vnt": "m",
+            "kiekis": 1.5,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.57,
+            "medz_kaina_viso": 6.86,
+            "viso_be_pvm": 6.86
+          },
+          {
+            "nr": 63,
+            "aprasymas": "Lankstus akustinis izoliuotas ortakis SONODUCT D102mm",
+            "vnt": "m",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.1,
+            "medz_kaina_viso": 4.1,
+            "viso_be_pvm": 4.1
+          },
+          {
+            "nr": 64,
+            "aprasymas": "Lankstus akustinis izoliuotas ortakis SONODUCT D163mm",
+            "vnt": "m",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 5.33,
+            "medz_kaina_viso": 10.66,
+            "viso_be_pvm": 10.66
+          },
+          {
+            "nr": 65,
+            "aprasymas": "Lankstus aliuminis ortakis laminuotas PVC, COMBIFLEX D102mm COMBIFLEX",
+            "vnt": "m",
+            "kiekis": 4.5,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 2.6,
+            "medz_kaina_viso": 11.7,
+            "viso_be_pvm": 11.7
+          },
+          {
+            "nr": 66,
+            "aprasymas": "Lankstus aliuminis ortakis laminuotas PVC, COMBIFLEX D127mm",
+            "vnt": "m",
+            "kiekis": 13.5,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 2.95,
+            "medz_kaina_viso": 39.83,
+            "viso_be_pvm": 39.83
+          },
+          {
+            "nr": 67,
+            "aprasymas": "Trišakis su g.t. 160-160mm, c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 10.38,
+            "medz_kaina_viso": 41.52,
+            "viso_be_pvm": 41.52
+          },
+          {
+            "nr": 68,
+            "aprasymas": "Trišakis su g.t. 125-100mm, c.s.",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 9.22,
+            "medz_kaina_viso": 9.22,
+            "viso_be_pvm": 9.22
+          },
+          {
+            "nr": 69,
+            "aprasymas": "Balninė atšaka pres. su g.t. 160-125mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 3.39,
+            "medz_kaina_viso": 13.56,
+            "viso_be_pvm": 13.56
+          },
+          {
+            "nr": 70,
+            "aprasymas": "Apvali Ø160mm oro reguliavimo sklendė rankinio valdymo su g.t., c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 9.83,
+            "medz_kaina_viso": 39.32,
+            "viso_be_pvm": 39.32
+          },
+          {
+            "nr": 71,
+            "aprasymas": "Aliuminė armuota juosta 50mmx50m",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 6.27,
+            "medz_kaina_viso": 6.27,
+            "viso_be_pvm": 6.27
+          },
+          {
+            "nr": 72,
+            "aprasymas": "Perforuota tvirtinimo juosta 0,6mm x 17mm, 25m",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 8.35,
+            "medz_kaina_viso": 8.35,
+            "viso_be_pvm": 8.35
+          },
+          {
+            "nr": 73,
+            "aprasymas": "Izoliacinė juosta siūlėms ACE 50x3mm",
+            "vnt": "m",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 0.76,
+            "medz_kaina_viso": 4.56,
+            "viso_be_pvm": 4.56
+          },
+          {
+            "nr": 74,
+            "aprasymas": "Statmena kryžmė Ø160-Ø160mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 93.0,
+            "medz_kaina_viso": 93.0,
+            "viso_be_pvm": 93.0
+          },
+          {
+            "nr": 75,
+            "aprasymas": "Pagalbinės montavimo medžiagos",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 12.1,
+            "medz_kaina_viso": 12.1,
+            "viso_be_pvm": 12.1
+          },
+          {
+            "nr": 76,
+            "aprasymas": "Alkūnė pres. su g.t. 45° Ø125mm c.s.",
+            "vnt": "vnt",
+            "kiekis": 4.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 4.88,
+            "medz_kaina_viso": 19.52,
+            "viso_be_pvm": 19.52
+          },
+          {
+            "nr": 77,
+            "aprasymas": "Plyšinis priglaistomas difuzorius EGROVENT 1m, 20mm, 2x125 tvirtinimas",
+            "vnt": "vnt",
+            "kiekis": 13.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 194.39,
+            "medz_kaina_viso": 2527.07,
+            "viso_be_pvm": 2527.07
+          },
+          {
+            "nr": 78,
+            "aprasymas": "Apvalus potinkinis priglaistomas difuzorius EGROVENT Ø125mm",
+            "vnt": "vnt",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 41.14,
+            "medz_kaina_viso": 246.84,
+            "viso_be_pvm": 246.84
+          },
+          {
+            "nr": 79,
+            "aprasymas": "Apvalus potinkinis priglaistomas difuzorius EGROVENT Ø100mm",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 41.14,
+            "medz_kaina_viso": 123.42,
+            "viso_be_pvm": 123.42
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Santechnikos darbai",
+        "eilutes": [
+          {
+            "nr": 80,
+            "aprasymas": "Vandens mazgo demontavimas, potinkinės dėžės sumontavimas, vamzdžių suleidimas į",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 320.0,
+            "darbo_kaina_viso": 320.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 320.0
+          },
+          {
+            "nr": 81,
+            "aprasymas": "Vandens tašo laistymui įrengimas garaže",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 55.0,
+            "darbo_kaina_viso": 55.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 55.0
+          },
+          {
+            "nr": 82,
+            "aprasymas": "Lauko laistymo čiaupo montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 60.0,
+            "darbo_kaina_viso": 60.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 60.0
+          },
+          {
+            "nr": 83,
+            "aprasymas": "Tėvų vonios maišytuvo montavimas, betono štrobavimas vamzdžių pravedimui, potinkinės maišytuvo dalies sumontavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 180.0,
+            "darbo_kaina_viso": 180.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 180.0
+          },
+          {
+            "nr": 84,
+            "aprasymas": "Potinkinio vonios maišytuvo virštinkinės dalies montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 75.0,
+            "darbo_kaina_viso": 75.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 75.0
+          },
+          {
+            "nr": 85,
+            "aprasymas": "Potinkinio praustuvo maišytuvo potinkinės dalies montavimas, kanalizacijos privedimas",
+            "vnt": "vnt",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 95.0,
+            "darbo_kaina_viso": 475.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 475.0
+          },
+          {
+            "nr": 86,
+            "aprasymas": "Potinkinio praustuvo maišytuvo virštinkinės dalies montavimas",
+            "vnt": "vnt",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 55.0,
+            "darbo_kaina_viso": 275.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 275.0
+          },
+          {
+            "nr": 87,
+            "aprasymas": "Potinkinio dušo maišytuvo potinkinės dalies montavimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 95.0,
+            "darbo_kaina_viso": 190.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 190.0
+          },
+          {
+            "nr": 88,
+            "aprasymas": "Potinkinio dušo maišytuvo virštinkinės dalies montavimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 55.0,
+            "darbo_kaina_viso": 110.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 110.0
+          },
+          {
+            "nr": 89,
+            "aprasymas": "WC ir bide rėmo montavimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 75.0,
+            "darbo_kaina_viso": 225.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 225.0
+          },
+          {
+            "nr": 90,
+            "aprasymas": "WC ir bide rėmo montavimas suleidžiant į sieną",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 300.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 300.0
+          },
+          {
+            "nr": 91,
+            "aprasymas": "Bide dušiukų potinkinės dalies įrengimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 195.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 195.0
+          },
+          {
+            "nr": 92,
+            "aprasymas": "Bide dušiukų virštinkinės dalies montavimas",
+            "vnt": "vnt",
+            "kiekis": 3.0,
+            "darbo_kaina_vnt": 45.0,
+            "darbo_kaina_viso": 135.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 135.0
+          },
+          {
+            "nr": 93,
+            "aprasymas": "Bide dušiuko vamzdžių privedimas svetainės wc",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 40.0,
+            "darbo_kaina_viso": 40.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 40.0
+          },
+          {
+            "nr": 94,
+            "aprasymas": "Vaikų vonios maišytuvo privedimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 40.0,
+            "darbo_kaina_viso": 40.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 40.0
+          },
+          {
+            "nr": 95,
+            "aprasymas": "Skalbimo mašinos sifono montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 25.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 25.0
+          },
+          {
+            "nr": 96,
+            "aprasymas": "Klozeto/ bide montavimas",
+            "vnt": "vnt",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 70.0,
+            "darbo_kaina_viso": 350.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 350.0
+          },
+          {
+            "nr": 97,
+            "aprasymas": "Gyvatuko montavimas, teno pajungimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 130.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 130.0
+          },
+          {
+            "nr": 98,
+            "aprasymas": "Skalbimo mašinos montavimas",
+            "vnt": "vnt",
+            "kiekis": 0.0,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": null
+          },
+          {
+            "nr": 99,
+            "aprasymas": "Džiovyklės montavimas",
+            "vnt": "vnt",
+            "kiekis": 0.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": null
+          },
+          {
+            "nr": 100,
+            "aprasymas": "Medžiagos montavimui",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 910.0,
+            "medz_kaina_viso": 910.0,
+            "viso_be_pvm": 910.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Grindų montavimas",
+        "eilutes": [
+          {
+            "nr": 101,
+            "aprasymas": "Parketlenčių klijavimas 45° eglutė",
+            "vnt": "m2",
+            "kiekis": 108.08,
+            "darbo_kaina_vnt": 20.0,
+            "darbo_kaina_viso": 2161.6,
+            "medz_kaina_vnt": 8.0,
+            "medz_kaina_viso": 864.64,
+            "viso_be_pvm": 3026.24
+          },
+          {
+            "nr": 102,
+            "aprasymas": "Išlyginamojo sluoksnio įrengimas",
+            "vnt": "m2",
+            "kiekis": 143.19,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 859.1,
+            "medz_kaina_vnt": 9.8,
+            "medz_kaina_viso": 1403.26,
+            "viso_be_pvm": 2262.36
+          },
+          {
+            "nr": 103,
+            "aprasymas": "Į sieną įleistų grindjuosčių įrengimas",
+            "vnt": "m",
+            "kiekis": 63.0,
+            "darbo_kaina_vnt": 50.0,
+            "darbo_kaina_viso": 3150.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 3150.0
+          },
+          {
+            "nr": 104,
+            "aprasymas": "Paprastų grindjuosčių montavimas",
+            "vnt": "m",
+            "kiekis": 30.8,
+            "darbo_kaina_vnt": 8.0,
+            "darbo_kaina_viso": 246.4,
+            "medz_kaina_vnt": 12.1,
+            "medz_kaina_viso": 372.68,
+            "viso_be_pvm": 619.08
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Paplidomi darbai ir medžiagos",
+        "eilutes": [
+          {
+            "nr": 105,
+            "aprasymas": "Durų angos platinimas į miegamojo rūbinę",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 500.0,
+            "darbo_kaina_viso": 500.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 500.0
+          },
+          {
+            "nr": 106,
+            "aprasymas": "Sienos paruošimas Mėnulio dekorui",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 1025.0,
+            "darbo_kaina_viso": 1025.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1025.0
+          },
+          {
+            "nr": 107,
+            "aprasymas": "Mėnulio ir tv sienos dekoravimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 3500.0,
+            "darbo_kaina_viso": 3500.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 3500.0
+          },
+          {
+            "nr": 108,
+            "aprasymas": "Guminės dangos montavimas garaže",
+            "vnt": "m2",
+            "kiekis": 10.8,
+            "darbo_kaina_vnt": 10.0,
+            "darbo_kaina_viso": 108.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 108.0
+          },
+          {
+            "nr": 109,
+            "aprasymas": "Jungikliai",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 664.04,
+            "medz_kaina_viso": 664.04,
+            "viso_be_pvm": 664.04
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Statybvietės išlaidos",
+        "eilutes": [
+          {
+            "nr": 110,
+            "aprasymas": "Šiukšlių išvežimas",
+            "vnt": "m3",
+            "kiekis": 12.0,
+            "darbo_kaina_vnt": 40.0,
+            "darbo_kaina_viso": 480.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 480.0
+          },
+          {
+            "nr": 111,
+            "aprasymas": "Pastolių nuoma (aukštesnių nei 3m)",
+            "vnt": "d.d",
+            "kiekis": 90.0,
+            "darbo_kaina_vnt": 7.3,
+            "darbo_kaina_viso": 653.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 653.4
+          },
+          {
+            "nr": 112,
+            "aprasymas": "Durų rankenos keitimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 50.0,
+            "medz_kaina_viso": 50.0,
+            "viso_be_pvm": 50.0
+          }
+        ]
+      }
+    ]
+  },
+  "P2": {
+    "skyriai": [
+      {
+        "pavadinimas": "Gipso kartono montavimas",
+        "eilutes": [
+          {
+            "nr": 1,
+            "aprasymas": "GKP monatavimas ant lubų, įrengiant dvigubą karkasą",
+            "vnt": "m2",
+            "kiekis": 111.84,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 1453.92,
+            "medz_kaina_vnt": 18.0,
+            "medz_kaina_viso": 2013.12,
+            "viso_be_pvm": 3467.04
+          },
+          {
+            "nr": 2,
+            "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)",
+            "vnt": "m",
+            "kiekis": 16.84,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 218.92,
+            "medz_kaina_vnt": 16.0,
+            "medz_kaina_viso": 269.44,
+            "viso_be_pvm": 488.36
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti (dviguba)",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 100.0,
+            "darbo_kaina_viso": 200.0,
+            "medz_kaina_vnt": 40.0,
+            "medz_kaina_viso": 80.0,
+            "viso_be_pvm": 280.0
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Angokraščių apdirbimas GKP",
+            "vnt": "m",
+            "kiekis": 34.53,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 518.0,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 172.65,
+            "viso_be_pvm": 690.65
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Smulkūs papildomi darbai",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 100.0,
+            "darbo_kaina_viso": 100.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 100.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Sienų lubų glaistymas dažymas",
+        "eilutes": [
+          {
+            "nr": 6,
+            "aprasymas": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+            "vnt": "m2",
+            "kiekis": 37.0,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 259.0,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 222.0,
+            "viso_be_pvm": 481.0
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Sienų, lubų glaistymas/dažymas",
+            "vnt": "m2",
+            "kiekis": 388.01,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 5044.1,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 2716.07,
+            "viso_be_pvm": 7760.17
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m",
+            "kiekis": 201.86,
+            "darbo_kaina_vnt": 4.0,
+            "darbo_kaina_viso": 807.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 807.4
+          },
+          {
+            "nr": 9,
+            "aprasymas": "Durų angos į rūbinę glaistymas dažymas",
+            "vnt": "m",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 65.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 65.0
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Priglaistomo plyšinio difūzoriaus apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 30.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 30.0
+          },
+          {
+            "nr": 11,
+            "aprasymas": "Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+            "vnt": "m",
+            "kiekis": 16.84,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 218.9,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 218.9
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Plytelių klijavimas",
+        "eilutes": [
+          {
+            "nr": 12,
+            "aprasymas": "Plytelių klijavimas ant sienų ir grindų ( standartinio formato plytelės)",
+            "vnt": "m2; b/m",
+            "kiekis": 55.27,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 1381.8,
+            "medz_kaina_vnt": 14.0,
+            "medz_kaina_viso": 773.78,
+            "viso_be_pvm": 2155.58
+          },
+          {
+            "nr": 13,
+            "aprasymas": "Nuolydžio formavimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 150.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 150.0
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Hidroizoliacijos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 180.0,
+            "darbo_kaina_viso": 360.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 360.0
+          },
+          {
+            "nr": 15,
+            "aprasymas": "Skylių gręžimas plytelėse",
+            "vnt": "vnt",
+            "kiekis": 21.0,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 126.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 126.0
+          },
+          {
+            "nr": 16,
+            "aprasymas": "Kampų silikonavimas",
+            "vnt": "m",
+            "kiekis": 38.15,
+            "darbo_kaina_vnt": 2.5,
+            "darbo_kaina_viso": 95.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 95.4
+          },
+          {
+            "nr": 17,
+            "aprasymas": "Plytelių supjovimas 45⁰ kampu",
+            "vnt": "m",
+            "kiekis": 18.6,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 465.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 465.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Santechnikos darbai/ kondicionavimo darbai",
+        "eilutes": [
+          {
+            "nr": 18,
+            "aprasymas": "Santechnikos taškų koregavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 75.0,
+            "darbo_kaina_viso": 75.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 75.0
+          },
+          {
+            "nr": 18,
+            "aprasymas": "Wc rėmo montavimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 130.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 130.0
+          },
+          {
+            "nr": 1,
+            "aprasymas": "Potinkinės dušo sistemos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 150.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 150.0
+          },
+          {
+            "nr": 2,
+            "aprasymas": "Potinkinės praustuvo sistemos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 85.0,
+            "darbo_kaina_viso": 85.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 85.0
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Skalbimo mašinos sifono įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 60.0,
+            "darbo_kaina_viso": 60.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 60.0
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Kondicionieriaus sifono įrengimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 45.0,
+            "darbo_kaina_viso": 90.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 90.0
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Medžiagos santechnikos montavimui",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 314.0,
+            "medz_kaina_viso": 314.0,
+            "viso_be_pvm": 314.0
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Trasų kondicionieriams įrengimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 225.0,
+            "darbo_kaina_viso": 450.0,
+            "medz_kaina_vnt": 167.1,
+            "medz_kaina_viso": 334.2,
+            "viso_be_pvm": 784.2
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Elektros instaliacijos darbai",
+        "eilutes": [
+          {
+            "nr": 6,
+            "aprasymas": "Smulkūs el. darbai",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 75.0,
+            "darbo_kaina_viso": 75.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 75.0
+          },
+          {
+            "nr": 1,
+            "aprasymas": "Rozetės/ jungiklio komutavimas",
+            "vnt": "vnt",
+            "kiekis": 75.0,
+            "darbo_kaina_vnt": 6.5,
+            "darbo_kaina_viso": 487.5,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 487.5
+          },
+          {
+            "nr": 2,
+            "aprasymas": "Skylių šviestuvams gręžimas",
+            "vnt": "vnt",
+            "kiekis": 57.0,
+            "darbo_kaina_vnt": 5.5,
+            "darbo_kaina_viso": 313.5,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 313.5
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Pakabinamų šviestuvų montavimas",
+            "vnt": "vnt",
+            "kiekis": 0.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": null
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Led juostos komutavimas",
+            "vnt": "m",
+            "kiekis": 16.7,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 217.1,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 217.1
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Signalizacijos daviklių pajungimas languose",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 75.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 20.0,
+            "medz_kaina_viso": 20.0,
+            "viso_be_pvm": 20.0
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Medžiagos",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 597.43,
+            "medz_kaina_viso": 597.43,
+            "viso_be_pvm": 597.43
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Grindų durų montavimas",
+        "eilutes": [
+          {
+            "nr": 7,
+            "aprasymas": "Palangių montavimas",
+            "vnt": "m",
+            "kiekis": 4.94,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 74.1,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 34.58,
+            "viso_be_pvm": 108.67999999999999
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Pvc grindų įrengimas (ne eglute)",
+            "vnt": "m2",
+            "kiekis": 98.0,
+            "darbo_kaina_vnt": 15.5,
+            "darbo_kaina_viso": 1519.0,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 490.0,
+            "viso_be_pvm": 2009.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Statybvietės išlaidos",
+        "eilutes": [
+          {
+            "nr": 9,
+            "aprasymas": "Šiukšlių išvežimas",
+            "vnt": "m3",
+            "kiekis": 10.0,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 350.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 350.0
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Drėgmės surinkėjo nuoma",
+            "vnt": "d.d",
+            "kiekis": 25.0,
+            "darbo_kaina_vnt": 8.0,
+            "darbo_kaina_viso": 200.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 200.0
+          }
+        ]
+      }
+    ]
+  },
+  "P3": {
+    "skyriai": [
+      {
+        "pavadinimas": "Sienų lubų glaistymas dažymas",
+        "eilutes": [
+          {
+            "nr": 1,
+            "aprasymas": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+            "vnt": "m2",
+            "kiekis": 95.0,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 665.0,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 570.0,
+            "viso_be_pvm": 1235.0
+          },
+          {
+            "nr": 2,
+            "aprasymas": "Lubų glaistymas/dažymas ( Benajamin Moore dažai)",
+            "vnt": "m2",
+            "kiekis": 139.79,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 2096.9,
+            "medz_kaina_vnt": 8.85,
+            "medz_kaina_viso": 1237.14,
+            "viso_be_pvm": 3334.04
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Sienų, lubų glaistymas/dažymas ( Benajamin Moore dažai)",
+            "vnt": "m2",
+            "kiekis": 250.95,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 3764.3,
+            "medz_kaina_vnt": 11.62,
+            "medz_kaina_viso": 2916.04,
+            "viso_be_pvm": 6680.34
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Stiklo audinio klijavimas ant vėsinamų lubų",
+            "vnt": "m2",
+            "kiekis": 134.79,
+            "darbo_kaina_vnt": 10.0,
+            "darbo_kaina_viso": 1347.9,
+            "medz_kaina_vnt": 3.5,
+            "medz_kaina_viso": 471.77,
+            "viso_be_pvm": 1819.67
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Sienų, lubų glaistymas/dažymas ( Supreme Ultimate dažais )",
+            "vnt": "m2",
+            "kiekis": 29.34,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 440.1,
+            "medz_kaina_vnt": 7.5,
+            "medz_kaina_viso": 220.05,
+            "viso_be_pvm": 660.1500000000001
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Durų angų paruošimas beapvadinėms durims",
+            "vnt": "b/m",
+            "kiekis": 23.92,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 358.8,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 358.8
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Paslėptų durų staktų apdirbimas gipso kartonu bei glaistymas dažymas",
+            "vnt": "b/m",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 55.0,
+            "darbo_kaina_viso": 275.0,
+            "medz_kaina_vnt": 12.0,
+            "medz_kaina_viso": 60.0,
+            "viso_be_pvm": 335.0
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Durų varčios dažymas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 70.0,
+            "darbo_kaina_viso": 70.0,
+            "medz_kaina_vnt": 35.0,
+            "medz_kaina_viso": 35.0,
+            "viso_be_pvm": 105.0
+          },
+          {
+            "nr": 9,
+            "aprasymas": "Angokraščių glaistymas dažymas",
+            "vnt": "b/m",
+            "kiekis": 23.8,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 357.0,
+            "medz_kaina_vnt": 7.5,
+            "medz_kaina_viso": 178.5,
+            "viso_be_pvm": 535.5
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Moldingų dažymas",
+            "vnt": "bv/m",
+            "kiekis": 27.1,
+            "darbo_kaina_vnt": 5.0,
+            "darbo_kaina_viso": 135.5,
+            "medz_kaina_vnt": 1.5,
+            "medz_kaina_viso": 40.65,
+            "viso_be_pvm": 176.15
+          },
+          {
+            "nr": 11,
+            "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m",
+            "kiekis": 329.77,
+            "darbo_kaina_vnt": 4.0,
+            "darbo_kaina_viso": 1319.1,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1319.1
+          },
+          {
+            "nr": 12,
+            "aprasymas": "Priglaistomų led ptofilių apdirbimas",
+            "vnt": "m",
+            "kiekis": 5.5,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 82.5,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 82.5
+          },
+          {
+            "nr": 13,
+            "aprasymas": "Priglaistomų gipsinių šviestuvų apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 37.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 555.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 555.0
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+            "vnt": "m",
+            "kiekis": 34.54,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 1036.2,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1036.2
+          },
+          {
+            "nr": 15,
+            "aprasymas": "Lubų iš gipso kartono montavimas laiptinėje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 250.0,
+            "darbo_kaina_viso": 250.0,
+            "medz_kaina_vnt": 120.0,
+            "medz_kaina_viso": 120.0,
+            "viso_be_pvm": 370.0
+          }
+        ]
+      }
+    ]
+  },
+  "P4": {
+    "skyriai": [
+      {
+        "pavadinimas": "Sienų lubų glaistymas dažymas",
+        "eilutes": [
+          {
+            "nr": 1,
+            "aprasymas": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+            "vnt": "m2",
+            "kiekis": 132.36,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 926.5,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 794.16,
+            "viso_be_pvm": 1720.6599999999999
+          },
+          {
+            "nr": 2,
+            "aprasymas": "Sienų, lubų glaistymas/dažymas",
+            "vnt": "m2; b/m",
+            "kiekis": 461.31,
+            "darbo_kaina_vnt": 13.0,
+            "darbo_kaina_viso": 5997.0,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 3229.17,
+            "viso_be_pvm": 9226.17
+          },
+          {
+            "nr": 3,
+            "aprasymas": "Papildomas sienų glaistymas",
+            "vnt": "m2",
+            "kiekis": 395.19,
+            "darbo_kaina_vnt": 1.5,
+            "darbo_kaina_viso": 592.8,
+            "medz_kaina_vnt": 0.7,
+            "medz_kaina_viso": 276.63,
+            "viso_be_pvm": 869.43
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Durų angų paruošimas beapvadinėms durims",
+            "vnt": "m",
+            "kiekis": 33.97,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 509.6,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 509.6
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m",
+            "kiekis": 303.25,
+            "darbo_kaina_vnt": 4.0,
+            "darbo_kaina_viso": 1213.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 1213.0
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Priglaistomų gipsinių difūzorių apdirbimas (apvalių)",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 30.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 30.0
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Priglaistomų difūzorių apdirbimas (pailgų)",
+            "vnt": "vnt",
+            "kiekis": 9.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 225.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 225.0
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Priglaistomų revizinių durelių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 30.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 30.0
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Durų angų siaurinimas žeminimas",
+            "vnt": "m",
+            "kiekis": 7.88,
+            "darbo_kaina_vnt": 11.0,
+            "darbo_kaina_viso": 86.7,
+            "medz_kaina_vnt": 5.0,
+            "medz_kaina_viso": 39.4,
+            "viso_be_pvm": 126.1
+          },
+          {
+            "nr": 9,
+            "aprasymas": "Angokraščių apdirbimas gipso kartonu",
+            "vnt": "m",
+            "kiekis": 85.45,
+            "darbo_kaina_vnt": 20.0,
+            "darbo_kaina_viso": 1709.0,
+            "medz_kaina_vnt": 7.0,
+            "medz_kaina_viso": 598.15,
+            "viso_be_pvm": 2307.15
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Stoglangių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 130.0,
+            "darbo_kaina_viso": 780.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 780.0
+          },
+          {
+            "nr": 11,
+            "aprasymas": "Štrabų sienose užtaisymas",
+            "vnt": "m",
+            "kiekis": 18.0,
+            "darbo_kaina_vnt": 5.0,
+            "darbo_kaina_viso": 90.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 90.0
+          },
+          {
+            "nr": 12,
+            "aprasymas": "Gipso kartono pjovimas lubose, šešėlinei siūlei įrengti",
+            "vnt": "m",
+            "kiekis": 19.0,
+            "darbo_kaina_vnt": 5.0,
+            "darbo_kaina_viso": 95.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 95.0
+          },
+          {
+            "nr": 13,
+            "aprasymas": "Plyšinių difūzorių reguliavimas/ perdarymas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 150.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 150.0
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Gipso kartono klijavimas ant sienos katilinėje WC rėmui uždengti",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 50.0,
+            "darbo_kaina_viso": 50.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 50.0
+          },
+          {
+            "nr": 15,
+            "aprasymas": "Katiliės betono lubų valymas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 200.0,
+            "darbo_kaina_viso": 200.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 200.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Plytelių klijavimas",
+        "eilutes": [
+          {
+            "nr": 16,
+            "aprasymas": "Plytelių klijavimas ant sienų ir grindų ( standartinio formato plytelės)",
+            "vnt": "m2",
+            "kiekis": 101.57,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 2539.3,
+            "medz_kaina_vnt": 14.0,
+            "medz_kaina_viso": 1421.98,
+            "viso_be_pvm": 3961.28
+          },
+          {
+            "nr": 17,
+            "aprasymas": "Angokraščių ir nišų šampunui klijavimas plytelėmis",
+            "vnt": "b/m",
+            "kiekis": 25.74,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 643.5,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 643.5
+          },
+          {
+            "nr": 18,
+            "aprasymas": "Nuolydžio formavimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 300.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 300.0
+          },
+          {
+            "nr": 19,
+            "aprasymas": "Latako montavimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 150.0,
+            "darbo_kaina_viso": 300.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 300.0
+          },
+          {
+            "nr": 20,
+            "aprasymas": "Trapo montavimas katilinėje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 90.0,
+            "darbo_kaina_viso": 90.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 90.0
+          },
+          {
+            "nr": 21,
+            "aprasymas": "Hidroizoliacijos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 180.0,
+            "darbo_kaina_viso": 360.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 360.0
+          },
+          {
+            "nr": 22,
+            "aprasymas": "Skylių gręžimas plytelėse",
+            "vnt": "vnt",
+            "kiekis": 49.0,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 343.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 343.0
+          },
+          {
+            "nr": 23,
+            "aprasymas": "Kampų silikonavimas",
+            "vnt": "m",
+            "kiekis": 60.54,
+            "darbo_kaina_vnt": 2.5,
+            "darbo_kaina_viso": 151.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 151.4
+          },
+          {
+            "nr": 24,
+            "aprasymas": "Plintusų supjovimas ir klijavimas",
+            "vnt": "m",
+            "kiekis": 8.33,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 125.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 125.0
+          },
+          {
+            "nr": 25,
+            "aprasymas": "Plytelių supjovimas 45⁰ kampu",
+            "vnt": "m",
+            "kiekis": 32.52,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 813.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 813.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Statybvietės išlaidos",
+        "eilutes": [
+          {
+            "nr": 26,
+            "aprasymas": "Šiukšlių išvežimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 100.0,
+            "darbo_kaina_viso": 100.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 100.0
+          },
+          {
+            "nr": 27,
+            "aprasymas": "Pastolių nuoma (aukštesnių nei 3m)",
+            "vnt": "d.d",
+            "kiekis": 25.0,
+            "darbo_kaina_vnt": 8.5,
+            "darbo_kaina_viso": 212.5,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 212.5
+          }
+        ]
+      }
+    ]
+  },
+  "P5": {
+    "skyriai": [
+      {
+        "pavadinimas": "Gipso kartono montavimas",
+        "eilutes": [
+          {
+            "nr": 1,
+            "aprasymas": "GKP monatavimas ant lubų, įrengiant dvigubą karkasą",
+            "vnt": "m2",
+            "kiekis": 41.28,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 1032.0,
+            "medz_kaina_vnt": 28.0,
+            "medz_kaina_viso": 1155.84,
+            "viso_be_pvm": 2187.84
+          },
+          {
+            "nr": 2,
+            "aprasymas": "GKP pertvaru įrengimas, montuojant keturis sluoksnius gipso kartono ir apšiltinant vata",
+            "vnt": "m2",
+            "kiekis": 11.14,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 278.5,
+            "medz_kaina_vnt": 35.0,
+            "medz_kaina_viso": 389.9,
+            "viso_be_pvm": 668.4
+          },
+          {
+            "nr": 3,
+            "aprasymas": "GKP \"dėžučių\" motavimas ant lubų (žeminimas, aukštinimas ir kt.)",
+            "vnt": "m",
+            "kiekis": 9.94,
+            "darbo_kaina_vnt": 20.0,
+            "darbo_kaina_viso": 198.8,
+            "medz_kaina_vnt": 28.0,
+            "medz_kaina_viso": 278.32,
+            "viso_be_pvm": 477.12
+          },
+          {
+            "nr": 4,
+            "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)",
+            "vnt": "m",
+            "kiekis": 10.58,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 158.7,
+            "medz_kaina_vnt": 16.0,
+            "medz_kaina_viso": 169.28,
+            "viso_be_pvm": 327.98
+          },
+          {
+            "nr": 5,
+            "aprasymas": "Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 65.0,
+            "medz_kaina_vnt": 25.0,
+            "medz_kaina_viso": 25.0,
+            "viso_be_pvm": 90.0
+          },
+          {
+            "nr": 6,
+            "aprasymas": "Paslėptų durų staktų apdirbimas",
+            "vnt": "m",
+            "kiekis": 10.22,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 255.5,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 61.32,
+            "viso_be_pvm": 316.82
+          },
+          {
+            "nr": 7,
+            "aprasymas": "Priglaistomų gipsinių difūzorių montavimas",
+            "vnt": "vnt",
+            "kiekis": 6.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 90.0,
+            "medz_kaina_vnt": 40.49,
+            "medz_kaina_viso": 242.94,
+            "viso_be_pvm": 332.94
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Priglaistomų gipsinių šviestuvų, montavimas",
+            "vnt": "vnt",
+            "kiekis": 9.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 135.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 135.0
+          },
+          {
+            "nr": 8,
+            "aprasymas": "Priglaistomų led profilių montavimas",
+            "vnt": "m",
+            "kiekis": 6.85,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 102.75,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 102.75
+          },
+          {
+            "nr": 9,
+            "aprasymas": "Priglaistomų revizinių durelių montavimas vonioje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 65.0,
+            "medz_kaina_vnt": 189.0,
+            "medz_kaina_viso": 189.0,
+            "viso_be_pvm": 254.0
+          },
+          {
+            "nr": 10,
+            "aprasymas": "Angokraščių apdirbimas GKP",
+            "vnt": "m",
+            "kiekis": 31.8,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 795.0,
+            "medz_kaina_vnt": 15.0,
+            "medz_kaina_viso": 477.0,
+            "viso_be_pvm": 1272.0
+          },
+          {
+            "nr": 11,
+            "aprasymas": "Nišos įrengimas duše",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 50.0,
+            "darbo_kaina_viso": 50.0,
+            "medz_kaina_vnt": 10.0,
+            "medz_kaina_viso": 10.0,
+            "viso_be_pvm": 60.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Sienų lubų glaistymas dažymas",
+        "eilutes": [
+          {
+            "nr": 12,
+            "aprasymas": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+            "vnt": "m2",
+            "kiekis": 32.41,
+            "darbo_kaina_vnt": 9.0,
+            "darbo_kaina_viso": 291.7,
+            "medz_kaina_vnt": 5.5,
+            "medz_kaina_viso": 178.26,
+            "viso_be_pvm": 469.96
+          },
+          {
+            "nr": 13,
+            "aprasymas": "Sienų, lubų glaistymas/dažymas",
+            "vnt": "m2",
+            "kiekis": 150.57,
+            "darbo_kaina_vnt": 14.0,
+            "darbo_kaina_viso": 2108.0,
+            "medz_kaina_vnt": 8.0,
+            "medz_kaina_viso": 1204.56,
+            "viso_be_pvm": 3312.56
+          },
+          {
+            "nr": 14,
+            "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m",
+            "kiekis": 123.59,
+            "darbo_kaina_vnt": 7.0,
+            "darbo_kaina_viso": 865.1,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 865.1
+          },
+          {
+            "nr": 15,
+            "aprasymas": "Priglaistomų led ptofilių apdirbimas",
+            "vnt": "m",
+            "kiekis": 6.85,
+            "darbo_kaina_vnt": 14.0,
+            "darbo_kaina_viso": 95.9,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 95.9
+          },
+          {
+            "nr": 16,
+            "aprasymas": "Priglaistomų gipsinių šviestuvų, bei difūzorių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 15.0,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 225.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 225.0
+          },
+          {
+            "nr": 17,
+            "aprasymas": "Priglaistomų revizinių durelių apdirbimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 30.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 30.0
+          },
+          {
+            "nr": 18,
+            "aprasymas": "Durų angų paruošimas beapvadinėms durims",
+            "vnt": "m",
+            "kiekis": 10.22,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 153.3,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 153.3
+          },
+          {
+            "nr": 19,
+            "aprasymas": "Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+            "vnt": "m",
+            "kiekis": 10.68,
+            "darbo_kaina_vnt": 15.0,
+            "darbo_kaina_viso": 160.2,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 160.2
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Plytelių klijavimas",
+        "eilutes": [
+          {
+            "nr": 20,
+            "aprasymas": "Plytelių klijavimas ant sienų ir grindų ( iki 120*60)",
+            "vnt": "m2/m",
+            "kiekis": 32.97,
+            "darbo_kaina_vnt": 45.0,
+            "darbo_kaina_viso": 1483.7,
+            "medz_kaina_vnt": 15.0,
+            "medz_kaina_viso": 494.55,
+            "viso_be_pvm": 1978.25
+          },
+          {
+            "nr": 21,
+            "aprasymas": "Nuolydžio formavimas dušo kabinoje",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 210.0,
+            "darbo_kaina_viso": 210.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 210.0
+          },
+          {
+            "nr": 22,
+            "aprasymas": "Hidroizoliacijos įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 185.0,
+            "darbo_kaina_viso": 185.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 185.0
+          },
+          {
+            "nr": 23,
+            "aprasymas": "Skylių gręžimas plytelėse",
+            "vnt": "vnt",
+            "kiekis": 17.0,
+            "darbo_kaina_vnt": 10.0,
+            "darbo_kaina_viso": 170.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 170.0
+          },
+          {
+            "nr": 24,
+            "aprasymas": "Kampų silikonavimas",
+            "vnt": "m",
+            "kiekis": 25.36,
+            "darbo_kaina_vnt": 2.5,
+            "darbo_kaina_viso": 63.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 63.4
+          },
+          {
+            "nr": 25,
+            "aprasymas": "Plytelių supjovimas 45⁰ kampu",
+            "vnt": "m",
+            "kiekis": 5.91,
+            "darbo_kaina_vnt": 30.0,
+            "darbo_kaina_viso": 177.3,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 177.3
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Santechnikos darbai",
+        "eilutes": [
+          {
+            "nr": 26,
+            "aprasymas": "Wc rėmo montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 65.0,
+            "medz_kaina_vnt": 175.0,
+            "medz_kaina_viso": 175.0,
+            "viso_be_pvm": 240.0
+          },
+          {
+            "nr": 27,
+            "aprasymas": "Latako montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 95.0,
+            "darbo_kaina_viso": 95.0,
+            "medz_kaina_vnt": 108.0,
+            "medz_kaina_viso": 108.0,
+            "viso_be_pvm": 203.0
+          },
+          {
+            "nr": 28,
+            "aprasymas": "Santechnikos taškų koregavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 120.0,
+            "darbo_kaina_viso": 120.0,
+            "medz_kaina_vnt": 65.23,
+            "medz_kaina_viso": 65.23,
+            "viso_be_pvm": 185.23000000000002
+          },
+          {
+            "nr": 29,
+            "aprasymas": "Klozeto montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 70.0,
+            "darbo_kaina_viso": 70.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 70.0
+          },
+          {
+            "nr": 30,
+            "aprasymas": "Gyvatuko montavimas, teno pajungimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 65.0,
+            "darbo_kaina_viso": 65.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 65.0
+          },
+          {
+            "nr": 31,
+            "aprasymas": "Dušo maišytuvo sistemos montavimas ( ne potinkinės)",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 85.0,
+            "darbo_kaina_viso": 85.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 85.0
+          },
+          {
+            "nr": 32,
+            "aprasymas": "Plautuvės montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 70.0,
+            "darbo_kaina_viso": 70.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 70.0
+          },
+          {
+            "nr": 33,
+            "aprasymas": "Praustuvės montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 70.0,
+            "darbo_kaina_viso": 70.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 70.0
+          },
+          {
+            "nr": 34,
+            "aprasymas": "Skalbimo mašinos montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 35.0,
+            "darbo_kaina_viso": 35.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 35.0
+          },
+          {
+            "nr": 35,
+            "aprasymas": "Džiovyklės montavimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 25.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 25.0
+          },
+          {
+            "nr": 36,
+            "aprasymas": "Medžiagos montavimui",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 0.0,
+            "darbo_kaina_viso": 0.0,
+            "medz_kaina_vnt": 175.0,
+            "medz_kaina_viso": 175.0,
+            "viso_be_pvm": 175.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Elektros instaliacijos darbai",
+        "eilutes": [
+          {
+            "nr": 37,
+            "aprasymas": "Skylių gręžimas (į betoną) dėžučių rozetėms montavimas",
+            "vnt": "vnt",
+            "kiekis": 13.0,
+            "darbo_kaina_vnt": 10.0,
+            "darbo_kaina_viso": 130.0,
+            "medz_kaina_vnt": 1.5,
+            "medz_kaina_viso": 19.5,
+            "viso_be_pvm": 149.5
+          },
+          {
+            "nr": 38,
+            "aprasymas": "Skylių gręžimas (į gipso kartoną) dėžučių rozetėms montavimas",
+            "vnt": "vnt",
+            "kiekis": 5.0,
+            "darbo_kaina_vnt": 5.0,
+            "darbo_kaina_viso": 25.0,
+            "medz_kaina_vnt": 1.5,
+            "medz_kaina_viso": 7.5,
+            "viso_be_pvm": 32.5
+          },
+          {
+            "nr": 39,
+            "aprasymas": "Esamų kabelių koregavimas, naujų kabeliavimas",
+            "vnt": "m",
+            "kiekis": 252.0,
+            "darbo_kaina_vnt": 2.0,
+            "darbo_kaina_viso": 504.0,
+            "medz_kaina_vnt": 0.55,
+            "medz_kaina_viso": 138.6,
+            "viso_be_pvm": 642.6
+          },
+          {
+            "nr": 40,
+            "aprasymas": "Automatinių jungiklių montavimas E. skyde",
+            "vnt": "vnt",
+            "kiekis": 17.0,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 102.0,
+            "medz_kaina_vnt": 3.2,
+            "medz_kaina_viso": 54.4,
+            "viso_be_pvm": 156.4
+          },
+          {
+            "nr": 41,
+            "aprasymas": "Rozetės/ jungiklio komutavimas",
+            "vnt": "vnt",
+            "kiekis": 33.0,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 198.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 198.0
+          },
+          {
+            "nr": 42,
+            "aprasymas": "Pakabinamų šviestuvų montavimas",
+            "vnt": "vnt",
+            "kiekis": 2.0,
+            "darbo_kaina_vnt": 25.0,
+            "darbo_kaina_viso": 50.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 50.0
+          },
+          {
+            "nr": 43,
+            "aprasymas": "Led juostos komutavimas",
+            "vnt": "m",
+            "kiekis": 16.53,
+            "darbo_kaina_vnt": 12.0,
+            "darbo_kaina_viso": 198.4,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 198.4
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Grindų įrengimas",
+        "eilutes": [
+          {
+            "nr": 44,
+            "aprasymas": "PVC dangos klijavimas",
+            "vnt": "m2",
+            "kiekis": 36.99,
+            "darbo_kaina_vnt": 17.0,
+            "darbo_kaina_viso": 628.8,
+            "medz_kaina_vnt": 6.0,
+            "medz_kaina_viso": 221.94,
+            "viso_be_pvm": 850.74
+          },
+          {
+            "nr": 45,
+            "aprasymas": "Grindjuosčių klijavimas (medinių ne baltų iki 7cm aukščio)",
+            "vnt": "m",
+            "kiekis": 23.07,
+            "darbo_kaina_vnt": 6.0,
+            "darbo_kaina_viso": 138.4,
+            "medz_kaina_vnt": 0.7,
+            "medz_kaina_viso": 16.15,
+            "viso_be_pvm": 154.55
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Vėdinimas/ kondicionavimas/šildymas",
+        "eilutes": [
+          {
+            "nr": 16,
+            "aprasymas": "Rekuperacijos ortakių įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 550.0,
+            "darbo_kaina_viso": 550.0,
+            "medz_kaina_vnt": 710.0,
+            "medz_kaina_viso": 710.0,
+            "viso_be_pvm": 1260.0
+          },
+          {
+            "nr": 17,
+            "aprasymas": "Rekuperatoriaus montavimas*",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 200.0,
+            "darbo_kaina_viso": 200.0,
+            "medz_kaina_vnt": 1413.22,
+            "medz_kaina_viso": 1413.22,
+            "viso_be_pvm": 1613.22
+          },
+          {
+            "nr": 19,
+            "aprasymas": "Kondicionieriaus įrengimas",
+            "vnt": "vnt",
+            "kiekis": 1.0,
+            "darbo_kaina_vnt": 250.0,
+            "darbo_kaina_viso": 250.0,
+            "medz_kaina_vnt": 200.0,
+            "medz_kaina_viso": 200.0,
+            "viso_be_pvm": 450.0
+          }
+        ]
+      },
+      {
+        "pavadinimas": "Statybvietės išlaidos",
+        "eilutes": [
+          {
+            "nr": 46,
+            "aprasymas": "Šiukšlių išvežimas",
+            "vnt": "m3",
+            "kiekis": 8.0,
+            "darbo_kaina_vnt": 40.0,
+            "darbo_kaina_viso": 320.0,
+            "medz_kaina_vnt": 0.0,
+            "medz_kaina_viso": 0.0,
+            "viso_be_pvm": 320.0
+          }
+        ]
+      }
+    ]
+  }
+}

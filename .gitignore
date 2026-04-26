@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+backend/logs/
+*.log
+
+# Large training assets — keep them out of git
+training-data/*/projektas_*_breziniai.pdf
+training-data/*/projektas_*_pasiulymas.pdf
+
+# Plan / experiment artifacts
+backend/scripts/baseline_output/*.json

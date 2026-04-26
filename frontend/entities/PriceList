@@ -1,0 +1,41 @@
+{
+  "name": "PriceList",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Price list name"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "description": "Price list items",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "total_items": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

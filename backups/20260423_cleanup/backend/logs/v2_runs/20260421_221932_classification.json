@@ -1,0 +1,522 @@
+[
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 0,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 1,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 2,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 3,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 4,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 5,
+    "page_type": "ceiling_plan",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 6,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 7,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 8,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 9,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 10,
+    "page_type": "explication",
+    "method": "text",
+    "confidence": 1.0,
+    "reasoning": "Matched text keyword"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 11,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje rodomi dvi sienų išklotinės (viršutinė ir apatinė) su detalizuotais vertikaliais vaizdais, matmenimis, durų/langų pozicijomis, bei šono nuotraukos, kas charakteringa sienų elevacijoms."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 12,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Puslapyje rodomi sienų šoniniai vaizdai su matmenimis, medžiagų specifikacijomis ir vizualizacijomis, kas yra būdinga sienų išklotinės brėžiniui."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 13,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Puslapyje rodomi šoniniai vaizdai su detalėmis apie aklo, kuparos ir šildymo įrenginių montavimą, matmenys ir profiliai, kas charakteringa sienų išklotinės brėžiniui."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 14,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTLtGMWaBEZa82f9pFL'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 15,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje matoma sienų išklotinė su vertikaliu vaizdu iš šono - sienos profiliai, matmenys, medžiagų (medienos likustos, pilkos dalys) ir spalvos pasiskirstymas, taip pat perspektyvūs vaizdai apačioje rodo sienų dizainą."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 16,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje rodomi vonios kambariai iš viršaus (pertvarų planas), bet žemiau pateiktos detalios aksonometrinės nuotraukos iš šono ir medžiagų specifikacija, rodo sienų vertikalius vaizdus bei detalę."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 17,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje rodoma sienų išklotinė iš šono su spalvotomis medžiagų zonomis, langų išdėstymu, dimensijomis bei 3D vizualizacijomis, kurie vaizduoja vertikalų sienų vaizdą."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 18,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje rodomas patalpos vertikalus vaizdas (sienų išklotinė) su medžiagų spalvomis, apšvietimu ir dizaino elementais, žemiau pateiktos perspektyvos nuotraukos, medžiagų legenda."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 19,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTLsXxAeEF351uEBRAr'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 20,
+    "page_type": "wall_elevations",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje parodytas vienas kambariu sienų išklotinės vaizdas iš šono su detalizuotais matmenimis, medžiagomis (SMART šifopilas, MDF), apšvietimu ir interjero nuotraukomis."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 21,
+    "page_type": "floor_plan",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Brėžinyje matyti grindų dangos planas su spalvotomis zonomis, plytelių ir medžiagų legendos paveikslėlis, bei skirtingų grindų dangų (parketo, plytelių, MDF) išdėstymas patalpoje iš viršaus."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 22,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne statybos techninis brėžinys."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 23,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Tai yra interjerio dizaino 3D vizualizacija, o ne statybos techninis brėžinys arba planas."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 24,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne techninis statybos brėžinys - tai fotoreaListinis kameros vaizdas iš perspektyvos, o ne žemėlapis ar schema."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 25,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne statybos techninis brėžinys - nėra nė vieno iš nurodytų brėžinio tipų charakteristikų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 26,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/perspektyvinis nuotrauka interjero, o ne statybos brėžinys."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 27,
+    "page_type": "ceiling_plan",
+    "method": "ai_vision",
+    "confidence": 0.75,
+    "reasoning": "Vaizdas iš viršaus rodo lubas su šviestuvais (du chandelier tipo šviestuvai) ir lubų išdėstymą, kas atitinka lubų/apšvietimo planą."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 28,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija (perspektyvinis vaizdas), o ne statybos techninis brėžinys."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 29,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.9,
+    "reasoning": "Tai yra 3D perspektyvinis interjero vizualizacijos vaizdas, o ne techninis statybos brėžinys. Nė vienas iš nurodytų tipų netinka."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 30,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne techninis statybos brėžinys, todėl neatitinka nė vieno iš nurodytų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 31,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/renders interjero dizaino, o ne techninis statybos brėžinys iš nurodytų kategorijų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 32,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTMMukwhEV3P7BoiR8M'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 33,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50 requests per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTMAXQLHde4nZf3fghT'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 34,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50 requests per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTMHuALQQGDqTAkMB7W'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 35,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.05,
+    "reasoning": "Tai yra 3D žmogaus sukurtas vonios kambario interjero vaizdas, ne statybos techninis brėžinys."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 36,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Paveikslėlis rodo interjerinio projektavimo 3D vizualizaciją (miegamojo scena), o ne techninį statybos brėžinį."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 37,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTMyDHnTxinBeYJmZJP'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 38,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/perspektyvinis interjero vaizdas, o ne techninis statybos brėžinys iš nurodytų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 39,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNTKEE6E4G4zhSMMmT'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 40,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne techninis statybos brėžinys - tai netiesioginis interjero dizaino vaizdas iš perspektyvos, o ne planas ar išklotinė."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 41,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija (perspektyvinis interjero vaizdas), o ne techninis statybos brėžinys."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 42,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNKcsXSm9rHagHeJe6'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 43,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTMkDCchnLscdqncsEV'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 44,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/renderas vonios kambario, o ne statybinis brėžinys - tai nepriklausomas nei vienam iš nurodytų brėžinio tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 45,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija (render) vonios interjero, o ne statybos brėžinys iš pateiktų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 46,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNCbTD5bKdYjKFGbXL'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 47,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNaEhcA68SeHq13kEE'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 48,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNLWhja9sADSJjfY7v'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 49,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D renderis/perspektyvinė interjero vizualizacija, o ne techninis statybos brėžinys iš viršaus ar kito projekcinio vaizdo."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 50,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNT2cYKno4qXdtzHTc'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 51,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D interjero vizualizacija, o ne statybos techninis brėžinys - nepriklausanti jokiam iš nurodytų brėžinio tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 52,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/renderas, o ne statybinis brėžinys ar techninė dokumentacija"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 53,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTNnQwA8Aw89fitFJ9z'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 54,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTPDnv4uGZU38aur5SU'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 55,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTPEZJKF8hVLK5NQWrR'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 56,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Classifier error: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's rate limit of 50,000 input tokens per minute (org: 638ed421-9fda-4646-9ba4-b457f1d6ff75, model: claude-haiku-4-5-20251001). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase.\"}, 'request_id': 'req_011CaHTPHvDGiME5v5gHAsJ8'}"
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 57,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/perspektyvinė nuotrauka vonios kambario interjero, o ne techninis statybos brėžinys iš jokios iš nurodytų kategorijų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 58,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D rendering/vizualizacija, o ne statybos brėžinys - čia rodomas vonios kambario interjeris iš perspektyvos, o ne techninis brėžinio planas."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 59,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija / renderi nuo kameros, o ne techninis statybos brėžinys, todėl neatitinka nė vieno iš nurodytų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 60,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija/perspektyvinis vaizdas vonios kambario, o ne techninis statybos brėžinys - nepriklausantis jokiam iš nurodytų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 61,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.0,
+    "reasoning": "Tai yra 3D interjerinės vizualizacijos nuotrauka, o ne techninis statybos brėžinys - nepriklauso nė vienam iš pateiktų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 62,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.85,
+    "reasoning": "Tai yra 3D vizualizacija arba renderas, o ne techninis statybos brėžinys — pavaizduota vonios kambario interjeras su armatūra, bet tai nėra nė vienas iš nurodytų brėžinio planų tipų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 63,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D vizualizacija vonios kambario, o ne statybos brėžinys - nėra žemėlapio, planų, schemos ar techninių brėžinio elementų."
+  },
+  {
+    "filename": "projektas_1_breziniai.pdf",
+    "page_idx": 64,
+    "page_type": "unknown",
+    "method": "ai_vision",
+    "confidence": 0.95,
+    "reasoning": "Tai yra 3D tūrio vizualizacija (render) vonios kambario interjero, o ne statybinis techninis brėžinys"
+  }
+]

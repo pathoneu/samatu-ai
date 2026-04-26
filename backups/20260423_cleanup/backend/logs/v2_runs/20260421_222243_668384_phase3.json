@@ -1,0 +1,89 @@
+{
+  "scope_confirmed": "full_project",
+  "confidence_level": "medium",
+  "similar_projects": [
+    {
+      "projekto_id": "P3",
+      "similarity_reason": "Premium klasės projektas su Benjamin Moore, HPL compact, Schuco Gola profilis, paslėptos durys, LED nišos — vienintelis premium pavyzdys training duomenyse"
+    }
+  ],
+  "validated_items": {
+    "premium_benjamin_moore_sienos_lubos": 50.2,
+    "duru_angos_beapvadines_paruosimas": 22.2,
+    "angokrasciai_glaistymas_dazymas": 9.5,
+    "lubos_standart_aukstis": 180.0,
+    "nisu_formavimas_led_apsvietimui": 40.0,
+    "laidu_apsiuvimas_garaze": 24.0,
+    "lubos_virs_3m": 44.0,
+    "difuzoriu_montavimas_apvalus": 8.0,
+    "difuzoriu_montavimas_plysiniai": 10.0,
+    "sviestuvu_montavimas": 45.0,
+    "sviestuvu_led_profiliu_montavimas": 35.0,
+    "reviziniu_dureliu_montavimas_600x600": 2.0,
+    "reviziniu_dureliu_montavimas_300x300": 4.0,
+    "parketlentes_klijavimas_45_eglute": 138.99,
+    "pvc_grindys": 0.0,
+    "isliginamasis_sluoksnis": 180.0,
+    "grindjuostes_i_siena_ileistos": 150.0,
+    "palangiu_montavimas": 18.0,
+    "guminis_dangos_montavimas_garaze": 44.0
+  },
+  "warnings": [
+    {
+      "rule_id": "LOW_CONFIDENCE_SINGLE_EXAMPLE",
+      "severity": "info",
+      "description": "Premium klasė turi tik 1 training pavyzdį (P3). Ratios validacija negalima — naudojamas kategorinis klasifikavimas pagal trigger keywords. Kiekiai yra estimates only ir reikia papildomo rankinio patikrinimo prieš kainodarą.",
+      "expected_range": null,
+      "actual_value": null
+    },
+    {
+      "rule_id": "PAINT_AREA_REASONABLE_BY_CLASS",
+      "severity": "info",
+      "description": "Premium klasei paint ratio validacija praleista (skirtinga nomenklatūra — Benjamin Moore premium dažymas nurodomas atskirai nuo standartinio). premium_benjamin_moore_sienos_lubos=50.2 m2 apima tik specifines premium zonas, ne visą plotą.",
+      "expected_range": null,
+      "actual_value": 50.2
+    },
+    {
+      "rule_id": "CEILING_AREA_MATCHES_FLOOR",
+      "severity": "info",
+      "description": "Lubų plotas (lubos_standart_aukstis=180 + lubos_virs_3m=44 = 224 m2) atitinka bendrą patalpų plotą 180 m2 su priedu už aukštesnes lubas (02 svetainė + 15 garažas). Ratio 224/180=1.24 — šiek tiek virš 1.10 ribos, bet paaiškinama premium nišomis ir aukštesnėmis lubomis.",
+      "expected_range": "0.30-1.10",
+      "actual_value": 1.24
+    },
+    {
+      "rule_id": "TILES_IN_BATHROOMS",
+      "severity": "warning",
+      "description": "Phase 2 rezultatuose NĖRA plytelių kategorijos (plyteliu_klijavimas / plyteliu_plotas). Projektas turi 4 sanitarines patalpas (vonios 08, 10, svečių wc 12, tech/skalbykla 13) — viso ~33.25 m2. Premium klasėje tikėtinas plytelių plotas ~130-300 m2. Patikrinti ar plytelės buvo praleistos Phase 2 ekstrakcijoje, ar jos yra atskiroje kategorijoje.",
+      "expected_range": "133-299 m2 plytelių",
+      "actual_value": 0
+    },
+    {
+      "rule_id": "CORNERS_REASONABLE",
+      "severity": "info",
+      "description": "Phase 2 rezultatuose nėra aiškios 'kampai' kategorijos — premium projekte kampų apdaila gali būti integruota į moldingų/nišų kategorijas (nisu_formavimas_led_apsvietimui=40 m). Patikrinti ar yra atskira kampų/moldingų pozicija.",
+      "expected_range": "0.7-1.5 kampai/dazymo_plotas",
+      "actual_value": null
+    },
+    {
+      "rule_id": "PREMIUM_FEATURES_COVERAGE",
+      "severity": "warning",
+      "description": "Phase 1 nurodo premium_pozymiai: hpl_compact, schuco_gola_profilis, feelness_ultra_matt_plus, smart_soho_spring, apvalios_formos_r250, frezuotas_dazytas_mdf. Phase 2 rezultatuose nematyti atskirų kategorijų šiems elementams (HPL compact plokštės, Schuco Gola virtuvės profilis, apvalių R250 formų gamyba, frezuotas MDF). Rekomenduojama patikrinti ar šios pozicijos įtrauktos kitur arba reikia papildomų kategorijų.",
+      "expected_range": null,
+      "actual_value": null
+    },
+    {
+      "rule_id": "ARCHES_ROUND_FORMS",
+      "severity": "info",
+      "description": "Phase 1: arkos_ar_apvalios_formos=true ir apvalios_formos_r250 premium požymis. Phase 2 neturi aiškios apvalių formų/arkų gamybos kategorijos — tai darbui imli pozicija premium klasėje, būtina patikrinti.",
+      "expected_range": null,
+      "actual_value": null
+    },
+    {
+      "rule_id": "SINGLE_EXAMPLE_CLASS",
+      "severity": "info",
+      "description": "Klasė 'premium' turi tik 1 training example. Ratios yra spėjimai, ne statistinis pagrindas.",
+      "actual_value": null,
+      "expected_range": null
+    }
+  ]
+}

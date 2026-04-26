@@ -1,0 +1,105 @@
+{
+  "patalpos": [
+    {
+      "nr": "01",
+      "pavadinimas": "Tambūras",
+      "plotas_m2": 7.36
+    },
+    {
+      "nr": "02",
+      "pavadinimas": "Svetainė/valgomasis/virtuvė",
+      "plotas_m2": 62.42
+    },
+    {
+      "nr": "03",
+      "pavadinimas": "Koridorius",
+      "plotas_m2": 15.25
+    },
+    {
+      "nr": "04",
+      "pavadinimas": "Kambarys",
+      "plotas_m2": 12.14
+    },
+    {
+      "nr": "05",
+      "pavadinimas": "Kambario drabužinė",
+      "plotas_m2": 3.75
+    },
+    {
+      "nr": "06",
+      "pavadinimas": "Kambarys 2",
+      "plotas_m2": 14.63
+    },
+    {
+      "nr": "07",
+      "pavadinimas": "Kambario 2 drabužinė",
+      "plotas_m2": 3.82
+    },
+    {
+      "nr": "08",
+      "pavadinimas": "Vaikų vonia",
+      "plotas_m2": 6.83
+    },
+    {
+      "nr": "09",
+      "pavadinimas": "Miegamasis",
+      "plotas_m2": 14.58
+    },
+    {
+      "nr": "10",
+      "pavadinimas": "Miegamojo vonia",
+      "plotas_m2": 14.04
+    },
+    {
+      "nr": "11",
+      "pavadinimas": "Miegamojo drabužinė",
+      "plotas_m2": 5.73
+    },
+    {
+      "nr": "12",
+      "pavadinimas": "Svečių wc",
+      "plotas_m2": 2.89
+    },
+    {
+      "nr": "13",
+      "pavadinimas": "Tech. patalpa/skalbykla",
+      "plotas_m2": 9.49
+    },
+    {
+      "nr": "14",
+      "pavadinimas": "Pagrindinė namo drabužinė",
+      "plotas_m2": 7.07
+    },
+    {
+      "nr": "15",
+      "pavadinimas": "Garažas",
+      "plotas_m2": 44.0
+    }
+  ],
+  "bendras_plotas_m2": 180.0,
+  "garazo_plotas_m2": 44.0,
+  "lubu_aukstis_m": 2.8,
+  "aukstesniu_lubu_patalpos": [
+    "02",
+    "15"
+  ],
+  "sudetingumo_klase": "premium",
+  "scope_type": "full_project",
+  "features": {
+    "arkos_ar_apvalios_formos": true,
+    "lubu_nisos_led": true,
+    "aukstesniu_nei_3m": true,
+    "sanitariniu_patalpu_skaicius": 3,
+    "stoglangiai": false,
+    "garazas_virs_2m_auksciu": true,
+    "premium_pozymiai": [
+      "hpl_compact",
+      "schuco_gola_profilis",
+      "feelness_ultra_matt_plus",
+      "smart_soho_spring",
+      "apvalios_formos_r250",
+      "led_nisos_mazgai_abc"
+    ]
+  },
+  "confidence": 0.95
+}

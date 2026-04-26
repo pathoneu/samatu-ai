@@ -1,0 +1,81 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "company_name": {
+      "type": "string",
+      "description": "Company name"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "processing",
+        "ready",
+        "error"
+      ],
+      "default": "processing"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "Uploaded PDF/Excel file URL"
+    },
+    "rows": {
+      "type": "array",
+      "description": "Extracted estimation rows",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nr": {
+            "type": "string"
+          },
+          "aprasymas": {
+            "type": "string"
+          },
+          "mato_vnt": {
+            "type": "string"
+          },
+          "kiekis": {
+            "type": "number"
+          },
+          "kaina": {
+            "type": "number"
+          },
+          "suma": {
+            "type": "number"
+          },
+          "skyrius": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "total_rows": {
+      "type": "number",
+      "default": 0
+    },
+    "total_value": {
+      "type": "number",
+      "default": 0
+    },
+    "vat_rate": {
+      "type": "number",
+      "default": 21
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
