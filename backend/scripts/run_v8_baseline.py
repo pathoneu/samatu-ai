@@ -59,10 +59,13 @@ def find_breziniai_pdf(n: int) -> Path | None:
     exact = proj_dir / f"projektas_{n}_breziniai.pdf"
     if exact.exists():
         return exact
-    # Numbered variants: sort and take the first
-    candidates = sorted(proj_dir.glob(f"projektas_{n}(*)*_breziniai.pdf"))
+    # Numbered variants: pick the LARGEST file. P5 has 9 separate PDFs of
+    # different sizes; the smallest are 1-page detail sheets (no eksplikacija,
+    # no usable plan). The largest is the main set with rooms.
+    candidates = list(proj_dir.glob(f"projektas_{n}(*)*_breziniai.pdf"))
+    candidates += list(proj_dir.glob(f"porjektas_{n}(*)*_breziniai.pdf"))  # typo'd file
     if candidates:
-        return candidates[0]
+        return max(candidates, key=lambda p: p.stat().st_size)
     return None
 
 

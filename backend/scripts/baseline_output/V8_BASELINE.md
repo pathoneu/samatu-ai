@@ -5,17 +5,17 @@
 > Any new simplified pipeline MUST match or beat these numbers in Phase 3.
 > See individual `V8_PN.json` for full per-project detail.
 
-Captured: 2026-04-26 21:29:51
+Captured: 2026-04-26 21:43:28
 
 ## V8 Captured Metrics
 
 | P# | Rooms | Bendras m² | Dažymo m² | Kampai m | Plytelės sienos m² | Šaltinis | t(s) | Klaida? |
 |----|-------|------------|-----------|----------|--------------------|----------|------|---------|
-| P1 | 13 | 205.55 | 446.6 | 380.98 | 87.2 | eksplikacija | 244.7 |  |
+| P1 | 13 | 205.55 | 446.6 | 380.98 | 87.2 | eksplikacija | 242.4 |  |
 | P2 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | vision | 50.8 |  |
-| P3 | 18 | 240.05 | 734.6 | 583.66 | 65.1 | eksplikacija | 39.0 |  |
-| P4 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | vision | 48.1 |  |
-| P5 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | vision | 12.6 |  |
+| P3 | 18 | 240.05 | 734.6 | 583.66 | 65.1 | eksplikacija | 39.5 |  |
+| P4 | ERR | ERR | ERR | ERR | ERR | ERR | 23.8 | KLAIDA |
+| P5 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | vision | 20.5 |  |
 
 ## Manual review needed — Ground truth (rangovo's proposals)
 
@@ -47,4 +47,21 @@ The worst-case Δ here becomes the threshold the new pipeline must match.
 
 ## Error log
 
-No errors — all 5 projects completed successfully.
+- **P4**: worker exited -6 (SIGABRT) AFTER saving V8_P4.json. Likely
+  pypdfium2/pdfplumber state corruption during V9 symbol detection
+  cleanup. The JSON was saved successfully — crash occurred in worker
+  cleanup phase. V8's actual extraction result for P4: 0 rooms (Vision
+  fallback, no eksplikacija text found, drawings classified as wall_elevation).
+
+## Patterns observed
+
+V8 only succeeds when the PDF has a textual eksplikacija table:
+- **PASS**: P1, P3 (eksplikacija text → patalpu_saltinis="eksplikacija")
+- **FAIL (0 rooms)**: P2, P5 (no eksplikacija → Vision fallback fails)
+- **CRASH**: P4 (no eksplikacija + V9 symbol detection → SIGABRT)
+
+This means the new single-Vision-call pipeline has a clear opportunity:
+- On P1/P3 it must match eksplikacija-text accuracy (high bar)
+- On P2/P4/P5 anything > 0 rooms is a strict improvement (low bar)
+- On P4 it must at minimum not crash (architectural improvement)
+

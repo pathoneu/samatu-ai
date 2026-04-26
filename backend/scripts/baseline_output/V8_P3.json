@@ -11,7 +11,7 @@
     "duru_skaicius": 0,
     "langu_skaicius": 0,
     "nisu_skaicius": 0,
-    "ai_detected_symbol_types": 2
+    "ai_detected_symbol_types": 1
   },
   "skaiciavimai": {
     "dazomas_plotas": {
@@ -2007,37 +2007,8 @@
             "count": 1,
             "symbols": [
               {
-                "x_pct": 0.74,
-                "y_pct": 0.36,
-                "confidence": "medium",
-                "length_m": null
-              }
-            ]
-          }
-        ]
-      },
-      "langai": {
-        "total": 1,
-        "pages": [
-          {
-            "page": 1,
-            "count": 1,
-            "symbols": [
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.5,
-                "confidence": "low",
-                "length_m": null
-              }
-            ]
-          },
-          {
-            "page": 4,
-            "count": 1,
-            "symbols": [
-              {
-                "x_pct": 0.79,
-                "y_pct": 0.55,
+                "x_pct": 0.755,
+                "y_pct": 0.42,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -2049,13 +2020,12 @@
     "stats": {
       "api_calls": 6,
       "pages_processed": 6,
-      "ms_total": 6679,
+      "ms_total": 7178,
       "method": "bundled+parallel"
     }
   },
   "detected_symbols_summary": {
-    "durys": 1,
-    "langai": 1
+    "durys": 1
   },
-  "_elapsed_s": 39.0
+  "_elapsed_s": 39.5
 }

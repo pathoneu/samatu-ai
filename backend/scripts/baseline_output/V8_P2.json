@@ -163,9 +163,9 @@
         },
         {
           "page_nr": 2,
-          "x_pct": 0.43,
-          "y_pct": 0.35,
-          "confidence": "high"
+          "x_pct": 0.45,
+          "y_pct": 0.36,
+          "confidence": "medium"
         },
         {
           "page_nr": 2,
@@ -181,99 +181,99 @@
         },
         {
           "page_nr": 2,
-          "x_pct": 0.42,
-          "y_pct": 0.42,
-          "confidence": "medium"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.51,
-          "y_pct": 0.41,
-          "confidence": "medium"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.61,
-          "y_pct": 0.27,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.69,
-          "y_pct": 0.27,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.72,
-          "y_pct": 0.34,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.71,
+          "x_pct": 0.4,
           "y_pct": 0.43,
           "confidence": "high"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.71,
-          "y_pct": 0.5,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.61,
-          "y_pct": 0.5,
+          "x_pct": 0.55,
+          "y_pct": 0.41,
           "confidence": "medium"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.31,
-          "y_pct": 0.59,
+          "x_pct": 0.65,
+          "y_pct": 0.3,
           "confidence": "high"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.45,
-          "y_pct": 0.61,
+          "x_pct": 0.74,
+          "y_pct": 0.3,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.78,
+          "y_pct": 0.36,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.78,
+          "y_pct": 0.4,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.78,
+          "y_pct": 0.46,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.74,
+          "y_pct": 0.51,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.78,
+          "y_pct": 0.55,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.31,
+          "y_pct": 0.66,
           "confidence": "high"
         },
         {
           "page_nr": 2,
           "x_pct": 0.5,
           "y_pct": 0.61,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 2,
-          "x_pct": 0.55,
-          "y_pct": 0.61,
           "confidence": "medium"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.42,
-          "y_pct": 0.66,
-          "confidence": "high"
+          "x_pct": 0.55,
+          "y_pct": 0.65,
+          "confidence": "medium"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.46,
-          "y_pct": 0.66,
+          "x_pct": 0.5,
+          "y_pct": 0.69,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 2,
+          "x_pct": 0.45,
+          "y_pct": 0.71,
           "confidence": "high"
         },
         {
           "page_nr": 2,
           "x_pct": 0.51,
-          "y_pct": 0.66,
+          "y_pct": 0.71,
           "confidence": "high"
         },
         {
           "page_nr": 2,
-          "x_pct": 0.55,
-          "y_pct": 0.66,
-          "confidence": "medium"
+          "x_pct": 0.56,
+          "y_pct": 0.71,
+          "confidence": "high"
         }
       ]
     },
@@ -336,7 +336,7 @@
       "skyrius": "Apšvietimas",
       "aprasymas": "Lubinių priglaistomų šviestuvų apdirbimas",
       "mato_vnt": "vnt",
-      "kiekis": 30,
+      "kiekis": 32,
       "kaina": 0,
       "suma": 0,
       "v8_industries_standart": true,
@@ -347,33 +347,21 @@
       "trace_links": [
         {
           "page_nr": 3,
-          "x_pct": 0.18,
-          "y_pct": 0.27,
+          "x_pct": 0.2,
+          "y_pct": 0.26,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.27,
-          "y_pct": 0.27,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.24,
-          "y_pct": 0.34,
+          "y_pct": 0.26,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.27,
-          "y_pct": 0.51,
+          "y_pct": 0.32,
           "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.26,
-          "y_pct": 0.66,
-          "confidence": "medium"
         },
         {
           "page_nr": 3,
@@ -384,7 +372,7 @@
         {
           "page_nr": 3,
           "x_pct": 0.36,
-          "y_pct": 0.39,
+          "y_pct": 0.36,
           "confidence": "high"
         },
         {
@@ -395,32 +383,50 @@
         },
         {
           "page_nr": 3,
-          "x_pct": 0.62,
+          "x_pct": 0.6,
           "y_pct": 0.3,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
+          "x_pct": 0.65,
           "y_pct": 0.3,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.55,
-          "y_pct": 0.36,
+          "y_pct": 0.34,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.62,
-          "y_pct": 0.36,
+          "x_pct": 0.6,
+          "y_pct": 0.34,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
-          "y_pct": 0.36,
+          "x_pct": 0.65,
+          "y_pct": 0.34,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.65,
+          "y_pct": 0.38,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.7,
+          "y_pct": 0.3,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.7,
+          "y_pct": 0.34,
           "confidence": "high"
         },
         {
@@ -431,74 +437,62 @@
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
-          "y_pct": 0.42,
+          "x_pct": 0.62,
+          "y_pct": 0.46,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.55,
-          "y_pct": 0.51,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.62,
-          "y_pct": 0.51,
+          "y_pct": 0.46,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.55,
-          "y_pct": 0.57,
+          "y_pct": 0.52,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.62,
-          "y_pct": 0.57,
+          "x_pct": 0.55,
+          "y_pct": 0.58,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
-          "y_pct": 0.57,
+          "x_pct": 0.65,
+          "y_pct": 0.46,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
-          "y_pct": 0.51,
+          "x_pct": 0.65,
+          "y_pct": 0.52,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.69,
+          "x_pct": 0.7,
+          "y_pct": 0.46,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.7,
+          "y_pct": 0.52,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.65,
+          "y_pct": 0.58,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.42,
           "y_pct": 0.62,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.69,
-          "y_pct": 0.68,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.55,
-          "y_pct": 0.68,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.55,
-          "y_pct": 0.74,
-          "confidence": "high"
-        },
-        {
-          "page_nr": 3,
-          "x_pct": 0.62,
-          "y_pct": 0.74,
           "confidence": "high"
         },
         {
@@ -510,19 +504,25 @@
         {
           "page_nr": 3,
           "x_pct": 0.42,
-          "y_pct": 0.71,
+          "y_pct": 0.7,
           "confidence": "high"
         },
         {
           "page_nr": 3,
-          "x_pct": 0.42,
-          "y_pct": 0.76,
+          "x_pct": 0.36,
+          "y_pct": 0.74,
+          "confidence": "high"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.4,
+          "y_pct": 0.74,
           "confidence": "high"
         },
         {
           "page_nr": 3,
           "x_pct": 0.46,
-          "y_pct": 0.76,
+          "y_pct": 0.74,
           "confidence": "high"
         }
       ],
@@ -533,7 +533,7 @@
       "skyrius": "Apšvietimas",
       "aprasymas": "Pakabinamų šviestuvų montavimas",
       "mato_vnt": "vnt",
-      "kiekis": 1,
+      "kiekis": 2,
       "kaina": 0,
       "suma": 0,
       "v8_industries_standart": true,
@@ -544,9 +544,15 @@
       "trace_links": [
         {
           "page_nr": 3,
-          "x_pct": 0.18,
+          "x_pct": 0.27,
+          "y_pct": 0.46,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 3,
+          "x_pct": 0.2,
           "y_pct": 0.69,
-          "confidence": "high"
+          "confidence": "medium"
         }
       ],
       "formula_explanation": null
@@ -556,7 +562,7 @@
       "skyrius": "GKP",
       "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui)",
       "mato_vnt": "m",
-      "kiekis": 4,
+      "kiekis": 5,
       "kaina": 0,
       "suma": 0,
       "v8_industries_standart": true,
@@ -572,7 +578,7 @@
       "skyrius": "Apšvietimas",
       "aprasymas": "LED juostos komutavimas",
       "mato_vnt": "m",
-      "kiekis": 4,
+      "kiekis": 5,
       "kaina": 0,
       "suma": 0,
       "v8_industries_standart": true,
@@ -702,7 +708,7 @@
   "detected_symbols": {
     "by_type": {
       "durys": {
-        "total": 6,
+        "total": 5,
         "pages": [
           {
             "page": 1,
@@ -710,20 +716,20 @@
             "symbols": [
               {
                 "x_pct": 0.42,
-                "y_pct": 0.4,
+                "y_pct": 0.42,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.51,
-                "y_pct": 0.4,
+                "y_pct": 0.42,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.62,
-                "y_pct": 0.4,
-                "confidence": "high",
+                "y_pct": 0.42,
+                "confidence": "medium",
                 "length_m": null
               },
               {
@@ -735,72 +741,72 @@
             ]
           },
           {
-            "page": 2,
-            "count": 6,
+            "page": 3,
+            "count": 5,
             "symbols": [
               {
-                "x_pct": 0.45,
+                "x_pct": 0.43,
                 "y_pct": 0.32,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.5,
+                "x_pct": 0.51,
                 "y_pct": 0.36,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.58,
-                "y_pct": 0.36,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.65,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.65,
-                "y_pct": 0.55,
+                "x_pct": 0.62,
+                "y_pct": 0.39,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.66,
-                "y_pct": 0.66,
+                "y_pct": 0.42,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.69,
+                "y_pct": 0.78,
                 "confidence": "high",
                 "length_m": null
               }
             ]
           },
           {
-            "page": 3,
-            "count": 4,
+            "page": 2,
+            "count": 5,
             "symbols": [
               {
-                "x_pct": 0.42,
-                "y_pct": 0.34,
+                "x_pct": 0.51,
+                "y_pct": 0.39,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.5,
-                "y_pct": 0.41,
+                "x_pct": 0.59,
+                "y_pct": 0.4,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.62,
+                "y_pct": 0.5,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.66,
-                "y_pct": 0.45,
+                "y_pct": 0.59,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.66,
-                "y_pct": 0.81,
+                "x_pct": 0.62,
+                "y_pct": 0.74,
                 "confidence": "high",
                 "length_m": null
               }
@@ -809,47 +815,160 @@
         ]
       },
       "langai": {
-        "total": 6,
+        "total": 7,
         "pages": [
           {
             "page": 1,
-            "count": 6,
+            "count": 7,
             "symbols": [
               {
-                "x_pct": 0.5,
-                "y_pct": 0.16,
+                "x_pct": 0.51,
+                "y_pct": 0.18,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.2,
+                "x_pct": 0.78,
+                "y_pct": 0.18,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.18,
                 "y_pct": 0.3,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.2,
+                "x_pct": 0.18,
                 "y_pct": 0.55,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.83,
-                "y_pct": 0.36,
+                "x_pct": 0.86,
+                "y_pct": 0.42,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.83,
-                "y_pct": 0.58,
+                "x_pct": 0.86,
+                "y_pct": 0.62,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.62,
-                "y_pct": 0.8,
+                "x_pct": 0.71,
+                "y_pct": 0.81,
                 "confidence": "medium",
                 "length_m": null
+              }
+            ]
+          },
+          {
+            "page": 3,
+            "count": 4,
+            "symbols": [
+              {
+                "x_pct": 0.165,
+                "y_pct": 0.24,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.165,
+                "y_pct": 0.62,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.27,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.5,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          },
+          {
+            "page": 2,
+            "count": 6,
+            "symbols": [
+              {
+                "x_pct": 0.43,
+                "y_pct": 0.25,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.25,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.79,
+                "y_pct": 0.38,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.79,
+                "y_pct": 0.55,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.3,
+                "y_pct": 0.74,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.43,
+                "y_pct": 0.74,
+                "confidence": "high",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "led_juostos": {
+        "total": 5,
+        "pages": [
+          {
+            "page": 1,
+            "count": 4,
+            "symbols": [
+              {
+                "x_pct": 0.18,
+                "y_pct": 0.32,
+                "confidence": "medium",
+                "length_m": 2.0
+              },
+              {
+                "x_pct": 0.18,
+                "y_pct": 0.55,
+                "confidence": "medium",
+                "length_m": 2.0
+              },
+              {
+                "x_pct": 0.86,
+                "y_pct": 0.42,
+                "confidence": "medium",
+                "length_m": 1.4
+              },
+              {
+                "x_pct": 0.86,
+                "y_pct": 0.62,
+                "confidence": "medium",
+                "length_m": 1.4
               }
             ]
           },
@@ -858,32 +977,246 @@
             "count": 5,
             "symbols": [
               {
-                "x_pct": 0.16,
-                "y_pct": 0.27,
-                "confidence": "medium",
-                "length_m": null
+                "x_pct": 0.165,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": 1.8
               },
               {
-                "x_pct": 0.16,
+                "x_pct": 0.165,
                 "y_pct": 0.55,
-                "confidence": "medium",
-                "length_m": null
+                "confidence": "high",
+                "length_m": 2.5
               },
               {
                 "x_pct": 0.78,
-                "y_pct": 0.27,
-                "confidence": "medium",
-                "length_m": null
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": 1.5
               },
               {
                 "x_pct": 0.78,
-                "y_pct": 0.45,
+                "y_pct": 0.55,
+                "confidence": "high",
+                "length_m": 2.0
+              },
+              {
+                "x_pct": 0.51,
+                "y_pct": 0.72,
                 "confidence": "medium",
+                "length_m": 1.0
+              }
+            ]
+          }
+        ]
+      },
+      "sviestuvai": {
+        "total": 32,
+        "pages": [
+          {
+            "page": 3,
+            "count": 32,
+            "symbols": [
+              {
+                "x_pct": 0.2,
+                "y_pct": 0.26,
+                "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.78,
+                "x_pct": 0.27,
+                "y_pct": 0.26,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.27,
+                "y_pct": 0.32,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.36,
+                "y_pct": 0.32,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.36,
+                "y_pct": 0.36,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.6,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.34,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.6,
+                "y_pct": 0.34,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.34,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.38,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.34,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.62,
+                "y_pct": 0.42,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.62,
+                "y_pct": 0.46,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.46,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.52,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.58,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.46,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.52,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.46,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.52,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.65,
+                "y_pct": 0.58,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
                 "y_pct": 0.62,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.66,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.7,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.36,
+                "y_pct": 0.74,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.4,
+                "y_pct": 0.74,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.46,
+                "y_pct": 0.74,
+                "confidence": "high",
+                "length_m": null
+              }
+            ]
+          }
+        ]
+      },
+      "pakabinami_sviestuvai": {
+        "total": 2,
+        "pages": [
+          {
+            "page": 3,
+            "count": 2,
+            "symbols": [
+              {
+                "x_pct": 0.27,
+                "y_pct": 0.46,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.2,
+                "y_pct": 0.69,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -891,66 +1224,60 @@
           }
         ]
       },
-      "led_juostos": {
-        "total": 4,
+      "jungikliai": {
+        "total": 5,
         "pages": [
           {
-            "page": 1,
-            "count": 4,
+            "page": 3,
+            "count": 5,
             "symbols": [
               {
-                "x_pct": 0.2,
-                "y_pct": 0.3,
+                "x_pct": 0.3,
+                "y_pct": 0.39,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.46,
+                "y_pct": 0.45,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.49,
+                "y_pct": 0.66,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.3,
+                "y_pct": 0.27,
                 "confidence": "medium",
-                "length_m": 2.0
+                "length_m": null
               },
               {
                 "x_pct": 0.2,
-                "y_pct": 0.55,
+                "y_pct": 0.27,
                 "confidence": "medium",
-                "length_m": 2.0
-              },
-              {
-                "x_pct": 0.83,
-                "y_pct": 0.36,
-                "confidence": "medium",
-                "length_m": 1.4
-              },
-              {
-                "x_pct": 0.83,
-                "y_pct": 0.58,
-                "confidence": "medium",
-                "length_m": 1.4
+                "length_m": null
               }
             ]
           },
           {
-            "page": 3,
-            "count": 4,
+            "page": 2,
+            "count": 2,
             "symbols": [
               {
-                "x_pct": 0.155,
-                "y_pct": 0.45,
-                "confidence": "high",
-                "length_m": 4.5
-              },
-              {
-                "x_pct": 0.78,
-                "y_pct": 0.34,
-                "confidence": "high",
-                "length_m": 2.0
-              },
-              {
-                "x_pct": 0.78,
-                "y_pct": 0.55,
-                "confidence": "high",
-                "length_m": 1.8
-              },
-              {
-                "x_pct": 0.46,
-                "y_pct": 0.74,
+                "x_pct": 0.49,
+                "y_pct": 0.42,
                 "confidence": "medium",
-                "length_m": 1.0
+                "length_m": null
+              },
+              {
+                "x_pct": 0.59,
+                "y_pct": 0.42,
+                "confidence": "medium",
+                "length_m": null
               }
             ]
           }
@@ -982,9 +1309,9 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.43,
-                "y_pct": 0.35,
-                "confidence": "high",
+                "x_pct": 0.45,
+                "y_pct": 0.36,
+                "confidence": "medium",
                 "length_m": null
               },
               {
@@ -1000,347 +1327,98 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.42,
-                "y_pct": 0.42,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.51,
-                "y_pct": 0.41,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.61,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.72,
-                "y_pct": 0.34,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.71,
+                "x_pct": 0.4,
                 "y_pct": 0.43,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.71,
-                "y_pct": 0.5,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.61,
-                "y_pct": 0.5,
+                "x_pct": 0.55,
+                "y_pct": 0.41,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.31,
-                "y_pct": 0.59,
+                "x_pct": 0.65,
+                "y_pct": 0.3,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.45,
-                "y_pct": 0.61,
+                "x_pct": 0.74,
+                "y_pct": 0.3,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.36,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.4,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.46,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.74,
+                "y_pct": 0.51,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.55,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.31,
+                "y_pct": 0.66,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.5,
                 "y_pct": 0.61,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.61,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.42,
-                "y_pct": 0.66,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.46,
-                "y_pct": 0.66,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.51,
-                "y_pct": 0.66,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
                 "x_pct": 0.55,
-                "y_pct": 0.66,
-                "confidence": "medium",
-                "length_m": null
-              }
-            ]
-          }
-        ]
-      },
-      "jungikliai": {
-        "total": 3,
-        "pages": [
-          {
-            "page": 2,
-            "count": 1,
-            "symbols": [
-              {
-                "x_pct": 0.43,
-                "y_pct": 0.4,
-                "confidence": "medium",
-                "length_m": null
-              }
-            ]
-          },
-          {
-            "page": 3,
-            "count": 3,
-            "symbols": [
-              {
-                "x_pct": 0.36,
-                "y_pct": 0.43,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.49,
-                "y_pct": 0.66,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.3,
-                "y_pct": 0.41,
-                "confidence": "medium",
-                "length_m": null
-              }
-            ]
-          }
-        ]
-      },
-      "sviestuvai": {
-        "total": 30,
-        "pages": [
-          {
-            "page": 3,
-            "count": 30,
-            "symbols": [
-              {
-                "x_pct": 0.18,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.27,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.24,
-                "y_pct": 0.34,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.27,
-                "y_pct": 0.51,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.26,
-                "y_pct": 0.66,
+                "y_pct": 0.65,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.36,
-                "y_pct": 0.32,
-                "confidence": "high",
+                "x_pct": 0.5,
+                "y_pct": 0.69,
+                "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.36,
-                "y_pct": 0.39,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.3,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.3,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.3,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.36,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.36,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.36,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.51,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.51,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.57,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.57,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.57,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.51,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.62,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.69,
-                "y_pct": 0.68,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.68,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.74,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.74,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.42,
-                "y_pct": 0.66,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.42,
+                "x_pct": 0.45,
                 "y_pct": 0.71,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.42,
-                "y_pct": 0.76,
+                "x_pct": 0.51,
+                "y_pct": 0.71,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.46,
-                "y_pct": 0.76,
-                "confidence": "high",
-                "length_m": null
-              }
-            ]
-          }
-        ]
-      },
-      "pakabinami_sviestuvai": {
-        "total": 1,
-        "pages": [
-          {
-            "page": 3,
-            "count": 1,
-            "symbols": [
-              {
-                "x_pct": 0.18,
-                "y_pct": 0.69,
+                "x_pct": 0.56,
+                "y_pct": 0.71,
                 "confidence": "high",
                 "length_m": null
               }
@@ -1352,18 +1430,18 @@
     "stats": {
       "api_calls": 3,
       "pages_processed": 3,
-      "ms_total": 19278,
+      "ms_total": 23122,
       "method": "bundled+parallel"
     }
   },
   "detected_symbols_summary": {
-    "durys": 6,
-    "langai": 6,
-    "led_juostos": 4,
-    "rozetes": 22,
-    "jungikliai": 3,
-    "sviestuvai": 30,
-    "pakabinami_sviestuvai": 1
+    "durys": 5,
+    "langai": 7,
+    "led_juostos": 5,
+    "sviestuvai": 32,
+    "pakabinami_sviestuvai": 2,
+    "jungikliai": 5,
+    "rozetes": 22
   },
   "_elapsed_s": 50.8
 }

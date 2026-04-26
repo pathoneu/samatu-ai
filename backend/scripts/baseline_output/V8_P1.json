@@ -2077,69 +2077,165 @@
   "detected_symbols": {
     "by_type": {
       "langai": {
-        "total": 14,
+        "total": 15,
         "pages": [
           {
             "page": 4,
-            "count": 10,
+            "count": 12,
             "symbols": [
               {
-                "x_pct": 0.32,
-                "y_pct": 0.32,
+                "x_pct": 0.34,
+                "y_pct": 0.34,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.46,
-                "y_pct": 0.32,
+                "y_pct": 0.34,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.55,
-                "y_pct": 0.32,
+                "y_pct": 0.34,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.66,
-                "y_pct": 0.32,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.4,
-                "y_pct": 0.74,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.55,
-                "y_pct": 0.74,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.68,
-                "y_pct": 0.74,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.78,
-                "y_pct": 0.74,
+                "x_pct": 0.69,
+                "y_pct": 0.34,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.3,
-                "y_pct": 0.74,
+                "y_pct": 0.66,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.72,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.72,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.66,
+                "y_pct": 0.72,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.75,
+                "y_pct": 0.72,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.83,
-                "y_pct": 0.32,
+                "x_pct": 0.86,
+                "y_pct": 0.72,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.25,
+                "y_pct": 0.4,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.25,
+                "y_pct": 0.55,
+                "confidence": "medium",
+                "length_m": null
+              }
+            ]
+          },
+          {
+            "page": 3,
+            "count": 13,
+            "symbols": [
+              {
+                "x_pct": 0.22,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.27,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.5,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.66,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.2,
+                "y_pct": 0.5,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.2,
+                "y_pct": 0.6,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.78,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.62,
+                "y_pct": 0.78,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.78,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.78,
+                "y_pct": 0.78,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.45,
+                "y_pct": 0.78,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.85,
+                "y_pct": 0.55,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -2162,25 +2258,25 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.43,
+                "x_pct": 0.42,
                 "y_pct": 0.31,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.51,
+                "x_pct": 0.5,
                 "y_pct": 0.31,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.6,
+                "x_pct": 0.59,
                 "y_pct": 0.31,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.7,
+                "x_pct": 0.68,
                 "y_pct": 0.31,
                 "confidence": "high",
                 "length_m": null
@@ -2192,116 +2288,38 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.4,
-                "y_pct": 0.71,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.47,
-                "y_pct": 0.71,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.54,
-                "y_pct": 0.71,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.61,
-                "y_pct": 0.71,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.21,
-                "y_pct": 0.46,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.83,
-                "y_pct": 0.45,
-                "confidence": "medium",
-                "length_m": null
-              }
-            ]
-          },
-          {
-            "page": 3,
-            "count": 12,
-            "symbols": [
-              {
-                "x_pct": 0.21,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.23,
-                "y_pct": 0.55,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.32,
-                "y_pct": 0.27,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
                 "x_pct": 0.43,
-                "y_pct": 0.27,
+                "y_pct": 0.78,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.5,
-                "y_pct": 0.27,
-                "confidence": "medium",
+                "y_pct": 0.78,
+                "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.55,
-                "y_pct": 0.27,
-                "confidence": "medium",
+                "x_pct": 0.57,
+                "y_pct": 0.78,
+                "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.65,
-                "y_pct": 0.27,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.76,
-                "y_pct": 0.27,
+                "y_pct": 0.78,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.55,
-                "y_pct": 0.73,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.62,
-                "y_pct": 0.73,
+                "x_pct": 0.3,
+                "y_pct": 0.62,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.7,
-                "y_pct": 0.73,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.77,
-                "y_pct": 0.73,
+                "x_pct": 0.83,
+                "y_pct": 0.55,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -2309,16 +2327,22 @@
           },
           {
             "page": 2,
-            "count": 14,
+            "count": 15,
             "symbols": [
               {
-                "x_pct": 0.18,
+                "x_pct": 0.2,
                 "y_pct": 0.27,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.27,
+                "x_pct": 0.25,
+                "y_pct": 0.27,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.31,
                 "y_pct": 0.27,
                 "confidence": "high",
                 "length_m": null
@@ -2330,21 +2354,27 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.46,
+                "x_pct": 0.42,
                 "y_pct": 0.27,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.56,
+                "x_pct": 0.48,
                 "y_pct": 0.27,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.65,
+                "x_pct": 0.54,
                 "y_pct": 0.27,
-                "confidence": "medium",
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.6,
+                "y_pct": 0.27,
+                "confidence": "high",
                 "length_m": null
               },
               {
@@ -2354,39 +2384,33 @@
                 "length_m": null
               },
               {
-                "x_pct": 0.2,
-                "y_pct": 0.78,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.3,
-                "y_pct": 0.78,
+                "x_pct": 0.25,
+                "y_pct": 0.62,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.4,
-                "y_pct": 0.78,
-                "confidence": "medium",
+                "y_pct": 0.66,
+                "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.5,
-                "y_pct": 0.78,
+                "y_pct": 0.66,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.6,
-                "y_pct": 0.78,
+                "y_pct": 0.66,
                 "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.7,
-                "y_pct": 0.78,
-                "confidence": "medium",
+                "y_pct": 0.66,
+                "confidence": "high",
                 "length_m": null
               },
               {
@@ -2400,141 +2424,141 @@
         ]
       },
       "durys": {
-        "total": 13,
+        "total": 12,
         "pages": [
           {
-            "page": 1,
-            "count": 8,
+            "page": 3,
+            "count": 11,
             "symbols": [
               {
+                "x_pct": 0.3,
+                "y_pct": 0.36,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.34,
+                "y_pct": 0.36,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.38,
+                "y_pct": 0.4,
+                "confidence": "high",
+                "length_m": null
+              },
+              {
                 "x_pct": 0.42,
-                "y_pct": 0.43,
+                "y_pct": 0.4,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.46,
-                "y_pct": 0.43,
+                "y_pct": 0.4,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.5,
-                "y_pct": 0.5,
-                "confidence": "medium",
+                "y_pct": 0.36,
+                "confidence": "high",
                 "length_m": null
               },
               {
                 "x_pct": 0.54,
-                "y_pct": 0.5,
+                "y_pct": 0.4,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.36,
-                "y_pct": 0.46,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.32,
-                "y_pct": 0.5,
+                "x_pct": 0.58,
+                "y_pct": 0.4,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.62,
-                "y_pct": 0.43,
+                "y_pct": 0.4,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.66,
+                "x_pct": 0.3,
                 "y_pct": 0.5,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.27,
+                "y_pct": 0.45,
                 "confidence": "medium",
                 "length_m": null
               }
             ]
           },
           {
-            "page": 3,
-            "count": 13,
+            "page": 1,
+            "count": 10,
             "symbols": [
               {
-                "x_pct": 0.27,
-                "y_pct": 0.36,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.3,
-                "y_pct": 0.4,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.33,
-                "y_pct": 0.4,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
                 "x_pct": 0.36,
-                "y_pct": 0.4,
+                "y_pct": 0.44,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.41,
-                "y_pct": 0.4,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.45,
-                "y_pct": 0.4,
+                "x_pct": 0.39,
+                "y_pct": 0.5,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.48,
-                "y_pct": 0.4,
+                "x_pct": 0.43,
+                "y_pct": 0.44,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.52,
-                "y_pct": 0.4,
+                "x_pct": 0.47,
+                "y_pct": 0.44,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.56,
-                "y_pct": 0.4,
+                "x_pct": 0.51,
+                "y_pct": 0.5,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.44,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.6,
-                "y_pct": 0.4,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.63,
-                "y_pct": 0.4,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.36,
-                "y_pct": 0.55,
+                "y_pct": 0.5,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.66,
+                "y_pct": 0.44,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.71,
                 "y_pct": 0.55,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.49,
+                "y_pct": 0.62,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -2545,74 +2569,74 @@
             "count": 12,
             "symbols": [
               {
-                "x_pct": 0.32,
-                "y_pct": 0.42,
+                "x_pct": 0.3,
+                "y_pct": 0.45,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.36,
+                "x_pct": 0.34,
                 "y_pct": 0.42,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.4,
-                "y_pct": 0.42,
+                "x_pct": 0.38,
+                "y_pct": 0.45,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.42,
+                "y_pct": 0.45,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.46,
+                "y_pct": 0.45,
                 "confidence": "high",
                 "length_m": null
               },
               {
-                "x_pct": 0.44,
+                "x_pct": 0.5,
+                "y_pct": 0.45,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.45,
+                "confidence": "medium",
+                "length_m": null
+              },
+              {
+                "x_pct": 0.58,
                 "y_pct": 0.42,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.48,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.52,
-                "y_pct": 0.42,
+                "x_pct": 0.62,
+                "y_pct": 0.45,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.56,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.6,
-                "y_pct": 0.42,
-                "confidence": "medium",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.64,
-                "y_pct": 0.42,
+                "x_pct": 0.66,
+                "y_pct": 0.45,
                 "confidence": "medium",
                 "length_m": null
               },
               {
                 "x_pct": 0.7,
-                "y_pct": 0.42,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.43,
-                "y_pct": 0.5,
+                "y_pct": 0.45,
                 "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.5,
-                "y_pct": 0.5,
+                "x_pct": 0.74,
+                "y_pct": 0.45,
                 "confidence": "medium",
                 "length_m": null
               }
@@ -2624,13 +2648,13 @@
     "stats": {
       "api_calls": 6,
       "pages_processed": 6,
-      "ms_total": 18011,
+      "ms_total": 17936,
       "method": "bundled+parallel"
     }
   },
   "detected_symbols_summary": {
-    "langai": 14,
-    "durys": 13
+    "langai": 15,
+    "durys": 12
   },
-  "_elapsed_s": 244.7
+  "_elapsed_s": 242.4
 }

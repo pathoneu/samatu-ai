@@ -11,7 +11,7 @@
     "duru_skaicius": 0,
     "langu_skaicius": 0,
     "nisu_skaicius": 0,
-    "ai_detected_symbol_types": 2
+    "ai_detected_symbol_types": 3
   },
   "skaiciavimai": {
     "dazomas_plotas": {
@@ -197,6 +197,67 @@
       "trace_type": "formula",
       "trace_links": [],
       "formula_explanation": "Skaičiavimas pagal universal industries formulę ()"
+    },
+    {
+      "eil_nr": 10,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "Lubinių priglaistomų šviestuvų apdirbimas",
+      "mato_vnt": "vnt",
+      "kiekis": 2,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "counted",
+      "trace_links": [
+        {
+          "page_nr": 4,
+          "x_pct": 0.72,
+          "y_pct": 0.42,
+          "confidence": "medium"
+        },
+        {
+          "page_nr": 4,
+          "x_pct": 0.22,
+          "y_pct": 0.78,
+          "confidence": "medium"
+        }
+      ],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 11,
+      "skyrius": "GKP",
+      "aprasymas": "Nišų formavimas iš GKP (paslėptam apšvietimui)",
+      "mato_vnt": "m",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas — LED nišos)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
+    },
+    {
+      "eil_nr": 12,
+      "skyrius": "Apšvietimas",
+      "aprasymas": "LED juostos komutavimas",
+      "mato_vnt": "m",
+      "kiekis": 3,
+      "kaina": 0,
+      "suma": 0,
+      "v8_industries_standart": true,
+      "source": "AI Vision (lubų planas — LED juostos)",
+      "confidence": "medium",
+      "detected": true,
+      "trace_type": "linear",
+      "trace_links": [],
+      "formula_explanation": null
     }
   ],
   "skyriu_suvestinis": {
@@ -235,28 +296,14 @@
   },
   "v8_rooms": [],
   "v8_scale": {
-    "scale_ratio": 40,
-    "mm_per_unit": 40.0,
-    "confidence": "medium",
-    "source": "text",
-    "votes": [
-      {
-        "scale_ratio": 40,
-        "mm_per_unit": 40.0,
-        "confidence": "medium",
-        "source": "text",
-        "match_count": 2
-      },
-      {
-        "scale_ratio": 50,
-        "mm_per_unit": 14.110756123535676,
-        "expected_for_ratio": 17.638888888888886,
-        "confidence": "medium",
-        "source": "dimensions",
-        "match_count": 27
-      }
+    "scale_ratio": 50,
+    "mm_per_unit": 50.0,
+    "confidence": "low",
+    "source": "fallback",
+    "votes": [],
+    "warnings": [
+      "Mastelis nerastas — naudojam default 1:50"
     ],
-    "warnings": [],
     "sanity": null
   },
   "v8_pages": [
@@ -266,26 +313,91 @@
       "matched_keywords": [],
       "label": "Nežinomas",
       "page": 1,
-      "text_length": 305
+      "text_length": 559
+    },
+    {
+      "type": "floor_plan",
+      "confidence": "high",
+      "matched_keywords": [
+        "2a"
+      ],
+      "label": "Grindų / aukšto planas",
+      "page": 2,
+      "text_length": 190
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 3,
+      "text_length": 322
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 4,
+      "text_length": 412
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 5,
+      "text_length": 401
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 6,
+      "text_length": 196
+    },
+    {
+      "type": "unknown",
+      "confidence": "low",
+      "matched_keywords": [],
+      "label": "Nežinomas",
+      "page": 7,
+      "text_length": 354
     }
   ],
   "v8_pages_summary": {
-    "total_pages": 1,
+    "total_pages": 7,
     "by_type": {
       "unknown": [
-        1
+        1,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "floor_plan": [
+        2
       ]
     },
     "ceiling_pages": [],
     "wall_elevations": [],
-    "floor_plans": [],
+    "floor_plans": [
+      2
+    ],
     "facades": [],
     "sections": [],
     "electrical": [],
     "plumbing": [],
     "specs": [],
     "unknown_pages": [
-      1
+      1,
+      3,
+      4,
+      5,
+      6,
+      7
     ]
   },
   "v8_archetipas": "standart",
@@ -310,52 +422,117 @@
   },
   "detected_symbols": {
     "by_type": {
-      "langai": {
+      "led_juostos": {
         "total": 3,
         "pages": [
           {
-            "page": 1,
+            "page": 4,
             "count": 3,
             "symbols": [
               {
-                "x_pct": 0.43,
-                "y_pct": 0.2,
-                "confidence": "high",
+                "x_pct": 0.35,
+                "y_pct": 0.35,
+                "confidence": "medium",
+                "length_m": 1.0
+              },
+              {
+                "x_pct": 0.7,
+                "y_pct": 0.35,
+                "confidence": "medium",
+                "length_m": 1.0
+              },
+              {
+                "x_pct": 0.3,
+                "y_pct": 0.7,
+                "confidence": "medium",
+                "length_m": 1.0
+              }
+            ]
+          },
+          {
+            "page": 6,
+            "count": 2,
+            "symbols": [
+              {
+                "x_pct": 0.55,
+                "y_pct": 0.42,
+                "confidence": "medium",
+                "length_m": 3.0
+              },
+              {
+                "x_pct": 0.75,
+                "y_pct": 0.36,
+                "confidence": "medium",
+                "length_m": 3.0
+              }
+            ]
+          },
+          {
+            "page": 5,
+            "count": 2,
+            "symbols": [
+              {
+                "x_pct": 0.625,
+                "y_pct": 0.395,
+                "confidence": "medium",
+                "length_m": 4.0
+              },
+              {
+                "x_pct": 0.5,
+                "y_pct": 0.46,
+                "confidence": "medium",
+                "length_m": 4.0
+              }
+            ]
+          }
+        ]
+      },
+      "sviestuvai": {
+        "total": 2,
+        "pages": [
+          {
+            "page": 4,
+            "count": 2,
+            "symbols": [
+              {
+                "x_pct": 0.72,
+                "y_pct": 0.42,
+                "confidence": "medium",
                 "length_m": null
               },
               {
-                "x_pct": 0.57,
-                "y_pct": 0.2,
-                "confidence": "high",
-                "length_m": null
-              },
-              {
-                "x_pct": 0.74,
-                "y_pct": 0.49,
-                "confidence": "high",
+                "x_pct": 0.22,
+                "y_pct": 0.78,
+                "confidence": "medium",
                 "length_m": null
               }
             ]
           }
         ]
       },
-      "durys": {
-        "total": 2,
+      "jungikliai": {
+        "total": 1,
         "pages": [
           {
-            "page": 1,
-            "count": 2,
+            "page": 6,
+            "count": 1,
             "symbols": [
               {
-                "x_pct": 0.41,
-                "y_pct": 0.85,
+                "x_pct": 0.18,
+                "y_pct": 0.74,
                 "confidence": "high",
                 "length_m": null
-              },
+              }
+            ]
+          },
+          {
+            "page": 5,
+            "count": 1,
+            "symbols": [
               {
-                "x_pct": 0.66,
-                "y_pct": 0.55,
-                "confidence": "medium",
+                "x_pct": 0.198,
+                "y_pct": 0.585,
+                "confidence": "high",
                 "length_m": null
               }
             ]
@@ -364,15 +541,16 @@
       }
     },
     "stats": {
-      "api_calls": 1,
-      "pages_processed": 1,
-      "ms_total": 6006,
+      "api_calls": 6,
+      "pages_processed": 6,
+      "ms_total": 10374,
       "method": "bundled+parallel"
     }
   },
   "detected_symbols_summary": {
-    "langai": 3,
-    "durys": 2
+    "led_juostos": 3,
+    "sviestuvai": 2,
+    "jungikliai": 1
   },
-  "_elapsed_s": 12.6
+  "_elapsed_s": 20.5
 }
