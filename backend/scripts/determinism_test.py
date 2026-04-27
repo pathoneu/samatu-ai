@@ -27,7 +27,7 @@ from _pdf_helper import find_breziniai_pdf
 from extractor import extract_interior
 
 RUNS_PER_PROJECT = 3
-PROJECTS = ["P2"]  # zoom validation focus — P2 is the no-eksplikacija worst case
+PROJECTS = ["P1", "P3"]  # validate zoom determinism on large projects (P2 already done)
 
 
 def headline(result: dict) -> dict:
@@ -74,7 +74,7 @@ def main():
             h = headline(result)
             h["run"] = run_i
             all_results[proj].append(h)
-            out_file = OUT / f"DETERMINISM_ZOOM_{proj}_run{run_i}.json"
+            out_file = OUT / f"DETERMINISM_ZOOM_LARGE_{proj}_run{run_i}.json"
             out_file.write_text(json.dumps(result, ensure_ascii=False, indent=2))
             print(f"  ✓ rooms={h['rooms']} dažymas={h['dazymo_total']} "
                   f"kampai={h['kampai_total']} plytelės={h['plyteles_sienos_total']} "
