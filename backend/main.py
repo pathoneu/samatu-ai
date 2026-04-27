@@ -16,12 +16,18 @@ logging.basicConfig(
 log = logging.getLogger("samatu_ai")
 
 # ── Production safety helpers ──────────────────────────────────────────────────
-MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB — large LT residential projects ~20MB
+# 200 MB max — covers large commercial projects (multi-aukštai apartment buildings,
+# 150+ pages with high-res raster scans). Typical LT residential = 5-20 MB.
+# Note: Vision pipeline still caps at MAX_PAGES=100 (Anthropic API hard limit).
+# A 150-page PDF would have pages 101-150 silently skipped — surface as warning.
+MAX_PDF_SIZE_BYTES = 200 * 1024 * 1024
 MIN_PDF_SIZE_BYTES = 100               # below = junk
 
-def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> None:
+def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
     """Reject malformed/oversize uploads BEFORE expensive Vision call.
-    Raises HTTPException on failure."""
+    Raises HTTPException on failure.
+    Returns: {"page_count": int, "warning": str | None} on success.
+    """
     n = len(pdf_bytes)
     if n < MIN_PDF_SIZE_BYTES:
         raise HTTPException(status_code=400, detail=f"PDF failas tuščias arba per mažas ({n} B). Įkelkite tikrą brėžinį.")
@@ -34,6 +40,27 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> None:
     if filename and (".." in filename or filename.startswith("/")):
         log.warning("suspicious filename rejected: %r", filename)
         raise HTTPException(status_code=400, detail="Neleistinas failo pavadinimas.")
+
+    # Quick page count via pdfplumber (fast — only reads metadata)
+    try:
+        import io as _io
+        with pdfplumber.open(_io.BytesIO(pdf_bytes)) as _pdf:
+            page_count = len(_pdf.pages)
+    except Exception as e:
+        log.warning("pdf page count probe failed: %s", e)
+        page_count = 0
+
+    warning = None
+    # MAX_PAGES is the Vision pipeline cap (defined in extractor/prompt.py = 100)
+    if page_count > 100:
+        warning = (
+            f"PDF turi {page_count} puslapių. AI analizuos tik pirmus 100 — "
+            f"jei svarbi info (pvz. eksplikacija) yra vėlesniuose puslapiuose, "
+            f"perorganizuokite PDF arba įkelkite atskirai pirmus 100 + likusius."
+        )
+        log.info("large PDF: %d pages (will cap at 100)", page_count)
+
+    return {"page_count": page_count, "warning": warning}
 
 
 # In-memory rate limiter — per-IP request counter with sliding 60s window.
@@ -3710,7 +3737,7 @@ async def extract_interior_endpoint(
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
     pdf_bytes = await files[0].read()
-    _validate_pdf_upload(pdf_bytes, files[0].filename or "")
+    validation = _validate_pdf_upload(pdf_bytes, files[0].filename or "")
 
     overrides_dict: dict | None = None
     if rules_override:
@@ -3719,10 +3746,28 @@ async def extract_interior_endpoint(
         except json.JSONDecodeError as e:
             raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
 
-    log.info("extract-interior: ip=%s file=%s size=%dKB has_overrides=%s",
-             client_ip, files[0].filename, len(pdf_bytes) // 1024, overrides_dict is not None)
+    log.info("extract-interior: ip=%s file=%s size=%dKB pages=%d has_overrides=%s",
+             client_ip, files[0].filename, len(pdf_bytes) // 1024,
+             validation.get("page_count", 0), overrides_dict is not None)
     from extractor import extract_interior
-    return await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
+    result = await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
+
+    # Propagate large-PDF warning into result.warnings[] so SanityWarningsBanner shows it.
+    if isinstance(result, dict) and validation.get("warning"):
+        existing = result.get("warnings") or []
+        existing.append({"level": "WARN", "message": validation["warning"]})
+        result["warnings"] = existing
+        # Rebuild lt_sanity mirror to include this warning
+        if isinstance(result.get("lt_sanity"), dict):
+            ls = result["lt_sanity"]
+            ls.setdefault("warnings", []).append({
+                "level": "WARNING", "message": validation["warning"], "room": ""
+            })
+            ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
+            ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
+        result["_pdf_page_count"] = validation.get("page_count", 0)
+
+    return result
 
 
 # ── /recompute-interior — pure-math recompute with new rules_override ───────
