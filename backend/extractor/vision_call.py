@@ -328,6 +328,25 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
     except Exception as exc:
         print(f"[extractor] lt_sanity failed: {exc}")
 
+    # Step 4.5: Determinism warning — if no eksplikacija text was found, Vision
+    # had to infer rooms from drawing dimensions alone, which has high run-to-run
+    # variance per Phase 6.5.2 measurement (P2 sample: rooms CV 22.9%, plytelės CV
+    # 153.8%; vs P3 with eksplikacija: rooms CV 2.8%, dažymas CV 4.2%).
+    # Surface this so UI can display a "rezultatai gali svyruoti" hint.
+    eksplikacija_page = parsed.get("eksplikacija_source_page")
+    if not eksplikacija_page:
+        existing = parsed.get("warnings") or []
+        existing.append({
+            "level": "INFO",
+            "message": (
+                "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai "
+                "išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų "
+                "(±10–20% kambarių skaičiui, daugiau plytelių zonoms). "
+                "Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
+            ),
+        })
+        parsed["warnings"] = existing
+
     # Step 5: Frontend backwards-compat — emit V8-shape fields alongside new schema.
     # Frontend (ExportModal, ProjectMainView, WorkspacePanel) reads `darbu_sarasas`,
     # `v8_totals`, `v8_rooms`. Without these, the works/materials list and Excel/PDF
