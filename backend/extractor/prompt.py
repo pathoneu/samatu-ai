@@ -11,9 +11,10 @@ from __future__ import annotations
 MODEL = "claude-opus-4-7"
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
-MAX_PAGES = 80  # Opus 4.7 API max is 100 images/request; 80 leaves headroom.
-                # 65-page PDFs (P1) need full coverage — eksplikacija / sienų
-                # išklotinės / langų sąrašas may live on later pages. Cost ~$0.025/image.
+MAX_PAGES = 100  # Opus 4.7 API hard max — full coverage for any realistic LT project.
+                 # User decision (2026-04-27): accuracy > latency; 50k+ € projects
+                 # justify multi-minute waits. Cost scales linearly (~$0.025/image).
+                 # Beyond 20 images, Anthropic auto-caps res at 2000px (which we already use).
 IMG_MAX_DIM = 2000  # Opus 4.7 auto-caps at 2000 when >20 images (no quality loss vs current).
 
 
@@ -384,7 +385,7 @@ hidroizoliacijos_vnt santraukoje = vonia/wc/dušo zonos kiekis
 gkp_lubu_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis ≤ 3.0m
 gkp_lubu_virs_3m_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis > 3.0m
 ```
-Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (pvz. rangovo P1 atskirai 68.28 m²).
+Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (LT industry konvencija: aukšto darbo režimas, papildomi pastoliai).
 
 </quantity_formulas>
 
