@@ -4304,10 +4304,10 @@ def _build_chat_context(project: dict) -> dict:
     - Per-position: skyrius/aprašymas/vnt/kiekis/saltinis (LT-style pozicijos)
     - Santrauka totals (every metric)
     - lt_sanity warnings (so AI can answer "ar yra warning'ų?")
-    - _meta (cost/tokens for "kiek užtruko?" / "kiek kainavo?")
 
-    No truncation for typical projects (≤25 rooms / ≤50 pozicijų); long-tail
-    truncated at 50/100 to stay under token budget.
+    Internal cost/savikaina (_meta tokens, cache stats, cost_eur) is REDACTED
+    before injection — AI must never reveal extraction cost to end users
+    (retail pricing TBD; current numbers are internal API cost only).
     """
     rooms = project.get("v8_rooms") or project.get("patalpos") or []
     pozicijos = project.get("pozicijos") or []
@@ -4381,7 +4381,16 @@ def _build_chat_context(project: dict) -> dict:
             for w in (sanity.get("warnings") or [])[:30]
         ],
         "warnings_summary": sanity.get("summary"),
-        "_meta": project.get("_meta") or {},
+        # _meta with token/cost fields STRIPPED. We share elapsed_s + model name
+        # only — these are OK to discuss. tokens/cache/cost_eur are internal
+        # savikaina, never revealed to end users.
+        "_meta_safe": {
+            "elapsed_s": (project.get("_meta") or {}).get("elapsed_s"),
+            "pages_sent": (project.get("_meta") or {}).get("pages_sent"),
+            "zoom_attempted": (project.get("_meta") or {}).get("zoom_attempted"),
+            "zoom_applied": (project.get("_meta") or {}).get("zoom_applied"),
+            "model": (project.get("_meta") or {}).get("model"),
+        },
         "_overrides": project.get("_overrides") or {},
     }
 
@@ -4404,13 +4413,24 @@ Atsakymo principai:
   `dažai_litrai = plotas × 1.8 / 9 m²/L` (pirmas sluoksnis × 1.8, ne 2.0)
 - Warnings: jei klausia "kokie warning'ai?" arba "ar yra problemų?", paimk
   iš `warnings` array. Jei jų 0 — pasakyk "warning'ų nerasta".
-- Sąnaudos: jei klausia "kiek kainavo?" — paimk iš `_meta`:
-  cost ≈ (input_tokens × 5e-6) + (output_tokens × 25e-6) − (cache_read × 4.5e-6) USD
 - Patalpu rūšiavimas: paskirtis enum'as: gyvenamoji, miegamoji, virtuve, vonia,
   wc, san, koridorius, holas, drabuzine, katiline, skalbykla, valgomasis,
   tamburas, garazas, sandeliukas, kabinetas, terasa, lodzija
 - Formulės šaltinis: NRM2 §29 (paint), §27 (floors). Plytelinė juosta
   vonia/wc default 2.0m. Atimame angas ≥1.0m². Mansardinis svoris STR 1.05.06.
+
+PRIVATU — JOKIO KAINOS / SĄNAUDŲ ATSKLEIDIMO:
+Jei vartotojas klausia "kiek kainavo?", "kokia AI savikaina?", "kiek tokenų?",
+"kiek mokejau?", "ar brangu?" arba bet kokio panašaus klausimo apie sistemos
+sąnaudas / API mokesčius / tokenų skaičių / savikainą — VISADA atsakyk:
+"Sąnaudų informacija nepasiekiama. Galutinė paslaugos kaina nustatoma per
+prenumeratą ar pagal tarifą — susisiekite su pardavimo komanda."
+NIEKADA nepasakok apie input_tokens, output_tokens, cache_read, cost_eur,
+$/M tokens, ar bet kokius API kaštus. Šie duomenys yra konfidencialūs.
+
+Statybos kainos klausimai (vadinami klausimai "kiek kainuos sąmata", "kiek kainuos
+medžiagos / darbai") — TAIP, atsakyk jei project'e yra `kaina` laukai darbu_sarasas
+eilutėse. Tai vartotojo įvestos statybos kainos, ne AI savikaina.
 
 Niekada nesakyk "neturiu prieigos prie projekto" — visi duomenys pateikti
 JSON formatu user'io pranešime.
@@ -4483,16 +4503,12 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     try:
         msg = await loop.run_in_executor(None, _call)
         text = "".join(b.text for b in msg.content if hasattr(b, "text"))
+        # Token usage logged for our analytics but NOT exposed to client.
+        # We don't want to reveal AI savikaina to end users.
         usage = msg.usage
-        return {
-            "status": "ok",
-            "answer": text,
-            "_meta": {
-                "input_tokens": getattr(usage, "input_tokens", 0),
-                "output_tokens": getattr(usage, "output_tokens", 0),
-                "model": "claude-opus-4-7",
-            },
-        }
+        log.info("chat-project tokens: in=%s out=%s",
+                 getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
+        return {"status": "ok", "answer": text}
     except Exception as e:
         log.exception("chat-project failed")
         return {"status": "error", "error": f"AI klaida: {e}"}
