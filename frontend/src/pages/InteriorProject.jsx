@@ -5,7 +5,7 @@ import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler, Package, Droplet,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map, ListChecks, MessageSquare, Download,
+  Map, ListChecks, MessageSquare, Download, Sliders,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -17,6 +17,7 @@ import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import ProjectCanvas from '@/components/project/ProjectCanvas';
 import ExportDropdown from '@/components/project/ExportDropdown';
+import RulesOverridePanel from '@/components/project/RulesOverridePanel';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
@@ -62,6 +63,7 @@ function TabBar({ tab, setTab, hasPdf }) {
   const tabs = [
     ...(hasPdf ? [{ id: 'brezinys', label: 'Brėžinys', Icon: Map }] : []),
     { id: 'main',     label: 'Kiekiai',   Icon: ListChecks },
+    { id: 'rules',    label: 'Prielaidos', Icon: Sliders },
     { id: 'aichat',   label: 'AI Chat',   Icon: MessageSquare },
     { id: 'eksport',  label: 'Eksportas', Icon: Download },
   ];
@@ -381,7 +383,14 @@ function DarbuSarasas({ items }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InteriorProject({ project, onAssumptionsChange }) {
+export default function InteriorProject({ project: projectProp, onAssumptionsChange }) {
+  // Local mirror of project prop — needed because RulesOverridePanel rewrites
+  // big swaths of state via /recompute-interior. Keep prop sync via useEffect
+  // so navigation between projects still works.
+  const [projectState, setProjectState] = useState(projectProp);
+  useEffect(() => { setProjectState(projectProp); }, [projectProp]);
+  const project = projectState;
+  const setProject = setProjectState;
   // ROLLBACK 2026-04-26: ProjectCanvas single-canvas eksperimentas sulaužė
   // realių projektų rendering'ą. Default = sena tabbed UI (kuri DIRBA).
   // Naujas canvas pasiekiamas tik per ?canvas=1 query string (eksperimentinis).
@@ -531,6 +540,19 @@ export default function InteriorProject({ project, onAssumptionsChange }) {
           }}
           onShowDrawing={pdfUrl ? () => setTab('brezinys') : null}
         />
+      )}
+
+      {/* ── TAB: PRIELAIDOS — vartotojo override'ai (per-paskirtis + per-room) ─ */}
+      {tab === 'rules' && (
+        <div className="border border-border rounded-xl bg-card p-6">
+          <RulesOverridePanel
+            project={project}
+            onProjectUpdate={(updated) => {
+              setProject(updated);
+              updateProject(project.id, updated);
+            }}
+          />
+        </div>
       )}
 
       {/* ── TAB: AI CHAT — natural language Q&A apie projektą ──────────── */}

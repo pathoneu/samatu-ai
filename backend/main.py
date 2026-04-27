@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 import pdfplumber
 import anthropic
 import openpyxl
@@ -3618,6 +3619,164 @@ async def extract_interior_endpoint(
 
     from extractor import extract_interior
     return await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
+
+
+# ── /recompute-interior — pure-math recompute with new rules_override ───────
+# (Phase 10 — AssumptionsPanel reactivation. No Vision call, no PDF re-render.
+# User edits per-paskirtis preferences in the UI; we re-apply formulas to the
+# already-extracted patalpos[]. Sub-second roundtrip vs minutes for full re-extract.)
+
+class RecomputePayload(BaseModel):
+    patalpos: list[dict]
+    rules_override: dict = Field(default_factory=dict)
+    # Optional per-room overrides keyed by patalpa.nr (e.g. force tile vs parquet)
+    per_room_overrides: dict = Field(default_factory=dict)
+    archetipas: str | None = None
+    bendras_plotas_m2: float | None = None
+
+
+@app.post("/recompute-interior")
+async def recompute_interior(payload: RecomputePayload):
+    """Re-apply universal formulas + user overrides to already-extracted patalpos.
+
+    Returns the same shape as /extract-interior (sans _meta zoom/cost stats).
+    Used by AssumptionsPanel — user edits a toggle, we recompute synchronously.
+    """
+    from extractor.universal_rules import (
+        calc_room_quantities, normalize_paskirtis,
+        ROOM_TYPE_RULES, translate_user_prefs_to_room_rules, UNIVERSAL_RULES,
+    )
+
+    rules = translate_user_prefs_to_room_rules(payload.rules_override) or {}
+
+    # Per-room overrides (e.g. force koridorius floor=tile)
+    per_room = payload.per_room_overrides or {}
+
+    out_rooms: list[dict] = []
+    for room in payload.patalpos:
+        # Preserve Vision-emitted fields we don't recompute
+        preserved = {
+            "nr": room.get("nr"),
+            "pavadinimas": room.get("pavadinimas"),
+            "paskirtis": room.get("paskirtis"),
+            "puslapio_nr": room.get("puslapio_nr"),
+            "bbox_pct": room.get("bbox_pct"),
+            "plotas_saltinis": room.get("plotas_saltinis"),
+            "lubu_aukstis_saltinis": room.get("lubu_aukstis_saltinis"),
+            "lubu_tipas": room.get("lubu_tipas"),
+            "calculation_trace": room.get("calculation_trace"),
+            "confidence": room.get("confidence"),
+            "elementai": room.get("elementai"),
+            "_zoom": room.get("_zoom"),
+            "_zoom_changes": room.get("_zoom_changes"),
+        }
+
+        nr = room.get("nr") or ""
+        room_override = per_room.get(nr) or {}
+
+        # Rules for this paskirtis — start from translated, apply per-room override
+        paskirtis = normalize_paskirtis(room.get("paskirtis") or "")
+        rt_rules = dict((rules.get(paskirtis)
+                         or ROOM_TYPE_RULES.get(paskirtis)
+                         or ROOM_TYPE_RULES["gyvenamoji"]))
+        # Per-room flags can flip floor type or paint
+        if "tile_floor" in room_override:
+            rt_rules["tile_floor"] = bool(room_override["tile_floor"])
+        if "walls_paint" in room_override:
+            rt_rules["walls_paint"] = float(room_override["walls_paint"])
+
+        # Build a single-room rules dict that calc_room_quantities expects
+        single_rules = {paskirtis: rt_rules}
+
+        recalc = calc_room_quantities(room, rules=single_rules)
+
+        merged = {**room, **recalc, **preserved}
+        out_rooms.append(merged)
+
+    # Recompute santrauka + emit V8-compat + lt_sanity mirror
+    parsed = {
+        "archetipas": payload.archetipas or "standart",
+        "bendras_plotas_m2": payload.bendras_plotas_m2 or sum(
+            r.get("plotas_m2", 0) for r in out_rooms
+            if normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
+        ),
+        "patalpos": out_rooms,
+        "pozicijos": [],  # rebuilt below by emit_v8_compat? No — pozicijos come from Vision narrative
+        "_overrides": payload.rules_override,
+    }
+
+    # Reuse extractor's post-processing helpers
+    from extractor.vision_call import (
+        _recompute_santrauka, _emit_v8_compat_fields,
+    )
+    from extractor.lt_rules import apply_lt_sanity
+
+    parsed = _recompute_santrauka(parsed)
+    parsed = apply_lt_sanity(parsed)
+
+    # Emit lt_sanity:{warnings,summary} mirror so SanityWarningsBanner renders
+    # (same mirror the main /extract-interior emits in step 4.1).
+    flat_warnings = parsed.get("_lt_warnings") or []
+    ui_warnings = []
+    for w in flat_warnings:
+        level = w.get("level", "INFO")
+        if level == "WARN":
+            level = "WARNING"
+        ui_warnings.append({
+            "level": level,
+            "room": w.get("patalpa_nr") or w.get("room") or "",
+            "field": w.get("field", ""),
+            "value": w.get("value"),
+            "expected": w.get("expected"),
+            "message": w.get("message", ""),
+        })
+    n_err = sum(1 for w in ui_warnings if w["level"] == "ERROR")
+    n_warn = sum(1 for w in ui_warnings if w["level"] == "WARNING")
+    n_info = sum(1 for w in ui_warnings if w["level"] == "INFO")
+    parsed["lt_sanity"] = {
+        "warnings": ui_warnings,
+        "summary": {
+            "rooms_count": len(out_rooms),
+            "total_area_m2": round(parsed.get("bendras_plotas_m2", 0), 1),
+            "warnings_count": n_err + n_warn,
+            "errors": n_err,
+            "warnings": n_warn,
+            "info": n_info,
+        },
+    }
+
+    # Build minimal pozicijos[] from per-room totals (keeps Excel export populated).
+    # Note: we lose Vision's narrative pozicijos (e.g. "Plytelių 1200×1200×6") on
+    # recompute. UI should still allow re-extraction for full pozicijos detail.
+    pos: list[dict] = []
+    s = parsed.get("santrauka", {}) or {}
+
+    def _pos(skyrius: str, aprasymas: str, vnt: str, kiekis: float, saltinis: str = "skaiciuota_is_brezinio"):
+        if (kiekis or 0) > 0:
+            pos.append({
+                "skyrius": skyrius, "aprasymas": aprasymas, "vnt": vnt,
+                "kiekis": round(kiekis, 2), "saltinis": saltinis,
+            })
+
+    _pos("GKP montavimas", "GKP lubų montavimas (standart aukštis ≤3m)", "m2", s.get("gkp_lubu_m2_total", 0))
+    _pos("GKP montavimas", "GKP lubų montavimas (aukštis virš 3m)", "m2", s.get("gkp_lubu_virs_3m_m2_total", 0))
+    _pos("Glaistymas dazymas", "Sienų ir lubų glaistymas/dažymas", "m2", s.get("dazymo_plotas_total_m2", 0))
+    _pos("Glaistymas dazymas", "Dažymo kampų montavimas", "m", s.get("kampai_m_total", 0))
+    _pos("Glaistymas dazymas", "Angokraščių GKP apdaila", "m", s.get("angokrasciu_gkp_m_total", 0))
+    _pos("Glaistymas dazymas", "Paslėptų durų staktų apdirbimas", "m", s.get("pasleptu_duru_staktu_m_total", 0))
+    _pos("Glaistymas dazymas", "LED nišų glaistymas/dažymas", "m", s.get("nisu_metrai_total", 0))
+    _pos("Plyteles", "Sienų plytelės", "m2", s.get("plyteles_sienos_m2_total", 0))
+    _pos("Plyteles", "Grindų plytelės", "m2", s.get("plyteles_grindys_m2_total", 0))
+    _pos("Plyteles", "Išlyginamojo grindų pylimas", "m2", s.get("isliginamasis_m2_total", 0))
+    _pos("Plyteles", "Grindjuostės (parketo zonos)", "m", s.get("grindjuosciu_m_total", 0))
+    _pos("Plyteles", "PVC/parketo grindys", "m2", s.get("pvc_grindys_m2_total", 0))
+    _pos("Hidroizoliacija", "Hidroizoliacija drėgnose zonose", "vnt", s.get("hidroizoliacijos_vnt", 0))
+
+    parsed["pozicijos"] = pos
+    parsed = _emit_v8_compat_fields(parsed)
+    parsed["status"] = "ok"
+    parsed["_recomputed"] = True
+    return parsed
 
 
 @app.post("/v9/symbols/detect")
