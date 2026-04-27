@@ -37,26 +37,46 @@ function ConfidenceDot({ level, hint }) {
   );
 }
 
-// Confidence per reikšmę (heuristika iš duomenų šaltinio)
+// Confidence per reikšmę. Pirma — bandom backend'o `confidence` (jei extractor
+// grąžino) + `plotas_saltinis` / `lubu_aukstis_saltinis` source tags. Fallback —
+// senesnė heuristika iš reikšmių šaltinio.
 function getFieldConfidence(room, field) {
   const val = room?.[field];
   if (val == null) return null;
 
+  // Priority 1: backend per-room `confidence` from new extractor
+  const backendConf = room?.confidence;
+
+  // Priority 2: source tag — eksplikacija/section_pjuvis = high; default_fallback = low
+  if (field === 'plotas_m2' && room?.plotas_saltinis) {
+    const src = room.plotas_saltinis;
+    if (src === 'eksplikacija' || src === 'inline_label') return 'high';
+    if (src === 'wall_dim_calc') return backendConf || 'medium';
+    if (src === 'default_fallback') return 'low';
+  }
+  if (field === 'lubu_aukstis_m' && room?.lubu_aukstis_saltinis) {
+    const src = room.lubu_aukstis_saltinis;
+    if (src === 'section_pjuvis') return 'high';
+    if (src === 'ceiling_plan_annotation') return backendConf || 'medium';
+    if (src === 'default_fallback') return 'low';
+  }
+
   if (field === 'plotas_m2') {
     if (val <= 0) return 'low';
-    const decimals = String(val).split('.')[1] || '';
-    return decimals.length <= 2 ? 'high' : 'medium';
+    return backendConf || 'medium';
   }
 
   if (field === 'perimetras_m') {
     if (val <= 0) return 'low';
+    // _zoom_changes proves perimetras was zoom-refined
+    const zoomChanges = room?._zoom_changes || [];
+    if (zoomChanges.some(c => c.startsWith('perimetras'))) return 'high';
     const plotas = room.plotas_m2 || 0;
     if (plotas > 0) {
       const aprox = 4.18 * Math.sqrt(plotas);
-      // Jei panašus į aproks formulę — tikriausiai apskaičiuotas, ne skaitytas
       if (Math.abs(val - aprox) / aprox < 0.05) return 'medium';
     }
-    return 'high';
+    return backendConf || 'high';
   }
 
   if (field === 'lubu_aukstis_m') {

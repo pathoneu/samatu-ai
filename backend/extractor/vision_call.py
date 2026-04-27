@@ -510,10 +510,13 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
     # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
     # SanityWarningsBanner.jsx expects this V8 shape; new extractor uses flat
     # `_lt_warnings`. Normalize level WARN → WARNING to match UI's level enum.
+    # Also merges `warnings[]` (Vision-emitted + auto eksplikacija-missing INFO)
+    # so the user sees BOTH STR sanity AND pipeline-level notes in one banner.
     try:
         flat_warnings = parsed.get("_lt_warnings") or []
+        pipeline_warnings = parsed.get("warnings") or []
         ui_warnings = []
-        for w in flat_warnings:
+        for w in flat_warnings + pipeline_warnings:
             level = w.get("level", "INFO")
             if level == "WARN":
                 level = "WARNING"
