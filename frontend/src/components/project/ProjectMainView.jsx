@@ -295,8 +295,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               </div>
             </div>
 
-            {/* Right: export */}
-            <ExportDropdown project={projectWithDarbai} />
+            {/* Right: re-extract + export */}
+            <div className="flex items-center gap-2">
+              <ReextractButton project={project} onComplete={onProjectChange} />
+              <ExportDropdown project={projectWithDarbai} />
+            </div>
           </div>
 
           {/* Trūksta kainų — perspėjimas */}

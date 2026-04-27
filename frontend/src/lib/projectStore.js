@@ -1,17 +1,18 @@
-import { DEMO_PROJECTS } from '../demoData';
-
 /**
  * projectStore — durable project storage.
  *
- * Architecture (Phase 12.3):
+ * Architecture (Phase 12.3 + 13):
  * - Write-through: every mutation writes to localStorage (instant UX) AND
- *   POSTs to backend /api/projects (durable, cross-device).
+ *   POSTs to backend /api/projects (durable, cross-device, per-user).
  * - Backend is the source of truth; localStorage is the offline cache.
- * - On first app load (after schema migration or fresh device), localStorage
- *   is empty; we fetch backend list and populate localStorage as cache.
+ * - On Dashboard mount, pullProjectsFromBackend() syncs backend → cache.
+ * - On logout (authContext), localStorage is cleared so next user starts fresh.
  *
- * Backend POSTs are fire-and-forget — UI never blocks waiting for them.
- * If backend is offline, localStorage still works; sync resumes when online.
+ * Demo data is NOT seeded — auth-gated empty state on first login is correct.
+ *
+ * Backend POSTs use credentials: 'include' for session cookie. They're
+ * fire-and-forget — UI never blocks waiting; if backend is offline,
+ * localStorage still works and sync resumes when online.
  */
 
 const PROJECTS_KEY = 'samatu_projects';
@@ -20,24 +21,20 @@ const SETTINGS_KEY = 'samatu_settings';
 
 const API = '';
 
-// Seed demo data on first load (empty localStorage)
-if (!localStorage.getItem(PROJECTS_KEY)) {
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(DEMO_PROJECTS));
-}
-
 // ── Backend sync helpers (fire-and-forget) ────────────────────────────────────
 
 const _syncToBackend = (project) => {
   if (!project?.id) return;
   fetch(`${API}/api/projects/${project.id}`, {
     method: 'PUT',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(project),
   }).catch((e) => console.warn('[projectStore] backend sync failed:', e));
 };
 
 const _deleteFromBackend = (id) => {
-  fetch(`${API}/api/projects/${id}`, { method: 'DELETE' })
+  fetch(`${API}/api/projects/${id}`, { method: 'DELETE', credentials: 'include' })
     .catch((e) => console.warn('[projectStore] backend delete failed:', e));
 };
 
@@ -51,32 +48,32 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
   _hasPulled = true;
   try {
-    const res = await fetch(`${API}/api/projects`);
+    const res = await fetch(`${API}/api/projects`, { credentials: 'include' });
+    if (res.status === 401) {
+      // Not authenticated — caller (AuthProvider) handles redirect; clear cache.
+      localStorage.removeItem(PROJECTS_KEY);
+      return null;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { projects: list = [] } = await res.json();
-    if (list.length === 0) return null;
 
-    // Backend returns SUMMARIES — to populate cache fully, fetch each.
-    // For 100+ projects, this is a lot of round trips — acceptable for MVP.
-    const fulls = await Promise.all(
-      list.map(p => fetch(`${API}/api/projects/${p.id}`).then(r => r.ok ? r.json() : null))
-    );
-    const valid = fulls.filter(Boolean);
-
-    // Merge with localStorage by updated_at — keep newer
-    const local = JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
-    const byId = new Map(local.map(p => [p.id, p]));
-    for (const p of valid) {
-      const existing = byId.get(p.id);
-      if (!existing || (p.updated_at && existing.updated_at && p.updated_at > existing.updated_at)) {
-        byId.set(p.id, p);
-      }
+    // Backend is source of truth — replace cache fully (don't merge old localStorage
+    // entries from a previous user/session; we cleared on logout but this is defensive).
+    if (list.length === 0) {
+      localStorage.setItem(PROJECTS_KEY, JSON.stringify([]));
+      return [];
     }
-    const merged = Array.from(byId.values()).sort((a, b) =>
+
+    // Backend returns SUMMARIES — fetch full data per project.
+    const fulls = await Promise.all(
+      list.map(p => fetch(`${API}/api/projects/${p.id}`, { credentials: 'include' })
+                     .then(r => r.ok ? r.json() : null))
+    );
+    const valid = fulls.filter(Boolean).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(merged));
-    return merged;
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(valid));
+    return valid;
   } catch (e) {
     console.warn('[projectStore] pull from backend failed:', e);
     return null;
@@ -133,6 +130,7 @@ export function logCorrection(projectId, payload) {
   if (!projectId || !payload?.field_path) return;
   fetch(`${API}/api/projects/${projectId}/corrections`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).catch((e) => console.warn('[projectStore] correction log failed:', e));
