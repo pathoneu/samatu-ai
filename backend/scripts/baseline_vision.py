@@ -43,7 +43,7 @@ OUT = Path(__file__).parent / "baseline_output"
 OUT.mkdir(exist_ok=True)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_v8_baseline import find_breziniai_pdf  # reuse PDF discovery (largest variant)
+from _pdf_helper import find_breziniai_pdf  # PDF discovery (largest variant per project)
 
 env_file = Path(__file__).resolve().parents[1] / ".env"
 if env_file.exists():

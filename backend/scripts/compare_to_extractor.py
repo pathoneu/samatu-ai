@@ -26,7 +26,7 @@ OUT.mkdir(exist_ok=True)
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from run_v8_baseline import find_breziniai_pdf  # PDF discovery (largest variant)
+from _pdf_helper import find_breziniai_pdf  # PDF discovery (largest variant per project)
 from extractor import extract_interior
 
 
