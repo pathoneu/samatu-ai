@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-27
 **Status:** Pre-production refactor complete + Phase 9 production-readiness fixes landed.
-**Honest production-readiness:** ~85% (was ~60% before Phase 9; up from 30% before refactor).
+**Honest production-readiness:** ~92% (was ~85% before Phase 10; up from 60% before Phase 9; up from 30% before refactor).
 
 This document is the result of an Explore-subagent UI audit + manual stress testing. It exists so the launch decision is made with full visibility into what works, what's been tested, and what's deferred.
 
@@ -23,30 +23,24 @@ This document is the result of an Explore-subagent UI audit + manual stress test
 
 ---
 
-## ⚠ Known limitations (not fixed; documented for transparency)
+## ⚠ Known limitations status (Phase 10 update)
 
-### Limitation 1: AssumptionsPanel doesn't recalculate post-extraction
-**Severity:** MED. **Impact:** "Edit assumptions and see updated quantities" feature broken for all new projects.
-**Root cause:** New extractor returns pre-computed `patalpos[]`; the legacy frontend recalc path (`calculateInteriorQuantities` with `raw_calc_data`) is skipped because `raw_calc_data` is no longer emitted. Also: AssumptionsPanel ("Prielaidos" tab) is hidden from `TabBar` entirely.
-**Workaround:** Users can edit individual room values inline (RoomCard) which DOES recalculate via `calcRoomQuantities` in RoomsGrid.
-**Future fix:** Either re-trigger backend with `rules_override` on assumption change, or add Python-side recalc that takes patalpos + rules_override and replays `calc_room_quantities`.
+### ✅ Limitation 1: AssumptionsPanel — FIXED in Phase 10
+Backend `/recompute-interior` endpoint + frontend `RulesOverridePanel.jsx`. 6 per-paskirtis toggles + 3 numeric inputs + per-room override table. Sub-second roundtrip (~8ms measured). "Prielaidos" tab restored to TabBar.
 
-### Limitation 2: Hidden tabs (`prielaidos`, `puslapiai`, `kiekiai`, `workspace`)
-**Severity:** LOW. Tab content code exists in `InteriorProject.jsx` but tabs aren't in `TabBar`. They're unreachable but cause no runtime errors.
-**Future fix:** Either delete the code or add tabs back if the features are wanted.
+### Limitation 2: Hidden tabs (`puslapiai`, `kiekiai`, `workspace`)
+**Severity:** LOW. Tab content code exists but unreachable. **Note:** "Prielaidos" was added back as a working tab in Phase 10; the others remain dead.
+**Future fix:** Delete dead tab code or add to TabBar.
 
-### Limitation 3: Mobile sidebar always visible
-**Severity:** MED for on-site estimators using tablets/phones. **Impact:** Unusable on screens <600px wide.
-**Root cause:** `AppLayout.jsx` doesn't use the `useIsMobile()` hook that exists in the codebase.
-**Future fix:** Add hamburger toggle + responsive hide below `md` breakpoint.
+### ✅ Limitation 3: Mobile sidebar — FIXED in Phase 10 follow-up
+`AppLayout.jsx` now uses `useIsMobile()` hook (was unused). Mobile (<768px) gets top bar + hamburger + off-canvas drawer. Desktop unchanged.
 
-### Limitation 4: `_zoom_changes[]` audit trail not displayed
-**Severity:** LOW (transparency feature, not functional). Backend emits zoom adjustments per room ("perimetras: 7.5→7.3") but UI never shows them.
-**Future fix:** Add expandable "Zoom refinements" section in RoomCard.
+### ✅ Limitation 4: `_zoom_changes[]` audit trail — FIXED in Phase 10 follow-up
+RoomCard now has expandable details section showing zoom audit trail, calculation_trace formula, and Vision-perskaityti mm. Demonstrates two-pass zoom transparency.
 
 ### Limitation 5: Dead V8 references in InteriorProject.jsx
-**Severity:** LOW (cosmetic dead code). References to `project.v8_pages`, `project.raw_calc_data`, `project.page_classifications`, `project.confidence` (top-level). All gracefully nil-safe — no runtime errors.
-**Future fix:** Cleanup in a dedicated commit.
+**Severity:** LOW (cosmetic). References to `project.v8_pages`, `project.raw_calc_data`, `project.page_classifications`. All nil-safe.
+**Future fix:** Cleanup pass.
 
 ### Limitation 6: Plytelės sienos high variance without sienų išklotinės
 **Severity:** MED for projects without wall-development pages.

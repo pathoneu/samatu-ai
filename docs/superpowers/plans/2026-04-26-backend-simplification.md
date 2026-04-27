@@ -1761,6 +1761,39 @@ Zoom adds ~$0.05 per room and ~6-10s per room (cached system prompt minimizes ov
 
 User can decide whether to launch with these as monitored unknowns or wait for sample data.
 
+### A9 — Phase 10: AssumptionsPanel reactivation + UI polish
+
+**User direction (2026-04-27):** *"tesiame darbus toliau, kiek atsimenu dar nemaza dalis plano liko"* — continued work to fix remaining UI gaps.
+
+**A9.1 — `/recompute-interior` endpoint** (resolves Limitation 1 + 7)
+
+Backend POST `/recompute-interior` accepts `{patalpos, rules_override, per_room_overrides}` and returns full updated output (santrauka, pozicijos, darbu_sarasas, v8_totals, lt_sanity). No Vision call — pure math via `extractor.universal_rules.calc_room_quantities`. **8ms measured roundtrip** vs ~3-8 minutes for full Vision re-extract = 22,000× faster.
+
+Frontend `RulesOverridePanel.jsx` provides:
+- 6 per-paskirtis toggles: drabuzine_painted, rubine_painted, sandeliukas_painted, katiline_painted, garazas_painted, tamburas_painted
+- 3 numeric inputs: bathroom_tile_height_m, kitchen_backsplash_height_m, high_ceiling_threshold_m
+- Per-room override table for floor type + paint flags on rooms with classifier ambiguity (koridoriai, holai, gyvenamosios, drabužinės, kabinetai)
+- 400ms debounced trigger → POST → live total update
+
+"Prielaidos" tab restored to TabBar (was unreachable). InteriorProject local project state mirror enables live re-render after recompute.
+
+**A9.2 — `_zoom_changes` audit trail** (resolves Limitation 4)
+
+RoomCard.jsx now has expandable details section showing:
+- Zoom audit trail per room (e.g. "perimetras: 7.5 → 7.3")
+- `calculation_trace` formula
+- Vision-perskaityti mm dimensions list (when zoom call returns them)
+
+Closed by default — non-distracting. Demonstrates two-pass zoom value to users.
+
+**A9.3 — Mobile sidebar** (resolves Limitation 3)
+
+`AppLayout.jsx` now uses `useIsMobile()` hook (was unused despite existing in codebase):
+- Mobile (<768px): top bar + hamburger + off-canvas drawer + backdrop, route change auto-closes
+- Desktop (≥768px): unchanged
+
+**Production-readiness after Phase 10: ~92%** (was 85% post Phase 9). Remaining gaps mostly require user input (sample PDFs for renovation/commercial/multi-floor scenarios) or are cosmetic dead-code cleanup.
+
 ### Future work (not in this PR)
 
 - **6.5.1 Edge-case PDFs** — synthetic test inputs needed (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated, low-DPI). Crafting these is a separate effort.
