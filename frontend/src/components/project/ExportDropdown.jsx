@@ -13,19 +13,25 @@ const API = '';
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
 // AND pipeline warnings[] (e.g. eksplikacija-missing INFO). Legacy
 // project.perspejimani is also passed through if present.
+// Backend generate-excel expects {tekstas, kategorija} per warning.
+// Map our {level, room, message} to that shape.
 function collectWarnings(project) {
   const out = [];
   const sanity = project.lt_sanity?.warnings || [];
   for (const w of sanity) {
-    out.push({
-      level: w.level || 'INFO',
-      room: w.room || '',
-      message: w.message || '',
-    });
+    const kat = w.room ? `${w.level || 'INFO'} · ${w.room}` : (w.level || 'INFO');
+    out.push({ tekstas: w.message || '', kategorija: kat });
   }
   if (Array.isArray(project.perspejimani)) {
     for (const w of project.perspejimani) {
-      out.push(typeof w === 'string' ? { level: 'INFO', message: w } : w);
+      if (typeof w === 'string') {
+        out.push({ tekstas: w, kategorija: 'INFO' });
+      } else {
+        out.push({
+          tekstas: w.tekstas || w.message || '',
+          kategorija: w.kategorija || w.level || 'INFO',
+        });
+      }
     }
   }
   return out;
