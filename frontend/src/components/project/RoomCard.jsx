@@ -329,6 +329,45 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf }) {
           Virš 3m — atskira pozicija
         </div>
       )}
+
+      {/* Zoom audit trail + calculation_trace — transparency from Phase 8 */}
+      {!editing && ((room._zoom_changes?.length > 0) || room.calculation_trace) && (
+        <details className="mt-2 text-xs">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+            {room._zoom_changes?.length > 0
+              ? `Zoom patikslino ${room._zoom_changes.length} reikšmę${room._zoom_changes.length === 1 ? '' : 's'}`
+              : 'Skaičiavimo formulė'}
+          </summary>
+          <div className="mt-2 p-2 bg-muted/30 rounded space-y-1.5">
+            {room._zoom_changes?.length > 0 && (
+              <div>
+                <div className="font-medium text-foreground/80 mb-1">Zoom pataisymai:</div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {room._zoom_changes.map((c, i) => (
+                    <li key={i} className="text-muted-foreground">{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {room.calculation_trace && (
+              <div>
+                <div className="font-medium text-foreground/80 mb-1">Formulė:</div>
+                <code className="block text-[11px] text-muted-foreground whitespace-pre-wrap">
+                  {room.calculation_trace}
+                </code>
+              </div>
+            )}
+            {room._zoom?.matmenys_perskaityti?.length > 0 && (
+              <div>
+                <div className="font-medium text-foreground/80 mb-1">Vision perskaityti mm:</div>
+                <div className="text-muted-foreground">
+                  {room._zoom.matmenys_perskaityti.join(', ')}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
