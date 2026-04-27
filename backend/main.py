@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body
+from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import pdfplumber
@@ -2339,8 +2339,9 @@ async def detect_type(file: UploadFile = File(...)):
     return {"type": proj_type}
 
 
-@app.post("/extract-interior")
-async def extract_interior(file: UploadFile = File(...)):
+@app.post("/extract-interior-v1")
+async def extract_interior_v1(file: UploadFile = File(...)):
+    """Legacy V1 multi-pass interior extraction (preserved for reference)."""
     try:
         async with asyncio.timeout(300):
             contents = await file.read()
@@ -3674,6 +3675,36 @@ async def generate_pdf(data: dict):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ── /extract-interior (new extractor package — Phase 2) ───────────────────────
+
+@app.post("/extract-interior")
+async def extract_interior_endpoint(
+    files: list[UploadFile] = File(...),
+    rules_override: str | None = Form(None),
+):
+    """Vidaus apdailos ekstrakcijos endpoint'as.
+
+    Vienas Vision call'as → struktūruotas takeoff JSON. Jokio V7/V8/V9
+    versijavimo, jokių pipeline'ų, jokių Tier-fallback'ų. Gali būti
+    used backend'ui ir tiesiogiai (Python import).
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
+    pdf_bytes = await files[0].read()
+
+    overrides_dict: dict | None = None
+    if rules_override:
+        try:
+            overrides_dict = json.loads(rules_override)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
+
+    from extractor import extract_interior
+    return await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
+
+
 @app.post("/extract-interior-v8")
 async def extract_interior_v8(
     files: list[UploadFile] = File(...),
