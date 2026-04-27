@@ -286,6 +286,49 @@ async def api_me(request: Request):
     return {"user": user}
 
 
+class PasswordChangePayload(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/auth/change-password")
+async def api_change_password(payload: PasswordChangePayload, request: Request):
+    """Change user's password. Verifies current_password first.
+    Generic error message on wrong current password (no enumeration helper)."""
+    user = _auth.require_user(request)
+    _check_rate_limit(request.client.host if request.client else "unknown", "change-password")
+    _auth.validate_password(payload.new_password)
+
+    full_user = db.get_user_by_id(user["id"])
+    if not full_user or not _auth.verify_password(payload.current_password, full_user.get("password_hash", "")):
+        log.warning("failed password change: user_id=%s", user["id"])
+        raise HTTPException(status_code=401, detail="Neteisingas dabartinis slaptažodis")
+
+    new_hash = _auth.hash_password(payload.new_password)
+    with db._conn() as c:
+        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
+    log.info("password changed for user_id=%s", user["id"])
+    return {"status": "ok"}
+
+
+class ProfileUpdatePayload(BaseModel):
+    name: str | None = None
+    company_name: str | None = None
+
+
+@app.put("/api/auth/profile")
+async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
+    """Update user's display name + company. Email NOT changeable here
+    (would need verification flow)."""
+    user = _auth.require_user(request)
+    with db._conn() as c:
+        c.execute(
+            "UPDATE users SET name = ?, company_name = ? WHERE id = ?",
+            (payload.name, payload.company_name, user["id"]),
+        )
+    return {"user": db.get_user_by_id(user["id"]) or {}}
+
+
 # ── Project endpoints (per-user isolation) ──────────────────────────────────
 
 @app.get("/api/projects")
