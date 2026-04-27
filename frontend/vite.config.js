@@ -30,6 +30,9 @@ export default defineConfig({
       '/dev':              { target: BACKEND, changeOrigin: true },
       '/openapi.json':     { target: BACKEND, changeOrigin: true },
       '/health':           { target: BACKEND, changeOrigin: true },
+      '/recompute-interior': { target: BACKEND, changeOrigin: true },
+      '/api':              { target: BACKEND, changeOrigin: true },
+      '/v9':               { target: BACKEND, changeOrigin: true },
     },
   },
 })

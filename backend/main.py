@@ -107,6 +107,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Global unhandled-exception handler ─────────────────────────────────────────
+# Catches any unhandled exception in route handlers, logs with traceback, returns
+# generic 500 (no stack trace leak to client). Prevents the FastAPI default which
+# echoes back the exception type in debug mode.
+@app.exception_handler(Exception)
+async def _global_exception_handler(request, exc):
+    import traceback as _tb
+    tid = f"err-{int(_time.time())}-{hash(str(exc)) & 0xFFFF:04x}"
+    log.error("[%s] Unhandled %s on %s: %s\n%s",
+              tid, type(exc).__name__, request.url.path, exc, _tb.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "_error": f"Vidinė serverio klaida (ref: {tid})",
+            "ref": tid,
+        },
+    )
+
+
+# ── /api/log-error — frontend error reporting ─────────────────────────────────
+class FrontendErrorPayload(BaseModel):
+    message: str
+    stack: str | None = None
+    component: str | None = None
+    url: str | None = None
+    user_agent: str | None = None
+
+
+@app.post("/api/log-error")
+async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
+    """Frontend ErrorBoundary + manual try/catch can POST here.
+    Lightweight error sink — production should swap for Sentry SDK.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    log.error(
+        "[FRONTEND] component=%s url=%s ip=%s msg=%s\nstack: %s",
+        payload.component or "?",
+        payload.url or "?",
+        client_ip,
+        payload.message,
+        (payload.stack or "")[:2000],
+    )
+    return {"status": "ok", "logged": True}
+
 client = anthropic.Anthropic(
     api_key=os.environ["ANTHROPIC_API_KEY"],
     max_retries=1,
