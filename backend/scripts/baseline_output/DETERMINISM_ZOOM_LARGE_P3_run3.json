@@ -1,0 +1,4378 @@
+{
+  "archetipas": "dideli_namu_premium",
+  "bendras_plotas_m2": 267.71,
+  "scale_source_page": 5,
+  "eksplikacija_source_page": 5,
+  "patalpos": [
+    {
+      "nr": "1",
+      "pavadinimas": "Holas",
+      "paskirtis": "holas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.42,
+        "y": 0.45,
+        "w": 0.1,
+        "h": 0.12
+      },
+      "plotas_m2": 11.55,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 13.7,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 41.1,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 50.8,
+      "kampu_metrai": 28.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 11.55,
+      "grindjuosciu_m": 14.08,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "perim(13.7)*H(3.0)=41.1 - duris(1.85) + lubos(11.55)=50.80; akmens kilimėlis grindyse pažymimas atskirai",
+      "confidence": "medium",
+      "pastabos": "Holo akmens kilimėlis - žr. 4.1 brėžinį (atskira pozicija)"
+    },
+    {
+      "nr": "2",
+      "pavadinimas": "Katilinė",
+      "paskirtis": "katiline",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.3,
+        "w": 0.1,
+        "h": 0.18
+      },
+      "plotas_m2": 5.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 9.8,
+      "lubu_aukstis_m": 2.94,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 28.81,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 0,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 5.9,
+      "plyteles_sienos_m2": 19.6,
+      "plyteles_sienos_aukstis_m": 2.0,
+      "isliginamasis_m2": 5.9,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 8.84,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "Katilinė plytelėmis - sienų plytelės iki 2m: 9.8*2.0=19.6m²; grindys 5.9m²; hidroizo 5.9+9.8*0.3=8.84",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "3",
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.3,
+        "y": 0.3,
+        "w": 0.15,
+        "h": 0.4
+      },
+      "plotas_m2": 12.05,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 52.5,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 5.55,
+          "count": 3
+        }
+      ],
+      "dazymo_plotas_m2": 59.0,
+      "kampu_metrai": 35.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.5,
+      "pvc_grindys_m2": 12.05,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.05,
+      "grindjuosciu_m": 16.55,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 3,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        }
+      ],
+      "calculation_trace": "sienos 17.5*3.0=52.5 - 3 durys(5.55) + lubos 12.05 = 59.0; LED juosta koridoriuje L~3550mm",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "3",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "320",
+          "86",
+          "215",
+          "230",
+          "385",
+          "25",
+          "320",
+          "69",
+          "80",
+          "90",
+          "172",
+          "78",
+          "134",
+          "59",
+          "230",
+          "343",
+          "128",
+          "25",
+          "67",
+          "35",
+          "29",
+          "184",
+          "562",
+          "387",
+          "326",
+          "553",
+          "600",
+          "16",
+          "180",
+          "180",
+          "326"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Koridorius (geltonas plytelių užpildymas) - L formos, jungia kelias patalpas. Matomi matmenys daugiausiai gretimų patalpų (7-miegamasis, 9-valgomasis, virtuvė). Koridoriaus pločiai apie 180 (siaura dalis prie virtuvės) ir platesnė dalis. Tikslus perimetras sunkiai nuskaitomas dėl sudėtingos formos. Lubų aukštis ir plytelių aukštis šiame plane nematomas (tik pjūvyje)."
+      }
+    },
+    {
+      "nr": "4",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.45,
+        "y": 0.2,
+        "w": 0.08,
+        "h": 0.15
+      },
+      "plotas_m2": 4.1,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.4,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 25.2,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 25.2,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.1,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 0.6,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.1,
+      "plyteles_sienos_m2": 25.2,
+      "plyteles_sienos_aukstis_m": 3.0,
+      "isliginamasis_m2": 4.1,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 6.62,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "san mazgas pilnai plytelėmis: sienos 8.4*3.0=25.2m²; grindys 4.1; hidroizo 4.1+8.4*0.3=6.62; lubos dažomos 4.1m²; LED nišelė virš dušo 600mm",
+      "confidence": "medium",
+      "pastabos": "Plytelės: MATERIA PESCA TRAMA RETT 600x1200, grindys MATERIA PESCA 1200x1200"
+    },
+    {
+      "nr": "5",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.1,
+        "w": 0.2,
+        "h": 0.25
+      },
+      "plotas_m2": 15.4,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 15.8,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 47.4,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 1.8,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 59.15,
+      "kampu_metrai": 34.4,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 15.4,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 15.4,
+      "grindjuosciu_m": 16.39,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "sienos 15.8*3.0=47.4 -1.8 -1.85 +lubos 15.4 = 59.15",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "5",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "345",
+          "110",
+          "88",
+          "12",
+          "12",
+          "88",
+          "125",
+          "180",
+          "180",
+          "320",
+          "86",
+          "320",
+          "215",
+          "25",
+          "230",
+          "385",
+          "90",
+          "25",
+          "69",
+          "320",
+          "30",
+          "134"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Vaizde matomos dvi patalpos (Nr.6 ir Nr.7), o ne Nr.5. Matmenys cm: kamb. Nr.7 ~385x230 cm (~3850x2300mm), su nišomis. Patalpa Nr.6 ~345x180+320 cm. Originali patalpa Nr.5 (Kambarys 15.4m²) šiame zoom'e nematoma — tai gretima sritis. Negaliu patikslinti Nr.5 duomenų."
+      }
+    },
+    {
+      "nr": "6",
+      "pavadinimas": "Sandėliukas",
+      "paskirtis": "sandeliukas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.18,
+        "w": 0.1,
+        "h": 0.15
+      },
+      "plotas_m2": 5.76,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 28.8,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        },
+        {
+          "type": "spinta_built_in",
+          "area_m2": 14.4,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 18.31,
+      "kampu_metrai": 15.0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 5.76,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 5.76,
+      "grindjuosciu_m": 8.55,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "spinta_built_in",
+          "kiekis": 1
+        }
+      ],
+      "calculation_trace": "sienos 9.6*3.0=28.8 -duris -50% spintų +lubos 5.76",
+      "confidence": "low",
+      "pastabos": "Ūkinė spinta + serverinė",
+      "_zoom_changes": [
+        "perimetras: 9.6 → 10.0"
+      ],
+      "_zoom": {
+        "patalpa_nr": "6",
+        "perimetras_m": 10.0,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 5.76,
+        "plotas_saltinis": "inferred",
+        "matmenys_perskaityti": [
+          "345",
+          "110",
+          "88",
+          "12",
+          "12",
+          "180",
+          "320",
+          "320",
+          "86",
+          "25",
+          "215",
+          "230",
+          "25",
+          "69",
+          "320"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 880,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Patalpa 6: matmenys cm vienetais (raudoni skaičiai). Ilgis ~320cm, plotis ~180cm. Perimetras ~ 2*(3.20+1.80)=10.0m. Plotas ~3.20*1.80=5.76m². Durys ~880mm pločio."
+      }
+    },
+    {
+      "nr": "7",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "kabinetas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.2,
+        "w": 0.2,
+        "h": 0.2
+      },
+      "plotas_m2": 12.32,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.1,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 43.2,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 1.8,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 51.87,
+      "kampu_metrai": 31.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 3.85,
+      "pvc_grindys_m2": 12.32,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.32,
+      "grindjuosciu_m": 14.85,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.85
+        }
+      ],
+      "calculation_trace": "sienos 14.4*3.0=43.2 -1.8 -1.85 +lubos 12.32; LED L3850mm",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.4 → 14.1"
+      ],
+      "_zoom": {
+        "patalpa_nr": "7",
+        "perimetras_m": 14.1,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 12.32,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "86",
+          "25",
+          "230",
+          "25",
+          "69",
+          "320",
+          "80",
+          "90",
+          "385",
+          "215",
+          "320"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Kambarys 7: matomi segmentai - kairė siena 86+25+230+25+69 = 435 cm; dešinė siena 215+385 = 600 cm; viršus 320 cm; apačia 320+80 = 400 cm (apytiksliai). Perimetras ~ (4.35+6.0+3.2+4.0) ≈ 17.55 m, bet apatinė riba neaiški dėl perėjimo į san. mazgą. Plotas paliktas nepakeistas - reikia patikrinimo."
+      }
+    },
+    {
+      "nr": "8",
+      "pavadinimas": "Virtuvė",
+      "paskirtis": "virtuve",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.15,
+        "y": 0.4,
+        "w": 0.2,
+        "h": 0.2
+      },
+      "plotas_m2": 24.03,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 20.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 61.5,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 3.6,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        },
+        {
+          "type": "plyteles_virtuves",
+          "area_m2": 11.4,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 68.68,
+      "kampu_metrai": 42.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 24.03,
+      "plyteles_sienos_m2": 11.4,
+      "plyteles_sienos_aukstis_m": 0.6,
+      "isliginamasis_m2": 24.03,
+      "grindjuosciu_m": 18.0,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2400,
+          "aukstis_mm": 1500,
+          "panoraminis": true
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "sienos 20.5*3.0=61.5 -3.6 -1.85 -plytelinė juosta(11.4) +lubos 24.03 = 68.68",
+      "confidence": "medium",
+      "pastabos": "Grindys ir sienų backsplash plytelės: Quinteserra Verde 2 Lucido 65x266 sienos, Topcer ALASKA 300x346 grindys"
+    },
+    {
+      "nr": "9",
+      "pavadinimas": "Valgomasis",
+      "paskirtis": "valgomasis",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.3,
+        "y": 0.45,
+        "w": 0.15,
+        "h": 0.18
+      },
+      "plotas_m2": 11.18,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 13.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.5,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 4.5,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 47.18,
+      "kampu_metrai": 28.5,
+      "angokrasciu_gkp_m": 3.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 3.55,
+      "pvc_grindys_m2": 11.18,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 11.18,
+      "grindjuosciu_m": 13.5,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.55
+        }
+      ],
+      "calculation_trace": "sienos 13.5*3.0=40.5 -4.5 +lubos 11.18; panoraminis langas reveals; LED L3550",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "10",
+      "pavadinimas": "Svetainė",
+      "paskirtis": "gyvenamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.55,
+        "w": 0.25,
+        "h": 0.3
+      },
+      "plotas_m2": 32.44,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 22.8,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 68.4,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 9.0,
+          "count": 2
+        }
+      ],
+      "dazymo_plotas_m2": 91.84,
+      "kampu_metrai": 50.0,
+      "angokrasciu_gkp_m": 12.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 17.1,
+      "pvc_grindys_m2": 32.44,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 32.44,
+      "grindjuosciu_m": 25.08,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 2,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 3,
+          "ilgis_m": 17.1
+        }
+      ],
+      "calculation_trace": "sienos 22.8*3=68.4 -2 langai(9.0) +lubos 32.44 = 91.84; 3 LED juostos L=6+5.4+5.7=17.1m; faneruotė viena siena (~10m²)",
+      "confidence": "medium",
+      "pastabos": "Faneruotė siena ~10m² (atskira pozicija); panoraminiai langai į kiemą"
+    },
+    {
+      "nr": "11",
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.1,
+        "w": 0.25,
+        "h": 0.35
+      },
+      "plotas_m2": 35.94,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 24.0,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "betonas",
+      "dazymo_plotas_gross_m2": 0,
+      "deductions": [],
+      "dazymo_plotas_m2": 0,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 35.94,
+      "plyteles_sienos_m2": 72.0,
+      "plyteles_sienos_aukstis_m": 3.0,
+      "isliginamasis_m2": 0,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1000,
+          "aukstis_mm": 1500
+        }
+      ],
+      "calculation_trace": "Garažas plytelėmis SENSI fossil grey 80x80; sienos 24*3=72m²; grindys 35.94",
+      "confidence": "medium",
+      "pastabos": "Pilnai plytelės 80x80; garažo vartai"
+    },
+    {
+      "nr": "2A_1",
+      "pavadinimas": "Holas (2 a.)",
+      "paskirtis": "holas",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.15,
+        "y": 0.15,
+        "w": 0.5,
+        "h": 0.3
+      },
+      "plotas_m2": 14.76,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.0,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 46.58,
+      "deductions": [
+        {
+          "type": "langai_stoglangiai",
+          "area_m2": 3.6,
+          "count": 2
+        },
+        {
+          "type": "duris",
+          "area_m2": 7.4,
+          "count": 4
+        }
+      ],
+      "dazymo_plotas_m2": 50.34,
+      "kampu_metrai": 36.0,
+      "angokrasciu_gkp_m": 7.2,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 1.8,
+      "pvc_grindys_m2": 14.76,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 14.76,
+      "grindjuosciu_m": 17.1,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "stoglangis",
+          "kiekis": 2,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 4,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "2 a holas: sienos 17*2.74=46.58 -2 stoglangiai(3.6) -4 durys(7.4) +lubos 14.76 = 50.34",
+      "confidence": "medium",
+      "pastabos": "2 stoglangiai - tikslinama būvio davikliai; spintai L1800x2 paslėpta šviesa",
+      "_zoom": {
+        "patalpa_nr": "2A_1",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "1342",
+          "290",
+          "100",
+          "270",
+          "100",
+          "270",
+          "100",
+          "135",
+          "189",
+          "23",
+          "90",
+          "140",
+          "100",
+          "78",
+          "89",
+          "100",
+          "40",
+          "140",
+          "40",
+          "418",
+          "503",
+          "418",
+          "503",
+          "170",
+          "99",
+          "100",
+          "170",
+          "125",
+          "125",
+          "125",
+          "218",
+          "473",
+          "104",
+          "192",
+          "334",
+          "112",
+          "269",
+          "401",
+          "328",
+          "481",
+          "146",
+          "100",
+          "88",
+          "180",
+          "88"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "durys_pastaba": "3 įėjimai iš holo į 3,4,5 kambarius bei vonios",
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Holas (patalpa atitinka centrinę juostą tarp 3,4,5 ir vonių 6,7). Bendras ilgis ~13.42 m (1342). Holas yra siauras koridorius/praėjimo zona tarp kambarių. Tikslus holo plotis iš šio plano sunkiai nuskaitomas — tikėtina ~1.0-1.1 m (matosi 100, 99 anotacijos grindų lygyje). Pradinis plotas 14.76 m² ir perimetras 17 m atrodo pagrįsti, paliekami nepakeisti. Lubų aukštis plane nematomas."
+      }
+    },
+    {
+      "nr": "2A_2",
+      "pavadinimas": "Skalbykla",
+      "paskirtis": "skalbykla",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.15,
+        "w": 0.1,
+        "h": 0.2
+      },
+      "plotas_m2": 7.7,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 11.4,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 31.24,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 31.24,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 7.7,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 7.7,
+      "plyteles_sienos_m2": 31.24,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 7.7,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 11.12,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "Skalbykla pilnai plytelėmis FLORIM SENSI WHITE LITHOS 80x80; sienos 11.4*2.74=31.24; grindys 7.7; hidroizo 7.7+3.42=11.12",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "2A_3",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.2,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.92,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.0,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.9,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.15,
+      "kampu_metrai": 29.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.9,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.9,
+      "grindjuosciu_m": 15.07,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2900,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.6*2.74=40 -2.9 -1.85 +lubos 12.9",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.6 → 17.92"
+      ],
+      "_zoom": {
+        "patalpa_nr": "2A_3",
+        "perimetras_m": 17.92,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 19.66,
+        "plotas_saltinis": "inferred",
+        "matmenys_perskaityti": [
+          "135",
+          "189",
+          "290",
+          "90",
+          "160",
+          "70",
+          "218",
+          "473",
+          "100",
+          "418",
+          "170",
+          "90",
+          "125",
+          "161",
+          "170"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 1000,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          },
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Matomos dvi patalpos (2 ir 3). Patalpa 3 (kambarys/miegamoji) ~4.18m x ~4.70m (160+290+su sienomis). Perimetras ~17.9m apskaiciuotas is matomu sienu segmentu. Plotas inferred is iliustracinio dydzio ~4.18 x ~4.70m."
+      }
+    },
+    {
+      "nr": "2A_4",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.32,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.85,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.5,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 39.73,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.03,
+      "kampu_metrai": 29.4,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.85,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.85,
+      "grindjuosciu_m": 14.97,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2700,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.5*2.74=39.73 -2.7 -1.85 +12.85",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "2A_4",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "389",
+          "180",
+          "70",
+          "170",
+          "99",
+          "100",
+          "503",
+          "518",
+          "25"
+        ],
+        "langai": [
+          {
+            "plotis_mm": 1700,
+            "aukstis_mm": 2100
+          }
+        ],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Patalpa Nr.4 - matomi cm matmenys: gylis ~503-518cm, lango plotis 170cm, sienelės 389+180+70cm. Perimetras apytiksliai (5.03+5.18)*2 ~20.4m, bet tikslesni duomenys neperskaityti aiskiai. Paliekam original."
+      }
+    },
+    {
+      "nr": "2A_5",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.44,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.42,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.0,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.35,
+      "kampu_metrai": 29.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.9,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.9,
+      "grindjuosciu_m": 15.07,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2700,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.6*2.74=40 -2.7 -1.85 +12.9",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.6 → 14.42"
+      ],
+      "_zoom": {
+        "patalpa_nr": "2A_5",
+        "perimetras_m": 14.42,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "180",
+          "140",
+          "503",
+          "100",
+          "250",
+          "170",
+          "270",
+          "100",
+          "270",
+          "100",
+          "230"
+        ],
+        "langai": [
+          {
+            "plotis_mm": 1800,
+            "aukstis_mm": 1400
+          }
+        ],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Kambarys 5: matomi sienų matmenys ~5030 mm (ilgis) x ~2100 mm (plotis dalies). Perimetras apytiksliai 2*(5.03+2.1)=14.26m, panašu i pradinį 14.6m. Langas ~1800x1400 mm. Durys 900 mm pločio. Lubų aukštis ir plytelių aukštis šiame plane nematomi."
+      }
+    },
+    {
+      "nr": "2A_6",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.55,
+        "y": 0.2,
+        "w": 0.06,
+        "h": 0.1
+      },
+      "plotas_m2": 4.63,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.6,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 23.56,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 23.56,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.63,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 1.8,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.63,
+      "plyteles_sienos_m2": 23.56,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 4.63,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 7.21,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "WC2 plytelėmis Limo Cedit COMPATTA: sienos 240x120 pilnos; grindys 4.63; hidroizo 4.63+8.6*0.3=7.21",
+      "confidence": "medium",
+      "pastabos": "Limo Cedit COMPATTA 240x120 sienos, 120x120 grindys",
+      "_zoom": {
+        "patalpa_nr": "2A_6",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "270",
+          "100",
+          "23",
+          "100",
+          "192",
+          "180",
+          "140",
+          "160",
+          "60",
+          "210",
+          "2",
+          "70",
+          "240",
+          "240",
+          "334",
+          "90",
+          "112",
+          "269",
+          "503",
+          "200",
+          "290",
+          "200",
+          "90",
+          "490",
+          "160",
+          "90",
+          "200",
+          "60",
+          "481",
+          "88",
+          "15",
+          "12"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 700,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Sanitarinis mazgas su dušais ir WC. Matomi vidaus matmenys ~200x290 ir 200x240 zonoms. Bendras patalpos ilgis ~503cm (5030mm), plotis nera aiskiai matomas vienu skaičiumi. Dauguma matmenu yra cm, ne mm. Perimetras ir plotas nepatikslinti, nes nematomas pilnas dimension chain."
+      }
+    },
+    {
+      "nr": "2A_7",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.55,
+        "y": 0.3,
+        "w": 0.06,
+        "h": 0.1
+      },
+      "plotas_m2": 4.57,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.6,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 23.56,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 23.56,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.57,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 2.3,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.57,
+      "plyteles_sienos_m2": 23.56,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 4.57,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 7.15,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "WC3 plytelėmis MUTINA FOLDET 60x60 sienos, Limo Cedit COMPATTA grindys; sienos 23.56; LED 1.8x2.3",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "2A_7",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "503",
+          "112",
+          "269",
+          "200",
+          "90",
+          "90",
+          "90",
+          "90",
+          "200",
+          "481"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Matomi tik dalies sienų matmenys cm vienetais (503, 200 - sienos; 90 - durų plotis). Pilnas perimetras nepatikslintas - matomi ne visi sienų matmenys. Durys ~900 mm pločio (lankas matomas). Langų nėra (vidaus san.mazgas)."
+      }
+    },
+    {
+      "nr": "2A_8",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.15,
+        "w": 0.2,
+        "h": 0.3
+      },
+      "plotas_m2": 20.72,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 18.5,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 50.69,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 4.5,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 65.06,
+      "kampu_metrai": 36.7,
+      "angokrasciu_gkp_m": 3.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 8.1,
+      "pvc_grindys_m2": 20.72,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 20.72,
+      "grindjuosciu_m": 18.65,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 2,
+          "ilgis_m": 8.1
+        }
+      ],
+      "calculation_trace": "sienos 18.5*2.74=50.69 -4.5 -1.85 +20.72; LED L4300+3800=8.1m",
+      "confidence": "medium",
+      "pastabos": "Tėvų miegamasis su panoraminiu langu",
+      "_zoom": {
+        "patalpa_nr": "2A_8",
+        "perimetras_m": 18.5,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": 20.72,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "88",
+          "100",
+          "146",
+          "192",
+          "88",
+          "88",
+          "82",
+          "90",
+          "15",
+          "334",
+          "269",
+          "100",
+          "112",
+          "269",
+          "100",
+          "90",
+          "328",
+          "401",
+          "90",
+          "481",
+          "25",
+          "12",
+          "12",
+          "188"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Miegamasis (8) su drabuzine (9). Pagrindines patalpos matmenys ~481cm plotis, ~401+328cm gylis. Durys ~90cm. Baldine sienute H140. Veidrodis nisoje. Lubu aukstis ir plyteliu aukstis nematomi siame vaizde."
+      }
+    },
+    {
+      "nr": "2A_9",
+      "pavadinimas": "Drabužinė",
+      "paskirtis": "drabuzine",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.77,
+        "y": 0.15,
+        "w": 0.1,
+        "h": 0.18
+      },
+      "plotas_m2": 6.01,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 27.4,
+      "deductions": [
+        {
+          "type": "spinta_built_in",
+          "area_m2": 13.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 17.86,
+      "kampu_metrai": 15.0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 6.01,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 6.01,
+      "grindjuosciu_m": 4.5,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "spinta_built_in",
+          "kiekis": 1
+        }
+      ],
+      "calculation_trace": "sienos 10*2.74=27.4 -50% spintos -duris +lubos 6.01",
+      "confidence": "low",
+      "pastabos": "Tėvų rūbinė su built-in spintomis"
+    }
+  ],
+  "durys_total": [
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2050,
+      "tipas": "standart",
+      "kiekis": 13
+    },
+    {
+      "plotis_mm": 700,
+      "aukstis_mm": 2000,
+      "tipas": "pasleptos",
+      "kiekis": 3
+    }
+  ],
+  "langai_total": [
+    {
+      "plotis_mm": 1200,
+      "aukstis_mm": 1500,
+      "kiekis": 2
+    },
+    {
+      "plotis_mm": 2400,
+      "aukstis_mm": 1500,
+      "kiekis": 1,
+      "panoraminis": true,
+      "gkp_angokrastis": true
+    },
+    {
+      "plotis_mm": 3000,
+      "aukstis_mm": 1500,
+      "kiekis": 4,
+      "panoraminis": true,
+      "gkp_angokrastis": true
+    },
+    {
+      "plotis_mm": 2900,
+      "aukstis_mm": 1000,
+      "kiekis": 1
+    },
+    {
+      "plotis_mm": 2700,
+      "aukstis_mm": 1000,
+      "kiekis": 2
+    },
+    {
+      "plotis_mm": 1000,
+      "aukstis_mm": 1500,
+      "kiekis": 1
+    },
+    {
+      "plotis_mm": 1200,
+      "aukstis_mm": 1500,
+      "kiekis": 2,
+      "stoglangis": true
+    }
+  ],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 745.62,
+    "kampai_m_total": 442.3,
+    "angokrasciu_gkp_m_total": 25.2,
+    "pasleptu_duru_staktu_m_total": 8.1,
+    "nisu_metrai_total": 49.7,
+    "gkp_lubu_m2_total": 231.77,
+    "gkp_lubu_virs_3m_m2_total": 0.0,
+    "pvc_grindys_m2_total": 169.29,
+    "plyteles_grindys_m2_total": 86.87,
+    "plyteles_sienos_m2_total": 206.56,
+    "isliginamasis_m2_total": 231.77,
+    "grindjuosciu_m_total": 212.36,
+    "hidroizoliacijos_vnt": 5
+  },
+  "pozicijos": [
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP lubų montavimas dvigubu karkasu su izoliacija",
+      "vnt": "m2",
+      "kiekis": 231.77,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP lubų lygio pažeminimai (dropped levels) - krioklių formavimas",
+      "vnt": "m",
+      "kiekis": 52.0,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "LED nišų formavimas iš GKP (50-80mm aukščio, ~100mm gylio)",
+      "vnt": "m",
+      "kiekis": 47.2,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP angokraščių apdirbimas (panoraminiai langai, stoglangiai)",
+      "vnt": "m",
+      "kiekis": 25.2,
+      "saltinis": "isklotines"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Paslėptų durų staktų rėmų montavimas (700x2000)",
+      "vnt": "m",
+      "kiekis": 8.1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Reviziniai dureliai 300x300 (santechnikai)",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP pertvarų sandariklių/papildomas tvirtinimas drėgnoms patalpoms",
+      "vnt": "m2",
+      "kiekis": 120.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "pastaba": "Vonios, WC, skalbykla, katilinė"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Sienų lyginimas Rotband - tinkavimo darbai (gyvenamosios patalpos)",
+      "vnt": "m2",
+      "kiekis": 540.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Sienų ir lubų glaistymas + dažymas 2 sluoksniais (Benjamin Moore premium dažai)",
+      "vnt": "m2",
+      "kiekis": 760.92,
+      "saltinis": "skaiciuota_is_brezinio",
+      "pastaba": "Spalvos pagal 4.7 sienų apdailos planą"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Dažymo kampų (corner bead) montavimas - PILNA suma su angokraščiais",
+      "vnt": "m",
+      "kiekis": 442.4,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Durų angų paruošimas beapvasdinėms (paslėptoms) durims",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "LED nišų sienelių glaistymas ir dažymas",
+      "vnt": "m",
+      "kiekis": 47.2,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Įleidžiamų šviestuvų ir difuzorių apdirbimas",
+      "vnt": "vnt",
+      "kiekis": 35,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Glaistymas dazymas",
+      "aprasymas": "Faneruotės sienos paruošimas ir tvirtinimo elementai (svetainė)",
+      "vnt": "m2",
+      "kiekis": 10.0,
+      "saltinis": "isklotines",
+      "pastaba": "Pjūvio detalė: faneruotė storis 30+12+3mm"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - vonios sienos (1A WC) MATERIA PESCA TRAMA RETT 600x1200x9mm",
+      "vnt": "m2",
+      "kiekis": 25.2,
+      "saltinis": "specifikacija",
+      "pastaba": "60x120cm 9mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - vonios grindys (1A WC) MATERIA PESCA 1200x1200x6mm",
+      "vnt": "m2",
+      "kiekis": 4.1,
+      "saltinis": "specifikacija",
+      "pastaba": "120x120cm 6mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - WC2 sienos Limo Cedit COMPATTA 2400x1200x9mm",
+      "vnt": "m2",
+      "kiekis": 23.56,
+      "saltinis": "specifikacija",
+      "pastaba": "240x120cm 9mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - WC2 grindys Limo Cedit COMPATTA 1200x1200x9mm",
+      "vnt": "m2",
+      "kiekis": 4.63,
+      "saltinis": "specifikacija",
+      "pastaba": "120x120cm 9mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - WC3 sienos MUTINA FOLDET 600x600x10mm",
+      "vnt": "m2",
+      "kiekis": 23.56,
+      "saltinis": "specifikacija",
+      "pastaba": "60x60cm 10mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - WC3 grindys Limo Cedit COMPATTA 1200x1200x9mm",
+      "vnt": "m2",
+      "kiekis": 4.57,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - skalbykla sienos+grindys FLORIM SENSI WHITE LITHOS 800x800x9mm",
+      "vnt": "m2",
+      "kiekis": 38.94,
+      "saltinis": "specifikacija",
+      "pastaba": "80x80cm 9mm storio"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - garažas sienos+grindys SENSI fossil grey 800x800x9mm",
+      "vnt": "m2",
+      "kiekis": 107.94,
+      "saltinis": "specifikacija",
+      "pastaba": "80x80cm 9mm storio; garažas pilnai plytelėmis"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - virtuvės backsplash Quinteserra Verde 2 Lucido 65x266x10mm",
+      "vnt": "m2",
+      "kiekis": 11.4,
+      "saltinis": "specifikacija",
+      "pastaba": "65x266mm mozaikos tipo"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - virtuvės grindys Topcer ALASKA 300x346mm pattern",
+      "vnt": "m2",
+      "kiekis": 24.03,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių klijavimas - katilinė",
+      "vnt": "m2",
+      "kiekis": 25.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "pastaba": "Sienos 19.6 + grindys 5.9"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių 45° pjovimas (visi kampai jungiami 45° kampu - žr. visas išklotines)",
+      "vnt": "m",
+      "kiekis": 85.0,
+      "saltinis": "isklotines",
+      "pastaba": "PLYTELĖS JUNGIAMOS 45 LAIPSNIŲ KAMPU"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Plytelių dušo zonos angokraščiai ir nišelės",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "isklotines"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Lentynėlių formavimas su nuolydžiu dušo zonose",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "isklotines"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Skylių gręžimas plytelėse (santechnikai, čiaupams, dušo galvoms)",
+      "vnt": "vnt",
+      "kiekis": 40,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Kampų silikonavimas (drėgnos patalpos)",
+      "vnt": "m",
+      "kiekis": 50.0,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Akmens kilimėlio (holo) gamyba ir montavimas - marmurai 282x150cm",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija",
+      "pastaba": "4.1 HOLO AKMENS KILIMĖLIS - 6 marmurų rūšys"
+    },
+    {
+      "skyrius": "Plyteles",
+      "aprasymas": "Išlyginamojo sluoksnio pylimas (savaime išsilyginantys mišiniai 5mm)",
+      "vnt": "m2",
+      "kiekis": 231.77,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Hidroizoliacija",
+      "aprasymas": "Hidroizoliacijos klijavimas - vonios/WC grindys + splash zonos + pilnos dušo sienos",
+      "vnt": "m2",
+      "kiekis": 40.94,
+      "saltinis": "skaiciuota_is_brezinio",
+      "pastaba": "Vonia 1, WC2, WC3, skalbykla, katilinė"
+    },
+    {
+      "skyrius": "Hidroizoliacija",
+      "aprasymas": "Hidroizoliacija drėgnose zonose (vnt - patalpų skaičius)",
+      "vnt": "vnt",
+      "kiekis": 7,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Standartinių durų montavimas (900x2050)",
+      "vnt": "vnt",
+      "kiekis": 13,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Paslėptų (beapvasdinių) durų montavimas (700x2000)",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Grindjuosčių montavimas - paslėptos MDF tipo, H170mm",
+      "vnt": "m",
+      "kiekis": 212.46,
+      "saltinis": "skaiciuota_is_brezinio",
+      "pastaba": "Išviršinė grindjuostė - matinis MDF, žr. 4.2 brėžinį"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Medinių grindų lentų klojimas 16mm (1 Strip Oak BC Kose Grey Pores)",
+      "vnt": "m2",
+      "kiekis": 167.04,
+      "saltinis": "specifikacija",
+      "pastaba": "ESTA PARKET; medinis skydas 530x1050mm"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Apvadinės medinės juostos",
+      "vnt": "m",
+      "kiekis": 80.0,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Laiptų pakopų ir turėklų montavimas (medinis turėklas, MDF, metalas)",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "specifikacija",
+      "pastaba": "4.1 LAIPTAI; Spice Metal turėklai"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Holo pertvara G_8 (stiklas + faneruotė) montavimas",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija",
+      "pastaba": "4.1 HOLO PERTVARA"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Svetainės TV/baldinė siena G_12 (frezuota faneruotė + dažytas MDF)",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Virtuvės sala G_7 (faneruotė + butcher block stalviršis + metalas)",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Virtuvės baldas G_9 (vyno sandėlys + spintelės)",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Virtuvės baldas G_12 (kombinuotas baldas su akmens stalviršiu)",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "skyrius": "Pridetiniai elementai",
+      "aprasymas": "Stiklo audinio klijavimas (premium projektas)",
+      "vnt": "m2",
+      "kiekis": 540.0,
+      "saltinis": "default_per_paskirtis",
+      "pastaba": "Premium archetipas"
+    },
+    {
+      "skyrius": "Out of scope",
+      "aprasymas": "Santechnika (puodai, maišytuvai, dušo sistemos) - Aquahome pasiūlymas",
+      "vnt": "vnt",
+      "kiekis": 0,
+      "saltinis": "specifikacija",
+      "pastaba": "OOS - santechnika tiekiama atskirai pagal AQUA-05426"
+    },
+    {
+      "skyrius": "Out of scope",
+      "aprasymas": "Apšvietimo armatūros tiekimas (LED juostos, šviestuvai, transformatoriai)",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "specifikacija",
+      "pastaba": "OOS - Promodus IO specifikacija 2025/07/29 D"
+    },
+    {
+      "skyrius": "Out of scope",
+      "aprasymas": "Elektros instaliacija (rozetės, jungikliai JUNG LS990, kabeliai)",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "lubu_planas",
+      "pastaba": "OOS - el. projektas atskirai"
+    },
+    {
+      "skyrius": "Out of scope",
+      "aprasymas": "Šildymo sistema, rekuperacija, ŠVOK",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "default_per_paskirtis",
+      "pastaba": "OOS"
+    }
+  ],
+  "pastabos": "Premium individualus dideli namo projektas (170.67 + 97.04 = 267.71 m²). 2 aukštai. 1 a.: virtuvė+valgomasis+svetainė atvira erdvė (lubų aukštis 3.0m), holas su akmens kilimėliu, 2 kambariai, sandėliukas, katilinė, garažas. 2 a.: holas, 3 vaikų kambariai, 2 san. mazgai, tėvų miegamasis su drabužine, skalbykla. Lubų aukštis 2 a.: 2.74m (švarus 2.74m pagal apšvietimo planą). Visos plytelės jungiamos 45° kampu. Spalvų paletė: Benjamin Moore 975 tapestry beige (pagrindinė), HC-98 providence olive (virtuvė), 1475 graystone (garažas), 1522 inner balance (1A WC). Premium statybinės medžiagos: ESTA PARKET medinės grindys 16mm, Florim/Mutina/Limo Cedit plytelės, JUNG LS990 jungikliai. Holo akmens kilimėlis - 6 marmurų rūšys (Limestone Jura Grey, Marmuras Cyprus Grey, Daino Reale, Pietra Grey, Gvatemala, Sivec).",
+  "warnings": [
+    {
+      "level": "INFO",
+      "message": "Projektas yra premium klasės dideli namų projektas - daugybė specialių sprendimų (akmens kilimėlis, faneruotės pertvaros, butcher block stalviršiai)"
+    },
+    {
+      "level": "WARN",
+      "message": "Lubų aukštis 2 a. - 2.74m gali būti per žemas STR 2.02.09 reikalavimams (≥2.50m gyvenamosioms - OK; bet šiek tiek nestandartinis)",
+      "patalpa_nr": "2A_*"
+    },
+    {
+      "level": "INFO",
+      "message": "Lubų aukštis 1 a. svetainė/valgomasis - 3.0m (švarus) - aukštesnis nei standartas, bet < 3.0m, todėl gkp_lubu_virs_3m_m2 = 0"
+    },
+    {
+      "level": "WARN",
+      "message": "Patalpos 2A_* perimetrai apskaičiuoti apytiksliai iš brėžinio - rekomenduojama natūrinis matavimas"
+    },
+    {
+      "level": "INFO",
+      "message": "Garažas (35.94m²) ir skalbykla (7.7m²) pilnai plytelės - dažymo darbų jose nėra"
+    },
+    {
+      "level": "INFO",
+      "message": "Specifikuotų plytelių 7 skirtingi tipai - skirtingos kainos pagal vienetų matmenis"
+    },
+    {
+      "level": "WARN",
+      "message": "Stoglangiai (2 vnt) holuose 2 a. - papildomas reveal apdirbimas pažymėtas angokrasciu_gkp_m"
+    }
+  ],
+  "_meta": {
+    "input_tokens": 168801,
+    "output_tokens": 18839,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 11259,
+    "stop_reason": "end_turn",
+    "attempt": 1,
+    "pages_sent": 45,
+    "model": "claude-opus-4-7",
+    "zoom_attempted": 20,
+    "zoom_applied": 4,
+    "zoom_elapsed_s": 202.4,
+    "elapsed_s": 479.5
+  },
+  "_lt_warnings": [],
+  "darbu_sarasas": [
+    {
+      "eil_nr": 1,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP lubų montavimas dvigubu karkasu su izoliacija",
+      "pavadinimas": "GKP lubų montavimas dvigubu karkasu su izoliacija",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 231.77,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 2,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP lubų lygio pažeminimai (dropped levels) - krioklių formavimas",
+      "pavadinimas": "GKP lubų lygio pažeminimai (dropped levels) - krioklių formavimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 52.0,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "eil_nr": 3,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "LED nišų formavimas iš GKP (50-80mm aukščio, ~100mm gylio)",
+      "pavadinimas": "LED nišų formavimas iš GKP (50-80mm aukščio, ~100mm gylio)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 47.2,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "eil_nr": 4,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP angokraščių apdirbimas (panoraminiai langai, stoglangiai)",
+      "pavadinimas": "GKP angokraščių apdirbimas (panoraminiai langai, stoglangiai)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 25.2,
+      "saltinis": "isklotines"
+    },
+    {
+      "eil_nr": 5,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Paslėptų durų staktų rėmų montavimas (700x2000)",
+      "pavadinimas": "Paslėptų durų staktų rėmų montavimas (700x2000)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 8.1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 6,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Reviziniai dureliai 300x300 (santechnikai)",
+      "pavadinimas": "Reviziniai dureliai 300x300 (santechnikai)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "eil_nr": 7,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP pertvarų sandariklių/papildomas tvirtinimas drėgnoms patalpoms (Vonios, WC, skalbykla, katilinė)",
+      "pavadinimas": "GKP pertvarų sandariklių/papildomas tvirtinimas drėgnoms patalpoms (Vonios, WC, skalbykla, katilinė)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 120.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 8,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų lyginimas Rotband - tinkavimo darbai (gyvenamosios patalpos)",
+      "pavadinimas": "Sienų lyginimas Rotband - tinkavimo darbai (gyvenamosios patalpos)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 540.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 9,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų ir lubų glaistymas + dažymas 2 sluoksniais (Benjamin Moore premium dažai) (Spalvos pagal 4.7 sienų apdailos planą)",
+      "pavadinimas": "Sienų ir lubų glaistymas + dažymas 2 sluoksniais (Benjamin Moore premium dažai) (Spalvos pagal 4.7 sienų apdailos planą)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 760.92,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 10,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Dažymo kampų (corner bead) montavimas - PILNA suma su angokraščiais",
+      "pavadinimas": "Dažymo kampų (corner bead) montavimas - PILNA suma su angokraščiais",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 442.4,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 11,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Durų angų paruošimas beapvasdinėms (paslėptoms) durims",
+      "pavadinimas": "Durų angų paruošimas beapvasdinėms (paslėptoms) durims",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 12,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "LED nišų sienelių glaistymas ir dažymas",
+      "pavadinimas": "LED nišų sienelių glaistymas ir dažymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 47.2,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "eil_nr": 13,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Įleidžiamų šviestuvų ir difuzorių apdirbimas",
+      "pavadinimas": "Įleidžiamų šviestuvų ir difuzorių apdirbimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 35,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 14,
+      "skyrius": "Glaistymas dazymas",
+      "skyrius_label": "Glaistymas dazymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Faneruotės sienos paruošimas ir tvirtinimo elementai (svetainė) (Pjūvio detalė: faneruotė storis 30+12+3mm)",
+      "pavadinimas": "Faneruotės sienos paruošimas ir tvirtinimo elementai (svetainė) (Pjūvio detalė: faneruotė storis 30+12+3mm)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 10.0,
+      "saltinis": "isklotines"
+    },
+    {
+      "eil_nr": 15,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - vonios sienos (1A WC) MATERIA PESCA TRAMA RETT 600x1200x9mm (60x120cm 9mm storio)",
+      "pavadinimas": "Plytelių klijavimas - vonios sienos (1A WC) MATERIA PESCA TRAMA RETT 600x1200x9mm (60x120cm 9mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 25.2,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 16,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - vonios grindys (1A WC) MATERIA PESCA 1200x1200x6mm (120x120cm 6mm storio)",
+      "pavadinimas": "Plytelių klijavimas - vonios grindys (1A WC) MATERIA PESCA 1200x1200x6mm (120x120cm 6mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 4.1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 17,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - WC2 sienos Limo Cedit COMPATTA 2400x1200x9mm (240x120cm 9mm storio)",
+      "pavadinimas": "Plytelių klijavimas - WC2 sienos Limo Cedit COMPATTA 2400x1200x9mm (240x120cm 9mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 23.56,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 18,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - WC2 grindys Limo Cedit COMPATTA 1200x1200x9mm (120x120cm 9mm storio)",
+      "pavadinimas": "Plytelių klijavimas - WC2 grindys Limo Cedit COMPATTA 1200x1200x9mm (120x120cm 9mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 4.63,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 19,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - WC3 sienos MUTINA FOLDET 600x600x10mm (60x60cm 10mm storio)",
+      "pavadinimas": "Plytelių klijavimas - WC3 sienos MUTINA FOLDET 600x600x10mm (60x60cm 10mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 23.56,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 20,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - WC3 grindys Limo Cedit COMPATTA 1200x1200x9mm",
+      "pavadinimas": "Plytelių klijavimas - WC3 grindys Limo Cedit COMPATTA 1200x1200x9mm",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 4.57,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 21,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - skalbykla sienos+grindys FLORIM SENSI WHITE LITHOS 800x800x9mm (80x80cm 9mm storio)",
+      "pavadinimas": "Plytelių klijavimas - skalbykla sienos+grindys FLORIM SENSI WHITE LITHOS 800x800x9mm (80x80cm 9mm storio)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 38.94,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 22,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - garažas sienos+grindys SENSI fossil grey 800x800x9mm (80x80cm 9mm storio; garažas pilnai plytelėmis)",
+      "pavadinimas": "Plytelių klijavimas - garažas sienos+grindys SENSI fossil grey 800x800x9mm (80x80cm 9mm storio; garažas pilnai plytelėmis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 107.94,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 23,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - virtuvės backsplash Quinteserra Verde 2 Lucido 65x266x10mm (65x266mm mozaikos tipo)",
+      "pavadinimas": "Plytelių klijavimas - virtuvės backsplash Quinteserra Verde 2 Lucido 65x266x10mm (65x266mm mozaikos tipo)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 11.4,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 24,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - virtuvės grindys Topcer ALASKA 300x346mm pattern",
+      "pavadinimas": "Plytelių klijavimas - virtuvės grindys Topcer ALASKA 300x346mm pattern",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 24.03,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 25,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių klijavimas - katilinė (Sienos 19.6 + grindys 5.9)",
+      "pavadinimas": "Plytelių klijavimas - katilinė (Sienos 19.6 + grindys 5.9)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 25.5,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 26,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių 45° pjovimas (visi kampai jungiami 45° kampu - žr. visas išklotines) (PLYTELĖS JUNGIAMOS 45 LAIPSNIŲ KAMPU)",
+      "pavadinimas": "Plytelių 45° pjovimas (visi kampai jungiami 45° kampu - žr. visas išklotines) (PLYTELĖS JUNGIAMOS 45 LAIPSNIŲ KAMPU)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 85.0,
+      "saltinis": "isklotines"
+    },
+    {
+      "eil_nr": 27,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių dušo zonos angokraščiai ir nišelės",
+      "pavadinimas": "Plytelių dušo zonos angokraščiai ir nišelės",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "isklotines"
+    },
+    {
+      "eil_nr": 28,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Lentynėlių formavimas su nuolydžiu dušo zonose",
+      "pavadinimas": "Lentynėlių formavimas su nuolydžiu dušo zonose",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "isklotines"
+    },
+    {
+      "eil_nr": 29,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Skylių gręžimas plytelėse (santechnikai, čiaupams, dušo galvoms)",
+      "pavadinimas": "Skylių gręžimas plytelėse (santechnikai, čiaupams, dušo galvoms)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 40,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "eil_nr": 30,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Kampų silikonavimas (drėgnos patalpos)",
+      "pavadinimas": "Kampų silikonavimas (drėgnos patalpos)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 50.0,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "eil_nr": 31,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Akmens kilimėlio (holo) gamyba ir montavimas - marmurai 282x150cm (4.1 HOLO AKMENS KILIMĖLIS - 6 marmurų rūšys)",
+      "pavadinimas": "Akmens kilimėlio (holo) gamyba ir montavimas - marmurai 282x150cm (4.1 HOLO AKMENS KILIMĖLIS - 6 marmurų rūšys)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 32,
+      "skyrius": "Plyteles",
+      "skyrius_label": "Plyteles",
+      "skyrius_enum": "tile",
+      "aprasymas": "Išlyginamojo sluoksnio pylimas (savaime išsilyginantys mišiniai 5mm)",
+      "pavadinimas": "Išlyginamojo sluoksnio pylimas (savaime išsilyginantys mišiniai 5mm)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 231.77,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 33,
+      "skyrius": "Hidroizoliacija",
+      "skyrius_label": "Hidroizoliacija",
+      "skyrius_enum": "waterproof",
+      "aprasymas": "Hidroizoliacijos klijavimas - vonios/WC grindys + splash zonos + pilnos dušo sienos (Vonia 1, WC2, WC3, skalbykla, katilinė)",
+      "pavadinimas": "Hidroizoliacijos klijavimas - vonios/WC grindys + splash zonos + pilnos dušo sienos (Vonia 1, WC2, WC3, skalbykla, katilinė)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 40.94,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 34,
+      "skyrius": "Hidroizoliacija",
+      "skyrius_label": "Hidroizoliacija",
+      "skyrius_enum": "waterproof",
+      "aprasymas": "Hidroizoliacija drėgnose zonose (vnt - patalpų skaičius)",
+      "pavadinimas": "Hidroizoliacija drėgnose zonose (vnt - patalpų skaičius)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 7,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 35,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Standartinių durų montavimas (900x2050)",
+      "pavadinimas": "Standartinių durų montavimas (900x2050)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 13,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 36,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Paslėptų (beapvasdinių) durų montavimas (700x2000)",
+      "pavadinimas": "Paslėptų (beapvasdinių) durų montavimas (700x2000)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 3,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 37,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Grindjuosčių montavimas - paslėptos MDF tipo, H170mm (Išviršinė grindjuostė - matinis MDF, žr. 4.2 brėžinį)",
+      "pavadinimas": "Grindjuosčių montavimas - paslėptos MDF tipo, H170mm (Išviršinė grindjuostė - matinis MDF, žr. 4.2 brėžinį)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 212.46,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "eil_nr": 38,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Medinių grindų lentų klojimas 16mm (1 Strip Oak BC Kose Grey Pores) (ESTA PARKET; medinis skydas 530x1050mm)",
+      "pavadinimas": "Medinių grindų lentų klojimas 16mm (1 Strip Oak BC Kose Grey Pores) (ESTA PARKET; medinis skydas 530x1050mm)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 167.04,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 39,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Apvadinės medinės juostos",
+      "pavadinimas": "Apvadinės medinės juostos",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 80.0,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 40,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Laiptų pakopų ir turėklų montavimas (medinis turėklas, MDF, metalas) (4.1 LAIPTAI; Spice Metal turėklai)",
+      "pavadinimas": "Laiptų pakopų ir turėklų montavimas (medinis turėklas, MDF, metalas) (4.1 LAIPTAI; Spice Metal turėklai)",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 41,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Holo pertvara G_8 (stiklas + faneruotė) montavimas (4.1 HOLO PERTVARA)",
+      "pavadinimas": "Holo pertvara G_8 (stiklas + faneruotė) montavimas (4.1 HOLO PERTVARA)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 42,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Svetainės TV/baldinė siena G_12 (frezuota faneruotė + dažytas MDF)",
+      "pavadinimas": "Svetainės TV/baldinė siena G_12 (frezuota faneruotė + dažytas MDF)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 43,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Virtuvės sala G_7 (faneruotė + butcher block stalviršis + metalas)",
+      "pavadinimas": "Virtuvės sala G_7 (faneruotė + butcher block stalviršis + metalas)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 44,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Virtuvės baldas G_9 (vyno sandėlys + spintelės)",
+      "pavadinimas": "Virtuvės baldas G_9 (vyno sandėlys + spintelės)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 45,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Virtuvės baldas G_12 (kombinuotas baldas su akmens stalviršiu)",
+      "pavadinimas": "Virtuvės baldas G_12 (kombinuotas baldas su akmens stalviršiu)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 46,
+      "skyrius": "Pridetiniai elementai",
+      "skyrius_label": "Pridetiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Stiklo audinio klijavimas (premium projektas) (Premium archetipas)",
+      "pavadinimas": "Stiklo audinio klijavimas (premium projektas) (Premium archetipas)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 540.0,
+      "saltinis": "default_per_paskirtis"
+    },
+    {
+      "eil_nr": 47,
+      "skyrius": "Out of scope",
+      "skyrius_label": "Out of scope",
+      "skyrius_enum": "out_of_scope",
+      "aprasymas": "Santechnika (puodai, maišytuvai, dušo sistemos) - Aquahome pasiūlymas (OOS - santechnika tiekiama atskirai pagal AQUA-05426)",
+      "pavadinimas": "Santechnika (puodai, maišytuvai, dušo sistemos) - Aquahome pasiūlymas (OOS - santechnika tiekiama atskirai pagal AQUA-05426)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 0,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 48,
+      "skyrius": "Out of scope",
+      "skyrius_label": "Out of scope",
+      "skyrius_enum": "out_of_scope",
+      "aprasymas": "Apšvietimo armatūros tiekimas (LED juostos, šviestuvai, transformatoriai) (OOS - Promodus IO specifikacija 2025/07/29 D)",
+      "pavadinimas": "Apšvietimo armatūros tiekimas (LED juostos, šviestuvai, transformatoriai) (OOS - Promodus IO specifikacija 2025/07/29 D)",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "specifikacija"
+    },
+    {
+      "eil_nr": 49,
+      "skyrius": "Out of scope",
+      "skyrius_label": "Out of scope",
+      "skyrius_enum": "out_of_scope",
+      "aprasymas": "Elektros instaliacija (rozetės, jungikliai JUNG LS990, kabeliai) (OOS - el. projektas atskirai)",
+      "pavadinimas": "Elektros instaliacija (rozetės, jungikliai JUNG LS990, kabeliai) (OOS - el. projektas atskirai)",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "lubu_planas"
+    },
+    {
+      "eil_nr": 50,
+      "skyrius": "Out of scope",
+      "skyrius_label": "Out of scope",
+      "skyrius_enum": "out_of_scope",
+      "aprasymas": "Šildymo sistema, rekuperacija, ŠVOK (OOS)",
+      "pavadinimas": "Šildymo sistema, rekuperacija, ŠVOK (OOS)",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 0,
+      "saltinis": "default_per_paskirtis"
+    }
+  ],
+  "v8_totals": {
+    "bendras_plotas_m2": 267.71,
+    "dazymo_plotas_m2": 745.62,
+    "kampai_m": 442.3,
+    "angokrasciu_gkp_m": 25.2,
+    "pasleptu_duru_staktu_m": 8.1,
+    "nisu_metrai": 49.7,
+    "gkp_lubu_standart_m2": 231.77,
+    "gkp_lubu_virs_3m_m2": 0.0,
+    "pvc_grindys_m2": 169.29,
+    "plyteles_grindys_m2": 86.87,
+    "plyteles_sienos_m2": 206.56,
+    "isliginamasis_m2": 231.77,
+    "grindjuosciu_m": 212.36,
+    "hidroizoliacijos_vnt": 5
+  },
+  "v8_rooms": [
+    {
+      "nr": "1",
+      "pavadinimas": "Holas",
+      "paskirtis": "holas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.42,
+        "y": 0.45,
+        "w": 0.1,
+        "h": 0.12
+      },
+      "plotas_m2": 11.55,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 13.7,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 41.1,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 50.8,
+      "kampu_metrai": 28.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 11.55,
+      "grindjuosciu_m": 14.08,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "perim(13.7)*H(3.0)=41.1 - duris(1.85) + lubos(11.55)=50.80; akmens kilimėlis grindyse pažymimas atskirai",
+      "confidence": "medium",
+      "pastabos": "Holo akmens kilimėlis - žr. 4.1 brėžinį (atskira pozicija)"
+    },
+    {
+      "nr": "2",
+      "pavadinimas": "Katilinė",
+      "paskirtis": "katiline",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.3,
+        "w": 0.1,
+        "h": 0.18
+      },
+      "plotas_m2": 5.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 9.8,
+      "lubu_aukstis_m": 2.94,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 28.81,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 0,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 5.9,
+      "plyteles_sienos_m2": 19.6,
+      "plyteles_sienos_aukstis_m": 2.0,
+      "isliginamasis_m2": 5.9,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 8.84,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "Katilinė plytelėmis - sienų plytelės iki 2m: 9.8*2.0=19.6m²; grindys 5.9m²; hidroizo 5.9+9.8*0.3=8.84",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "3",
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.3,
+        "y": 0.3,
+        "w": 0.15,
+        "h": 0.4
+      },
+      "plotas_m2": 12.05,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 52.5,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 5.55,
+          "count": 3
+        }
+      ],
+      "dazymo_plotas_m2": 59.0,
+      "kampu_metrai": 35.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.5,
+      "pvc_grindys_m2": 12.05,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.05,
+      "grindjuosciu_m": 16.55,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 3,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        }
+      ],
+      "calculation_trace": "sienos 17.5*3.0=52.5 - 3 durys(5.55) + lubos 12.05 = 59.0; LED juosta koridoriuje L~3550mm",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "3",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "320",
+          "86",
+          "215",
+          "230",
+          "385",
+          "25",
+          "320",
+          "69",
+          "80",
+          "90",
+          "172",
+          "78",
+          "134",
+          "59",
+          "230",
+          "343",
+          "128",
+          "25",
+          "67",
+          "35",
+          "29",
+          "184",
+          "562",
+          "387",
+          "326",
+          "553",
+          "600",
+          "16",
+          "180",
+          "180",
+          "326"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Koridorius (geltonas plytelių užpildymas) - L formos, jungia kelias patalpas. Matomi matmenys daugiausiai gretimų patalpų (7-miegamasis, 9-valgomasis, virtuvė). Koridoriaus pločiai apie 180 (siaura dalis prie virtuvės) ir platesnė dalis. Tikslus perimetras sunkiai nuskaitomas dėl sudėtingos formos. Lubų aukštis ir plytelių aukštis šiame plane nematomas (tik pjūvyje)."
+      }
+    },
+    {
+      "nr": "4",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.45,
+        "y": 0.2,
+        "w": 0.08,
+        "h": 0.15
+      },
+      "plotas_m2": 4.1,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.4,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 25.2,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 25.2,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.1,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 0.6,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.1,
+      "plyteles_sienos_m2": 25.2,
+      "plyteles_sienos_aukstis_m": 3.0,
+      "isliginamasis_m2": 4.1,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 6.62,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "san mazgas pilnai plytelėmis: sienos 8.4*3.0=25.2m²; grindys 4.1; hidroizo 4.1+8.4*0.3=6.62; lubos dažomos 4.1m²; LED nišelė virš dušo 600mm",
+      "confidence": "medium",
+      "pastabos": "Plytelės: MATERIA PESCA TRAMA RETT 600x1200, grindys MATERIA PESCA 1200x1200"
+    },
+    {
+      "nr": "5",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.1,
+        "w": 0.2,
+        "h": 0.25
+      },
+      "plotas_m2": 15.4,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 15.8,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 47.4,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 1.8,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 59.15,
+      "kampu_metrai": 34.4,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 15.4,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 15.4,
+      "grindjuosciu_m": 16.39,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "sienos 15.8*3.0=47.4 -1.8 -1.85 +lubos 15.4 = 59.15",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "5",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "345",
+          "110",
+          "88",
+          "12",
+          "12",
+          "88",
+          "125",
+          "180",
+          "180",
+          "320",
+          "86",
+          "320",
+          "215",
+          "25",
+          "230",
+          "385",
+          "90",
+          "25",
+          "69",
+          "320",
+          "30",
+          "134"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Vaizde matomos dvi patalpos (Nr.6 ir Nr.7), o ne Nr.5. Matmenys cm: kamb. Nr.7 ~385x230 cm (~3850x2300mm), su nišomis. Patalpa Nr.6 ~345x180+320 cm. Originali patalpa Nr.5 (Kambarys 15.4m²) šiame zoom'e nematoma — tai gretima sritis. Negaliu patikslinti Nr.5 duomenų."
+      }
+    },
+    {
+      "nr": "6",
+      "pavadinimas": "Sandėliukas",
+      "paskirtis": "sandeliukas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.18,
+        "w": 0.1,
+        "h": 0.15
+      },
+      "plotas_m2": 5.76,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 28.8,
+      "deductions": [
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        },
+        {
+          "type": "spinta_built_in",
+          "area_m2": 14.4,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 18.31,
+      "kampu_metrai": 15.0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 5.76,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 5.76,
+      "grindjuosciu_m": 8.55,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "spinta_built_in",
+          "kiekis": 1
+        }
+      ],
+      "calculation_trace": "sienos 9.6*3.0=28.8 -duris -50% spintų +lubos 5.76",
+      "confidence": "low",
+      "pastabos": "Ūkinė spinta + serverinė",
+      "_zoom_changes": [
+        "perimetras: 9.6 → 10.0"
+      ],
+      "_zoom": {
+        "patalpa_nr": "6",
+        "perimetras_m": 10.0,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 5.76,
+        "plotas_saltinis": "inferred",
+        "matmenys_perskaityti": [
+          "345",
+          "110",
+          "88",
+          "12",
+          "12",
+          "180",
+          "320",
+          "320",
+          "86",
+          "25",
+          "215",
+          "230",
+          "25",
+          "69",
+          "320"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 880,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Patalpa 6: matmenys cm vienetais (raudoni skaičiai). Ilgis ~320cm, plotis ~180cm. Perimetras ~ 2*(3.20+1.80)=10.0m. Plotas ~3.20*1.80=5.76m². Durys ~880mm pločio."
+      }
+    },
+    {
+      "nr": "7",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "kabinetas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.2,
+        "w": 0.2,
+        "h": 0.2
+      },
+      "plotas_m2": 12.32,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.1,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 43.2,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 1.8,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 51.87,
+      "kampu_metrai": 31.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 3.85,
+      "pvc_grindys_m2": 12.32,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.32,
+      "grindjuosciu_m": 14.85,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.85
+        }
+      ],
+      "calculation_trace": "sienos 14.4*3.0=43.2 -1.8 -1.85 +lubos 12.32; LED L3850mm",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.4 → 14.1"
+      ],
+      "_zoom": {
+        "patalpa_nr": "7",
+        "perimetras_m": 14.1,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 12.32,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "86",
+          "25",
+          "230",
+          "25",
+          "69",
+          "320",
+          "80",
+          "90",
+          "385",
+          "215",
+          "320"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Kambarys 7: matomi segmentai - kairė siena 86+25+230+25+69 = 435 cm; dešinė siena 215+385 = 600 cm; viršus 320 cm; apačia 320+80 = 400 cm (apytiksliai). Perimetras ~ (4.35+6.0+3.2+4.0) ≈ 17.55 m, bet apatinė riba neaiški dėl perėjimo į san. mazgą. Plotas paliktas nepakeistas - reikia patikrinimo."
+      }
+    },
+    {
+      "nr": "8",
+      "pavadinimas": "Virtuvė",
+      "paskirtis": "virtuve",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.15,
+        "y": 0.4,
+        "w": 0.2,
+        "h": 0.2
+      },
+      "plotas_m2": 24.03,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 20.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 61.5,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 3.6,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        },
+        {
+          "type": "plyteles_virtuves",
+          "area_m2": 11.4,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 68.68,
+      "kampu_metrai": 42.5,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 24.03,
+      "plyteles_sienos_m2": 11.4,
+      "plyteles_sienos_aukstis_m": 0.6,
+      "isliginamasis_m2": 24.03,
+      "grindjuosciu_m": 18.0,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2400,
+          "aukstis_mm": 1500,
+          "panoraminis": true
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "sienos 20.5*3.0=61.5 -3.6 -1.85 -plytelinė juosta(11.4) +lubos 24.03 = 68.68",
+      "confidence": "medium",
+      "pastabos": "Grindys ir sienų backsplash plytelės: Quinteserra Verde 2 Lucido 65x266 sienos, Topcer ALASKA 300x346 grindys"
+    },
+    {
+      "nr": "9",
+      "pavadinimas": "Valgomasis",
+      "paskirtis": "valgomasis",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.3,
+        "y": 0.45,
+        "w": 0.15,
+        "h": 0.18
+      },
+      "plotas_m2": 11.18,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 13.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.5,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 4.5,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 47.18,
+      "kampu_metrai": 28.5,
+      "angokrasciu_gkp_m": 3.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 3.55,
+      "pvc_grindys_m2": 11.18,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 11.18,
+      "grindjuosciu_m": 13.5,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.55
+        }
+      ],
+      "calculation_trace": "sienos 13.5*3.0=40.5 -4.5 +lubos 11.18; panoraminis langas reveals; LED L3550",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "10",
+      "pavadinimas": "Svetainė",
+      "paskirtis": "gyvenamoji",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.55,
+        "w": 0.25,
+        "h": 0.3
+      },
+      "plotas_m2": 32.44,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 22.8,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 68.4,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 9.0,
+          "count": 2
+        }
+      ],
+      "dazymo_plotas_m2": 91.84,
+      "kampu_metrai": 50.0,
+      "angokrasciu_gkp_m": 12.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 17.1,
+      "pvc_grindys_m2": 32.44,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 32.44,
+      "grindjuosciu_m": 25.08,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 2,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 3,
+          "ilgis_m": 17.1
+        }
+      ],
+      "calculation_trace": "sienos 22.8*3=68.4 -2 langai(9.0) +lubos 32.44 = 91.84; 3 LED juostos L=6+5.4+5.7=17.1m; faneruotė viena siena (~10m²)",
+      "confidence": "medium",
+      "pastabos": "Faneruotė siena ~10m² (atskira pozicija); panoraminiai langai į kiemą"
+    },
+    {
+      "nr": "11",
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "puslapio_nr": 5,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.1,
+        "w": 0.25,
+        "h": 0.35
+      },
+      "plotas_m2": 35.94,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 24.0,
+      "lubu_aukstis_m": 3.0,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "betonas",
+      "dazymo_plotas_gross_m2": 0,
+      "deductions": [],
+      "dazymo_plotas_m2": 0,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 35.94,
+      "plyteles_sienos_m2": 72.0,
+      "plyteles_sienos_aukstis_m": 3.0,
+      "isliginamasis_m2": 0,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1000,
+          "aukstis_mm": 1500
+        }
+      ],
+      "calculation_trace": "Garažas plytelėmis SENSI fossil grey 80x80; sienos 24*3=72m²; grindys 35.94",
+      "confidence": "medium",
+      "pastabos": "Pilnai plytelės 80x80; garažo vartai"
+    },
+    {
+      "nr": "2A_1",
+      "pavadinimas": "Holas (2 a.)",
+      "paskirtis": "holas",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.15,
+        "y": 0.15,
+        "w": 0.5,
+        "h": 0.3
+      },
+      "plotas_m2": 14.76,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.0,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "ceiling_plan_annotation",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 46.58,
+      "deductions": [
+        {
+          "type": "langai_stoglangiai",
+          "area_m2": 3.6,
+          "count": 2
+        },
+        {
+          "type": "duris",
+          "area_m2": 7.4,
+          "count": 4
+        }
+      ],
+      "dazymo_plotas_m2": 50.34,
+      "kampu_metrai": 36.0,
+      "angokrasciu_gkp_m": 7.2,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 1.8,
+      "pvc_grindys_m2": 14.76,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 14.76,
+      "grindjuosciu_m": 17.1,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "stoglangis",
+          "kiekis": 2,
+          "plotis_mm": 1200,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 4,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "2 a holas: sienos 17*2.74=46.58 -2 stoglangiai(3.6) -4 durys(7.4) +lubos 14.76 = 50.34",
+      "confidence": "medium",
+      "pastabos": "2 stoglangiai - tikslinama būvio davikliai; spintai L1800x2 paslėpta šviesa",
+      "_zoom": {
+        "patalpa_nr": "2A_1",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "1342",
+          "290",
+          "100",
+          "270",
+          "100",
+          "270",
+          "100",
+          "135",
+          "189",
+          "23",
+          "90",
+          "140",
+          "100",
+          "78",
+          "89",
+          "100",
+          "40",
+          "140",
+          "40",
+          "418",
+          "503",
+          "418",
+          "503",
+          "170",
+          "99",
+          "100",
+          "170",
+          "125",
+          "125",
+          "125",
+          "218",
+          "473",
+          "104",
+          "192",
+          "334",
+          "112",
+          "269",
+          "401",
+          "328",
+          "481",
+          "146",
+          "100",
+          "88",
+          "180",
+          "88"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "durys_pastaba": "3 įėjimai iš holo į 3,4,5 kambarius bei vonios",
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Holas (patalpa atitinka centrinę juostą tarp 3,4,5 ir vonių 6,7). Bendras ilgis ~13.42 m (1342). Holas yra siauras koridorius/praėjimo zona tarp kambarių. Tikslus holo plotis iš šio plano sunkiai nuskaitomas — tikėtina ~1.0-1.1 m (matosi 100, 99 anotacijos grindų lygyje). Pradinis plotas 14.76 m² ir perimetras 17 m atrodo pagrįsti, paliekami nepakeisti. Lubų aukštis plane nematomas."
+      }
+    },
+    {
+      "nr": "2A_2",
+      "pavadinimas": "Skalbykla",
+      "paskirtis": "skalbykla",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.1,
+        "y": 0.15,
+        "w": 0.1,
+        "h": 0.2
+      },
+      "plotas_m2": 7.7,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 11.4,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 31.24,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 31.24,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 7.7,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 7.7,
+      "plyteles_sienos_m2": 31.24,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 7.7,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 11.12,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        }
+      ],
+      "calculation_trace": "Skalbykla pilnai plytelėmis FLORIM SENSI WHITE LITHOS 80x80; sienos 11.4*2.74=31.24; grindys 7.7; hidroizo 7.7+3.42=11.12",
+      "confidence": "medium",
+      "pastabos": ""
+    },
+    {
+      "nr": "2A_3",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.2,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 17.92,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.0,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.9,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.15,
+      "kampu_metrai": 29.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.9,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.9,
+      "grindjuosciu_m": 15.07,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2900,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.6*2.74=40 -2.9 -1.85 +lubos 12.9",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.6 → 17.92"
+      ],
+      "_zoom": {
+        "patalpa_nr": "2A_3",
+        "perimetras_m": 17.92,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": 19.66,
+        "plotas_saltinis": "inferred",
+        "matmenys_perskaityti": [
+          "135",
+          "189",
+          "290",
+          "90",
+          "160",
+          "70",
+          "218",
+          "473",
+          "100",
+          "418",
+          "170",
+          "90",
+          "125",
+          "161",
+          "170"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 1000,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          },
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Matomos dvi patalpos (2 ir 3). Patalpa 3 (kambarys/miegamoji) ~4.18m x ~4.70m (160+290+su sienomis). Perimetras ~17.9m apskaiciuotas is matomu sienu segmentu. Plotas inferred is iliustracinio dydzio ~4.18 x ~4.70m."
+      }
+    },
+    {
+      "nr": "2A_4",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.32,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.85,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.5,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 39.73,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.03,
+      "kampu_metrai": 29.4,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.85,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.85,
+      "grindjuosciu_m": 14.97,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2700,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.5*2.74=39.73 -2.7 -1.85 +12.85",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "2A_4",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "389",
+          "180",
+          "70",
+          "170",
+          "99",
+          "100",
+          "503",
+          "518",
+          "25"
+        ],
+        "langai": [
+          {
+            "plotis_mm": 1700,
+            "aukstis_mm": 2100
+          }
+        ],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Patalpa Nr.4 - matomi cm matmenys: gylis ~503-518cm, lango plotis 170cm, sienelės 389+180+70cm. Perimetras apytiksliai (5.03+5.18)*2 ~20.4m, bet tikslesni duomenys neperskaityti aiskiai. Paliekam original."
+      }
+    },
+    {
+      "nr": "2A_5",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.44,
+        "y": 0.15,
+        "w": 0.12,
+        "h": 0.25
+      },
+      "plotas_m2": 12.9,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 14.42,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 40.0,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 2.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 48.35,
+      "kampu_metrai": 29.6,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 2.7,
+      "pvc_grindys_m2": 12.9,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 12.9,
+      "grindjuosciu_m": 15.07,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2700,
+          "aukstis_mm": 1000
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.7
+        }
+      ],
+      "calculation_trace": "sienos 14.6*2.74=40 -2.7 -1.85 +12.9",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom_changes": [
+        "perimetras: 14.6 → 14.42"
+      ],
+      "_zoom": {
+        "patalpa_nr": "2A_5",
+        "perimetras_m": 14.42,
+        "perimetras_saltinis": "from_zoom",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "180",
+          "140",
+          "503",
+          "100",
+          "250",
+          "170",
+          "270",
+          "100",
+          "270",
+          "100",
+          "230"
+        ],
+        "langai": [
+          {
+            "plotis_mm": 1800,
+            "aukstis_mm": 1400
+          }
+        ],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Kambarys 5: matomi sienų matmenys ~5030 mm (ilgis) x ~2100 mm (plotis dalies). Perimetras apytiksliai 2*(5.03+2.1)=14.26m, panašu i pradinį 14.6m. Langas ~1800x1400 mm. Durys 900 mm pločio. Lubų aukštis ir plytelių aukštis šiame plane nematomi."
+      }
+    },
+    {
+      "nr": "2A_6",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.55,
+        "y": 0.2,
+        "w": 0.06,
+        "h": 0.1
+      },
+      "plotas_m2": 4.63,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.6,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 23.56,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 23.56,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.63,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 1.8,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.63,
+      "plyteles_sienos_m2": 23.56,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 4.63,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 7.21,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "WC2 plytelėmis Limo Cedit COMPATTA: sienos 240x120 pilnos; grindys 4.63; hidroizo 4.63+8.6*0.3=7.21",
+      "confidence": "medium",
+      "pastabos": "Limo Cedit COMPATTA 240x120 sienos, 120x120 grindys",
+      "_zoom": {
+        "patalpa_nr": "2A_6",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "270",
+          "100",
+          "23",
+          "100",
+          "192",
+          "180",
+          "140",
+          "160",
+          "60",
+          "210",
+          "2",
+          "70",
+          "240",
+          "240",
+          "334",
+          "90",
+          "112",
+          "269",
+          "503",
+          "200",
+          "290",
+          "200",
+          "90",
+          "490",
+          "160",
+          "90",
+          "200",
+          "60",
+          "481",
+          "88",
+          "15",
+          "12"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 700,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Sanitarinis mazgas su dušais ir WC. Matomi vidaus matmenys ~200x290 ir 200x240 zonoms. Bendras patalpos ilgis ~503cm (5030mm), plotis nera aiskiai matomas vienu skaičiumi. Dauguma matmenu yra cm, ne mm. Perimetras ir plotas nepatikslinti, nes nematomas pilnas dimension chain."
+      }
+    },
+    {
+      "nr": "2A_7",
+      "pavadinimas": "San. mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.55,
+        "y": 0.3,
+        "w": 0.06,
+        "h": 0.1
+      },
+      "plotas_m2": 4.57,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 8.6,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 23.56,
+      "deductions": [
+        {
+          "type": "plyteles_pilnai",
+          "area_m2": 23.56,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 4.57,
+      "kampu_metrai": 0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 2.7,
+      "nisu_metrai": 2.3,
+      "pvc_grindys_m2": 0,
+      "plyteles_grindys_m2": 4.57,
+      "plyteles_sienos_m2": 23.56,
+      "plyteles_sienos_aukstis_m": 2.74,
+      "isliginamasis_m2": 4.57,
+      "grindjuosciu_m": 0,
+      "hidroizoliacija_m2": 7.15,
+      "elementai": [
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 700,
+          "aukstis_mm": 2000
+        }
+      ],
+      "calculation_trace": "WC3 plytelėmis MUTINA FOLDET 60x60 sienos, Limo Cedit COMPATTA grindys; sienos 23.56; LED 1.8x2.3",
+      "confidence": "medium",
+      "pastabos": "",
+      "_zoom": {
+        "patalpa_nr": "2A_7",
+        "perimetras_m": null,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": null,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "503",
+          "112",
+          "269",
+          "200",
+          "90",
+          "90",
+          "90",
+          "90",
+          "200",
+          "481"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Matomi tik dalies sienų matmenys cm vienetais (503, 200 - sienos; 90 - durų plotis). Pilnas perimetras nepatikslintas - matomi ne visi sienų matmenys. Durys ~900 mm pločio (lankas matomas). Langų nėra (vidaus san.mazgas)."
+      }
+    },
+    {
+      "nr": "2A_8",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.15,
+        "w": 0.2,
+        "h": 0.3
+      },
+      "plotas_m2": 20.72,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 18.5,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 50.69,
+      "deductions": [
+        {
+          "type": "langas",
+          "area_m2": 4.5,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 65.06,
+      "kampu_metrai": 36.7,
+      "angokrasciu_gkp_m": 3.0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 8.1,
+      "pvc_grindys_m2": 20.72,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 20.72,
+      "grindjuosciu_m": 18.65,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 3000,
+          "aukstis_mm": 1500,
+          "panoraminis": true,
+          "gkp_angokrastis": true
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 2,
+          "ilgis_m": 8.1
+        }
+      ],
+      "calculation_trace": "sienos 18.5*2.74=50.69 -4.5 -1.85 +20.72; LED L4300+3800=8.1m",
+      "confidence": "medium",
+      "pastabos": "Tėvų miegamasis su panoraminiu langu",
+      "_zoom": {
+        "patalpa_nr": "2A_8",
+        "perimetras_m": 18.5,
+        "perimetras_saltinis": "unchanged",
+        "plotas_m2": 20.72,
+        "plotas_saltinis": "unchanged",
+        "matmenys_perskaityti": [
+          "88",
+          "100",
+          "146",
+          "192",
+          "88",
+          "88",
+          "82",
+          "90",
+          "15",
+          "334",
+          "269",
+          "100",
+          "112",
+          "269",
+          "100",
+          "90",
+          "328",
+          "401",
+          "90",
+          "481",
+          "25",
+          "12",
+          "12",
+          "188"
+        ],
+        "langai": [],
+        "durys": [
+          {
+            "plotis_mm": 900,
+            "aukstis_mm": 2100,
+            "tipas": "standart"
+          }
+        ],
+        "lubu_aukstis_m": null,
+        "plyteles_sienos_aukstis_m": null,
+        "nisu_metrai": null,
+        "confidence_zoom": "medium",
+        "pastabos": "Miegamasis (8) su drabuzine (9). Pagrindines patalpos matmenys ~481cm plotis, ~401+328cm gylis. Durys ~90cm. Baldine sienute H140. Veidrodis nisoje. Lubu aukstis ir plyteliu aukstis nematomi siame vaizde."
+      }
+    },
+    {
+      "nr": "2A_9",
+      "pavadinimas": "Drabužinė",
+      "paskirtis": "drabuzine",
+      "puslapio_nr": 6,
+      "bbox_pct": {
+        "x": 0.77,
+        "y": 0.15,
+        "w": 0.1,
+        "h": 0.18
+      },
+      "plotas_m2": 6.01,
+      "plotas_saltinis": "eksplikacija",
+      "perimetras_m": 10.0,
+      "lubu_aukstis_m": 2.74,
+      "lubu_aukstis_saltinis": "section_pjuvis",
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_gross_m2": 27.4,
+      "deductions": [
+        {
+          "type": "spinta_built_in",
+          "area_m2": 13.7,
+          "count": 1
+        },
+        {
+          "type": "duris",
+          "area_m2": 1.85,
+          "count": 1
+        }
+      ],
+      "dazymo_plotas_m2": 17.86,
+      "kampu_metrai": 15.0,
+      "angokrasciu_gkp_m": 0,
+      "pasleptu_duru_staktu_m": 0,
+      "nisu_metrai": 0,
+      "pvc_grindys_m2": 6.01,
+      "plyteles_grindys_m2": 0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_sienos_aukstis_m": 0,
+      "isliginamasis_m2": 6.01,
+      "grindjuosciu_m": 4.5,
+      "hidroizoliacija_m2": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2050
+        },
+        {
+          "tipas": "spinta_built_in",
+          "kiekis": 1
+        }
+      ],
+      "calculation_trace": "sienos 10*2.74=27.4 -50% spintos -duris +lubos 6.01",
+      "confidence": "low",
+      "pastabos": "Tėvų rūbinė su built-in spintomis"
+    }
+  ],
+  "_elapsed_s": 479.5,
+  "status": "ok"
+}
