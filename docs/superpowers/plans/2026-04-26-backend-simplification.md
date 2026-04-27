@@ -1713,6 +1713,54 @@ Rooms count and dažymas now reliable on single run. Plytelės still benefit fro
 
 Zoom adds ~$0.05 per room and ~6-10s per room (cached system prompt minimizes overhead).
 
+### A8 — Phase 9: Production-readiness stress tests (pre-launch)
+
+**User direction (2026-04-27):** *"appsas dar nera i production isleistas, dabar viska ir darom kad butu galima kuo geresni paleist."* Pre-launch stress testing is required, not optional.
+
+**Honest assessment of test coverage:** Pipeline validated for 5 specific training projects (P1-P5, all private residential). **NOT** validated for: failure modes, concurrent load, malformed PDFs, browser UX under long waits, project-type variety (renovation, commercial, multi-floor), zoom-pass determinism on large projects, end-to-end Excel/PDF export.
+
+**Phase 9 plan (in priority order):**
+
+#### 9.1 Determinism completion (~30 min, ~$10)
+- 3× run with zoom on P1 (15 rooms, 65 pages) — confirm zoom doesn't introduce variance
+- 3× run with zoom on P3 (20 rooms, 45 pages) — confirm large-project stability
+
+#### 9.2 Failure mode tests (~30 min, free)
+- Empty PDF (0 bytes)
+- 1-page minimal PDF
+- Malformed bytes (random garbage with .pdf extension)
+- Password-protected PDF
+- Missing/invalid `ANTHROPIC_API_KEY`
+- Simulated API timeout (mock 503)
+- JSON repair fallback edge cases
+
+#### 9.3 Concurrent load (~10 min)
+- 3 simultaneous `/extract-interior` requests with different PDFs
+- Verify backend doesn't crash, all complete, no shared-state corruption
+
+#### 9.4 End-to-end UI flow (~1h)
+- Browser dev-server smoke test: upload P2, wait 3min, verify all panels populate
+- Excel export — verify rows match `darbu_sarasas`
+- PDF export — verify formatting
+- Warning banner — does UI show the eksplikacija-missing INFO?
+- Assumptions panel — does it work with new schema fields?
+
+#### 9.5 New-schema field UI rendering (UI debt)
+- `calculation_trace` per room — is it shown anywhere? (transparency feature)
+- `confidence` per room — is it shown? (high/medium/low badges)
+- `plotas_saltinis`, `lubu_aukstis_saltinis` — shown? (data-source badges)
+- `_zoom_changes[]` — shown? (zoom audit trail)
+- `_lt_warnings` — banner-rendered or buried?
+
+#### 9.6 Documented "known issues" (cannot fix without more data)
+- Renovation projects untested (red=demo, green=existing color conventions)
+- Commercial / multi-floor untested
+- Mansardos (sloped ceiling) untested
+- Mixed-language drawings untested
+- Scanned/raster PDFs untested
+
+User can decide whether to launch with these as monitored unknowns or wait for sample data.
+
 ### Future work (not in this PR)
 
 - **6.5.1 Edge-case PDFs** — synthetic test inputs needed (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated, low-DPI). Crafting these is a separate effort.
