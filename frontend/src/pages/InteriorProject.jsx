@@ -400,9 +400,8 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   const [doubleSides, setDoubleSides] = useState(false);
   const [gkMetodas, setGkMetodas]     = useState('tikslus');  // Task 9
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set()); // Task 6
-  const [pageClassifications, setPageClassifications] = useState(  // Task 1 user overrides
-    () => project.page_classifications || project.meta?.page_classifications || []
-  );
+  // page_classifications was V8 page_classifier output. New extractor doesn't
+  // emit it; the 'puslapiai' tab that consumed it has been removed.
   const [assumptions, setAssumptions] = useState({
     ...DEFAULT_ASSUMPTIONS,
     sienos_storis_m: project.prielaidos?.sienos_storis_m ?? 0.10,
@@ -412,14 +411,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   // Pasirinktas PDF puslapis (pagal kambarį arba puslapio tipą)
   const [focusedPage, setFocusedPage] = useState(null);
 
-  // page → metadata (label, type) mapping pagal v8_pages
-  const pageMetaDict = useMemo(() => {
-    const dict = {};
-    (project.v8_pages || []).forEach(p => {
-      dict[p.page] = { label: p.label, type: p.type, confidence: p.confidence };
-    });
-    return dict;
-  }, [project.v8_pages]);
+  // pageMetaDict was V8 page_classifier output mapper (page → label/type/confidence).
+  // New extractor doesn't emit v8_pages; PdfViewer falls back to "Puslapis N" labels.
+  const pageMetaDict = useMemo(() => ({}), []);
 
   // PDF URL iš IndexedDB (sukuriamas blob: URL'as runtime)
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -600,11 +594,12 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             <ScaleInfoBanner scaleInfo={project.v8_scale} />
           )}
 
-          {/* V8 brėžinio struktūra (auto-klasifikacija) */}
-          {project.v8_pages && project.v8_pages.length > 0 && (
+          {/* V8 page structure card removed — new extractor doesn't emit v8_pages.
+              PageStructureCard component still exists but is dead UI for new schema. */}
+          {false && (
             <PageStructureCard
-              pages={project.v8_pages}
-              summary={project.v8_pages_summary}
+              pages={[]}
+              summary={null}
               onPageClick={(pageNr) => {
                 if (pdfUrl) {
                   setFocusedPage(pageNr);
@@ -1145,81 +1140,6 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 ⚠ Langai — standartiniai pagal patalpų tipą
               </p>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB: PUSLAPIAI (Task 1) ───────────────────────────────────────── */}
-      {tab === 'puslapiai' && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            AI klasifikuoti brėžinių puslapiai. Jei klasifikacija neteisinga — pakeiskite.
-          </p>
-          <div className="border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b border-border">
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground w-12">Psl.</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Tipas</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Tikslumas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageClassifications.map((pg, i) => {
-                  const confColors = {
-                    high:   'text-green-600 dark:text-green-400',
-                    medium: 'text-yellow-600 dark:text-yellow-400',
-                    low:    'text-red-500',
-                  };
-                  const PAGE_TYPE_OPTIONS = [
-                    { value: 'pertvarų',      label: 'Pertvarų planas' },
-                    { value: 'baldų',         label: 'Baldų planas' },
-                    { value: 'santechnikos',  label: 'Santechnikos planas' },
-                    { value: 'rozecių',       label: 'Rozečių planas' },
-                    { value: 'apšvietimo',    label: 'Apšvietimo planas' },
-                    { value: 'lubų',          label: 'Lubų planas' },
-                    { value: 'grindų',        label: 'Grindų planas' },
-                    { value: 'apdailų',       label: 'Apdailų planas' },
-                    { value: 'išklotinė',     label: 'Išklotinė' },
-                    { value: 'fasadas',       label: 'Fasadas' },
-                    { value: 'pjūvis',        label: 'Pjūvis' },
-                    { value: 'specifikacija', label: 'Specifikacija' },
-                    { value: 'vizualizacija', label: 'Vizualizacija' },
-                    { value: 'cover',         label: 'Viršelis' },
-                    { value: 'kita',          label: 'Kita' },
-                  ];
-                  return (
-                    <tr key={i} className={`border-b border-border/50 last:border-0 ${i % 2 === 0 ? '' : 'bg-muted/20'}`}>
-                      <td className="px-3 py-2 text-xs text-muted-foreground font-mono">{pg.page_number}</td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={pg.page_type}
-                          onChange={e => {
-                            const updated = [...pageClassifications];
-                            const opt = PAGE_TYPE_OPTIONS.find(o => o.value === e.target.value);
-                            updated[i] = { ...pg, page_type: e.target.value, label_lt: opt?.label || e.target.value, confidence: 'high' };
-                            setPageClassifications(updated);
-                          }}
-                          className="text-xs bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground"
-                        >
-                          {PAGE_TYPE_OPTIONS.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <ConfidenceDot level={pg.confidence} />
-                          <span className={`text-xs ${confColors[pg.confidence] || 'text-muted-foreground'}`}>
-                            {pg.confidence === 'high' ? 'Aukštas' : pg.confidence === 'medium' ? 'Vidutinis' : 'Žemas'}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
