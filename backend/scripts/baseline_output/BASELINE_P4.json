@@ -1,0 +1,135 @@
+{
+  "archetipas": "premium",
+  "bendras_plotas_m2": 24.5,
+  "patalpos": [
+    {
+      "nr": "01",
+      "pavadinimas": "Vaikų san. mazgas",
+      "paskirtis": "vonia",
+      "puslapio_nr": 1,
+      "plotas_m2": 6.96,
+      "perimetras_m": 11.5,
+      "lubu_aukstis_m": 3.2,
+      "lubu_tipas": "pakabinamos",
+      "dazymo_plotas_m2": 0.0,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 6.96,
+      "plyteles_sienos_m2": 36.8,
+      "isliginamasis_m2": 6.96,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "02",
+      "pavadinimas": "Tėvų san. mazgas",
+      "paskirtis": "vonia",
+      "puslapio_nr": 2,
+      "plotas_m2": 12.5,
+      "perimetras_m": 15.6,
+      "lubu_aukstis_m": 3.2,
+      "lubu_tipas": "pakabinamos",
+      "dazymo_plotas_m2": 0.0,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 5.4,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 12.5,
+      "plyteles_sienos_m2": 49.9,
+      "isliginamasis_m2": 12.5,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "03",
+      "pavadinimas": "Techninė patalpa",
+      "paskirtis": "katiline",
+      "puslapio_nr": 7,
+      "plotas_m2": 5.04,
+      "perimetras_m": 9.4,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "betonas",
+      "dazymo_plotas_m2": 0.0,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 0.0,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 5.04,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 5.04,
+      "grindjuosciu_m": 0.0
+    }
+  ],
+  "durys": [
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2000,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 1200,
+      "aukstis_mm": 2100,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 604,
+      "aukstis_mm": 2000,
+      "tipas": "standart"
+    }
+  ],
+  "langai": [
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 1600,
+      "gkp_angokrastis": false,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 1200,
+      "aukstis_mm": 1600,
+      "gkp_angokrastis": false,
+      "stoglangis": false
+    }
+  ],
+  "nisos": [
+    {
+      "ilgis_m": 1.0
+    },
+    {
+      "ilgis_m": 1.45
+    },
+    {
+      "ilgis_m": 0.88
+    },
+    {
+      "ilgis_m": 1.1
+    }
+  ],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 0.0,
+    "kampai_m_total": 0.0,
+    "angokrasciu_gkp_m_total": 0.0,
+    "pasleptu_duru_staktu_m_total": 10.3,
+    "nisu_metrai_total": 4.43,
+    "gkp_lubu_m2_total": 0.0,
+    "gkp_lubu_virs_3m_m2_total": 0.0,
+    "pvc_grindys_m2_total": 0.0,
+    "plyteles_grindys_m2_total": 24.5,
+    "plyteles_sienos_m2_total": 86.7,
+    "isliginamasis_m2_total": 24.5,
+    "grindjuosciu_m_total": 0.0,
+    "hidroizoliacijos_vnt": 2
+  },
+  "pastabos": "Brėžiniai apima 2 sanitarinius mazgus (vaikų ir tėvų) bei techninę patalpą. Pakabinamos lubos H=3.2m, plytelės iki lubų pagal sienų išklotines. Visos durys – paslėptos (vonios durys). Plotai apskaičiuoti iš sienų matmenų (vaikų SM ~3.87×1.8=6.96m²; tėvų SM ~4.01×3.0+niša=12.5m²; techninė ~4.2×1.2=5.04m²). Plytelių kiekiai patikrinti pagal lentelėse pateiktus vnt. (67+77+11=155 vnt × 0.72m²/vnt ≈ 111m² total bendras plytelių poreikis su atliekomis). Eksplikacija nepridėta – plotai vertinti iš matmenų.",
+  "_meta": {
+    "project": 4,
+    "pdf": "projektas_4(2)_breziniai.pdf",
+    "elapsed_s": 40.2,
+    "pages_sent": 7,
+    "input_tokens": 29114,
+    "output_tokens": 1877,
+    "api_elapsed_s": 39.5,
+    "retry_count": 0,
+    "parse_repaired": false
+  }
+}

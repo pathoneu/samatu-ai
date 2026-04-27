@@ -1,0 +1,35 @@
+{
+  "archetipas": "standart",
+  "bendras_plotas_m2": 0.0,
+  "patalpos": [],
+  "durys": [],
+  "langai": [],
+  "nisos": [],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 0.0,
+    "kampai_m_total": 0.0,
+    "angokrasciu_gkp_m_total": 0.0,
+    "pasleptu_duru_staktu_m_total": 0.0,
+    "nisu_metrai_total": 0.0,
+    "gkp_lubu_m2_total": 0.0,
+    "gkp_lubu_virs_3m_m2_total": 0.0,
+    "pvc_grindys_m2_total": 0.0,
+    "plyteles_grindys_m2_total": 0.0,
+    "plyteles_sienos_m2_total": 0.0,
+    "isliginamasis_m2_total": 0.0,
+    "grindjuosciu_m_total": 0.0,
+    "hidroizoliacijos_vnt": 0
+  },
+  "pastabos": "Pateikti dokumentai NĖRA statybos/architektūriniai brėžiniai. Tai INSIGHT magnetinio LED bėgelio (užglaistomo montavimo) gamintojo montavimo instrukcija (6 puslapiai): montavimo žingsniai į viengubą/dvigubą gipsą, maitinimo schemos (vidiniai/išoriniai šaltiniai), dimeriavimo (DALI/PUSH-DIM) schemos. Nėra patalpų eksplikacijos, planų, pjūvių, sienų matmenų, durų/langų ar kitų duomenų, reikalingų vidaus apdailos sąmatos pozicijoms apskaičiuoti. Reikalingi architektūriniai brėžiniai (planas su matmenimis, eksplikacija, sienų išklotinės).",
+  "_meta": {
+    "project": 5,
+    "pdf": "projektas_5(8)_breziniai.pdf",
+    "elapsed_s": 28.0,
+    "pages_sent": 7,
+    "input_tokens": 29114,
+    "output_tokens": 661,
+    "api_elapsed_s": 27.7,
+    "retry_count": 0,
+    "parse_repaired": false
+  }
+}

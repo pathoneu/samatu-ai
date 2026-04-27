@@ -1,0 +1,461 @@
+{
+  "archetipas": "dideli_namu_premium",
+  "bendras_plotas_m2": 224.0,
+  "patalpos": [
+    {
+      "nr": "01",
+      "pavadinimas": "Tambūras",
+      "paskirtis": "tambuoras",
+      "puslapio_nr": 1,
+      "plotas_m2": 7.36,
+      "perimetras_m": 11.2,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "betonas",
+      "dazymo_plotas_m2": 0.0,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 0.0,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 7.36,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "02",
+      "pavadinimas": "Svetainė/valgomasis/virtuvė",
+      "paskirtis": "virtuve",
+      "puslapio_nr": 1,
+      "plotas_m2": 62.42,
+      "perimetras_m": 33.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 145.2,
+      "kampu_metrai": 56.78,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 0.0,
+      "pvc_grindys_m2": 38.42,
+      "plyteles_grindys_m2": 24.0,
+      "plyteles_sienos_m2": 4.2,
+      "isliginamasis_m2": 62.42,
+      "grindjuosciu_m": 32.0
+    },
+    {
+      "nr": "03",
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 1,
+      "plotas_m2": 15.25,
+      "perimetras_m": 22.4,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 75.42,
+      "kampu_metrai": 39.0,
+      "angokrasciu_gkp_m": 24.4,
+      "pasleptu_duru_staktu_m": 24.4,
+      "pvc_grindys_m2": 15.25,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 15.25,
+      "grindjuosciu_m": 18.0
+    },
+    {
+      "nr": "04",
+      "pavadinimas": "Kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "plotas_m2": 12.14,
+      "perimetras_m": 14.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 47.34,
+      "kampu_metrai": 25.28,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 12.14,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 12.14,
+      "grindjuosciu_m": 13.4
+    },
+    {
+      "nr": "05",
+      "pavadinimas": "Kambario drabužinė",
+      "paskirtis": "rubine",
+      "puslapio_nr": 1,
+      "plotas_m2": 3.75,
+      "perimetras_m": 8.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 22.31,
+      "kampu_metrai": 19.28,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 3.75,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 3.75,
+      "grindjuosciu_m": 7.5
+    },
+    {
+      "nr": "06",
+      "pavadinimas": "Kambarys 2",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "plotas_m2": 14.63,
+      "perimetras_m": 15.4,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 53.66,
+      "kampu_metrai": 26.68,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 14.63,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 14.63,
+      "grindjuosciu_m": 15.0
+    },
+    {
+      "nr": "07",
+      "pavadinimas": "Kambario 2 drabužinė",
+      "paskirtis": "rubine",
+      "puslapio_nr": 1,
+      "plotas_m2": 3.82,
+      "perimetras_m": 8.1,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 22.66,
+      "kampu_metrai": 19.38,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 3.82,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 3.82,
+      "grindjuosciu_m": 7.6
+    },
+    {
+      "nr": "08",
+      "pavadinimas": "Vaikų vonia",
+      "paskirtis": "vonia",
+      "puslapio_nr": 1,
+      "plotas_m2": 6.83,
+      "perimetras_m": 11.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 6.83,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 6.83,
+      "plyteles_sienos_m2": 22.0,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "09",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "plotas_m2": 14.58,
+      "perimetras_m": 15.4,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 53.61,
+      "kampu_metrai": 26.68,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 14.58,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 14.58,
+      "grindjuosciu_m": 15.0
+    },
+    {
+      "nr": "10",
+      "pavadinimas": "Miegamojo vonia",
+      "paskirtis": "vonia",
+      "puslapio_nr": 1,
+      "plotas_m2": 14.04,
+      "perimetras_m": 16.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 14.04,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 14.04,
+      "plyteles_sienos_m2": 32.0,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "11",
+      "pavadinimas": "Miegamojo drabužinė",
+      "paskirtis": "rubine",
+      "puslapio_nr": 1,
+      "plotas_m2": 5.73,
+      "perimetras_m": 9.7,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 28.96,
+      "kampu_metrai": 21.0,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 5.73,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 5.73,
+      "grindjuosciu_m": 8.7
+    },
+    {
+      "nr": "12",
+      "pavadinimas": "Svečių wc",
+      "paskirtis": "wc",
+      "puslapio_nr": 1,
+      "plotas_m2": 2.89,
+      "perimetras_m": 7.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 2.89,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 2.89,
+      "plyteles_sienos_m2": 14.0,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "13",
+      "pavadinimas": "Tech. patalpa/skalbykla",
+      "paskirtis": "skalbykla",
+      "puslapio_nr": 1,
+      "plotas_m2": 9.49,
+      "perimetras_m": 12.6,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 9.49,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 9.49,
+      "plyteles_sienos_m2": 25.2,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    },
+    {
+      "nr": "14",
+      "pavadinimas": "Pagrindinė namo drabužinė",
+      "paskirtis": "rubine",
+      "puslapio_nr": 1,
+      "plotas_m2": 7.07,
+      "perimetras_m": 11.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "gkp",
+      "dazymo_plotas_m2": 33.09,
+      "kampu_metrai": 22.3,
+      "angokrasciu_gkp_m": 4.9,
+      "pasleptu_duru_staktu_m": 4.9,
+      "pvc_grindys_m2": 7.07,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 7.07,
+      "grindjuosciu_m": 10.0
+    },
+    {
+      "nr": "15",
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "puslapio_nr": 1,
+      "plotas_m2": 44.0,
+      "perimetras_m": 27.6,
+      "lubu_aukstis_m": 2.82,
+      "lubu_tipas": "betonas",
+      "dazymo_plotas_m2": 0.0,
+      "kampu_metrai": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "pasleptu_duru_staktu_m": 0.0,
+      "pvc_grindys_m2": 0.0,
+      "plyteles_grindys_m2": 0.0,
+      "plyteles_sienos_m2": 0.0,
+      "isliginamasis_m2": 0.0,
+      "grindjuosciu_m": 0.0
+    }
+  ],
+  "durys": [
+    {
+      "plotis_mm": 1000,
+      "aukstis_mm": 2450,
+      "tipas": "standart"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    },
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2450,
+      "tipas": "pasleptos"
+    }
+  ],
+  "langai": [
+    {
+      "plotis_mm": 2000,
+      "aukstis_mm": 2100,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 2000,
+      "aukstis_mm": 2100,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 1000,
+      "aukstis_mm": 2100,
+      "gkp_angokrastis": false,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 1000,
+      "aukstis_mm": 2100,
+      "gkp_angokrastis": false,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 2000,
+      "aukstis_mm": 2100,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 2430,
+      "aukstis_mm": 1400,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 1000,
+      "aukstis_mm": 1400,
+      "gkp_angokrastis": false,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 3000,
+      "aukstis_mm": 2400,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 3000,
+      "aukstis_mm": 2400,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    },
+    {
+      "plotis_mm": 2460,
+      "aukstis_mm": 2400,
+      "gkp_angokrastis": true,
+      "stoglangis": false
+    }
+  ],
+  "nisos": [
+    {
+      "ilgis_m": 4.5
+    },
+    {
+      "ilgis_m": 2.0
+    },
+    {
+      "ilgis_m": 1.5
+    },
+    {
+      "ilgis_m": 2.7
+    }
+  ],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 515.5,
+    "kampai_m_total": 256.38,
+    "angokrasciu_gkp_m_total": 73.4,
+    "pasleptu_duru_staktu_m_total": 73.4,
+    "nisu_metrai_total": 21.4,
+    "gkp_lubu_m2_total": 172.64,
+    "gkp_lubu_virs_3m_m2_total": 0.0,
+    "pvc_grindys_m2_total": 115.39,
+    "plyteles_grindys_m2_total": 64.61,
+    "plyteles_sienos_m2_total": 97.4,
+    "isliginamasis_m2_total": 139.39,
+    "grindjuosciu_m_total": 127.2,
+    "hidroizoliacijos_vnt": 4
+  },
+  "pastabos": "Premium gyvenamasis namas Kaune (180 m² be garažo, 224 m² su garažu). Eksplikacija aiški (15 patalpų). GKP lubos su LED nišomis (mazgai A/B/C). Visos vidaus durys paslėptos H=2450mm. 4 šlapios zonos (vonios/wc/skalbykla) — plytelių sienos iki 2.0m. Virtuvė atvira su sala (backsplash zona). Garažas ir tambūras be apdailos darbų. Lubų aukštis priimtas 2.82m (standartinis).",
+  "_meta": {
+    "project": 1,
+    "pdf": "projektas_1_breziniai.pdf",
+    "elapsed_s": 93.0,
+    "pages_sent": 20,
+    "input_tokens": 76889,
+    "output_tokens": 6226,
+    "api_elapsed_s": 88.6,
+    "retry_count": 0,
+    "parse_repaired": false
+  }
+}
