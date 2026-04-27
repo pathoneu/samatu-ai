@@ -30,3 +30,10 @@ training-data/*/projektas_*_pasiulymas.pdf
 
 # Plan / experiment artifacts
 backend/scripts/baseline_output/*.json
+
+# Phase 12.3 — DB-backed projects
+backend/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

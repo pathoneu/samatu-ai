@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { logCorrection } from '@/lib/projectStore';
 
 const API = '';
 
@@ -90,27 +91,47 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
   };
 
   const updateToggle = (key, value) => {
+    const old = key in overrides ? overrides[key] : null;
     const next = { ...overrides, [key]: value };
     setOverrides(next);
     triggerRecompute(next, perRoomOverrides);
+    logCorrection(project.id, {
+      field_path: `rules_override.${key}`, old_value: old, new_value: value,
+      source: 'rules_override',
+    });
   };
 
   const updateNumeric = (key, value) => {
+    const old = key in overrides ? overrides[key] : null;
     const next = { ...overrides, [key]: value };
     setOverrides(next);
     triggerRecompute(next, perRoomOverrides);
+    logCorrection(project.id, {
+      field_path: `rules_override.${key}`, old_value: old, new_value: value,
+      source: 'rules_override',
+    });
   };
 
   const updatePerRoomTileFloor = (roomNr, tileFloor) => {
+    const old = perRoomOverrides[roomNr]?.tile_floor;
     const next = { ...perRoomOverrides, [roomNr]: { ...(perRoomOverrides[roomNr] || {}), tile_floor: tileFloor } };
     setPerRoomOverrides(next);
     triggerRecompute(overrides, next);
+    logCorrection(project.id, {
+      field_path: `per_room.${roomNr}.tile_floor`, old_value: old, new_value: tileFloor,
+      source: 'per_room_override', room_nr: roomNr,
+    });
   };
 
   const updatePerRoomPaint = (roomNr, paint) => {
+    const old = perRoomOverrides[roomNr]?.walls_paint;
     const next = { ...perRoomOverrides, [roomNr]: { ...(perRoomOverrides[roomNr] || {}), walls_paint: paint ? 1.0 : 0.0 } };
     setPerRoomOverrides(next);
     triggerRecompute(overrides, next);
+    logCorrection(project.id, {
+      field_path: `per_room.${roomNr}.walls_paint`, old_value: old, new_value: paint ? 1.0 : 0.0,
+      source: 'per_room_override', room_nr: roomNr,
+    });
   };
 
   const reset = () => {

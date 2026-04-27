@@ -180,6 +180,85 @@ async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
     )
     return {"status": "ok", "logged": True}
 
+
+# ── DB-backed projects (Phase 12.3) ──────────────────────────────────────────
+# Replaces frontend localStorage as durable source of truth.
+# Frontend keeps localStorage as offline cache (write-through).
+
+import db  # noqa: E402  — initializes schema on import
+
+
+class CorrectionPayload(BaseModel):
+    field_path: str
+    old_value: Any = None
+    new_value: Any = None
+    source: str = "inline_edit"
+    room_nr: str | None = None
+    note: str | None = None
+
+
+@app.get("/api/projects")
+async def api_list_projects():
+    """List all projects (summary; no full data blob)."""
+    return {"projects": db.list_projects()}
+
+
+@app.get("/api/projects/{project_id}")
+async def api_get_project(project_id: str):
+    p = db.get_project(project_id)
+    if not p:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    return p
+
+
+@app.put("/api/projects/{project_id}")
+async def api_upsert_project(project_id: str, payload: dict = Body(...)):
+    """Insert or full-replace project. Used by frontend on every state change
+    (write-through from localStorage). Returns canonical record."""
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty payload")
+    return db.upsert_project(project_id, payload)
+
+
+@app.delete("/api/projects/{project_id}")
+async def api_delete_project(project_id: str):
+    if not db.delete_project(project_id):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    return {"deleted": project_id}
+
+
+@app.post("/api/projects/{project_id}/corrections")
+async def api_log_correction(project_id: str, payload: CorrectionPayload):
+    """Record a user correction for future prompt-iteration analysis.
+    Does NOT update the project — just appends to audit log."""
+    db.log_correction(
+        project_id=project_id,
+        field_path=payload.field_path,
+        old_value=payload.old_value,
+        new_value=payload.new_value,
+        source=payload.source,
+        room_nr=payload.room_nr,
+        note=payload.note,
+    )
+    return {"status": "logged"}
+
+
+@app.get("/api/projects/{project_id}/corrections")
+async def api_list_corrections(project_id: str, limit: int = 500):
+    return {"corrections": db.list_corrections(project_id, limit=limit)}
+
+
+@app.get("/api/admin/corrections-summary")
+async def api_corrections_summary():
+    """Aggregated counts per field_path — input to manual prompt iteration.
+    Shows which fields users override most often → indicates Vision bias."""
+    return {"summary": db.corrections_summary()}
+
+
+@app.get("/api/projects/{project_id}/extractions")
+async def api_list_extractions(project_id: str):
+    return {"extractions": db.list_extractions(project_id)}
+
 client = anthropic.Anthropic(
     api_key=os.environ["ANTHROPIC_API_KEY"],
     max_retries=1,

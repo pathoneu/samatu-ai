@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import StatsBar from '@/components/dashboard/StatsBar';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import EmptyState from '@/components/dashboard/EmptyState';
-import { getProjects } from '@/lib/projectStore';
+import { getProjects, pullProjectsFromBackend } from '@/lib/projectStore';
+import { useQueryClient } from '@tanstack/react-query';
 import SetupWizard, { loadPrefs } from '@/components/project/SetupWizard';
 
 export default function Dashboard() {
@@ -16,6 +17,15 @@ export default function Dashboard() {
   // pamatys Dashboard ir spauskite "Nustatymai" mygtuką jei nori konfigūruoti.
   // Default reikšmes naudojam visiems naujiems vartotojams.
   const [showWizard, setShowWizard] = React.useState(false);
+  const queryClient = useQueryClient();
+
+  // On first mount, pull DB projects into localStorage (Phase 12.3).
+  // Handles: cross-device, localStorage cleared, edit-from-other-tab.
+  React.useEffect(() => {
+    pullProjectsFromBackend().then((merged) => {
+      if (merged) queryClient.invalidateQueries({ queryKey: ['projects'] });
+    });
+  }, [queryClient]);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
