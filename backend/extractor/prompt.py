@@ -11,8 +11,10 @@ from __future__ import annotations
 MODEL = "claude-opus-4-7"
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
-MAX_PAGES = 20
-IMG_MAX_DIM = 2000  # Opus 4.7 supports up to 2576; keep 2000 for batch cost balance
+MAX_PAGES = 80  # Opus 4.7 API max is 100 images/request; 80 leaves headroom.
+                # 65-page PDFs (P1) need full coverage — eksplikacija / sienų
+                # išklotinės / langų sąrašas may live on later pages. Cost ~$0.025/image.
+IMG_MAX_DIM = 2000  # Opus 4.7 auto-caps at 2000 when >20 images (no quality loss vs current).
 
 
 # =============================================================================
