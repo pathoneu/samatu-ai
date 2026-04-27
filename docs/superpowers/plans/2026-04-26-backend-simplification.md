@@ -1616,6 +1616,83 @@ Schedule offer: when this plan completes successfully, propose a `/schedule` fol
 
 ---
 
+---
+
+## Post-merge Amendments (2026-04-27)
+
+These items were not in the original plan but emerged during execution and post-merge user testing. Listed here so future readers see the FULL story, not just the original spec.
+
+### A1 — V8 baseline reframed: regression guard, not correctness oracle
+
+**Original plan framing:** "Naujas pipeline priimamas TIK jei jis išlaiko šitą gate'ą." V8 numbers were treated as "the bar."
+
+**User challenge (2026-04-27):** *"kas tas v8 baseline yra? kodel juo remiesi?"* — flagged that V8 itself was demonstrably broken (0 rooms on 3/5 projects, SIGABRT on 1).
+
+**Refined position:**
+- V8 baseline = **anti-regression safety net**, NOT correctness ground truth.
+- V8 was the only deterministic, automated baseline available. "Matches V8" only proves "no regression vs the previous production code." It does NOT prove correctness.
+- True correctness sources (now used as the actual gauge):
+  1. Brėžinio matematinis turinys — Vision reads mm dimensions from drawings
+  2. NRM2 §29 + STR formulas — industry standard, not contractor fork
+  3. STR 2.02.09 sanity ranges — flags anomalies
+  4. Per-room `calculation_trace` — every value visibly derived
+- New pipeline strictly improves on V8 (P2: 0→8 rooms; P4: crash→3 rooms) — that's an **objective** improvement independent of V8 reference.
+- Going forward, accuracy validation should compare against (1) drawing dimensions directly, (2) STR sanity ranges, (3) rangovo pasiulymai as reference for what positions LT contractors typically include — NOT V8 numbers as gate.
+
+### A2 — MAX_PAGES bumped 20 → 80 → 100 (API hard max)
+
+**User challenge (2026-04-27):** *"jei rangovas ikels 50k vertes projekta, tai tikrai gales palaukti kelias minutes"* — pointed out that `MAX_PAGES=20` was missing 45/65 pages of P1 and 25/45 of P3.
+
+**Resolution:**
+- 80 → re-test on P1 (full 65 pages): kampai 296 → 385 m (+30%), dažymas +3%, +1 room on P3
+- Bumped to 100 (Anthropic API hard max for Opus 4.7) for absolute coverage on commercial projects
+- Cost impact: +$0.50–1 per large project. Acceptable per user direction (accuracy > latency for 50k+ € projects)
+- Beyond 20 images, Anthropic auto-caps at 2000px (which we already use) — no quality loss
+
+### A3 — Phase 6.6: V8-compat schema fields (`darbu_sarasas`, `v8_totals`, `v8_rooms`)
+
+**User testing (2026-04-27):** localhost test showed patalpos rendered but **darbų ir medžiagų sąrašas was empty**.
+
+**Root cause:** Frontend (ExportModal, ProjectMainView, WorkspacePanel) reads `project.darbu_sarasas`, `v8_totals`, `v8_rooms` (V8 schema). Our `/extract-interior` only emitted the new `pozicijos[]` schema. Frontend has fallback for `v8_rooms || patalpos` but NONE for `darbu_sarasas`.
+
+**Fix in `extractor/vision_call.py`:**
+- `_emit_v8_compat_fields()` step added after `_recompute_santrauka` and `apply_lt_sanity`
+- Maps `pozicijos[i]` → `darbu_sarasas[i]` with V8 field names (`mato_vnt`, `pavadinimas`, `eil_nr`, `skyrius_label`, `skyrius_enum`)
+- Mirrors `santrauka` keys to `v8_totals` (`dazymo_plotas_m2`, `kampai_m`, etc.)
+- Aliases `patalpos` to `v8_rooms`
+- Both schemas (canonical + V8-compat) now coexist in response — frontend works without changes
+
+### A4 — rangovo reference comment removed from prompt
+
+**User direction (2026-04-27):** prompt should be rangovo-agnostic. Original prompt had one comment referencing "rangovo P1 atskirai 68.28 m²" as example for "lubos virš 3m" being a separate position.
+
+**Replaced with abstract LT industry rationale:** "Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (LT industry konvencija: aukšto darbo režimas, papildomi pastoliai)."
+
+### A5 — Phase 6.7: dead V8 script cleanup
+
+**Problem flagged by Phase 5 implementer:** Three scripts in `backend/scripts/` referenced deleted V8 modules: `v8_stress_test.py`, `v8_stress_test_v2.py`, `run_v8_baseline.py`.
+
+**Resolution:**
+- Extracted shared `find_breziniai_pdf` helper to `backend/scripts/_pdf_helper.py`
+- Updated `baseline_vision.py` and `compare_to_extractor.py` imports
+- Deleted all three V8 scripts (data preserved in `V8_PN.json` artifacts; source recoverable via `git show pre-simplification:...`)
+
+### A6 — Phase 6.5.2: determinism stress test
+
+User confirmed completion ("gali tęsti dabar iki kol bus completed"). Created `backend/scripts/determinism_test.py` — runs `extract_interior` 3× per project (P2 + P3) and computes coefficient of variation per metric. Threshold: CV >10% flags metrics where averaging/voting may help in production.
+
+Results: see `backend/scripts/baseline_output/DETERMINISM_REVIEW.md` (auto-generated).
+
+### Future work (not in this PR)
+
+- **6.5.1 Edge-case PDFs** — synthetic test inputs needed (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated, low-DPI). Crafting these is a separate effort.
+- **6.5.3 Adversarial PDFs** — security-restricted PDFs, ambiguous dimensions, eksplikacija on later pages.
+- **v8_pages page-classifier sidebar** — UI fallback handles its absence; reintroducing would need a lightweight Vision classification call. Nice-to-have.
+- **Kampai personalization** — per-contractor offsets (rangovas counts more outer corners; other contractors differ). Requires a contractor-prefs system.
+- **togal.ai UX iteration** — separate plan, post-accuracy.
+
+---
+
 ## Self-Review Notes
 
 **Spec coverage:**
