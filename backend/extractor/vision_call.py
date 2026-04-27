@@ -507,6 +507,42 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
     except Exception as exc:
         print(f"[extractor] lt_sanity failed: {exc}")
 
+    # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
+    # SanityWarningsBanner.jsx expects this V8 shape; new extractor uses flat
+    # `_lt_warnings`. Normalize level WARN → WARNING to match UI's level enum.
+    try:
+        flat_warnings = parsed.get("_lt_warnings") or []
+        ui_warnings = []
+        for w in flat_warnings:
+            level = w.get("level", "INFO")
+            if level == "WARN":
+                level = "WARNING"
+            ui_warnings.append({
+                "level": level,
+                "room": w.get("patalpa_nr") or w.get("room") or "",
+                "field": w.get("field", ""),
+                "value": w.get("value"),
+                "expected": w.get("expected"),
+                "message": w.get("message", ""),
+            })
+        rooms_total = parsed.get("patalpos") or []
+        n_err = sum(1 for w in ui_warnings if w["level"] == "ERROR")
+        n_warn = sum(1 for w in ui_warnings if w["level"] == "WARNING")
+        n_info = sum(1 for w in ui_warnings if w["level"] == "INFO")
+        parsed["lt_sanity"] = {
+            "warnings": ui_warnings,
+            "summary": {
+                "rooms_count": len(rooms_total),
+                "total_area_m2": round(parsed.get("bendras_plotas_m2", 0), 1),
+                "warnings_count": n_err + n_warn,
+                "errors": n_err,
+                "warnings": n_warn,
+                "info": n_info,
+            },
+        }
+    except Exception as exc:
+        print(f"[extractor] lt_sanity mirror emit failed: {exc}")
+
     # Step 4.5: Determinism warning — if no eksplikacija text was found, Vision
     # had to infer rooms from drawing dimensions alone, which has high run-to-run
     # variance per Phase 6.5.2 measurement (P2 sample: rooms CV 22.9%, plytelės CV

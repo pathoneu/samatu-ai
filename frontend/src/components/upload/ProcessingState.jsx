@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileSearch, Brain, Table2, CheckCircle2 } from 'lucide-react';
+import { FileSearch, Brain, Search, CheckCircle2 } from 'lucide-react';
 
+// Steps mapped to elapsed seconds (two-pass pipeline real timing).
+// Last step is "still working" — never auto-completes; parent unmounts when done.
 const steps = [
-  { icon: FileSearch, label: 'Skaitome PDF...', duration: 2000 },
-  { icon: Brain, label: 'AI analizuoja...', duration: 3000 },
-  { icon: Table2, label: 'Struktūrizuojame duomenis...', duration: 2000 },
-  { icon: CheckCircle2, label: 'Paruošta!', duration: 1000 },
+  { icon: FileSearch, label: 'Skaitome PDF...',                 minSec: 0 },
+  { icon: Brain,      label: 'Pass 1: AI analizuoja brėžinį...', minSec: 15 },
+  { icon: Search,     label: 'Pass 2: prizoominta kambarius...', minSec: 90 },
+  { icon: CheckCircle2, label: 'Sudedame rezultatus...',         minSec: 300 },
 ];
 
-export default function ProcessingState({ onComplete }) {
-  const [currentStep, setCurrentStep] = useState(0);
+
+export default function ProcessingState() {
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (currentStep < steps.length - 1) {
-      const timer = setTimeout(() => {
-        setCurrentStep(prev => prev + 1);
-      }, steps[currentStep].duration);
-      return () => clearTimeout(timer);
-    } else {
-      const timer = setTimeout(() => {
-        onComplete?.();
-      }, 1000);
-      return () => clearTimeout(timer);
+    const start = Date.now();
+    const t = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Find latest step the elapsed time has passed
+  let currentStep = 0;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (elapsed >= steps[i].minSec) {
+      currentStep = i;
+      break;
     }
-  }, [currentStep, onComplete]);
+  }
 
   return (
     <div className="flex flex-col items-center justify-center py-16">
@@ -40,7 +46,7 @@ export default function ProcessingState({ onComplete }) {
                 exit={{ opacity: 0, scale: 0.5 }}
                 transition={{ duration: 0.3 }}
               >
-                <Icon className={`w-10 h-10 ${i === steps.length - 1 ? 'text-primary' : 'text-primary animate-pulse'}`} />
+                <Icon className="w-10 h-10 text-primary animate-pulse" />
               </motion.div>
             ) : null;
           })}
@@ -64,7 +70,7 @@ export default function ProcessingState({ onComplete }) {
               {i < currentStep ? '✓' : i + 1}
             </div>
             <span className={`text-sm ${
-              i === currentStep ? 'text-foreground font-medium' : 
+              i === currentStep ? 'text-foreground font-medium' :
               i < currentStep ? 'text-primary' : 'text-muted-foreground'
             }`}>
               {step.label}

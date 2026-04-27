@@ -137,20 +137,21 @@ export default function NewProject() {
     setAbortController(controller);
 
     try {
-      // Realus laikas: 30-90s tipiškam PDF, iki 4 min sudėtingiems su simbolių detekcija
-      const timeoutId = setTimeout(() => controller.abort(), 240_000);
+      // Realus laikas: 30-90s mažiems PDF, iki 8-10 min dideliems projektams
+      // su two-pass zoom (P1 65 psl. + 15 zoom call'ų ≈ 8 min worst case).
+      const timeoutId = setTimeout(() => controller.abort(), 600_000);
       let json, res, projType;
 
-      // Progresyvūs status update'ai per laiką
+      // Progresyvūs status update'ai per laiką (two-pass pipeline ~3-8min)
       const elapsed = Date.now();
       const statusTimer = setInterval(() => {
         const sec = Math.floor((Date.now() - elapsed) / 1000);
-        if (sec < 15) setStatus(`AI analizuoja brėžinį... (${sec}s)`);
-        else if (sec < 45) setStatus(`AI matuoja patalpas... (${sec}s)`);
-        else if (sec < 90) setStatus(`AI skaičiuoja kiekius... (${sec}s — vidutinis laikas)`);
-        else if (sec < 150) setStatus(`AI ieško simbolių brėžiniuose... (${sec}s)`);
-        else if (sec < 210) setStatus(`Sudėtingas projektas, palaukite... (${sec}s)`);
-        else setStatus(`Trunka ilgai (${sec}s). Galite atšaukti ir bandyti dar kartą.`);
+        if (sec < 15) setStatus(`Konvertuoja PDF į vaizdus... (${sec}s)`);
+        else if (sec < 60) setStatus(`Pass 1: AI analizuoja brėžinį, ieško patalpų... (${sec}s)`);
+        else if (sec < 120) setStatus(`Pass 1: AI matuoja sienas, identifikuoja angas... (${sec}s)`);
+        else if (sec < 240) setStatus(`Pass 2: AI prizoominta kambarius, tikslina mm matmenis... (${sec}s)`);
+        else if (sec < 420) setStatus(`Pass 2: AI baigia tikslinti per kambarius... (${sec}s)`);
+        else setStatus(`Sudėtingas projektas (${sec}s). Galite atšaukti ir bandyti su mažesniu PDF.`);
       }, 1000);
 
       try {
@@ -170,6 +171,10 @@ export default function NewProject() {
           ? json.detail.map(d => d.msg).join(', ')
           : json?.detail || `Serverio klaida (${res.status})`;
         throw new Error(msg);
+      }
+      // Catch backend pipeline errors that return 200 with status="error"
+      if (json?.status === 'error' || json?._error) {
+        throw new Error(json._error || json.error || 'Pipeline klaida (nežinoma priežastis)');
       }
       if (json.error) throw new Error(json.error);
 
@@ -231,7 +236,17 @@ export default function NewProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate(`/project/${project.id}`);
     } catch (e) {
-      setError(`${e.message}\n\nStack: ${e.stack}`);
+      // User-friendly error mapping. Stack only kept in console for debugging.
+      console.error('Upload pipeline failed:', e);
+      let userMessage;
+      if (e.name === 'AbortError') {
+        userMessage = 'Užklausa atšaukta arba laiko limitas. Bandykite mažesnį PDF arba pakartokite.';
+      } else if (/network|fetch/i.test(e.message)) {
+        userMessage = 'Nepavyksta pasiekti serverio. Patikrinkite ryšį.';
+      } else {
+        userMessage = e.message || 'Nežinoma klaida';
+      }
+      setError(userMessage);
       setIsProcessing(false);
       setStatus('');
     }

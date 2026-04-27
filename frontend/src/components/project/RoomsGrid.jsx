@@ -47,8 +47,12 @@ function calcRoomQuantities(room) {
   }
 
   const wallsGross = perim * H;
-  const doorsTotal = 1 * 1.85;       // default 1 durys
-  const windowsTotal = 1 * 1.40;     // default 1 langas
+  // LT STR defaults — must stay in sync with backend extractor/universal_rules.py
+  // (UNIVERSAL_RULES dict). NRM2 §29: only deduct openings ≥ 1.0 m².
+  const DEFAULT_DOOR_M2 = 1.85;     // 0.9 × 2.05 m (LT STR 2.02.09)
+  const DEFAULT_WINDOW_M2 = 1.80;   // 1.2 × 1.5 m (LT STR standard)
+  const doorsTotal = 1 * DEFAULT_DOOR_M2;
+  const windowsTotal = 1 * DEFAULT_WINDOW_M2;
   const tileWallsArea = perim * rules.tile_walls_to_m;
   const wallsNet = Math.max(0, wallsGross - doorsTotal - windowsTotal - tileWallsArea);
   const wallsPaintable = wallsNet * rules.walls_paint;
@@ -58,7 +62,10 @@ function calcRoomQuantities(room) {
   const kampai = rules.walls_paint > 0 ? perim + 4 * H : 0;
   const plytSienos = tileWallsArea;
   const plytGrindys = rules.tile_floor ? plotas : 0;
-  const grindjuostes = !rules.tile_floor && rules.walls_paint > 0 ? Math.max(0, perim - 0.85) : 0;
+  // NRM2 §27: baseboard = (perimetras − Σ door widths) × 1.10 (10% waste)
+  const grindjuostes = !rules.tile_floor && rules.walls_paint > 0
+    ? Math.max(0, perim - 0.85) * 1.10
+    : 0;
 
   return {
     ...room,
