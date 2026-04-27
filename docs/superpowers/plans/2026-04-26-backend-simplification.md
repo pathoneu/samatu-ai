@@ -1683,6 +1683,36 @@ User confirmed completion ("gali tęsti dabar iki kol bus completed"). Created `
 
 Results: see `backend/scripts/baseline_output/DETERMINISM_REVIEW.md` (auto-generated).
 
+### A7 — Phase 8: Two-pass zoom-in for high-accuracy dimension reading
+
+**User direction (2026-04-27):** *"jeigu projektas be eksplikacijos, bet mums vis tiek reikia tikslumo, ar gali tada padaryti, kad realiai nuskaityti sutartinius ženklus, prizoominus projektu kur reikia ir vis tiek skaičiuotų... go best path even if expensive and slow."*
+
+**Architectural addition** (always-on, best-effort):
+- Pass 1 returns rooms with `bbox_pct: {x, y, w, h}` per room (room location on page as 0.0-1.0 fractions)
+- Pass 2 (per room): crop the page region at 300 DPI / 2576px (Opus 4.7 absolute max), send to Vision with room context + ZOOM_SYSTEM_TEXT prompt asking for refined mm dimensions
+- Apply refinements only when Vision returns `from_zoom` source + confidence ≥ medium; log audit trail in `_zoom_changes[]`
+- Recompute santrauka AFTER zoom so totals reflect refined values
+
+**Validated on P2 (no eksplikacija — worst case):**
+
+| Metric | Pre-zoom CV | Post-zoom CV | Improvement |
+|--------|-------------|--------------|-------------|
+| Rooms count | 22.9% | 7.9% | 3× better ✅ |
+| Bendras plotas | 1.8% | 1.8% | = (already stable) |
+| Dažymas | 12.0% | 2.1% | 6× better ✅ |
+| Kampai | 15.8% | 17.2% | ≈ same |
+| Plytelės sienos | 153.8% | 79.3% | 2× better (still high) |
+
+Rooms count and dažymas now reliable on single run. Plytelės still benefit from sienų išklotinės pages (zoom on floor plan only catches partial info).
+
+**Full-set validation** (P1 P3 P4 P5 with zoom): no regressions, all status=ok. P1 dažymas adjusted up (zoom found additional wall area not seen in overview). P1 plytelės adjusted down (zoom more conservative on tile vs paint zone classification).
+
+**Cost / latency impact:**
+- Small project: $0.40 → $1.00, 90s → 180s
+- Large project: $1.30 → $2.10, 225s → 460s
+
+Zoom adds ~$0.05 per room and ~6-10s per room (cached system prompt minimizes overhead).
+
 ### Future work (not in this PR)
 
 - **6.5.1 Edge-case PDFs** — synthetic test inputs needed (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated, low-DPI). Crafting these is a separate effort.

@@ -44,19 +44,36 @@ backend/
 | `POST /pdf-lines` | PDF vector linijų ekstrakcija |
 | `POST /generate-{excel,pdf}`, `/export/*` | Eksportas |
 
-## Pipeline (interior — naujas)
+## Pipeline (interior — naujas, two-pass)
 
 `extractor.extract_interior(pdf_bytes, rules_override=None)` flow:
 
+### Pass 1 — Overview
 1. **PDF → up to 100 pages JPEG** @ 200 DPI, max dim 2000px (Anthropic API hard max)
 2. **Page-labeled content build** — interleaved `Page N of M:` text + image (image-first ordering per Anthropic Vision docs)
 3. **Vision call** — `claude-opus-4-7`, streaming, `output_config={"effort": "high"}`, system prompt cached (`cache_control: ephemeral`)
-4. **JSON parse** with `_repair_json` fallback (key quoting, trailing commas)
-5. **Recompute santrauka** via `calc_totals` (single source of truth — overrides any Vision arithmetic errors)
-6. **Apply lt_sanity** — adds `_lt_warnings` per STR 2.02.09 ranges; does NOT mutate values
-7. **Emit V8-compat fields** — `darbu_sarasas[]`, `v8_totals`, `v8_rooms` (frontend backwards compatibility)
-8. **Attach `_overrides`** if user provided Setup Wizard prefs
-9. Return with `status: "ok"`, `_meta` (tokens, elapsed, cache hits)
+4. **JSON parse** with `_repair_json` fallback. Per room returns: nr, pavadinimas, paskirtis, plotas, perimetras, lubu_aukstis, dazymo_plotas, kampai, etc. + **`bbox_pct` + `puslapio_nr`** (used by pass 2).
+
+### Pass 2 — Zoom-in per-room (high accuracy)
+5. **Per room with bbox_pct**: crop the page region at **300 DPI / max_dim=2576px** (Opus 4.7 absolute max) with 5% padding
+6. **Zoom Vision call** — sends cropped image + room context, asks for refined mm dimensions (perimetras, plotas, openings, ceiling, tile height, niche meters) with `from_zoom`/`inferred`/`unchanged` source tags
+7. **Apply refinements**: when zoom returns `from_zoom` source + confidence ≥ medium → update room values, log audit trail in `_zoom_changes[]`
+8. Skipped automatically if Vision returns no rooms or rooms without bbox_pct
+
+### Post-processing
+9. **Recompute santrauka** via `calc_totals` AFTER zoom (totals reflect refined per-room dims)
+10. **Apply lt_sanity** — adds `_lt_warnings` per STR 2.02.09 ranges; does NOT mutate values
+11. **Determinism warning** — if no eksplikacija text, INFO warn "rezultatai gali svyruoti"
+12. **Emit V8-compat fields** — `darbu_sarasas[]`, `v8_totals`, `v8_rooms` (frontend compat)
+13. **Attach `_overrides`** if user provided Setup Wizard prefs
+14. Return with `status: "ok"`, `_meta` (tokens, elapsed, cache hits, zoom_attempted, zoom_applied, zoom_elapsed_s)
+
+### Cost / latency
+- Small project (3 pages, 6 rooms): ~$1.00, ~180s (was ~$0.40, ~90s pre-zoom)
+- Medium project (45 pages, 20 rooms): ~$2.00, ~500s (was ~$1.20, ~240s)
+- Large project (65 pages, 15 rooms): ~$2.10, ~460s (was ~$1.30, ~225s)
+
+User decision (2026-04-27): accuracy > latency for serious projects. 50k+ € jobs justify multi-minute waits.
 
 ## Schema (output)
 
