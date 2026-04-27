@@ -67,6 +67,85 @@ def _repair_json(text: str) -> str:
     return text
 
 
+_VNT_NORMALIZE = {
+    "m2": "m²",
+    "m²": "m²",
+    "m": "m",
+    "b/m": "m",     # b/m = bėginis metras (linear), normalize to m for UI
+    "vnt": "vnt",
+    "kg": "kg",
+    "l": "l",
+    "kompl": "kompl",
+}
+
+_SKYRIUS_ENUM = {
+    "GKP montavimas": "gkp",
+    "Glaistymas dazymas": "paint",
+    "Plyteles": "tile",
+    "Hidroizoliacija": "waterproof",
+    "Pridetiniai elementai": "extras",
+    "Out of scope": "out_of_scope",
+}
+
+
+def _emit_v8_compat_fields(parsed: dict) -> dict:
+    """Backwards-compat: emit V8-shape `darbu_sarasas`, `v8_totals`, `v8_rooms`.
+
+    Frontend (ExportModal.jsx, ProjectMainView.jsx, WorkspacePanel.jsx) reads
+    these fields. Without them, the kiekių žiniaraštis tab and Excel/PDF
+    export show no works/materials. New `pozicijos[]` schema is preserved
+    alongside.
+    """
+    pozicijos = parsed.get("pozicijos") or []
+    darbu_sarasas = []
+    for i, p in enumerate(pozicijos, start=1):
+        skyrius = p.get("skyrius", "Pridetiniai elementai")
+        vnt_raw = p.get("vnt", "vnt")
+        vnt = _VNT_NORMALIZE.get(vnt_raw, vnt_raw)
+        aprasymas = p.get("aprasymas", "")
+        # Append `pastaba` to aprasymas if present (e.g. tile size detail)
+        pastaba = p.get("pastaba")
+        if pastaba:
+            aprasymas = f"{aprasymas} ({pastaba})"
+        darbu_sarasas.append({
+            "eil_nr": i,
+            "skyrius": skyrius,
+            "skyrius_label": skyrius,
+            "skyrius_enum": _SKYRIUS_ENUM.get(skyrius, "extras"),
+            "aprasymas": aprasymas,
+            "pavadinimas": aprasymas,
+            "mato_vnt": vnt,
+            "vnt": vnt,
+            "kiekis": p.get("kiekis", 0),
+            "saltinis": p.get("saltinis", ""),
+        })
+    parsed["darbu_sarasas"] = darbu_sarasas
+
+    # v8_totals — mirrored santrauka with V8 key names
+    s = parsed.get("santrauka") or {}
+    parsed["v8_totals"] = {
+        "bendras_plotas_m2": parsed.get("bendras_plotas_m2", 0),
+        "dazymo_plotas_m2": s.get("dazymo_plotas_total_m2", 0),
+        "kampai_m": s.get("kampai_m_total", 0),
+        "angokrasciu_gkp_m": s.get("angokrasciu_gkp_m_total", 0),
+        "pasleptu_duru_staktu_m": s.get("pasleptu_duru_staktu_m_total", 0),
+        "nisu_metrai": s.get("nisu_metrai_total", 0),
+        "gkp_lubu_standart_m2": s.get("gkp_lubu_m2_total", 0),
+        "gkp_lubu_virs_3m_m2": s.get("gkp_lubu_virs_3m_m2_total", 0),
+        "pvc_grindys_m2": s.get("pvc_grindys_m2_total", 0),
+        "plyteles_grindys_m2": s.get("plyteles_grindys_m2_total", 0),
+        "plyteles_sienos_m2": s.get("plyteles_sienos_m2_total", 0),
+        "isliginamasis_m2": s.get("isliginamasis_m2_total", 0),
+        "grindjuosciu_m": s.get("grindjuosciu_m_total", 0),
+        "hidroizoliacijos_vnt": s.get("hidroizoliacijos_vnt", 0),
+    }
+
+    # v8_rooms — mirror patalpos with V8-friendly aliases (frontend has fallback)
+    parsed["v8_rooms"] = parsed.get("patalpos", [])
+
+    return parsed
+
+
 def _recompute_santrauka(parsed: dict) -> dict:
     """Recompute santrauka from per-room values via calc_totals (single source of truth).
 
@@ -249,11 +328,20 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
     except Exception as exc:
         print(f"[extractor] lt_sanity failed: {exc}")
 
-    # Step 5: Attach rules_override for downstream UI use
+    # Step 5: Frontend backwards-compat — emit V8-shape fields alongside new schema.
+    # Frontend (ExportModal, ProjectMainView, WorkspacePanel) reads `darbu_sarasas`,
+    # `v8_totals`, `v8_rooms`. Without these, the works/materials list and Excel/PDF
+    # export are empty even though `pozicijos[]` is populated.
+    try:
+        parsed = _emit_v8_compat_fields(parsed)
+    except Exception as exc:
+        print(f"[extractor] v8_compat emit failed: {exc}")
+
+    # Step 6: Attach rules_override for downstream UI use
     if rules_override is not None:
         parsed["_overrides"] = rules_override
 
-    # Step 6: Finalize
+    # Step 7: Finalize
     elapsed = round(time.time() - t0, 1)
     if "_meta" in parsed:
         parsed["_meta"]["elapsed_s"] = elapsed
