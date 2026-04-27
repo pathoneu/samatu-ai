@@ -284,6 +284,14 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 <strong className="text-foreground tabular-nums">{fmt(totalArea)} m²</strong>
                 <span className="text-muted-foreground">Pozicijų:</span>
                 <strong className="text-foreground tabular-nums">{totals.count}</strong>
+                {project.archetipas && (
+                  <>
+                    <span className="text-muted-foreground">Tipas:</span>
+                    <strong className="text-foreground capitalize">
+                      {project.archetipas.replace(/_/g, ' ')}
+                    </strong>
+                  </>
+                )}
               </div>
             </div>
 

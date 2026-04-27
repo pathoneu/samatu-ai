@@ -9,6 +9,28 @@ import { toast } from 'sonner';
 
 const API = '';
 
+// Collect human-readable warnings from new + legacy schema sources.
+// Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
+// AND pipeline warnings[] (e.g. eksplikacija-missing INFO). Legacy
+// project.perspejimani is also passed through if present.
+function collectWarnings(project) {
+  const out = [];
+  const sanity = project.lt_sanity?.warnings || [];
+  for (const w of sanity) {
+    out.push({
+      level: w.level || 'INFO',
+      room: w.room || '',
+      message: w.message || '',
+    });
+  }
+  if (Array.isArray(project.perspejimani)) {
+    for (const w of project.perspejimani) {
+      out.push(typeof w === 'string' ? { level: 'INFO', message: w } : w);
+    }
+  }
+  return out;
+}
+
 function buildPayload(project) {
   // V8 darbu_sarasas — primary source
   if (Array.isArray(project.darbu_sarasas) && project.darbu_sarasas.length > 0) {
@@ -28,6 +50,8 @@ function buildPayload(project) {
         })),
       patalpos: project.v8_rooms || project.patalpos || [],
       tipas: project.tipas || project.type || 'kz',
+      perspejimani: collectWarnings(project),
+      archetipas: project.archetipas || '',
     };
   }
   // Fallback (KŽ projektai)
