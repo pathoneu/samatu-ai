@@ -1,35 +1,55 @@
 {
   "archetipas": "standart",
-  "bendras_plotas_m2": 0.0,
+  "bendras_plotas_m2": 0,
+  "scale_source_page": null,
+  "eksplikacija_source_page": null,
   "patalpos": [],
-  "durys": [],
-  "langai": [],
-  "nisos": [],
+  "durys_total": [],
+  "langai_total": [],
   "santrauka": {
-    "dazymo_plotas_total_m2": 0.0,
-    "kampai_m_total": 0.0,
-    "angokrasciu_gkp_m_total": 0.0,
-    "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 0.0,
-    "gkp_lubu_m2_total": 0.0,
-    "gkp_lubu_virs_3m_m2_total": 0.0,
-    "pvc_grindys_m2_total": 0.0,
-    "plyteles_grindys_m2_total": 0.0,
-    "plyteles_sienos_m2_total": 0.0,
-    "isliginamasis_m2_total": 0.0,
-    "grindjuosciu_m_total": 0.0,
+    "dazymo_plotas_total_m2": 0,
+    "kampai_m_total": 0,
+    "angokrasciu_gkp_m_total": 0,
+    "pasleptu_duru_staktu_m_total": 0,
+    "nisu_metrai_total": 0,
+    "gkp_lubu_m2_total": 0,
+    "gkp_lubu_virs_3m_m2_total": 0,
+    "pvc_grindys_m2_total": 0,
+    "plyteles_grindys_m2_total": 0,
+    "plyteles_sienos_m2_total": 0,
+    "isliginamasis_m2_total": 0,
+    "grindjuosciu_m_total": 0,
     "hidroizoliacijos_vnt": 0
   },
-  "pastabos": "Pateikti dokumentai NĖRA statybos/architektūriniai brėžiniai. Tai INSIGHT magnetinio LED bėgelio (užglaistomo montavimo) gamintojo montavimo instrukcija (6 puslapiai): montavimo žingsniai į viengubą/dvigubą gipsą, maitinimo schemos (vidiniai/išoriniai šaltiniai), dimeriavimo (DALI/PUSH-DIM) schemos. Nėra patalpų eksplikacijos, planų, pjūvių, sienų matmenų, durų/langų ar kitų duomenų, reikalingų vidaus apdailos sąmatos pozicijoms apskaičiuoti. Reikalingi architektūriniai brėžiniai (planas su matmenimis, eksplikacija, sienų išklotinės).",
+  "pozicijos": [],
+  "pastabos": "Pateikti dokumentai NĖRA architektūriniai brėžiniai. Tai INSIGHT magnetinio LED bėgelio (track lighting) gamintojo techninė montavimo instrukcija (7 psl.): užglaistomo profilio montavimas į vienigubą/dvigubą gipsą, maitinimo schemos (išoriniai/vidiniai šaltiniai), dimeriavimas (DALI, PUSH-DIM). Dokumente NĖRA: patalpų planų, eksplikacijos, sienų matmenų, langų/durų pozicijų, pjūvių, sienų išklotinių. Dokumentas naudingas tik kaip nuoroda apie LED nišų konstrukciją (38mm tarpas tarp profilių, užglaistymas), bet kiekių žiniaraštis iš jo neištraukiamas - nėra projekto duomenų.",
+  "warnings": [
+    {
+      "level": "ERROR",
+      "message": "Pateiktas dokumentas yra LED bėgelio (INSIGHT magnetic track) gamintojo montavimo instrukcija, o ne architektūrinis projektas. Negalima ištraukti patalpų, plotų ar kiekių - šių duomenų dokumente nėra."
+    },
+    {
+      "level": "INFO",
+      "message": "Dokumente pateikiama techninė informacija apie LED nišų formavimą GKP lubose: 38mm tarpas tarp statybinių profilių, vienigubo/dvigubo gipso variantai, užglaistomas montavimas. Tai gali būti naudinga apskaičiuojant LED nišų darbo specifiką, bet ne kiekius."
+    },
+    {
+      "level": "INFO",
+      "message": "Maksimalus vienos LED grandinės ilgis - 20m; max 480W ant vieno užmaitinimo (techninis apribojimas iš psl. 5)."
+    },
+    {
+      "level": "WARN",
+      "message": "Pipeline'ui reikalingi architektūriniai brėžiniai: planai su matmenimis, eksplikacija, pjūviai, sienų išklotinės, lubų planai. Prašome pateikti projekto AP/SP/INT lapus."
+    }
+  ],
   "_meta": {
-    "project": 5,
-    "pdf": "projektas_5(8)_breziniai.pdf",
-    "elapsed_s": 28.0,
-    "pages_sent": 7,
-    "input_tokens": 29114,
-    "output_tokens": 661,
-    "api_elapsed_s": 27.7,
-    "retry_count": 0,
-    "parse_repaired": false
+    "input_tokens": 25891,
+    "output_tokens": 1048,
+    "cache_read_tokens": 10637,
+    "cache_write_tokens": 0,
+    "stop_reason": "end_turn",
+    "attempt": 1,
+    "elapsed_s": 34.6,
+    "pdf_name": "projektas_5(8)_breziniai.pdf",
+    "pages_sent": 7
   }
 }

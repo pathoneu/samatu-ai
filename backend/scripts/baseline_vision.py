@@ -54,7 +54,7 @@ if env_file.exists():
         pass
 
 MODEL = "claude-opus-4-7"
-MAX_OUTPUT_TOKENS = 16384  # Opus 4.7 max is 32k; 16k comfortable for ~25-room project with rich schema
+MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects (~20+ rooms with full pozicijos) need it
 DPI = 200
 MAX_PAGES = 20
 IMG_MAX_DIM = 2000  # Opus 4.7 supports up to 2576; keep 2000 for batch cost balance
@@ -833,13 +833,15 @@ def call_vision(pages: list[dict]) -> dict:
     last_err: Exception | None = None
     for attempt in range(3):
         try:
-            resp = client.messages.create(
+            # Use streaming for >10min potential timeouts (32k max_tokens needs it).
+            with client.messages.stream(
                 model=MODEL,
                 max_tokens=MAX_OUTPUT_TOKENS,
                 system=system,
                 messages=[{"role": "user", "content": build_user_content(pages)}],
                 output_config={"effort": "high"},
-            )
+            ) as stream:
+                resp = stream.get_final_message()
             if resp.stop_reason == "refusal":
                 return {"_error": "model_refused", "_stop_reason": "refusal"}
             if resp.stop_reason == "max_tokens":
