@@ -54,6 +54,15 @@ This document is the result of an Explore-subagent UI audit + manual stress test
 **Mitigation:** `lt_sanity.warnings` includes "no eksplikacija" INFO when relevant — banner alerts user. They can manually adjust per-room `plyteles_sienos_aukstis_m`.
 **Future fix:** When išklotinės are detected on later pages, give them special treatment in prompt.
 
+### Limitation 7: Plytelės grindys classifier ambiguity in non-wet rooms
+**Severity:** MED. **Impact:** P1 plytelės_grindys CV 32% across 3 zoom runs (40-80 m² range).
+**Root cause:** Vision deterministically classifies bathroom/WC/skalbykla as tile floors, but flips on:
+- Koridoriai / hallway floors (sometimes interpreted as tile, sometimes parquet)
+- Open-plan kitchen tile zones (partial tile area within larger gyvenamoji room)
+This is a CLASSIFICATION ambiguity (not measurement) — even high-res zoom on the floor plan doesn't fully resolve it without `grindų planas` (separate floor finish drawing) or `apdailos lentelė` (finish schedule) showing finish codes per room.
+**Mitigation in production:** User can edit per-room values inline via RoomCard. The aggregate works/materials list will reflect their override.
+**Future fix:** Reactivate AssumptionsPanel (Limitation 1 above) so user sets default per-paskirtis tile/parquet preferences AND triggers backend re-extract with rules_override. This is the highest-impact UX improvement post-launch.
+
 ---
 
 ## 🚫 Untested scenarios (cannot resolve without sample data)
