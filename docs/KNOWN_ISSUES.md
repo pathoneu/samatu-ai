@@ -2,7 +2,10 @@
 
 **Last updated:** 2026-04-27
 **Status:** Pre-production refactor complete + Phase 9 production-readiness fixes landed.
-**Honest production-readiness:** ~92% (was ~85% before Phase 10; up from 60% before Phase 9; up from 30% before refactor).
+**Honest production-readiness for AI extraction:** ~93% (Phase 10 + cleanup + Phase 11 safety/observability).
+**Honest production-readiness for full app (auth, design polish, multi-tenancy, browser cross-test):** ~70% — significant gaps remain.
+
+User audit (2026-04-27) flagged: dizainas, togal.ai UX, brėžinio žiūrėjimas, debugging, safety features. Phase 11 addressed safety + debugging + browser PDF overlay verification. Design polish + togal-style UX remain for separate plan.
 
 This document is the result of an Explore-subagent UI audit + manual stress testing. It exists so the launch decision is made with full visibility into what works, what's been tested, and what's deferred.
 
@@ -40,7 +43,47 @@ RoomCard now has expandable details section showing zoom audit trail, calculatio
 
 ### Limitation 5: Dead V8 references in InteriorProject.jsx
 **Severity:** LOW (cosmetic). References to `project.v8_pages`, `project.raw_calc_data`, `project.page_classifications`. All nil-safe.
-**Future fix:** Cleanup pass.
+**Future fix:** Cleanup pass — most cleared in Phase 10 follow-up; one PageStructureCard block remains gated `{false && ...}`.
+
+---
+
+## Phase 11 — production safety + observability (2026-04-27)
+
+**Fixed:**
+- ✅ File size limits (50 MB max, 100 B min) — HTTP 413 / 400
+- ✅ File type validation (%PDF magic bytes check)
+- ✅ Filename sanity (path traversal rejection)
+- ✅ Rate limit (30 req/min per IP, 60s sliding window) — HTTP 429
+- ✅ Backend logger setup (replaced print statements)
+- ✅ Global FastAPI exception handler (no stack trace leak; ref-ID for support)
+- ✅ Frontend ErrorBoundary (catches render errors, shows friendly UI)
+- ✅ window.onerror + unhandledrejection global listeners
+- ✅ /api/log-error backend endpoint receives frontend errors → log
+- ✅ aiRooms PdfViewer prop defensive fallback (`v8_rooms || patalpos`)
+- ✅ _meta debug panel in ProjectMainView (cost/tokens/zoom transparency)
+
+## Phase 11 — STILL PENDING
+
+### Limitation 8: No authentication / multi-tenancy
+**Severity:** MED for public-facing deployment, LOW for in-house tool.
+**Status:** App is open. Anyone with URL can upload + extract.
+**Future fix:** Add Auth0 / Clerk / simple email+pw before public launch. Currently OK for soft-launch with known users.
+
+### Limitation 9: Project data only in localStorage
+**Severity:** MED. **Impact:** Projects lost if user clears browser data. No cross-device sync.
+**Future fix:** Backend `/api/projects` CRUD with database (SQLite or Postgres). LocalStorage as offline cache.
+
+### Limitation 10: No "re-extract" button on existing projects
+**Severity:** LOW. **Impact:** If user wants to redo extraction (eg. after upgrading prompt), they must delete + re-upload.
+**Future fix:** Add "Re-extract" button that re-uses the saved PDF (in IndexedDB) with current pipeline.
+
+### Limitation 11: No design polish / accessibility audit
+**Severity:** LOW for MVP, MED for public launch. **Impact:** UI is functional but not "designed." No keyboard nav audit, no ARIA labels review, no empty/loading state polish across all views.
+**Future fix:** Dedicated design pass (likely separate plan with togal.ai UX research).
+
+### Limitation 12: No browser cross-test
+**Severity:** MED. **Impact:** Pipeline + UI tested only via curl + Vite dev server. Chrome/Safari/Firefox compatibility not verified by automated test.
+**Future fix:** Manual smoke test by user before launch + Playwright/Cypress test in CI.
 
 ### Limitation 6: Plytelės sienos high variance without sienų išklotinės
 **Severity:** MED for projects without wall-development pages.
