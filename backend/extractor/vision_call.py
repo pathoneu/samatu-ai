@@ -19,7 +19,9 @@ from pdf2image import convert_from_bytes
 
 from .prompt import (
     SYSTEM_TEXT, build_user_content,
+    ZOOM_SYSTEM_TEXT, build_zoom_user_content,
     MODEL, MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
+    ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
 
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
@@ -51,6 +53,150 @@ def pdf_to_b64_images(pdf_bytes: bytes,
             "image_b64": base64.b64encode(buf.getvalue()).decode("ascii"),
         })
     return out
+
+
+def _crop_room_image(
+    pdf_bytes: bytes,
+    page_number: int,
+    bbox_pct: dict,
+    target_dpi: int = ZOOM_DPI,
+    max_dim: int = ZOOM_MAX_DIM,
+    padding: float = ZOOM_PADDING_PCT,
+) -> str | None:
+    """Crop a region of a PDF page at high DPI for zoom-in re-read.
+
+    Args:
+        pdf_bytes: full PDF
+        page_number: 1-indexed (matches Vision's puslapio_nr)
+        bbox_pct: {x, y, w, h} in 0.0-1.0 fractions
+        target_dpi: render DPI (300 = readable mm annotations)
+        max_dim: cap long edge after crop (Opus 4.7 max 2576)
+        padding: fractional padding around bbox (0.05 = 5%)
+    Returns: JPEG b64 string of the cropped region, or None if crop fails.
+    """
+    try:
+        # Render only the target page at high DPI
+        pages = convert_from_bytes(
+            pdf_bytes,
+            dpi=target_dpi,
+            fmt="jpeg",
+            first_page=page_number,
+            last_page=page_number,
+        )
+        if not pages:
+            return None
+        img = pages[0]
+        W, H = img.size
+
+        # Apply padding around bbox
+        x = max(0.0, bbox_pct.get("x", 0) - padding)
+        y = max(0.0, bbox_pct.get("y", 0) - padding)
+        w = min(1.0 - x, bbox_pct.get("w", 1.0) + 2 * padding)
+        h = min(1.0 - y, bbox_pct.get("h", 1.0) + 2 * padding)
+
+        x0 = int(W * x)
+        y0 = int(H * y)
+        x1 = int(W * (x + w))
+        y1 = int(H * (y + h))
+
+        # Sanity: ensure minimum crop size
+        if x1 - x0 < 50 or y1 - y0 < 50:
+            return None
+
+        crop = img.crop((x0, y0, x1, y1))
+        cw, ch = crop.size
+        scale = min(1.0, max_dim / max(cw, ch))
+        if scale < 1.0:
+            crop = crop.resize((int(cw * scale), int(ch * scale)))
+        buf = io.BytesIO()
+        crop.save(buf, format="JPEG", quality=90)
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as exc:
+        print(f"[extractor] crop_room_image failed (page={page_number}): {exc}")
+        return None
+
+
+def _vision_zoom_room(
+    client: anthropic.Anthropic,
+    cropped_b64: str,
+    room: dict,
+) -> dict | None:
+    """Pass-2 zoom Vision call for one room. Returns ZoomResult dict or None."""
+    system = [
+        {"type": "text", "text": ZOOM_SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
+    ]
+    try:
+        with client.messages.stream(
+            model=MODEL,
+            max_tokens=4096,  # zoom output is small per room
+            system=system,
+            messages=[{"role": "user", "content": build_zoom_user_content(cropped_b64, room)}],
+            output_config={"effort": "high"},
+        ) as stream:
+            resp = stream.get_final_message()
+
+        if resp.stop_reason in ("refusal", "max_tokens"):
+            return None
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            try:
+                return json.loads(_repair_json(text))
+            except json.JSONDecodeError:
+                return None
+    except Exception as exc:
+        print(f"[extractor] zoom call failed for room {room.get('nr')}: {exc}")
+        return None
+
+
+def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
+    """Merge zoom result into room dict (in-place). Returns True if changes applied."""
+    if not zoom or zoom.get("confidence_zoom") == "low":
+        return False
+    changed = False
+
+    # Perimetras: prefer high-confidence zoom value
+    if zoom.get("perimetras_saltinis") == "from_zoom" and zoom.get("perimetras_m") is not None:
+        old = room.get("perimetras_m")
+        new = float(zoom["perimetras_m"])
+        if abs(new - (old or 0)) > 0.1:  # only update if meaningful diff
+            room["perimetras_m"] = new
+            room.setdefault("_zoom_changes", []).append(f"perimetras: {old} → {new}")
+            changed = True
+
+    if zoom.get("plotas_saltinis") == "from_zoom" and zoom.get("plotas_m2") is not None:
+        old = room.get("plotas_m2")
+        new = float(zoom["plotas_m2"])
+        if abs(new - (old or 0)) > 0.1:
+            room["plotas_m2"] = new
+            room["plotas_saltinis"] = "wall_dim_calc"  # zoom-derived
+            room.setdefault("_zoom_changes", []).append(f"plotas: {old} → {new}")
+            changed = True
+
+    if zoom.get("lubu_aukstis_m") is not None:
+        old = room.get("lubu_aukstis_m")
+        new = float(zoom["lubu_aukstis_m"])
+        if abs(new - (old or 0)) > 0.05:
+            room["lubu_aukstis_m"] = new
+            room.setdefault("_zoom_changes", []).append(f"lubu_aukstis: {old} → {new}")
+            changed = True
+
+    if zoom.get("plyteles_sienos_aukstis_m") is not None:
+        room["plyteles_sienos_aukstis_m"] = float(zoom["plyteles_sienos_aukstis_m"])
+        changed = True
+
+    if zoom.get("nisu_metrai") is not None:
+        old = room.get("nisu_metrai", 0)
+        new = float(zoom["nisu_metrai"])
+        if abs(new - old) > 0.1:
+            room["nisu_metrai"] = new
+            room.setdefault("_zoom_changes", []).append(f"nisu_metrai: {old} → {new}")
+            changed = True
+
+    # Store full zoom data for transparency
+    room["_zoom"] = zoom
+    return changed
 
 
 def _repair_json(text: str) -> str:
@@ -308,7 +454,40 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
             "_error": str(last_err or "Unknown error"),
         }
 
+    # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
+    # User decision (2026-04-27): always-on best-path approach. Per kambarį
+    # crop the page region at 300 DPI / 2576px max, send to Vision with room
+    # context, ask for refined mm dimensions. Phase 6.5.2 showed determinism
+    # is poor (CV 22-150%) on projects without eksplikacija; zoom should fix this.
+    rooms = parsed.get("patalpos") or []
+    zoom_count_attempted = 0
+    zoom_count_applied = 0
+    zoom_total_input_tok = 0
+    zoom_total_output_tok = 0
+    t_zoom_start = time.time()
+    for room in rooms:
+        bbox = room.get("bbox_pct")
+        page_nr = room.get("puslapio_nr")
+        if not bbox or not page_nr:
+            continue
+        cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
+        if not cropped:
+            continue
+        zoom_count_attempted += 1
+        zoom_result = _vision_zoom_room(client, cropped, room)
+        if not zoom_result:
+            continue
+        if _apply_zoom_refinements(room, zoom_result):
+            zoom_count_applied += 1
+    zoom_elapsed = round(time.time() - t_zoom_start, 1)
+    parsed.setdefault("_meta", {})["zoom_attempted"] = zoom_count_attempted
+    parsed["_meta"]["zoom_applied"] = zoom_count_applied
+    parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
+    print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
+          f"{zoom_count_applied} applied, {zoom_elapsed}s")
+
     # Step 3: Recompute santrauka from per-room values (single source of truth)
+    # NOTE: this runs AFTER zoom pass so totals reflect refined per-room dims.
     try:
         parsed = _recompute_santrauka(parsed)
     except Exception as exc:

@@ -17,6 +17,11 @@ MAX_PAGES = 100  # Opus 4.7 API hard max — full coverage for any realistic LT 
                  # Beyond 20 images, Anthropic auto-caps res at 2000px (which we already use).
 IMG_MAX_DIM = 2000  # Opus 4.7 auto-caps at 2000 when >20 images (no quality loss vs current).
 
+# Pass-2 zoom config (always-on per-room high-res re-read)
+ZOOM_DPI = 300            # higher than pass 1 — for legible mm dimensions
+ZOOM_MAX_DIM = 2576       # Opus 4.7 absolute max long edge
+ZOOM_PADDING_PCT = 0.05   # 5% padding around bbox so dimension chains are visible
+
 
 # =============================================================================
 # OUTPUT JSON SCHEMA — Kreo-style hierarchical with calculation_trace
@@ -54,6 +59,18 @@ OUTPUT_SCHEMA = {
                                  "lodzija", "techpatalpa", "laiptai"]
                     },
                     "puslapio_nr": {"type": ["integer", "null"]},
+                    "bbox_pct": {
+                        "type": ["object", "null"],
+                        "additionalProperties": False,
+                        "required": ["x", "y", "w", "h"],
+                        "properties": {
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "w": {"type": "number"},
+                            "h": {"type": "number"},
+                        },
+                        "description": "Patalpos vieta puslapyje kaip 0.0-1.0 fractions of page width/height. Naudojama pass-2 zoom-in re-read'ui."
+                    },
                     "plotas_m2": {"type": "number"},
                     "plotas_saltinis": {
                         "type": "string",
@@ -533,7 +550,8 @@ type Room = {
   nr: string;                                   // "01", "02"
   pavadinimas: string;                          // "Svetainė", "Vonia 1"
   paskirtis: RoomType;                          // žr. enum below
-  puslapio_nr: number | null;
+  puslapio_nr: number | null;             // PRIVALOMA: 1-indexed puslapio numeris kur patalpa floor plan'e
+  bbox_pct: {x: number, y: number, w: number, h: number} | null;  // PRIVALOMA: patalpos vieta puslapyje (0.0-1.0 fractions). Naudojama zoom re-read'ui.
   plotas_m2: number;
   plotas_saltinis: "eksplikacija" | "inline_label" | "wall_dim_calc" | "default_fallback";
   perimetras_m: number;
@@ -699,7 +717,7 @@ perimetras 15.4m.
 </examples>
 
 <output_format>
-Tu gausi kelis brėžinio puslapius (iki 20). Per visus rasi:
+Tu gausi kelis brėžinio puslapius. Per visus rasi:
 - floor_plan'us su patalpomis ir matmenimis
 - eksplikaciją (room schedule)
 - ceiling_plan'us su LED nišomis
@@ -709,12 +727,115 @@ Tu gausi kelis brėžinio puslapius (iki 20). Per visus rasi:
 
 Tavo užduotis — IŠGAUTI viską į vieną JSON pagal output_schema.
 
+**SVARBU per kiekvieną patalpą — `bbox_pct` ir `puslapio_nr`:**
+Šitas pipeline naudoja two-pass architektūrą. Po šito pirmojo pass'o, mes
+PRIZOOMUOSIM kiekvieną patalpą atskirai aukšta rezoliucija ir patiksinsim mm
+matmenis. Kad tai veiktų, **TU PRIVALAI** kiekvienai patalpai grąžinti:
+- `puslapio_nr` (1-indexed) — kuriame puslapyje matosi šios patalpos floor plan
+- `bbox_pct: {x, y, w, h}` — patalpos vieta tame puslapyje, kaip 0.0-1.0
+  fractions nuo puslapio kairio viršaus. Apima TIK PATALPĄ (visas sienas), su
+  ~5-10% papildomu plotu kad būtų matoma dimension chains.
+
+Pavyzdys: jei patalpa yra puslapio kairiame viršuje, užima ~30% pločio ir 25% aukščio:
+  `bbox_pct: {"x": 0.10, "y": 0.15, "w": 0.30, "h": 0.25}`
+
+Jei patalpa neturi atskiro floor plan'o (pvz. tik eksplikacijoje minima) —
+palik `puslapio_nr: null, bbox_pct: null`. Tokiai patalpai nebus zoom pass'o.
+
 Niekada negrąžink prozos. Niekada nedėk markdown fences. Niekada nepraleisk privalomų laukų.
 
 Jei ko nors NEGALI nustatyti iš brėžinių (pvz. perimetro, kai nėra dimension'ų) — naudok 0 arba
 default'ą + pažymėk `confidence: "low"` toje patalpoje + pridėk warning'ą.
 </output_format>
 """
+
+
+# =============================================================================
+# PASS 2 — ZOOM-IN per-room re-read (high accuracy)
+# =============================================================================
+ZOOM_SYSTEM_TEXT = """<role>
+Tu dabar žiūri į PRIZOOMINTĄ vieną patalpą iš LT vidaus apdailos brėžinio.
+Tavo užduotis: tiksliai perskaityti mm matmenis šalia sienų ir patikslinti
+patalpos duomenis.
+
+Atsakyk **TIK** JSON objektu pagal schema. Jokio teksto, jokio markdown.
+</role>
+
+<instructions>
+Šis vaizdas yra prizoomint sritis vienos patalpos floor plan'e. Aplinkoje
+matosi:
+- Patalpos sienos (su mm matmenimis šalia, dažniausiai dimension chains)
+- Durys (lankai)
+- Langai (paralelinės linijos)
+- Galbūt baldai, šviestuvai
+
+Tavo darbas — perskaityk **TIKSLIUS** mm matmenis kiekvienai sienai. Tada
+patikslink:
+1. `perimetras_m` — sumavimas iš mm-anotacijų (visi sienų matmenys ÷ 1000)
+2. `plotas_m2` — jei matosi anotacija (pvz. "14.50m²") arba apskaičiuojamas iš pločio×ilgio
+3. `langai`, `durys` — tikslūs matmenys (W×H mm)
+4. `lubu_aukstis_m` — JEI matosi anotacija šalia (paprastai pjūvyje, ne plane)
+5. `plyteles_sienos_aukstis_m` — JEI matosi anotacija (sienų išklotinės nuoroda)
+6. `nisu_metrai` — LED nišų (raudona linija lubose)
+
+Kiekvienam laukui — pažymėk šaltinį:
+- `from_zoom`: matuota iš anotacijos prizoomint vaizde (HIGH confidence)
+- `inferred`: spėta iš sienų grafinių proporcijų (MEDIUM confidence)
+- `unchanged`: nematoma šitam vaizde, palieku original (low/medium per origi.)
+
+Jei VAIZDE nematomas joks mm-skaičius — grąžink `confidence_zoom: "low"` ir
+nieko nepatikslink.
+</instructions>
+
+<output_schema>
+type ZoomResult = {
+  patalpa_nr: string;                              // matching pasiulyto room nr
+  perimetras_m: number | null;                     // patikslintas, arba null jei nepakeistas
+  perimetras_saltinis: "from_zoom" | "inferred" | "unchanged";
+  plotas_m2: number | null;
+  plotas_saltinis: "from_zoom" | "inferred" | "unchanged";
+  matmenys_perskaityti: string[];                  // visi mm-skaičiai matomi vaizde, kaip strings ("3600", "5200")
+  langai: Array<{plotis_mm: number, aukstis_mm: number}>;  // tikslūs, jei matosi
+  durys: Array<{plotis_mm: number, aukstis_mm: number, tipas: "standart"|"pasleptos"|"slankiojanti"}>;
+  lubu_aukstis_m: number | null;
+  plyteles_sienos_aukstis_m: number | null;
+  nisu_metrai: number | null;
+  confidence_zoom: "high" | "medium" | "low";       // HIGH jei daug mm rasta; LOW jei niekas
+  pastabos: string;
+};
+</output_schema>
+
+NIEKADA negrąžink markdown fences ar prozos. Tik JSON.
+"""
+
+
+def build_zoom_user_content(cropped_image_b64: str, room: dict) -> list[dict]:
+    """Build user message for pass-2 zoom call."""
+    import json
+    room_context = {
+        "nr": room.get("nr"),
+        "pavadinimas": room.get("pavadinimas"),
+        "paskirtis": room.get("paskirtis"),
+        "plotas_m2_pradinis": room.get("plotas_m2"),
+        "perimetras_m_pradinis": room.get("perimetras_m"),
+        "lubu_aukstis_m_pradinis": room.get("lubu_aukstis_m"),
+    }
+    return [
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/jpeg", "data": cropped_image_b64},
+        },
+        {
+            "type": "text",
+            "text": (
+                f"Patalpa kontekstas (iš overview pass'o):\n"
+                f"```json\n{json.dumps(room_context, ensure_ascii=False, indent=2)}\n```\n\n"
+                f"Šis prizoomint vaizdas yra šitos patalpos floor plan dalis. "
+                f"Perskaityk visus matomus mm matmenis ir patikslink reikšmes pagal "
+                f"output_schema. Grąžink VIENĄ ZoomResult JSON."
+            ),
+        },
+    ]
 
 
 def build_user_content(pages: list[dict]) -> list[dict]:
