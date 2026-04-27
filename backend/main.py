@@ -126,10 +126,27 @@ _PDF_CACHE: dict[str, dict] = {}
 
 app = FastAPI()
 
+from starlette.middleware.sessions import SessionMiddleware
+import auth as _auth  # noqa: E402  imports + initializes
+import db as _db  # noqa: E402
+
+# Session middleware FIRST (before CORS) — signed HTTPOnly cookies for auth.
+# In production, set SAMATU_SECRET_KEY env to a strong random string.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_auth.SECRET_KEY,
+    session_cookie=_auth.SESSION_COOKIE,
+    max_age=_auth.SESSION_MAX_AGE_S,
+    same_site="lax",
+    https_only=False,  # TODO: set True in production
+)
+
+# CORS — for cross-origin frontend (Vite dev on :5173, prod same-origin)
+# allow_credentials=True so session cookie traverses the proxy
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -186,6 +203,7 @@ async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
 # Frontend keeps localStorage as offline cache (write-through).
 
 import db  # noqa: E402  — initializes schema on import
+from fastapi import Depends  # noqa: E402
 
 
 class CorrectionPayload(BaseModel):
@@ -197,67 +215,193 @@ class CorrectionPayload(BaseModel):
     note: str | None = None
 
 
+# ── AUTH endpoints (Phase 13) ────────────────────────────────────────────────
+
+class RegisterPayload(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+    company_name: str | None = None
+
+
+class LoginPayload(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/register")
+async def api_register(payload: RegisterPayload, request: Request):
+    """Register new user. Validates email + password, hashes password, creates DB row,
+    starts session. First-ever registered user becomes admin automatically."""
+    _check_rate_limit(request.client.host if request.client else "unknown", "register")
+    email = _auth.validate_email(payload.email)
+    _auth.validate_password(payload.password)
+    if db.get_user_by_email(email):
+        raise HTTPException(status_code=409, detail="Vartotojas su šiuo el. paštu jau egzistuoja")
+
+    # First user → admin (self-bootstrap)
+    is_first = len(db.list_users()) == 0
+    pw_hash = _auth.hash_password(payload.password)
+    user = db.create_user(
+        email=email, password_hash=pw_hash,
+        name=payload.name, company_name=payload.company_name,
+        is_admin=is_first,
+    )
+    request.session["user_id"] = user["id"]
+    log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_first)
+    user.pop("password_hash", None)
+    return {"user": user, "is_first_admin": is_first}
+
+
+@app.post("/api/auth/login")
+async def api_login(payload: LoginPayload, request: Request):
+    """Email + password → session cookie. Generic error message (avoid user enumeration)."""
+    _check_rate_limit(request.client.host if request.client else "unknown", "login")
+    email = _auth.validate_email(payload.email)
+    user = db.get_user_by_email(email)
+    if not user or not user.get("is_active"):
+        raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
+    if not _auth.verify_password(payload.password, user.get("password_hash", "")):
+        log.warning("failed login: email=%s ip=%s", email,
+                    request.client.host if request.client else "?")
+        raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
+    request.session["user_id"] = user["id"]
+    db.update_user_login(user["id"])
+    user.pop("password_hash", None)
+    return {"user": user}
+
+
+@app.post("/api/auth/logout")
+async def api_logout(request: Request):
+    request.session.clear()
+    return {"status": "logged_out"}
+
+
+@app.get("/api/auth/me")
+async def api_me(request: Request):
+    """Return current user (or 401)."""
+    user = _auth.get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Nesate prisijungę")
+    return {"user": user}
+
+
+# ── Project endpoints (per-user isolation) ──────────────────────────────────
+
 @app.get("/api/projects")
-async def api_list_projects():
-    """List all projects (summary; no full data blob)."""
-    return {"projects": db.list_projects()}
+async def api_list_projects(request: Request):
+    """List CURRENT user's projects (admin sees all)."""
+    user = _auth.require_user(request)
+    if user.get("is_admin") and request.query_params.get("all") == "1":
+        return {"projects": db.list_projects(user_id=None), "scope": "all"}
+    return {"projects": db.list_projects(user_id=user["id"]), "scope": "own"}
 
 
 @app.get("/api/projects/{project_id}")
-async def api_get_project(project_id: str):
-    p = db.get_project(project_id)
+async def api_get_project(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    # Admin can read any; regular users only their own
+    user_filter = None if user.get("is_admin") else user["id"]
+    p = db.get_project(project_id, user_id=user_filter)
     if not p:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return p
 
 
 @app.put("/api/projects/{project_id}")
-async def api_upsert_project(project_id: str, payload: dict = Body(...)):
-    """Insert or full-replace project. Used by frontend on every state change
-    (write-through from localStorage). Returns canonical record."""
+async def api_upsert_project(request: Request, project_id: str, payload: dict = Body(...)):
+    user = _auth.require_user(request)
     if not payload:
         raise HTTPException(status_code=400, detail="Empty payload")
-    return db.upsert_project(project_id, payload)
+    try:
+        return db.upsert_project(project_id, payload, user_id=user["id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 @app.delete("/api/projects/{project_id}")
-async def api_delete_project(project_id: str):
-    if not db.delete_project(project_id):
+async def api_delete_project(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.delete_project(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return {"deleted": project_id}
 
 
 @app.post("/api/projects/{project_id}/corrections")
-async def api_log_correction(project_id: str, payload: CorrectionPayload):
-    """Record a user correction for future prompt-iteration analysis.
-    Does NOT update the project — just appends to audit log."""
+async def api_log_correction(request: Request, project_id: str, payload: CorrectionPayload):
+    """Append correction. Implicit ownership via project (only project owner can post)."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
     db.log_correction(
-        project_id=project_id,
-        field_path=payload.field_path,
-        old_value=payload.old_value,
-        new_value=payload.new_value,
-        source=payload.source,
-        room_nr=payload.room_nr,
-        note=payload.note,
+        project_id=project_id, field_path=payload.field_path,
+        old_value=payload.old_value, new_value=payload.new_value,
+        source=payload.source, room_nr=payload.room_nr, note=payload.note,
     )
     return {"status": "logged"}
 
 
 @app.get("/api/projects/{project_id}/corrections")
-async def api_list_corrections(project_id: str, limit: int = 500):
+async def api_list_corrections(request: Request, project_id: str, limit: int = 500):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
     return {"corrections": db.list_corrections(project_id, limit=limit)}
 
 
+@app.get("/api/projects/{project_id}/extractions")
+async def api_list_extractions(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"extractions": db.list_extractions(project_id)}
+
+
+# ── ADMIN endpoints (require is_admin) ───────────────────────────────────────
+
 @app.get("/api/admin/corrections-summary")
-async def api_corrections_summary():
+async def api_corrections_summary(request: Request):
     """Aggregated counts per field_path — input to manual prompt iteration.
     Shows which fields users override most often → indicates Vision bias."""
+    _auth.require_admin(request)
     return {"summary": db.corrections_summary()}
 
 
-@app.get("/api/projects/{project_id}/extractions")
-async def api_list_extractions(project_id: str):
-    return {"extractions": db.list_extractions(project_id)}
+@app.get("/api/admin/users")
+async def api_admin_list_users(request: Request):
+    _auth.require_admin(request)
+    return {"users": db.list_users()}
+
+
+@app.get("/api/admin/stats")
+async def api_admin_stats(request: Request):
+    """Cost + project counts across all users."""
+    _auth.require_admin(request)
+    with db._conn() as c:
+        users_count = c.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+        projects_count = c.execute("SELECT COUNT(*) AS n FROM projects").fetchone()["n"]
+        extractions_count = c.execute("SELECT COUNT(*) AS n FROM extractions").fetchone()["n"]
+        cost_row = c.execute("SELECT SUM(cost_eur) AS total, AVG(cost_eur) AS avg FROM extractions").fetchone()
+        corrections_count = c.execute("SELECT COUNT(*) AS n FROM corrections").fetchone()["n"]
+    return {
+        "users_count": users_count,
+        "projects_count": projects_count,
+        "extractions_count": extractions_count,
+        "total_cost_eur": round(cost_row["total"] or 0, 2),
+        "avg_cost_per_extract_eur": round(cost_row["avg"] or 0, 4),
+        "corrections_count": corrections_count,
+    }
+
+
+@app.get("/api/admin/recent-projects")
+async def api_admin_recent_projects(request: Request, limit: int = 50):
+    """All projects across all users — admin overview."""
+    _auth.require_admin(request)
+    return {"projects": db.list_projects(user_id=None)[:limit]}
 
 client = anthropic.Anthropic(
     api_key=os.environ["ANTHROPIC_API_KEY"],

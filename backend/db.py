@@ -54,8 +54,22 @@ def init_schema() -> None:
     """Create tables if missing. Safe to call repeatedly (idempotent)."""
     with _conn() as c:
         c.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id            TEXT PRIMARY KEY,
+                email         TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name          TEXT,
+                company_name  TEXT,
+                is_admin      INTEGER NOT NULL DEFAULT 0,
+                is_active     INTEGER NOT NULL DEFAULT 1,
+                created_at    TEXT NOT NULL,
+                last_login_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
             CREATE TABLE IF NOT EXISTS projects (
                 id           TEXT PRIMARY KEY,
+                user_id      TEXT REFERENCES users(id) ON DELETE CASCADE,
                 name         TEXT NOT NULL,
                 company_name TEXT,
                 tipas        TEXT NOT NULL,
@@ -68,6 +82,7 @@ def init_schema() -> None:
                 updated_at   TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_projects_updated ON projects(updated_at DESC);
+            -- idx_projects_user created in _migrate_schema after column exists
 
             CREATE TABLE IF NOT EXISTS extractions (
                 id              TEXT PRIMARY KEY,
@@ -102,23 +117,84 @@ def init_schema() -> None:
         """)
 
 
-# ── Projects ──────────────────────────────────────────────────────────────────
+# ── Users ─────────────────────────────────────────────────────────────────────
 
-def list_projects() -> list[dict]:
-    """Return summary list (no full data blob — use get_project for that)."""
+def create_user(email: str, password_hash: str, name: str | None = None,
+                 company_name: str | None = None, is_admin: bool = False) -> dict:
+    """Insert new user. Caller is responsible for password hashing."""
+    import uuid
+    user_id = str(uuid.uuid4())
+    now = _now_iso()
     with _conn() as c:
-        rows = c.execute("""
-            SELECT id, name, company_name, tipas, archetipas, status,
-                   bendras_plotas_m2, vat_rate, created_at, updated_at
-              FROM projects
-          ORDER BY updated_at DESC
-        """).fetchall()
+        c.execute("""
+            INSERT INTO users (id, email, password_hash, name, company_name,
+                               is_admin, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        """, (user_id, email.lower().strip(), password_hash, name, company_name,
+              1 if is_admin else 0, now))
+    return get_user_by_id(user_id) or {}
+
+
+def get_user_by_email(email: str) -> dict | None:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE email = ?", (email.lower().strip(),)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: str) -> dict | None:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def update_user_login(user_id: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now_iso(), user_id))
+
+
+def list_users(admin_only: bool = False) -> list[dict]:
+    """Admin endpoint — returns user summaries (no password_hash)."""
+    with _conn() as c:
+        sql = """SELECT id, email, name, company_name, is_admin, is_active,
+                        created_at, last_login_at
+                   FROM users
+               ORDER BY created_at DESC"""
+        rows = c.execute(sql).fetchall()
         return [dict(r) for r in rows]
 
 
-def get_project(project_id: str) -> dict | None:
+# ── Projects ──────────────────────────────────────────────────────────────────
+
+def list_projects(user_id: str | None = None) -> list[dict]:
+    """Return summary list (no full data blob).
+    If user_id given — only that user's projects. None = all (admin only)."""
     with _conn() as c:
-        row = c.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+        if user_id:
+            rows = c.execute("""
+                SELECT id, user_id, name, company_name, tipas, archetipas, status,
+                       bendras_plotas_m2, vat_rate, created_at, updated_at
+                  FROM projects
+                 WHERE user_id = ?
+              ORDER BY updated_at DESC
+            """, (user_id,)).fetchall()
+        else:
+            rows = c.execute("""
+                SELECT id, user_id, name, company_name, tipas, archetipas, status,
+                       bendras_plotas_m2, vat_rate, created_at, updated_at
+                  FROM projects
+              ORDER BY updated_at DESC
+            """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_project(project_id: str, user_id: str | None = None) -> dict | None:
+    """Get project. If user_id given — enforce ownership (returns None if not match)."""
+    with _conn() as c:
+        if user_id:
+            row = c.execute("SELECT * FROM projects WHERE id = ? AND user_id = ?",
+                            (project_id, user_id)).fetchone()
+        else:
+            row = c.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
         if not row:
             return None
         d = dict(row)
@@ -126,24 +202,34 @@ def get_project(project_id: str) -> dict | None:
             data = json.loads(d.pop("data") or "{}")
         except Exception:
             data = {}
-        # Merge stored metadata + JSON blob
         return {**data, **{k: v for k, v in d.items() if v is not None}}
 
 
-def upsert_project(project_id: str, payload: dict) -> dict:
-    """Insert or full-replace a project. Returns the canonical record."""
+def upsert_project(project_id: str, payload: dict, user_id: str | None = None) -> dict:
+    """Insert or full-replace. user_id stored on create; on update, ownership
+    is checked first (raises if mismatch)."""
     now = _now_iso()
     name = payload.get("name") or "Naujas projektas"
     tipas = payload.get("tipas") or "interjeras"
     blob = json.dumps(payload, ensure_ascii=False)
     with _conn() as c:
-        existing = c.execute("SELECT created_at FROM projects WHERE id = ?", (project_id,)).fetchone()
-        created_at = existing["created_at"] if existing else (payload.get("created_date") or now)
+        existing = c.execute(
+            "SELECT created_at, user_id FROM projects WHERE id = ?", (project_id,)
+        ).fetchone()
+        if existing:
+            if user_id and existing["user_id"] and existing["user_id"] != user_id:
+                raise PermissionError(f"User {user_id} does not own project {project_id}")
+            created_at = existing["created_at"]
+            owner = existing["user_id"]
+        else:
+            created_at = payload.get("created_date") or now
+            owner = user_id
+
         c.execute("""
             INSERT INTO projects
-                (id, name, company_name, tipas, archetipas, status,
+                (id, user_id, name, company_name, tipas, archetipas, status,
                  bendras_plotas_m2, vat_rate, data, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name=excluded.name,
                 company_name=excluded.company_name,
@@ -155,24 +241,23 @@ def upsert_project(project_id: str, payload: dict) -> dict:
                 data=excluded.data,
                 updated_at=excluded.updated_at
         """, (
-            project_id,
-            name,
-            payload.get("company_name"),
-            tipas,
-            payload.get("archetipas"),
+            project_id, owner, name,
+            payload.get("company_name"), tipas, payload.get("archetipas"),
             payload.get("status", "ready"),
-            payload.get("bendras_plotas_m2"),
-            payload.get("vat_rate", 21),
-            blob,
-            created_at,
-            now,
+            payload.get("bendras_plotas_m2"), payload.get("vat_rate", 21),
+            blob, created_at, now,
         ))
     return get_project(project_id) or {}
 
 
-def delete_project(project_id: str) -> bool:
+def delete_project(project_id: str, user_id: str | None = None) -> bool:
+    """Delete project. If user_id given — enforce ownership."""
     with _conn() as c:
-        cursor = c.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        if user_id:
+            cursor = c.execute("DELETE FROM projects WHERE id = ? AND user_id = ?",
+                               (project_id, user_id))
+        else:
+            cursor = c.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         return cursor.rowcount > 0
 
 
@@ -284,5 +369,17 @@ def corrections_summary() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def _migrate_schema() -> None:
+    """Idempotent column additions for existing DBs created before auth.
+    SQLite ALTER TABLE only supports ADD COLUMN — keep migrations append-only."""
+    with _conn() as c:
+        # Check if projects.user_id exists; add if not
+        cols = {row["name"] for row in c.execute("PRAGMA table_info(projects)").fetchall()}
+        if cols and "user_id" not in cols:
+            c.execute("ALTER TABLE projects ADD COLUMN user_id TEXT")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
+
+
 # Initialize schema on module import
 init_schema()
+_migrate_schema()
