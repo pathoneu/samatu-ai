@@ -1,0 +1,67 @@
+{
+  "archetipas": "standart",
+  "bendras_plotas_m2": 0,
+  "scale_source_page": null,
+  "eksplikacija_source_page": null,
+  "patalpos": [],
+  "durys_total": [],
+  "langai_total": [],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 0,
+    "kampai_m_total": 0,
+    "angokrasciu_gkp_m_total": 0,
+    "pasleptu_duru_staktu_m_total": 0,
+    "nisu_metrai_total": 0,
+    "gkp_lubu_m2_total": 0,
+    "gkp_lubu_virs_3m_m2_total": 0,
+    "pvc_grindys_m2_total": 0,
+    "plyteles_grindys_m2_total": 0,
+    "plyteles_sienos_m2_total": 0,
+    "isliginamasis_m2_total": 0,
+    "grindjuosciu_m_total": 0,
+    "hidroizoliacijos_vnt": 0
+  },
+  "pozicijos": [
+    {
+      "skyrius": "Out of scope",
+      "aprasymas": "INSIGHT magnetinio bėgelio LED apšvietimo sistemos montavimo instrukcija (gamintojo techninis dokumentas)",
+      "vnt": "vnt",
+      "kiekis": 0,
+      "pastaba": "Dokumentas yra elektros instaliacijos / apšvietimo sistemos montavimo instrukcija, ne architektūrinis projektas. Nėra patalpų, planų, eksplikacijos ar matmenų iš kurių būtų galima išgauti vidaus apdailos kiekius.",
+      "saltinis": "specifikacija"
+    }
+  ],
+  "pastabos": "Pateikti 7 puslapiai yra SpectraLight INSIGHT magnetinio bėgelio LED apšvietimo sistemos montavimo instrukcija (užglaistomas montavimas į gipso lubas, maitinimo schemos, dimeriavimas DALI/PUSH-DIM). Dokumente nėra: floor plan'ų, patalpų eksplikacijos, pjūvių, sienų išklotinių, lubų planų su LED nišų išdėstymu konkrečiose patalpose. Yra tik bendro pobūdžio LED bėgelio profilių specifikacija (LED33813=1m, LED33624=2m, LED33644=3m) ir montavimo žingsnių iliustracijos. Kiekių žiniaraščio (BoQ) iš šio dokumento sudaryti neįmanoma — reikalingi architektūriniai brėžiniai (AP-01 floor plan, eksplikacija, lubų planas su LED nišų pozicijomis).",
+  "warnings": [
+    {
+      "level": "ERROR",
+      "message": "Dokumentas nėra architektūrinis projektas — tai LED apšvietimo sistemos (INSIGHT magnetinis bėgelis) gamintojo montavimo instrukcija. Nėra patalpų planų, eksplikacijos, matmenų."
+    },
+    {
+      "level": "ERROR",
+      "message": "Negalima identifikuoti nei vienos patalpos (nr, pavadinimas, plotas, perimetras, lubų aukštis). Visi puslapiai rodo tik bendrines montavimo schemas (profilio pjūviai, elektros pajungimas, dimeriavimo principas)."
+    },
+    {
+      "level": "WARN",
+      "message": "Jeigu tikslas buvo įvertinti LED nišų kiekius konkrečiame projekte — reikia pateikti to projekto lubų planą (ceiling plan) su LED juostų išdėstymu raudonomis linijomis bei matmenimis."
+    },
+    {
+      "level": "INFO",
+      "message": "Iš dokumento galima išgauti tik produktų kodus referenciniam pirkimui: LED33813 (1m bėgelis), LED33624 (2m), LED33644 (3m), LED33823/24/25 (dangteliai 1/2/3m), LED33626 (maitinimo įvadas), LED33636 (užbaigimas su laidu), LED33842/LED34341 (48V maitinimo šaltiniai išoriniai), LED33629/LED34023 (vidiniai maitinimo šaltiniai), LED33844/LED34406 (DALI maitinimo šaltinis), LED30530 (PUSH-DIM->DALI keitiklis). Tai elektros/apšvietimo dalies pozicijos — Out of scope vidaus apdailos pipeline'ui."
+    }
+  ],
+  "_meta": {
+    "input_tokens": 25891,
+    "output_tokens": 1479,
+    "cache_read_tokens": 10637,
+    "cache_write_tokens": 0,
+    "stop_reason": "end_turn",
+    "attempt": 1,
+    "pages_sent": 7,
+    "model": "claude-opus-4-7",
+    "elapsed_s": 41.0
+  },
+  "_lt_warnings": [],
+  "_elapsed_s": 41.0,
+  "status": "ok"
+}
