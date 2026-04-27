@@ -1052,13 +1052,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         </>
       )}
 
-      {/* ── TAB: WORKSPACE (Togal-style split-screen) ─────────────────────── */}
-      {tab === 'workspace' && pdfUrl && (
-        <InteriorWorkspace project={project} />
-      )}
-
-      {/* ── TAB: PRIELAIDOS ───────────────────────────────────────────────── */}
-      {tab === 'prielaidos' && (
+      {/* TAB content for 'workspace' and 'prielaidos' was V8-era. Unreachable
+          from current TabBar; replaced by 'rules' tab using RulesOverridePanel
+          (see Phase 10). Retaining import lines for now in case re-introduced
+          via different feature. */}
+      {false && tab === 'prielaidos' && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Keisdami prielaidas, visi kiekiai persiskaičiuoja automatiškai.
