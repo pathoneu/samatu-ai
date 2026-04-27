@@ -25,9 +25,10 @@ backend/
 ├── tests/
 │   └── test_extractor_unit.py  # 12 unit tests for extractor/
 └── scripts/                 # baseline + comparison utilities
-    ├── baseline_vision.py   # Phase 1 baseline reference (canonical prompt source)
-    ├── compare_to_extractor.py  # Phase 3 validation
-    └── run_v8_baseline.py   # captures V8 baseline (THE BAR for refactor)
+    ├── _pdf_helper.py       # find_breziniai_pdf (largest variant per project)
+    ├── baseline_vision.py   # Phase 1 baseline reference (mirrors prompt; for ad-hoc tests)
+    ├── compare_to_extractor.py  # Phase 3 validation runner
+    └── determinism_test.py  # Phase 6.5.2 — N×runs per project, variance check
 ```
 
 ## Endpoint'ai
@@ -47,22 +48,29 @@ backend/
 
 `extractor.extract_interior(pdf_bytes, rules_override=None)` flow:
 
-1. **PDF → ≤20 puslapių JPEG** @ 200 DPI, max dim 2000px
+1. **PDF → up to 100 pages JPEG** @ 200 DPI, max dim 2000px (Anthropic API hard max)
 2. **Page-labeled content build** — interleaved `Page N of M:` text + image (image-first ordering per Anthropic Vision docs)
 3. **Vision call** — `claude-opus-4-7`, streaming, `output_config={"effort": "high"}`, system prompt cached (`cache_control: ephemeral`)
 4. **JSON parse** with `_repair_json` fallback (key quoting, trailing commas)
 5. **Recompute santrauka** via `calc_totals` (single source of truth — overrides any Vision arithmetic errors)
 6. **Apply lt_sanity** — adds `_lt_warnings` per STR 2.02.09 ranges; does NOT mutate values
-7. **Attach `_overrides`** if user provided Setup Wizard prefs
-8. Return with `status: "ok"`, `_meta` (tokens, elapsed, cache hits)
+7. **Emit V8-compat fields** — `darbu_sarasas[]`, `v8_totals`, `v8_rooms` (frontend backwards compatibility)
+8. **Attach `_overrides`** if user provided Setup Wizard prefs
+9. Return with `status: "ok"`, `_meta` (tokens, elapsed, cache hits)
 
 ## Schema (output)
 
-Top-level: `archetipas`, `bendras_plotas_m2`, `patalpos[]`, `durys_total[]`, `langai_total[]`, `santrauka`, `pozicijos[]`, `warnings[]`.
+**Canonical (new):**
+- Top-level: `archetipas`, `bendras_plotas_m2`, `patalpos[]`, `durys_total[]`, `langai_total[]`, `santrauka`, `pozicijos[]`, `warnings[]`
+- Per room: `nr`, `pavadinimas`, `paskirtis`, `plotas_m2`, `perimetras_m`, `lubu_aukstis_m`, `lubu_tipas`, `dazymo_plotas_m2`, `kampu_metrai`, `angokrasciu_gkp_m`, `pasleptu_duru_staktu_m`, `nisu_metrai`, `pvc_grindys_m2`, `plyteles_grindys_m2`, `plyteles_sienos_m2`, `isliginamasis_m2`, `grindjuosciu_m`, `hidroizoliacija_m2`, `elementai[]`, `calculation_trace`, `confidence`
+- `pozicijos[]` — flat kiekių žiniaraštis organized by skyriai: `GKP montavimas`, `Glaistymas dazymas`, `Plyteles`, `Hidroizoliacija`, `Pridetiniai elementai`, `Out of scope`
 
-Per room: `nr`, `pavadinimas`, `paskirtis`, `plotas_m2`, `perimetras_m`, `lubu_aukstis_m`, `lubu_tipas`, `dazymo_plotas_m2`, `kampu_metrai`, `angokrasciu_gkp_m`, `pasleptu_duru_staktu_m`, `nisu_metrai`, `pvc_grindys_m2`, `plyteles_grindys_m2`, `plyteles_sienos_m2`, `isliginamasis_m2`, `grindjuosciu_m`, `hidroizoliacija_m2`, `elementai[]`, `calculation_trace`, `confidence`.
+**V8-compat mirrors (for frontend):**
+- `darbu_sarasas[]` — `pozicijos[]` mapped to V8 field names (`mato_vnt`, `pavadinimas`, `eil_nr`, `skyrius_label`, etc.)
+- `v8_totals` — `santrauka` keys remapped to V8 names (`dazymo_plotas_m2`, `kampai_m`, `plyteles_sienos_m2`, etc.)
+- `v8_rooms` — `patalpos[]` (alias)
 
-`pozicijos` array — flat kiekių žiniaraštis organized by skyriai (rangovo-style): `GKP montavimas`, `Glaistymas dazymas`, `Plyteles`, `Hidroizoliacija`, `Pridetiniai elementai`, `Out of scope`.
+This keeps existing frontend (NewProject.jsx, ExportModal.jsx, ProjectMainView.jsx, WorkspacePanel.jsx) working without changes.
 
 ## Test'ai
 
