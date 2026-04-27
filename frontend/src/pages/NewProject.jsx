@@ -59,7 +59,7 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
   }
 
   const ENDPOINT_MAP = {
-    interior: '/extract-interior-v8',  // V8: Universal industries standart
+    interior: '/extract-interior',  // single Vision call pipeline (post-2026-04 simplification)
     kz:       '/extract',
     fasadas:  '/extract-facade',
     stogas:   '/extract-roof',
