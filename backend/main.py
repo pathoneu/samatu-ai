@@ -1,7 +1,58 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
+import logging
+import time as _time
+from collections import defaultdict, deque
+
+# Logger setup — replaces scattered print() calls. Default INFO level.
+# In production, swap StreamHandler for FileHandler or pipe to systemd journal.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("samatu_ai")
+
+# ── Production safety helpers ──────────────────────────────────────────────────
+MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB — large LT residential projects ~20MB
+MIN_PDF_SIZE_BYTES = 100               # below = junk
+
+def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> None:
+    """Reject malformed/oversize uploads BEFORE expensive Vision call.
+    Raises HTTPException on failure."""
+    n = len(pdf_bytes)
+    if n < MIN_PDF_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail=f"PDF failas tuščias arba per mažas ({n} B). Įkelkite tikrą brėžinį.")
+    if n > MAX_PDF_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=f"PDF failas per didelis ({n // (1024*1024)} MB). Maksimumas {MAX_PDF_SIZE_BYTES // (1024*1024)} MB.")
+    # Magic bytes check — first 4 bytes of valid PDF = b"%PDF"
+    if not pdf_bytes[:4].startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail=f"Failas nėra galiojantis PDF (nerasta %PDF antraštė). Patikrinkite, ar įkėlėte PDF, ne kitą formatą.")
+    # Filename sanity (defense in depth — filenames may contain path traversal etc)
+    if filename and (".." in filename or filename.startswith("/")):
+        log.warning("suspicious filename rejected: %r", filename)
+        raise HTTPException(status_code=400, detail="Neleistinas failo pavadinimas.")
+
+
+# In-memory rate limiter — per-IP request counter with sliding 60s window.
+# Production should use Redis or nginx-level rate limit. This guards single-instance
+# dev/staging from abusive clients (eg. accidental script loops).
+_RATE_BUCKET: dict[str, deque] = defaultdict(deque)
+_RATE_LIMIT_PER_MIN = 30  # generous; one estimator might do 5-10/hour normally
+
+def _check_rate_limit(client_ip: str, endpoint: str) -> None:
+    """Sliding-window rate limit. Raises 429 on overflow."""
+    now = _time.time()
+    bucket = _RATE_BUCKET[f"{client_ip}:{endpoint}"]
+    # Drop entries older than 60s
+    while bucket and now - bucket[0] > 60:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT_PER_MIN:
+        log.warning("rate limit hit: ip=%s endpoint=%s count=%d", client_ip, endpoint, len(bucket))
+        raise HTTPException(status_code=429, detail=f"Per daug užklausų. Palaukite minutę. (limitas: {_RATE_LIMIT_PER_MIN}/min)")
+    bucket.append(now)
 import pdfplumber
 import anthropic
 import openpyxl
@@ -3597,6 +3648,7 @@ async def generate_pdf(data: dict):
 
 @app.post("/extract-interior")
 async def extract_interior_endpoint(
+    request: Request,
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
 ):
@@ -3606,9 +3658,13 @@ async def extract_interior_endpoint(
     versijavimo, jokių pipeline'ų, jokių Tier-fallback'ų. Gali būti
     used backend'ui ir tiesiogiai (Python import).
     """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, "extract-interior")
+
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
     pdf_bytes = await files[0].read()
+    _validate_pdf_upload(pdf_bytes, files[0].filename or "")
 
     overrides_dict: dict | None = None
     if rules_override:
@@ -3617,6 +3673,8 @@ async def extract_interior_endpoint(
         except json.JSONDecodeError as e:
             raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
 
+    log.info("extract-interior: ip=%s file=%s size=%dKB has_overrides=%s",
+             client_ip, files[0].filename, len(pdf_bytes) // 1024, overrides_dict is not None)
     from extractor import extract_interior
     return await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
 

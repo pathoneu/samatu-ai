@@ -150,7 +150,7 @@ export default function ProjectCanvas({ project, onProjectChange }) {
             fileUrl={pdfUrl}
             projectId={project.id}
             pageMeta={pageMetaDict}
-            aiRooms={project.v8_rooms}
+            aiRooms={project.v8_rooms || project.patalpos}
             pdfFile={pdfBlob}
             focusedPage={focusedPage}
             activeRowId={activeRowId}

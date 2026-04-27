@@ -318,6 +318,44 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
         <SanityWarningsBanner sanity={project.lt_sanity} />
       )}
 
+      {/* AI _meta — transparency: laikas, tokenai, zoom statistikos */}
+      {project._meta && (
+        <details className="text-xs text-muted-foreground -mt-2 group">
+          <summary className="cursor-pointer hover:text-foreground select-none inline-flex items-center gap-2">
+            <span>AI ekstrakcijos detalės</span>
+            {project._meta.elapsed_s && (
+              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                {Math.round(project._meta.elapsed_s)}s
+              </span>
+            )}
+            {project._meta.zoom_applied !== undefined && (
+              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                zoom {project._meta.zoom_applied}/{project._meta.zoom_attempted || 0}
+              </span>
+            )}
+          </summary>
+          <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 p-3 bg-muted/30 rounded text-[11px] tabular-nums">
+            {project._meta.elapsed_s != null && <><span>Trukmė:</span><span>{project._meta.elapsed_s}s</span></>}
+            {project._meta.input_tokens != null && <><span>Input tokenai:</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
+            {project._meta.output_tokens != null && <><span>Output tokenai:</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
+            {project._meta.cache_read_tokens != null && project._meta.cache_read_tokens > 0 && (
+              <><span>Cache hit:</span><span>{project._meta.cache_read_tokens.toLocaleString()} ({(project._meta.cache_read_tokens / (project._meta.input_tokens || 1) * 100).toFixed(0)}%)</span></>
+            )}
+            {project._meta.zoom_attempted != null && <><span>Zoom call'ai:</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
+            {project._meta.zoom_elapsed_s != null && <><span>Zoom trukmė:</span><span>{project._meta.zoom_elapsed_s}s</span></>}
+            {project._meta.pages_sent != null && <><span>Puslapiai:</span><span>{project._meta.pages_sent}</span></>}
+            {project._meta.model && <><span>Modelis:</span><span>{project._meta.model}</span></>}
+            {project._meta.input_tokens != null && (() => {
+              // Rough cost estimate at $5/M input + $25/M output for Opus 4.7
+              const cost = (project._meta.input_tokens || 0) * 0.000005 +
+                           (project._meta.output_tokens || 0) * 0.000025 -
+                           (project._meta.cache_read_tokens || 0) * 0.0000045;  // 90% discount on cache reads
+              return <><span>~Kaina:</span><span>${cost.toFixed(2)}</span></>;
+            })()}
+          </div>
+        </details>
+      )}
+
       {/* AI rasti simboliai (Diena 4) — kuriose brėžiniuose ką AI Vision aptiko */}
       {(() => {
         const sym = project.v9_meta?.symbols_detected

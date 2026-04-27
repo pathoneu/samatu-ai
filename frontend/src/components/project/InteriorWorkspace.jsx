@@ -103,7 +103,7 @@ export default function InteriorWorkspace({ project }) {
             fileUrl={pdfUrl}
             projectId={project.id}
             pageMeta={pageMetaDict}
-            aiRooms={project.v8_rooms}
+            aiRooms={project.v8_rooms || project.patalpos}
             onAiRoomClick={(room) => {
               // TODO: atidaryti modal'ą su pavadinimo / paskirties / ploto edit'u
               console.log('[ai-room] click:', room);
