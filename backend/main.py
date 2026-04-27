@@ -4295,86 +4295,206 @@ async def pdf_lines(
     return result
 
 
-@app.post("/chat-project")
-async def chat_project(payload: dict = Body(...)):
-    """AI CHAT — vartotojas klausia natural language apie projektą.
+def _build_chat_context(project: dict) -> dict:
+    """Build comprehensive grounded context for /chat-project from a full project dict.
 
-    Payload:
-      {
-        "question": "Kiek dušų?",
-        "project_context": {
-          "name": "...",
-          "v8_rooms": [...],
-          "v8_totals": {...},
-          "darbu_sarasas": [...],
-          ...
-        }
-      }
+    Includes EVERYTHING the AI needs to answer LT estimator questions accurately:
+    - Project metadata (name, archetipas, bendras_plotas, status)
+    - Per-room: all geometric + finishing fields + calc traces + zoom audit + warnings
+    - Per-position: skyrius/aprašymas/vnt/kiekis/saltinis (LT-style pozicijos)
+    - Santrauka totals (every metric)
+    - lt_sanity warnings (so AI can answer "ar yra warning'ų?")
+    - _meta (cost/tokens for "kiek užtruko?" / "kiek kainavo?")
+
+    No truncation for typical projects (≤25 rooms / ≤50 pozicijų); long-tail
+    truncated at 50/100 to stay under token budget.
     """
-    question = (payload.get("question") or "").strip()
-    ctx = payload.get("project_context") or {}
+    rooms = project.get("v8_rooms") or project.get("patalpos") or []
+    pozicijos = project.get("pozicijos") or []
+    darbai = project.get("darbu_sarasas") or []
+    sanity = project.get("lt_sanity") or {}
 
-    if not question:
-        return {"status": "error", "error": "Klausimas tuščias"}
-
-    # Build compact context (be didelių laukų)
-    summary = {
-        "projekto_pavadinimas": ctx.get("name") or ctx.get("projektas"),
-        "patalpu_skaicius": len(ctx.get("v8_rooms") or []),
-        "totals": ctx.get("v8_totals") or {},
+    return {
+        "projektas": {
+            "pavadinimas": project.get("name") or project.get("projektas"),
+            "archetipas": project.get("archetipas"),
+            "tipas": project.get("tipas"),
+            "bendras_plotas_m2": project.get("bendras_plotas_m2"),
+            "status": project.get("status"),
+            "vat_rate": project.get("vat_rate", 21),
+        },
         "patalpos": [
             {
                 "nr": r.get("nr"),
                 "pavadinimas": r.get("pavadinimas"),
                 "paskirtis": r.get("paskirtis"),
+                "puslapis": r.get("puslapio_nr"),
                 "plotas_m2": r.get("plotas_m2"),
+                "plotas_saltinis": r.get("plotas_saltinis"),
                 "perimetras_m": r.get("perimetras_m"),
                 "lubu_aukstis_m": r.get("lubu_aukstis_m"),
+                "lubu_tipas": r.get("lubu_tipas"),
                 "dazymo_plotas_m2": r.get("dazymo_plotas_m2"),
+                "kampu_metrai": r.get("kampu_metrai"),
+                "angokrasciu_gkp_m": r.get("angokrasciu_gkp_m"),
+                "pasleptu_duru_staktu_m": r.get("pasleptu_duru_staktu_m"),
+                "nisu_metrai": r.get("nisu_metrai"),
+                "plyteles_grindys_m2": r.get("plyteles_grindys_m2"),
+                "plyteles_sienos_m2": r.get("plyteles_sienos_m2"),
+                "plyteles_sienos_aukstis_m": r.get("plyteles_sienos_aukstis_m"),
+                "pvc_grindys_m2": r.get("pvc_grindys_m2"),
+                "isliginamasis_m2": r.get("isliginamasis_m2"),
+                "grindjuosciu_m": r.get("grindjuosciu_m"),
+                "hidroizoliacija_m2": r.get("hidroizoliacija_m2"),
+                "elementai": r.get("elementai"),
+                "calculation_trace": r.get("calculation_trace"),
+                "confidence": r.get("confidence"),
+                "_zoom_changes": r.get("_zoom_changes"),
+                "pastabos": r.get("pastabos"),
             }
-            for r in (ctx.get("v8_rooms") or [])[:30]  # max 30 patalpų
+            for r in rooms[:50]
         ],
+        "santrauka": project.get("santrauka") or project.get("v8_totals") or {},
+        "pozicijos": [
+            {
+                "skyrius": p.get("skyrius"),
+                "aprasymas": p.get("aprasymas"),
+                "vnt": p.get("vnt"),
+                "kiekis": p.get("kiekis"),
+                "pastaba": p.get("pastaba"),
+                "saltinis": p.get("saltinis"),
+            }
+            for p in pozicijos[:100]
+        ],
+        # darbu_sarasas mirror — frontend uses both names; AI may match either
         "darbai": [
             {
+                "skyrius": it.get("skyrius"),
                 "aprasymas": it.get("aprasymas"),
-                "vnt": it.get("mato_vnt"),
+                "vnt": it.get("mato_vnt") or it.get("vnt"),
                 "kiekis": it.get("kiekis"),
             }
-            for it in (ctx.get("darbu_sarasas") or [])[:50]
+            for it in (darbai or pozicijos)[:100]
         ],
+        "warnings": [
+            {"level": w.get("level"), "room": w.get("room"), "message": w.get("message")}
+            for w in (sanity.get("warnings") or [])[:30]
+        ],
+        "warnings_summary": sanity.get("summary"),
+        "_meta": project.get("_meta") or {},
+        "_overrides": project.get("_overrides") or {},
     }
 
-    sys_prompt = (
-        "Tu esi sąmatininko padėjėjas. Atsakyk LIETUVIŠKAI, glaustai (1-3 sakiniai), "
-        "remdamasis pateiktais projekto duomenimis. Jei duomenų neužtenka — pasakyk. "
-        "Niekada neišgalvok skaičių."
-    )
 
-    import json
-    import asyncio
+_CHAT_SYSTEM_PROMPT = """Tu esi profesionalaus LT vidaus apdailos sąmatininko AI padėjėjas.
+
+Tavo tikslas — tiksliai atsakyti į vartotojo klausimus apie KONKRETŲ projektą,
+remiantis pateiktais duomenimis. Niekada neišgalvok skaičių, niekada
+nehallucinuok. Jei duomenų neužtenka — aiškiai pasakyk.
+
+Atsakymo principai:
+- LIETUVIŠKAI
+- Konkrečiai: nurodyk patalpos numerį, pavadinimą, kiekius
+- Glaustai: 1-4 sakiniai. Tik jei klausia detalių — ilgesni.
+- Cituok duomenis: "Pagal eksplikaciją 02 Vonia turi 6.4 m²..."
+- Kontekstas: jei klausia "kuriuose kambariuose plytelės?", patikrink
+  `plyteles_sienos_m2 > 0` arba `plyteles_grindys_m2 > 0` per visas patalpas
+- Skaičiavimai: jei klausia "kiek dažų reikės?", paimk dazymo_plotas_total
+  iš santraukos arba sumuok per kambarius. Naudok formulę:
+  `dažai_litrai = plotas × 1.8 / 9 m²/L` (pirmas sluoksnis × 1.8, ne 2.0)
+- Warnings: jei klausia "kokie warning'ai?" arba "ar yra problemų?", paimk
+  iš `warnings` array. Jei jų 0 — pasakyk "warning'ų nerasta".
+- Sąnaudos: jei klausia "kiek kainavo?" — paimk iš `_meta`:
+  cost ≈ (input_tokens × 5e-6) + (output_tokens × 25e-6) − (cache_read × 4.5e-6) USD
+- Patalpu rūšiavimas: paskirtis enum'as: gyvenamoji, miegamoji, virtuve, vonia,
+  wc, san, koridorius, holas, drabuzine, katiline, skalbykla, valgomasis,
+  tamburas, garazas, sandeliukas, kabinetas, terasa, lodzija
+- Formulės šaltinis: NRM2 §29 (paint), §27 (floors). Plytelinė juosta
+  vonia/wc default 2.0m. Atimame angas ≥1.0m². Mansardinis svoris STR 1.05.06.
+
+Niekada nesakyk "neturiu prieigos prie projekto" — visi duomenys pateikti
+JSON formatu user'io pranešime.
+"""
+
+
+@app.post("/chat-project")
+async def chat_project(request: Request, payload: dict = Body(...)):
+    """AI CHAT — vartotojas klausia natural language apie projektą.
+
+    Payload variants:
+    - {"project_id": "...", "question": "..."}                    (preferred — fetches fresh from DB)
+    - {"project_id": "...", "messages": [{role, content}, ...]}   (with conversation history)
+    - {"project_context": {...}, "question": "..."}               (legacy fallback — uses passed data)
+    """
+    user = _auth.require_user(request)
+    _check_rate_limit(request.client.host if request.client else "unknown", "chat")
+
+    question = (payload.get("question") or "").strip()
+    history = payload.get("messages") or []  # [{role: "user"|"assistant", content: "..."}]
+    project_id = payload.get("project_id")
+    ctx = payload.get("project_context") or {}
+
+    if not question and not history:
+        return {"status": "error", "error": "Klausimas tuščias"}
+
+    # If project_id provided, fetch fresh from DB (preferred — DB is source of truth).
+    # Otherwise fall back to passed context (legacy frontend support).
+    if project_id:
+        user_filter = None if user.get("is_admin") else user["id"]
+        full_project = db.get_project(project_id, user_id=user_filter)
+        if not full_project:
+            raise HTTPException(status_code=404, detail="Projektas nerastas")
+    else:
+        full_project = ctx
+        if not full_project:
+            return {"status": "error", "error": "Nepateiktas projektas"}
+
+    grounded_ctx = _build_chat_context(full_project)
+    ctx_json = json.dumps(grounded_ctx, ensure_ascii=False, indent=2)
+
+    # Build messages: project context as first user turn (cached if repeated),
+    # then prior history, then current question.
+    messages: list[dict] = [
+        {
+            "role": "user",
+            "content": f"Projekto duomenys:\n```json\n{ctx_json}\n```\n\n(Atsakyk į klausimą po šito.)",
+        },
+        {"role": "assistant", "content": "Suprantu projekto kontekstą. Klausk."},
+    ]
+    for m in history:
+        if m.get("role") in ("user", "assistant") and m.get("content"):
+            messages.append({"role": m["role"], "content": str(m["content"])})
+    if question:
+        messages.append({"role": "user", "content": question})
+
+    log.info("chat: user=%s project=%s history_len=%d ctx_size=%dKB",
+             user["id"], project_id or "(passed)", len(history), len(ctx_json) // 1024)
+
     loop = asyncio.get_running_loop()
 
     def _call():
         return client.messages.create(
             model="claude-opus-4-7",
-            max_tokens=512,
-            system=sys_prompt,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Projekto duomenys:\n```json\n{json.dumps(summary, ensure_ascii=False, indent=2)}\n```\n\n"
-                    f"Klausimas: {question}"
-                ),
-            }],
+            max_tokens=2000,
+            system=_CHAT_SYSTEM_PROMPT,
+            messages=messages,
         )
 
     try:
         msg = await loop.run_in_executor(None, _call)
-        text = "".join(
-            block.text for block in msg.content if hasattr(block, "text")
-        )
-        return {"status": "ok", "answer": text}
+        text = "".join(b.text for b in msg.content if hasattr(b, "text"))
+        usage = msg.usage
+        return {
+            "status": "ok",
+            "answer": text,
+            "_meta": {
+                "input_tokens": getattr(usage, "input_tokens", 0),
+                "output_tokens": getattr(usage, "output_tokens", 0),
+                "model": "claude-opus-4-7",
+            },
+        }
     except Exception as e:
+        log.exception("chat-project failed")
         return {"status": "error", "error": f"AI klaida: {e}"}
 
 
