@@ -1,10 +1,14 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FolderPlus, FileSpreadsheet, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, FolderPlus, FileSpreadsheet, Settings,
+  ChevronLeft, ChevronRight, ShieldCheck, LogOut,
+} from 'lucide-react';
 import Logo from './Logo';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/authContext';
 
-const navItems = [
+const baseNav = [
   { path: '/', icon: LayoutDashboard, label: 'Projektai' },
   { path: '/new-project', icon: FolderPlus, label: 'Naujas projektas' },
   { path: '/price-lists', icon: FileSpreadsheet, label: 'Kainynai' },
@@ -13,6 +17,17 @@ const navItems = [
 
 export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, logout } = useAuth();
+
+  const navItems = isAdmin
+    ? [...baseNav, { path: '/admin', icon: ShieldCheck, label: 'Admin' }]
+    : baseNav;
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <aside className={cn(
@@ -29,7 +44,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         )}
       </div>
 
-      <nav className="flex-1 py-4 px-2 space-y-1">
+      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
         {navItems.map(({ path, icon: Icon, label }) => {
           const isActive = path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
           return (
@@ -51,6 +66,37 @@ export default function Sidebar({ collapsed, onToggle }) {
           );
         })}
       </nav>
+
+      {/* User info + logout */}
+      {user && (
+        <div className={cn("border-t border-sidebar-border p-2", collapsed ? "" : "p-3")}>
+          {!collapsed && (
+            <div className="px-2 mb-2 min-w-0">
+              <div className="text-xs text-muted-foreground">Prisijungęs</div>
+              <div className="text-sm font-medium text-sidebar-foreground truncate">
+                {user.email}
+                {isAdmin && (
+                  <span className="ml-1 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">admin</span>
+                )}
+              </div>
+              {user.company_name && (
+                <div className="text-xs text-muted-foreground truncate">{user.company_name}</div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors",
+              collapsed && "justify-center px-0"
+            )}
+            title={collapsed ? 'Atsijungti' : undefined}
+          >
+            <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
+            {!collapsed && <span>Atsijungti</span>}
+          </button>
+        </div>
+      )}
 
       <button
         onClick={onToggle}

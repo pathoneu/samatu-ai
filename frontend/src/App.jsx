@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import React from 'react';
 import PageNotFound from './lib/PageNotFound';
 import AppLayout from '@/components/layout/AppLayout';
@@ -10,48 +10,53 @@ import NewProject from '@/pages/NewProject';
 import ProjectDetail from '@/pages/ProjectDetail';
 import PriceLists from '@/pages/PriceLists';
 import Settings from '@/pages/Settings';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import Privacy from '@/pages/Privacy';
+import Terms from '@/pages/Terms';
+import AdminDashboard from '@/pages/AdminDashboard';
+import CookieBanner from '@/components/CookieBanner';
+import { AuthProvider, useAuth } from '@/lib/authContext';
 
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(e) { return { error: e }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="p-8 max-w-2xl mx-auto">
-          <h2 className="text-lg font-bold text-red-500 mb-2">Rendering klaida</h2>
-          <pre className="text-xs bg-gray-900 text-red-300 p-4 rounded overflow-auto whitespace-pre-wrap">
-            {this.state.error.message}
-            {'\n\n'}
-            {this.state.error.stack}
-          </pre>
-          <button onClick={() => this.setState({ error: null })} className="mt-4 px-4 py-2 bg-primary text-white rounded text-sm">
-            Bandyti vėl
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
+function ProtectedRoute({ children }) {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Kraunama...</div>;
   }
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return children;
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
-      <Router>
-        <ErrorBoundary>
+      <AuthProvider>
+        <Router>
           <Routes>
-            <Route element={<AppLayout />}>
+            {/* Public routes (no auth required) */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+
+            {/* Protected — wrapped in AppLayout (sidebar) */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/new-project" element={<NewProject />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/price-lists" element={<PriceLists />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/admin" element={<AdminDashboard />} />
             </Route>
             <Route path="*" element={<PageNotFound />} />
           </Routes>
-        </ErrorBoundary>
-      </Router>
-      <Toaster />
+          <CookieBanner />
+        </Router>
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   )
 }
