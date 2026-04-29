@@ -82,7 +82,7 @@ function calcRoomQuantities(room) {
   };
 }
 
-export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf }) {
+export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, project, onJumpToPage }) {
   const [rooms, setRooms] = useState(() =>
     initialRooms.map(calcRoomQuantities)
   );
@@ -149,19 +149,19 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf }) 
           <div>
             <div className="text-stone-500 text-xs">Bendras plotas</div>
             <div className="font-bold text-lg text-stone-800">
-              {totals.bendras_plotas_m2.toFixed(1)} m²
+              {totals.bendras_plotas_m2.toFixed(2)} m²
             </div>
           </div>
           <div>
             <div className="text-stone-500 text-xs">Dažomas plotas</div>
             <div className="font-bold text-lg text-amber-700">
-              {totals.dazymo_plotas_m2.toFixed(1)} m²
+              {totals.dazymo_plotas_m2.toFixed(2)} m²
             </div>
           </div>
           <div>
             <div className="text-stone-500 text-xs">Dažymo kampai</div>
             <div className="font-bold text-lg text-orange-600">
-              {totals.kampai_m.toFixed(1)} m
+              {totals.kampai_m.toFixed(2)} m
             </div>
           </div>
         </div>
@@ -173,9 +173,11 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf }) 
           <RoomCard
             key={`${room.nr}-${idx}`}
             room={room}
+            project={project}
             onChange={(updated) => handleRoomChange(idx, updated)}
             onRemove={() => handleRemove(idx)}
             onShowOnPdf={onShowOnPdf}
+            onJumpToPage={onJumpToPage}
           />
         ))}
         {/* Add card */}
@@ -193,31 +195,31 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf }) 
           {totals.gkp_lubu_standart_m2 > 0 && (
             <div className="flex justify-between">
               <span className="text-stone-600">GKP lubos (standart)</span>
-              <span className="font-medium">{totals.gkp_lubu_standart_m2.toFixed(1)} m²</span>
+              <span className="font-medium">{totals.gkp_lubu_standart_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.gkp_lubu_virs_3m_m2 > 0 && (
             <div className="flex justify-between">
               <span className="text-stone-600">GKP lubos (virš 3m)</span>
-              <span className="font-medium">{totals.gkp_lubu_virs_3m_m2.toFixed(1)} m²</span>
+              <span className="font-medium">{totals.gkp_lubu_virs_3m_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.plyteles_sienos_m2 > 0 && (
             <div className="flex justify-between">
               <span className="text-stone-600">Plytelės sienose</span>
-              <span className="font-medium">{totals.plyteles_sienos_m2.toFixed(1)} m²</span>
+              <span className="font-medium">{totals.plyteles_sienos_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.plyteles_grindys_m2 > 0 && (
             <div className="flex justify-between">
               <span className="text-stone-600">Plytelės grindyse</span>
-              <span className="font-medium">{totals.plyteles_grindys_m2.toFixed(1)} m²</span>
+              <span className="font-medium">{totals.plyteles_grindys_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.grindjuostes_m > 0 && (
             <div className="flex justify-between">
               <span className="text-stone-600">Grindjuostės</span>
-              <span className="font-medium">{totals.grindjuostes_m.toFixed(1)} m</span>
+              <span className="font-medium">{totals.grindjuostes_m.toFixed(2)} m</span>
             </div>
           )}
           {totals.hidroizoliacijos_vnt > 0 && (

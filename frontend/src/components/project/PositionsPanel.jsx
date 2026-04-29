@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
+import ShareButton from './ShareButton';
 
-function fmt(val, d = 1) {
+function fmt(val, d = 2) {
   if (val == null) return '—';
   return Number(val).toLocaleString('lt-LT', { maximumFractionDigits: d });
 }
@@ -84,6 +85,14 @@ function PositionRow({ row, isActive, isHovered, onClick, onHover, onChange }) {
         <SourceDot row={row} />
         <div className="flex-1 min-w-0">
           <div className="text-foreground/90 leading-snug truncate">{row.aprasymas}</div>
+          {row.medziagos_kiekis != null && row.medziagos_kiekis > 0 && (
+            <div className="text-[10px] text-muted-foreground/80 leading-tight truncate mt-0.5">
+              + medžiaga: <span className="tabular-nums">{fmt(row.medziagos_kiekis)} {row.medziagos_vnt}</span>
+              {row.medziagos_aprasymas && (
+                <span className="text-muted-foreground/60"> · {row.medziagos_aprasymas}</span>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
             <span className="tabular-nums">{fmt(row.kiekis)} {row.mato_vnt}</span>
             <span>·</span>
@@ -133,6 +142,7 @@ function PositionRow({ row, isActive, isHovered, onClick, onHover, onChange }) {
 // ── PositionsPanel main ────────────────────────────────────────────────────
 export default function PositionsPanel({
   project, darbai, activeRowId, hoveredRowId,
+  highlightRowIds = null, // Set<rowId> from PDF room hover (Phase 14 / QW05)
   onRowClick, onRowHover, onDarbaiChange, onCollapse,
 }) {
   const [search, setSearch] = useState('');
@@ -160,14 +170,20 @@ export default function PositionsPanel({
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
   const cats = Object.keys(grouped);
 
+  // SM02: pokyčius kiekiams pritaiko getFloorCount(project) — totals
+  // padauginami iš aukštų skaičiaus (default 1).
+  const floorCount = (() => {
+    const n = parseInt(project?.prielaidos?.aukstu_skaicius, 10);
+    return Number.isFinite(n) && n >= 1 ? Math.min(9, n) : 1;
+  })();
   const totals = useMemo(() => {
     let sum = 0, count = 0;
     darbai.forEach(it => {
       sum += (it.kiekis || 0) * (it.kaina || 0);
       count++;
     });
-    return { sum, count };
-  }, [darbai]);
+    return { sum: sum * floorCount, count };
+  }, [darbai, floorCount]);
 
   const totalArea = useMemo(() => {
     const rooms = project.v8_rooms || project.patalpos || [];
@@ -199,8 +215,13 @@ export default function PositionsPanel({
       <div className="px-3 pt-3 pb-2 border-b border-border bg-card/95 backdrop-blur z-10">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1.5">
               Bendra suma (be PVM)
+              {floorCount > 1 && (
+                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold normal-case tracking-normal">
+                  × {floorCount} aukštai
+                </span>
+              )}
             </div>
             <div className="text-xl font-semibold tabular-nums text-foreground">
               {fmtEur(totals.sum)}
@@ -211,6 +232,7 @@ export default function PositionsPanel({
           </div>
           <div className="flex items-center gap-1">
             <ExportDropdown project={{ ...project, darbu_sarasas: darbai }} />
+            <ShareButton project={project} />
             <button
               onClick={onCollapse}
               className="p-1.5 hover:bg-muted rounded text-muted-foreground"
@@ -329,7 +351,7 @@ export default function PositionsPanel({
                         key={row._id}
                         row={row}
                         isActive={activeRowId === row._id}
-                        isHovered={hoveredRowId === row._id}
+                        isHovered={hoveredRowId === row._id || highlightRowIds?.has?.(row._id) === true}
                         onClick={onRowClick}
                         onHover={onRowHover}
                         onChange={handleRowChange}

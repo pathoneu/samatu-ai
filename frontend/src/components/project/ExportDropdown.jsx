@@ -6,6 +6,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import ExportFilterModal from './ExportFilterModal';
+import { getFloorCount } from '@/lib/floorMultiplier';
 
 const API = '';
 
@@ -16,68 +18,102 @@ const API = '';
 // Backend generate-excel expects {tekstas, kategorija} per warning.
 // Map our {level, room, message} to that shape.
 function collectWarnings(project) {
+  // Sprint §AUDIT (2026-04-29): dedupe by `tekstas` — legacy projects have
+  // BOTH lt_sanity.warnings AND project.perspejimani populated (Phase 9
+  // mirror), so each warning appeared twice in exported Excel/PDF.
   const out = [];
+  const seen = new Set();
+  const push = (tekstas, kategorija) => {
+    const t = (tekstas || '').trim();
+    if (!t) return;
+    const key = t.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ tekstas: t, kategorija });
+  };
   const sanity = project.lt_sanity?.warnings || [];
   for (const w of sanity) {
     const kat = w.room ? `${w.level || 'INFO'} · ${w.room}` : (w.level || 'INFO');
-    out.push({ tekstas: w.message || '', kategorija: kat });
+    push(w.message, kat);
   }
   if (Array.isArray(project.perspejimani)) {
     for (const w of project.perspejimani) {
       if (typeof w === 'string') {
-        out.push({ tekstas: w, kategorija: 'INFO' });
+        push(w, 'INFO');
       } else {
-        out.push({
-          tekstas: w.tekstas || w.message || '',
-          kategorija: w.kategorija || w.level || 'INFO',
-        });
+        push(w.tekstas || w.message, w.kategorija || w.level || 'INFO');
       }
     }
   }
   return out;
 }
 
-function buildPayload(project) {
+function buildPayload(project, allowedSkyriai = null) {
+  // allowedSkyriai: Set<string> | null. If null = include everything.
+  const keep = (skyrius) => !allowedSkyriai || allowedSkyriai.has(skyrius);
+  // SM02: daugiabučiams kiekiai padauginti × aukštų skaičiaus.
+  const floorCount = getFloorCount(project);
+  const mult = (n) => (n || 0) * floorCount;
+
   // V8 darbu_sarasas — primary source
   if (Array.isArray(project.darbu_sarasas) && project.darbu_sarasas.length > 0) {
+    const projektas = floorCount > 1
+      ? `${project.name} (× ${floorCount} aukštai)`
+      : project.name;
     return {
-      projektas: project.name,
+      projektas,
       eilutes: project.darbu_sarasas
         .filter(it => (it.kiekis || 0) > 0)
-        .map((it, i) => ({
-          nr: String(it.eil_nr || i + 1),
-          aprasymas: it.aprasymas || '',
-          mato_vnt: it.mato_vnt || it.vnt || '',
-          kiekis: it.kiekis || 0,
-          kaina: it.kaina || 0,
-          suma: (it.kiekis || 0) * (it.kaina || 0),
-          skyrius: it.skyrius || it.kategorija || 'Apdaila',
-          confidence: it.confidence || 'medium',
-        })),
+        .map((it, i) => {
+          const kiekis = mult(it.kiekis);
+          return {
+            nr: String(it.eil_nr || i + 1),
+            aprasymas: it.aprasymas || '',
+            mato_vnt: it.mato_vnt || it.vnt || '',
+            kiekis,
+            kaina: it.kaina || 0,
+            suma: kiekis * (it.kaina || 0),
+            skyrius: it.skyrius || it.kategorija || 'Apdaila',
+            confidence: it.confidence || 'medium',
+          };
+        })
+        .filter(it => keep(it.skyrius)),
       patalpos: project.v8_rooms || project.patalpos || [],
       tipas: project.tipas || project.type || 'kz',
       perspejimani: collectWarnings(project),
       archetipas: project.archetipas || '',
+      aukstu_skaicius: floorCount,
     };
   }
   // Fallback (KŽ projektai)
   return {
-    projektas: project.name,
-    eilutes: (project.rows || []).map(r => ({
-      nr: r.nr || '', aprasymas: r.aprasymas || '',
-      mato_vnt: r.mato_vnt || '', kiekis: r.kiekis || 0,
-      kaina: r.kaina || 0, suma: r.suma || 0,
-      skyrius: r.skyrius || '',
-    })),
+    projektas: floorCount > 1 ? `${project.name} (× ${floorCount} aukštai)` : project.name,
+    eilutes: (project.rows || [])
+      .map(r => {
+        const kiekis = mult(r.kiekis);
+        return {
+          nr: r.nr || '', aprasymas: r.aprasymas || '',
+          mato_vnt: r.mato_vnt || '',
+          kiekis,
+          kaina: r.kaina || 0,
+          suma: kiekis * (r.kaina || 0),
+          skyrius: r.skyrius || '',
+        };
+      })
+      .filter(it => keep(it.skyrius || '')),
     tipas: project.tipas || 'kz',
+    aukstu_skaicius: floorCount,
   };
 }
 
-async function downloadFile(endpoint, project, filename) {
+async function downloadFile(endpoint, project, filename, allowedSkyriai) {
+  // Sprint §AUDIT (2026-04-29): credentials: 'include' required after backend
+  // export endpoints became auth-gated.
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildPayload(project)),
+    body: JSON.stringify(buildPayload(project, allowedSkyriai)),
   });
   if (!res.ok) throw new Error(`Klaida (${res.status})`);
   const blob = await res.blob();
@@ -92,6 +128,7 @@ async function downloadFile(endpoint, project, filename) {
 export default function ExportDropdown({ project }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(null);
+  const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | null
   const ref = useRef(null);
 
   useEffect(() => {
@@ -102,17 +139,25 @@ export default function ExportDropdown({ project }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  const handle = async (action) => {
-    setLoading(action);
+  const handle = (action) => {
     setOpen(false);
+    setFilterFor(action);
+  };
+
+  const handleConfirm = async ({ skyriai, format }) => {
+    setLoading(format);
     try {
       const safeName = (project.name || 'projektas').replace(/[^\w\s-]/g, '').trim();
-      if (action === 'excel') {
-        await downloadFile('generate-excel', project, `${safeName}.xlsx`);
-      } else if (action === 'pdf') {
-        await downloadFile('generate-pdf', project, `${safeName}.pdf`);
+      if (format === 'excel') {
+        await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai);
+      } else if (format === 'pdf') {
+        await downloadFile('generate-pdf', project, `${safeName}.pdf`, skyriai);
       }
+      // Sprint §FIX-9 (2026-04-29): F2/F3 forms removed per user feedback.
+      // Code preserved in docs/superpowers/backup-2026-04-29-f2-f3-forms.py
+      // for re-enable once contractors confirm what's needed.
       toast.success('Failas atsisiųstas');
+      setFilterFor(null);
     } catch (e) {
       toast.error(`Eksporto klaida: ${e.message}`);
     } finally {
@@ -156,7 +201,20 @@ export default function ExportDropdown({ project }) {
               <div className="text-[11px] text-muted-foreground">Spausdintinas komercinis pasiūlymas</div>
             </div>
           </button>
+          {/* Sprint §FIX-9 (2026-04-29): F2/F3 forms removed per user.
+              Will return after contractor feedback — code in
+              docs/superpowers/backup-2026-04-29-f2-f3-forms.py */}
         </div>
+      )}
+
+      {filterFor && (
+        <ExportFilterModal
+          project={project}
+          format={filterFor}
+          loading={loading === filterFor}
+          onCancel={() => { if (loading == null) setFilterFor(null); }}
+          onConfirm={handleConfirm}
+        />
       )}
     </div>
   );

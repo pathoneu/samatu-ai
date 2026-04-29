@@ -68,9 +68,15 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
 # dev/staging from abusive clients (eg. accidental script loops).
 _RATE_BUCKET: dict[str, deque] = defaultdict(deque)
 _RATE_LIMIT_PER_MIN = 30  # generous; one estimator might do 5-10/hour normally
+_RATE_BUCKET_LAST_GC = [0.0]  # mutable cell so we can update from inside func
 
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
-    """Sliding-window rate limit. Raises 429 on overflow."""
+    """Sliding-window rate limit. Raises 429 on overflow.
+
+    Sprint §AUDIT (2026-04-29): periodic janitor evicts empty buckets so the
+    dict doesn't grow unbounded over weeks of unique IPs. Runs at most every
+    10 minutes; cheap O(n) scan over keys.
+    """
     now = _time.time()
     bucket = _RATE_BUCKET[f"{client_ip}:{endpoint}"]
     # Drop entries older than 60s
@@ -80,6 +86,21 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
         log.warning("rate limit hit: ip=%s endpoint=%s count=%d", client_ip, endpoint, len(bucket))
         raise HTTPException(status_code=429, detail=f"Per daug užklausų. Palaukite minutę. (limitas: {_RATE_LIMIT_PER_MIN}/min)")
     bucket.append(now)
+    # Janitor: evict stale entries every 10 minutes. Cheap because most buckets
+    # already empty after a minute of inactivity.
+    if now - _RATE_BUCKET_LAST_GC[0] > 600:
+        _RATE_BUCKET_LAST_GC[0] = now
+        stale_keys = []
+        for key, deq in _RATE_BUCKET.items():
+            while deq and now - deq[0] > 60:
+                deq.popleft()
+            if not deq:
+                stale_keys.append(key)
+        for key in stale_keys:
+            del _RATE_BUCKET[key]
+        if stale_keys:
+            log.info("rate-limiter GC: evicted %d empty buckets, %d remaining",
+                     len(stale_keys), len(_RATE_BUCKET))
 import pdfplumber
 import anthropic
 import openpyxl
@@ -369,6 +390,219 @@ async def api_delete_project(request: Request, project_id: str):
     if not db.delete_project(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return {"deleted": project_id}
+
+
+# ── SM04: read-only share links ──────────────────────────────────────────────
+
+@app.post("/api/projects/{project_id}/share")
+async def api_create_share(request: Request, project_id: str, payload: dict | None = None):
+    """Issue (or refresh) a UUID share token for read-only viewing. Auth required.
+
+    Sprint §36 (2026-04-29): supports `expires_in_days` (default 30, 0 = no expiry).
+    Returns: {token, url, expires_at, view_count}
+    """
+    from datetime import datetime, timedelta, timezone
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Parse expires_in_days from body (default 30 days)
+    expires_in = 30
+    if payload and isinstance(payload, dict):
+        try:
+            expires_in = int(payload.get("expires_in_days", 30))
+        except (ValueError, TypeError):
+            expires_in = 30
+    expires_at = None
+    if expires_in > 0:
+        exp_dt = datetime.now(timezone.utc) + timedelta(days=expires_in)
+        expires_at = exp_dt.isoformat()
+
+    import uuid
+    token = uuid.uuid4().hex
+    db.set_share_token(project_id, token, expires_at=expires_at)
+    log.info("share token issued: project=%s by user=%s expires=%s",
+             project_id, user["id"], expires_at)
+    return {
+        "token": token,
+        "url": f"/share/{token}",
+        "expires_at": expires_at,
+        "view_count": 0,
+    }
+
+
+@app.get("/api/projects/{project_id}/share")
+async def api_get_share_status(request: Request, project_id: str):
+    """Get current share token state (token, expires_at, view_count, last_viewed_at).
+    Returns null fields if no active token."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
+    status = db.get_share_status(project_id) or {}
+    return {
+        "token": status.get("token"),
+        "url": f"/share/{status['token']}" if status.get("token") else None,
+        "expires_at": status.get("expires_at"),
+        "view_count": status.get("view_count", 0),
+        "last_viewed_at": status.get("last_viewed_at"),
+        "active": bool(status.get("token")),
+    }
+
+
+# ── Sprint E3 — On-demand material specs per room ────────────────────────────
+#
+# When user clicks "Dizainerio medžiagos" on RoomCard, frontend POSTs the PDF
+# blob (from IndexedDB) + room_nr. We pick spec-rich pages for that room and
+# run a focused Vision call. Result cached in project DB so second click is
+# free. ~$0.20 per first-time click.
+
+
+def _pick_spec_pages_for_room(target_room: dict, puslapiai: list[dict]) -> list[int]:
+    """Heuristic: pick up to 3 designer-spec pages most relevant to this room.
+
+    Priority:
+    1. material_spec_per_room with title matching room name (e.g. "VAIKŲ VONIOS SPALVOS")
+    2. wall_elevation_with_tiles matching room name or room nr
+    3. specification (broader) — fallback for projects without dedicated per-room pages
+    """
+    if not puslapiai:
+        return []
+    room_name = (target_room.get("pavadinimas") or "").lower().strip()
+    room_nr = (target_room.get("nr") or "").lower().strip()
+    name_tokens = [t for t in room_name.split() if len(t) >= 4]
+
+    def _matches(page_title: str) -> bool:
+        title = (page_title or "").lower()
+        if not title:
+            return False
+        if room_nr and f"({room_nr})" in title or f" {room_nr} " in title:
+            return True
+        return any(tok in title for tok in name_tokens) if name_tokens else False
+
+    by_priority: list[int] = []
+    spec_pages = [p for p in puslapiai
+                  if (p.get("tipas") or "") in ("specification", "wall_elevation",
+                                                  "finish_schedule")]
+    # Pri 1 — title match
+    for p in spec_pages:
+        if _matches(p.get("pavadinimas", "")):
+            nr = p.get("nr")
+            if nr and nr not in by_priority:
+                by_priority.append(nr)
+    # Pri 2 — wall_elevation pages (often have tile spec for the room they show)
+    for p in spec_pages:
+        if (p.get("tipas") or "") == "wall_elevation":
+            nr = p.get("nr")
+            if nr and nr not in by_priority and len(by_priority) < 3:
+                by_priority.append(nr)
+    return by_priority[:3]
+
+
+@app.post("/api/projects/{project_id}/material-specs")
+async def api_extract_room_material_specs(
+    request: Request,
+    project_id: str,
+    files: list[UploadFile] = File(...),
+    room_nr: str = Form(...),
+):
+    """Extract designer material specs for ONE room. Frontend POSTs PDF blob."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    project = db.get_project(project_id, user_id=user_filter)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    data = project.get("data") or {}
+    rooms = data.get("patalpos") or []
+    target_room = next((r for r in rooms if r.get("nr") == room_nr), None)
+    if not target_room:
+        raise HTTPException(status_code=404, detail=f"Room {room_nr} not found")
+
+    # Cache check
+    cached = (data.get("_material_specs") or {}).get(room_nr)
+    if cached and not cached.get("_error"):
+        return {**cached, "_cached": True}
+
+    # Pick relevant pages
+    puslapiai = data.get("puslapiai") or []
+    spec_pages = _pick_spec_pages_for_room(target_room, puslapiai)
+    if not spec_pages:
+        return {
+            "paint": None, "sienos_plyteles": None,
+            "grindys_plyteles": None, "grindys_medines": None,
+            "_meta": {"pages_inspected": [], "_warning": "no_spec_pages_found"},
+        }
+
+    if not files:
+        raise HTTPException(status_code=400, detail="PDF file required")
+    pdf_bytes = await files[0].read()
+
+    # Run extraction (sync — wrapped in to_thread)
+    from extractor.material_specs import extract_room_material_specs
+    result = await asyncio.to_thread(
+        extract_room_material_specs, pdf_bytes, spec_pages,
+        target_room.get("pavadinimas") or room_nr,
+    )
+
+    # Cache in project data
+    try:
+        data.setdefault("_material_specs", {})[room_nr] = result
+        db.upsert_project(project_id, {**project, "data": data},
+                           user_id=user["id"])
+    except Exception as exc:
+        log.warning("material specs cache failed: %s", exc)
+
+    return result
+
+
+@app.delete("/api/projects/{project_id}/share")
+async def api_revoke_share(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
+    db.clear_share_token(project_id)
+    log.info("share token revoked: project=%s by user=%s", project_id, user["id"])
+    return {"status": "revoked"}
+
+
+@app.get("/api/share/{token}")
+async def api_get_shared(token: str):
+    """Public — return read-only project payload by share token. No auth needed.
+
+    Strips owner-internal fields (_meta cost data, user_id) before returning.
+    """
+    project = db.get_project_by_share_token(token)
+    if not project:
+        raise HTTPException(status_code=404, detail="Share link netinkamas, atšauktas arba pasibaigęs galiojimas")
+    # Sprint §36: bump view count on every successful access
+    try:
+        db.increment_share_view(token)
+    except Exception as exc:
+        log.warning("share view counter bump failed: %s", exc)
+    data = project.get("data") or {}
+    # Strip cost / token-level metadata so viewers can't see API spend.
+    if isinstance(data, dict):
+        meta = data.get("_meta")
+        if isinstance(meta, dict):
+            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
+                       "cache_write_tokens", "cost_eur", "zoom_input_tokens",
+                       "zoom_output_tokens"):
+                meta.pop(k, None)
+    return {
+        "id": project["id"],
+        "name": project.get("name"),
+        "company_name": project.get("company_name"),
+        "tipas": project.get("tipas"),
+        "archetipas": project.get("archetipas"),
+        "bendras_plotas_m2": project.get("bendras_plotas_m2"),
+        "vat_rate": project.get("vat_rate"),
+        "created_at": project.get("created_at"),
+        "data": data,
+        "shared": True,
+    }
 
 
 @app.post("/api/projects/{project_id}/corrections")
@@ -3345,7 +3579,10 @@ def _enrich_eilutes(eilutes: list[dict]) -> list[dict]:
 # ── /generate-excel ───────────────────────────────────────────────────────────
 
 @app.post("/generate-excel")
-async def generate_excel(data: dict):
+async def generate_excel(request: Request, data: dict):
+    # Sprint §AUDIT (2026-04-29): require auth — was open endpoint, vulnerable
+    # to abuse (each call spins up openpyxl + heavy I/O).
+    _auth.require_user(request)
     from datetime import date as _date
 
     C_DARK   = "1F3864"
@@ -3374,7 +3611,9 @@ async def generate_excel(data: dict):
     # Helper: write a standard section header row on any sheet
     # ─────────────────────────────────────────────────────────────────────────
     def _write_sheet_header(ws, title: str, data_row: int = 3):
-        ws.merge_cells(f"A1:G1")
+        # Sprint §FIX-3 (2026-04-29): merge A1:F1 (was A1:G1) — Conf column
+        # removed from data rows; header banner shouldn't extend past Suma.
+        ws.merge_cells(f"A1:F1")
         c = ws["A1"]
         c.value     = f"{title}  ·  {projektas}"
         c.font      = Font(bold=True, size=12, color="FFFFFF")
@@ -3387,6 +3626,9 @@ async def generate_excel(data: dict):
         ws["A2"].font  = Font(size=8, color="888888")
         ws.row_dimensions[2].height = 14
 
+        # Sprint §FIX-3 (2026-04-29): Conf. stulpelis pašalintas iš header'io
+        # ir _write_rows. User reported: client-facing Excel turi būti clean
+        # be vidaus debug indikatorių.
         HDR = [
             ("Nr.",        "left",   "A", 9),
             ("Aprašymas",  "left",   "B", 50),
@@ -3394,7 +3636,6 @@ async def generate_excel(data: dict):
             ("Kiekis",     "right",  "D", 13),
             ("Kaina €",    "right",  "E", 14),
             ("Suma €",     "right",  "F", 16),
-            ("Conf.",      "center", "G", 8),
         ]
         for col, (label, align, col_letter, width) in enumerate(HDR, 1):
             c = ws.cell(row=data_row, column=col, value=label)
@@ -3440,10 +3681,10 @@ async def generate_excel(data: dict):
             kiekis = e.get("kiekis", 0)
             kaina  = e.get("kaina",  0)
 
-            conf = e.get("confidence", "")
-            # PDF eksporte naudojam tekstinius indikatorius, ne emoji
-            conf_label = {"high": "✓", "medium": "·", "low": "?"}.get(conf, "")
-
+            # Sprint §FIX-3 (2026-04-29): user reported confidence dots in
+            # Excel are noise — exported sąmata should look clean for clients.
+            # Removed the 7th column entirely. Internal confidence still
+            # available in JSON / UI peržiūra queue.
             for col, (val, align, wrap) in enumerate([
                 (e.get("nr",        ""),  "left",   False),
                 (e.get("aprasymas", ""),  "left",   True),
@@ -3451,7 +3692,6 @@ async def generate_excel(data: dict):
                 (kiekis,                  "right",  False),
                 (kaina,                   "right",  False),
                 (None,                    "right",  False),   # formula placeholder
-                (conf_label,              "center", False),   # confidence
             ], 1):
                 if col == 6:
                     # Excel formula: Suma = Kiekis × Kaina
@@ -3518,12 +3758,20 @@ async def generate_excel(data: dict):
     _write_totals(ws_main, eilutes, last_r)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Sheets 2..N: one sheet per section (skyrius)
+    # Sheets 2..N: one sheet per section (skyrius).
+    # Sprint §FIX-2 (2026-04-29): normalize skyrius via SKYRIUS_LEGACY_MIGRATION
+    # before grouping so legacy variants ("GKP", "Gipso kartono montavimas",
+    # "Glaistymas dazymas", etc.) collapse into one canonical sheet.
     # ─────────────────────────────────────────────────────────────────────────
     from collections import OrderedDict
+    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION
     sections: dict[str, list] = OrderedDict()
     for e in eilutes:
-        sec = (e.get("skyrius") or "KITI DARBAI").strip()
+        sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
+        sec = SKYRIUS_LEGACY_MIGRATION.get(sec_raw, sec_raw)
+        # Mutate the row's skyrius to canonical so the section header in
+        # _write_rows shows the normalized name too.
+        e["skyrius"] = sec
         sections.setdefault(sec, []).append(e)
 
     for sec_name, sec_rows in sections.items():
@@ -3660,7 +3908,9 @@ async def generate_excel(data: dict):
 # ── /generate-pdf ─────────────────────────────────────────────────────────────
 
 @app.post("/generate-pdf")
-async def generate_pdf(data: dict):
+async def generate_pdf(request: Request, data: dict):
+    # Sprint §AUDIT (2026-04-29): require auth — was open endpoint.
+    _auth.require_user(request)
     from reportlab.platypus import HRFlowable
     from reportlab.lib.units import mm
     from reportlab.pdfgen.canvas import Canvas as _RLCanvas
@@ -4036,6 +4286,103 @@ async def extract_interior_endpoint(
     return result
 
 
+# ── /extract-interior-stream — SSE progressive extraction (SM01) ─────────────
+#
+# Same input as /extract-interior, but the response is text/event-stream.
+# Events: rendering_pdf, started, pass1_started, pass1_completed, zoom_started,
+# zoom_room_started, zoom_room_completed, zoom_completed, post_processing,
+# done (carrying full result), error.
+#
+# We run the sync pipeline on a worker thread (extractor.stream wraps that)
+# and forward queue items to the client as they appear. Heartbeat comments
+# every 10s keep proxies + browsers from closing the connection mid-extraction.
+
+@app.post("/extract-interior-stream")
+async def extract_interior_stream_endpoint(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    rules_override: str | None = Form(None),
+):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, "extract-interior")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
+    pdf_bytes = await files[0].read()
+    validation = _validate_pdf_upload(pdf_bytes, files[0].filename or "")
+
+    overrides_dict: dict | None = None
+    if rules_override:
+        try:
+            overrides_dict = json.loads(rules_override)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
+
+    log.info("extract-interior-stream: ip=%s file=%s size=%dKB pages=%d",
+             client_ip, files[0].filename, len(pdf_bytes) // 1024,
+             validation.get("page_count", 0))
+    from extractor import extract_interior_stream
+
+    def _format_sse(ev: dict) -> bytes:
+        return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8")
+
+    async def event_source():
+        # Push file-validation warning early so the UI can show it before pass-1.
+        if validation.get("warning"):
+            yield _format_sse({
+                "event": "validation_warning",
+                "message": validation["warning"],
+                "page_count": validation.get("page_count", 0),
+            })
+
+        loop = asyncio.get_event_loop()
+        gen = extract_interior_stream(pdf_bytes, overrides_dict)
+
+        # Bridge the sync generator to async — pull items in a worker thread
+        # one-at-a-time so cancellations propagate quickly.
+        sentinel = object()
+        while True:
+            try:
+                ev = await loop.run_in_executor(None, lambda: next(gen, sentinel))
+            except Exception as exc:
+                yield _format_sse({"event": "error", "message": str(exc)})
+                yield _format_sse({"event": "done", "result": {
+                    "status": "error", "_error": str(exc),
+                }})
+                return
+            if ev is sentinel:
+                return
+
+            # Augment terminal event with the page-count warning the same way
+            # the non-streaming endpoint does, so the UI banner still fires.
+            if ev.get("event") == "done" and isinstance(ev.get("result"), dict):
+                result = ev["result"]
+                if validation.get("warning"):
+                    existing = result.get("warnings") or []
+                    existing.append({"level": "WARN", "message": validation["warning"]})
+                    result["warnings"] = existing
+                    if isinstance(result.get("lt_sanity"), dict):
+                        ls = result["lt_sanity"]
+                        ls.setdefault("warnings", []).append({
+                            "level": "WARNING", "message": validation["warning"], "room": ""
+                        })
+                        ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
+                        ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
+                    result["_pdf_page_count"] = validation.get("page_count", 0)
+
+            yield _format_sse(ev)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+            "Connection": "keep-alive",
+        },
+    )
+
+
 # ── /recompute-interior — pure-math recompute with new rules_override ───────
 # (Phase 10 — AssumptionsPanel reactivation. No Vision call, no PDF re-render.
 # User edits per-paskirtis preferences in the UI; we re-apply formulas to the
@@ -4160,34 +4507,17 @@ async def recompute_interior(payload: RecomputePayload):
         },
     }
 
-    # Build minimal pozicijos[] from per-room totals (keeps Excel export populated).
-    # Note: we lose Vision's narrative pozicijos (e.g. "Plytelių 1200×1200×6") on
-    # recompute. UI should still allow re-extraction for full pozicijos detail.
-    pos: list[dict] = []
-    s = parsed.get("santrauka", {}) or {}
-
-    def _pos(skyrius: str, aprasymas: str, vnt: str, kiekis: float, saltinis: str = "skaiciuota_is_brezinio"):
-        if (kiekis or 0) > 0:
-            pos.append({
-                "skyrius": skyrius, "aprasymas": aprasymas, "vnt": vnt,
-                "kiekis": round(kiekis, 2), "saltinis": saltinis,
-            })
-
-    _pos("GKP montavimas", "GKP lubų montavimas (standart aukštis ≤3m)", "m2", s.get("gkp_lubu_m2_total", 0))
-    _pos("GKP montavimas", "GKP lubų montavimas (aukštis virš 3m)", "m2", s.get("gkp_lubu_virs_3m_m2_total", 0))
-    _pos("Glaistymas dazymas", "Sienų ir lubų glaistymas/dažymas", "m2", s.get("dazymo_plotas_total_m2", 0))
-    _pos("Glaistymas dazymas", "Dažymo kampų montavimas", "m", s.get("kampai_m_total", 0))
-    _pos("Glaistymas dazymas", "Angokraščių GKP apdaila", "m", s.get("angokrasciu_gkp_m_total", 0))
-    _pos("Glaistymas dazymas", "Paslėptų durų staktų apdirbimas", "m", s.get("pasleptu_duru_staktu_m_total", 0))
-    _pos("Glaistymas dazymas", "LED nišų glaistymas/dažymas", "m", s.get("nisu_metrai_total", 0))
-    _pos("Plyteles", "Sienų plytelės", "m2", s.get("plyteles_sienos_m2_total", 0))
-    _pos("Plyteles", "Grindų plytelės", "m2", s.get("plyteles_grindys_m2_total", 0))
-    _pos("Plyteles", "Išlyginamojo grindų pylimas", "m2", s.get("isliginamasis_m2_total", 0))
-    _pos("Plyteles", "Grindjuostės (parketo zonos)", "m", s.get("grindjuosciu_m_total", 0))
-    _pos("Plyteles", "PVC/parketo grindys", "m2", s.get("pvc_grindys_m2_total", 0))
-    _pos("Hidroizoliacija", "Hidroizoliacija drėgnose zonose", "vnt", s.get("hidroizoliacijos_vnt", 0))
-
-    parsed["pozicijos"] = pos
+    # Sprint §FIX (2026-04-29): use the FULL deterministic pozicijų generator
+    # (~70+ lines per residential project) instead of the prior 13-line summary.
+    # Earlier code was lossy: every Prielaidos toggle dropped 56→10 positions.
+    # _build_pozicijos_from_rooms() reads parsed["_overrides"] (set above) for
+    # NRM2/VOB/LT deduction standard + Q-level + paint class.
+    from extractor.vision_call import _build_pozicijos_from_rooms
+    try:
+        parsed = _build_pozicijos_from_rooms(parsed)
+    except Exception as exc:
+        print(f"[recompute-interior] pozicijos build failed: {exc}")
+        parsed["pozicijos"] = parsed.get("pozicijos") or []
     parsed = _emit_v8_compat_fields(parsed)
     parsed["status"] = "ok"
     parsed["_recomputed"] = True
@@ -4515,12 +4845,68 @@ async def chat_project(request: Request, payload: dict = Body(...)):
 
 
 @app.post("/export/excel")
-async def export_excel_alias(data: dict):
-    return await generate_excel(data)
+async def export_excel_alias(request: Request, data: dict):
+    return await generate_excel(request, data)
 
 @app.post("/export/pdf")
-async def export_pdf_alias(data: dict):
-    return await generate_pdf(data)
+async def export_pdf_alias(request: Request, data: dict):
+    return await generate_pdf(request, data)
+
+
+
+# ── /detect-scale-hint — Sprint G5 (2026-04-29) ──────────────────────────
+# Scans PDF text layer for "M 1:50" / "1:100" / "Skalė 1:50" patterns and
+# returns the suggested scale ratio. Frontend uses this to pre-fill the
+# ScaleCalibrationModal so users don't have to eyeball it.
+
+class DetectScalePayload(BaseModel):
+    pdf_url: str | None = None  # data URL or backend-served URL
+    pdf_b64: str | None = None  # base64-encoded PDF bytes
+
+
+@app.post("/detect-scale-hint")
+async def detect_scale_hint(payload: DetectScalePayload):
+    """Returns {found: bool, page: int|null, scale_ratio: int|null, scale_text: str|null,
+    confidence: 'high'|'medium'|'low'} after scanning PDF text layer for scale annotations."""
+    import re as _re_local
+    import base64
+    import pdfplumber
+
+    raw = None
+    if payload.pdf_b64:
+        try:
+            raw = base64.b64decode(payload.pdf_b64)
+        except Exception as e:
+            return {"found": False, "error": f"base64 decode failed: {e}"}
+    if not raw:
+        return {"found": False, "error": "pdf_b64 required"}
+
+    SCALE_PATTERNS = [
+        # "M 1:50", "Skalė 1:100", "M1:50", "1:50"
+        _re_local.compile(r"(?:^|[\s])M[\s]?1\s*:\s*(\d{2,4})\b", _re_local.IGNORECASE),
+        _re_local.compile(r"Skal[ėe]\s*1\s*:\s*(\d{2,4})\b", _re_local.IGNORECASE),
+        _re_local.compile(r"Mastelis\s*1\s*:\s*(\d{2,4})\b", _re_local.IGNORECASE),
+        _re_local.compile(r"\b1\s*:\s*(50|75|100|125|150|200|250|500|1000)\b"),
+    ]
+
+    try:
+        with pdfplumber.open(io.BytesIO(raw)) as pdf:
+            for page_idx, page in enumerate(pdf.pages, 1):
+                txt = page.extract_text() or ""
+                for pat in SCALE_PATTERNS:
+                    for m in pat.finditer(txt):
+                        ratio = int(m.group(1))
+                        if 20 <= ratio <= 2000:  # sanity
+                            return {
+                                "found": True,
+                                "page": page_idx,
+                                "scale_ratio": ratio,
+                                "scale_text": f"1:{ratio}",
+                                "confidence": "high" if pat is SCALE_PATTERNS[0] or pat is SCALE_PATTERNS[1] or pat is SCALE_PATTERNS[2] else "medium",
+                            }
+    except Exception as e:
+        return {"found": False, "error": str(e)}
+    return {"found": False, "page": None, "scale_ratio": None, "scale_text": None, "confidence": "low"}
 
 
 # ── /health ───────────────────────────────────────────────────────────────────

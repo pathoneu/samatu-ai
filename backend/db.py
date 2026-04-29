@@ -267,11 +267,15 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
                      pdf_sha256: str = "", pdf_size: int = 0,
                      page_count: int = 0) -> None:
     """Archive a Vision extraction response for cost analysis + audit."""
+    # Sprint §AUDIT (2026-04-29): use shared pricing module (was duplicate
+    # constants in both backend and frontend).
+    from pricing import calc_claude_cost_usd
     meta = response.get("_meta") or {}
-    in_tok = meta.get("input_tokens") or 0
-    out_tok = meta.get("output_tokens") or 0
-    cache_tok = meta.get("cache_read_tokens") or 0
-    cost_usd = (in_tok * 5e-6) + (out_tok * 25e-6) - (cache_tok * 4.5e-6)
+    cost_usd = calc_claude_cost_usd(
+        input_tokens=meta.get("input_tokens") or 0,
+        output_tokens=meta.get("output_tokens") or 0,
+        cache_read_tokens=meta.get("cache_read_tokens") or 0,
+    )
     cost_eur = cost_usd * 0.93  # rough USD→EUR
     with _conn() as c:
         c.execute("""
@@ -373,11 +377,101 @@ def _migrate_schema() -> None:
     """Idempotent column additions for existing DBs created before auth.
     SQLite ALTER TABLE only supports ADD COLUMN — keep migrations append-only."""
     with _conn() as c:
-        # Check if projects.user_id exists; add if not
         cols = {row["name"] for row in c.execute("PRAGMA table_info(projects)").fetchall()}
         if cols and "user_id" not in cols:
             c.execute("ALTER TABLE projects ADD COLUMN user_id TEXT")
             c.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
+        # SM04 — read-only share link
+        if cols and "share_token" not in cols:
+            c.execute("ALTER TABLE projects ADD COLUMN share_token TEXT")
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_share ON projects(share_token) WHERE share_token IS NOT NULL")
+        # Sprint §36 (2026-04-29): share token expiry + view tracking
+        if cols and "share_expires_at" not in cols:
+            c.execute("ALTER TABLE projects ADD COLUMN share_expires_at TEXT")
+        if cols and "share_view_count" not in cols:
+            c.execute("ALTER TABLE projects ADD COLUMN share_view_count INTEGER DEFAULT 0")
+        if cols and "share_last_viewed_at" not in cols:
+            c.execute("ALTER TABLE projects ADD COLUMN share_last_viewed_at TEXT")
+
+
+# ── SM04 share-link helpers ──────────────────────────────────────────────────
+
+def set_share_token(project_id: str, token: str, expires_at: str | None = None) -> None:
+    """Sprint §36 (2026-04-29): expires_at ISO string optional. None = no expiry.
+    Resets share_view_count to 0 when issuing a fresh token."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE projects SET share_token = ?, share_expires_at = ?, "
+            "share_view_count = 0, share_last_viewed_at = NULL, updated_at = ? WHERE id = ?",
+            (token, expires_at, _now_iso(), project_id),
+        )
+
+
+def clear_share_token(project_id: str) -> None:
+    with _conn() as c:
+        c.execute(
+            "UPDATE projects SET share_token = NULL, share_expires_at = NULL, "
+            "share_view_count = 0, share_last_viewed_at = NULL, updated_at = ? WHERE id = ?",
+            (_now_iso(), project_id),
+        )
+
+
+def get_share_status(project_id: str) -> dict | None:
+    """Return current share token state for owner UI."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT share_token, share_expires_at, share_view_count, share_last_viewed_at "
+            "FROM projects WHERE id = ?", (project_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "token": row["share_token"],
+            "expires_at": row["share_expires_at"],
+            "view_count": row["share_view_count"] or 0,
+            "last_viewed_at": row["share_last_viewed_at"],
+        }
+
+
+def increment_share_view(token: str) -> None:
+    """Atomically bump view_count + last_viewed_at when share URL accessed."""
+    if not token:
+        return
+    with _conn() as c:
+        c.execute(
+            "UPDATE projects SET share_view_count = COALESCE(share_view_count, 0) + 1, "
+            "share_last_viewed_at = ? WHERE share_token = ?",
+            (_now_iso(), token),
+        )
+
+
+def get_project_by_share_token(token: str) -> dict | None:
+    """Sprint §36: now also checks expires_at — returns None if expired."""
+    if not token:
+        return None
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM projects WHERE share_token = ?", (token,)
+        ).fetchone()
+        if not row:
+            return None
+        # Check expiry
+        expires = row["share_expires_at"] if "share_expires_at" in row.keys() else None
+        if expires:
+            try:
+                from datetime import datetime
+                exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00") if expires.endswith("Z") else expires)
+                if exp_dt < datetime.now(exp_dt.tzinfo):
+                    return None  # expired
+            except (ValueError, TypeError):
+                pass  # malformed expiry — treat as non-expiring
+        d = dict(row)
+        # Inflate data JSON blob
+        try:
+            d["data"] = json.loads(d.get("data") or "{}")
+        except json.JSONDecodeError:
+            d["data"] = {}
+        return d
 
 
 # Initialize schema on module import

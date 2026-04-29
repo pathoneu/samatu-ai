@@ -145,11 +145,19 @@ paint_liters = (paintable_area × coats) / coverage_rate
 | Q1 | Under heavy wallpaper | 0.8 kg/m²/mm | 0.5-1mm |
 | Q2 | Under matte paint | 1.0 kg/m²/mm | 1-1.5mm |
 | Q3 | Under semi-gloss | 1.2 kg/m²/mm | 1.5-2mm |
-| Q4 | Under gloss/lacquer | 1.5 kg/m²/mm | 2-3mm |
+| Q4 | Under gloss/lacquer | 1.5 kg/m²/mm | **3-5mm** (full-surface skim) |
 ```
 putty_kg = area × thickness_mm × consumption_rate
 bags_25kg = CEILING(putty_kg / 25)
 ```
+
+**Q4 sanding labor — SEPARATE LINE ITEM, often missed:**
+```
+glaistymo_šlifavimas_Q4 = wall_area × 0.30 h/m²    // 80-120 grit, 100% surface
+```
+Q4 = gloss/lacquer-ready surface. Every 0.1mm imperfection shows under gloss paint.
+Source: Merkblatt Nr. 2 "Verspachtelung von Gipsplatten" (Bundesverband der Gipsindustrie),
+DIN 18181/18363. Sanding labor alone is ~25-35% of total drywall finishing cost.
 
 ### 1.12 Hidroizoliacija (Waterproofing) — OFTEN FORGOTTEN!
 ```
@@ -493,8 +501,14 @@ Show these in UI so user knows what to double-check.
 8. Not accounting for different ceiling heights per room
 9. Forgetting fire-rated assemblies where required
 10. Missing MEP penetration sealing (firestops)
+11. Mixing ceiling drywall (9.5mm) with wall drywall (12.5mm) in one total — different thickness, different sheet counts; estimators often sum into one number
+12. Skipping sanding labor — represents 25-35% of drywall finishing cost; rushed estimates count only material
+13. Touch-up buffer too low on rough/textured walls — needs 10-20% extra paint, not just 5-8% standard waste factor
+14. Specifying metal corner bead everywhere — only outside corners need metal; inside corners use cheaper paper tape
 
 The app should WARN users about these commonly missed items.
+
+> **Sources for #11-14:** RICS NRM2, Merkblatt Nr. 2 (Bundesverband der Gipsindustrie), DIN 18363, Tikkurila/Caparol TI sheets, Hyde Tools corner bead guide. Full research: `docs/superpowers/research/2026-04-28-takeoff-standards-and-pdf-ux.md`
 
 ---
 

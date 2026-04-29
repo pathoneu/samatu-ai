@@ -222,16 +222,158 @@ _VNT_NORMALIZE = {
     "kg": "kg",
     "l": "l",
     "kompl": "kompl",
+    "m3": "m3",     # m³ for šiukšlių išvežimas, betonas etc.
+    "d.d": "d.d",   # d.d = darbo diena (pastolių nuoma)
 }
 
 _SKYRIUS_ENUM = {
+    # Modern LT-correct keys (with diacritics)
     "GKP montavimas": "gkp",
+    "Sienų lubų glaistymas dažymas": "paint",
+    "Plytelių klijavimas": "tile",
+    "Hidroizoliacija": "waterproof",
+    "Grindys": "floor",
+    "Santechnikos darbai": "plumbing",
+    "Elektros instaliacijos darbai": "electrical",
+    "Pridėtiniai elementai": "extras",
+    "Out of scope": "out_of_scope",
+    # Legacy ASCII-stripped keys (mojibake from earlier exports) — preserved
+    # so projects saved with old skyrius names still classify correctly.
     "Glaistymas dazymas": "paint",
     "Plyteles": "tile",
-    "Hidroizoliacija": "waterproof",
     "Pridetiniai elementai": "extras",
-    "Out of scope": "out_of_scope",
+    "Santechnikos darbai/ kondicionavimo darbai": "plumbing",
 }
+
+# Legacy → modern skyrius name migration. Used both in _emit_v8_compat_fields
+# (server) and frontend localStorage on project load.
+# Sprint §FIX-2 (2026-04-29): expanded with GKP/glaistymas variants found in old
+# extractions — user reported 3 separate "GKP montavimas" groups in UI from these.
+SKYRIUS_LEGACY_MIGRATION = {
+    "Glaistymas dazymas": "Sienų lubų glaistymas dažymas",
+    "Glaistymas dažymas": "Sienų lubų glaistymas dažymas",
+    "Sienų glaistymas dažymas": "Sienų lubų glaistymas dažymas",
+    "Plyteles": "Plytelių klijavimas",
+    "Plytelių darbai": "Plytelių klijavimas",
+    "Pridetiniai elementai": "Pridėtiniai elementai",
+    "Santechnikos darbai/ kondicionavimo darbai": "Santechnikos darbai",
+    "Elektros instaliacijos darbai/ apsvietimas": "Elektros instaliacijos darbai",
+    "Grindu darbai": "Grindys",
+    "Grindų darbai": "Grindys",
+    "Grindų danga": "Grindys",
+    # GKP variants — all collapse to the canonical "GKP montavimas"
+    "GKP": "GKP montavimas",
+    "GKP konstrukcija": "GKP montavimas",
+    "GKP karkas": "GKP montavimas",
+    "Gipso kartono montavimas": "GKP montavimas",
+    "Gipsokartono montavimas": "GKP montavimas",
+    "GKP lubu montavimas": "GKP montavimas",
+    "GKP lubų montavimas": "GKP montavimas",
+}
+
+
+def normalize_skyrius(skyrius: str | None) -> str:
+    """Normalize a skyrius string to its canonical form. Used by frontend
+    via /api/projects pipeline + by _build_pozicijos_from_rooms ensure no
+    duplicate groups appear in UI for the same logical category."""
+    if not skyrius:
+        return "Kiti darbai"
+    s = str(skyrius).strip()
+    return SKYRIUS_LEGACY_MIGRATION.get(s, s)
+
+
+def _apply_wall_elevation_tile_override(parsed: dict) -> int:
+    """Sprint §35 (2026-04-29): when _wall_elevations data exists with
+    mm-precision tile zones, override paskirtis-based plyteles_sienos_m2
+    estimate per room.
+
+    Formula (CLAUDE.md §1.7 polygon-based variant):
+        tile_area = Σ (to_floor_mm − from_floor_mm) × wall_total_width_mm / 1e6
+
+    Sprint §AUDIT (2026-04-29): match by `nr` first (unique), then fall back
+    to `room_name` only when no nr collision exists. Previously matched purely
+    by lowercase name → "Vonia 1" + "Vonia 2" both with `pavadinimas="Vonia"`
+    got the same wall data applied to both → inflated counts.
+
+    Returns count of rooms updated. Non-mutating where data missing.
+    Adds lt_sanity warning when ambiguous name match attempted.
+    """
+    elevations = parsed.get("_wall_elevations") or []
+    if not elevations:
+        return 0
+    rooms = parsed.get("patalpos") or []
+    if not rooms:
+        return 0
+
+    # Group elevations by nr (preferred) AND by normalized room name (fallback).
+    by_nr: dict[str, list[dict]] = {}
+    by_name: dict[str, list[dict]] = {}
+    for e in elevations:
+        nr_key = str(e.get("nr") or e.get("room_nr") or "").strip()
+        name_key = (e.get("room_name") or "").strip().lower()
+        if nr_key:
+            by_nr.setdefault(nr_key, []).append(e)
+        if name_key:
+            by_name.setdefault(name_key, []).append(e)
+
+    # Detect duplicate room names — when two patalpos share the same name,
+    # name-based matching is ambiguous and we'd apply the same walls twice.
+    from collections import Counter
+    name_counts = Counter(
+        (r.get("pavadinimas") or "").strip().lower() for r in rooms
+    )
+    ambiguous_names = {n for n, c in name_counts.items() if c > 1}
+
+    updated = 0
+    warnings = parsed.setdefault("_lt_warnings", [])
+    for r in rooms:
+        nr_key = str(r.get("nr") or "").strip()
+        name = (r.get("pavadinimas") or "").strip().lower()
+
+        walls = by_nr.get(nr_key) if nr_key else None
+        if not walls:
+            # Fallback to name match — but only if name is unambiguous
+            if name in ambiguous_names:
+                warnings.append({
+                    "level": "WARN",
+                    "field": "plyteles_sienos_m2",
+                    "patalpa_nr": r.get("nr"),
+                    "message": (
+                        f"Patalpa „{r.get('pavadinimas','?')}" + f"" + f"" +
+                        f" (Nr. {r.get('nr','?')}) — wall_elevation duomenys praleisti, " +
+                        f"nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų " +
+                        f"`nr` lauką wall_elevation entry'jėje."
+                    ),
+                })
+                continue
+            walls = by_name.get(name)
+
+        if not walls:
+            continue
+
+        total_tile_m2 = 0.0
+        for w in walls:
+            wall_w_mm = w.get("wall_total_width_mm") or 0
+            if not wall_w_mm:
+                continue
+            for tz in (w.get("tile_zones") or []):
+                from_mm = tz.get("from_floor_mm") or 0
+                to_mm = tz.get("to_floor_mm") or 0
+                height_mm = max(0, to_mm - from_mm)
+                if height_mm > 0:
+                    total_tile_m2 += (height_mm * wall_w_mm) / 1_000_000.0
+
+        # Override existing estimate. Round to 0.01 m² for sąmata sanity.
+        prior = r.get("plyteles_sienos_m2")
+        r["plyteles_sienos_m2"] = round(total_tile_m2, 2)
+        r["_plyteles_sienos_m2_source"] = "wall_elevation_mm"
+        if prior is not None and prior != r["plyteles_sienos_m2"]:
+            r["_plyteles_sienos_m2_prior"] = round(prior, 2)
+        updated += 1
+
+    if updated > 0:
+        print(f"[extractor] wall_elevation override applied to {updated}/{len(rooms)} rooms")
+    return updated
 
 
 def _emit_v8_compat_fields(parsed: dict) -> dict:
@@ -245,7 +387,9 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
     pozicijos = parsed.get("pozicijos") or []
     darbu_sarasas = []
     for i, p in enumerate(pozicijos, start=1):
-        skyrius = p.get("skyrius", "Pridetiniai elementai")
+        skyrius_raw = p.get("skyrius", "Pridėtiniai elementai")
+        # P7: Migrate legacy ASCII-stripped keys to modern LT-with-diacritics
+        skyrius = SKYRIUS_LEGACY_MIGRATION.get(skyrius_raw, skyrius_raw)
         vnt_raw = p.get("vnt", "vnt")
         vnt = _VNT_NORMALIZE.get(vnt_raw, vnt_raw)
         aprasymas = p.get("aprasymas", "")
@@ -264,6 +408,10 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "vnt": vnt,
             "kiekis": p.get("kiekis", 0),
             "saltinis": p.get("saltinis", ""),
+            # Sprint D Track 1 — medžiagos embedded į work line (LT convention)
+            "medziagos_aprasymas": p.get("medziagos_aprasymas"),
+            "medziagos_kiekis": p.get("medziagos_kiekis"),
+            "medziagos_vnt": p.get("medziagos_vnt"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
@@ -289,6 +437,1126 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
     # v8_rooms — mirror patalpos with V8-friendly aliases (frontend has fallback)
     parsed["v8_rooms"] = parsed.get("patalpos", [])
 
+    return parsed
+
+
+def _elementai_to_counts(elementai: list) -> dict:
+    """Translate Vision-emitted elementai[] into the n_doors/n_windows/area
+    fields that calc_room_quantities expects.
+
+    elementai = [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}, ...]
+    Returns {"n_doors", "n_windows", "door_area_m2", "window_area_m2",
+             "n_niches", "niche_lengths_m"}
+    """
+    n_doors, n_windows, n_niches = 0, 0, 0
+    door_areas, window_areas, niche_lengths = [], [], []
+    for el in (elementai or []):
+        tipas = (el.get("tipas") or "").lower()
+        kiekis = int(el.get("kiekis") or 1)
+        plotis_mm = el.get("plotis_mm") or 0
+        aukstis_mm = el.get("aukstis_mm") or 0
+        ilgis_m = el.get("ilgis_m") or 0
+        area_m2 = (plotis_mm * aukstis_mm / 1_000_000) if (plotis_mm and aukstis_mm) else 0
+
+        if tipas in ("duris", "pasleptos_duris"):
+            n_doors += kiekis
+            if area_m2 > 0:
+                door_areas.extend([area_m2] * kiekis)
+        elif tipas in ("langas", "stoglangis"):
+            n_windows += kiekis
+            if area_m2 > 0:
+                window_areas.extend([area_m2] * kiekis)
+        elif tipas == "nisa_led":  # `.lower()` was applied above
+            n_niches += kiekis
+            if ilgis_m:
+                niche_lengths.extend([ilgis_m] * kiekis)
+
+    return {
+        "n_doors": n_doors,
+        "n_windows": n_windows,
+        # Use mean per-element area when present so calc_room_quantities can scale
+        # by n. If absent, calc_room_quantities falls back to UNIVERSAL_RULES defaults.
+        "door_area_m2": (sum(door_areas) / len(door_areas)) if door_areas else None,
+        "window_area_m2": (sum(window_areas) / len(window_areas)) if window_areas else None,
+        "n_niches": n_niches,
+        "niche_lengths_m": niche_lengths,
+    }
+
+
+# Q-glaisto consumption coefficients (CLAUDE.md §1.11). kg per m² per mm thickness.
+_Q_GLAISTAS_KG_PER_M2_MM = {"Q1": 0.8, "Q2": 1.0, "Q3": 1.2, "Q4": 1.5}
+# Default putty thickness per Q level (mm). Conservative center of CLAUDE.md range.
+# Q4 corrected 2026-04-28: full-surface skim per Merkblatt Nr.2 needs 3-5mm
+# (every 0.1mm imperfection visible under gloss paint). Prior 2.5mm under-quoted
+# premium projects. Source: Bundesverband der Gipsindustrie + DIN 18181/18363.
+_Q_GLAISTAS_THICKNESS_MM = {"Q1": 0.75, "Q2": 1.25, "Q3": 1.75, "Q4": 4.0}
+# Q4 sanding labor norm (h/m²). 80-120 grit, 100% surface coverage.
+_Q4_SANDING_HOURS_PER_M2 = 0.30
+# Paint coverage per liter per coat (m²/l). CLAUDE.md §1.10.
+_PAINT_COVERAGE_M2_PER_L = 9.0  # smooth Q2-Q3 surface, 1 coat baseline (Class 2)
+# 2-coat multiplier (first coat absorbs more — 1.8× not 2.0×). CLAUDE.md §1.10.
+_PAINT_TWO_COAT_FACTOR = 1.8
+
+# Paint class profiles (Sprint §2A.5, 2026-04-28).
+# Source: Tikkurila Optiva, Caparol CapaSol TI sheets + EN 13300 paint classes.
+# Class 1 — top-quality opaque (Tikkurila Joker, Sikkens Aplhorn): high-hide,
+#           1 coat sufficient on prepared/painted substrate.
+# Class 2 — standard interior (Sikkens Alpha Matt, Dulux Easycare, Sniezka):
+#           the LT residential default. 2 coats with 1.8× first-coat factor.
+# Class 3 — economy / fresh-plaster substrate / rough textured walls:
+#           more absorbent, requires 3 coats; lower coverage per liter.
+_PAINT_CLASS_PROFILES = {
+    1: {"coverage_m2_per_l": 10.0, "coats": 1, "absorption_factor": 1.0},
+    2: {"coverage_m2_per_l": 9.0,  "coats": 2, "absorption_factor": 1.8},
+    3: {"coverage_m2_per_l": 7.5,  "coats": 3, "absorption_factor": 2.5},
+}
+_PAINT_CLASS_DEFAULT = 2
+
+
+def _calc_glaistas_kg(dazymo_plotas_m2: float, q_level: str = "Q2") -> float:
+    """LT vidaus apdailos glaisto kiekis pagal Q kokybės lygį.
+
+    Formula (CLAUDE.md §1.11): kg = plotas × storis_mm × Q_koef
+    Q1 (po sunkių tapetų) = 0.5-1mm × 0.8 kg/m²/mm
+    Q2 (po matinio dažymo) = 1-1.5mm × 1.0
+    Q3 (po pusiau blizgaus) = 1.5-2mm × 1.2
+    Q4 (po blizgaus/lakuoto) = 2-3mm × 1.5
+    """
+    coef = _Q_GLAISTAS_KG_PER_M2_MM.get(q_level, 1.0)
+    thickness = _Q_GLAISTAS_THICKNESS_MM.get(q_level, 1.25)
+    return round(dazymo_plotas_m2 * thickness * coef, 2)
+
+
+def _calc_dazai_liters(dazymo_plotas_m2: float, coats: int = 2,
+                        paint_class: int | None = None) -> float:
+    """Dažų kiekis litrais (CLAUDE.md §1.10, Sprint §2A.5).
+
+    Formula: l = plotas × absorption_factor / coverage_m²/l
+
+    paint_class (1/2/3) ima pirmenybę prieš coats parametrą — pasiutimo už
+    coats reikšmės profile'as nustato visus tris parametrus (coats,
+    coverage, absorption_factor). Coats parametras paliktas backward-compat
+    (kviečiantieji be paint_class).
+
+    Class 1: 10 m²/L × 1 coat (top opaque, prepared substrate).
+    Class 2: 9 m²/L × 2 coats × 1.8 absorption (LT default).
+    Class 3: 7.5 m²/L × 3 coats × 2.5 absorption (rough/fresh plaster).
+    """
+    if paint_class is not None:
+        prof = _PAINT_CLASS_PROFILES.get(int(paint_class)) \
+            or _PAINT_CLASS_PROFILES[_PAINT_CLASS_DEFAULT]
+        return round(dazymo_plotas_m2 * prof["absorption_factor"]
+                     / prof["coverage_m2_per_l"], 2)
+    # Legacy path: coats only.
+    factor = _PAINT_TWO_COAT_FACTOR if coats >= 2 else 1.0
+    return round(dazymo_plotas_m2 * factor / _PAINT_COVERAGE_M2_PER_L, 2)
+
+
+def _resolve_paint_class(rules_or_overrides: dict | None) -> int:
+    """Read paint_class (1/2/3) from user prefs (Setup Wizard / Prielaidos).
+    Falls back to LT default = 2. Accepts both raw user prefs and the
+    translated rules dict (`_paint_class` meta key)."""
+    if not rules_or_overrides or not isinstance(rules_or_overrides, dict):
+        return _PAINT_CLASS_DEFAULT
+    val = rules_or_overrides.get("_paint_class") or rules_or_overrides.get("paint_class")
+    try:
+        cls = int(val) if val is not None else _PAINT_CLASS_DEFAULT
+    except (ValueError, TypeError):
+        cls = _PAINT_CLASS_DEFAULT
+    return cls if cls in (1, 2, 3) else _PAINT_CLASS_DEFAULT
+
+
+# Lubų karnizas dedamas TIK gyvenamose patalpose su dekoratyvinėm lubom
+# (svetainė, miegamasis, valgomasis, koridorius, holas, kabinetas, drabuzine,
+# rubine). NEDEDAMAS: vonia/WC (pakabinamos lubos), garažas/tambūras/sandėliukas
+# (utilitarinės — be dekoro), katiline/skalbykla (be apdailos).
+_KARNIZAS_PASKIRTYS = {
+    "gyvenamoji", "miegamoji", "valgomasis", "koridorius",
+    "holas", "kabinetas", "drabuzine", "rubine",
+}
+
+
+def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "") -> float:
+    """Lubų karnizas (cornice). CLAUDE.md §1.4: perimetras + 5% atliekų,
+    durys NEATIMAMOS (priešingai nei grindjuostės).
+
+    BET tik gyvenamosioms patalpoms su dekoratyvinėm lubom — ne vonioms,
+    garažams, ne katilinei. Praktinis LT samatininko convention'as.
+    """
+    if (paskirtis or "").lower() not in _KARNIZAS_PASKIRTYS:
+        return 0.0
+    return round(perim * 1.05, 2)
+
+
+def _calc_nisu_metrai_m(elementai: list) -> float:
+    """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
+
+    Niche length per element = lango_plotis + 2 × 0.20 m (overhang each side).
+    Suma per visus elementai su tipas == 'nisa_LED'.
+    """
+    total = 0.0
+    for el in (elementai or []):
+        if (el.get("tipas") or "").lower() == "nisa_led":
+            kiekis = int(el.get("kiekis") or 1)
+            ilgis = float(el.get("ilgis_m") or 0)
+            if ilgis > 0:
+                total += ilgis * kiekis
+            else:
+                # Fallback if ilgis_m not provided: use lango_plotis + 0.40
+                plotis_mm = float(el.get("plotis_mm") or 0)
+                if plotis_mm > 0:
+                    total += (plotis_mm / 1000 + 0.40) * kiekis
+    return round(total, 2)
+
+
+def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
+    """LT STR 2.04.01:2018 — vonios/WC/san. mazgo hidroizoliacija.
+
+    grindys: pilnas plotas
+    sienos: perimetras × 0.30 m (drėgmės zona) + dušo zona × lubų aukštis (jei dušas)
+
+    Šitas paprastas variantas sumuoja grindis + perim × 0.30. Dušo zona
+    pridedama jei pastabose minimas „dušas"/„shower" arba paskirtis vonia.
+    """
+    paskirtis = (room.get("paskirtis") or "").lower()
+    if paskirtis not in ("vonia", "wc", "san", "skalbykla"):
+        return 0.0
+    plotas = float(room.get("plotas_m2") or 0)
+    H = float(room.get("lubu_aukstis_m") or 2.82)
+    drėgmės_zona = perim * 0.30
+    # Dušas: priimam 1.0 × 1.2 m zoną iki lubų aukščio (apytiksliai)
+    has_shower = paskirtis in ("vonia", "san")
+    dušo_zona = (1.0 * 2 + 1.2) * H if has_shower else 0  # perimetras × H
+    return round(plotas + drėgmės_zona + dušo_zona, 2)
+
+
+def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) -> dict:
+    """Replace Vision-computed per-room totals with Python-computed deterministic
+    values (2026-04-28 deterministic refactor).
+
+    Vision returns ONLY primitives (plotas, perimetras, lubu_aukstis, elementai,
+    paskirtis). This function uses those primitives + universal_rules to compute
+    every derived quantity (dazymo_plotas, kampu, plyteles_sienos/grindys,
+    grindjuostes, hidroizoliacija, GK lubos).
+
+    Same primitives → same output, every run. No Vision arithmetic drift.
+    """
+    from .universal_rules import calc_room_quantities, translate_user_prefs_to_room_rules
+
+    rules = translate_user_prefs_to_room_rules(rules_override or {})
+    rooms = parsed.get("patalpos") or []
+    for room in rooms:
+        # 1. Parse elementai → counts/areas the calc function understands
+        counts = _elementai_to_counts(room.get("elementai") or [])
+        # Inject into a working dict (don't mutate primitives)
+        calc_input = {
+            **room,
+            **counts,
+        }
+        # 2. Compute deterministic per-room quantities
+        try:
+            computed = calc_room_quantities(calc_input, rules=rules)
+        except Exception as exc:
+            print(f"[extractor] calc_room_quantities failed for room {room.get('nr')}: {exc}")
+            continue
+
+        # 3. Merge — primitives win (already in room), computed overrides everything else.
+        # Keep Vision-emitted primitives untouched; overwrite computed fields.
+        PRIMITIVE_KEYS = {
+            "nr", "pavadinimas", "paskirtis", "puslapio_nr", "bbox_pct",
+            "plotas_m2", "plotas_saltinis", "plotas_m2_raw",
+            "perimetras_m", "perimetras_m_raw",
+            "lubu_aukstis_m", "lubu_aukstis_saltinis", "lubu_aukstis_m_raw",
+            "lubu_tipas", "elementai", "confidence", "pastabos",
+            "eksplikacija_row_idx",
+            "eksplikacija_row_bbox",
+            "eksplikacija_page_width_pdf",
+            "eksplikacija_page_height_pdf",
+            "_zoom", "_zoom_changes",
+        }
+        for k, v in computed.items():
+            if k not in PRIMITIVE_KEYS:
+                room[k] = v
+
+        # 4. Hidroizoliacija (not in calc_room_quantities; CLAUDE.md §1.12)
+        perim = float(room.get("perimetras_m") or 0)
+        room["hidroizoliacija_m2"] = _calc_hidroizoliacija_m2(room, perim)
+
+        # 4.1 Glaistas (kg) per Q-level (rules_override.glaistas_q_lygis if set)
+        q_lygis = (rules_override or {}).get("glaistas_q_lygis", "Q2")
+        dazymo = float(room.get("dazymo_plotas_m2") or 0)
+        room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
+
+        # 4.2 Dažai (litrai) — paint class drives coats × coverage (Sprint §2A.5).
+        paint_class = _resolve_paint_class(rules_override)
+        room["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=paint_class)
+        room["_paint_class"] = paint_class  # surface to UI / debug
+
+        # 4.3 Gruntas (litrai) — 1 coat at lower coverage (~7 m²/l)
+        room["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
+
+        # 4.4 Lubų karnizas (cornice) — perim + 5%, no door deduct,
+        # only for living-quality rooms (not vonia/garažas/utility)
+        room["lubu_karnizo_m"] = _calc_lubu_karnizas_m(
+            perim, room.get("paskirtis", ""))
+
+        # 4.5 LED nišų metrai
+        room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
+
+        # 5. Audit field
+        room["_computed_by"] = "python_deterministic"
+        # 6. Calculation trace (human-readable for RoomCard)
+        H = float(room.get("lubu_aukstis_m") or 2.82)
+        perim = float(room.get("perimetras_m") or 0)
+        n_doors = counts["n_doors"]
+        n_windows = counts["n_windows"]
+        room["calculation_trace"] = (
+            f"perim({perim:.2f}) × H({H:.2f}) = {perim * H:.2f} m² "
+            f"− {n_windows} lang./{n_doors} dur. atimimai → "
+            f"dažymas {room.get('dazymo_plotas_m2', 0):.2f} m². "
+            f"Skaičiavo Python (deterministinis)."
+        )
+    return parsed
+
+
+def _build_pozicijos_from_rooms(parsed: dict) -> dict:
+    """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
+    aggregates (2026-04-28 deterministic refactor).
+
+    Vision no longer emits pozicijos[]. Python aggregates per-room totals into
+    skyrius-grouped lines: Sienų lubų glaistymas dažymas, GKP montavimas,
+    Plytelių klijavimas, Hidroizoliacija, Santechnikos darbai, Elektros
+    instaliacijos darbai, Pridėtiniai elementai. Each line has skyrius/aprasymas/vnt/kiekis
+    matching the original schema so downstream `_emit_v8_compat_fields` still works.
+    """
+    rooms = parsed.get("patalpos") or []
+    if not rooms:
+        parsed["pozicijos"] = []
+        return parsed
+
+    def _sum(field: str) -> float:
+        return round(sum(float(r.get(field) or 0) for r in rooms), 2)
+
+    def _sum_filtered(field: str, paskirtys: set) -> float:
+        return round(sum(float(r.get(field) or 0) for r in rooms
+                         if (r.get("paskirtis") or "").lower() in paskirtys), 2)
+
+    pozicijos: list[dict] = []
+    SAL = "skaiciuota_is_brezinio"
+
+    # Walls vs lubos split aggregates (per-room values from calc_room_quantities)
+    walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
+    dazymo_total = walls_paint + lubos_paint
+
+    # Glaistas/gruntas/dažai per medium — split proportionally to walls vs lubos
+    walls_share = (walls_paint / dazymo_total) if dazymo_total > 0 else 0.5
+    lubos_share = 1 - walls_share if dazymo_total > 0 else 0.5
+    glaistas_total = _sum("glaistas_kg")
+    dazai_total = _sum("dazai_l")
+    gruntas_total = _sum("gruntas_l")
+
+    # Wet rooms (vonia/wc/san) — voniose dažymas tik virš plytelių zonos
+    WET = {"vonia", "wc", "san"}
+
+    SK_GD = "Sienų lubų glaistymas dažymas"
+    SK_GKP = "GKP montavimas"
+    SK_PL = "Plytelių klijavimas"
+    SK_HI = "Hidroizoliacija"
+    SK_GR = "Grindys"
+    SK_SAN = "Santechnikos darbai"
+    SK_EL = "Elektros instaliacijos darbai"
+    SK_PR = "Pridėtiniai elementai"
+
+    # ════════════════════════════════════════════════════════════════════════
+    # SIENŲ LUBŲ GLAISTYMAS DAŽYMAS (~21 lines)
+    # Per-coat, walls/lubos split, kampai/grindjuostės/karnizas atskirai
+    # ════════════════════════════════════════════════════════════════════════
+
+    # Q-level for sanding labor uplift (Sprint §2A.4 Phase 2). Q4 needs full-
+    # surface 80-120 grit sanding (0.30 h/m²) per Merkblatt Nr.2; lower Q's
+    # use light scuff sanding only.
+    q_lygis = (parsed.get("_overrides") or {}).get("glaistas_q_lygis", "Q2")
+    is_q4 = str(q_lygis).upper() == "Q4"
+    sanding_suffix = " Q4 (80–120 grit, 100% paviršius)" if is_q4 else ""
+
+    if walls_paint > 0:
+        # Sienų lyginimas Rotband — pradinis storas sluoksnis (5-10mm) ant
+        # pliko bloko/betono prieš glaistymą. rangovas šitą turi 5/5 projektų.
+        # 1 maišas (25kg) ~2.5 m² pridengti 1cm storiu, ~5 m² pridengti 5mm.
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
+            "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+            "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
+            "medziagos_kiekis": round(walls_paint * 10.0, 2),
+            "medziagos_vnt": "kg",
+        })
+        pozicijos.extend([
+            {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Pradinis glaistas",
+             "medziagos_kiekis": round(glaistas_total * walls_share * 0.5, 2),
+             "medziagos_vnt": "kg"},
+            {"skyrius": SK_GD, "aprasymas": "Sienų antrinis glaistymas Q2",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Baigiamasis glaistas",
+             "medziagos_kiekis": round(glaistas_total * walls_share * 0.5, 2),
+             "medziagos_vnt": "kg"},
+            {"skyrius": SK_GD, "aprasymas": f"Sienų šlifavimas{sanding_suffix}",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+             **({"darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"} if is_q4 else {})},
+            {"skyrius": SK_GD, "aprasymas": "Sienų gruntavimas (1 sluoksnis)",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Gruntas",
+             "medziagos_kiekis": round(gruntas_total * walls_share, 2),
+             "medziagos_vnt": "l"},
+            {"skyrius": SK_GD, "aprasymas": "Sienų dažymas (1 sluoksnis)",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL},
+            {"skyrius": SK_GD, "aprasymas": "Sienų dažymas (2 sluoksnis)",
+             "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+             "medziagos_kiekis": round(dazai_total * walls_share, 2),
+             "medziagos_vnt": "l"},
+        ])
+
+    if lubos_paint > 0:
+        pozicijos.extend([
+            {"skyrius": SK_GD, "aprasymas": "Lubų pirminis glaistymas Q1",
+             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Pradinis glaistas",
+             "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
+             "medziagos_vnt": "kg"},
+            {"skyrius": SK_GD, "aprasymas": "Lubų antrinis glaistymas Q2",
+             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Baigiamasis glaistas",
+             "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
+             "medziagos_vnt": "kg"},
+            {"skyrius": SK_GD, "aprasymas": f"Lubų šlifavimas{sanding_suffix}",
+             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             **({"darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"} if is_q4 else {})},
+            {"skyrius": SK_GD, "aprasymas": "Lubų gruntavimas (1 sluoksnis)",
+             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Gruntas",
+             "medziagos_kiekis": round(gruntas_total * lubos_share, 2),
+             "medziagos_vnt": "l"},
+            {"skyrius": SK_GD, "aprasymas": "Lubų dažymas (2 sluoksniai)",
+             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+             "medziagos_kiekis": round(dazai_total * lubos_share, 2),
+             "medziagos_vnt": "l"},
+        ])
+
+        # Sprint §FIX-5 (2026-04-29): per rangovas P1 — atskirame eilutę „Lubų
+        # glaistymas/dažymas (virš 3m aukščio)" su tuo pačiu plotu, ne kaip
+        # dvigubas count, o kaip subset HIGHLIGHT — premium aukšto darbas.
+        # rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
+        # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
+        lubos_virs_3m = round(sum(
+            float(r.get("ceiling_paintable_m2") or 0) for r in rooms
+            if float(r.get("lubu_aukstis_m") or 0) > 3.0
+        ), 2)
+        if lubos_virs_3m > 0:
+            pozicijos.append({
+                "skyrius": SK_GD,
+                "aprasymas": "Lubų glaistymas/dažymas (virš 3 m aukščio) — papildomas darbas dėl aukščio",
+                "vnt": "m2", "kiekis": lubos_virs_3m, "saltinis": SAL,
+                "_height_zone": ">3m",
+                "confidence": "medium",
+            })
+
+    # Kampai split: vidiniai (perim + 4×H) vs išoriniai (angos × kampai)
+    # Approx: ~70% vidiniai, ~30% išoriniai (LT typical)
+    kampai_total = _sum("kampu_metrai")
+    if kampai_total > 0:
+        kampai_vidiniai = round(kampai_total * 0.7, 2)
+        kampai_isoriniai = round(kampai_total * 0.3, 2)
+        pozicijos.extend([
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai (perimetras + lubų-sienų ribos)",
+             "vnt": "m", "kiekis": kampai_vidiniai, "saltinis": SAL},
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai (angokraščiai + nišos)",
+             "vnt": "m", "kiekis": kampai_isoriniai, "saltinis": SAL,
+             "medziagos_aprasymas": "PVC kampuotės",
+             "medziagos_kiekis": kampai_isoriniai, "medziagos_vnt": "m"},
+            # rangovas audit 2026-04-29: separate labor line for corner installation.
+            # 5/5 his projects itemize this (~308 m avg). Materials above already
+            # include kampuotės; this line covers mounting/glaistymas labor only.
+            {"skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
+             "vnt": "m", "kiekis": kampai_total, "saltinis": SAL},
+        ])
+
+    # Angokraščių apdailos (per anga: 2H+W metrai) + paslėptų durų stakta.
+    # Sprint §2A.1: gate reveals by deduction standard (NRM2: only > 3 m², LT: always).
+    from extractor.universal_rules import _opening_adds_reveal, _resolve_deduction_standard
+    # Read user prefs from parsed["_overrides"] (set by caller). Fallback to LT default.
+    deduction_standard = _resolve_deduction_standard(parsed.get("_overrides"))
+    angokrasciai_m = 0
+    pasleptu_duru_staktu_m = 0
+    for r in rooms:
+        elementai = r.get("elementai") or []
+        for el in elementai:
+            tipas = (el.get("tipas") or "").lower()
+            kiekis = int(el.get("kiekis") or 1)
+            W = (el.get("plotis_mm") or 0) / 1000
+            H = (el.get("aukstis_mm") or 0) / 1000
+            opening_area = W * H if (W > 0 and H > 0) else 0
+            if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
+                if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
+                    angokrasciai_m += (2 * H + W) * kiekis
+            if tipas == "pasleptos_duris" and W > 0 and H > 0:
+                # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
+                # paruošimo nepriklausomai nuo size threshold (LT-specific
+                # premium hardware item, ne klasikinis NRM2 reveal).
+                pasleptu_duru_staktu_m += (2 * H + W) * kiekis
+    angokrasciai_m = round(angokrasciai_m, 2)
+    pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
+    if angokrasciai_m > 0:
+        # Glaistymo skyriaus eilutė (apdailos darbas)
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas (langai + durys)",
+            "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
+        })
+        # P2 fix: GKP skyriaus eilutė (struktūrinis darbas — angokraščio formavimas).
+        # rangovas P1+P2+P5 4/5 freq. Tas pats kiekis, kita skyrius.
+        pozicijos.append({
+            "skyrius": SK_GKP, "aprasymas": "Angokraščių apdirbimas GKP (struktūra)",
+            "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
+            "medziagos_aprasymas": "GKP juostelės + savisriegiai",
+            "medziagos_kiekis": angokrasciai_m, "medziagos_vnt": "m",
+        })
+    if pasleptu_duru_staktu_m > 0.5:
+        # P5 fix: paslėptų durų staktų pozicija (4/5 freq, ~400 EUR/proj)
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Durų angų paruošimas beapvadinėms durims",
+            "vnt": "m", "kiekis": pasleptu_duru_staktu_m, "saltinis": SAL,
+        })
+
+    # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over rangovas).
+    # Per-room (perim − Σdurys) × 1.10 double-counts interior walls (each
+    # interior wall belongs to 2 rooms). rangovas ratios across P1+P5: 0.50-0.62
+    # m of grindjuostė per m² of floor. Cap at 0.65 m/m² to remove the
+    # phantom segments. Audit field marks when cap fires for transparency.
+    GRINDJUOSCIU_RATIO_CAP = 0.65  # m grindjuostės per m² floor (rangovas-empirical)
+    grindjuostes_raw = _sum("grindjuosciu_m")
+    bendras_plotas_for_cap = sum(float(r.get("plotas_m2") or 0) for r in rooms)
+    grindjuostes_capped = min(grindjuostes_raw, bendras_plotas_for_cap * GRINDJUOSCIU_RATIO_CAP)
+    if grindjuostes_raw > grindjuostes_capped + 0.01:
+        # Cap fired — record on each room for audit trail
+        for r in rooms:
+            r["_grindjuosciu_capped"] = True
+        parsed.setdefault("_meta", {})["grindjuosciu_pre_cap_m"] = round(grindjuostes_raw, 2)
+        parsed["_meta"]["grindjuosciu_post_cap_m"] = round(grindjuostes_capped, 2)
+        parsed["_meta"]["grindjuosciu_cap_ratio_m_per_m2"] = GRINDJUOSCIU_RATIO_CAP
+    grindjuostes_total = round(grindjuostes_capped, 2)
+    if grindjuostes_total > 0:
+        pozicijos.extend([
+            {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
+             "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL,
+             "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
+             "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
+             "medziagos_vnt": "m"},
+            {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
+             "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
+        ])
+
+    karnizas_total = _sum("lubu_karnizo_m")
+    if karnizas_total > 0:
+        pozicijos.extend([
+            {"skyrius": SK_GD, "aprasymas": "Lubų karnizo sumontavimas",
+             "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL,
+             "medziagos_aprasymas": "Karnizas (m + 5% atliekų)",
+             "medziagos_kiekis": round(karnizas_total * 1.05, 2),
+             "medziagos_vnt": "m"},
+            {"skyrius": SK_GD, "aprasymas": "Lubų karnizo dažymas",
+             "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL},
+        ])
+
+    nisu_total = _sum("nisu_metrai")
+    if nisu_total > 0:
+        # rangovas audit 2026-04-29: separate STRUCTURAL framing line (GKP karkasą
+        # formuoja prieš glaistymą; tai 3/5 jo projektų atskira eilutė).
+        pozicijos.extend([
+            {"skyrius": SK_GKP, "aprasymas": "Nišų formavimas GKP konstrukcijoje",
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL,
+             "medziagos_aprasymas": "GKP profiliai + savisriegiai",
+             "medziagos_kiekis": round(nisu_total * 2.5, 2),  # ~2.5 m profilio per ilgiui
+             "medziagos_vnt": "m"},
+            {"skyrius": SK_GD, "aprasymas": "LED nišų glaistymas",
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
+            {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
+        ])
+
+    # ════════════════════════════════════════════════════════════════════════
+    # GKP MONTAVIMAS (~5-9 lines)
+    # ════════════════════════════════════════════════════════════════════════
+
+    gkp_standart = _sum("gkp_lubu_standart_m2")
+    gkp_high = _sum("gkp_lubu_virs_3m_m2")
+    gkp_total = gkp_standart + gkp_high
+    if gkp_total > 0:
+        # Lapai vnt = m² / 3.0 × 1.10 atliekų
+        lapai_vnt = round(gkp_total / 3.0 * 1.10)
+        if gkp_standart > 0:
+            pozicijos.append({
+                "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (standartinis aukštis)",
+                "vnt": "m2", "kiekis": gkp_standart, "saltinis": SAL,
+            })
+        if gkp_high > 0:
+            pozicijos.append({
+                "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (virš 3 m aukščio)",
+                "vnt": "m2", "kiekis": gkp_high, "saltinis": SAL,
+            })
+        pozicijos.extend([
+            {"skyrius": SK_GKP, "aprasymas": "GKP lapai (12.5 mm)",
+             "vnt": "vnt", "kiekis": lapai_vnt, "saltinis": SAL,
+             "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+             "medziagos_kiekis": lapai_vnt, "medziagos_vnt": "vnt"},
+            {"skyrius": SK_GKP, "aprasymas": "GKP karkaso profiliai (CD/UD)",
+             "vnt": "m", "kiekis": round(gkp_total * 3.0, 2), "saltinis": SAL,
+             "medziagos_aprasymas": "Profiliai (~3 m/m² lubų)",
+             "medziagos_kiekis": round(gkp_total * 3.0, 2), "medziagos_vnt": "m"},
+            {"skyrius": SK_GKP, "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
+             "vnt": "m", "kiekis": round(gkp_total * 1.5, 2), "saltinis": SAL,
+             "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
+             "medziagos_kiekis": round(gkp_total * 1.5, 2), "medziagos_vnt": "m"},
+            {"skyrius": SK_GKP, "aprasymas": "Savisriegiai GKP montavimui",
+             "vnt": "vnt", "kiekis": int(gkp_total * 30), "saltinis": SAL,
+             "medziagos_aprasymas": "~30 vnt/m² lubų",
+             "medziagos_kiekis": int(gkp_total * 30), "medziagos_vnt": "vnt"},
+        ])
+
+    # Reviziniai dureliai voniose (1 vnt per drėgnam patalpą)
+    rev_dureliai = sum(1 for r in rooms
+                       if (r.get("paskirtis") or "").lower() in WET)
+    if rev_dureliai > 0:
+        pozicijos.append({
+            "skyrius": SK_GKP, "aprasymas": "Reviziniai dureliai (vamzdžių prieiga)",
+            "vnt": "vnt", "kiekis": rev_dureliai, "saltinis": SAL,
+            "medziagos_aprasymas": "Reviziniai dureliai 200×200 mm",
+            "medziagos_kiekis": rev_dureliai, "medziagos_vnt": "vnt",
+        })
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PLYTELĖS (per location: vonia sienos / vonia grindys / virtuvė backsplash)
+    # ════════════════════════════════════════════════════════════════════════
+
+    # Per-location aggregates
+    pl_sienos_vonia = _sum_filtered("plyteles_sienos_m2", WET)
+    pl_sienos_virtuve = _sum_filtered("plyteles_sienos_m2", {"virtuve"})
+    pl_sienos_kita = round(_sum("plyteles_sienos_m2") - pl_sienos_vonia - pl_sienos_virtuve, 2)
+    pl_grindys_vonia = _sum_filtered("plyteles_grindys_m2", WET)
+    pl_grindys_virtuve = _sum_filtered("plyteles_grindys_m2", {"virtuve"})
+    pl_grindys_kita = round(_sum("plyteles_grindys_m2") - pl_grindys_vonia - pl_grindys_virtuve, 2)
+
+    def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str):
+        """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos."""
+        if kiekis <= 0:
+            return
+        pozicijos.append({
+            "skyrius": SK_PL,
+            "aprasymas": f"{vieta} plytelių klijavimas",
+            "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
+            "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+            "medziagos_kiekis": round(kiekis * 5.0, 2),
+            "medziagos_vnt": "kg",
+        })
+        pozicijos.append({
+            "skyrius": SK_PL,
+            "aprasymas": f"{vieta} plytelės",
+            "vnt": "m2", "kiekis": round(kiekis * 1.08, 2), "saltinis": SAL,
+            "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+            "medziagos_kiekis": round(kiekis * 1.08, 2),
+            "medziagos_vnt": "m2",
+        })
+        pozicijos.append({
+            "skyrius": SK_PL,
+            "aprasymas": f"{vieta} plytelių fugavimas",
+            "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
+            "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+            "medziagos_kiekis": round(kiekis * 0.3, 2),
+            "medziagos_vnt": "kg",
+        })
+
+    _add_tile_lines(SK_PL, pl_sienos_vonia, "Vonios sienų")
+    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės backsplash")
+    _add_tile_lines(SK_PL, pl_sienos_kita, "Kitų sienų")
+    _add_tile_lines(SK_PL, pl_grindys_vonia, "Vonios grindų")
+    _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų")
+    _add_tile_lines(SK_PL, pl_grindys_kita, "Kitų grindų")
+
+    # Sprint §41 (2026-04-29): tile format split — per rangovas audit v2 #2 gap.
+    # Didžiaformatės plytelės (>600×600) reikalauja papildomo darbo: extra
+    # klijų sluoksnio, dvigubo padengimo (back-buttering), specialių įrankių.
+    # rangovas premium projektai šitai itemize'ina su 2-3× kainos surcharge.
+    plyteliu_specs = parsed.get("_plyteliu_specs") or []
+    didzformat_count = sum(
+        1 for s in plyteliu_specs
+        if (s.get("format_label") or "").lower() in {"didžiaformatė", "didžiaformate", "didziaformat"}
+    )
+    if didzformat_count > 0 and pl_total > 0:
+        # Heuristic: when ≥1 didžiaformatė detected, assume ~30% of total
+        # tile area is large-format. User can override via Prielaidos.
+        # Surcharge: extra labor for backbuttering + masinis lygis levelers.
+        didzformat_share = (parsed.get("_overrides") or {}).get("didzformat_share", 0.30)
+        didzformat_m2 = round(pl_total * didzformat_share, 2)
+        if didzformat_m2 > 0:
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Didžiaformačių plytelių klijavimas (>600×600 mm) — papildoma rūpestis",
+                "vnt": "m2", "kiekis": didzformat_m2, "saltinis": SAL,
+                "medziagos_aprasymas": "Klijų sluoksnis storas (back-buttering) — ~5 kg/m²",
+                "medziagos_kiekis": round(didzformat_m2 * 5.0, 1),
+                "medziagos_vnt": "kg",
+                "confidence": "medium",
+            })
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Didžiaformačių plytelių lygio kontrolė (lazerio + pavedimas)",
+                "vnt": "m2", "kiekis": didzformat_m2, "saltinis": SAL,
+                "confidence": "medium",
+            })
+
+    # Tile-specific operations: 45° pjovimas, silikonas, gręžimas, dušo nuolydis
+    # P3 refinement: silikon multiplier × 0.5 → × 1.2 (rangovas P1=129m vs our
+    # 0.5×perim suggests we undercount; he counts grindys + lubų pjūvis +
+    # dušo kabinos perim). Skylių gręžimas refactored to use symbol counts
+    # when available, fallback to opening-count heuristic.
+    pl_total = round(_sum("plyteles_sienos_m2") + _sum("plyteles_grindys_m2"), 2)
+    if pl_total > 0:
+        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+                              if (r.get("paskirtis") or "").lower() in WET), 2)
+        if wet_perim > 0:
+            # Plytelių 45° pjovimas — outer corners × tile_height (vonia
+            # default 2 outer corners). Floor: wet_perim × 0.4.
+            avg_tile_h = sum(float(r.get("plyteles_sienos_aukstis_m") or 0) for r in rooms
+                             if (r.get("paskirtis") or "").lower() in WET)
+            n_wet = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() in WET)
+            tile_h = (avg_tile_h / n_wet) if n_wet > 0 else 2.0
+            pjovimas_45 = max(round(wet_perim * 0.4, 2), round(2 * n_wet * tile_h, 2))
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Plytelių 45° pjovimas (vidiniai kampai)",
+                "vnt": "m", "kiekis": pjovimas_45, "saltinis": SAL,
+            })
+            # rangovas audit 2026-04-29: epoxy variant for premium projects (P1
+            # 1/5 freq, but represents premium archetype). Only emit when
+            # rules_override or archetypas == "premium". For now: emit as
+            # optional add-on when paint_class == 1 (top-tier projects).
+            paint_class_for_45 = (parsed.get("_overrides") or {}).get("paint_class", 2)
+            if int(paint_class_for_45) == 1:
+                pozicijos.append({
+                    "skyrius": SK_PL,
+                    "aprasymas": "Plytelių 45° pjovimas EPOKSIDU (premium kampai)",
+                    "vnt": "m", "kiekis": pjovimas_45, "saltinis": SAL,
+                    "medziagos_aprasymas": "Epoksidinis klijuoklis (Mapei Kerapoxy ar pan.)",
+                    "medziagos_kiekis": round(pjovimas_45 * 0.05, 2),  # ~0.05 kg/m
+                    "medziagos_vnt": "kg",
+                })
+            # Silikonavimas split (rangovas audit 2026-04-29): separate corner
+            # silicone (between tile zones / floor-wall junctions / outside
+            # corners) from sanitaryware sealing. rangovas itemizes both.
+            #
+            # Empirical splits across his 5 projects:
+            #   Sanitaryware silikonas ≈ wet_perim × 0.8 (around bath/sink/WC)
+            #   Plytelių kampų silikonas ≈ wet_perim × 0.6 (inside corners)
+            silikon_san_m = round(wet_perim * 0.8, 2)
+            silikon_kampai_m = round(wet_perim * 0.6, 2)
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
+                "vnt": "m", "kiekis": silikon_san_m, "saltinis": SAL,
+                "medziagos_aprasymas": "Sanitarinis silikonas (~10 m/tūbelę)",
+                "medziagos_kiekis": max(1, round(silikon_san_m / 10, 0)),
+                "medziagos_vnt": "vnt",
+            })
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Plytelių vidinių kampų silikonavimas",
+                "vnt": "m", "kiekis": silikon_kampai_m, "saltinis": SAL,
+                "medziagos_aprasymas": "Spalvotas silikonas pagal fugavimo spalvą",
+                "medziagos_kiekis": max(1, round(silikon_kampai_m / 10, 0)),
+                "medziagos_vnt": "vnt",
+            })
+        # Skylių gręžimas — symbol-driven (klozetas×4 + praustuvė×6 + vonia×8
+        # + WC rėmas×3) per wet room. Symbols come from detected_symbols_summary
+        # or fall back to opening-count heuristic when symbols not detected.
+        sym = (parsed.get("detected_symbols_summary") or {})
+        n_kloz = int(sym.get("klozetai") or 0)
+        n_praust = int(sym.get("praustuves") or 0)
+        n_vonia = int(sym.get("vonios") or 0)
+        n_wcrem = int(sym.get("wc_remai") or 0)
+        skyliu_symbols = n_kloz * 4 + n_praust * 6 + n_vonia * 8 + n_wcrem * 3
+        if skyliu_symbols > 0:
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Skylių gręžimas plytelėse (vamzdžiams, kaiščiams)",
+                "vnt": "vnt", "kiekis": skyliu_symbols, "saltinis": "simboliai_brezinyje",
+                "confidence": "medium",
+            })
+        else:
+            # Fallback: opening-count heuristic when no symbols detected
+            n_holes = sum(int(el.get("kiekis") or 1)
+                          for r in rooms if (r.get("paskirtis") or "").lower() in WET
+                          for el in (r.get("elementai") or [])
+                          if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris", "langas"))
+            if n_holes > 0:
+                pozicijos.append({
+                    "skyrius": SK_PL,
+                    "aprasymas": "Skylių gręžimas plytelėse (vamzdžiams, kaiščiams)",
+                    "vnt": "vnt", "kiekis": n_holes * 4, "saltinis": SAL,
+                    "confidence": "low",
+                })
+        # Dušo nuolydis — 1 vnt per vonia su dušu
+        n_showers = sum(1 for r in rooms
+                        if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
+        if n_showers > 0:
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Nuolydžio formavimas dušo zonoje",
+                "vnt": "vnt", "kiekis": n_showers, "saltinis": SAL,
+            })
+        # P3 NEW: Lentynėliai iš plytelių dušo kabinoje — default 1 per vonia
+        # (rangovas P1 has 3 — premium projects more; default 1 is safe baseline).
+        n_full_vonia = sum(1 for r in rooms
+                           if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
+        if n_full_vonia > 0:
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
+                "vnt": "vnt", "kiekis": n_full_vonia, "saltinis": "paskirtis_default",
+                "confidence": "low",
+            })
+
+    # P3 NEW: Dėžučių iš GKP formavimas WC mechanizmams paslėpti — count of
+    # wet rooms with klozetas (rangovas P1=2, P2=2, P5=1; 3+/5 freq). 1 per
+    # vonia/wc/san where klozetas exists.
+    n_wet_klozetas = sum(1 for r in rooms
+                          if (r.get("paskirtis") or "").lower() in {"vonia", "wc", "san", "san_mazgas"})
+    if n_wet_klozetas > 0:
+        pozicijos.append({
+            "skyrius": SK_GKP,
+            "aprasymas": "Dėžučių iš GKP formavimas WC mechanizmams paslėpti",
+            "vnt": "vnt", "kiekis": n_wet_klozetas, "saltinis": "paskirtis_default",
+            "medziagos_aprasymas": "GKP plokštė + profiliai",
+            "medziagos_kiekis": n_wet_klozetas, "medziagos_vnt": "vnt",
+        })
+
+    # ════════════════════════════════════════════════════════════════════════
+    # HIDROIZOLIACIJA (~5 lines)
+    # ════════════════════════════════════════════════════════════════════════
+
+    # P6: Hidroizoliacijos įrengimas — VIENA pozicija (LT pro contractor
+    # convention, rangovas pattern). Bundle paruošimas + 2 sluoksniai + juostelė
+    # kampuose į vieną darbą. m² + juostelės m saugojami kaip _detail_*
+    # frontend'ui, kad galėtų išskleisti detales jei reikia.
+    hidro_m2 = _sum("hidroizoliacija_m2")
+    n_wet_zones = sum(1 for r in rooms
+                      if (r.get("paskirtis") or "").lower() in WET)
+    if hidro_m2 > 0 and n_wet_zones > 0:
+        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+                              if (r.get("paskirtis") or "").lower() in WET), 2)
+        # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
+        membrana_kg = round(hidro_m2 * 3.0, 2)  # 2 sluoksniai
+        pozicijos.append({
+            "skyrius": SK_HI,
+            "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
+            "vnt": "vnt", "kiekis": n_wet_zones, "saltinis": SAL,
+            "medziagos_aprasymas": "Hidroizoliacijos medžiaga + sandarinimo juostelė (×2 sluoksniai)",
+            "medziagos_kiekis": membrana_kg, "medziagos_vnt": "kg",
+            # Detail fields — frontend can show on expand
+            "_detail_m2": hidro_m2,
+            "_detail_juostele_m": wet_perim,
+        })
+
+    # ════════════════════════════════════════════════════════════════════════
+    # GRINDYS (~5-6 lines)
+    # ════════════════════════════════════════════════════════════════════════
+
+    isliginamasis = _sum("isliginamasis_m2")
+    if isliginamasis > 0:
+        pozicijos.append({
+            "skyrius": SK_GR, "aprasymas": "Grindų išlyginamasis sluoksnis",
+            "vnt": "m2", "kiekis": isliginamasis, "saltinis": SAL,
+            "medziagos_aprasymas": "Savaime išsilyginantis mišinys (~2 kg/m²/mm)",
+            "medziagos_kiekis": round(isliginamasis * 6.0, 2),  # ~3mm × 2 kg
+            "medziagos_vnt": "kg",
+        })
+
+    pvc_grindys = _sum("pvc_grindys_m2")
+    if pvc_grindys > 0:
+        pozicijos.extend([
+            {"skyrius": SK_GR, "aprasymas": "Grindų dangos pamušalas",
+             "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
+             "medziagos_aprasymas": "Pamušalo membrana",
+             "medziagos_kiekis": pvc_grindys, "medziagos_vnt": "m2"},
+            {"skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
+             "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
+             "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
+             "medziagos_kiekis": round(pvc_grindys * 1.10, 2),
+             "medziagos_vnt": "m2"},
+        ])
+
+    # Slenksniai — perėjimai tarp patalpų (per kambarį 1 vnt)
+    n_slenksniai = max(0, len(rooms) - 1)
+    if pvc_grindys > 0 and n_slenksniai > 0:
+        pozicijos.append({
+            "skyrius": SK_GR, "aprasymas": "Slenksniai (perėjimai tarp patalpų)",
+            "vnt": "vnt", "kiekis": n_slenksniai, "saltinis": SAL,
+            "medziagos_aprasymas": "Slenksnis (alu / mediena)",
+            "medziagos_kiekis": n_slenksniai, "medziagos_vnt": "vnt",
+        })
+
+    # ════════════════════════════════════════════════════════════════════════
+    # SANTECHNIKOS DARBAI (~7-12 lines)
+    # Per-paskirtis defaults: rangovas P1/P2/P5 stiliumi.
+    # Tikslumas — count'ai pagal kambario tipą; vartotojas gali keisti.
+    # ════════════════════════════════════════════════════════════════════════
+
+    n_vonia = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "vonia")
+    n_wc = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "wc")
+    n_san = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() in ("san", "san_mazgas"))
+    n_virtuve = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "virtuve")
+    n_skalbykla = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "skalbykla")
+
+    # Pilnos drėgnos patalpos (vonia + wc + san) — turi klozetą + WC rėmą
+    n_wet_with_klozetas = n_vonia + n_wc + n_san
+    # Vonios — turi dušą + gyvatuką + dušo maišytuvą + lataką
+    n_full_bathroom = n_vonia + n_san
+
+    if n_wet_with_klozetas > 0 or n_virtuve > 0 or n_skalbykla > 0:
+        # WC rėmas + Klozetas
+        if n_wet_with_klozetas > 0:
+            pozicijos.extend([
+                {"skyrius": SK_SAN, "aprasymas": "WC rėmo montavimas",
+                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default",
+                 "medziagos_aprasymas": "WC potinkinis rėmas",
+                 "medziagos_kiekis": n_wet_with_klozetas, "medziagos_vnt": "vnt"},
+                {"skyrius": SK_SAN, "aprasymas": "Klozeto montavimas",
+                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                {"skyrius": SK_SAN, "aprasymas": "Praustuvės maišytuvo montavimas",
+                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
+                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+            ])
+        # Pilna vonia — dušas + gyvatukas + linijinis latakas
+        if n_full_bathroom > 0:
+            pozicijos.extend([
+                {"skyrius": SK_SAN, "aprasymas": "Dušo maišytuvo sistemos montavimas",
+                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
+                {"skyrius": SK_SAN, "aprasymas": "Gyvatuko montavimas, teno pajungimas",
+                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
+                {"skyrius": SK_SAN, "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
+                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
+            ])
+        # Virtuvė — plautuvė + maišytuvas
+        if n_virtuve > 0:
+            pozicijos.extend([
+                {"skyrius": SK_SAN, "aprasymas": "Plautuvės montavimas",
+                 "vnt": "vnt", "kiekis": n_virtuve, "saltinis": "paskirtis_default"},
+                {"skyrius": SK_SAN, "aprasymas": "Virtuvės maišytuvo montavimas",
+                 "vnt": "vnt", "kiekis": n_virtuve, "saltinis": "paskirtis_default"},
+            ])
+        # Skalbimo mašinos sifonas — skalbyklos arba vonia
+        n_skalbimo_sifonas = max(n_skalbykla, 1 if n_full_bathroom > 0 and n_skalbykla == 0 else 0)
+        if n_skalbimo_sifonas > 0:
+            pozicijos.append({
+                "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos sifono įrengimas",
+                "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
+            })
+        # Santechnikos taškų koregavimas — visada baseline 1 vnt projektui
+        pozicijos.append({
+            "skyrius": SK_SAN, "aprasymas": "Santechnikos taškų koregavimas",
+            "vnt": "kompl", "kiekis": 1, "saltinis": "baseline"})
+
+    # ════════════════════════════════════════════════════════════════════════
+    # ELEKTROS INSTALIACIJOS DARBAI (placeholders — count po Vision symbol counter)
+    # rangovas P2/P5 stiliumi. Kiekiai pagal sutartinius ženklus brėžinyje.
+    # Šiuo metu placeholder: confidence "low", vartotojas įveda kiekį.
+    # Po simbolių extractor'iaus integracijos — automatiškai užpildys.
+    # ════════════════════════════════════════════════════════════════════════
+
+    # Symbol counts iš puslapio analizės (pradiniame draft'e — null/0)
+    # Vertinam paskirtį turintį detected_symbols arba v9_meta.symbols_detected
+    symbols = (parsed.get("v9_meta", {}) or {}).get("symbols_detected") \
+              or parsed.get("detected_symbols_summary") \
+              or {}
+    rozetes_n = int(symbols.get("rozetes") or 0)
+    jungikliai_n = int(symbols.get("jungikliai") or 0)
+    sviestuvai_n = int(symbols.get("sviestuvai") or 0)
+    pakabinami_n = int(symbols.get("pakabinami_sviestuvai") or 0)
+    led_juostu_m = float(symbols.get("led_juostos") or 0)
+    difuzoriai_n = int(symbols.get("difuzoriai") or 0)
+
+    # Šitos pozicijos pridedam VISADA (kaip Tomos „checklist") — kiekiai 0/null
+    # kai nėra duomenų; vartotojas gali įvesti rankiniu būdu.
+    el_lines: list[dict] = []
+    if rozetes_n + jungikliai_n > 0:
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Rozetės / jungiklio pajungimas",
+            "vnt": "vnt", "kiekis": rozetes_n + jungikliai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+    if sviestuvai_n > 0:
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Lubinių priglaistomų šviestuvų montavimas",
+            "vnt": "vnt", "kiekis": sviestuvai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Skylių šviestuvams gręžimas",
+            "vnt": "vnt", "kiekis": sviestuvai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+    if pakabinami_n > 0:
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Pakabinamų šviestuvų montavimas",
+            "vnt": "vnt", "kiekis": pakabinami_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+    if led_juostu_m > 0:
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "LED juostos pajungimas",
+            "vnt": "m", "kiekis": round(led_juostu_m, 2),
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+    if difuzoriai_n > 0:
+        # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
+        # (priglaistomas + glaistymo darbas — separate trade tasks)
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Difūzorių montavimas (vėdinimo taškai)",
+            "vnt": "vnt", "kiekis": difuzoriai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Difūzorių apdirbimas (priglaistomas)",
+            "vnt": "vnt", "kiekis": difuzoriai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+
+    # Sprint §40 (2026-04-29): HVAC ortakiai — rangovas audit v2 top gap.
+    # 40% premium projektų turi ortakius (D100/125/160 mm). Vision prompt'as
+    # papildytas detect'inti ortakių žymėjimus brėžiniuose; jei rasta — emit
+    # per-diameter line items. Heuristic fallback: jei `difuzoriai_n > 0` BET
+    # ortakių symbols nedetected, emit estimated D125 (most common).
+    SK_VENT = "Ventiliacijos darbai"
+    ortakiai_d100 = float(symbols.get("ortakiai_d100_m") or 0)
+    ortakiai_d125 = float(symbols.get("ortakiai_d125_m") or 0)
+    ortakiai_d160 = float(symbols.get("ortakiai_d160_m") or 0)
+    ortakiai_total = ortakiai_d100 + ortakiai_d125 + ortakiai_d160
+
+    if ortakiai_total == 0 and difuzoriai_n > 0:
+        # Heuristic fallback: average duct run per diffuser ≈ 4-6 m.
+        # Use D125 as default (most common single-family residential).
+        ortakiai_d125 = round(difuzoriai_n * 5.0, 1)
+        ortakiai_total = ortakiai_d125
+
+    if ortakiai_d100 > 0:
+        pozicijos.append({
+            "skyrius": SK_VENT, "aprasymas": "Ortakių D100 mm montavimas",
+            "vnt": "m", "kiekis": ortakiai_d100,
+            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d100_m") else "skaiciuota_is_brezinio",
+            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D100",
+            "medziagos_kiekis": round(ortakiai_d100 * 1.05, 1),  # 5% atliekos
+            "medziagos_vnt": "m",
+        })
+    if ortakiai_d125 > 0:
+        pozicijos.append({
+            "skyrius": SK_VENT, "aprasymas": "Ortakių D125 mm montavimas",
+            "vnt": "m", "kiekis": ortakiai_d125,
+            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d125_m") else "skaiciuota_is_brezinio",
+            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D125",
+            "medziagos_kiekis": round(ortakiai_d125 * 1.05, 1),
+            "medziagos_vnt": "m",
+        })
+    if ortakiai_d160 > 0:
+        pozicijos.append({
+            "skyrius": SK_VENT, "aprasymas": "Ortakių D160 mm montavimas",
+            "vnt": "m", "kiekis": ortakiai_d160,
+            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d160_m") else "skaiciuota_is_brezinio",
+            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D160",
+            "medziagos_kiekis": round(ortakiai_d160 * 1.05, 1),
+            "medziagos_vnt": "m",
+        })
+    if ortakiai_total > 0:
+        # rangovas paaiškina: ortakių izoliacija + tvirtinimas — atskiros eilutės
+        pozicijos.append({
+            "skyrius": SK_VENT, "aprasymas": "Ortakių izoliacija (akmens vata + AlMg folija)",
+            "vnt": "m", "kiekis": round(ortakiai_total * 0.7, 1),  # ~70% (in slabs only)
+            "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
+        })
+        pozicijos.append({
+            "skyrius": SK_VENT, "aprasymas": "Ortakių tvirtinimas (kabykės, rankės)",
+            "vnt": "vnt", "kiekis": round(ortakiai_total / 1.5),  # ~1 fix per 1.5 m
+            "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
+        })
+    if sviestuvai_n > 0:
+        # Same pair pattern for šviestuvai — rangovas lists montavimas separately
+        # from apdirbimas (gipsiniai). We already emit montavimas + skylės
+        # above; add apdirbimas as third line.
+        el_lines.append({
+            "skyrius": SK_EL, "aprasymas": "Šviestuvų apdirbimas (gipsiniai priglaistomi)",
+            "vnt": "vnt", "kiekis": sviestuvai_n,
+            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+        })
+    pozicijos.extend(el_lines)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PRIDĖTINIAI ELEMENTAI (~4-5 lines)
+    # ════════════════════════════════════════════════════════════════════════
+
+    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4)
+    high_ceiling_dazymo = round(sum(
+        float(r.get("dazymo_plotas_m2") or 0) for r in rooms
+        if float(r.get("lubu_aukstis_m") or 0) > 3.0
+    ), 2)
+    if high_ceiling_dazymo > 0:
+        # ~1 d.d. per ~50 m² didelio aukščio dažomo ploto
+        pastoliu_dd = max(1, round(high_ceiling_dazymo / 50))
+        pozicijos.append({
+            "skyrius": SK_PR, "aprasymas": "Pastolių nuoma (aukštesnių nei 3m)",
+            "vnt": "d.d", "kiekis": pastoliu_dd, "saltinis": "lubu_aukstis>3m",
+            "medziagos_aprasymas": "Pastoliai (mobilūs)",
+            "medziagos_kiekis": pastoliu_dd, "medziagos_vnt": "d.d",
+        })
+
+    bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
+    if bendras_plotas > 0:
+        # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
+        # Empirical ratio ~0.06 m³/m² for full vidaus apdaila.
+        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.06, 1))
+        pozicijos.extend([
+            {"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
+             "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio",
+             "medziagos_aprasymas": "Konteineris + transportas",
+             "medziagos_kiekis": siuksliu_m3, "medziagos_vnt": "m3"},
+            {"skyrius": SK_PR, "aprasymas": "Statybvietės sutvarkymas po darbų",
+             "vnt": "kompl", "kiekis": 1, "saltinis": SAL},
+            {"skyrius": SK_PR, "aprasymas": "Apsauginės dangos / juostos darbų metu",
+             "vnt": "m2", "kiekis": round(bendras_plotas, 2), "saltinis": SAL,
+             "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
+             "medziagos_kiekis": round(bendras_plotas, 2), "medziagos_vnt": "m2"},
+        ])
+
+    # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.
+    # lines stay grouped even when generator interleaves emit order.
+    # User reported „2 GKP montavimas sections" in Excel because „Angokraščių
+    # apdirbimas GKP" (SK_GKP) emits BEFORE the main painting block, then the
+    # rest of GKP montavimas emits AFTER. Stable sort fixes both Excel sheets
+    # and frontend grouping.
+    SKYRIUS_ORDER = {
+        "Sienų lubų glaistymas dažymas": 1,
+        "GKP montavimas":                2,
+        "Plytelių klijavimas":           3,
+        "Hidroizoliacija":               4,
+        "Grindys":                       5,
+        "Santechnikos darbai":           6,
+        "Ventiliacijos darbai":          7,
+        "Elektros instaliacijos darbai": 8,
+        "Pridėtiniai elementai":         9,
+    }
+    pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
+
+    parsed["pozicijos"] = pozicijos
     return parsed
 
 
@@ -346,13 +1614,20 @@ def _recompute_santrauka(parsed: dict) -> dict:
     return parsed
 
 
-def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> dict:
+def extract_interior(
+    pdf_bytes: bytes,
+    rules_override: dict | None = None,
+    progress_cb=None,
+) -> dict:
     """Single Vision call entry point. PDF bytes → structured takeoff JSON.
 
     Args:
         pdf_bytes: Raw PDF bytes (single file)
         rules_override: Optional Setup Wizard preferences dict; attached to result
                         as _overrides for downstream UI use.
+        progress_cb: Optional callable(event_dict) fired at lifecycle checkpoints
+                     for SM01 streaming UI. Failures swallowed — never break the
+                     extraction itself if a downstream consumer raises.
     Returns: parsed JSON dict with `patalpos`, `santrauka`, `pozicijos`, etc.
              On error returns {"_error": "...", "status": "error"}.
              On success returns {..., "status": "ok", "_meta": {...}}.
@@ -360,26 +1635,75 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
     t0 = time.time()
     client = anthropic.Anthropic()
 
+    def _emit(ev: dict) -> None:
+        if not progress_cb:
+            return
+        try:
+            progress_cb(ev)
+        except Exception as exc:
+            print(f"[extractor] progress_cb raised: {exc}")
+
     system = [
         {"type": "text", "text": SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
     ]
 
     # Step 1: PDF → base64 images
+    _emit({"event": "rendering_pdf"})
     try:
         pages = pdf_to_b64_images(pdf_bytes)
     except Exception as exc:
+        _emit({"event": "error", "message": f"pdf_to_images_failed: {exc}"})
         return {
             "status": "error",
             "_error": f"pdf_to_images_failed: {exc}",
         }
 
     if not pages:
+        _emit({"event": "error", "message": "PDF has no renderable pages"})
         return {
             "status": "error",
             "_error": "PDF has no renderable pages",
         }
 
+    # Step 1.1 (Sprint E1, 2026-04-28): cost-safe filter — drop vendor quote
+    # pages from Pass-1 input. Detected via pdfplumber text heuristics (zero
+    # API cost, zero accuracy risk — these pages have no room/dimension data,
+    # only supplier price catalogs that the designer stapled into the bundle).
+    # page_index field on each page preserves the ORIGINAL 1-based number so
+    # `room.puslapio_nr` references stay correct downstream.
+    try:
+        from .page_filter import detect_vendor_quote_pages
+        vendor_pages = detect_vendor_quote_pages(pdf_bytes)
+        if vendor_pages:
+            original_count = len(pages)
+            pages = [p for p in pages if p["page_index"] not in vendor_pages]
+            print(f"[extractor] vendor filter: skipped {original_count - len(pages)} "
+                  f"pages (indices: {sorted(vendor_pages)}); {len(pages)} → Vision")
+    except Exception as exc:
+        # Non-fatal: if filter fails, fall through with all pages
+        print(f"[extractor] vendor page filter failed: {exc}")
+        vendor_pages = set()
+
+    _emit({"event": "started", "page_count": len(pages),
+           "vendor_pages_skipped": sorted(vendor_pages) if vendor_pages else []})
+
+    # Step 1.5: Pre-pass — read eksplikacija + schedule tables for ground-truth anchoring.
+    _emit({"event": "eksplikacija_started"})
+    try:
+        from .eksplikacija_reader import read_eksplikacija
+        eks = read_eksplikacija(pdf_bytes, client)
+    except Exception as exc:
+        print(f"[extractor] eksplikacija pre-pass failed: {exc}")
+        eks = {"patalpos": [], "schedule_tables": {"durys": [], "langai": []}}
+    _emit({
+        "event": "eksplikacija_completed",
+        "rooms_in_table": len(eks.get("patalpos", [])),
+        "doors_in_table": len(eks.get("schedule_tables", {}).get("durys", [])),
+        "windows_in_table": len(eks.get("schedule_tables", {}).get("langai", [])),
+    })
+
     # Step 2: Vision call with retry (max 3 attempts)
+    _emit({"event": "pass1_started", "page_count": len(pages)})
     last_err: Exception | None = None
     parsed: dict | None = None
 
@@ -449,54 +1773,294 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
             time.sleep(1.5 ** attempt)
 
     if parsed is None:
+        _emit({"event": "error", "message": str(last_err or "Unknown error")})
         return {
             "status": "error",
             "_error": str(last_err or "Unknown error"),
         }
+
+    _pass1_rooms = parsed.get("patalpos") or []
+    _emit({
+        "event": "pass1_completed",
+        "rooms_count": len(_pass1_rooms),
+        "patalpos": [
+            {
+                "nr": r.get("nr"),
+                "pavadinimas": r.get("pavadinimas"),
+                "paskirtis": r.get("paskirtis"),
+                "plotas_m2": r.get("plotas_m2"),
+                "puslapio_nr": r.get("puslapio_nr"),
+                "confidence": r.get("confidence"),
+            }
+            for r in _pass1_rooms
+        ],
+    })
+
+    # Step 2.4: Merge eksplikacija ground truth into rooms by name match (case-insensitive).
+    # Eksplikacija plotas/perimetras override Vision dimension-chain values when available.
+    rooms = parsed.get("patalpos") or []
+    try:
+        eks_by_name = {
+            (r.get("pavadinimas") or "").strip().lower(): r
+            for r in eks.get("patalpos", [])
+        }
+        merged_count = 0
+        for room in rooms:
+            name = (room.get("pavadinimas") or "").strip().lower()
+            eks_row = eks_by_name.get(name)
+            if eks_row:
+                if eks_row.get("plotas_m2"):
+                    room["plotas_m2"] = eks_row["plotas_m2"]
+                    room["plotas_saltinis"] = "eksplikacija"
+                if eks_row.get("perimetras_m"):
+                    room["perimetras_m"] = eks_row["perimetras_m"]
+                room["eksplikacija_row_idx"] = eks_row.get("row_idx")
+                # Per-row bbox + page dims (pdfplumber only; Vision pre-pass
+                # doesn't compute these). Frontend uses them to overlay a
+                # highlight on the eksplikacija page when this room is focused.
+                if eks_row.get("eksplikacija_row_bbox"):
+                    room["eksplikacija_row_bbox"] = eks_row["eksplikacija_row_bbox"]
+                if eks_row.get("eksplikacija_page_width_pdf"):
+                    room["eksplikacija_page_width_pdf"] = eks_row["eksplikacija_page_width_pdf"]
+                if eks_row.get("eksplikacija_page_height_pdf"):
+                    room["eksplikacija_page_height_pdf"] = eks_row["eksplikacija_page_height_pdf"]
+                merged_count += 1
+        parsed.setdefault("_meta", {})["eksplikacija_merged_rooms"] = merged_count
+        parsed["_meta"]["eksplikacija_total_rows"] = len(eks.get("patalpos", []))
+        parsed["_eksplikacija"] = eks  # full pre-pass result for frontend reference
+        _emit({
+            "event": "eksplikacija_merged",
+            "merged_rooms": merged_count,
+            "total_rows": len(eks.get("patalpos", [])),
+        })
+    except Exception as exc:
+        print(f"[extractor] eksplikacija merge failed: {exc}")
+
+    # Step 2.45: Schedule-table anchoring for window/door dimensions (Sprint 2).
+    # Each room.elementai item with tipas in (langas, stoglangis, duris, pasleptos_duris)
+    # is matched against schedule_tables.langai/durys by dimension proximity (±50mm).
+    # On match: override plotis_mm/aukstis_mm with EXACT schedule values, mark
+    # `_schedule_anchored: True` and `_schedule_id: "L1"` etc. for UI surfacing.
+    # Also emits a count-sanity warning if room totals diverge from schedule by >15%.
+    try:
+        sched = (eks.get("schedule_tables") or {})
+        sched_langai = sched.get("langai") or []
+        sched_durys = sched.get("durys") or []
+        DIM_TOL_MM = 50
+
+        def _match(elem_w, elem_h, candidates):
+            if not elem_w or not elem_h:
+                return None
+            best, best_dist = None, DIM_TOL_MM + 1
+            for s in candidates:
+                sw, sh = s.get("plotis_mm"), s.get("aukstis_mm")
+                if not sw or not sh:
+                    continue
+                d = abs(sw - elem_w) + abs(sh - elem_h)
+                if d < best_dist:
+                    best, best_dist = s, d
+            return best if best_dist <= DIM_TOL_MM * 2 else None
+
+        anchored_count = 0
+        room_langai_total = 0
+        room_durys_total = 0
+        for room in rooms:
+            for elem in (room.get("elementai") or []):
+                tipas = elem.get("tipas")
+                ew = elem.get("plotis_mm")
+                eh = elem.get("aukstis_mm")
+                count = elem.get("kiekis") or 1
+                if tipas in ("langas", "stoglangis"):
+                    room_langai_total += count
+                    matched = _match(ew, eh, sched_langai)
+                    if matched:
+                        elem["plotis_mm"] = matched["plotis_mm"]
+                        elem["aukstis_mm"] = matched["aukstis_mm"]
+                        elem["_schedule_anchored"] = True
+                        elem["_schedule_id"] = matched.get("id")
+                        anchored_count += 1
+                elif tipas in ("duris", "pasleptos_duris"):
+                    room_durys_total += count
+                    matched = _match(ew, eh, sched_durys)
+                    if matched:
+                        elem["plotis_mm"] = matched["plotis_mm"]
+                        elem["aukstis_mm"] = matched["aukstis_mm"]
+                        elem["_schedule_anchored"] = True
+                        elem["_schedule_id"] = matched.get("id")
+                        anchored_count += 1
+
+        sched_langai_total = sum((s.get("kiekis") or 1) for s in sched_langai)
+        sched_durys_total = sum((s.get("kiekis") or 1) for s in sched_durys)
+        parsed.setdefault("_meta", {})["schedule_anchored_elements"] = anchored_count
+        parsed["_meta"]["schedule_count_check"] = {
+            "langai_room_total": room_langai_total,
+            "langai_schedule_total": sched_langai_total,
+            "durys_room_total": room_durys_total,
+            "durys_schedule_total": sched_durys_total,
+        }
+
+        # Emit count-mismatch warnings (>15% divergence and schedule has data).
+        warnings = parsed.get("warnings") or []
+        for label, room_n, sched_n in [
+            ("langų", room_langai_total, sched_langai_total),
+            ("durų",  room_durys_total,  sched_durys_total),
+        ]:
+            if sched_n > 0 and abs(room_n - sched_n) / sched_n > 0.15:
+                warnings.append({
+                    "level": "WARN",
+                    "message": (
+                        f"Patalpose suskaičiuota {room_n} {label}, bet "
+                        f"specifikacijos lentelėje {sched_n}. Skirtumas "
+                        f"{abs(room_n - sched_n)} vnt. — patikrinkite ar visi "
+                        f"{label} priskirti patalpoms."
+                    ),
+                })
+        parsed["warnings"] = warnings
+
+        _emit({
+            "event": "schedule_anchored",
+            "anchored_elements": anchored_count,
+            "langai_match": f"{room_langai_total}/{sched_langai_total}",
+            "durys_match": f"{room_durys_total}/{sched_durys_total}",
+        })
+    except Exception as exc:
+        print(f"[extractor] schedule anchor merge failed: {exc}")
 
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
     # crop the page region at 300 DPI / 2576px max, send to Vision with room
     # context, ask for refined mm dimensions. Phase 6.5.2 showed determinism
     # is poor (CV 22-150%) on projects without eksplikacija; zoom should fix this.
-    rooms = parsed.get("patalpos") or []
     zoom_count_attempted = 0
     zoom_count_applied = 0
     zoom_total_input_tok = 0
     zoom_total_output_tok = 0
+    zoom_count_skipped = 0
     t_zoom_start = time.time()
-    for room in rooms:
+
+    # Sprint E2: SMART ZOOM SKIP — when room has eksplikacija-anchored plotas
+    # AND a name-matched eksplikacija row, plotas is byte-exact (pdfplumber).
+    # Zoom adds value primarily for opening dimensions and edge cases. We can
+    # safely skip zoom when:
+    #   1. plotas_saltinis == "eksplikacija" (deterministic primitive)
+    #   2. eksplikacija_row_idx is set (confirmed name match)
+    # This typically saves 50-75% of zoom calls on CAD-export projects with
+    # clean eksplikacija — without losing accuracy on the primary primitive.
+    def _can_skip_zoom(r: dict) -> bool:
+        if (r.get("plotas_saltinis") or "") != "eksplikacija":
+            return False
+        if r.get("eksplikacija_row_idx") is None:
+            return False
+        # Confidence guard: only skip if Vision considered this room "high"
+        if (r.get("confidence") or "") == "low":
+            return False
+        return True
+
+    _zoomable = [r for r in rooms
+                 if r.get("bbox_pct") and r.get("puslapio_nr")
+                 and not _can_skip_zoom(r)]
+    _emit({"event": "zoom_started", "total": len(_zoomable),
+           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r))})
+    for idx, room in enumerate(rooms, start=1):
         bbox = room.get("bbox_pct")
         page_nr = room.get("puslapio_nr")
         if not bbox or not page_nr:
+            continue
+        # Smart zoom skip — eksplikacija primitives are deterministic enough
+        if _can_skip_zoom(room):
+            zoom_count_skipped += 1
             continue
         cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
         if not cropped:
             continue
         zoom_count_attempted += 1
+        _emit({
+            "event": "zoom_room_started",
+            "idx": zoom_count_attempted,
+            "total": len(_zoomable),
+            "room_nr": room.get("nr"),
+            "pavadinimas": room.get("pavadinimas"),
+        })
         zoom_result = _vision_zoom_room(client, cropped, room)
         if not zoom_result:
+            _emit({
+                "event": "zoom_room_completed",
+                "idx": zoom_count_attempted,
+                "total": len(_zoomable),
+                "room_nr": room.get("nr"),
+                "applied": False,
+            })
             continue
-        if _apply_zoom_refinements(room, zoom_result):
+        applied = _apply_zoom_refinements(room, zoom_result)
+        if applied:
             zoom_count_applied += 1
+        _emit({
+            "event": "zoom_room_completed",
+            "idx": zoom_count_attempted,
+            "total": len(_zoomable),
+            "room_nr": room.get("nr"),
+            "applied": applied,
+            "plotas_m2": room.get("plotas_m2"),
+        })
     zoom_elapsed = round(time.time() - t_zoom_start, 1)
+    _emit({
+        "event": "zoom_completed",
+        "attempted": zoom_count_attempted,
+        "applied": zoom_count_applied,
+        "skipped_via_eksplikacija": zoom_count_skipped,
+        "elapsed_s": zoom_elapsed,
+    })
     parsed.setdefault("_meta", {})["zoom_attempted"] = zoom_count_attempted
+    parsed["_meta"]["zoom_skipped_via_eksplikacija"] = zoom_count_skipped
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
           f"{zoom_count_applied} applied, {zoom_elapsed}s")
 
+    _emit({"event": "post_processing"})
+
+    # Step 2.9: PYTHON DETERMINISTIC MATH (2026-04-28 deterministic refactor).
+    # Replace Vision-emitted per-room totals with Python-computed values from
+    # primitives. Same primitives → same output, every run.
+    try:
+        parsed = _recompute_per_room_via_python(parsed, rules_override)
+        _emit({
+            "event": "python_math_completed",
+            "rooms_computed": len(parsed.get("patalpos") or []),
+        })
+    except Exception as exc:
+        print(f"[extractor] per-room Python recompute failed: {exc}")
+        existing_warnings = parsed.get("warnings") or []
+        existing_warnings.append({
+            "level": "WARN",
+            "message": f"Python skaičiavimo klaida: {exc}",
+        })
+        parsed["warnings"] = existing_warnings
+
+    # Step 2.95: BUILD POZICIJOS from Python-computed per-room aggregates.
+    # Vision no longer emits pozicijos[] (deterministic refactor). Python
+    # synthesizes the kiekių žiniaraštis from per-room totals.
+    # Pre-set _overrides so _build_pozicijos_from_rooms can read NRM2/VOB/LT
+    # deduction standard (Sprint §2A.1). Re-set definitively at Step 6 below.
+    if rules_override is not None:
+        parsed["_overrides"] = rules_override
+    try:
+        parsed = _build_pozicijos_from_rooms(parsed)
+    except Exception as exc:
+        print(f"[extractor] pozicijos build failed: {exc}")
+        parsed["pozicijos"] = parsed.get("pozicijos") or []
+
     # Step 3: Recompute santrauka from per-room values (single source of truth)
-    # NOTE: this runs AFTER zoom pass so totals reflect refined per-room dims.
+    # NOTE: this runs AFTER Python per-room compute so totals reflect deterministic dims.
     try:
         parsed = _recompute_santrauka(parsed)
     except Exception as exc:
-        # Non-fatal: keep Vision's santrauka, add warning
+        # Non-fatal: keep current santrauka, add warning
         print(f"[extractor] santrauka recompute failed: {exc}")
         existing_warnings = parsed.get("warnings") or []
         existing_warnings.append({
             "level": "WARN",
-            "message": f"Santrauka recompute klaida: {exc} — naudojama Vision santrauka",
+            "message": f"Santrauka recompute klaida: {exc}",
         })
         parsed["warnings"] = existing_warnings
 
@@ -506,6 +2070,83 @@ def extract_interior(pdf_bytes: bytes, rules_override: dict | None = None) -> di
         parsed = apply_lt_sanity(parsed)
     except Exception as exc:
         print(f"[extractor] lt_sanity failed: {exc}")
+
+    # Step 4.05: Cross-page consistency validator — pure-python rule engine
+    # cross-checks plotai/elementai/schedules/eksplikacija. Adds entries to
+    # parsed["warnings"] so they propagate into the lt_sanity UI banner below.
+    try:
+        from .cross_page_validator import validate_consistency
+        cross_warnings = validate_consistency(parsed)
+        if cross_warnings:
+            existing = parsed.get("warnings") or []
+            for w in cross_warnings:
+                existing.append({
+                    "level": w["level"].upper(),
+                    "field": w.get("field", ""),
+                    "message": w.get("message_lt", ""),
+                    "suggestion": w.get("suggestion", ""),
+                    "discrepancy_pct": w.get("discrepancy_pct"),
+                    "source": "cross_page_validator",
+                })
+            parsed["warnings"] = existing
+            print(f"[extractor] cross_page_validator emitted {len(cross_warnings)} warnings")
+    except Exception as exc:
+        print(f"[extractor] cross_page_validator failed: {exc}")
+
+    # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
+    # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
+    # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].
+    # Per `parsed.puslapiai[].tipas` classification — limit scan to relevant
+    # pages so we don't false-match door dims on plan pages.
+    try:
+        from .plyteliu_specifikacija import (
+            extract_plyteliu_specifikacija, RELEVANT_PAGE_TYPES,
+        )
+        relevant = [
+            p["nr"] for p in (parsed.get("puslapiai") or [])
+            if p.get("tipas") in RELEVANT_PAGE_TYPES
+        ]
+        plyt = extract_plyteliu_specifikacija(pdf_bytes, relevant_pages=relevant or None)
+        parsed["_plyteliu_specs"] = plyt.get("tile_specs", [])
+        if plyt.get("tile_specs"):
+            print(f"[extractor] plyteliu_specifikacija found {len(plyt['tile_specs'])} "
+                  f"size-specific tile mentions on {len(relevant)} relevant pages, "
+                  f"{plyt['_meta'].get('elapsed_s', 0)}s, $0 cost")
+    except Exception as exc:
+        print(f"[extractor] plyteliu_specifikacija failed (non-fatal): {exc}")
+
+    # Step 4.08: Wall elevation specialized Vision extractor. Opt-in via
+    # WALL_ELEVATION_EXTRACT=1 env var because each page costs ~$0.10-0.20.
+    # Output attached as parsed['_wall_elevations']; pozicijos generator and
+    # frontend can use exact tile_zones/paint_zones/niches mm boundaries
+    # instead of paskirtis-based approximations.
+    if os.environ.get("WALL_ELEVATION_EXTRACT") == "1":
+        try:
+            from .wall_elevation import extract_wall_elevations
+            we_pages = [
+                p["nr"] for p in (parsed.get("puslapiai") or [])
+                if p.get("tipas") == "wall_elevation"
+            ]
+            if we_pages:
+                _emit({"event": "wall_elevation_started", "pages": len(we_pages)})
+                we_result = extract_wall_elevations(pdf_bytes, client, we_pages)
+                parsed["_wall_elevations"] = we_result.get("wall_elevations", [])
+                parsed.setdefault("_meta", {})["wall_elevation_meta"] = we_result.get("_meta", {})
+                _emit({
+                    "event": "wall_elevation_completed",
+                    "elevations": len(we_result.get("wall_elevations", [])),
+                    "pages_processed": we_result.get("_meta", {}).get("pages_processed", 0),
+                })
+                print(f"[extractor] wall_elevation: {len(we_result.get('wall_elevations', []))} "
+                      f"elevations from {we_result.get('_meta', {}).get('pages_processed', 0)} pages, "
+                      f"{we_result.get('_meta', {}).get('elapsed_s', 0)}s")
+
+                # Sprint §35 (2026-04-29): override paskirtis-based plyteles_sienos_m2
+                # with mm-precision sum from wall_elevations data. Per CLAUDE.md §1.7,
+                # tile zone area = (to_floor_mm − from_floor_mm) × wall_total_width_mm.
+                _apply_wall_elevation_tile_override(parsed)
+        except Exception as exc:
+            print(f"[extractor] wall_elevation failed (non-fatal): {exc}")
 
     # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
     # SanityWarningsBanner.jsx expects this V8 shape; new extractor uses flat

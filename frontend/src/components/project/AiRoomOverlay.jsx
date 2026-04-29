@@ -30,9 +30,24 @@ function colorFor(paskirtis) {
   return COLORS_BY_PASKIRTIS[paskirtis] || '#10b981';
 }
 
+// SM01-debug: A/B Y-flip toggle. Default OFF after visual diagnosis
+// (2026-04-27 P1 sample): Vision is already emitting top-left origin for
+// bbox_pct, so no flip needed. The flag remains for future investigation
+// if a project shows rooms inverted — try
+// `localStorage.setItem('samatu_bbox_flip_y', 'true')` and refresh.
+function shouldFlipY() {
+  try {
+    return localStorage.getItem('samatu_bbox_flip_y') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export default function AiRoomOverlay({
   width, height, page, rooms,
   onRoomClick,
+  onRoomHover,
+  highlightRoomNrs = null, // Set<roomNr> | null — Phase 14 / QW05
 }) {
   if (!rooms || rooms.length === 0) return null;
 
@@ -43,6 +58,8 @@ export default function AiRoomOverlay({
   });
 
   if (pageRooms.length === 0) return null;
+
+  const flipY = shouldFlipY();
 
   return (
     <Stage
@@ -58,6 +75,9 @@ export default function AiRoomOverlay({
       <Layer listening={true}>
         {pageRooms.map((room, idx) => {
           const color = colorFor(room.paskirtis);
+          const isHighlight = highlightRoomNrs?.has?.(room.nr) === true;
+          const strokeW = isHighlight ? 4 : 1.5;
+          const fillAlpha = isHighlight ? '55' : '22';
           let cx, cy, shape;
 
           // V9: polygon_pdf (vector poligonai — TIKSLU)
@@ -77,9 +97,9 @@ export default function AiRoomOverlay({
               shape = (
                 <Line
                   points={pts}
-                  fill={`${color}22`}
+                  fill={`${color}${fillAlpha}`}
                   stroke={color}
-                  strokeWidth={2}
+                  strokeWidth={Math.max(strokeW, 2)}
                   closed={true}
                   listening={true}
                 />
@@ -99,16 +119,17 @@ export default function AiRoomOverlay({
               // Be PDF dim — naudojam centroid_pct + bbox_pct (jei yra)
               const cp = room.centroid_pct;
               cx = cp[0] * width;
-              cy = cp[1] * height;
+              cy = (flipY ? (1 - cp[1]) : cp[1]) * height;
               if (room.bbox_pct) {
                 const bb = room.bbox_pct;
+                const by = flipY ? (1 - bb.y - bb.h) * height : bb.y * height;
                 shape = (
                   <Rect
-                    x={bb.x * width} y={bb.y * height}
+                    x={bb.x * width} y={by}
                     width={bb.w * width} height={bb.h * height}
-                    fill={`${color}22`}
+                    fill={`${color}${fillAlpha}`}
                     stroke={color}
-                    strokeWidth={2}
+                    strokeWidth={Math.max(strokeW, 2)}
                     cornerRadius={2}
                   />
                 );
@@ -121,7 +142,7 @@ export default function AiRoomOverlay({
             const bb = room.bbox_pct;
             if (!bb || bb.w <= 0 || bb.h <= 0) return null;
             const x = bb.x * width;
-            const y = bb.y * height;
+            const y = flipY ? (1 - bb.y - bb.h) * height : bb.y * height;
             const w = bb.w * width;
             const h = bb.h * height;
             cx = x + w / 2;
@@ -129,9 +150,9 @@ export default function AiRoomOverlay({
             shape = (
               <Rect
                 x={x} y={y} width={w} height={h}
-                fill={`${color}22`}
+                fill={`${color}${fillAlpha}`}
                 stroke={color}
-                strokeWidth={1.5}
+                strokeWidth={strokeW}
                 cornerRadius={2}
                 listening={true}
               />
@@ -149,7 +170,9 @@ export default function AiRoomOverlay({
               listening={true}
               onClick={() => onRoomClick?.(room)}
               onTap={() => onRoomClick?.(room)}
-              style={{ pointerEvents: 'auto' }}
+              onMouseEnter={() => onRoomHover?.(room)}
+              onMouseLeave={() => onRoomHover?.(null)}
+              style={{ pointerEvents: 'auto', cursor: onRoomHover ? 'pointer' : 'default' }}
             >
               {shape}
               {/* Label fone */}

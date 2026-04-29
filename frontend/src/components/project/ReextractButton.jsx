@@ -44,50 +44,57 @@ export default function ReextractButton({ project, onComplete }) {
       }
 
       const t0 = Date.now();
-      const ti = setInterval(() => {
-        const sec = Math.floor((Date.now() - t0) / 1000);
-        if (sec < 60) setProgress(`Pass 1: AI matuoja patalpas... (${sec}s)`);
-        else if (sec < 200) setProgress(`Pass 2: AI prizoom'ina kambarius... (${sec}s)`);
-        else setProgress(`Sudėtingas projektas (${sec}s)... gali užtrukti iki 8 min.`);
-      }, 1000);
+      // Sprint §AUDIT (2026-04-29): wrap setInterval in try/finally so it
+      // always cleared on error/abort. Previously, network/parse failures
+      // skipped clearInterval at L60 and the timer leaked indefinitely.
+      let ti = null;
+      try {
+        ti = setInterval(() => {
+          const sec = Math.floor((Date.now() - t0) / 1000);
+          if (sec < 60) setProgress(`Pass 1: AI matuoja patalpas... (${sec}s)`);
+          else if (sec < 200) setProgress(`Pass 2: AI prizoom'ina kambarius... (${sec}s)`);
+          else setProgress(`Sudėtingas projektas (${sec}s)... gali užtrukti iki 8 min.`);
+        }, 1000);
 
-      const res = await fetch(`${API}/extract-interior`, {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-        signal: AbortSignal.timeout(600_000),
-      });
-      clearInterval(ti);
+        const res = await fetch(`${API}/extract-interior`, {
+          method: 'POST',
+          credentials: 'include',
+          body: fd,
+          signal: AbortSignal.timeout(600_000),
+        });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `HTTP ${res.status}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `HTTP ${res.status}`);
+        }
+
+        const result = await res.json();
+        if (result?.status === 'error') {
+          throw new Error(result._error || 'Pipeline klaida');
+        }
+        if (!result.patalpos) {
+          throw new Error('AI grąžino netinkamą formatą');
+        }
+
+        // Replace project data — preserve user-edited fields (kainos, name, etc.)
+        const merged = {
+          ...project,
+          ...result,
+          name: project.name,
+          company_name: project.company_name,
+          vat_rate: project.vat_rate,
+          _reextracted_at: new Date().toISOString(),
+        };
+        updateProject(project.id, merged);
+        setProgress('✓ Atnaujinta!');
+        setTimeout(() => {
+          onComplete?.(merged);
+          setExtracting(false);
+          setConfirming(false);
+        }, 800);
+      } finally {
+        if (ti != null) clearInterval(ti);
       }
-
-      const result = await res.json();
-      if (result?.status === 'error') {
-        throw new Error(result._error || 'Pipeline klaida');
-      }
-      if (!result.patalpos) {
-        throw new Error('AI grąžino netinkamą formatą');
-      }
-
-      // Replace project data — preserve user-edited fields (kainos, name, etc.)
-      const merged = {
-        ...project,
-        ...result,
-        name: project.name,
-        company_name: project.company_name,
-        vat_rate: project.vat_rate,
-        _reextracted_at: new Date().toISOString(),
-      };
-      updateProject(project.id, merged);
-      setProgress('✓ Atnaujinta!');
-      setTimeout(() => {
-        onComplete?.(merged);
-        setExtracting(false);
-        setConfirming(false);
-      }, 800);
     } catch (e) {
       console.error('Re-extract failed:', e);
       setError(e.message || 'Klaida');

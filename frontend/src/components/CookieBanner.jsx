@@ -1,12 +1,12 @@
 /**
- * CookieBanner — minimal GDPR-friendly notice (Phase 13).
- * We only use ESSENTIAL session cookies (no tracking/ads). Per LT/EU rules,
- * essential cookies don't need explicit consent — but transparent notice is good practice.
+ * CookieBanner — minimal single-line bottom strip (subtle, not a modal).
+ * Only essential session cookie used; no tracking — LT/EU rules don't
+ * mandate consent but transparent notice is still good practice.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Cookie } from 'lucide-react';
+import { X } from 'lucide-react';
 
 const STORAGE_KEY = 'samatu_cookie_acknowledged';
 
@@ -16,7 +16,9 @@ export default function CookieBanner() {
   useEffect(() => {
     try {
       if (!localStorage.getItem(STORAGE_KEY)) setShow(true);
-    } catch { /* private mode — show banner */ setShow(true); }
+    } catch {
+      setShow(true);
+    }
   }, []);
 
   const acknowledge = () => {
@@ -27,26 +29,28 @@ export default function CookieBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50">
-      <div className="bg-card border border-border rounded-xl shadow-lg p-4">
-        <div className="flex items-start gap-3">
-          <Cookie className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium mb-1">Slapukai</p>
-            <p className="text-xs text-muted-foreground mb-3">
-              Naudojame VIENĄ esminį prisijungimo slapuką (samatu_session).
-              Reklamos ar tracking slapukų nėra. Daugiau —{' '}
-              <Link to="/privacy" className="text-primary hover:underline">privatumo politika</Link>.
-            </p>
-            <button
-              onClick={acknowledge}
-              className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded hover:opacity-90"
-            >
-              Suprantu
-            </button>
-          </div>
-        </div>
-      </div>
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center"
+      style={{
+        background: 'hsl(var(--card))',
+        borderTop: '1px solid hsl(var(--border))',
+        padding: '8px 16px',
+        fontSize: 11,
+      }}
+    >
+      <span className="text-muted-foreground">
+        Esminis prisijungimo slapukas, jokio tracking'o.{' '}
+        <Link to="/privacy" className="underline hover:text-foreground">
+          Privatumas
+        </Link>
+      </span>
+      <button
+        onClick={acknowledge}
+        className="ml-3 flex items-center gap-1 text-foreground/80 hover:text-foreground"
+        title="Suprantu"
+      >
+        <X className="w-3 h-3" />
+      </button>
     </div>
   );
 }

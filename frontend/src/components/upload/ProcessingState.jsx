@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileSearch, Brain, Search, CheckCircle2 } from 'lucide-react';
 
-// Steps mapped to elapsed seconds (two-pass pipeline real timing).
-// Last step is "still working" — never auto-completes; parent unmounts when done.
+// User-facing labels — no technical jargon (no "Pass", "Vision", "AI" tier).
 const steps = [
-  { icon: FileSearch, label: 'Skaitome PDF...',                 minSec: 0 },
-  { icon: Brain,      label: 'Pass 1: AI analizuoja brėžinį...', minSec: 15 },
-  { icon: Search,     label: 'Pass 2: prizoominta kambarius...', minSec: 90 },
-  { icon: CheckCircle2, label: 'Sudedame rezultatus...',         minSec: 300 },
+  { icon: FileSearch,   label: 'Skaitome brėžinį...',                minSec: 0 },
+  { icon: Brain,        label: 'Atpažįstame patalpas...',            minSec: 15 },
+  { icon: Search,       label: 'Tiksliname matmenys...',             minSec: 90 },
+  { icon: CheckCircle2, label: 'Sudedame kiekius...',                minSec: 300 },
 ];
 
 

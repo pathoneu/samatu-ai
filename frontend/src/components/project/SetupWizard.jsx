@@ -45,7 +45,15 @@ export const DEFAULT_PREFS = {
   // Skaičiavimo metodas
   openings_threshold_m2: 1.0,          // openings <1m² ne atimama (NRM2)
   default_door_area_m2: 1.85,          // 0.9 × 2.05
-  default_window_area_m2: 1.40,
+  default_window_area_m2: 1.80,        // FIX 2026-04-29: was 1.40 (US std), LT std = 1.20×1.50 = 1.80
+
+  // Sprint §20 (2026-04-29): pridėti naujieji standartai
+  paint_deduction_standard: 'LT',      // LT | NRM2 | VOB (Sprint §2A.1)
+  paint_class: 2,                      // 1 | 2 | 3 (Sprint §2A.5, EN 13300)
+
+  // Sienos storis (Sprint §20). Vidaus pertvaros vs nešanti siena vs išorinė.
+  sienos_storis_m: 0.10,               // GK pertvara default; mūro = 0.20-0.25; isol exterior = 0.30-0.50
+  exterior_wall_thickness_m: 0.40,
 
   // Kampai
   count_inner_corners: false,           // industries: tik išorės kampai
@@ -54,6 +62,9 @@ export const DEFAULT_PREFS = {
   // Glaistas
   glaistas_q_lygis: 'Q2',              // Q1/Q2/Q3/Q4
   glaistas_storis_mm: 1.25,
+
+  // Dažymo sluoksnių skaičius
+  paint_coats: 2,                      // 1 / 2 / 3 — paint_class lemia automatiškai bet user gali override
 
   // Atliekos
   paint_waste_pct: 8,

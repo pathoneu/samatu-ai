@@ -20,7 +20,8 @@
  *   └───────────────────────────────────────────────────────┘
  */
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
   Edit2, Check, X, Trash2, AlertCircle, Search,
@@ -28,11 +29,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
+import ReextractButton from './ReextractButton';
 import SanityWarningsBanner from './SanityWarningsBanner';
+import { useAuth } from '@/lib/authContext';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(val, d = 1) {
+function fmt(val, d = 2) {
   if (val == null) return '—';
   return Number(val).toLocaleString('lt-LT', { maximumFractionDigits: d });
 }
@@ -125,51 +128,20 @@ function WorkRow({ item, onChange, onRemove }) {
 
   const noPrice = !item.kaina;
 
-  // ── Šaltinio indikatorius (Diena 4) ─────────────────────────────────────
-  // detected=true → AI Vision rado iš brėžinio (žalias dot, "AI")
-  // detected=false → fallback vidurkis (geltonas dot, "vidurkis")
-  // confidence high (geom) → mėlynas dot, "geom"
-  let sourceDot = null;
-  if (item.detected === true) {
-    if (item.confidence === 'high') {
-      sourceDot = (
-        <span title={`Geometrija — ${item.source || 'tikslus'}`}
-          className="inline-flex items-center gap-1 text-[10px] text-blue-700 dark:text-blue-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          geom
-        </span>
-      );
-    } else {
-      sourceDot = (
-        <span title={`AI Vision rado iš brėžinio — ${item.source || ''}`}
-          className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          AI
-        </span>
-      );
-    }
-  } else if (item.detected === false) {
-    sourceDot = (
-      <span title={`AI nerado, naudojam vidurkį — ${item.source || ''}`}
-        className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-        vidurkis
-      </span>
-    );
-  }
+  // Sprint §FIX-8 (2026-04-29): user feedback — visi taškai vizualiai trukdo
+  // ir confidence info jau matosi PERŽIŪRA queue'oje. Dots default OFF.
+  // Kept as dead code so showProvenance toggle gali grąžinti vėliau.
+  const sourceDot = null;
+  const confDot = null;
 
   return (
     <tr className="hover:bg-muted/30 group transition-colors">
       <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
       <td className="px-3 py-2 text-sm text-foreground">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span>{item.aprasymas}</span>
+        <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
-          {item.confidence === 'low' && !item.detected && (
-            <Badge variant="outline" className="text-[10px] py-0 h-4 border-amber-300 text-amber-700">
-              tikrink
-            </Badge>
-          )}
+          <span className="truncate">{item.aprasymas}</span>
+          {confDot}
         </div>
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
@@ -200,7 +172,8 @@ function WorkRow({ item, onChange, onRemove }) {
 
 // ── Pagrindinis komponentas ──────────────────────────────────────────────────
 
-export default function ProjectMainView({ project, onProjectChange, onShowDrawing }) {
+export default function ProjectMainView({ project, onProjectChange, onShowDrawing, onJumpToPage }) {
+  const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
 
@@ -254,49 +227,36 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   return (
     <div className="space-y-4">
       {/* TOP STICKY — Projekto suvestinė + Eksportas */}
+      {/* Top bar — mirrors prototype's 52px ProjectTopBar (compact, single row).
+          Be PVM 13px regular · Su PVM 18px bold · same 10px uppercase eyebrow. */}
       <div className="sticky top-0 z-10 bg-background pt-2 pb-3 -mx-1 px-1">
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            {/* Left: stats */}
+        <div className="bg-card border border-border rounded-md px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            {/* Left: totals — Be PVM (compact) | Su PVM (emphasized) */}
             <div className="flex items-center gap-6 flex-wrap">
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                  Bendra suma (be PVM)
-                </div>
-                <div className="text-2xl font-semibold tabular-nums text-foreground">
+              <div className="flex items-baseline gap-2">
+                <span className="skyrius-header" style={{ fontSize: 10 }}>Be PVM</span>
+                <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
                   {fmtEur(totals.viso)}
-                </div>
+                </span>
               </div>
-              <div className="border-l border-border pl-6">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+              <div className="flex items-baseline gap-2 border-l border-border pl-6">
+                <span className="skyrius-header" style={{ fontSize: 10 }}>
                   Su PVM ({project.vat_rate || 21}%)
-                </div>
-                <div className="text-base font-medium tabular-nums text-foreground/80">
+                </span>
+                <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
                   {fmtEur(totals.viso * (1 + (project.vat_rate || 21) / 100))}
-                </div>
+                </span>
               </div>
-              <div className="border-l border-border pl-6 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                <span className="text-muted-foreground">Patalpos:</span>
-                <strong className="text-foreground tabular-nums">
-                  {(project.v8_rooms || project.patalpos || []).length}
-                </strong>
-                <span className="text-muted-foreground">Plotas:</span>
-                <strong className="text-foreground tabular-nums">{fmt(totalArea)} m²</strong>
-                <span className="text-muted-foreground">Pozicijų:</span>
-                <strong className="text-foreground tabular-nums">{totals.count}</strong>
-                {project.archetipas && (
-                  <>
-                    <span className="text-muted-foreground">Tipas:</span>
-                    <strong className="text-foreground capitalize">
-                      {project.archetipas.replace(/_/g, ' ')}
-                    </strong>
-                  </>
-                )}
+              <div className="border-l border-border pl-6 flex items-center gap-4 text-xs text-muted-foreground">
+                <span><span className="tabular font-medium text-foreground">{(project.v8_rooms || project.patalpos || []).length}</span> patalpų</span>
+                <span><span className="tabular font-medium text-foreground">{fmt(totalArea)}</span> m²</span>
+                <span><span className="tabular font-medium text-foreground">{totals.count}</span> pozicijų</span>
               </div>
             </div>
 
             {/* Right: re-extract + export */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <ReextractButton project={project} onComplete={onProjectChange} />
               <ExportDropdown project={projectWithDarbai} />
             </div>
@@ -321,38 +281,32 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
         <SanityWarningsBanner sanity={project.lt_sanity} />
       )}
 
-      {/* AI _meta — transparency: laikas, tokenai, zoom statistikos */}
-      {project._meta && (
+      {/* Analizės metadata — tik admin'ams (debugging). Eiliniam vartotojui
+          šitos technikos detalės nedomina ir gadina trust'ą. */}
+      {isAdmin && project._meta && (
         <details className="text-xs text-muted-foreground -mt-2 group">
           <summary className="cursor-pointer hover:text-foreground select-none inline-flex items-center gap-2">
-            <span>AI ekstrakcijos detalės</span>
+            <span>Analizės detalės (admin)</span>
             {project._meta.elapsed_s && (
               <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
                 {Math.round(project._meta.elapsed_s)}s
               </span>
             )}
-            {project._meta.zoom_applied !== undefined && (
-              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                zoom {project._meta.zoom_applied}/{project._meta.zoom_attempted || 0}
-              </span>
-            )}
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 p-3 bg-muted/30 rounded text-[11px] tabular-nums">
             {project._meta.elapsed_s != null && <><span>Trukmė:</span><span>{project._meta.elapsed_s}s</span></>}
-            {project._meta.input_tokens != null && <><span>Input tokenai:</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
-            {project._meta.output_tokens != null && <><span>Output tokenai:</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
+            {project._meta.input_tokens != null && <><span>Input token'ai:</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
+            {project._meta.output_tokens != null && <><span>Output token'ai:</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
             {project._meta.cache_read_tokens != null && project._meta.cache_read_tokens > 0 && (
               <><span>Cache hit:</span><span>{project._meta.cache_read_tokens.toLocaleString()} ({(project._meta.cache_read_tokens / (project._meta.input_tokens || 1) * 100).toFixed(0)}%)</span></>
             )}
-            {project._meta.zoom_attempted != null && <><span>Zoom call'ai:</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
-            {project._meta.zoom_elapsed_s != null && <><span>Zoom trukmė:</span><span>{project._meta.zoom_elapsed_s}s</span></>}
+            {project._meta.zoom_attempted != null && <><span>Patikslinimai:</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
+            {project._meta.zoom_elapsed_s != null && <><span>Patikslinimo trukmė:</span><span>{project._meta.zoom_elapsed_s}s</span></>}
             {project._meta.pages_sent != null && <><span>Puslapiai:</span><span>{project._meta.pages_sent}</span></>}
             {project._meta.model && <><span>Modelis:</span><span>{project._meta.model}</span></>}
             {project._meta.input_tokens != null && (() => {
-              // Rough cost estimate at $5/M input + $25/M output for Opus 4.7
-              const cost = (project._meta.input_tokens || 0) * 0.000005 +
-                           (project._meta.output_tokens || 0) * 0.000025 -
-                           (project._meta.cache_read_tokens || 0) * 0.0000045;  // 90% discount on cache reads
+              // Sprint §AUDIT (2026-04-29): use shared pricing module
+              const cost = calcClaudeCostUSD(project._meta);
               return <><span>~Kaina:</span><span>${cost.toFixed(2)}</span></>;
             })()}
           </div>
@@ -448,16 +402,44 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                   </tr>
                 </thead>
                 <tbody>
-                  {(project.v8_rooms || project.patalpos || []).map((r, i) => (
-                    <tr key={i} className="border-b border-border/40 last:border-0 hover:bg-muted/20">
-                      <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">{r.nr}</td>
-                      <td className="px-2 py-1.5 text-foreground">{r.pavadinimas}</td>
-                      <td className="px-2 py-1.5 text-xs text-muted-foreground">{r.paskirtis}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.plotas_m2)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.perimetras_m)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.lubu_aukstis_m, 2)}</td>
-                    </tr>
-                  ))}
+                  {(project.v8_rooms || project.patalpos || []).map((r, i) => {
+                    // Prefer eksplikacija page if room has bbox highlight data
+                    // (lets users land directly on the row they're inspecting).
+                    // Falls back to floor-plan page (puslapio_nr).
+                    const eksPage = project?._eksplikacija?.eksplikacija_source_page;
+                    const targetPage = (r.eksplikacija_row_bbox && eksPage) || r.puslapio_nr;
+                    const canJump = !!(onJumpToPage && targetPage);
+                    return (
+                      <tr
+                        key={i}
+                        onClick={canJump ? () => onJumpToPage(targetPage, r) : undefined}
+                        className={`border-b border-border/40 last:border-0 group ${
+                          canJump
+                            ? 'cursor-pointer hover:bg-foreground/5'
+                            : 'hover:bg-muted/20'
+                        }`}
+                        title={canJump
+                          ? (r.eksplikacija_row_bbox
+                              ? `Atidaryti eksplikaciją (psl. ${eksPage}) ir paryškinti šią eilutę`
+                              : `Atidaryti psl. ${targetPage} brėžinyje`)
+                          : undefined}
+                      >
+                        <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">{r.nr}</td>
+                        <td className="px-2 py-1.5 text-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            {r.pavadinimas}
+                            {canJump && (
+                              <Eye className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-xs text-muted-foreground">{r.paskirtis}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.plotas_m2)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.perimetras_m)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.lubu_aukstis_m, 2)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -500,26 +482,35 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 </tr>
               </thead>
               <tbody>
-                {categories.map(cat => (
-                  <>
-                    <tr key={`cat-${cat}`} className="bg-muted/40">
-                      <td colSpan={7} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-                        {cat}
-                      </td>
-                    </tr>
-                    {grouped[cat].map((item) => {
-                      const idx = darbai.indexOf(item);
-                      return (
-                        <WorkRow
-                          key={`${item.eil_nr}-${idx}`}
-                          item={item}
-                          onChange={(newItem) => handleRowChange(idx, newItem)}
-                          onRemove={() => handleRowRemove(idx)}
-                        />
-                      );
-                    })}
-                  </>
-                ))}
+                {/* Sprint §AUDIT (2026-04-29): two perf+correctness fixes:
+                    (1) Fragment now React.Fragment with key (was bare `<>` —
+                        React warned "missing key" on every render).
+                    (2) Precomputed itemIndexMap avoids O(n²) `darbai.indexOf`
+                        per row. ~6,400 iters → ~80 lookups on rangovas-style 80-row
+                        projects. Each price keystroke was triggering full scan. */}
+                {(() => {
+                  const itemIndexMap = new Map(darbai.map((d, i) => [d, i]));
+                  return categories.map(cat => (
+                    <React.Fragment key={`cat-${cat}`}>
+                      <tr className="bg-muted/40">
+                        <td colSpan={7} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+                          {cat}
+                        </td>
+                      </tr>
+                      {grouped[cat].map((item) => {
+                        const idx = itemIndexMap.get(item) ?? 0;
+                        return (
+                          <WorkRow
+                            key={`${item.eil_nr}-${idx}`}
+                            item={item}
+                            onChange={(newItem) => handleRowChange(idx, newItem)}
+                            onRemove={() => handleRowRemove(idx)}
+                          />
+                        );
+                      })}
+                    </React.Fragment>
+                  ));
+                })()}
               </tbody>
               <tfoot className="border-t-2 border-border bg-muted/20">
                 <tr>

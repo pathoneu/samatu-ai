@@ -42,6 +42,44 @@ SESSION_MAX_AGE_S = 30 * 24 * 3600
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 MIN_PASSWORD_LEN = 8
 
+# Dev bypass — when SAMATU_AUTH_DISABLED=1, require_user/require_admin return a
+# real (persisted) admin row instead of enforcing session cookies. Used for
+# local testing only. NEVER enable in production.
+#
+# Sprint §AUDIT (2026-04-29): hard fail-fast if accidentally combined with
+# production env. Catches misconfigured Docker secrets, .env symlinks, etc.
+AUTH_DISABLED = os.environ.get("SAMATU_AUTH_DISABLED") == "1"
+_ENV = (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+if AUTH_DISABLED and _ENV in ("production", "prod"):
+    import sys
+    sys.stderr.write(
+        "\n\n!!! FATAL: SAMATU_AUTH_DISABLED=1 detected with ENV=production. "
+        "This combination is forbidden — refusing to start. Unset "
+        "SAMATU_AUTH_DISABLED or change ENV before retrying.\n\n"
+    )
+    sys.exit(2)
+_DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
+_DEV_USER_EMAIL = "dev@samatu.local"
+
+
+def _ensure_dev_user() -> dict:
+    """Idempotent — make sure the dev user row exists so project FKs resolve."""
+    user = db.get_user_by_id(_DEV_USER_ID)
+    if user:
+        user.pop("password_hash", None)
+        return user
+    with db._conn() as c:
+        c.execute(
+            """INSERT OR IGNORE INTO users
+               (id, email, password_hash, name, company_name,
+                is_admin, is_active, created_at)
+               VALUES (?, ?, '', 'Dev', '', 1, 1, ?)""",
+            (_DEV_USER_ID, _DEV_USER_EMAIL, db._now_iso()),
+        )
+    user = db.get_user_by_id(_DEV_USER_ID) or {}
+    user.pop("password_hash", None)
+    return user
+
 
 def hash_password(plain: str) -> str:
     """bcrypt hash with work factor 12 (~250ms on modern CPU)."""
@@ -76,6 +114,8 @@ def validate_password(pw: str) -> None:
 
 def get_current_user(request: Request) -> dict | None:
     """Returns user dict (sans password_hash) if logged in, else None."""
+    if AUTH_DISABLED:
+        return _ensure_dev_user()
     user_id = request.session.get("user_id") if hasattr(request, "session") else None
     if not user_id:
         return None
@@ -88,6 +128,8 @@ def get_current_user(request: Request) -> dict | None:
 
 def require_user(request: Request) -> dict:
     """FastAPI Depends — raises 401 if not logged in."""
+    if AUTH_DISABLED:
+        return _ensure_dev_user()
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Reikia prisijungti")
@@ -96,6 +138,8 @@ def require_user(request: Request) -> dict:
 
 def require_admin(request: Request) -> dict:
     """FastAPI Depends — raises 401 if not logged in, 403 if not admin."""
+    if AUTH_DISABLED:
+        return _ensure_dev_user()
     user = require_user(request)
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Reikia administratoriaus teisių")

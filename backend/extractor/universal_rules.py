@@ -20,8 +20,23 @@ from typing import Any
 # ═════════════════════════════════════════════════════════════════════════
 
 UNIVERSAL_RULES = {
-    # NRM2 Section 29: angos > 1m² atimamos iš dažomo ploto
+    # NRM2 Section 29: angos > 1m² atimamos iš dažomo ploto (LT default).
     "openings_threshold_m2": 1.0,
+
+    # ─── Opening deduction standard (Sprint §2A.1, 2026-04-28) ─────────────
+    # Selects which international convention to apply for opening deductions
+    # and reveal (angokraštis) additions:
+    #   "LT"   — practical Lithuanian default. Every door/window deducted if
+    #            ≥ openings_threshold_m2; reveals added for EVERY opening.
+    #   "NRM2" — RICS New Rules of Measurement 2 (UK industry standard).
+    #            ≤ 0.5 m² → no deduction, no reveal.
+    #            0.5–3.0 m² → deduct one face; no reveal addition.
+    #            > 3.0 m² → deduct + measure reveals separately.
+    #   "VOB"  — DIN 18363 (German VOB Part C). Same as NRM2 but threshold = 2.5 m².
+    "paint_deduction_standard": "LT",
+    "nrm2_no_deduct_threshold_m2": 0.5,
+    "nrm2_reveal_threshold_m2": 3.0,
+    "vob_reveal_threshold_m2": 2.5,
 
     # Standart angų dydžiai (m²)
     # FORMULA CORRECTION (formula-validation.md §2.4):
@@ -105,6 +120,10 @@ ROOM_TYPE_RULES = {
     "garazas":     {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": False},
     "sandėliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
     "sandeliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
+    # Sprint §2A.3: stairwell. Multi-height walls (max_height_m + num_steps),
+    # painted walls + GKP/painted ceiling typical. Tile floor for safety.
+    "laiptine":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
+    "laiptinė":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
 }
 
 
@@ -157,7 +176,122 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
             if rk in rules:
                 rules[rk]["walls_paint"] = 1.0 if val else 0.0
 
+    # Sprint §2A.1: propagate opening-deduction standard via meta key.
+    # Used by _resolve_deduction_standard to gate door/window deductions
+    # and reveal additions. Underscore prefix distinguishes from paskirtis names.
+    std = prefs.get("paint_deduction_standard")
+    if std:
+        rules["_paint_deduction_standard"] = str(std).upper()
+
+    # Sprint §2A.5: propagate paint class (1/2/3) via meta key.
+    pc = prefs.get("paint_class")
+    if pc is not None:
+        try:
+            pc_int = int(pc)
+            if pc_int in (1, 2, 3):
+                rules["_paint_class"] = pc_int
+        except (ValueError, TypeError):
+            pass
+
     return rules
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# CEILING GEOMETRY HELPERS (Sprint §2A.3, 2026-04-28)
+# ═════════════════════════════════════════════════════════════════════════
+# Reference: CLAUDE.md §3 (slope factor table reused for interior).
+# LT pavienių namų projects often have mansardiniai stogai → sloped ceilings.
+# Without these, plain S_ceiling = floor_area underestimates 15-40%.
+
+# Slope factor table (CLAUDE.md §3, copied for interior reuse).
+# factor = 1 / cos(angle). Linear interp between known points.
+_SLOPE_FACTOR_TABLE = {
+    0:  1.000,
+    5:  1.004,
+    10: 1.015,
+    15: 1.035,
+    20: 1.064,
+    25: 1.103,
+    30: 1.155,
+    35: 1.221,
+    40: 1.305,
+    45: 1.414,
+    50: 1.556,
+    55: 1.743,
+    60: 2.000,
+}
+
+
+def slope_factor(angle_deg: float) -> float:
+    """Compute roof/ceiling slope factor = 1 / cos(angle).
+
+    Linear-interpolates between table values for accuracy + smoothness.
+    Clamped to [0, 60] degrees (steeper = exotic, table edge).
+    """
+    if angle_deg <= 0:
+        return 1.0
+    a = max(0.0, min(60.0, float(angle_deg)))
+    # Use math.cos for precision, table only as reference / sanity check.
+    rad = math.radians(a)
+    return 1.0 / math.cos(rad)
+
+
+def stairwell_wall_area_m2(perimeter_m: float, max_height_m: float,
+                            num_steps: int = 0,
+                            stair_run_m: float = 0.0,
+                            stair_rise_m: float = 0.0) -> float:
+    """Wall area for a stairwell room.
+
+    Formula: perim × max_height − Σ(stair triangles).
+    Each step cuts a small triangle: 0.5 × run × rise out of one wall.
+    The full staircase = num_steps × triangle_area.
+
+    Returns m². If steps unknown, falls back to plain perim × max_height.
+    """
+    gross = max(0.0, perimeter_m * max_height_m)
+    if num_steps <= 0 or stair_run_m <= 0 or stair_rise_m <= 0:
+        return round(gross, 2)
+    triangle = 0.5 * stair_run_m * stair_rise_m * num_steps
+    return round(max(0.0, gross - triangle), 2)
+
+
+def room_aukstas_from_nr(nr) -> int:
+    """Extract floor number from room nr (Sprint §16, 2026-04-29).
+
+    Convention used in LT projects:
+      "1F-01", "01", "I-01"   → 1   (first floor)
+      "2F-05", "II-12"        → 2
+      "3F-02", "III-08"       → 3
+      "0F-01", "0-01", "P-01" → 0   (cellar / parter / požeminis)
+
+    Returns 1 by default (single-floor or unknown). Used by frontend filters
+    + cross-page validator to spot mixed-floor extractions.
+    """
+    s = str(nr or "").strip().upper()
+    if not s:
+        return 1
+    # "2F-05", "2F05", "2-05"
+    if s[0].isdigit():
+        return int(s[0])
+    # Roman: "I-01", "II-12", "III-08"
+    if s.startswith("III"): return 3
+    if s.startswith("II"):  return 2
+    if s.startswith("I"):   return 1
+    # Cellar / parter
+    if s[0] in ("P", "C"):  return 0
+    return 1
+
+
+def group_rooms_by_floor(rooms: list[dict]) -> dict[int, list[dict]]:
+    """Group a flat rooms list by inferred floor number. Useful for UI
+    filters (Aukštas 1 / 2 / 3 tabs) and for per-floor sub-totals."""
+    out: dict[int, list[dict]] = {}
+    for r in rooms or []:
+        floor = r.get("aukstas")  # explicit if Vision filled it
+        if floor is None:
+            floor = room_aukstas_from_nr(r.get("nr"))
+        out.setdefault(int(floor), []).append(r)
+    return out
 
 
 def normalize_paskirtis(p: str) -> str:
@@ -193,9 +327,60 @@ def normalize_paskirtis(p: str) -> str:
         return "holas"
     if "koridor" in p:
         return "koridorius"
+    if "laiptin" in p:
+        return "laiptine"
     if "sandėl" in p or "sandel" in p:
         return "sandeliukas"
     return p
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# OPENING DEDUCTION HELPERS (Sprint §2A.1, NRM2 / VOB / LT)
+# ═════════════════════════════════════════════════════════════════════════
+
+def _opening_should_deduct(area_m2: float, standard: str) -> bool:
+    """True if a single opening (door/window) of given area should be
+    subtracted from this room's wall area under the given standard.
+
+    LT  → ≥ openings_threshold_m2 (typically 1.0 m²) — practical LT pro convention.
+    NRM2/VOB → ≥ nrm2_no_deduct_threshold_m2 (0.5 m²) — international standard.
+    """
+    if standard in ("NRM2", "VOB"):
+        return area_m2 >= UNIVERSAL_RULES["nrm2_no_deduct_threshold_m2"]
+    return area_m2 >= UNIVERSAL_RULES["openings_threshold_m2"]
+
+
+def _opening_adds_reveal(area_m2: float, standard: str) -> bool:
+    """True if a single opening should contribute its perimeter to the
+    angokraštis (reveal) line item.
+
+    LT  → always True for any opening with both dimensions known. The LT
+          convention treats reveals as a separate finish trade and prices
+          them per linear meter regardless of opening size.
+    NRM2 → True only when opening_area > 3.0 m² (large openings get their
+           reveals/jambs/sills measured separately as additions per NRM2).
+    VOB  → True only when opening_area > 2.5 m² (DIN 18363 threshold).
+    """
+    if standard == "NRM2":
+        return area_m2 > UNIVERSAL_RULES["nrm2_reveal_threshold_m2"]
+    if standard == "VOB":
+        return area_m2 > UNIVERSAL_RULES["vob_reveal_threshold_m2"]
+    return True
+
+
+def _resolve_deduction_standard(rules: dict | None) -> str:
+    """Read deduction standard from user rules override (Setup Wizard /
+    Prielaidos panel) or fall back to UNIVERSAL_RULES default.
+
+    Recognised values: "LT" | "NRM2" | "VOB". Anything else → "LT".
+    """
+    val = None
+    if rules and isinstance(rules, dict):
+        val = rules.get("_paint_deduction_standard") or rules.get("paint_deduction_standard")
+    if not val:
+        val = UNIVERSAL_RULES.get("paint_deduction_standard") or "LT"
+    val = str(val).upper()
+    return val if val in ("LT", "NRM2", "VOB") else "LT"
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -230,17 +415,26 @@ def calc_room_quantities(room: dict,
     if perim <= 0 and plotas > 0:
         perim = 4.18 * math.sqrt(plotas)
 
-    # Sienos bruto plotas
-    walls_gross = perim * H
+    # Sienos bruto plotas. Sprint §2A.3: stairwell uses
+    # max_height − Σ(stair triangles), not flat perim × H.
+    if (room.get("room_type") or "").lower() == "stairwell" or paskirtis == "laiptine":
+        max_h = float(room.get("max_height_m") or H * 2)  # default: 2-story
+        n_steps = int(room.get("num_steps") or 0)
+        run = float(room.get("stair_run_m") or 0)
+        rise = float(room.get("stair_rise_m") or 0)
+        walls_gross = stairwell_wall_area_m2(perim, max_h, n_steps, run, rise)
+    else:
+        walls_gross = perim * H
 
-    # Atimti angas (NRM2: > 1m² atimame)
+    # Atimti angas (NRM2 / VOB / LT — see _opening_should_deduct above).
+    standard = _resolve_deduction_standard(rules)
     n_doors = int(room.get("n_doors") or 1)
     n_windows = int(room.get("n_windows") or 1)
     door_area = float(room.get("door_area_m2") or UNIVERSAL_RULES["default_door_area_m2"])
     window_area = float(room.get("window_area_m2") or UNIVERSAL_RULES["default_window_area_m2"])
 
-    doors_total = n_doors * door_area if door_area >= UNIVERSAL_RULES["openings_threshold_m2"] else 0
-    windows_total = n_windows * window_area if window_area >= UNIVERSAL_RULES["openings_threshold_m2"] else 0
+    doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
+    windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
 
     # Plytelinės sienos (vonia / virtuvė backsplash)
     tile_height = float(rt_rules.get("tile_walls_to_m") or 0)
@@ -252,9 +446,27 @@ def calc_room_quantities(room: dict,
     walls_net = max(0, walls_gross - doors_total - windows_total - tile_walls_area)
     walls_paintable = walls_net * walls_paint_factor
 
-    # Lubos
+    # Lubos. Sprint §2A.3: support sloped/vaulted/coffered geometry beyond flat.
     ceiling_type = rt_rules.get("ceiling_type") or "gkp"
-    ceiling_paintable = plotas if ceiling_type in ("gkp", "tempiamos") else 0
+    ceiling_geometry = (room.get("ceiling_geometry") or "flat").lower()
+    slope_angle_deg = float(room.get("slope_angle_deg") or 0)
+    base_ceiling_area = plotas if ceiling_type in ("gkp", "tempiamos") else 0
+    if ceiling_geometry == "sloped" and slope_angle_deg > 0:
+        # Single-pitch sloped ceiling: actual_area = floor_area / cos(angle)
+        ceiling_paintable = base_ceiling_area * slope_factor(slope_angle_deg)
+    elif ceiling_geometry == "vaulted" and slope_angle_deg > 0:
+        # Symmetric vault (two slopes meeting at ridge): same formula since
+        # both halves slope at the same angle. For asymmetric vaults the
+        # caller must pre-split into two rooms or supply a custom multiplier.
+        ceiling_paintable = base_ceiling_area * slope_factor(slope_angle_deg)
+    elif ceiling_geometry == "coffered":
+        # Coffered ceiling: +15-25% over flat (NKBA, painttalk.com). Use 20%
+        # as the reasonable midpoint; callers can override via room dict.
+        coffered_factor = float(room.get("coffered_factor") or 1.20)
+        ceiling_paintable = base_ceiling_area * coffered_factor
+    else:
+        # Flat / unspecified — preserve legacy behavior (no factor).
+        ceiling_paintable = base_ceiling_area
 
     # GKP lubos atskirtos pagal aukštį
     is_high_ceiling = H > UNIVERSAL_RULES["high_ceiling_threshold_m"]
@@ -286,8 +498,15 @@ def calc_room_quantities(room: dict,
 
     # Grindjuostės (perimetras − durų pločiai, vonia/wc neturi)
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
+    # Sprint §38 (2026-04-29): also skip on concrete floors (garažas, parter)
+    # — no plinth where there's no finished surface.
     door_widths_total = n_doors * 0.85
-    grindjuostes_base = max(0, perim - door_widths_total) if not tile_floor else 0
+    floor_type_for_grindjuostes = rt_rules.get("floor")
+    grindjuostes_base = (
+        max(0, perim - door_widths_total)
+        if (not tile_floor and floor_type_for_grindjuostes != "concrete" and walls_paint_factor > 0)
+        else 0
+    )
     grindjuostes = grindjuostes_base * 1.10  # +10% waste (NRM2 §27)
 
     # PVC/parketas/laminatas grindys

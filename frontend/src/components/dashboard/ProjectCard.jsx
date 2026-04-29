@@ -1,60 +1,130 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { lt } from 'date-fns/locale';
 
-const statusConfig = {
-  ready: { label: 'Paruošta', icon: CheckCircle2, class: 'bg-primary/10 text-primary border-primary/20' },
-  processing: { label: 'Apdorojama', icon: Loader2, class: 'bg-chart-3/10 text-chart-3 border-chart-3/20' },
-  error: { label: 'Klaida', icon: AlertCircle, class: 'bg-destructive/10 text-destructive border-destructive/20' },
-};
+/**
+ * ProjectCard — vertical card mirroring claude.ai/design prototype
+ * (`prototype/screen-dashboard.jsx ProjectCard`):
+ * - Title (13/600) + company (11 muted) + status pill (PARUOŠTA/AP)
+ * - Big 26px tabular gross sum with tiny € suffix
+ * - Footer: row count + date, separated by top border
+ * - Hover: translate-y(-1px) + accent border
+ */
+
+function fmtDate(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  try { return format(d, 'yyyy-MM-dd', { locale: lt }); }
+  catch { return '—'; }
+}
+
+function fmtSum(net, vatRate = 21) {
+  if (!net) return null;
+  const gross = net * (1 + vatRate / 100);
+  return Math.round(gross).toLocaleString('lt-LT');
+}
 
 export default function ProjectCard({ project }) {
-  const status = statusConfig[project.status] || statusConfig.ready;
-  const StatusIcon = status.icon;
+  const [hover, setHover] = useState(false);
+  // Sprint §FIX (2026-04-29): backend's /extract-interior emits status="ok",
+  // recompute-interior also emits "ok", and legacy projects have undefined.
+  // All three should render as "Paruošta", not "Klaida".
+  const isReady = project.status === 'ready'
+    || project.status === 'ok'
+    || project.status === undefined;
+  const isProcessing = project.status === 'processing';
 
-  return (
-    <Link
-      to={`/project/${project.id}`}
-      className="group block bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:bg-accent/50 transition-all duration-200"
+  // Compute net & gross from darbu_sarasas if total_value not set
+  const totalNet = project.total_value
+    || (project.darbu_sarasas || []).reduce(
+      (s, it) => s + (it.kiekis || 0) * (it.kaina || 0), 0,
+    );
+  const grossDisplay = fmtSum(totalNet, project.vat_rate || 21);
+  const dateStr = fmtDate(project.created_date || project.created_at || project.updated_at);
+  const rowCount = project.darbu_sarasas?.length || project.total_rows || 0;
+
+  const card = (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className="flex flex-col gap-3.5 transition-all"
+      style={{
+        background: 'hsl(var(--card))',
+        border: '1px solid ' + (hover && isReady ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--border))'),
+        borderRadius: 6, padding: 16,
+        cursor: isReady ? 'pointer' : 'default',
+        transform: hover && isReady ? 'translateY(-1px)' : 'none',
+      }}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0 mt-0.5">
-            <FileText className="w-5 h-5 text-muted-foreground" />
+      <div className="flex justify-between items-start gap-2.5">
+        <div className="min-w-0">
+          <div
+            className="font-semibold text-foreground truncate"
+            style={{ fontSize: 13, letterSpacing: '-0.005em' }}
+          >
+            {project.name || 'Be pavadinimo'}
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-              {project.name}
-            </h3>
-            {project.company_name && (
-              <p className="text-sm text-muted-foreground truncate">{project.company_name}</p>
-            )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span>{format(new Date(project.created_date), 'yyyy-MM-dd', { locale: lt })}</span>
-              <span>•</span>
-              <span className="font-mono">{project.total_rows || 0} eilučių</span>
-              {project.total_value > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="font-mono text-primary font-medium">
-                    {project.total_value.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €
-                  </span>
-                </>
-              )}
+          {project.company_name && (
+            <div className="text-muted-foreground truncate mt-0.5" style={{ fontSize: 11 }}>
+              {project.company_name}
             </div>
-          </div>
+          )}
         </div>
-        <div className="flex items-center gap-3 ml-4">
-          <Badge variant="outline" className={`${status.class} border text-xs`}>
-            <StatusIcon className={`w-3 h-3 mr-1 ${project.status === 'processing' ? 'animate-spin' : ''}`} />
-            {status.label}
-          </Badge>
-          <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
+        <span
+          className="font-medium uppercase tracking-wide whitespace-nowrap"
+          style={{
+            fontSize: 10, padding: '2px 7px', borderRadius: 3,
+            border: '1px solid ' + (isReady
+              ? 'hsl(var(--primary) / 0.3)'
+              : 'hsl(var(--source-ai) / 0.4)'),
+            color: isReady ? 'hsl(var(--primary))' : 'hsl(var(--source-ai))',
+            background: 'hsl(var(--card))',
+          }}
+        >
+          {isReady ? 'Paruošta' : isProcessing ? 'Apdoroja' : 'Klaida'}
+        </span>
       </div>
-    </Link>
+
+      {grossDisplay ? (
+        <div
+          className="tabular text-foreground font-semibold mono"
+          style={{ fontSize: 26, letterSpacing: '-0.02em' }}
+        >
+          {grossDisplay}
+          <span className="text-muted-foreground font-normal ml-1" style={{ fontSize: 15 }}>
+            €
+          </span>
+        </div>
+      ) : isProcessing ? (
+        <div className="flex items-center gap-2" style={{ height: 32 }}>
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+          <span className="text-muted-foreground" style={{ fontSize: 11 }}>
+            Apdorojama PDF…
+          </span>
+        </div>
+      ) : (
+        <div className="text-muted-foreground" style={{ fontSize: 11, height: 32, lineHeight: '32px' }}>
+          Kainos dar nesuvestos
+        </div>
+      )}
+
+      <div
+        className="flex justify-between text-muted-foreground"
+        style={{
+          fontSize: 10, paddingTop: 8,
+          borderTop: '1px solid hsl(var(--border) / 0.6)',
+        }}
+      >
+        <span className="tabular">{rowCount} eilučių</span>
+        <span className="tabular">{dateStr}</span>
+      </div>
+    </div>
   );
+
+  return isReady
+    ? <Link to={`/project/${project.id}`} className="no-underline">{card}</Link>
+    : <div>{card}</div>;
 }

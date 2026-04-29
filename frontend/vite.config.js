@@ -11,6 +11,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // react-pdf + pdfjs-dist pulls ~600KB of WASM/PDF parsing — used
+          // only on Brėžinys tab, lazy-load via separate chunk.
+          'pdf-viewer': ['react-pdf', 'pdfjs-dist'],
+          // Konva + react-konva — markup canvas, only loaded when PdfViewer
+          // mounts.
+          'canvas': ['konva', 'react-konva'],
+        },
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     allowedHosts: true,

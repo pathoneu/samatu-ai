@@ -14,11 +14,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
 
+// Sprint §15 (2026-04-29): suggestions atnaujintos po naujų schema laukų
+// (paint_class, NRM2 standard, _wall_elevations, plytelių specifikacija).
+// Pirmieji 4 — visada relevantūs; toliau — kontekstiniai.
 const SUGGESTED_QUESTIONS = [
   'Kuris kambarys didžiausias?',
-  'Kiek bendrai dušo zonų?',
-  'Koks visas dažomas plotas?',
-  'Ar yra patalpų virš 3m aukščio?',
+  'Koks visas dažomas plotas su NRM2 standartu?',
+  'Kiek pozicijų peržiūrai (žemo pasitikėjimo)?',
+  'Ar yra patalpų virš 3 m aukščio?',
+  'Kiek hidroizoliacijos zonų ir kokie metrai?',
+  'Kokios plytelių specifikacijos rastos brėžinyje?',
+  'Ar visiems kambariams nustatytas mastelis?',
+  'Kiek dažų litrų reikės jei pereisiu į Klasę 3?',
 ];
 
 export default function AiChat({ project, inline = false }) {

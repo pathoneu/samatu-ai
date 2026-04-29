@@ -12,7 +12,7 @@ import RowDetailPanel from '@/components/project/RowDetailPanel';
 import ExportModal from '@/components/project/ExportModal';
 import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
-import { getProject, updateProject, deleteProject } from '@/lib/projectStore';
+import { getProject, updateProject, deleteProject, pullProjectsFromBackend } from '@/lib/projectStore';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -25,11 +25,24 @@ export default function ProjectDetail() {
   const [localRows, setLocalRows] = useState([]);
   const [hasUnsaved, setHasUnsaved] = useState(false);
 
+  // Direct-URL access fallback: if project not in localStorage cache (user
+  // landed on /project/<id> without visiting Dashboard first), pull from
+  // backend and re-run the query.
+  const [didFallback, setDidFallback] = useState(false);
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
     queryFn: () => getProject(id),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (!isLoading && !project && id && !didFallback) {
+      setDidFallback(true);
+      pullProjectsFromBackend({ force: true }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['project', id] });
+      });
+    }
+  }, [isLoading, project, id, didFallback, queryClient]);
 
   useEffect(() => {
     if (project?.rows) {
@@ -153,41 +166,11 @@ export default function ProjectDetail() {
     );
   }
 
-  // ── Interior project: separate render path ──────────────────────────────────
+  // ── Interior project: full-bleed render. InteriorProject's own
+  // ProjectTopBar provides back arrow + name + Be PVM / Su PVM totals +
+  // Prielaidos / Eksportuoti buttons. Wrapper header removed (was redundant).
   if (project?.tipas === 'interjeras') {
-    return (
-      <div className="pb-20">
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border">
-          <div className="px-6 py-4 max-w-[90rem] mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link to="/" className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
-                <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-              </Link>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">{project.name}</h1>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {project.company_name && (
-                    <span className="text-xs text-muted-foreground">{project.company_name}</span>
-                  )}
-                  <Badge variant="outline" className="text-xs border-border">Interjero projektas</Badge>
-                </div>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-        <div className="px-6 max-w-[90rem] mx-auto mt-6">
-          <InteriorProject project={project} />
-        </div>
-      </div>
-    );
+    return <InteriorProject project={project} onDelete={handleDelete} />;
   }
 
   // Build the enriched project object for the export modal (with current prices)

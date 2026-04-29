@@ -25,12 +25,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { Layers } from 'lucide-react';
 import PdfViewer from './PdfViewer';
 import WorkspacePanel from './WorkspacePanel';
+import OnboardingTooltips from './OnboardingTooltips';
 import { getPdfUrl, getPdfBlob } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
+import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
 
 const SYMBOL_LABELS = {
-  rozetes: 'Rozetės/jungiklio komutavimas',
-  jungikliai: 'Rozetės/jungiklio komutavimas',
+  rozetes: 'Rozetės / jungiklio pajungimas',
+  jungikliai: 'Rozetės / jungiklio pajungimas',
   sviestuvai: 'Lubinių priglaistomų šviestuvų apdirbimas',
   pakabinami_sviestuvai: 'Pakabinamų šviestuvų montavimas',
   difuzoriai: 'Difūzorių apdirbimas (ventiliacijos taškai)',
@@ -60,11 +62,30 @@ const SYMBOL_CATEGORIES = {
   langai: 'GKP',
 };
 
-export default function InteriorWorkspace({ project }) {
+export default function InteriorWorkspace({
+  project,
+  focusedPage = null,
+  focusedRoom = null,
+  onJumpToPage = null,
+  onProjectChange = null,
+}) {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfBlob, setPdfBlob] = useState(null);  // Diena 6: V9 click-to-count'ui
-  const [splitRatio, setSplitRatio] = useState(65);
+  // Sprint H7 (2026-04-29): default 70/30 — PDF gets more central space.
+  // Resizer still allows 40-75 range so user can adjust if their panel is dense.
+  const [splitRatio, setSplitRatio] = useState(70);
   const [pdfMissing, setPdfMissing] = useState(false);
+  // Local override: when user clicks a room in the right-side panel while
+  // already on this view, bump local focused page/room (in addition to
+  // bubbling up). Prop changes take priority — local override resets on prop.
+  const [localFocusedPage, setLocalFocusedPage] = useState(null);
+  const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
+  const effectiveFocusedPage = localFocusedPage ?? focusedPage;
+  const effectiveFocusedRoom = localFocusedRoom ?? focusedRoom;
+  useEffect(() => {
+    setLocalFocusedPage(null);
+    setLocalFocusedRoom(null);
+  }, [focusedPage, focusedRoom]);
 
   useEffect(() => {
     let revoked = false;
@@ -86,24 +107,44 @@ export default function InteriorWorkspace({ project }) {
     };
   }, [project.id]);
 
-  const pageMetaDict = useMemo(() => {
-    const dict = {};
-    (project.v8_pages || []).forEach(p => {
-      dict[p.page] = { label: p.label, type: p.type, confidence: p.confidence };
-    });
-    return dict;
-  }, [project.v8_pages]);
+  const pageMetaDict = useMemo(() => buildPageMetaDict(project),
+    [project.puslapiai, project.v8_pages]);
+  const missingTypes = useMemo(() => missingInteriorTypes(project.puslapiai),
+    [project.puslapiai]);
+
+  // Sprint §12 (2026-04-29): mobile responsive — stack vertically on <md.
+  // Detect viewport width once on mount; resizer hidden on mobile so user
+  // doesn't see a non-functional element.
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   return (
-    <div className="flex h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background">
-      {/* LEFT: PDF + AI overlay (Togal-style) */}
-      <div className="flex flex-col border-r border-border" style={{ width: `${splitRatio}%` }}>
+    <div className="flex flex-col md:flex-row h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
+      {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
+      <OnboardingTooltips />
+      {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (Togal-style) */}
+      <div
+        className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
+        style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
+      >
         {pdfUrl ? (
           <PdfViewer
             fileUrl={pdfUrl}
             projectId={project.id}
             pageMeta={pageMetaDict}
-            aiRooms={project.v8_rooms || project.patalpos}
+            missingTypes={missingTypes}
+            aiRooms={null}
+            focusedPage={effectiveFocusedPage}
+            focusedRoom={effectiveFocusedRoom}
+            eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
             onAiRoomClick={(room) => {
               // TODO: atidaryti modal'ą su pavadinimo / paskirties / ploto edit'u
               console.log('[ai-room] click:', room);
@@ -126,7 +167,7 @@ export default function InteriorWorkspace({ project }) {
                   ...darbai[existingIdx],
                   kiekis,
                   detected: true,
-                  source: 'AI Vision (click-to-count)',
+                  source: 'Pažymėjus brėžinyje',
                   confidence: 'medium',
                 };
               } else {
@@ -139,7 +180,7 @@ export default function InteriorWorkspace({ project }) {
                   kaina: 0,
                   suma: 0,
                   detected: true,
-                  source: 'AI Vision (click-to-count)',
+                  source: 'Pažymėjus brėžinyje',
                   confidence: 'medium',
                 });
               }
@@ -162,29 +203,42 @@ export default function InteriorWorkspace({ project }) {
         )}
       </div>
 
-      {/* Resizer */}
-      <div
-        className="w-1 hover:bg-foreground/20 cursor-col-resize transition-colors shrink-0"
-        onMouseDown={(e) => {
-          const startX = e.clientX;
-          const startRatio = splitRatio;
-          const containerWidth = e.currentTarget.parentElement.offsetWidth;
-          const onMove = (ev) => {
-            const delta = ((ev.clientX - startX) / containerWidth) * 100;
-            setSplitRatio(Math.max(40, Math.min(75, startRatio + delta)));
-          };
-          const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-          };
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-        }}
-      />
+      {/* Resizer — only on desktop. Mobile uses fixed 60/40 vertical split. */}
+      {!isMobile && (
+        <div
+          className="w-1 hover:bg-foreground/20 cursor-col-resize transition-colors shrink-0"
+          onMouseDown={(e) => {
+            const startX = e.clientX;
+            const startRatio = splitRatio;
+            const containerWidth = e.currentTarget.parentElement.offsetWidth;
+            const onMove = (ev) => {
+              const delta = ((ev.clientX - startX) / containerWidth) * 100;
+              setSplitRatio(Math.max(40, Math.min(75, startRatio + delta)));
+            };
+            const onUp = () => {
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+          }}
+        />
+      )}
 
-      {/* RIGHT: Kompaktinė sąmatos panelė */}
-      <div style={{ width: `${100 - splitRatio}%` }} className="overflow-hidden">
-        <WorkspacePanel project={project} />
+      {/* RIGHT (md+) / BOTTOM (mobile): Kompaktinė sąmatos panelė */}
+      <div
+        style={{ width: isMobile ? '100%' : `${100 - splitRatio}%`, height: isMobile ? '40%' : 'auto' }}
+        className="overflow-hidden"
+      >
+        <WorkspacePanel
+          project={project}
+          onJumpToPage={(pageNr, room) => {
+            setLocalFocusedPage(pageNr);
+            setLocalFocusedRoom(room || null);
+            onJumpToPage?.(pageNr, room);
+          }}
+          onProjectChange={onProjectChange}
+        />
       </div>
     </div>
   );

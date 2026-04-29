@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Rocket } from 'lucide-react';
 import UploadZone from '@/components/upload/UploadZone';
 import ProcessingState from '@/components/upload/ProcessingState';
-import { createProject } from '@/lib/projectStore';
+import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
+import { createProject, updateProject } from '@/lib/projectStore';
 import { savePdf } from '@/lib/pdfStore';
+import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 
@@ -112,6 +114,58 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
   return { json, res, projType };
 }
 
+// SM01: streaming variant for interior projects. Wires SSE events to onProgress
+// and resolves with the same {json, projType} shape the non-streaming path
+// returned, so downstream code can keep its branching.
+async function streamInteriorExtract(file, signal, opts, onProgress) {
+  const fd = new FormData();
+  fd.append('files', file);
+  fd.append('interior_subtype', opts.interiorSubtype || 'naujas');
+  try {
+    const prefs = loadPrefs();
+    if (prefs && prefs.setup_completed) {
+      fd.append('rules_override', JSON.stringify({
+        bathroom_tile_height_m: prefs.bathroom_tile_height_m,
+        bathroom_walls_painted_above_tiles: prefs.bathroom_walls_painted_above_tiles,
+        kitchen_backsplash_height_m: prefs.kitchen_backsplash_height_m,
+        drabuzine_painted: prefs.drabuzine_painted,
+        rubine_painted: prefs.rubine_painted,
+        sandeliukas_painted: prefs.sandeliukas_painted,
+        katiline_painted: prefs.katiline_painted,
+        garazas_painted: prefs.garazas_painted,
+        tamburas_painted: prefs.tamburas_painted,
+        openings_threshold_m2: prefs.openings_threshold_m2,
+        default_door_area_m2: prefs.default_door_area_m2,
+        default_window_area_m2: prefs.default_window_area_m2,
+        count_inner_corners: prefs.count_inner_corners,
+        count_outer_corners: prefs.count_outer_corners,
+        glaistas_q_lygis: prefs.glaistas_q_lygis,
+        glaistas_storis_mm: prefs.glaistas_storis_mm,
+        tile_method: prefs.tile_method,
+        tile_waste_pct: prefs.tile_waste_pct,
+        paint_waste_pct: prefs.paint_waste_pct,
+        high_ceiling_threshold_m: prefs.high_ceiling_threshold_m,
+      }));
+    }
+  } catch (e) {
+    console.warn('Could not load user prefs', e);
+  }
+
+  let finalResult = null;
+  await postSse('/extract-interior-stream', fd, {
+    signal,
+    onEvent: (ev) => {
+      if (ev.event === 'done') {
+        finalResult = ev.result;
+      }
+      onProgress?.(ev);
+    },
+  });
+
+  if (!finalResult) throw new Error('Extraction stream ended without result');
+  return { json: finalResult, projType: 'interior' };
+}
+
 export default function NewProject() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -125,16 +179,32 @@ export default function NewProject() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError]               = useState(null);
   const [status, setStatus]             = useState('');
+  // SM01 streaming progress state
+  const [streamPhase, setStreamPhase]     = useState(null); // null | 'rendering' | 'pass1' | 'zoom' | 'post'
+  const [streamProgress, setStreamProgress] = useState({
+    rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null,
+  });
+  const [streamElapsed, setStreamElapsed] = useState(0);
+  const elapsedTimerRef = useRef(null);
 
   const handleCreate = async () => {
     if (!file) { setError('Pasirinkite PDF failą'); return; }
     setError(null);
     setStatus('Siunčiama...');
     setIsProcessing(true);
+    setStreamPhase(null);
+    setStreamProgress({ rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null });
+    setStreamElapsed(0);
 
     // Naujas controller — vartotojas gali atšaukti su mygtuku
     const controller = new AbortController();
     setAbortController(controller);
+
+    // Generic per-second elapsed counter (also used by streaming UI).
+    const elapsedStart = Date.now();
+    elapsedTimerRef.current = setInterval(() => {
+      setStreamElapsed(Math.floor((Date.now() - elapsedStart) / 1000));
+    }, 1000);
 
     try {
       // Realus laikas: 30-90s mažiems PDF, iki 8-10 min dideliems projektams
@@ -142,27 +212,68 @@ export default function NewProject() {
       const timeoutId = setTimeout(() => controller.abort(), 600_000);
       let json, res, projType;
 
-      // Progresyvūs status update'ai per laiką (two-pass pipeline ~3-8min)
-      const elapsed = Date.now();
-      const statusTimer = setInterval(() => {
-        const sec = Math.floor((Date.now() - elapsed) / 1000);
-        if (sec < 15) setStatus(`Konvertuoja PDF į vaizdus... (${sec}s)`);
-        else if (sec < 60) setStatus(`Pass 1: AI analizuoja brėžinį, ieško patalpų... (${sec}s)`);
-        else if (sec < 120) setStatus(`Pass 1: AI matuoja sienas, identifikuoja angas... (${sec}s)`);
-        else if (sec < 240) setStatus(`Pass 2: AI prizoominta kambarius, tikslina mm matmenis... (${sec}s)`);
-        else if (sec < 420) setStatus(`Pass 2: AI baigia tikslinti per kambarius... (${sec}s)`);
-        else setStatus(`Sudėtingas projektas (${sec}s). Galite atšaukti ir bandyti su mažesniu PDF.`);
-      }, 1000);
+      // Status text fallback only when NOT streaming (KŽ + construction types).
+      const statusTimer = (projTypeChoice !== 'interior' && projTypeChoice !== 'auto')
+        ? setInterval(() => {
+            const sec = Math.floor((Date.now() - elapsedStart) / 1000);
+            if (sec < 15) setStatus(`Skaitome brėžinį... (${sec}s)`);
+            else if (sec < 60) setStatus(`Apdorojama... (${sec}s)`);
+            else setStatus(`Sudėtingas projektas, palaukite (${sec}s)...`);
+          }, 1000)
+        : null;
 
       try {
-        ({ json, res, projType } = await detectAndExtract(
-          file, projTypeChoice, controller.signal,
-          { interiorSubtype },
-        ));
+        if (projTypeChoice === 'interior') {
+          // SM01: stream the extraction so user sees progress in real time.
+          setStreamPhase('rendering');
+          ({ json, projType } = await streamInteriorExtract(
+            file, controller.signal,
+            { interiorSubtype },
+            (ev) => {
+              if (ev.event === 'started') {
+                setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
+              } else if (ev.event === 'pass1_started') {
+                setStreamPhase('pass1');
+              } else if (ev.event === 'pass1_completed') {
+                setStreamProgress(p => ({
+                  ...p,
+                  rooms: (ev.patalpos || []).map(r => ({ ...r, refined: false })),
+                }));
+              } else if (ev.event === 'zoom_started') {
+                setStreamPhase('zoom');
+                setStreamProgress(p => ({ ...p, zoomTotal: ev.total || 0, zoomDone: 0 }));
+              } else if (ev.event === 'zoom_room_completed') {
+                setStreamProgress(p => {
+                  const rooms = p.rooms.map(r => r.nr === ev.room_nr
+                    ? { ...r, refined: ev.applied === true,
+                        plotas_m2: ev.plotas_m2 ?? r.plotas_m2 }
+                    : r);
+                  return { ...p, rooms, zoomDone: ev.idx ?? (p.zoomDone + 1) };
+                });
+              } else if (ev.event === 'post_processing') {
+                setStreamPhase('post');
+              } else if (ev.event === 'error') {
+                // Surface mid-stream error message; the final 'done' event
+                // still drives the error result branch below.
+                setError(ev.message || 'Klaida');
+              }
+            },
+          ));
+          res = { ok: true };
+        } else {
+          ({ json, res, projType } = await detectAndExtract(
+            file, projTypeChoice, controller.signal,
+            { interiorSubtype },
+          ));
+        }
         setStatus('Išsaugoma...');
       } finally {
         clearTimeout(timeoutId);
-        clearInterval(statusTimer);
+        if (statusTimer) clearInterval(statusTimer);
+        if (elapsedTimerRef.current) {
+          clearInterval(elapsedTimerRef.current);
+          elapsedTimerRef.current = null;
+        }
         setAbortController(null);
       }
 
@@ -233,6 +344,53 @@ export default function NewProject() {
         // tab'as nebus prieinamas iš naujo.
       }
 
+      // Sprint §G5 (2026-04-29): scale auto-detect from PDF text layer
+      // (regex „M 1:50 / 1:100" iš pdfplumber). Fire-and-forget — projektas
+      // jau išsaugotas; mastelio hint įsirašo asynchronously.
+      // Sprint §AUDIT (2026-04-29): chunked base64 encoding (avoid V8 heap
+      // overflow on 200MB PDFs). Skip auto-detect entirely if file > 50MB
+      // since the regex-based scan is unlikely to add value for huge plans
+      // (mastelį tokie projektai nurodo kiekviename lape, vartotojas matys).
+      try {
+        if (file.size <= 50 * 1024 * 1024) {
+          const pdfBytes = await file.arrayBuffer();
+          // Use FileReader.readAsDataURL — handles big buffers chunkwise
+          const pdfBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result;
+              const idx = dataUrl.indexOf(',');
+              resolve(idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+          });
+          const scaleResp = await fetch('/detect-scale-hint', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdf_b64: pdfBase64 }),
+          });
+          if (scaleResp.ok) {
+            const hint = await scaleResp.json();
+            if (hint?.found) {
+              updateProject(project.id, {
+                ...project,
+                _scale_hint: {
+                  scale_ratio: hint.scale_ratio,
+                  scale_text: hint.scale_text,
+                  page: hint.page,
+                  confidence: hint.confidence,
+                  detected_at: new Date().toISOString(),
+                },
+              });
+            }
+          }
+        }
+      } catch (scaleErr) {
+        console.warn('Mastelio aptikimas nepavyko (nekritinė klaida):', scaleErr);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate(`/project/${project.id}`);
     } catch (e) {
@@ -253,10 +411,20 @@ export default function NewProject() {
   };
 
   if (isProcessing) {
+    const isStreaming = streamPhase != null;
     return (
       <div className="p-6 lg:p-8 max-w-2xl mx-auto">
-        <ProcessingState />
-        {status && !error && (
+        {isStreaming ? (
+          <ProcessingStateStream
+            phase={streamPhase}
+            progress={streamProgress}
+            elapsed={streamElapsed}
+            error={error}
+          />
+        ) : (
+          <ProcessingState />
+        )}
+        {!isStreaming && status && !error && (
           <p className="text-center text-xs text-muted-foreground mt-2">{status}</p>
         )}
         {abortController && !error && (

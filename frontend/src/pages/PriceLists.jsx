@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Upload, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,75 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getPriceLists, createPriceList, deletePriceList } from '@/lib/projectStore';
+
+// Sprint §30 (2026-04-29): CSV parser. Supports both `,` and `;` separators
+// (LT Excel uses `;` by default). Quoted fields with embedded commas. UTF-8 BOM
+// stripped. First row treated as headers.
+function parseCsv(text) {
+  // Detect separator from first non-empty line
+  const cleaned = text.replace(/^﻿/, '');
+  const firstLine = cleaned.split(/\r?\n/).find(l => l.trim()) || '';
+  const sep = firstLine.includes(';') && !firstLine.includes(',') ? ';'
+            : firstLine.split(',').length >= firstLine.split(';').length ? ','
+            : ';';
+
+  const rows = [];
+  let cur = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (inQuotes) {
+      if (ch === '"' && cleaned[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === sep) { cur.push(field); field = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (field || cur.length) { cur.push(field); rows.push(cur); cur = []; field = ''; }
+        if (ch === '\r' && cleaned[i + 1] === '\n') i++;
+      }
+      else { field += ch; }
+    }
+  }
+  if (field || cur.length) { cur.push(field); rows.push(cur); }
+  if (rows.length < 2) throw new Error('CSV neturi duomenų eilučių');
+
+  const headers = rows[0].map(h => h.trim().toLowerCase());
+  const headerMap = {
+    'skyrius': 'skyrius', 'kategorija': 'skyrius',
+    'aprasymas': 'aprasymas', 'aprašymas': 'aprasymas', 'pavadinimas': 'aprasymas',
+    'vnt': 'mato_vnt', 'mato_vnt': 'mato_vnt', 'matas': 'mato_vnt', 'unit': 'mato_vnt',
+    'kaina': 'kaina', 'kaina_eur': 'kaina', 'price': 'kaina',
+  };
+  const colIdx = {};
+  headers.forEach((h, i) => {
+    const m = headerMap[h];
+    if (m) colIdx[m] = i;
+  });
+  if (colIdx.aprasymas == null || colIdx.kaina == null) {
+    throw new Error('Reikalingi stulpeliai: skyrius, aprasymas, vnt, kaina (kalbantis su Excel ar atsisiųstu CSV)');
+  }
+
+  const items = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(c => !c.trim())) continue;
+    const aprasymas = (row[colIdx.aprasymas] || '').trim();
+    if (!aprasymas) continue;
+    const kainaRaw = (row[colIdx.kaina] || '').trim().replace(',', '.').replace(/[^\d.\-]/g, '');
+    const kaina = parseFloat(kainaRaw);
+    if (!isFinite(kaina)) continue;
+    items.push({
+      skyrius: colIdx.skyrius != null ? (row[colIdx.skyrius] || '').trim() : 'Kiti darbai',
+      aprasymas,
+      mato_vnt: colIdx.mato_vnt != null ? (row[colIdx.mato_vnt] || '').trim() : '',
+      kaina,
+    });
+  }
+  return items;
+}
 
 export default function PriceLists() {
   const queryClient = useQueryClient();
@@ -39,6 +108,34 @@ export default function PriceLists() {
     toast.success('Kainynė ištrinta');
   };
 
+  // Sprint §30: bulk CSV import — parse + create new pricelist
+  const handleCsvImport = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const items = parseCsv(reader.result);
+        if (items.length === 0) {
+          toast.error('CSV neturi tinkamų eilučių');
+          return;
+        }
+        const safeName = file.name.replace(/\.csv$/i, '').slice(0, 60) || 'Importuota kainynė';
+        createPriceList({
+          name: safeName,
+          company_name: '',
+          items,
+          total_items: items.length,
+        });
+        queryClient.invalidateQueries({ queryKey: ['priceLists'] });
+        toast.success(`Importuota ${items.length} eilutės iš „${file.name}"`);
+      } catch (e) {
+        toast.error(`CSV klaida: ${e.message}`);
+      }
+    };
+    reader.onerror = () => toast.error('Nepavyko nuskaityti failo');
+    reader.readAsText(file, 'utf-8');
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
@@ -46,6 +143,21 @@ export default function PriceLists() {
           <h1 className="text-2xl font-bold text-foreground">Kainynai</h1>
           <p className="text-sm text-muted-foreground mt-1">Valdykite įmonės kainų sąrašus</p>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Sprint §30: CSV import — parses skyrius/aprasymas/vnt/kaina columns */}
+          <input
+            type="file"
+            id="csv-import-input"
+            accept=".csv,text/csv"
+            onChange={(e) => handleCsvImport(e.target.files?.[0])}
+            className="hidden"
+          />
+          <Button asChild variant="outline" title="Importuoti kainas iš CSV failo (skyrius, aprasymas, vnt, kaina)">
+            <label htmlFor="csv-import-input" className="cursor-pointer">
+              <FileUp className="w-4 h-4 mr-2" />
+              Importuoti CSV
+            </label>
+          </Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -76,6 +188,7 @@ export default function PriceLists() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {isLoading ? (

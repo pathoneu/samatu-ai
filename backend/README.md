@@ -80,7 +80,7 @@ User decision (2026-04-27): accuracy > latency for serious projects. 50k+ € jo
 **Canonical (new):**
 - Top-level: `archetipas`, `bendras_plotas_m2`, `patalpos[]`, `durys_total[]`, `langai_total[]`, `santrauka`, `pozicijos[]`, `warnings[]`
 - Per room: `nr`, `pavadinimas`, `paskirtis`, `plotas_m2`, `perimetras_m`, `lubu_aukstis_m`, `lubu_tipas`, `dazymo_plotas_m2`, `kampu_metrai`, `angokrasciu_gkp_m`, `pasleptu_duru_staktu_m`, `nisu_metrai`, `pvc_grindys_m2`, `plyteles_grindys_m2`, `plyteles_sienos_m2`, `isliginamasis_m2`, `grindjuosciu_m`, `hidroizoliacija_m2`, `elementai[]`, `calculation_trace`, `confidence`
-- `pozicijos[]` — flat kiekių žiniaraštis organized by skyriai: `GKP montavimas`, `Glaistymas dazymas`, `Plyteles`, `Hidroizoliacija`, `Pridetiniai elementai`, `Out of scope`
+- `pozicijos[]` — flat kiekių žiniaraštis organized by skyriai: `GKP montavimas`, `Sienų lubų glaistymas dažymas`, `Plytelių klijavimas`, `Hidroizoliacija`, `Pridėtiniai elementai`, `Out of scope`
 
 **V8-compat mirrors (for frontend):**
 - `darbu_sarasas[]` — `pozicijos[]` mapped to V8 field names (`mato_vnt`, `pavadinimas`, `eil_nr`, `skyrius_label`, etc.)

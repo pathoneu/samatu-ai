@@ -7,6 +7,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { sanitizeHeaders } from '@/lib/safeHeaders';
 
 const AuthCtx = createContext({
   user: null,
@@ -20,10 +21,16 @@ const AuthCtx = createContext({
 const API = '';
 
 async function apiCall(path, opts = {}) {
+  // Merge order: defaults → caller opts → headers (caller can't override
+  // credentials accidentally, headers are sanitized & merged not replaced).
+  const { headers: extraHeaders, ...restOpts } = opts;
   const res = await fetch(`${API}${path}`, {
     credentials: 'include',  // CRITICAL: send session cookie
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-    ...opts,
+    ...restOpts,
+    headers: sanitizeHeaders({
+      'Content-Type': 'application/json',
+      ...(extraHeaders || {}),
+    }),
   });
   let body;
   try { body = await res.json(); } catch { body = null; }
@@ -71,6 +78,12 @@ export function AuthProvider({ children }) {
     try { await apiCall('/api/auth/logout', { method: 'POST' }); } catch {}
     setUser(null);
     try { localStorage.removeItem('samatu_projects'); } catch {}
+    // Sprint §AUDIT (2026-04-29): clear pull cache so next user's first
+    // request actually fetches from backend (was stuck on previous user's pull).
+    try {
+      const { resetPullCache } = await import('@/lib/projectStore');
+      resetPullCache();
+    } catch { /* ignore */ }
   };
 
   const value = {

@@ -1,30 +1,33 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Link } from 'react-router-dom';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler, Package, Droplet,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map, ListChecks, MessageSquare, Download, Sliders,
+  Map, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
-import PdfViewer from '@/components/project/PdfViewer';
 import ScaleInfoBanner from '@/components/project/ScaleInfoBanner';
 import PageStructureCard from '@/components/project/PageStructureCard';
 import AiChat from '@/components/project/AiChat';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
-import ProjectCanvas from '@/components/project/ProjectCanvas';
+// Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
+// flow never shipped to production after 2026-04-26 rollback.
 import ExportDropdown from '@/components/project/ExportDropdown';
+import ShareButton from '@/components/project/ShareButton';
 import RulesOverridePanel from '@/components/project/RulesOverridePanel';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
+import { toast } from 'sonner';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmt(val, decimals = 1) {
+function fmt(val, decimals = 2) {
   if (val == null) return '—';
   if (typeof val !== 'number') return String(val);
   return val.toLocaleString('lt-LT', {
@@ -57,18 +60,123 @@ function ConfidenceDot({ level }) {
   );
 }
 
+// ── Project top bar (mirrors prototype/screen-project.jsx ProjectTopBar) ─
+//
+// 52px high single-row bar with: back arrow · project.name (13/600) ·
+// company (11 muted) · Interjeras pill · spacer · Be PVM (13) | Su PVM (18 bold) ·
+// Prielaidos button · Eksportuoti button. Always visible above tab bar.
+
+function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete }) {
+  return (
+    <div
+      className="flex items-center bg-background border-b border-border"
+      style={{ height: 52, padding: '0 16px', gap: 12, flexShrink: 0 }}
+    >
+      <Link
+        to="/"
+        title="Į projektų sąrašą"
+        className="flex items-center justify-center rounded transition-colors"
+        style={{
+          width: 28, height: 28, color: 'hsl(var(--muted-foreground))',
+        }}
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+      </Link>
+      <div className="flex items-baseline gap-2.5 min-w-0">
+        <span className="font-semibold text-foreground truncate" style={{ fontSize: 13 }}>
+          {project.name || 'Be pavadinimo'}
+        </span>
+        {project.company_name && (
+          <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: 11 }}>
+            {project.company_name}
+          </span>
+        )}
+        <span
+          className="font-medium uppercase tracking-wide whitespace-nowrap"
+          style={{
+            fontSize: 10, padding: '2px 7px', borderRadius: 3,
+            border: '1px solid hsl(var(--border-strong))',
+            color: 'hsl(var(--muted-foreground))',
+            background: 'hsl(var(--card))',
+          }}
+        >
+          Interjeras
+        </span>
+      </div>
+      <div className="flex-1" />
+      <div
+        className="flex items-center pr-3"
+        style={{ gap: 24, borderRight: '1px solid hsl(var(--border))', height: 28 }}
+      >
+        <div className="flex items-baseline" style={{ gap: 6 }}>
+          <span className="skyrius-header" style={{ fontSize: 10 }}>Be PVM</span>
+          <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
+            {totalNet.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </span>
+        </div>
+        <div className="flex items-baseline" style={{ gap: 6 }}>
+          <span className="skyrius-header" style={{ fontSize: 10 }}>Su PVM</span>
+          <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
+            {totalGross.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={onPrielaidos}
+        className="flex items-center gap-1.5 rounded transition-colors hover:bg-muted/50"
+        style={{
+          height: 30, padding: '0 12px',
+          border: '1px solid hsl(var(--border-strong))',
+          background: 'hsl(var(--card))',
+          fontSize: 12, fontWeight: 500,
+          color: 'hsl(var(--foreground) / 0.85)',
+        }}
+      >
+        <Sliders className="w-3 h-3" /> Prielaidos
+      </button>
+      <button
+        onClick={onEksportuoti}
+        className="flex items-center gap-1.5 rounded transition-colors"
+        style={{
+          height: 30, padding: '0 12px',
+          background: 'hsl(var(--primary))',
+          color: 'hsl(var(--primary-foreground))',
+          fontSize: 12, fontWeight: 500,
+        }}
+      >
+        <Download className="w-3 h-3" /> Eksportuoti
+      </button>
+      {/* Sprint §FIX-4 (2026-04-29): delete button (icon-only) — soft-delete'as
+          per §28; projektas nukeliauja į Šiukšliadėžę 30d. retention. */}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          title="Ištrinti projektą (atšaukiama 30 d.)"
+          className="flex items-center justify-center rounded transition-colors hover:bg-muted/50"
+          style={{
+            height: 30, width: 30,
+            border: '1px solid hsl(var(--border-strong))',
+            background: 'hsl(var(--card))',
+            color: 'hsl(var(--muted-foreground))',
+          }}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
 function TabBar({ tab, setTab, hasPdf }) {
   const tabs = [
     ...(hasPdf ? [{ id: 'brezinys', label: 'Brėžinys', Icon: Map }] : []),
     { id: 'main',     label: 'Kiekiai',   Icon: ListChecks },
-    { id: 'rules',    label: 'Prielaidos', Icon: Sliders },
     { id: 'aichat',   label: 'AI Chat',   Icon: MessageSquare },
-    { id: 'eksport',  label: 'Eksportas', Icon: Download },
   ];
   return (
-    <div className="flex items-center gap-0 border-b border-border mb-5 -mt-1">
+    <div className="flex items-center gap-0 border-b border-border" style={{ paddingLeft: 16 }}>
       {tabs.map(t => {
         const Icon = t.Icon;
         const isActive = tab === t.id;
@@ -383,7 +491,7 @@ function DarbuSarasas({ items }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InteriorProject({ project: projectProp, onAssumptionsChange }) {
+export default function InteriorProject({ project: projectProp, onAssumptionsChange, onDelete }) {
   // Local mirror of project prop — needed because RulesOverridePanel rewrites
   // big swaths of state via /recompute-interior. Keep prop sync via useEffect
   // so navigation between projects still works.
@@ -391,15 +499,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   useEffect(() => { setProjectState(projectProp); }, [projectProp]);
   const project = projectState;
   const setProject = setProjectState;
-  // ROLLBACK 2026-04-26: ProjectCanvas single-canvas eksperimentas sulaužė
-  // realių projektų rendering'ą. Default = sena tabbed UI (kuri DIRBA).
-  // Naujas canvas pasiekiamas tik per ?canvas=1 query string (eksperimentinis).
-  const useNewCanvas = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('canvas') === '1';
   const [tab, setTab]           = useState(() => 'brezinys');
   const [doubleSides, setDoubleSides] = useState(false);
   const [gkMetodas, setGkMetodas]     = useState('tikslus');  // Task 9
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set()); // Task 6
+  const [isRecomputing, setIsRecomputing] = useState(false);
   // page_classifications was V8 page_classifier output. New extractor doesn't
   // emit it; the 'puslapiai' tab that consumed it has been removed.
   const [assumptions, setAssumptions] = useState({
@@ -410,10 +514,14 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
   // Pasirinktas PDF puslapis (pagal kambarį arba puslapio tipą)
   const [focusedPage, setFocusedPage] = useState(null);
+  // Currently-focused room — used to highlight matching row on eksplikacija
+  // page. Set whenever a room-driven jump fires; cleared on tab switch.
+  const [focusedRoom, setFocusedRoom] = useState(null);
 
-  // pageMetaDict was V8 page_classifier output mapper (page → label/type/confidence).
-  // New extractor doesn't emit v8_pages; PdfViewer falls back to "Puslapis N" labels.
-  const pageMetaDict = useMemo(() => ({}), []);
+  const focusOnRoom = (pageNr, room) => {
+    setFocusedPage(pageNr);
+    setFocusedRoom(room || null);
+  };
 
   // PDF URL iš IndexedDB (sukuriamas blob: URL'as runtime)
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -495,29 +603,107 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
     if (onAssumptionsChange) onAssumptionsChange(next);
   };
 
-  // ROLLBACK: ProjectCanvas tik kai ?canvas=1 (default = senas tabbed UI)
-  if (useNewCanvas) {
-    return (
-      <ProjectCanvas
-        project={project}
-        onProjectChange={(updated) => {
-          updateProject(project.id, updated);
-        }}
-      />
-    );
-  }
+  // Edit cascade — kai vartotojas pataiso patalpos primityvą (plotas, perimetras,
+  // lubų aukštis, paskirtis), kviečiame backend'o /recompute-interior, kuris
+  // deterministiškai perskaičiuoja darbu_sarasas + santrauką. Be Vision call'o.
+  // Sub-second roundtrip. Pataisymas neperšviečia kitų laukų — vartotojas
+  // niekada nepradeda nuo nulio.
+  const handleRoomsChange = async (newRooms) => {
+    if (!Array.isArray(newRooms)) return;
+    setIsRecomputing(true);
+    try {
+      const res = await fetch('/recompute-interior', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patalpos: newRooms,
+          rules_override: project._overrides || {},
+          per_room_overrides: project._per_room_overrides || {},
+          archetipas: project.archetipas,
+          bendras_plotas_m2: newRooms.reduce(
+            (s, r) => s + (Number(r.plotas_m2) || 0), 0,
+          ),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      if (result.status !== 'ok') {
+        throw new Error(result._error || 'Recompute klaida');
+      }
+      // Merge — preserve user fields (name, kainos, etc.) — overwrite computed.
+      const merged = {
+        ...project,
+        ...result,
+        // Preserve metadata user may have edited
+        name: project.name,
+        company_name: project.company_name,
+        vat_rate: project.vat_rate,
+        // Preserve kainos in darbu_sarasas if user already set them
+        darbu_sarasas: result.darbu_sarasas
+          ? result.darbu_sarasas.map((newItem) => {
+              const oldItem = (project.darbu_sarasas || []).find(
+                (o) => (o.aprasymas || '').toLowerCase()
+                       === (newItem.aprasymas || '').toLowerCase(),
+              );
+              return oldItem?.kaina
+                ? { ...newItem, kaina: oldItem.kaina,
+                    suma: (newItem.kiekis || 0) * oldItem.kaina }
+                : newItem;
+            })
+          : project.darbu_sarasas,
+      };
+      updateProject(project.id, merged);
+      setProject(merged);
+      toast.success('Kiekiai persiskaičiuoti');
+    } catch (e) {
+      console.error('Edit cascade failed:', e);
+      toast.error(`Klaida persiskaičiuojant: ${e.message}`);
+    } finally {
+      setIsRecomputing(false);
+    }
+  };
+
+  // Compute totals for ProjectTopBar (mirrors ProjectMainView's logic)
+  const totalNet = (project.darbu_sarasas || []).reduce(
+    (s, it) => s + (it.kiekis || 0) * (it.kaina || 0), 0,
+  );
+  const vatRate = project.vat_rate || 21;
+  const totalGross = totalNet * (1 + vatRate / 100);
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col">
+      <ProjectTopBar
+        project={project}
+        totalNet={totalNet}
+        totalGross={totalGross}
+        onPrielaidos={() => setTab('rules')}
+        onEksportuoti={() => setTab('eksport')}
+        onDelete={onDelete}
+      />
 
       <TabBar
         tab={tab} setTab={setTab}
         hasPdf={!!pdfUrl}
       />
 
+      <div className="flex-1 px-4 py-4 space-y-5">
+
       {/* ── TAB: BRĖŽINYS (default — PDF viewer + AI overlay) ───────── */}
       {tab === 'brezinys' && pdfUrl && (
-        <InteriorWorkspace project={project} />
+        <InteriorWorkspace
+          project={project}
+          focusedPage={focusedPage}
+          focusedRoom={focusedRoom}
+          onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
+          onProjectChange={(updated) => {
+            updateProject(project.id, updated);
+            setProject(updated);
+          }}
+        />
       )}
       {tab === 'brezinys' && !pdfUrl && (
         <div className="flex items-center justify-center h-96 border border-border rounded-xl bg-card text-muted-foreground text-sm">
@@ -533,6 +719,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             updateProject(project.id, updated);
           }}
           onShowDrawing={pdfUrl ? () => setTab('brezinys') : null}
+          onJumpToPage={pdfUrl ? (pageNr, room) => {
+            focusOnRoom(pageNr, room);
+            setTab('brezinys');
+          } : null}
         />
       )}
 
@@ -575,13 +765,14 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           </div>
           <div className="flex items-center gap-3">
             <ExportDropdown project={project} />
+            <ShareButton project={project} />
             <span className="text-xs text-muted-foreground">
               {(project.darbu_sarasas || []).length} pozicijų · {(project.v8_rooms || project.patalpos || []).length} patalpų
             </span>
           </div>
           <div className="border-t border-border/50 pt-4 text-xs text-muted-foreground space-y-1">
-            <p><strong className="text-foreground">Excel</strong> — pilna sąmata su skyrių grupavimu, formulėmis ir VAT.</p>
-            <p><strong className="text-foreground">PDF</strong> — formattuotas pasiūlymas spausdinimui (su antraštės, suvestinės, pvm).</p>
+            <p><strong className="text-foreground">Excel</strong> — pilna sąmata su skyrių grupavimu, formulėmis ir PVM.</p>
+            <p><strong className="text-foreground">PDF</strong> — formattuotas pasiūlymas spausdinimui (su antraštėmis, suvestinėmis, PVM).</p>
           </div>
         </div>
       )}
@@ -592,6 +783,30 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {/* V8 mastelio info — production-blocking sanity */}
           {project.v8_scale && (
             <ScaleInfoBanner scaleInfo={project.v8_scale} />
+          )}
+
+          {/* Sprint §42 (2026-04-29): _scale_hint badge — auto-detected from
+              text layer in NewProject upload. Lightweight info, dismissable. */}
+          {project._scale_hint && project._scale_hint.scale_text && (
+            <div
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
+              style={{
+                background: 'hsl(var(--source-table) / 0.08)',
+                border: '1px solid hsl(var(--source-table) / 0.25)',
+                color: 'hsl(var(--source-table))',
+              }}
+            >
+              <Ruler className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Brėžinio mastelis aptiktas automatiškai:{' '}
+                <strong className="mono tabular">{project._scale_hint.scale_text}</strong>
+                {project._scale_hint.page && (
+                  <span className="text-muted-foreground ml-2">
+                    (puslapis {project._scale_hint.page})
+                  </span>
+                )}
+              </span>
+            </div>
           )}
 
           {/* V8 page structure card removed — new extractor doesn't emit v8_pages.
@@ -854,7 +1069,21 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                   setTab('brezinys');
                 }
               }}
+              project={project}
+              onJumpToPage={(pageNr) => {
+                if (pdfUrl) {
+                  setFocusedPage(pageNr);
+                  setTab('brezinys');
+                }
+              }}
+              onChange={handleRoomsChange}
             />
+            {isRecomputing && (
+              <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Persiskaičiuojam kiekius...
+              </div>
+            )}
           </div>
 
           {/* ── Detalus darbų sąrašas (visos rangovo-stiliaus pozicijos) ──── */}
@@ -997,7 +1226,16 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {/* Rooms */}
           <Section icon={Home} title="Patalpos" badge={rooms.length} defaultOpen={rooms.length <= 12}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {rooms.map(room => <RoomCard key={room.nr} room={room} />)}
+              {rooms.map(room => (
+                <RoomCard
+                  key={room.nr}
+                  room={room}
+                  project={project}
+                  onJumpToPage={(pageNr) => {
+                    if (pdfUrl) { setFocusedPage(pageNr); setTab('brezinys'); }
+                  }}
+                />
+              ))}
             </div>
           </Section>
 
@@ -1142,8 +1380,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         </div>
       )}
 
-      {/* Floating AI CHAT — paslėpta MVP versijoj (Sprint 1, Q6) */}
-      {/* <AiChat project={project} /> */}
+        {/* Floating AI CHAT — paslėpta MVP versijoj (Sprint 1, Q6) */}
+        {/* <AiChat project={project} /> */}
+      </div>
     </div>
   );
 }

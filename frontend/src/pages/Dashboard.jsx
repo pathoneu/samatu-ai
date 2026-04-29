@@ -32,10 +32,14 @@ export default function Dashboard() {
     queryFn: getProjects,
   });
 
-  const filtered = projects.filter(p =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.company_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Sprint §28: hide archived projects from Dashboard (user can restore from
+  // Settings → Šiukšliadėžė).
+  const filtered = projects
+    .filter(p => !p._archived)
+    .filter(p =>
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.company_name?.toLowerCase().includes(search.toLowerCase())
+    );
 
   if (isLoading) {
     return (
@@ -93,17 +97,25 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            {filtered.length > 0 ? (
-              filtered.map(project => (
+          {filtered.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {filtered.map(project => (
                 <ProjectCard key={project.id} project={project} />
-              ))
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>Nerasta projektų pagal „{search}"</p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              className="text-center"
+              style={{
+                padding: '48px 16px', color: 'hsl(var(--muted-foreground))',
+                fontSize: 12,
+                border: '1px dashed hsl(var(--border-strong))',
+                borderRadius: 6,
+              }}
+            >
+              Nieko nerasta pagal filtrą „<span style={{ color: 'hsl(var(--foreground) / 0.85)' }}>{search}</span>".
+            </div>
+          )}
         </>
       ) : (
         <EmptyState />

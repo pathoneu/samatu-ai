@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -271,7 +271,128 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           <p className="text-xs text-muted-foreground pt-1">
             Kiekiai persiskaičiuoja automatiškai kiekvieną kartą keičiant prielaidas.
           </p>
+
+          <FormulasCard
+            sienosStorisM={sienos_storis_m}
+            glaistimoLygis={glaistimo_lygis}
+          />
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Calculation formulas card (Phase 14 / QW03) ──────────────────────────────
+//
+// Surfaces the universal LT interior formulas applied to this project.
+// Values from the current Prielaidos panel are plugged in so the user can see
+// exactly which numbers their toggles change. Sources: CLAUDE.md §1.
+
+const Q_LEVEL_KG_PER_M2_MM = { Q1: 0.8, Q2: 1.0, Q3: 1.2, Q4: 1.5 };
+
+function FormulaRow({ name, formula, current, source }) {
+  return (
+    <li className="space-y-0.5 pb-2 last:pb-0 border-b last:border-0 border-border/40">
+      <div className="text-xs font-semibold text-foreground">{name}</div>
+      <code className="block text-[11px] text-muted-foreground font-mono whitespace-pre-wrap leading-relaxed">
+        {formula}
+      </code>
+      {current && (
+        <div className="text-[11px] text-foreground/80">
+          <span className="text-muted-foreground">Su jūsų prielaidomis: </span>
+          <span className="font-mono">{current}</span>
+        </div>
+      )}
+      {source && (
+        <div className="text-[10px] text-muted-foreground/70">{source}</div>
+      )}
+    </li>
+  );
+}
+
+function FormulasCard({ sienosStorisM, glaistimoLygis }) {
+  const [open, setOpen] = useState(false);
+  const qCoef = Q_LEVEL_KG_PER_M2_MM[glaistimoLygis] ?? 1.0;
+  const reveal = (sienosStorisM ?? 0).toFixed(2);
+
+  return (
+    <div className="mt-3 border border-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+      >
+        <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+          <Calculator className="w-3.5 h-3.5 text-muted-foreground" />
+          Skaičiavimo formulės
+          <span className="text-[10px] font-normal text-muted-foreground">
+            (kaip kiekvienas skaičius gaunamas)
+          </span>
+        </span>
+        {open
+          ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+          : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <ul className="px-3 py-2 space-y-2">
+          <FormulaRow
+            name="Sienų dažomas plotas"
+            formula="S_neto = perimetras × lubų_aukštis − Σ(angos > 0.5 m²) + lubos"
+            source="RICS NRM2 §29 — angos < 0.5 m² neatimamos"
+          />
+          <FormulaRow
+            name="Angokraščiai (langai/durys)"
+            formula="ilgis = 2 × H + W;  plotas = ilgis × sienos_storis"
+            current={`sienos_storis = ${reveal} m`}
+            source="CLAUDE.md §1.2"
+          />
+          <FormulaRow
+            name="Glaistymas"
+            formula={`kg = plotas × storis_mm × Q_koef\nQ_koef: Q1=0.8 · Q2=1.0 · Q3=1.2 · Q4=1.5 kg/m²/mm`}
+            current={`Q_koef = ${qCoef} (lygis ${glaistimoLygis})`}
+            source="CLAUDE.md §1.11"
+          />
+          <FormulaRow
+            name="Dažų kiekis"
+            formula="l = (plotas × sluoksniai) / coverage_m²/l\ncoverage: glaistytas Q2 ~9 · šviežias tinkas ~4 · gruntas ~7"
+            source="2 sluoksniai = ×1.8 (ne ×2 — pirmas sluoksnis sugeria daugiau)"
+          />
+          <FormulaRow
+            name="Glaistymo kampai"
+            formula="kampu_metrai = išorinių_kampų_skaičius × lubų_aukštis"
+            source="CLAUDE.md §1.3 — vidaus kampai paprastai be apkalo"
+          />
+          <FormulaRow
+            name="Grindjuostės"
+            formula="ilgis = perimetras − Σ(durų_plotis) + 10% atliekų"
+            source="CLAUDE.md §1.4"
+          />
+          <FormulaRow
+            name="Lubų perimetras (karnizas)"
+            formula="ilgis = perimetras + 5% atliekų  (durys neatimamos)"
+            source="CLAUDE.md §1.4"
+          />
+          <FormulaRow
+            name="Užuolaidų nišos"
+            formula="L_niša = lango_plotis + 2 × 0.20 m\nplotas = L_niša × niša_gylis × 3 (viršus + 2 šonai)"
+            source="CLAUDE.md §1.5"
+          />
+          <FormulaRow
+            name="GK lapai"
+            formula="lapai = ⌈sienų_plotas / 3.0⌉ × 1.10  (1 lapas = 1.2×2.5 m, +10% atliekų)"
+            source="CLAUDE.md §1.8"
+          />
+          <FormulaRow
+            name="Plytelės (sienos)"
+            formula="plotas = plyteliuotos_sienos_ilgis × plytelių_aukštis\natliekos: tiesiai +8% · eglutė +12% · šešiakampis +16%"
+            source="CLAUDE.md §1.7 — vonia: paprastai iki 2.0–2.4 m"
+          />
+          <FormulaRow
+            name="Hidroizoliacija (vonia)"
+            formula="grindys: visas plotas\nsienos: perimetras × 0.30 m + dušo_zona × lubų_aukštis"
+            source="CLAUDE.md §1.12 — dažnai pamirštama!"
+          />
+        </ul>
       )}
     </div>
   );

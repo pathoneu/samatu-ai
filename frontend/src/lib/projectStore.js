@@ -21,15 +21,78 @@ const SETTINGS_KEY = 'samatu_settings';
 
 const API = '';
 
+// P7: Legacy ASCII-stripped skyrius names → modern LT-with-diacritics. Used
+// to migrate old projects in localStorage so UI shows consistent names.
+// Mirror of backend SKYRIUS_LEGACY_MIGRATION (extractor/vision_call.py).
+// Sprint §FIX-2 (2026-04-29): expanded with GKP/glaistymas variants —
+// user reported 3 separate "GKP montavimas" groups in UI from these.
+// Mirror of backend SKYRIUS_LEGACY_MIGRATION (extractor/vision_call.py).
+const SKYRIUS_LEGACY_MIGRATION = {
+  'Glaistymas dazymas': 'Sienų lubų glaistymas dažymas',
+  'Glaistymas dažymas': 'Sienų lubų glaistymas dažymas',
+  'Sienų glaistymas dažymas': 'Sienų lubų glaistymas dažymas',
+  'Plyteles': 'Plytelių klijavimas',
+  'Plytelių darbai': 'Plytelių klijavimas',
+  'Pridetiniai elementai': 'Pridėtiniai elementai',
+  'Santechnikos darbai/ kondicionavimo darbai': 'Santechnikos darbai',
+  'Elektros instaliacijos darbai/ apsvietimas': 'Elektros instaliacijos darbai',
+  'Grindu darbai': 'Grindys',
+  'Grindų darbai': 'Grindys',
+  'Grindų danga': 'Grindys',
+  // GKP variants — collapse to canonical "GKP montavimas"
+  'GKP': 'GKP montavimas',
+  'GKP konstrukcija': 'GKP montavimas',
+  'GKP karkas': 'GKP montavimas',
+  'Gipso kartono montavimas': 'GKP montavimas',
+  'Gipsokartono montavimas': 'GKP montavimas',
+  'GKP lubu montavimas': 'GKP montavimas',
+  'GKP lubų montavimas': 'GKP montavimas',
+};
+
+function _migrateProject(p) {
+  if (!p || typeof p !== 'object') return p;
+  const migrated = { ...p };
+  // Migrate skyrius names in darbu_sarasas
+  if (Array.isArray(p.darbu_sarasas)) {
+    migrated.darbu_sarasas = p.darbu_sarasas.map(it => {
+      if (!it || typeof it !== 'object') return it;
+      const newSk = SKYRIUS_LEGACY_MIGRATION[it.skyrius];
+      const newSkLabel = SKYRIUS_LEGACY_MIGRATION[it.skyrius_label];
+      if (newSk || newSkLabel) {
+        return {
+          ...it,
+          skyrius: newSk || it.skyrius,
+          skyrius_label: newSkLabel || it.skyrius_label,
+        };
+      }
+      return it;
+    });
+  }
+  // Same for pozicijos
+  if (Array.isArray(p.pozicijos)) {
+    migrated.pozicijos = p.pozicijos.map(it => {
+      if (!it || typeof it !== 'object') return it;
+      const newSk = SKYRIUS_LEGACY_MIGRATION[it.skyrius];
+      return newSk ? { ...it, skyrius: newSk } : it;
+    });
+  }
+  return migrated;
+}
+
 // ── Backend sync helpers (fire-and-forget) ────────────────────────────────────
 
 const _syncToBackend = (project) => {
   if (!project?.id) return;
+  // Sprint §AUDIT (2026-04-29): strip frontend-only meta keys before sync so
+  // backend never persists _archived/_archived_at — they're frontend soft-delete
+  // state. If they accidentally synced, restoreProject + page refresh wouldn't
+  // stick because backend would override the restored state on next pull.
+  const { _archived, _archived_at, ...persisted } = project;
   fetch(`${API}/api/projects/${project.id}`, {
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(project),
+    body: JSON.stringify(persisted),
   }).catch((e) => console.warn('[projectStore] backend sync failed:', e));
 };
 
@@ -44,6 +107,12 @@ const _deleteFromBackend = (id) => {
 // from another tab/session.
 
 let _hasPulled = false;
+// Sprint §AUDIT (2026-04-29): exported reset so authContext.logout() can
+// clear the once-per-session guard. Without this, user A's archived flag
+// would carry into user B's session in the same tab.
+export function resetPullCache() {
+  _hasPulled = false;
+}
 export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
   _hasPulled = true;
@@ -59,9 +128,28 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 
     // Backend is source of truth — replace cache fully (don't merge old localStorage
     // entries from a previous user/session; we cleared on logout but this is defensive).
+    // Sprint §FIX (2026-04-29): preserve local archive state across pulls.
+    // _archived is frontend-only soft-delete flag; backend doesn't know about
+    // it, so a naïve overwrite would resurrect deleted projects on every refresh.
+    let archiveMap = {};
+    try {
+      const localList = JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
+      for (const p of localList) {
+        if (p?._archived && p.id) {
+          archiveMap[p.id] = {
+            _archived: p._archived,
+            _archived_at: p._archived_at,
+          };
+        }
+      }
+    } catch { /* ignore */ }
+
     if (list.length === 0) {
-      localStorage.setItem(PROJECTS_KEY, JSON.stringify([]));
-      return [];
+      // Even if backend returns empty, keep the archived projects locally
+      // so user can still see/restore them from Šiukšliadėžė.
+      const archivedOnly = Object.entries(archiveMap).map(([id, a]) => ({ id, ...a }));
+      localStorage.setItem(PROJECTS_KEY, JSON.stringify(archivedOnly));
+      return archivedOnly;
     }
 
     // Backend returns SUMMARIES — fetch full data per project.
@@ -69,7 +157,10 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
       list.map(p => fetch(`${API}/api/projects/${p.id}`, { credentials: 'include' })
                      .then(r => r.ok ? r.json() : null))
     );
-    const valid = fulls.filter(Boolean).sort((a, b) =>
+    const valid = fulls.filter(Boolean).map(p => ({
+      ...p,
+      ...(archiveMap[p.id] || {}),  // restore _archived/_archived_at if present
+    })).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
     localStorage.setItem(PROJECTS_KEY, JSON.stringify(valid));
@@ -84,7 +175,10 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 
 export function getProjects() {
   try {
-    return JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
+    const raw = JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
+    // P7 migration: legacy skyrius mojibake → modern LT names. Pure-function
+    // pass — doesn't write back, so old saves stay untouched until next save.
+    return raw.map(_migrateProject);
   } catch {
     return [];
   }
@@ -118,10 +212,57 @@ export function updateProject(id, updates) {
   return projects[idx];
 }
 
+// Sprint §28 (2026-04-29): soft delete with 30d restore window.
+// Hard delete preserved as `permanentlyDeleteProject` for the Trash view.
+
+const ARCHIVE_RETENTION_DAYS = 30;
+
 export function deleteProject(id) {
+  // Backwards-compatible: now soft-deletes (archives) instead of hard delete.
+  // To purge immediately, call permanentlyDeleteProject(id).
+  archiveProject(id);
+}
+
+export function archiveProject(id) {
+  const all = getProjects();
+  const target = all.find(p => p.id === id);
+  if (!target) return;
+  target._archived = true;
+  target._archived_at = new Date().toISOString();
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
+  // Don't delete from backend yet — preserved until purge window expires.
+}
+
+export function restoreProject(id) {
+  const all = getProjects();
+  const target = all.find(p => p.id === id);
+  if (!target) return;
+  delete target._archived;
+  delete target._archived_at;
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
+}
+
+export function permanentlyDeleteProject(id) {
   const projects = getProjects().filter(p => p.id !== id);
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
   _deleteFromBackend(id);
+}
+
+export function getArchivedProjects() {
+  return getProjects().filter(p => p._archived === true);
+}
+
+export function purgeExpiredArchive() {
+  const cutoff = Date.now() - ARCHIVE_RETENTION_DAYS * 86400 * 1000;
+  const archived = getArchivedProjects();
+  const expired = archived.filter(p => {
+    const ts = p._archived_at ? new Date(p._archived_at).getTime() : 0;
+    return ts > 0 && ts < cutoff;
+  });
+  for (const p of expired) {
+    permanentlyDeleteProject(p.id);
+  }
+  return expired.length;
 }
 
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
@@ -176,4 +317,100 @@ export function getSettings() {
 export function saveSettings(settings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   return settings;
+}
+
+// ── Sprint §13 (2026-04-29): backup / restore localStorage projects ───────────
+// Purpose: users will lose all projects if they clear browser history. The
+// backend is the source of truth, but the local cache holds offline data
+// (e.g. uncommitted price edits) the backend hasn't yet seen. Export gives
+// the user a portable JSON they can re-import on a fresh browser.
+
+const BACKUP_VERSION = 1;
+
+export function exportProjectsBackup() {
+  const projects = getProjects();
+  const settings = getSettings();
+  const payload = {
+    version: BACKUP_VERSION,
+    exported_at: new Date().toISOString(),
+    projects_count: projects.length,
+    projects,
+    settings,
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+export function downloadProjectsBackup() {
+  const json = exportProjectsBackup();
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const today = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `samatu-projektai-${today}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function importProjectsBackup(jsonText, opts = {}) {
+  // opts: { mergeStrategy: 'replace' | 'merge' (default) }
+  const merge = opts.mergeStrategy !== 'replace';
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (e) {
+    throw new Error(`Negaliu nuskaityti backup'o: failas neturi tinkamo JSON formato (${e.message})`);
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
+    throw new Error('Failas neatitinka backup struktūros (laukiamas { version, projects: [], settings })');
+  }
+  if (parsed.version > BACKUP_VERSION) {
+    throw new Error(`Backup'as iš naujesnės versijos (${parsed.version}). Atnaujink Sąmatų AI ir bandyk vėl.`);
+  }
+  // Sprint §AUDIT (2026-04-29): explicit version migration table. Old
+  // backups silently succeeded; now we apply known migrations + warn user
+  // when format unknown. Each migration runs IN ORDER from incoming.version.
+  const incomingVersion = Number(parsed.version) || 1;
+  if (incomingVersion < BACKUP_VERSION) {
+    // Apply migrations in sequence. v1 → v2 example:
+    // for (let v = incomingVersion; v < BACKUP_VERSION; v++) {
+    //   if (v === 1) parsed.projects = migrateV1ToV2(parsed.projects);
+    // }
+    // For now BACKUP_VERSION = 1 so no migrations needed; this block is
+    // scaffolding for when we bump.
+    console.info(`[backup] migrating from v${incomingVersion} to v${BACKUP_VERSION} (no migrations registered yet)`);
+  }
+  // Run modern migrations on each project (skyrius normalize, etc.)
+  parsed.projects = parsed.projects.map(_migrateProject);
+
+  const incoming = parsed.projects;
+  let final;
+  if (merge) {
+    const existing = getProjects();
+    const byId = new Map(existing.map(p => [p.id, p]));
+    for (const p of incoming) {
+      if (!p?.id) continue;
+      // Newer updated_at wins (or incoming if no timestamps)
+      const old = byId.get(p.id);
+      if (!old || (p.updated_at && (!old.updated_at || p.updated_at > old.updated_at))) {
+        byId.set(p.id, p);
+      }
+    }
+    final = Array.from(byId.values());
+  } else {
+    final = incoming;
+  }
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(final));
+
+  if (parsed.settings && typeof parsed.settings === 'object') {
+    saveSettings({ ...getSettings(), ...parsed.settings });
+  }
+
+  return {
+    projects_imported: incoming.length,
+    projects_total: final.length,
+    settings_imported: !!parsed.settings,
+  };
 }
