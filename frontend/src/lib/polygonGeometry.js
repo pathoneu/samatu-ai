@@ -183,3 +183,24 @@ function perpFoot(p, a, b) {
   if (t < 0 || t > 1) return null;  // foot is outside segment
   return { x: a.x + t * dx, y: a.y + t * dy };
 }
+
+/**
+ * Area-weighted centroid (correct for non-convex polygons).
+ * Returns null for degenerate input.
+ */
+export function polygonCentroid(points) {
+  if (!points || points.length < 3) return null;
+  let cx = 0, cy = 0, areaSum = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const f = p1.x * p2.y - p2.x * p1.y;
+    cx += (p1.x + p2.x) * f;
+    cy += (p1.y + p2.y) * f;
+    areaSum += f;
+  }
+  if (areaSum === 0) return null;
+  const a = areaSum / 2;
+  return { x: cx / (6 * a), y: cy / (6 * a) };
+}

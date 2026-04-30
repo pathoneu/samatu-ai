@@ -149,3 +149,16 @@ test('nearestEdge: skips edges of excludePolygonId', () => {
   const result = nearestEdge({x:5,y:2}, polys, 8, { excludePolygonId: 'a' });
   assert.equal(result, null);
 });
+
+import { polygonCentroid } from './polygonGeometry.js';
+
+test('polygonCentroid: square center is at 5,5', () => {
+  const sq = [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}];
+  const c = polygonCentroid(sq);
+  assert.ok(Math.abs(c.x - 5) < 0.001);
+  assert.ok(Math.abs(c.y - 5) < 0.001);
+});
+
+test('polygonCentroid: degenerate polygon (< 3 pts) returns null', () => {
+  assert.equal(polygonCentroid([{x:0,y:0},{x:1,y:1}]), null);
+});
