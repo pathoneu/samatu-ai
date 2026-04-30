@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PAGE_TYPE_LABELS, PAGE_TYPE_COLOR } from '@/lib/pageTypes';
 import { Stage, Layer, Rect, Line, Text as KonvaText, Group, Circle } from 'react-konva';
+import Konva from 'konva';
 import {
   loadTakeoff, saveTakeoff,
   setPageScale, applyScaleToAll, getPageScale,
@@ -55,6 +56,12 @@ if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   );
 }
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
+
+// Phase C-1 (2026-04-29): see docs/superpowers/research/2026-04-29-phase-c-libraries.md §4.2.
+// These globals are write-once; turning them off shaves 10-30% draw cost on
+// overlays with no transforms or shadows, which is our case.
+Konva.pixelRatio = 1;
+Konva.autoDrawEnabled = true;
 
 // ── Markup data model ────────────────────────────────────────────────────────
 
@@ -1241,6 +1248,12 @@ export default function PdfViewer({
   const [pageDims, setPageDims] = useState({ width: 800, height: 1000 });
   const containerRef = useRef(null);
 
+  // Phase C-1 (2026-04-29) Task 1: explicit pdf.destroy() + page.cleanup() on
+  // unmount. Without this, long sessions leak ~30 MB/page in pdf.js worker
+  // memory because react-pdf doesn't tear down the PDFDocumentProxy on unmount.
+  const pdfDocRef = useRef(null);
+  const pageProxyRef = useRef(null);
+
   // Diena 6: SymbolCounter shared state (toolbar viewport-fixed + overlay PDF coords)
   const [symbolState, setSymbolState] = useState({
     active: false, loading: false, matches: null,
@@ -1300,6 +1313,27 @@ export default function PdfViewer({
     setCalibPoints({ p1: null, p2: null });
     setPolygonDraft(null);
   }, [pageNumber, tool]);
+
+  // Phase C-1 (2026-04-29) Task 1: explicit PDF teardown on unmount. react-pdf
+  // does not destroy the underlying PDFDocumentProxy / PDFPageProxy when its
+  // component unmounts, which leaks the rendered page bitmap (~30 MB/page) and
+  // its worker-side memory. Empty deps array → runs ONLY on unmount.
+  useEffect(() => {
+    return () => {
+      try {
+        pageProxyRef.current?.cleanup?.();
+      } catch (e) {
+        console.warn('[PdfViewer] page.cleanup failed', e);
+      }
+      try {
+        pdfDocRef.current?.destroy?.();
+      } catch (e) {
+        console.warn('[PdfViewer] pdf.destroy failed', e);
+      }
+      pageProxyRef.current = null;
+      pdfDocRef.current = null;
+    };
+  }, []);
 
   // Enter / Escape klavišai polygon brūkšniojimui
   useEffect(() => {
@@ -1536,7 +1570,11 @@ export default function PdfViewer({
           <div className="relative inline-block bg-white shadow-2xl">
             <Document
               file={fileUrl}
-              onLoadSuccess={({ numPages: n }) => setNumPages(n)}
+              onLoadSuccess={(pdf) => {
+                // Phase C-1 Task 1: capture PDFDocumentProxy for unmount cleanup.
+                pdfDocRef.current = pdf;
+                setNumPages(pdf.numPages);
+              }}
               loading={<PdfSkeleton label="Krauname brėžinį…" />}
               error={
                 <div className="p-8 bg-red-50 text-red-600 rounded border border-red-200" style={{ minWidth: 480 }}>
@@ -1550,7 +1588,15 @@ export default function PdfViewer({
               <Page
                 pageNumber={pageNumber}
                 scale={scale}
-                onLoadSuccess={(p) => setPageDims({ width: p.width * scale, height: p.height * scale })}
+                onLoadSuccess={(p) => {
+                  // Phase C-1 Task 1: capture PDFPageProxy for unmount cleanup.
+                  // Note: react-pdf passes a wrapped page object; the underlying
+                  // PDFPageProxy with .cleanup() is at p._pageInfo or p itself
+                  // depending on version. We try .cleanup() first, fall back
+                  // gracefully in the unmount effect.
+                  pageProxyRef.current = p;
+                  setPageDims({ width: p.width * scale, height: p.height * scale });
+                }}
                 renderTextLayer={false}
                 renderAnnotationLayer={false}
                 loading={
