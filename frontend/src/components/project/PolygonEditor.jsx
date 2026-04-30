@@ -10,8 +10,8 @@
  * on every mousemove per Konva perf guide).
  */
 
-import { useRef } from 'react';
-import { Group, Circle } from 'react-konva';
+import { useRef, useState } from 'react';
+import { Group, Circle, Rect, Text as KonvaText } from 'react-konva';
 import { nearestVertex, nearestEdge } from '@/lib/polygonGeometry';
 
 const VERTEX_R = 6;
@@ -108,6 +108,7 @@ function VertexHandle({
 }) {
   const ref = useRef(null);
   const startRef = useRef(null);
+  const [snapTarget, setSnapTarget] = useState(null);
   const isMulti = isSelected && selectedIndices.length > 1;
 
   return (
@@ -133,18 +134,27 @@ function VertexHandle({
           startRef.current = { x: point.x, y: point.y };
         }}
         onDragMove={(e) => {
-          if (!snapEnabled) return;
-          if (modKeysRef?.current?.alt) return;
+          if (!snapEnabled || modKeysRef?.current?.alt) {
+            setSnapTarget(null);
+            return;
+          }
           const pos = { x: e.target.x(), y: e.target.y() };
           const v = nearestVertex(pos, allPolygons, snapTolerance, { excludePolygonId });
           if (v) {
             e.target.position(v.point);
+            setSnapTarget({ x: v.point.x, y: v.point.y, type: 'vertex', label: 'kampas' });
             return;
           }
           const ed = nearestEdge(pos, allPolygons, Math.round(snapTolerance * 0.66), { excludePolygonId });
-          if (ed) e.target.position(ed.point);
+          if (ed) {
+            e.target.position(ed.point);
+            setSnapTarget({ x: ed.point.x, y: ed.point.y, type: 'edge', label: 'kraštas' });
+            return;
+          }
+          setSnapTarget(null);
         }}
         onDragEnd={(e) => {
+          setSnapTarget(null);
           const newPos = { x: e.target.x(), y: e.target.y() };
           if (isMulti && onDragEndAll && startRef.current) {
             const dx = newPos.x - startRef.current.x;
@@ -156,6 +166,25 @@ function VertexHandle({
           startRef.current = null;
         }}
       />
+      {/* Snap indicator: cyan halo + Lithuanian label ("kampas" / "kraštas").
+          Without this users disable snap and double-place vertices (UX research §3.4). */}
+      {snapTarget && (
+        <Group listening={false}>
+          <Circle
+            x={snapTarget.x} y={snapTarget.y} radius={10}
+            stroke="#00B8D9" strokeWidth={2} opacity={0.6}
+          />
+          <Rect
+            x={snapTarget.x + 12} y={snapTarget.y - 22}
+            width={56} height={18}
+            fill="rgba(15,23,42,0.85)" cornerRadius={3}
+          />
+          <KonvaText
+            x={snapTarget.x + 16} y={snapTarget.y - 20}
+            text={snapTarget.label} fontSize={11} fill="#e2e8f0"
+          />
+        </Group>
+      )}
     </>
   );
 }
