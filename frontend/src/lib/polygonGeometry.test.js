@@ -126,3 +126,26 @@ test('nearestVertex: returns closest of multiple candidates', () => {
   assert.deepEqual(result.point, {x:5,y:5});
   assert.equal(result.polygonId, 'b');
 });
+
+import { nearestEdge } from './polygonGeometry.js';
+
+test('nearestEdge: snaps to perpendicular foot on edge', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}] }];
+  // Cursor at (5, 2) — perpendicular foot on the bottom edge is (5, 0)
+  const result = nearestEdge({x:5,y:2}, polys, 8);
+  assert.deepEqual(result.point, {x:5,y:0});
+  assert.equal(result.polygonId, 'a');
+  assert.equal(result.edgeIndex, 0);
+});
+
+test('nearestEdge: returns null beyond tolerance', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}] }];
+  const result = nearestEdge({x:50,y:50}, polys, 8);
+  assert.equal(result, null);
+});
+
+test('nearestEdge: skips edges of excludePolygonId', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}] }];
+  const result = nearestEdge({x:5,y:2}, polys, 8, { excludePolygonId: 'a' });
+  assert.equal(result, null);
+});

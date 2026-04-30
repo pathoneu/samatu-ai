@@ -148,3 +148,38 @@ export function nearestVertex(point, polygons, tolerance, opts = {}) {
   }
   return best;
 }
+
+/**
+ * Find the nearest perpendicular-foot on any polygon edge within tolerance.
+ *
+ * @returns {point, polygonId, edgeIndex} | null
+ */
+export function nearestEdge(point, polygons, tolerance, opts = {}) {
+  let best = null;
+  let bestDist = tolerance;
+  for (const poly of polygons) {
+    if (opts.excludePolygonId && poly.id === opts.excludePolygonId) continue;
+    const n = poly.points.length;
+    for (let i = 0; i < n; i++) {
+      const a = poly.points[i];
+      const b = poly.points[(i + 1) % n];
+      const foot = perpFoot(point, a, b);
+      if (!foot) continue;
+      const d = Math.hypot(foot.x - point.x, foot.y - point.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { point: foot, polygonId: poly.id, edgeIndex: i };
+      }
+    }
+  }
+  return best;
+}
+
+function perpFoot(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return null;
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+  if (t < 0 || t > 1) return null;  // foot is outside segment
+  return { x: a.x + t * dx, y: a.y + t * dy };
+}
