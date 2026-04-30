@@ -1364,8 +1364,9 @@ export default function PdfViewer({
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (polygonDraft) {
+          e.preventDefault();
           setPolygonDraft(null);
-          toast?.('Atšaukta', { duration: 1500 });
+          toast('Atšaukta', { duration: 1500 });
         }
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -1382,7 +1383,7 @@ export default function PdfViewer({
           e.preventDefault();
           finalizePolygon();
         } else if (polygonDraft) {
-          toast?.('Polygonui reikia mažiausiai 3 taškų', { duration: 2000 });
+          toast('Polygonui reikia mažiausiai 3 taškų', { duration: 2000 });
         }
       }
     };
