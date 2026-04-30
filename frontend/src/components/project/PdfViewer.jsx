@@ -25,13 +25,14 @@ import { Stage, Layer, Rect, Line, Text as KonvaText, Group, Circle } from 'reac
 import {
   loadTakeoff, saveTakeoff,
   setPageScale, applyScaleToAll, getPageScale,
-  addPolygon, removePolygon, getPolygonsForPage,
+  addPolygon, updatePolygon, removePolygon, getPolygonsForPage,
   polygonAreaM2, polygonPerimeterM, distanceM, snapToLines,
   undo as takeoffUndo, redo as takeoffRedo,
   canUndo, canRedo,
 } from '@/lib/takeoffStore';
 import ScaleCalibrationModal from './ScaleCalibrationModal';
 import PolygonRoomModal from './PolygonRoomModal';
+import PolygonEditor from './PolygonEditor';
 import AiRoomOverlay from './AiRoomOverlay';
 import FocusFlashOverlay from './FocusFlashOverlay';
 // Sprint §17 (2026-04-29): SymbolCounter file deleted along with its import.
@@ -743,6 +744,10 @@ function MarkupCanvas({
   pageLines, linesLoading,
   orthoEnabled,
   modKeysRef,
+  // Phase C-1 Task 14: edit-after-commit
+  selectedPolygonId, setSelectedPolygonId,
+  selectedVertexIndices, setSelectedVertexIndices,
+  onPolygonVerticesUpdate, onPolygonVertexInsert, onPolygonVertexDelete,
 }) {
   // Linijų scale faktorius: PDF unitai → canvas px
   // Konva canvas dydis = width/height. PDF dokumentas turi page_width_pdf.
@@ -809,6 +814,10 @@ function MarkupCanvas({
 
   const pageMarkups = markups.filter(m => m.page === page);
   const pagePolygons = (polygons || []).filter(p => p.page === page);
+  // Phase C-1 Task 14: which polygon is currently being edited (this page only)
+  const selectedPolygon = selectedPolygonId
+    ? pagePolygons.find(p => p.id === selectedPolygonId) || null
+    : null;
 
   const handleMouseDown = (e) => {
     const pos = e.target.getStage().getPointerPosition();
@@ -956,42 +965,146 @@ function MarkupCanvas({
                 tool === 'erase' ? 'not-allowed' : 'default',
       }}
     >
-      <Layer>
-        {/* SAVED POLYGONS (matuoti zonos) */}
-        {showMarkups && pagePolygons.map(poly => {
-          const flatPoints = poly.points.flatMap(p => [p.x, p.y]);
-          const isAi = poly.source === 'ai';
-          const color = poly.color || (isAi ? '#3b82f6' : '#10b981');
-          // Centroid label pozicijai
-          const cx = poly.points.reduce((s, p) => s + p.x, 0) / poly.points.length;
-          const cy = poly.points.reduce((s, p) => s + p.y, 0) / poly.points.length;
-          return (
-            <Group key={poly.id}
-              onClick={() => {
-                if (tool === 'erase') {
-                  if (window.confirm(`Ištrinti „${poly.label || 'patalpą'}"?`)) {
-                    onDeletePolygon?.(poly.id);
+      {/* ── Layer 1: committed polygons (paint only, no listening) ────────
+          Phase C-1 Task 14: per Konva perf guide, draws stay on a fast
+          paint-only layer. Hit-testing for un-selected polys lives on
+          the invisible Layer 1.5 below. Selected polygon (if any) is
+          rendered on Layer 2 with its editor handles. */}
+      <Layer listening={false} transformsEnabled="position">
+        {showMarkups && pagePolygons
+          .filter(poly => poly.id !== selectedPolygonId)
+          .map(poly => {
+            const flatPoints = poly.points.flatMap(p => [p.x, p.y]);
+            const isAi = poly.source === 'ai';
+            const color = poly.color || (isAi ? '#3b82f6' : '#10b981');
+            // Centroid label pozicijai
+            const cx = poly.points.reduce((s, p) => s + p.x, 0) / poly.points.length;
+            const cy = poly.points.reduce((s, p) => s + p.y, 0) / poly.points.length;
+            return (
+              <Group key={poly.id}>
+                <Line
+                  points={flatPoints}
+                  closed
+                  fill={`${color}22`}
+                  stroke={color}
+                  strokeWidth={2}
+                  perfectDrawEnabled={false}
+                  shadowForStrokeEnabled={false}
+                />
+                <KonvaText
+                  x={cx - 30} y={cy - 12}
+                  text={`${poly.label || 'Patalpa'}\n${(poly.area_m2 || 0).toFixed(1)} m²`}
+                  fontSize={11} fontStyle="bold"
+                  fill={color}
+                  align="center"
+                  width={60}
+                  perfectDrawEnabled={false}
+                />
+              </Group>
+            );
+          })}
+      </Layer>
+
+      {/* ── Layer 1.5: invisible hit-test for committed polygons ──────────
+          Click a body → select for editing. Click while erase tool is
+          active → confirm + delete (preserves prior behavior). */}
+      <Layer listening={true}>
+        {showMarkups && pagePolygons
+          .filter(poly => poly.id !== selectedPolygonId)
+          .map(poly => {
+            const flatPoints = poly.points.flatMap(p => [p.x, p.y]);
+            return (
+              <Line
+                key={poly.id + '-hit'}
+                points={flatPoints}
+                closed
+                fill="rgba(0,0,0,0.001)"
+                stroke="rgba(0,0,0,0)" strokeWidth={6}
+                listening={true}
+                onClick={() => {
+                  if (tool === 'erase') {
+                    if (window.confirm(`Ištrinti „${poly.label || 'patalpą'}"?`)) {
+                      onDeletePolygon?.(poly.id);
+                    }
+                    return;
                   }
-                }
-              }}>
+                  if (tool === 'select' || !tool) {
+                    setSelectedPolygonId?.(poly.id);
+                    setSelectedVertexIndices?.([]);
+                  }
+                }}
+              />
+            );
+          })}
+      </Layer>
+
+      {/* ── Layer 2: active edit + draft + tool overlays (full listening) */}
+      <Layer listening={true}>
+        {/* Currently-selected polygon body (rendered here so editor handles
+            sit on top in the same layer's hit graph). */}
+        {showMarkups && selectedPolygon && (() => {
+          const flatPoints = selectedPolygon.points.flatMap(p => [p.x, p.y]);
+          const isAi = selectedPolygon.source === 'ai';
+          const color = selectedPolygon.color || (isAi ? '#3b82f6' : '#10b981');
+          const cx = selectedPolygon.points.reduce((s, p) => s + p.x, 0) / selectedPolygon.points.length;
+          const cy = selectedPolygon.points.reduce((s, p) => s + p.y, 0) / selectedPolygon.points.length;
+          return (
+            <Group>
               <Line
                 points={flatPoints}
                 closed
                 fill={`${color}22`}
                 stroke={color}
-                strokeWidth={2}
+                strokeWidth={3}
+                onClick={() => {
+                  if (tool === 'erase') {
+                    if (window.confirm(`Ištrinti „${selectedPolygon.label || 'patalpą'}"?`)) {
+                      onDeletePolygon?.(selectedPolygon.id);
+                      setSelectedPolygonId?.(null);
+                      setSelectedVertexIndices?.([]);
+                    }
+                  }
+                }}
               />
               <KonvaText
                 x={cx - 30} y={cy - 12}
-                text={`${poly.label || 'Patalpa'}\n${(poly.area_m2 || 0).toFixed(1)} m²`}
+                text={`${selectedPolygon.label || 'Patalpa'}\n${(selectedPolygon.area_m2 || 0).toFixed(1)} m²`}
                 fontSize={11} fontStyle="bold"
                 fill={color}
                 align="center"
                 width={60}
+                listening={false}
               />
             </Group>
           );
-        })}
+        })()}
+
+        {/* PolygonEditor — vertex handles + midpoint ghosts */}
+        {selectedPolygon && (
+          <PolygonEditor
+            polygon={selectedPolygon}
+            allPolygons={pagePolygons}
+            pageNumber={page}
+            selectedVertexIndices={selectedVertexIndices || []}
+            onVerticesUpdate={(newPts, op) =>
+              onPolygonVerticesUpdate?.(selectedPolygon.id, newPts, op)
+            }
+            onVertexInsert={(i, v) =>
+              onPolygonVertexInsert?.(selectedPolygon.id, i, v)
+            }
+            onVertexDelete={(i) =>
+              onPolygonVertexDelete?.(selectedPolygon.id, i)
+            }
+            onSelectVertex={(i, multi) =>
+              setSelectedVertexIndices?.(
+                multi ? [...(selectedVertexIndices || []), i] : [i],
+              )
+            }
+            modKeysRef={modKeysRef}
+            snapEnabled
+            snapTolerance={12}
+          />
+        )}
 
         {/* POLYGON DRAFT (brūkšniojama) */}
         {isPolygonMode && polygonDraft && polygonDraft.points.length > 0 && (
@@ -1287,6 +1400,42 @@ export default function PdfViewer({
   const [polygonDraft, setPolygonDraft] = useState(null); // {points: [{x,y}, ...]}
   const [pendingPolygon, setPendingPolygon] = useState(null); // baigtas, laukiam modal'o
 
+  // Phase C-1 Task 14: edit-after-commit selection state. Click a committed
+  // polygon's body → it moves to the active-edit Layer where vertex handles
+  // and midpoint ghosts appear. Vertex shift-click multi-selects.
+  const [selectedPolygonId, setSelectedPolygonId] = useState(null);
+  const [selectedVertexIndices, setSelectedVertexIndices] = useState([]);
+
+  // Polygon CRUD callbacks shared with MarkupCanvas → PolygonEditor.
+  // Each pushes a single op onto the undo stack via takeoffStore.updatePolygon.
+  const onPolygonVerticesUpdate = useCallback((polygonId, newPoints /*, op */) => {
+    setTakeoff(t => updatePolygon(t, polygonId, { points: newPoints }));
+  }, []);
+  const onPolygonVertexInsert = useCallback((polygonId, index, vertex) => {
+    setTakeoff(t => {
+      const poly = t.polygons.find(p => p.id === polygonId);
+      if (!poly) return t;
+      const newPoints = [
+        ...poly.points.slice(0, index),
+        vertex,
+        ...poly.points.slice(index),
+      ];
+      return updatePolygon(t, polygonId, { points: newPoints });
+    });
+  }, []);
+  const onPolygonVertexDelete = useCallback((polygonId, index) => {
+    setTakeoff(t => {
+      const poly = t.polygons.find(p => p.id === polygonId);
+      if (!poly) return t;
+      if (poly.points.length <= 3) {
+        toast('Polygonui reikia mažiausiai 3 taškų', { duration: 2000 });
+        return t;
+      }
+      const newPoints = poly.points.filter((_, i) => i !== index);
+      return updatePolygon(t, polygonId, { points: newPoints });
+    });
+  }, []);
+
   // Phase C-1: ortho-90° default on for floor plans (per UX research).
   // Toggle via F8 (AutoCAD convention); Alt-while-moving disables temporarily.
   const [orthoEnabled, setOrthoEnabled] = useState(true);
@@ -1334,6 +1483,10 @@ export default function PdfViewer({
   useEffect(() => {
     setCalibPoints({ p1: null, p2: null });
     setPolygonDraft(null);
+    // Phase C-1 Task 14: deselect polygon edit when leaving the page or
+    // switching tools — handles can't follow you across pages anyway.
+    setSelectedPolygonId(null);
+    setSelectedVertexIndices([]);
   }, [pageNumber, tool]);
 
   // Phase C-1 (2026-04-29) Task 1: explicit PDF teardown on unmount. react-pdf
@@ -1760,6 +1913,13 @@ export default function PdfViewer({
               linesLoading={linesLoading}
               orthoEnabled={orthoEnabled}
               modKeysRef={modKeysRef}
+              selectedPolygonId={selectedPolygonId}
+              setSelectedPolygonId={setSelectedPolygonId}
+              selectedVertexIndices={selectedVertexIndices}
+              setSelectedVertexIndices={setSelectedVertexIndices}
+              onPolygonVerticesUpdate={onPolygonVerticesUpdate}
+              onPolygonVertexInsert={onPolygonVertexInsert}
+              onPolygonVertexDelete={onPolygonVertexDelete}
             />
           </div>
         </div>
