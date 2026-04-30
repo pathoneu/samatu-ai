@@ -41,11 +41,10 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 import TraceOverlay from './TraceOverlay';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 
-// PDF.js worker config — naudojam tą patį pdfjs-dist version'ą per CDN.
-// Variantas su `new URL(... import.meta.url)` neveikia su Vite worker'iam.
-// CDN patikimas, ne reikia copy'inti worker file'o į public/.
-pdfjs.GlobalWorkerOptions.workerSrc =
-  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
+// Set workerSrc here, not in main.jsx — Vite's module-execution order can let
+// later imports overwrite a workerSrc set globally, breaking prod after deploy.
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 
 // ── Markup data model ────────────────────────────────────────────────────────
 
