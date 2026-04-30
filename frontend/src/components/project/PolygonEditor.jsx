@@ -66,6 +66,7 @@ export default function PolygonEditor({
           point={p}
           index={i}
           isSelected={selectedVertexIndices.includes(i)}
+          selectedIndices={selectedVertexIndices}
           allPolygons={allPolygons}
           excludePolygonId={polygon.id}
           modKeysRef={modKeysRef}
@@ -80,6 +81,19 @@ export default function PolygonEditor({
               from: p, to: newPoint,
             });
           }}
+          onDragEndAll={(offset) => {
+            const newPts = pts.map((q, j) =>
+              selectedVertexIndices.includes(j)
+                ? { x: q.x + offset.dx, y: q.y + offset.dy }
+                : q,
+            );
+            onVerticesUpdate(newPts, {
+              type: 'move-vertices-batch',
+              polygonId: polygon.id,
+              indices: [...selectedVertexIndices],
+              offset,
+            });
+          }}
         />
       ))}
     </Group>
@@ -87,11 +101,14 @@ export default function PolygonEditor({
 }
 
 function VertexHandle({
-  point, index, isSelected, allPolygons, excludePolygonId,
+  point, index, isSelected, selectedIndices = [],
+  allPolygons, excludePolygonId,
   modKeysRef, snapEnabled, snapTolerance,
-  onSelect, onDragEnd,
+  onSelect, onDragEnd, onDragEndAll,
 }) {
   const ref = useRef(null);
+  const startRef = useRef(null);
+  const isMulti = isSelected && selectedIndices.length > 1;
 
   return (
     <>
@@ -112,6 +129,9 @@ function VertexHandle({
           e.cancelBubble = true;
           onSelect(index, modKeysRef?.current?.shift || false);
         }}
+        onDragStart={() => {
+          startRef.current = { x: point.x, y: point.y };
+        }}
         onDragMove={(e) => {
           if (!snapEnabled) return;
           if (modKeysRef?.current?.alt) return;
@@ -125,7 +145,15 @@ function VertexHandle({
           if (ed) e.target.position(ed.point);
         }}
         onDragEnd={(e) => {
-          onDragEnd({ x: e.target.x(), y: e.target.y() });
+          const newPos = { x: e.target.x(), y: e.target.y() };
+          if (isMulti && onDragEndAll && startRef.current) {
+            const dx = newPos.x - startRef.current.x;
+            const dy = newPos.y - startRef.current.y;
+            onDragEndAll({ dx, dy });
+          } else {
+            onDragEnd(newPos);
+          }
+          startRef.current = null;
         }}
       />
     </>
