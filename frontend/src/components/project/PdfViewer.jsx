@@ -39,6 +39,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 // Vision prompt + symbol-driven pozicijų generation in vision_call.py.
 import TraceOverlay from './TraceOverlay';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
+import { toast } from 'sonner';
 
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
 // Set workerSrc here, not in main.jsx — Vite's module-execution order can let
@@ -1328,19 +1329,16 @@ export default function PdfViewer({
     };
   }, []);
 
-  // Enter / Escape klavišai polygon brūkšniojimui
+  // Phase C-1 Task 8: Esc cancels mid-trace (universal expectation; never
+  // commits on Esc per UX research §3.3).
   useEffect(() => {
+    if (tool !== 'polygon') return;
     const onKey = (e) => {
-      if (tool !== 'polygon' || !polygonDraft) return;
-      if (e.key === 'Enter' && polygonDraft.points.length >= 3) {
-        e.preventDefault();
-        finalizePolygon();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        setPolygonDraft(null);
-      } else if (e.key === 'Backspace' && polygonDraft.points.length > 0) {
-        e.preventDefault();
-        setPolygonDraft(d => ({ points: d.points.slice(0, -1) }));
+      if (e.key === 'Escape') {
+        if (polygonDraft) {
+          setPolygonDraft(null);
+          toast?.('Atšaukta', { duration: 1500 });
+        }
       }
     };
     window.addEventListener('keydown', onKey);
