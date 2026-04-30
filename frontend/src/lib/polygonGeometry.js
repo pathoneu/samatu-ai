@@ -91,3 +91,34 @@ export function orthoSnap(prev, cursor, opts) {
     y: Math.round(prev.y + dist * Math.sin(rad)),
   };
 }
+
+/**
+ * Ray-casting point-in-polygon. Returns true for points strictly inside
+ * AND on edges (so click-to-select-by-body works for clicks on the border).
+ */
+export function pointInPolygon(p, poly) {
+  if (!poly || poly.length < 3) return false;
+  // Edge-on test first (cheap)
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (pointOnSegment(p, poly[j], poly[i])) return true;
+  }
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y))
+      && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function pointOnSegment(p, a, b, eps = 1) {
+  const cross = (p.y - a.y) * (b.x - a.x) - (p.x - a.x) * (b.y - a.y);
+  if (Math.abs(cross) > eps) return false;
+  const minX = Math.min(a.x, b.x) - eps;
+  const maxX = Math.max(a.x, b.x) + eps;
+  const minY = Math.min(a.y, b.y) - eps;
+  const maxY = Math.max(a.y, b.y) + eps;
+  return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+}

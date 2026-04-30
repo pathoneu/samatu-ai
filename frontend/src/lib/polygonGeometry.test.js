@@ -77,3 +77,21 @@ test('orthoSnap: vertical lock', () => {
   assert.equal(out.x, 50);
   assert.equal(out.y, 100);
 });
+
+import { pointInPolygon } from './polygonGeometry.js';
+
+test('pointInPolygon: center of square is inside', () => {
+  const sq = [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}];
+  assert.equal(pointInPolygon({x:5,y:5}, sq), true);
+});
+
+test('pointInPolygon: outside is outside', () => {
+  const sq = [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}];
+  assert.equal(pointInPolygon({x:15,y:5}, sq), false);
+});
+
+test('pointInPolygon: on edge is true (consistent with click-to-select)', () => {
+  const sq = [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}];
+  // On the right edge — hitting an edge during click-to-select must register
+  assert.equal(pointInPolygon({x:10,y:5}, sq), true);
+});
