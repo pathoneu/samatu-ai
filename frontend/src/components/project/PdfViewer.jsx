@@ -1544,6 +1544,54 @@ export default function PdfViewer({
     return () => window.removeEventListener('keydown', onKey);
   }, [tool, polygonDraft]);
 
+  // Phase C-1 Task 17: Delete key removes selected vertex(es) or whole polygon.
+  // Polygon-vs-vertex resolved by what's selected (PlanSwift convention):
+  // — vertex(es) selected → remove those vertices, with min-3 enforcement
+  // — only polygon selected (no vertex) → remove the whole polygon
+  // Skip when user is typing in inputs/textarea/contenteditable.
+  useEffect(() => {
+    if (tool !== 'select') return;
+    const isTyping = (target) => {
+      if (!target) return false;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      return target.isContentEditable === true;
+    };
+    const onKey = (e) => {
+      if (isTyping(e.target)) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+      if (selectedPolygonId && (selectedVertexIndices?.length || 0) > 0) {
+        e.preventDefault();
+        // Delete vertices in descending index order so earlier indices stay valid
+        const sortedDesc = [...selectedVertexIndices].sort((a, b) => b - a);
+        let cancelled = false;
+        setTakeoff(t => {
+          const poly = (t.polygons || []).find(p => p.id === selectedPolygonId);
+          if (!poly) return t;
+          if (poly.points.length - sortedDesc.length < 3) {
+            cancelled = true;
+            toast('Polygonui reikia mažiausiai 3 taškų', { duration: 2000 });
+            return t;
+          }
+          const newPoints = poly.points.filter((_, i) => !sortedDesc.includes(i));
+          // Note: takeoffStore.updatePolygon auto-logs the diff into actionStack;
+          // a vertex-delete shows up there as a generic update_polygon action.
+          return updatePolygon(t, selectedPolygonId, { points: newPoints });
+        });
+        if (!cancelled) setSelectedVertexIndices([]);
+      } else if (selectedPolygonId) {
+        // No vertex selected → delete the whole polygon
+        e.preventDefault();
+        setTakeoff(t => removePolygon(t, selectedPolygonId));
+        setSelectedPolygonId(null);
+        setSelectedVertexIndices([]);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tool, selectedPolygonId, selectedVertexIndices]);
+
   // Phase C-1 Task 11: track Shift/Alt modifiers globally (for ortho overrides)
   // and F8 toggles ortho mode (AutoCAD convention).
   useEffect(() => {
