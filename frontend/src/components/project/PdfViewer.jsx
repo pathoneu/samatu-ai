@@ -39,6 +39,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 // Vision prompt + symbol-driven pozicijų generation in vision_call.py.
 import TraceOverlay from './TraceOverlay';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
+import { orthoSnap } from '@/lib/polygonGeometry';
 import { toast } from 'sonner';
 
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
@@ -739,6 +740,8 @@ function MarkupCanvas({
   polygons, polygonDraft, onPolygonDraftChange, onFinalizePolygon,
   onDeletePolygon,
   pageLines, linesLoading,
+  orthoEnabled,
+  modKeysRef,
 }) {
   // Linijų scale faktorius: PDF unitai → canvas px
   // Konva canvas dydis = width/height. PDF dokumentas turi page_width_pdf.
@@ -819,19 +822,28 @@ function MarkupCanvas({
     }
 
     if (tool === 'polygon') {
-      // Polygon brūkšniojimas — su snap'u į vector linijas
-      const snapped = snapPoint(pos);
-      // Jei spaudžiu ant pirmo point'o (radiusu 10px) — closing → finalize
+      let candidate = snapPoint(pos);
+      // Ortho applies AFTER vector-line snap; if snap engaged, ortho is bypassed
+      // (snap wins — user explicitly hit a wall point).
+      if (!candidate.snapped && polygonDraft && polygonDraft.points.length > 0) {
+        const prev = polygonDraft.points[polygonDraft.points.length - 1];
+        candidate = orthoSnap(prev, candidate, {
+          orthoEnabled,
+          shiftHeld: modKeysRef.current.shift,
+          altHeld: modKeysRef.current.alt,
+        });
+      }
+      // existing close-on-first-vertex check uses `candidate`
       if (polygonDraft && polygonDraft.points.length >= 3) {
         const first = polygonDraft.points[0];
-        const dist = Math.sqrt((snapped.x - first.x)**2 + (snapped.y - first.y)**2);
-        if (dist < 10) {
+        const dist = Math.sqrt((candidate.x - first.x)**2 + (candidate.y - first.y)**2);
+        if (dist < 12) {  // bumped from 10 to match UX spec 12px tolerance
           onFinalizePolygon();
           return;
         }
       }
       const points = polygonDraft ? polygonDraft.points : [];
-      onPolygonDraftChange({ points: [...points, { x: snapped.x, y: snapped.y }] });
+      onPolygonDraftChange({ points: [...points, { x: candidate.x, y: candidate.y }] });
       return;
     }
 
@@ -871,8 +883,18 @@ function MarkupCanvas({
 
   const handleMouseMove = (e) => {
     const rawPos = e.target.getStage().getPointerPosition();
-    // Polygon mode'e — snap'inam hover poziciją vizualizacijai
-    const pos = tool === 'polygon' ? snapPoint(rawPos) : rawPos;
+    let pos = rawPos;
+    if (tool === 'polygon') {
+      pos = snapPoint(rawPos);
+      if (!pos.snapped && polygonDraft && polygonDraft.points.length > 0) {
+        const prev = polygonDraft.points[polygonDraft.points.length - 1];
+        pos = orthoSnap(prev, pos, {
+          orthoEnabled,
+          shiftHeld: modKeysRef.current.shift,
+          altHeld: modKeysRef.current.alt,
+        });
+      }
+    }
     setHoverPos(pos);
     if (!drawing) return;
     if (drawing.type === 'rect') {
@@ -1264,6 +1286,11 @@ export default function PdfViewer({
   const [polygonDraft, setPolygonDraft] = useState(null); // {points: [{x,y}, ...]}
   const [pendingPolygon, setPendingPolygon] = useState(null); // baigtas, laukiam modal'o
 
+  // Phase C-1: ortho-90° default on for floor plans (per UX research).
+  // Toggle via F8 (AutoCAD convention); Alt-while-moving disables temporarily.
+  const [orthoEnabled, setOrthoEnabled] = useState(true);
+  const modKeysRef = useRef({ shift: false, alt: false });
+
   // Vector PDF linijos snap'ui — fetch'inamos kai polygon mode aktyvuotas
   const [pageLines, setPageLines] = useState(null);  // {lines, page_width_pdf, page_height_pdf}
   const [linesLoading, setLinesLoading] = useState(false);
@@ -1361,6 +1388,26 @@ export default function PdfViewer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [tool, polygonDraft]);
+
+  // Phase C-1 Task 11: track Shift/Alt modifiers globally (for ortho overrides)
+  // and F8 toggles ortho mode (AutoCAD convention).
+  useEffect(() => {
+    const onKD = (e) => {
+      if (e.key === 'Shift') modKeysRef.current.shift = true;
+      if (e.key === 'Alt')   modKeysRef.current.alt = true;
+      if (e.key === 'F8')    { e.preventDefault(); setOrthoEnabled(v => !v); }
+    };
+    const onKU = (e) => {
+      if (e.key === 'Shift') modKeysRef.current.shift = false;
+      if (e.key === 'Alt')   modKeysRef.current.alt = false;
+    };
+    window.addEventListener('keydown', onKD);
+    window.addEventListener('keyup', onKU);
+    return () => {
+      window.removeEventListener('keydown', onKD);
+      window.removeEventListener('keyup', onKU);
+    };
+  }, []);
 
   const finalizePolygon = () => {
     if (!polygonDraft || polygonDraft.points.length < 3) return;
@@ -1700,6 +1747,8 @@ export default function PdfViewer({
               onDeletePolygon={(id) => setTakeoff(t => removePolygon(t, id))}
               pageLines={pageLines}
               linesLoading={linesLoading}
+              orthoEnabled={orthoEnabled}
+              modKeysRef={modKeysRef}
             />
           </div>
         </div>
