@@ -7,8 +7,7 @@
  *
  * Naudojam: react-pdf + react-konva.
  *
- * IMPORTANT: PDF.js worker turi būti sukonfigūruotas globally.
- * Šitai daroma vienoj vietoj — žr. main.jsx arba app entry.
+ * PDF.js worker — žr. workerSrc konfigūraciją žemiau (po importų, ~44 eil.).
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -44,6 +43,17 @@ import { fetchPageLines } from '@/lib/pdfLinesApi';
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
 // Set workerSrc here, not in main.jsx — Vite's module-execution order can let
 // later imports overwrite a workerSrc set globally, breaking prod after deploy.
+//
+// Build-time guard: the worker version is the version we ship.
+// If you upgrade react-pdf or pdfjs-dist and the version skews, this throws
+// at module load instead of silently breaking PDFs at runtime.
+if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
+  console.error(
+    `[PdfViewer] pdfjs version drift detected: API=${pdfjs.version}, ` +
+    `but /pdf.worker.mjs is shipped from react-pdf's bundled 4.8.69. ` +
+    `Update vite.config viteStaticCopy src or pin pdfjs-dist to match.`
+  );
+}
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 
 // ── Markup data model ────────────────────────────────────────────────────────
