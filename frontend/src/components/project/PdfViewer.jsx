@@ -38,6 +38,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 // Symbol counting now flows through `detected_symbols_summary` in the main
 // Vision prompt + symbol-driven pozicijų generation in vision_call.py.
 import TraceOverlay from './TraceOverlay';
+import FirstTimePolygonHint from './FirstTimePolygonHint';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { toast } from 'sonner';
@@ -1628,6 +1629,9 @@ export default function PdfViewer({
             setScale(s => Math.max(0.3, Math.min(3, +(s + delta).toFixed(2))));
           }}
         >
+          {/* Phase C-1 Task 13: first-time polygon trace mode hint overlay */}
+          <FirstTimePolygonHint active={tool === 'polygon'} />
+
           <div className="relative inline-block bg-white shadow-2xl">
             <Document
               file={fileUrl}
