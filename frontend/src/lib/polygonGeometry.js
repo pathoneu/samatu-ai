@@ -47,3 +47,47 @@ function segmentsCross(p1, p2, p3, p4) {
 function direction(a, b, c) {
   return (c.x - a.x) * (b.y - a.y) - (b.x - a.x) * (c.y - a.y);
 }
+
+const ORTHO_TOLERANCE_DEG = 15;
+
+/**
+ * Snap cursor to the nearest of [0°, 90°, 180°, 270°] (or 45° increments
+ * when shiftHeld) measured from the previous vertex direction. Returns
+ * a new {x, y}; pass-through when ortho disabled, alt held, or cursor
+ * is outside tolerance from any snap angle.
+ *
+ * @param prev {x,y} — last placed vertex (origin of the rubber band)
+ * @param cursor {x,y} — current pointer position
+ * @param opts {orthoEnabled, shiftHeld, altHeld}
+ * @returns {x,y}
+ */
+export function orthoSnap(prev, cursor, opts) {
+  if (!opts.orthoEnabled || opts.altHeld) return cursor;
+
+  const dx = cursor.x - prev.x;
+  const dy = cursor.y - prev.y;
+  if (dx === 0 && dy === 0) return cursor;
+
+  const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+  const snapAngles = opts.shiftHeld
+    ? [-180, -135, -90, -45, 0, 45, 90, 135, 180]
+    : [-180, -90, 0, 90, 180];
+
+  let nearest = null;
+  let nearestDelta = ORTHO_TOLERANCE_DEG;
+  for (const a of snapAngles) {
+    const d = Math.abs(angleDeg - a);
+    if (d < nearestDelta) {
+      nearestDelta = d;
+      nearest = a;
+    }
+  }
+  if (nearest === null) return cursor;
+
+  const dist = Math.hypot(dx, dy);
+  const rad = nearest * Math.PI / 180;
+  return {
+    x: Math.round(prev.x + dist * Math.cos(rad)),
+    y: Math.round(prev.y + dist * Math.sin(rad)),
+  };
+}

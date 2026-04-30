@@ -29,3 +29,51 @@ test('selfIntersects: shared vertex between adjacent edges is allowed', () => {
   ];
   assert.equal(selfIntersects(square), false);
 });
+
+import { orthoSnap } from './polygonGeometry.js';
+
+test('orthoSnap: cursor near horizontal locks to horizontal', () => {
+  const prev = { x: 0, y: 0 };
+  const cursor = { x: 100, y: 5 };  // 2.86° from horizontal — within 15° tolerance
+  const out = orthoSnap(prev, cursor, { orthoEnabled: true, shiftHeld: false, altHeld: false });
+  assert.equal(out.y, 0);
+  assert.equal(out.x, 100);
+});
+
+test('orthoSnap: cursor far from any axis returns cursor unchanged', () => {
+  const prev = { x: 0, y: 0 };
+  const cursor = { x: 100, y: 100 };  // 45° — outside tolerance for {0, 90}
+  const out = orthoSnap(prev, cursor, { orthoEnabled: true, shiftHeld: false, altHeld: false });
+  assert.deepEqual(out, cursor);
+});
+
+test('orthoSnap: shiftHeld enables 45° increments', () => {
+  const prev = { x: 0, y: 0 };
+  const cursor = { x: 100, y: 100 };
+  const out = orthoSnap(prev, cursor, { orthoEnabled: true, shiftHeld: true, altHeld: false });
+  // Should snap to 45° → x ≈ y ≈ 100
+  assert.ok(Math.abs(out.x - 100) < 1);
+  assert.ok(Math.abs(out.y - 100) < 1);
+});
+
+test('orthoSnap: altHeld disables ortho regardless', () => {
+  const prev = { x: 0, y: 0 };
+  const cursor = { x: 100, y: 5 };
+  const out = orthoSnap(prev, cursor, { orthoEnabled: true, shiftHeld: false, altHeld: true });
+  assert.deepEqual(out, cursor);
+});
+
+test('orthoSnap: orthoEnabled=false passes through', () => {
+  const prev = { x: 0, y: 0 };
+  const cursor = { x: 100, y: 5 };
+  const out = orthoSnap(prev, cursor, { orthoEnabled: false, shiftHeld: false, altHeld: false });
+  assert.deepEqual(out, cursor);
+});
+
+test('orthoSnap: vertical lock', () => {
+  const prev = { x: 50, y: 0 };
+  const cursor = { x: 53, y: 100 };  // ~1.7° from vertical
+  const out = orthoSnap(prev, cursor, { orthoEnabled: true, shiftHeld: false, altHeld: false });
+  assert.equal(out.x, 50);
+  assert.equal(out.y, 100);
+});
