@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { PAGE_TYPE_LABELS, PAGE_TYPE_COLOR } from '@/lib/pageTypes';
 import { Stage, Layer, Rect, Line, Text as KonvaText, Group, Circle } from 'react-konva';
-import Konva from 'konva';
 import {
   loadTakeoff, saveTakeoff,
   setPageScale, applyScaleToAll, getPageScale,
@@ -56,12 +55,6 @@ if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   );
 }
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
-
-// Phase C-1 (2026-04-29): see docs/superpowers/research/2026-04-29-phase-c-libraries.md §4.2.
-// These globals are write-once; turning them off shaves 10-30% draw cost on
-// overlays with no transforms or shadows, which is our case.
-Konva.pixelRatio = 1;
-Konva.autoDrawEnabled = true;
 
 // ── Markup data model ────────────────────────────────────────────────────────
 
@@ -1590,10 +1583,9 @@ export default function PdfViewer({
                 scale={scale}
                 onLoadSuccess={(p) => {
                   // Phase C-1 Task 1: capture PDFPageProxy for unmount cleanup.
-                  // Note: react-pdf passes a wrapped page object; the underlying
-                  // PDFPageProxy with .cleanup() is at p._pageInfo or p itself
-                  // depending on version. We try .cleanup() first, fall back
-                  // gracefully in the unmount effect.
+                  // react-pdf 9.x passes the underlying PDFPageProxy directly
+                  // (extended with width/height shortcuts). Use optional
+                  // chaining defensively in case of future API changes.
                   pageProxyRef.current = p;
                   setPageDims({ width: p.width * scale, height: p.height * scale });
                 }}

@@ -132,21 +132,9 @@ inside the PdfViewer module to avoid Vite's module-execution race in main.jsx."
 **Files:**
 - Modify: `frontend/src/components/project/PdfViewer.jsx` — add cleanup effects and Konva globals
 
-- [ ] **Step 1.1: Set Konva global perf flags at PdfViewer module top**
+- [ ] **Step 1.1: (CORRECTION 2026-04-30) Skip global Konva config**
 
-In `frontend/src/components/project/PdfViewer.jsx`, near the top (after the konva imports around line 25), add:
-
-```javascript
-import Konva from 'konva';
-
-// Phase C-1 (2026-04-29): see docs/superpowers/research/2026-04-29-phase-c-libraries.md §4.2.
-// These globals are write-once; turning them off shaves 10-30% draw cost on
-// overlays with no transforms or shadows, which is our case.
-Konva.pixelRatio = 1;
-Konva.autoDrawEnabled = true;
-```
-
-Then on every Konva `Layer` we own (search for `<Layer` occurrences in PdfViewer.jsx — there should be 1 inside `MarkupCanvas`), set `listening` only on the active-edit layer (Task 12 splits this) and add `transformsEnabled="position"` on shapes that don't rotate/skew.
+Step 1.1 was originally specified to set Konva module-level globals (`pixelRatio`, `autoDrawEnabled`), but on review those flags either don't appear in the cited research or would cause a retina regression on small text labels. The actual research-recommended flags (`perfectDrawEnabled: false`, `transformsEnabled: 'position'`, `shadowForStrokeEnabled: false`) are per-shape/per-Layer, not global, and are correctly in scope for Tasks 12 and 14 where the polygon Konva layer is built. Skipping global Konva config in Task 1; Task 1 reduces to the PDF cleanup wiring (Step 1.3).
 
 - [ ] **Step 1.2: Verify FastLayer is not used**
 
