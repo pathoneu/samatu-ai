@@ -1349,6 +1349,14 @@ export default function PdfViewer({
           });
         }
       }
+      if (e.key === 'Enter') {
+        if (polygonDraft && polygonDraft.points.length >= 3) {
+          e.preventDefault();
+          finalizePolygon();
+        } else if (polygonDraft) {
+          toast?.('Polygonui reikia mažiausiai 3 taškų', { duration: 2000 });
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
