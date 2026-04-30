@@ -39,7 +39,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 // Vision prompt + symbol-driven pozicijų generation in vision_call.py.
 import TraceOverlay from './TraceOverlay';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
-import { orthoSnap } from '@/lib/polygonGeometry';
+import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { toast } from 'sonner';
 
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
@@ -1411,6 +1411,12 @@ export default function PdfViewer({
 
   const finalizePolygon = () => {
     if (!polygonDraft || polygonDraft.points.length < 3) return;
+    // Phase C-1 Task 12: reject self-intersecting polygons (silently break
+    // shoelace area calc otherwise). User can fix via Backspace.
+    if (selfIntersects(polygonDraft.points)) {
+      toast.error('Polygonas susikerta — pataisykite linijas', { duration: 3000 });
+      return;
+    }
     const scale = getPageScale(takeoff, pageNumber);
     const pxPerMeter = scale?.pixels_per_meter || 1;
     const area = polygonAreaM2(polygonDraft.points, pxPerMeter);
