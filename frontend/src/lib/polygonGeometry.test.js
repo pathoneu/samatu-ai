@@ -95,3 +95,34 @@ test('pointInPolygon: on edge is true (consistent with click-to-select)', () => 
   // On the right edge — hitting an edge during click-to-select must register
   assert.equal(pointInPolygon({x:10,y:5}, sq), true);
 });
+
+import { nearestVertex } from './polygonGeometry.js';
+
+test('nearestVertex: snaps to nearest within tolerance', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:5,y:10}] }];
+  const result = nearestVertex({x:1,y:1}, polys, 12);
+  assert.deepEqual(result.point, {x:0,y:0});
+  assert.equal(result.polygonId, 'a');
+});
+
+test('nearestVertex: returns null when no vertex within tolerance', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:5,y:10}] }];
+  const result = nearestVertex({x:50,y:50}, polys, 12);
+  assert.equal(result, null);
+});
+
+test('nearestVertex: skips excludePolygonId (so a polygon does not snap to itself)', () => {
+  const polys = [{ id: 'a', points: [{x:0,y:0},{x:10,y:0},{x:5,y:10}] }];
+  const result = nearestVertex({x:1,y:1}, polys, 12, { excludePolygonId: 'a' });
+  assert.equal(result, null);
+});
+
+test('nearestVertex: returns closest of multiple candidates', () => {
+  const polys = [
+    { id: 'a', points: [{x:0,y:0},{x:10,y:0}] },
+    { id: 'b', points: [{x:5,y:5},{x:15,y:5}] },
+  ];
+  const result = nearestVertex({x:6,y:5}, polys, 12);
+  assert.deepEqual(result.point, {x:5,y:5});
+  assert.equal(result.polygonId, 'b');
+});

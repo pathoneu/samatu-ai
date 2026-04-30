@@ -122,3 +122,29 @@ function pointOnSegment(p, a, b, eps = 1) {
   const maxY = Math.max(a.y, b.y) + eps;
   return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
 }
+
+/**
+ * Find the nearest vertex among polygons within tolerance.
+ *
+ * @param point {x,y}
+ * @param polygons {id, points}[]
+ * @param tolerance px
+ * @param opts {excludePolygonId?: string} — skip vertices belonging to this polygon
+ * @returns {point: {x,y}, polygonId, vertexIndex} | null
+ */
+export function nearestVertex(point, polygons, tolerance, opts = {}) {
+  let best = null;
+  let bestDist = tolerance;
+  for (const poly of polygons) {
+    if (opts.excludePolygonId && poly.id === opts.excludePolygonId) continue;
+    for (let i = 0; i < poly.points.length; i++) {
+      const v = poly.points[i];
+      const d = Math.hypot(v.x - point.x, v.y - point.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { point: { x: v.x, y: v.y }, polygonId: poly.id, vertexIndex: i };
+      }
+    }
+  }
+  return best;
+}
