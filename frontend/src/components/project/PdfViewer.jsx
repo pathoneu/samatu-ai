@@ -1340,6 +1340,15 @@ export default function PdfViewer({
           toast?.('Atšaukta', { duration: 1500 });
         }
       }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (polygonDraft && polygonDraft.points.length > 0) {
+          e.preventDefault();
+          setPolygonDraft({
+            ...polygonDraft,
+            points: polygonDraft.points.slice(0, -1),
+          });
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
