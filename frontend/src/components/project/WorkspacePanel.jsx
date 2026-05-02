@@ -14,7 +14,7 @@ import {
 import { loadTakeoff, removePolygon } from '@/lib/takeoffStore';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
-import PolygonReviewBadge from './PolygonReviewBadge';
+import ConfidenceBadge from './ConfidenceBadge';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -301,7 +301,7 @@ export default function WorkspacePanel({ project, onJumpToPage, onProjectChange 
                     drėgna
                   </span>
                 )}
-                <PolygonReviewBadge
+                <ConfidenceBadge
                   room={r}
                   onClick={(e) => {
                     e?.stopPropagation?.();
