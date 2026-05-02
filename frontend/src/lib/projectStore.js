@@ -375,6 +375,36 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
   return result;
 }
 
+/**
+ * Phase C-2 (2026-05-02): one-click "✓ patvirtinta" — user confirms the
+ * AI's plotas_m2 without tracing a polygon. Sets user_verified_at on the
+ * patalpa; the frontend confidence calculator promotes the badge to 🟢.
+ *
+ * No coordinate-space mess (unlike updateRoomPolygon) because we're not
+ * touching geometry — just a single timestamp.
+ */
+export function markRoomVerified(projectId, roomNr) {
+  const projects = getProjects();
+  const proj = projects.find((p) => p.id === projectId);
+  if (!proj) return;
+  const patalpos = Array.isArray(proj.patalpos) ? [...proj.patalpos] : [];
+  const idx = patalpos.findIndex((r) => String(r.nr) === String(roomNr));
+  if (idx < 0) return;
+  patalpos[idx] = {
+    ...patalpos[idx],
+    user_verified_at: new Date().toISOString(),
+  };
+  updateProject(projectId, { patalpos });
+  // Trigger downstream recompute (matches the pattern from updateRoomPolygon).
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('samatu:project-recompute', {
+        detail: { projectId, reason: 'room-verified', roomNr },
+      }),
+    );
+  }
+}
+
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
 
 export function logCorrection(projectId, payload) {
