@@ -280,6 +280,10 @@ export function purgeExpiredArchive() {
  * Stores polygon in PDF point coordinates (matches polygon_pdf schema in
  * vision_call.py / AiRoomOverlay).
  *
+ * INVARIANT: polygonPoints and pageMeta.pixels_per_meter MUST be in the same
+ * coordinate space (both PDF points OR both canvas pixels). Caller is
+ * responsible for the conversion before invoking this helper.
+ *
  * @param projectId       Project UUID
  * @param roomNr          Room number / id (string or number)
  * @param polygonPoints   [[x, y], ...] in PDF points
@@ -298,13 +302,11 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
   const rooms = Array.isArray(proj.patalpos) ? [...proj.patalpos] : [];
   const roomIdx = rooms.findIndex(r => String(r.nr) === String(roomNr));
 
-  // Compute area in m² via shoelace if scale available. Polygon points are in
-  // PDF coordinates; we convert via pixels_per_meter (which is already on the
-  // canvas-pixel scale in takeoffStore — but PDF points and canvas pixels share
-  // the same physical scale because pageDims = pdfDims * zoomScale and
-  // pixels_per_meter was calibrated in canvas px). To stay coherent, the
-  // caller must pass pixels_per_meter referenced to the same coordinate space
-  // as polygonPoints — i.e. PDF points. We re-derive on the caller side.
+  // Compute area in m² via shoelace if scale available.
+  // NOTE: polygon points are in caller's coordinate space; pixels_per_meter
+  // must be in the same space (see INVARIANT in JSDoc above). The shoelace
+  // result is in (whatever-units)², which we convert to m² by dividing by
+  // pixels_per_meter² in the matching space.
   let plotasM2 = null;
   if (pageMeta?.pixels_per_meter && polygonPoints.length >= 3) {
     let sum = 0;
@@ -313,9 +315,9 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
       const [x2, y2] = polygonPoints[(i + 1) % polygonPoints.length];
       sum += x1 * y2 - x2 * y1;
     }
-    const areaPx = Math.abs(sum) / 2;
+    const areaPolygonUnits = Math.abs(sum) / 2;
     plotasM2 = Math.round(
-      (areaPx / (pageMeta.pixels_per_meter * pageMeta.pixels_per_meter)) * 100,
+      (areaPolygonUnits / (pageMeta.pixels_per_meter * pageMeta.pixels_per_meter)) * 100,
     ) / 100;
   }
 
@@ -337,6 +339,12 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
     rooms[roomIdx] = { ...rooms[roomIdx], ...polygonFields };
   } else {
     // Manual-only room — append. Nr stays as caller-supplied (e.g. "M1").
+    // page_nr and puslapio_nr are semantically the same value here (both
+    // refer to the PDF page index where the polygon was traced) — set BOTH
+    // because WorkspacePanel.onJumpToPage reads puslapio_nr while overlays
+    // read page_nr. eksplikacija_row_bbox is explicitly null for manual
+    // rooms (no eksplikacija row) so downstream branches that null-check
+    // it don't blow up on undefined.
     rooms.push({
       nr: roomNr,
       pavadinimas: roomMeta.pavadinimas || `Patalpa ${roomNr}`,
@@ -344,6 +352,8 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
       lubu_aukstis_mm: roomMeta.lubu_aukstis_m
         ? Math.round(roomMeta.lubu_aukstis_m * 1000)
         : 2820,
+      puslapio_nr: pageMeta?.page_nr,
+      eksplikacija_row_bbox: null,
       ...polygonFields,
     });
   }

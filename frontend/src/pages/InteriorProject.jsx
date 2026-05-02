@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
@@ -21,7 +21,7 @@ import ExportDropdown from '@/components/project/ExportDropdown';
 import ShareButton from '@/components/project/ShareButton';
 import RulesOverridePanel from '@/components/project/RulesOverridePanel';
 import { getPdfUrl } from '@/lib/pdfStore';
-import { updateProject } from '@/lib/projectStore';
+import { updateProject, getProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
 import { toast } from 'sonner';
 
@@ -608,7 +608,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   // deterministiškai perskaičiuoja darbu_sarasas + santrauką. Be Vision call'o.
   // Sub-second roundtrip. Pataisymas neperšviečia kitų laukų — vartotojas
   // niekada nepradeda nuo nulio.
-  const handleRoomsChange = async (newRooms) => {
+  // Phase C-1 Task 21: wrapped in useCallback so the samatu:project-recompute
+  // listener (below) gets a stable reference and re-binds only when project
+  // identity / overrides change, not on every render.
+  const handleRoomsChange = useCallback(async (newRooms) => {
     if (!Array.isArray(newRooms)) return;
     setIsRecomputing(true);
     try {
@@ -665,7 +668,25 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
     } finally {
       setIsRecomputing(false);
     }
-  };
+  }, [project, setProject]);
+
+  // Phase C-1 Task 21 (closes review feedback): listen for the
+  // samatu:project-recompute event dispatched by projectStore.updateRoomPolygon
+  // after a manual polygon commit. Without this listener the event fired into
+  // the void and downstream darbu_sarasas / kiekiai kept stale plotas_m2.
+  // We re-read patalpos from storage (updateRoomPolygon already wrote them)
+  // and route them through handleRoomsChange so /recompute-interior reruns.
+  useEffect(() => {
+    const onRecompute = (e) => {
+      if (!e?.detail || e.detail.projectId !== project.id) return;
+      const fresh = getProject(project.id);
+      if (fresh?.patalpos) {
+        handleRoomsChange(fresh.patalpos);
+      }
+    };
+    window.addEventListener('samatu:project-recompute', onRecompute);
+    return () => window.removeEventListener('samatu:project-recompute', onRecompute);
+  }, [project.id, handleRoomsChange]);
 
   // Compute totals for ProjectTopBar (mirrors ProjectMainView's logic)
   const totalNet = (project.darbu_sarasas || []).reduce(
