@@ -2034,19 +2034,19 @@ export default function PdfViewer({
       {/* Sprint H3 (2026-04-29): bottom status bar — ALWAYS visible.
           Shows current tool, scale, and contextual keyboard hint so
           fresh users discover shortcuts and know what mode they're in. */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-card border-t border-border text-[11px] text-muted-foreground">
-        <div className="flex items-center gap-3">
-          {/* Always-visible: current tool */}
+      <div className="flex items-center justify-between px-3 py-1 bg-card border-t border-border text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2">
+          {/* — Cluster 1: status (tool + scale) — */}
           <span>
             Įrankis: <strong className="text-foreground font-medium">{
               { select: 'Žymėjimas', polygon: 'Polygon', scale: 'Mastelis',
                 comment: 'Komentaras', erase: 'Trinti' }[tool] || tool
             }</strong>
           </span>
-          {/* Always-visible: page scale (mastelis) */}
+          <span className="text-border">·</span>
           {currentScale ? (
             <span>
-              Mastelis: <strong className="text-foreground font-medium">
+              Mastelis: <strong className="text-foreground font-medium tabular-nums">
                 {currentScale.pixels_per_meter.toFixed(0)} px/m
               </strong>
               {currentScale.source === 'inherited' && (
@@ -2058,47 +2058,66 @@ export default function PdfViewer({
               Mastelis nenustatytas · naudok „Pažangu" → liniuotė
             </span>
           )}
-          {/* Always-visible: keyboard hint */}
-          <span className="text-[10px] text-muted-foreground hidden md:inline">
-            <kbd className="px-1 rounded bg-muted">F</kbd> pritaikyti
-            {' · '}<kbd className="px-1 rounded bg-muted">+</kbd>/<kbd className="px-1 rounded bg-muted">−</kbd> mastelis
-            {' · '}<kbd className="px-1 rounded bg-muted">[</kbd>/<kbd className="px-1 rounded bg-muted">]</kbd> psl
-            {' · '}<kbd className="px-1 rounded bg-muted">Esc</kbd> grįžti
-          </span>
-          {showAdvanced && (
+
+          {/* — Cluster 2: counts (advanced only) — */}
+          {showAdvanced && (markups.length > 0 || (takeoff.polygons || []).length > 0) && (
             <>
-              <span>Žymėjimai: <strong className="text-foreground font-medium">{markups.length}</strong></span>
+              <span className="text-border">·</span>
+              {markups.length > 0 && (
+                <span>Žymėjimai: <strong className="text-foreground font-medium tabular-nums">{markups.length}</strong></span>
+              )}
               {(takeoff.polygons || []).length > 0 && (
-                <span>Zonos: <strong className="text-foreground font-medium">{(takeoff.polygons || []).length}</strong></span>
+                <span>Zonos: <strong className="text-foreground font-medium tabular-nums">{(takeoff.polygons || []).length}</strong></span>
               )}
             </>
           )}
+
+          {/* — Cluster 3: contextual tool hint (highlighted) — */}
           {tool === 'scale' && (
-            <span className="text-red-600">
-              {!calibPoints.p1
-                ? 'Spauskite pradžios tašką brėžinyje'
-                : !calibPoints.p2
-                  ? 'Spauskite pabaigos tašką'
-                  : 'Įveskite atstumą'}
-            </span>
+            <>
+              <span className="text-border">·</span>
+              <span className="text-red-600">
+                {!calibPoints.p1
+                  ? 'Spauskite pradžios tašką brėžinyje'
+                  : !calibPoints.p2
+                    ? 'Spauskite pabaigos tašką'
+                    : 'Įveskite atstumą'}
+              </span>
+            </>
           )}
           {tool === 'polygon' && (
-            <span className="text-emerald-700">
-              {!polygonDraft
-                ? 'Spauskite kambario kampus (Esc atšaukti)'
-                : polygonDraft.points.length < 3
-                  ? `${polygonDraft.points.length}/3 taškai. Spauskite daugiau (Backspace = ištrinti paskutinį)`
-                  : `${polygonDraft.points.length} taškai. Enter = baigti, arba spauskite ant pirmo taško`}
-            </span>
+            <>
+              <span className="text-border">·</span>
+              <span className="text-emerald-700">
+                {!polygonDraft
+                  ? 'Spauskite kambario kampus (Esc atšaukti)'
+                  : polygonDraft.points.length < 3
+                    ? `${polygonDraft.points.length}/3 taškai · Spauskite daugiau · Backspace ištrina paskutinį`
+                    : `${polygonDraft.points.length} taškai · Enter baigti · arba spauskite pirmą tašką`}
+              </span>
+            </>
           )}
         </div>
-        {markups.length > 0 && (
-          <button onClick={handleClearAll}
-            className="text-red-600 hover:text-red-700 flex items-center gap-1">
-            <Trash2 className="w-3 h-3" />
-            Ištrinti viską
-          </button>
-        )}
+
+        {/* — Right side: keyboard hints + danger action — */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-muted-foreground hidden lg:inline-flex items-center gap-1">
+            <kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">F</kbd> pritaikyti
+            <span className="text-border mx-0.5">·</span>
+            <kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">+</kbd>/<kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">−</kbd> mastelis
+            <span className="text-border mx-0.5">·</span>
+            <kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">[</kbd>/<kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">]</kbd> psl
+            <span className="text-border mx-0.5">·</span>
+            <kbd className="px-1 py-px rounded bg-muted text-foreground/80 text-[9px]">Esc</kbd> grįžti
+          </span>
+          {markups.length > 0 && (
+            <button onClick={handleClearAll}
+              className="text-red-600 hover:text-red-700 flex items-center gap-1 transition-colors">
+              <Trash2 className="w-3 h-3" />
+              Ištrinti viską
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Scale calibration modal — atsiranda kai 2 taškai pažymėti */}
