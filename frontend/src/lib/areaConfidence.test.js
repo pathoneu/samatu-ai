@@ -72,6 +72,17 @@ test('computeAreaConfidence: room with no plotas_m2 → unknown', () => {
   assert.equal(r.confidence, 'unknown');
 });
 
+test('computeAreaConfidence: legacy room with plotas_m2 but no plotas_source → backfilled as eksplikacija medium', () => {
+  // Simulates a project extracted before Phase C-2 Task 2 landed. The backend
+  // didn't tag plotas_source on these, but pdfplumber eksplikacija was the
+  // dominant historical path. Backfill in collectSources keeps the badge from
+  // hiding (would otherwise return 'unknown').
+  const room = { nr: '08', plotas_m2: 7.36, pavadinimas: 'Tambūras' };
+  const r = computeAreaConfidence(room);
+  assert.equal(r.confidence, 'medium');
+  assert.equal(r.primarySource, 'eksplikacija');
+});
+
 test('AREA_AGREEMENT_TOLERANCE_PCT is 5%', () => {
   // Spec §3.2.1 specifies ±2% in the "high" path, but allow up to ±5% for "agreement"
   // because hand-drawn polygons trace edges with imprecision. The badge stays "high"

@@ -126,6 +126,14 @@ function collectSources(room) {
   if (room.plotas_source === 'vision' && room.plotas_m2 != null) {
     out.push({ type: 'vision', value: room.plotas_m2, label: SOURCE_LABEL_LT.vision });
   }
+  // Phase C-2 backfill: projects extracted before the plotas_source audit (Task 2)
+  // landed have plotas_m2 but no plotas_source flag. pdfplumber eksplikacija HIT
+  // is the dominant historical path (deterministic, $0 cost, runs first), so we
+  // treat missing-source-with-area as legacy eksplikacija. New extractions get
+  // the explicit flag from the backend; this only affects pre-2026-05-02 data.
+  if (out.length === 0 && room.plotas_m2 != null && !room.plotas_source) {
+    out.push({ type: 'eksplikacija', value: room.plotas_m2, label: SOURCE_LABEL_LT.eksplikacija });
+  }
   return out;
 }
 
