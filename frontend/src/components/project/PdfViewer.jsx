@@ -41,6 +41,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 import TraceOverlay from './TraceOverlay';
 import FirstTimePolygonHint from './FirstTimePolygonHint';
 import TraceModeBanner from './TraceModeBanner';
+import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { updateRoomPolygon } from '@/lib/projectStore';
@@ -396,9 +397,17 @@ function LayersDropdown({ layers, setLayers }) {
 // always knows what mode they're in.
 
 function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
+  // Phase C-1 Task 24: Polygon editing is desktop-only. Suppress the polygon
+  // tool button on coarse-pointer (touch) devices so mobile users cannot
+  // enter trace mode. Mobile editing is Phase D.
+  const isCoarse = typeof window !== 'undefined'
+    && window.matchMedia?.('(pointer: coarse)').matches;
+
   const TOOLS = [
     { id: 'select',  Icon: MousePointer2, label: 'Pasirinkti',         hint: 'Pasirinkti / pan (Esc)' },
-    { id: 'polygon', Icon: PenTool,       label: 'Polygon (zona)',     hint: 'Brūkšnioti zoną — Enter užbaigti, Backspace anuliuoti tašką' },
+    ...(isCoarse ? [] : [
+      { id: 'polygon', Icon: PenTool,     label: 'Polygon (zona)',     hint: 'Brūkšnioti zoną — Enter užbaigti, Backspace anuliuoti tašką' },
+    ]),
     { id: 'scale',   Icon: Ruler,         label: 'Mastelis',           hint: 'Nustatyti mastelį — paspausk 2 taškus brėžinyje, įrašyk metrų atstumą' },
     { id: 'comment', Icon: MessageSquare, label: 'Komentaras',         hint: 'Pridėti komentaro žymą' },
     { id: 'erase',   Icon: Eraser,        label: 'Trinti',             hint: 'Ištrinti spustelėtą žymėjimą' },
@@ -1877,6 +1886,9 @@ export default function PdfViewer({
             polygonDraft={polygonDraft}
             orthoEnabled={orthoEnabled}
           />
+
+          {/* Phase C-1 Task 24: coarse-pointer (touch) view-only banner */}
+          <MobileViewOnlyBanner />
 
           <div className="relative inline-block bg-white shadow-2xl">
             <Document
