@@ -265,6 +265,92 @@ export function purgeExpiredArchive() {
   return expired.length;
 }
 
+// ── Phase C-1 (2026-04-29): manual polygon → room.polygon_pdf bridge ─────────
+//
+// When the user manually traces a polygon over a room in the Phase C-1
+// editor, mirror it onto the project's patalpos[].polygon_pdf field so the
+// existing AiRoomOverlay/TraceOverlay renderers (already polygon-aware) pick
+// it up automatically and so interiorCalc has a precise plotas_m2 to work
+// from. If a patalpa with the given nr doesn't exist yet, append a new one
+// (manual-traced rooms with synthetic nrs like M1/M2 from the polygon editor).
+
+/**
+ * Write a manually-traced polygon onto a room.
+ *
+ * Stores polygon in PDF point coordinates (matches polygon_pdf schema in
+ * vision_call.py / AiRoomOverlay).
+ *
+ * @param projectId       Project UUID
+ * @param roomNr          Room number / id (string or number)
+ * @param polygonPoints   [[x, y], ...] in PDF points
+ * @param pageMeta        { page_nr, page_width_pdf, page_height_pdf,
+ *                          pixels_per_meter? }
+ * @param roomMeta        Optional metadata for newly-appended patalpa
+ *                        ({ pavadinimas, paskirtis, lubu_aukstis_m })
+ */
+export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, roomMeta = {}) {
+  const projects = getProjects();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj) return null;
+
+  // Project shape is FLAT (verified 2026-04-29) — patalpos is at top-level,
+  // not nested under proj.data.
+  const rooms = Array.isArray(proj.patalpos) ? [...proj.patalpos] : [];
+  const roomIdx = rooms.findIndex(r => String(r.nr) === String(roomNr));
+
+  // Compute area in m² via shoelace if scale available. Polygon points are in
+  // PDF coordinates; we convert via pixels_per_meter (which is already on the
+  // canvas-pixel scale in takeoffStore — but PDF points and canvas pixels share
+  // the same physical scale because pageDims = pdfDims * zoomScale and
+  // pixels_per_meter was calibrated in canvas px). To stay coherent, the
+  // caller must pass pixels_per_meter referenced to the same coordinate space
+  // as polygonPoints — i.e. PDF points. We re-derive on the caller side.
+  let plotasM2 = null;
+  if (pageMeta?.pixels_per_meter && polygonPoints.length >= 3) {
+    let sum = 0;
+    for (let i = 0; i < polygonPoints.length; i++) {
+      const [x1, y1] = polygonPoints[i];
+      const [x2, y2] = polygonPoints[(i + 1) % polygonPoints.length];
+      sum += x1 * y2 - x2 * y1;
+    }
+    const areaPx = Math.abs(sum) / 2;
+    plotasM2 = Math.round(
+      (areaPx / (pageMeta.pixels_per_meter * pageMeta.pixels_per_meter)) * 100,
+    ) / 100;
+  }
+
+  const polygonFields = {
+    polygon_pdf: polygonPoints,
+    page_width_pdf: pageMeta?.page_width_pdf,
+    page_height_pdf: pageMeta?.page_height_pdf,
+    page_nr: pageMeta?.page_nr,
+    polygon_source: 'manual',
+    polygon_confidence: 'high',
+    polygon_traced_at: new Date().toISOString(),
+    ...(plotasM2 != null && {
+      plotas_m2: plotasM2,
+      plotas_source: 'manual_polygon',
+    }),
+  };
+
+  if (roomIdx >= 0) {
+    rooms[roomIdx] = { ...rooms[roomIdx], ...polygonFields };
+  } else {
+    // Manual-only room — append. Nr stays as caller-supplied (e.g. "M1").
+    rooms.push({
+      nr: roomNr,
+      pavadinimas: roomMeta.pavadinimas || `Patalpa ${roomNr}`,
+      paskirtis: roomMeta.paskirtis || 'gyvenamoji',
+      lubu_aukstis_mm: roomMeta.lubu_aukstis_m
+        ? Math.round(roomMeta.lubu_aukstis_m * 1000)
+        : 2820,
+      ...polygonFields,
+    });
+  }
+
+  return updateProject(projectId, { patalpos: rooms });
+}
+
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
 
 export function logCorrection(projectId, payload) {

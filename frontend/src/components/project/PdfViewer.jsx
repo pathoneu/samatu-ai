@@ -42,6 +42,7 @@ import TraceOverlay from './TraceOverlay';
 import FirstTimePolygonHint from './FirstTimePolygonHint';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
+import { updateRoomPolygon } from '@/lib/projectStore';
 import { toast } from 'sonner';
 
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
@@ -1649,6 +1650,31 @@ export default function PdfViewer({
       perimeter_m: pendingPolygon.perimeter_m,
       source: 'manual',
     }));
+
+    // Phase C-1 Task 20: mirror polygon to project.patalpos[].polygon_pdf so
+    // AiRoomOverlay (PDF-coord polygon renderer) and interiorCalc see it.
+    // Convert canvas px → PDF points via the unscaled PDFPageProxy dims.
+    // pageDims.width = pdfWidth * zoomScale, so pdf_x = canvas_x / zoomScale,
+    // equivalently pdf_x = canvas_x * (pdfWidth / pageDims.width).
+    const pdfWidth = pageProxyRef.current?.width;
+    const pdfHeight = pageProxyRef.current?.height;
+    if (pdfWidth && pdfHeight && projectId && pendingPolygon.pxPerMeter) {
+      const scaleX = pdfWidth / pageDims.width;
+      const scaleY = pdfHeight / pageDims.height;
+      const polygonPdf = pendingPolygon.points.map(p => [p.x * scaleX, p.y * scaleY]);
+      // Re-express pixels_per_meter into PDF-point space: takeoff calibration
+      // is in canvas px, so dividing by zoomScale (= pageDims.width / pdfWidth)
+      // gives pixels_per_meter in PDF points.
+      const ppmCanvas = pendingPolygon.pxPerMeter;
+      const ppmPdf = ppmCanvas * scaleX;  // canvas-px-per-meter * (pdf/canvas) = pdf-pt-per-meter
+      updateRoomPolygon(projectId, newRoomNr, polygonPdf, {
+        page_nr: pendingPolygon.page,
+        page_width_pdf: pdfWidth,
+        page_height_pdf: pdfHeight,
+        pixels_per_meter: ppmPdf,
+      }, { pavadinimas: label, paskirtis, lubu_aukstis_m });
+    }
+
     setPendingPolygon(null);
   };
 
