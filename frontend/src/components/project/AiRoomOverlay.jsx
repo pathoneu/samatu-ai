@@ -51,10 +51,14 @@ export default function AiRoomOverlay({
 }) {
   if (!rooms || rooms.length === 0) return null;
 
-  // Filtruojam patalpas tik šiam puslapiui (palaikom V9 polygon_pdf + V8 bbox_pct)
+  // Filtruojam patalpas tik šiam puslapiui.
   const pageRooms = rooms.filter(r => {
     const pageNr = r.page_nr || r.puslapio_nr || r.page || 1;
-    return pageNr === page && (r.polygon_pdf || r.bbox_pct);
+    // Phase C-2 (2026-05-02): only render rooms with a real polygon. The
+    // legacy bbox_pct rectangles flashed in wrong locations and have been
+    // dropped from the overlay. Eksplikacija numbers printed on the drawing
+    // handle the visual "where" question for free.
+    return pageNr === page && Array.isArray(r.polygon_pdf) && r.polygon_pdf.length >= 3;
   });
 
   if (pageRooms.length === 0) return null;
@@ -137,27 +141,8 @@ export default function AiRoomOverlay({
             }
           }
 
-          // V8 fallback: bbox_pct (rectangle)
-          if (!shape && room.bbox_pct) {
-            const bb = room.bbox_pct;
-            if (!bb || bb.w <= 0 || bb.h <= 0) return null;
-            const x = bb.x * width;
-            const y = flipY ? (1 - bb.y - bb.h) * height : bb.y * height;
-            const w = bb.w * width;
-            const h = bb.h * height;
-            cx = x + w / 2;
-            cy = y + h / 2;
-            shape = (
-              <Rect
-                x={x} y={y} width={w} height={h}
-                fill={`${color}${fillAlpha}`}
-                stroke={color}
-                strokeWidth={strokeW}
-                cornerRadius={2}
-                listening={true}
-              />
-            );
-          }
+          // Phase C-2 (2026-05-02): bbox_pct rendering removed. Only polygon_pdf
+          // rooms reach this point per the filter above.
 
           if (!shape) return null;
 
