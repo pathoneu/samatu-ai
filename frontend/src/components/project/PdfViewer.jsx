@@ -114,34 +114,34 @@ function ToolBar({
   layers, setLayers,
 }) {
   return (
-    <div className="flex items-center gap-1 px-3 py-2 bg-stone-900 border-b border-stone-700 text-white">
+    <div className="flex items-center gap-1.5 px-3 py-2 bg-card border-b border-border text-foreground">
       {/* — Pagrindiniai įrankiai (visada matomi) — */}
 
       {/* Puslapio navigacija. Sprint H4: tooltips + keyboard hints. */}
       <button onClick={() => setPage(Math.max(1, page - 1))}
         disabled={page <= 1}
         title="Ankstesnis puslapis (klavišas [ )"
-        className="p-1.5 hover:bg-stone-700 rounded disabled:opacity-30">
+        className="p-1.5 hover:bg-muted rounded disabled:opacity-30">
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <span className="text-xs text-stone-300 mx-2 tabular-nums">
+      <span className="text-xs text-muted-foreground mx-1 tabular-nums">
         {page} / {totalPages || '—'}
       </span>
       <button onClick={() => setPage(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
         title="Kitas puslapis (klavišas ] )"
-        className="p-1.5 hover:bg-stone-700 rounded disabled:opacity-30">
+        className="p-1.5 hover:bg-muted rounded disabled:opacity-30">
         <ChevronRight className="w-4 h-4" />
       </button>
 
-      <div className="w-px h-5 bg-stone-700 mx-2" />
+      <div className="w-px h-5 bg-border mx-1.5" />
 
       {/* Mastelio keitimas. Sprint H5 (2026-04-29): preset dropdown vietoj
           plain procento span'o. Visi pasirinkimai grąžina exact mastelio
           reikšmę kad nebūtų kumuliacinio drift'o. */}
       <button onClick={() => setScale(s => Math.max(0.3, +(s - 0.2).toFixed(2)))}
         title="Mažinti (klavišas −)"
-        className="p-1.5 hover:bg-stone-700 rounded">
+        className="p-1.5 hover:bg-muted rounded">
         <ZoomOut className="w-4 h-4" />
       </button>
       <select
@@ -158,7 +158,7 @@ function ToolBar({
           else setScale(parseInt(v, 10) / 100);
         }}
         title="Mastelio pasirinkimas"
-        className="text-xs tabular-nums bg-stone-800 border border-stone-700 hover:bg-stone-700 rounded px-1 py-0.5 cursor-pointer outline-none focus:border-stone-500"
+        className="text-xs tabular-nums bg-muted/40 border border-border hover:bg-muted rounded px-1 py-0.5 cursor-pointer outline-none focus:border-muted-foreground/30 text-foreground"
         style={{ minWidth: 76 }}
       >
         {/* Show current as a synthetic option when scale not in preset list */}
@@ -176,69 +176,69 @@ function ToolBar({
       </select>
       <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))}
         title="Didinti (klavišas +)"
-        className="p-1.5 hover:bg-stone-700 rounded">
+        className="p-1.5 hover:bg-muted rounded">
         <ZoomIn className="w-4 h-4" />
       </button>
       <button onClick={() => setScale(1)}
         title="100% (klavišas 0)"
-        className="p-1.5 hover:bg-stone-700 rounded">
+        className="p-1.5 hover:bg-muted rounded">
         <Maximize2 className="w-4 h-4" />
       </button>
 
       {showAdvanced && (
         <>
-          <div className="w-px h-5 bg-stone-700 mx-2" />
+          <div className="w-px h-5 bg-border mx-1.5" />
 
           {/* Mastelio kalibracija */}
           <button onClick={() => setTool(tool === 'scale' ? 'select' : 'scale')}
-            className={`p-1.5 rounded flex items-center gap-1 ${tool === 'scale' ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-700'}`}
+            className={`p-1.5 rounded flex items-center gap-1 ${tool === 'scale' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Nustatyti mastelį (paspaudus 2 taškus brėžinyje)">
             <Ruler className="w-4 h-4" />
             {pageScaleInfo
               ? <span className="text-[10px] font-mono tabular-nums">
                   {(pageScaleInfo.pixels_per_meter).toFixed(0)} px/m
                 </span>
-              : <span className="text-[10px] text-amber-400">nenustatyta</span>
+              : <span className="text-[10px] text-amber-600">nenustatyta</span>
             }
           </button>
 
-          <div className="w-px h-5 bg-stone-700 mx-2" />
+          <div className="w-px h-5 bg-border mx-1.5" />
 
           {/* Žymėjimo įrankiai */}
           <button onClick={() => setTool('select')}
-            className={`p-1.5 rounded ${tool === 'select' ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-700'}`}
+            className={`p-1.5 rounded ${tool === 'select' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Pasirinkti / žymėti zoną (klavišas Esc — grįžta į pasirinkimą)">
             <Pencil className="w-4 h-4" />
           </button>
           <button onClick={() => setTool('comment')}
-            className={`p-1.5 rounded ${tool === 'comment' ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-700'}`}
+            className={`p-1.5 rounded ${tool === 'comment' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Pridėti komentarą">
             <MessageSquare className="w-4 h-4" />
           </button>
           <button onClick={() => setTool('erase')}
-            className={`p-1.5 rounded ${tool === 'erase' ? 'bg-red-600' : 'hover:bg-stone-700'}`}
+            className={`p-1.5 rounded ${tool === 'erase' ? 'bg-red-600 text-white' : 'hover:bg-muted'}`}
             title="Ištrinti žymėjimą">
             <Eraser className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-stone-700 mx-2" />
+          <div className="w-px h-5 bg-border mx-1.5" />
 
           {/* Atšaukti / pakartoti */}
           <button onClick={onUndo} disabled={!undoOk}
-            className="p-1.5 hover:bg-stone-700 rounded disabled:opacity-30"
+            className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
             title="Atšaukti (Cmd+Z)">
             <Undo2 className="w-4 h-4" />
           </button>
           <button onClick={onRedo} disabled={!redoOk}
-            className="p-1.5 hover:bg-stone-700 rounded disabled:opacity-30"
+            className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
             title="Pakartoti (Cmd+Shift+Z)">
             <Redo2 className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-stone-700 mx-2" />
+          <div className="w-px h-5 bg-border mx-1.5" />
 
           <button onClick={() => setShowMarkups(v => !v)}
-            className={`p-1.5 rounded ${showMarkups ? 'hover:bg-stone-700' : 'bg-stone-700'}`}
+            className={`p-1.5 rounded ${showMarkups ? 'hover:bg-muted' : 'bg-muted'}`}
             title={showMarkups ? 'Slėpti žymėjimus' : 'Rodyti žymėjimus'}>
             {showMarkups ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </button>
@@ -255,7 +255,7 @@ function ToolBar({
       <button
         onClick={() => setShowAdvanced(v => !v)}
         className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] ${
-          showAdvanced ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-700 text-stone-300'
+          showAdvanced ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
         }`}
         title={showAdvanced ? 'Slėpti pažangiuosius įrankius' : 'Pažangu — mastelis, žymėjimas, atšaukti'}>
         <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -269,8 +269,8 @@ function ToolBar({
           onClick={() => setPage(eksplikacija_source_page)}
           className={`ml-1 inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border ${
             page === eksplikacija_source_page
-              ? 'border-emerald-400 bg-emerald-500/20 text-emerald-200'
-              : 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'
+              ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700'
+              : 'border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10'
           }`}
           title={page === eksplikacija_source_page
             ? 'Tu jau esi eksplikacijos puslapyje'
@@ -344,7 +344,7 @@ function LayersDropdown({ layers, setLayers }) {
         onClick={() => setOpen(v => !v)}
         title={`Sluoksniai (${visibleCount} iš ${totalCount} matomi)`}
         className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] ${
-          open ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-700 text-stone-300'
+          open ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
         }`}
       >
         <Layers className="w-3.5 h-3.5" />
@@ -414,7 +414,7 @@ function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
   ];
 
   return (
-    <div className="w-12 shrink-0 bg-stone-900 border-r border-stone-700 flex flex-col items-stretch py-1.5">
+    <div className="w-12 shrink-0 bg-card border-r border-border flex flex-col items-stretch py-1.5">
       {TOOLS.map(t => {
         const active = tool === t.id;
         return (
@@ -424,14 +424,14 @@ function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
             title={`${t.label} — ${t.hint}`}
             className={`relative mx-1 my-0.5 p-2 rounded transition-colors flex items-center justify-center ${
               active
-                ? 'bg-stone-100 text-stone-900'
-                : 'text-stone-400 hover:bg-stone-800 hover:text-stone-100'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
             <t.Icon className="w-4 h-4" />
             {active && (
               <span
-                className="absolute left-0 top-1 bottom-1 w-0.5 bg-stone-100 rounded-r"
+                className="absolute left-0 top-1 bottom-1 w-0.5 bg-primary-foreground rounded-r"
                 aria-hidden
               />
             )}
@@ -447,8 +447,8 @@ function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
         title={showAdvanced ? 'Slėpti pažangiuosius įrankius' : 'Rodyti pažangiuosius įrankius (žymėjimo + atšaukimo mygtukai)'}
         className={`mx-1 my-0.5 p-2 rounded transition-colors flex items-center justify-center ${
           showAdvanced
-            ? 'bg-stone-100 text-stone-900'
-            : 'text-stone-400 hover:bg-stone-800 hover:text-stone-100'
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
       >
         <SlidersHorizontal className="w-4 h-4" />
@@ -528,10 +528,10 @@ function EksplikacijaRowOverlay({ width, height, room, page, eksplikacijaPage })
 function PdfSkeleton({ width = 600, height = 800, label = 'Krauname brėžinį…' }) {
   return (
     <div
-      className="relative overflow-hidden bg-stone-100 rounded"
+      className="relative overflow-hidden bg-muted/30 rounded"
       style={{ width, height }}
     >
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-stone-400 text-xs gap-2">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs gap-2">
         <svg className="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.25" />
           <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -584,7 +584,7 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
 
   const color = meta?.type ? PAGE_TYPE_COLOR[meta.type] : '#78716c';
   const typeLabel = meta?.type ? PAGE_TYPE_LABELS[meta.type] : null;
-  const dotClass = CONFIDENCE_DOT[meta?.confidence] || 'bg-stone-500';
+  const dotClass = CONFIDENCE_DOT[meta?.confidence] || 'bg-muted-foreground';
   const tooltip = meta
     ? `${typeLabel || 'Nežinomas'}${
         meta.label && meta.label !== typeLabel ? ` — ${meta.label}` : ''
@@ -599,7 +599,7 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
       onClick={() => setPage(pageNr)}
       title={tooltip}
       className={`w-full p-1 rounded border-2 transition-colors text-left ${
-        isActive ? 'border-amber-500' : 'border-stone-700 hover:border-stone-500'
+        isActive ? 'border-primary' : 'border-border hover:border-primary/40'
       }`}
     >
       <div
@@ -613,19 +613,19 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
             renderTextLayer={false}
             renderAnnotationLayer={false}
             loading={
-              <div className="flex items-center justify-center h-[180px] text-stone-400 text-[11px]">
+              <div className="flex items-center justify-center h-[180px] text-muted-foreground text-[11px]">
                 #{pageNr}
               </div>
             }
           />
         ) : (
-          <div className="flex items-center justify-center h-[180px] text-stone-300 text-[11px]">
+          <div className="flex items-center justify-center h-[180px] text-muted-foreground text-[11px]">
             #{pageNr}
           </div>
         )}
         {meta?.confidence && (
           <span
-            className={`absolute top-1 right-1 w-2 h-2 rounded-full ring-1 ring-white/80 ${dotClass}`}
+            className={`absolute top-1 right-1 w-2 h-2 rounded-full ring-1 ring-card ${dotClass}`}
             title={`Pasitikėjimas: ${CONFIDENCE_LABEL[meta.confidence] || meta.confidence}`}
           />
         )}
@@ -636,14 +636,14 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
           style={{ background: color }}
         />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-stone-200 font-semibold leading-tight">
+          <div className="text-[11px] text-foreground font-semibold leading-tight">
             Psl. {pageNr}
             {typeLabel && (
-              <span className="font-normal text-stone-300"> · {typeLabel}</span>
+              <span className="font-normal text-muted-foreground"> · {typeLabel}</span>
             )}
           </div>
           {meta?.label && meta.label !== typeLabel && (
-            <div className="text-[10px] text-stone-400 truncate leading-tight">
+            <div className="text-[10px] text-muted-foreground truncate leading-tight">
               {meta.label}
             </div>
           )}
@@ -675,11 +675,11 @@ function PageThumbnails({ totalPages, currentPage, setPage, pageMeta, fileUrl, m
 
   if (collapsed) {
     return (
-      <div className="w-10 shrink-0 bg-stone-900 border-r border-stone-700 overflow-y-auto flex flex-col items-stretch">
+      <div className="w-10 shrink-0 bg-card border-r border-border overflow-y-auto flex flex-col items-stretch">
         <button
           onClick={toggle}
           title="Išplėsti puslapių miniatiūras"
-          className="text-stone-400 hover:bg-stone-700 hover:text-stone-100 py-1.5 border-b border-stone-700"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground py-1.5 border-b border-border"
         >
           <ChevronRight className="w-4 h-4 mx-auto" />
         </button>
@@ -690,8 +690,8 @@ function PageThumbnails({ totalPages, currentPage, setPage, pageMeta, fileUrl, m
               key={p}
               onClick={() => setPage(p)}
               title={`Puslapis ${p}`}
-              className={`text-[10px] tabular-nums py-1.5 border-b border-stone-800 transition-colors ${
-                isActive ? 'bg-stone-100 text-stone-900 font-semibold' : 'text-stone-400 hover:bg-stone-700'
+              className={`text-[10px] tabular-nums py-1.5 border-b border-border/60 transition-colors ${
+                isActive ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               {p}
@@ -703,11 +703,11 @@ function PageThumbnails({ totalPages, currentPage, setPage, pageMeta, fileUrl, m
   }
 
   return (
-    <div className="w-40 shrink-0 bg-stone-900 border-r border-stone-700 overflow-y-auto p-2 space-y-2 relative">
+    <div className="w-40 shrink-0 bg-card border-r border-border overflow-y-auto p-2 space-y-2 relative">
       <button
         onClick={toggle}
         title="Suskleisti miniatiūras"
-        className="absolute top-1 right-1 z-10 p-1 text-stone-400 hover:bg-stone-700 hover:text-stone-100 rounded"
+        className="absolute top-1 right-1 z-10 p-1 text-muted-foreground hover:bg-muted hover:text-foreground rounded"
       >
         <ChevronLeft className="w-3 h-3" />
       </button>
@@ -1793,14 +1793,14 @@ export default function PdfViewer({
 
   if (!fileUrl) {
     return (
-      <div className="flex items-center justify-center h-full bg-stone-100 text-stone-500 p-8">
+      <div className="flex items-center justify-center h-full bg-muted/30 text-muted-foreground p-8">
         <p>PDF brėžinys nepateiktas</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-stone-950">
+    <div className="flex flex-col h-full bg-background">
       <ToolBar
         tool={tool} setTool={setTool}
         scale={scale} setScale={setScale}
@@ -1838,7 +1838,7 @@ export default function PdfViewer({
 
         <div
           ref={containerRef}
-          className="flex-1 overflow-auto bg-stone-800 p-4 flex items-center justify-center relative"
+          className="flex-1 overflow-auto bg-muted/40 p-4 flex items-center justify-center relative"
           style={{
             // Default cursor = grab (drag-to-pan when no markup tool active)
             cursor: tool === 'select' ? 'grab' : 'default',
@@ -2032,11 +2032,11 @@ export default function PdfViewer({
       {/* Sprint H3 (2026-04-29): bottom status bar — ALWAYS visible.
           Shows current tool, scale, and contextual keyboard hint so
           fresh users discover shortcuts and know what mode they're in. */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-stone-900 border-t border-stone-700 text-xs text-stone-400">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-card border-t border-border text-[11px] text-muted-foreground">
         <div className="flex items-center gap-3">
           {/* Always-visible: current tool */}
           <span>
-            Įrankis: <strong className="text-stone-200">{
+            Įrankis: <strong className="text-foreground font-medium">{
               { select: 'Žymėjimas', polygon: 'Polygon', scale: 'Mastelis',
                 comment: 'Komentaras', erase: 'Trinti' }[tool] || tool
             }</strong>
@@ -2044,35 +2044,35 @@ export default function PdfViewer({
           {/* Always-visible: page scale (mastelis) */}
           {currentScale ? (
             <span>
-              Mastelis: <strong className="text-stone-200">
+              Mastelis: <strong className="text-foreground font-medium">
                 {currentScale.pixels_per_meter.toFixed(0)} px/m
               </strong>
               {currentScale.source === 'inherited' && (
-                <span className="text-stone-500 ml-1">(paveldėtas)</span>
+                <span className="text-muted-foreground/70 ml-1">(paveldėtas)</span>
               )}
             </span>
           ) : (
-            <span className="text-amber-400">
-              Mastelis nenustatytas — naudok „Pažangu" → liniuotė
+            <span className="text-amber-600">
+              Mastelis nenustatytas · naudok „Pažangu" → liniuotė
             </span>
           )}
           {/* Always-visible: keyboard hint */}
-          <span className="text-stone-500 hidden md:inline">
-            ⌨ <kbd className="px-1 rounded bg-stone-800">F</kbd> pritaikyti
-            {' · '}<kbd className="px-1 rounded bg-stone-800">+</kbd>/<kbd className="px-1 rounded bg-stone-800">−</kbd> mastelis
-            {' · '}<kbd className="px-1 rounded bg-stone-800">[</kbd>/<kbd className="px-1 rounded bg-stone-800">]</kbd> psl
-            {' · '}<kbd className="px-1 rounded bg-stone-800">Esc</kbd> grįžti
+          <span className="text-[10px] text-muted-foreground hidden md:inline">
+            <kbd className="px-1 rounded bg-muted">F</kbd> pritaikyti
+            {' · '}<kbd className="px-1 rounded bg-muted">+</kbd>/<kbd className="px-1 rounded bg-muted">−</kbd> mastelis
+            {' · '}<kbd className="px-1 rounded bg-muted">[</kbd>/<kbd className="px-1 rounded bg-muted">]</kbd> psl
+            {' · '}<kbd className="px-1 rounded bg-muted">Esc</kbd> grįžti
           </span>
           {showAdvanced && (
             <>
-              <span>Žymėjimai: <strong className="text-stone-200">{markups.length}</strong></span>
+              <span>Žymėjimai: <strong className="text-foreground font-medium">{markups.length}</strong></span>
               {(takeoff.polygons || []).length > 0 && (
-                <span>Zonos: <strong className="text-stone-200">{(takeoff.polygons || []).length}</strong></span>
+                <span>Zonos: <strong className="text-foreground font-medium">{(takeoff.polygons || []).length}</strong></span>
               )}
             </>
           )}
           {tool === 'scale' && (
-            <span className="text-red-400">
+            <span className="text-red-600">
               {!calibPoints.p1
                 ? 'Spauskite pradžios tašką brėžinyje'
                 : !calibPoints.p2
@@ -2081,7 +2081,7 @@ export default function PdfViewer({
             </span>
           )}
           {tool === 'polygon' && (
-            <span className="text-emerald-400">
+            <span className="text-emerald-700">
               {!polygonDraft
                 ? 'Spauskite kambario kampus (Esc atšaukti)'
                 : polygonDraft.points.length < 3
@@ -2092,7 +2092,7 @@ export default function PdfViewer({
         </div>
         {markups.length > 0 && (
           <button onClick={handleClearAll}
-            className="text-red-400 hover:text-red-300 flex items-center gap-1">
+            className="text-red-600 hover:text-red-700 flex items-center gap-1">
             <Trash2 className="w-3 h-3" />
             Ištrinti viską
           </button>
