@@ -348,7 +348,21 @@ export function updateRoomPolygon(projectId, roomNr, polygonPoints, pageMeta, ro
     });
   }
 
-  return updateProject(projectId, { patalpos: rooms });
+  const result = updateProject(projectId, { patalpos: rooms });
+
+  // Phase C-1 Task 21: notify listeners (InteriorProject, ProjectMainView etc.)
+  // that the project's room geometry changed and downstream kiekiai must be
+  // recomputed via interiorCalc / /recompute-interior. Custom event keeps the
+  // store decoupled from React; consumers subscribe with
+  //   window.addEventListener('samatu:project-recompute', e => …)
+  // and check e.detail.projectId to filter.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
+      detail: { projectId, reason: 'polygon-traced', roomNr },
+    }));
+  }
+
+  return result;
 }
 
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
