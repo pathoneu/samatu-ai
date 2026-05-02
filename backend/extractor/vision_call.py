@@ -2206,6 +2206,18 @@ def extract_interior(
         })
         parsed["warnings"] = existing
 
+    # Phase C-2 (2026-05-02): if a patalpa has plotas_m2 but no plotas_source,
+    # tag it as 'vision' (came from Anthropic Vision response, not eksplikacija).
+    # Eksplikacija reader sets 'eksplikacija' explicitly; manual polygons set
+    # 'manual_polygon' on the frontend. Anything left over is Vision.
+    try:
+        patalpos = parsed.get("patalpos") or []
+        for p in patalpos:
+            if p.get("plotas_m2") is not None and not p.get("plotas_source"):
+                p["plotas_source"] = "vision"
+    except Exception as exc:
+        print(f"[extractor] plotas_source fallback failed: {exc}")
+
     # Step 5: Frontend backwards-compat — emit V8-shape fields alongside new schema.
     # Frontend (ExportModal, ProjectMainView, WorkspacePanel) reads `darbu_sarasas`,
     # `v8_totals`, `v8_rooms`. Without these, the works/materials list and Excel/PDF

@@ -253,6 +253,10 @@ def _try_parse_row(
         "row_idx": row_idx,
         "page": page_nr,
     }
+    # Phase C-2 (2026-05-02): tag every eksplikacija-derived patalpa with the
+    # plotas_source field so frontend areaConfidence can classify trust correctly.
+    if out.get("plotas_m2") is not None:
+        out["plotas_source"] = "eksplikacija"
     if row_bbox is not None:
         x0, top, x1, bottom = row_bbox
         out["eksplikacija_row_bbox"] = [
