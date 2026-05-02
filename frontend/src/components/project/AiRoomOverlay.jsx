@@ -10,20 +10,36 @@
 
 import { Stage, Layer, Rect, Text as KonvaText, Group, Line } from 'react-konva';
 
+// Phase C-4-bis: per-category colors per Kreo competitor research. Each room
+// paskirtis gets its own hue so a glance at the polygon overlay reveals the
+// floor plan's functional zones without reading labels.
 const COLORS_BY_PASKIRTIS = {
-  gyvenamoji:  '#10b981',  // green
-  miegamoji:   '#3b82f6',  // blue
-  virtuve:     '#f59e0b',  // amber
-  vonia:       '#06b6d4',  // cyan
+  gyvenamoji:  '#10b981',  // green — svetainė / gyvenamasis
+  svetaine:    '#10b981',
+  miegamoji:   '#3b82f6',  // blue — miegamasis
+  miegamasis:  '#3b82f6',
+  vaikui:      '#3b82f6',
+  virtuve:     '#f59e0b',  // amber — virtuvė
+  valgomasis:  '#f59e0b',
+  vonia:       '#06b6d4',  // cyan — vonia / sanitarinės patalpos
+  vonios:      '#06b6d4',
   wc:          '#06b6d4',
   san:         '#06b6d4',
-  koridorius:  '#a78bfa',  // violet
+  sanitarine:  '#06b6d4',
+  koridorius:  '#a78bfa',  // violet — bendro naudojimo praeigos
   holas:       '#a78bfa',
-  drabuzine:   '#ec4899',  // pink
-  sandeliukas: '#94a3b8',  // slate
-  garazas:     '#64748b',  // gray
+  prieskambaris:'#a78bfa',
+  drabuzine:   '#ec4899',  // pink — uždaras dėvėjimas
+  rūbinė:      '#ec4899',
+  sandeliukas: '#94a3b8',  // slate — sandėliavimas
+  saugykla:    '#94a3b8',
+  garazas:     '#64748b',  // gray — techninės / ūkinės
   tambūras:    '#64748b',
+  tamburas:    '#64748b',
   katiline:    '#94a3b8',
+  ukio:        '#94a3b8',
+  balkonas:    '#22c55e',  // bright green — atviros zonos
+  terasa:      '#22c55e',
 };
 
 function colorFor(paskirtis) {
@@ -80,8 +96,11 @@ export default function AiRoomOverlay({
         {pageRooms.map((room, idx) => {
           const color = colorFor(room.paskirtis);
           const isHighlight = highlightRoomNrs?.has?.(room.nr) === true;
-          const strokeW = isHighlight ? 4 : 1.5;
-          const fillAlpha = isHighlight ? '55' : '22';
+          // Phase C-4-bis: thicker stroke + brighter fill so polygons read
+          // clearly on the dark blueprint frame. Highlight (room-from-panel
+          // jump) bumps the stroke + fill further.
+          const strokeW = isHighlight ? 4 : 2.5;
+          const fillAlpha = isHighlight ? '55' : '33';
           let cx, cy, shape;
 
           // V9: polygon_pdf (vector poligonai — TIKSLU)
@@ -103,7 +122,7 @@ export default function AiRoomOverlay({
                   points={pts}
                   fill={`${color}${fillAlpha}`}
                   stroke={color}
-                  strokeWidth={Math.max(strokeW, 2)}
+                  strokeWidth={strokeW}
                   closed={true}
                   listening={true}
                 />
@@ -133,7 +152,7 @@ export default function AiRoomOverlay({
                     width={bb.w * width} height={bb.h * height}
                     fill={`${color}${fillAlpha}`}
                     stroke={color}
-                    strokeWidth={Math.max(strokeW, 2)}
+                    strokeWidth={strokeW}
                     cornerRadius={2}
                   />
                 );
