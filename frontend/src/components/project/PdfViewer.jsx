@@ -42,6 +42,7 @@ import TraceOverlay from './TraceOverlay';
 import FirstTimePolygonHint from './FirstTimePolygonHint';
 import TraceModeBanner from './TraceModeBanner';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
+import AiBadge from './AiBadge';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { updateRoomPolygon } from '@/lib/projectStore';
@@ -281,6 +282,8 @@ function ToolBar({
             {page === eksplikacija_source_page ? 'Eksplikacija ✓' : 'Eksplikacija'}
           </span>
           <span className="tabular-nums">psl. {eksplikacija_source_page}</span>
+          {/* Phase C-4-bis: ✨ badge — eksplikacija auto-reader is AI-adjacent */}
+          <AiBadge label="" />
         </button>
       )}
     </div>
@@ -434,6 +437,11 @@ function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
                 className="absolute left-0 top-1 bottom-1 w-0.5 bg-viewer-chrome rounded-r"
                 aria-hidden
               />
+            )}
+            {/* Phase C-4-bis: ✨ AI badge for the polygon tool — Phase C-3 will
+                turn this into AI-assisted click-to-fill. */}
+            {t.id === 'polygon' && (
+              <AiBadge className="absolute -top-1 -right-1" label="" />
             )}
           </button>
         );

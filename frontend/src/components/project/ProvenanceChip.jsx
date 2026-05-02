@@ -10,8 +10,13 @@
  *   - 'vision' → "iš AI" (Vision-only, low trust)
  *   - 'dimension' → "iš dimensijos" (placeholder for future)
  *
+ * Phase C-4-bis: AI-adjacent sources (eksplikacija auto-reader, Vision)
+ * also render a small ✨ AI badge so the user perceives the tool's
+ * intelligence, à la Kreo's takeoff UI.
+ *
  * No "bbox" or "polygon" jargon in any visible string.
  */
+import AiBadge from './AiBadge';
 
 const SOURCE_META = {
   eksplikacija: {
@@ -39,14 +44,20 @@ const SOURCE_META = {
 export default function ProvenanceChip({ source, onClick }) {
   const meta = SOURCE_META[source];
   if (!meta) return null;
+  // Phase C-4-bis: ✨ badge for AI-powered or AI-adjacent sources.
+  // 'eksplikacija' is rules-based but sits inside an AI pipeline; 'vision'
+  // is direct Vision output. Manual / dimension sources do NOT get the badge.
+  const isAi = source === 'eksplikacija' || source === 'vision';
   return (
-    <button
-      onClick={onClick}
-      title={meta.title}
-      className={`inline-flex items-center px-1.5 py-[1px] rounded border text-[9px] font-medium uppercase tracking-wide ${meta.cls}`}
-      data-testid={`provenance-chip-${source}`}
-    >
-      {meta.label}
-    </button>
+    <span className="inline-flex items-center gap-1" data-testid={`provenance-chip-${source}`}>
+      <button
+        onClick={onClick}
+        title={meta.title}
+        className={`inline-flex items-center px-1.5 py-[1px] rounded border text-[9px] font-medium uppercase tracking-wide ${meta.cls}`}
+      >
+        {meta.label}
+      </button>
+      {isAi && <AiBadge label="" />}
+    </span>
   );
 }
