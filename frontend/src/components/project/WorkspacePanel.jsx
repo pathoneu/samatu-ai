@@ -14,6 +14,7 @@ import {
 import { loadTakeoff, removePolygon } from '@/lib/takeoffStore';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
+import PolygonReviewBadge from './PolygonReviewBadge';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -300,6 +301,13 @@ export default function WorkspacePanel({ project, onJumpToPage, onProjectChange 
                     drėgna
                   </span>
                 )}
+                <PolygonReviewBadge
+                  room={r}
+                  onClick={(e) => {
+                    e?.stopPropagation?.();
+                    if (onJumpToPage && targetPage) onJumpToPage(targetPage, r);
+                  }}
+                />
               </div>
               <span className="mono tabular text-foreground/90 whitespace-nowrap" style={{ fontSize: 11 }}>
                 {fmt(r.plotas_m2)}

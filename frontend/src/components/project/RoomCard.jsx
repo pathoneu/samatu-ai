@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { Edit2, Check, X, AlertCircle, Eye, BookOpen, Palette, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { getPdfBlob } from '@/lib/pdfStore';
+import PolygonReviewBadge from './PolygonReviewBadge';
 
 // ── Confidence dot (žalia/geltona/raudona) ────────────────────────────────────
 
@@ -172,7 +173,13 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
                 <span className="text-xs font-mono text-stone-400 mr-1.5">#{room.nr}</span>
                 {room.pavadinimas}
               </div>
-              <div className="text-xs text-stone-500 mt-0.5">{info.label}</div>
+              <div className="text-xs text-stone-500 mt-0.5 flex items-center gap-2">
+                <span>{info.label}</span>
+                <PolygonReviewBadge
+                  room={room}
+                  onClick={() => onShowOnPdf?.(room.puslapio_nr, room)}
+                />
+              </div>
             </div>
           )}
         </div>
