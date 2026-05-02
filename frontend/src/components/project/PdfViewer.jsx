@@ -598,12 +598,14 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
       ref={ref}
       onClick={() => setPage(pageNr)}
       title={tooltip}
-      className={`w-full p-1 rounded border-2 transition-colors text-left ${
-        isActive ? 'border-primary' : 'border-border hover:border-primary/40'
+      className={`w-full p-1 rounded-md border transition-all text-left group ${
+        isActive
+          ? 'border-primary ring-2 ring-primary/30 bg-accent/40'
+          : 'border-border hover:border-primary/40 hover:shadow-sm'
       }`}
     >
       <div
-        className="bg-white rounded overflow-hidden relative"
+        className="bg-white rounded-sm overflow-hidden relative shadow-sm"
         style={{ minHeight: 180 }}
       >
         {visible ? (
@@ -630,20 +632,20 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
           />
         )}
       </div>
-      <div className="flex items-start gap-1 mt-1.5 px-0.5">
+      <div className="flex items-start gap-1.5 mt-1.5 px-0.5">
         <span
           className="w-1.5 h-1.5 rounded-full shrink-0 mt-1"
           style={{ background: color }}
         />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-foreground font-semibold leading-tight">
+          <div className={`text-[11px] leading-tight ${isActive ? 'text-primary font-semibold' : 'text-foreground font-medium'}`}>
             Psl. {pageNr}
             {typeLabel && (
               <span className="font-normal text-muted-foreground"> · {typeLabel}</span>
             )}
           </div>
           {meta?.label && meta.label !== typeLabel && (
-            <div className="text-[10px] text-muted-foreground truncate leading-tight">
+            <div className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
               {meta.label}
             </div>
           )}
@@ -712,14 +714,14 @@ function PageThumbnails({ totalPages, currentPage, setPage, pageMeta, fileUrl, m
         <ChevronLeft className="w-3 h-3" />
       </button>
       {missingTypes && missingTypes.length > 0 && (
-        <div className="bg-amber-950/60 border border-amber-700/60 rounded p-2 mb-1">
+        <div className="bg-amber-50 border border-amber-300 rounded p-2 mb-1">
           <div className="flex items-center gap-1.5 mb-1">
-            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-            <span className="text-[10px] font-semibold text-amber-200">
+            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+            <span className="text-[10px] font-semibold text-amber-800">
               Trūksta brėžinių
             </span>
           </div>
-          <ul className="text-[10px] text-amber-100/80 leading-tight space-y-0.5">
+          <ul className="text-[10px] text-amber-700 leading-tight space-y-0.5">
             {missingTypes.map(t => (
               <li key={t}>• {PAGE_TYPE_LABELS[t] || t}</li>
             ))}
