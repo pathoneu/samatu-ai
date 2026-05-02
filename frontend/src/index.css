@@ -82,6 +82,18 @@
     --surface-2: 40 12% 93%;             /* hover */
     --surface-3: 40 13% 90%;             /* selected/deep hover */
     --border-strong: 40 9% 77%;          /* #cdc8be input/button border */
+
+    /* ──── Viewer chrome (PDF viewer ONLY — Kreo-style dark navy with cyan
+            accents). Drawing area stays white; the surrounding chrome
+            (toolbar / tool rail / thumbs / status bar / drawing-area frame)
+            uses these tokens. ──── */
+    --viewer-chrome: 220 30% 12%;            /* dark navy — toolbar/rail/thumbs */
+    --viewer-chrome-foreground: 215 20% 88%; /* light text on dark chrome */
+    --viewer-chrome-muted: 220 25% 18%;       /* subtler dark for nested cards */
+    --viewer-chrome-border: 220 25% 22%;      /* divider lines on dark chrome */
+    --viewer-chrome-hover: 220 20% 24%;       /* button hover */
+    --viewer-chrome-active: 192 80% 55%;      /* cyan accent for active state */
+    --viewer-blueprint-bg: 220 35% 8%;        /* darkest — drawing-area "frame" */
   }
 
   /* Dark mode kept identical to light for now — app is light-only by design.

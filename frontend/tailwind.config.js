@@ -63,7 +63,14 @@ module.exports = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+  			'viewer-chrome': 'hsl(var(--viewer-chrome))',
+  			'viewer-chrome-foreground': 'hsl(var(--viewer-chrome-foreground))',
+  			'viewer-chrome-muted': 'hsl(var(--viewer-chrome-muted))',
+  			'viewer-chrome-border': 'hsl(var(--viewer-chrome-border))',
+  			'viewer-chrome-hover': 'hsl(var(--viewer-chrome-hover))',
+  			'viewer-chrome-active': 'hsl(var(--viewer-chrome-active))',
+  			'viewer-blueprint-bg': 'hsl(var(--viewer-blueprint-bg))'
   		},
   		keyframes: {
   			'accordion-down': {
