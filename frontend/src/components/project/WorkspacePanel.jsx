@@ -15,6 +15,7 @@ import { loadTakeoff, removePolygon } from '@/lib/takeoffStore';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
+import ProvenanceChip from './ProvenanceChip';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -94,7 +95,7 @@ function useTakeoff(projectId) {
 // ── Wet-room paskirtis check (for "drėgna" pill) ──────────────────────────
 const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla']);
 
-export default function WorkspacePanel({ project, onJumpToPage, onProjectChange }) {
+export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange }) {
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
   // Provenance dots OFF by default — too noisy when most rows are computed.
@@ -309,9 +310,18 @@ export default function WorkspacePanel({ project, onJumpToPage, onProjectChange 
                   }}
                 />
               </div>
-              <span className="mono tabular text-foreground/90 whitespace-nowrap" style={{ fontSize: 11 }}>
+              <span className="mono tabular text-foreground/90 whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
                 {fmt(r.plotas_m2)}
-                <span className="text-muted-foreground/70 ml-1" style={{ fontSize: 9 }}>m²</span>
+                <span className="text-muted-foreground/70" style={{ fontSize: 9 }}>m²</span>
+                {r.plotas_source && (
+                  <ProvenanceChip
+                    source={r.plotas_source}
+                    onClick={(e) => {
+                      e?.stopPropagation?.();
+                      if (onJumpToProvenance) onJumpToProvenance(r);
+                    }}
+                  />
+                )}
               </span>
             </div>
           );
