@@ -80,6 +80,8 @@ export default function InteriorWorkspace({
   // bubbling up). Prop changes take priority — local override resets on prop.
   const [localFocusedPage, setLocalFocusedPage] = useState(null);
   const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
+  // Phase C-2 (2026-05-02): eksplikacija row flash trigger; cleared by PdfViewer.
+  const [flashRoom, setFlashRoom] = useState(null);
   const effectiveFocusedPage = localFocusedPage ?? focusedPage;
   const effectiveFocusedRoom = localFocusedRoom ?? focusedRoom;
   useEffect(() => {
@@ -144,6 +146,7 @@ export default function InteriorWorkspace({
             aiRooms={null}
             focusedPage={effectiveFocusedPage}
             focusedRoom={effectiveFocusedRoom}
+            flashRoom={flashRoom}
             eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
             onAiRoomClick={(room) => {
               // TODO: atidaryti modal'ą su pavadinimo / paskirties / ploto edit'u
@@ -246,6 +249,7 @@ export default function InteriorWorkspace({
                 ?? project.eksplikacija_source_page
                 ?? 2;
               if (onJumpToPage) onJumpToPage(targetPage, room);
+              setFlashRoom(room);
             } else if (room.plotas_source === 'manual_polygon') {
               // Manual polygons live on the room's own page; jump there.
               const targetPage = room.page_nr ?? room.puslapio_nr;
