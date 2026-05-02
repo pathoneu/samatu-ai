@@ -40,6 +40,7 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 // Vision prompt + symbol-driven pozicijų generation in vision_call.py.
 import TraceOverlay from './TraceOverlay';
 import FirstTimePolygonHint from './FirstTimePolygonHint';
+import TraceModeBanner from './TraceModeBanner';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { updateRoomPolygon } from '@/lib/projectStore';
@@ -1869,6 +1870,13 @@ export default function PdfViewer({
         >
           {/* Phase C-1 Task 13: first-time polygon trace mode hint overlay */}
           <FirstTimePolygonHint active={tool === 'polygon'} />
+
+          {/* Phase C-1 Task 23: live trace-mode banner with vertex count + ortho status */}
+          <TraceModeBanner
+            visible={tool === 'polygon'}
+            polygonDraft={polygonDraft}
+            orthoEnabled={orthoEnabled}
+          />
 
           <div className="relative inline-block bg-white shadow-2xl">
             <Document
