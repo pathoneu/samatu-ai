@@ -1652,13 +1652,23 @@ export default function PdfViewer({
     setPendingPolygon(null);
   };
 
-  // Cmd+Z / Cmd+Shift+Z keyboard shortcuts
+  // Cmd+Z / Cmd+Shift+Z keyboard shortcuts (Task 19 — universal in any tool mode).
+  // Skip when typing in inputs to avoid hijacking native field undo.
   useEffect(() => {
+    const isTyping = (target) => {
+      if (!target) return false;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      return target.isContentEditable === true;
+    };
     const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      if (isTyping(e.target)) return;
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      if (e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         if (canUndo(takeoff)) setTakeoff(t => takeoffUndo(t));
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
+      } else if (e.key === 'Z' || (e.key === 'z' && e.shiftKey)) {
         e.preventDefault();
         if (canRedo(takeoff)) setTakeoff(t => takeoffRedo(t));
       }
