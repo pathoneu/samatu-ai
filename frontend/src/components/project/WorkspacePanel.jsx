@@ -304,6 +304,7 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
                 )}
                 <ConfidenceBadge
                   room={r}
+                  projectId={project?.id}
                   onClick={(e) => {
                     e?.stopPropagation?.();
                     if (onJumpToPage && targetPage) onJumpToPage(targetPage, r);

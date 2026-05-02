@@ -177,6 +177,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
                 <span>{info.label}</span>
                 <ConfidenceBadge
                   room={room}
+                  projectId={project?.id}
                   onClick={() => onShowOnPdf?.(room.puslapio_nr, room)}
                 />
               </div>
