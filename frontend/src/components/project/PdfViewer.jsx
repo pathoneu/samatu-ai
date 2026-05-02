@@ -41,7 +41,6 @@ import FocusFlashOverlay from './FocusFlashOverlay';
 import TraceOverlay from './TraceOverlay';
 import FirstTimePolygonHint from './FirstTimePolygonHint';
 import TraceModeBanner from './TraceModeBanner';
-import EksplikacijaRowFlash from './EksplikacijaRowFlash';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
@@ -1330,7 +1329,6 @@ export default function PdfViewer({
   hoveredRowId = null,       // Etap 3 placeholder
   darbuSarasas = null,       // Etap 3 placeholder
   eksplikacija_source_page = null,  // ground-truth eksplikacija page jump button
-  flashRoom: externalFlashRoom = null,  // Phase C-2: room to flash on the eksplikacija page
 }) {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -1457,12 +1455,6 @@ export default function PdfViewer({
   // Vector PDF linijos snap'ui — fetch'inamos kai polygon mode aktyvuotas
   const [pageLines, setPageLines] = useState(null);  // {lines, page_width_pdf, page_height_pdf}
   const [linesLoading, setLinesLoading] = useState(false);
-
-  // Phase C-2 (2026-05-02): eksplikacija row flash. Synced from externalFlashRoom prop.
-  const [flashRoom, setFlashRoom] = useState(null);
-  useEffect(() => {
-    if (externalFlashRoom) setFlashRoom(externalFlashRoom);
-  }, [externalFlashRoom]);
 
   useEffect(() => {
     if (tool !== 'polygon') return;
@@ -1965,18 +1957,6 @@ export default function PdfViewer({
                 eksplikacijaPage={eksplikacija_source_page}
               />
             )}
-
-            {/* Phase C-2 (2026-05-02): yellow halo flash over the eksplikacija
-                row, triggered by ProvenanceChip click. Uses the unscaled PDF
-                page dims captured by pageProxyRef on Page onLoadSuccess. */}
-            <EksplikacijaRowFlash
-              flashRoom={flashRoom}
-              canvasWidth={pageDims.width}
-              canvasHeight={pageDims.height}
-              pdfPageWidth={pageProxyRef.current?.width}
-              pdfPageHeight={pageProxyRef.current?.height}
-              onComplete={() => setFlashRoom(null)}
-            />
 
             {/* Sprint G6: room polygon flash on floor plan page when user
                 clicks a room in the side panel. bbox_pct (Vision-emitted

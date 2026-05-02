@@ -80,8 +80,6 @@ export default function InteriorWorkspace({
   // bubbling up). Prop changes take priority — local override resets on prop.
   const [localFocusedPage, setLocalFocusedPage] = useState(null);
   const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
-  // Phase C-2 (2026-05-02): eksplikacija row flash trigger; cleared by PdfViewer.
-  const [flashRoom, setFlashRoom] = useState(null);
   const effectiveFocusedPage = localFocusedPage ?? focusedPage;
   const effectiveFocusedRoom = localFocusedRoom ?? focusedRoom;
   useEffect(() => {
@@ -146,7 +144,6 @@ export default function InteriorWorkspace({
             aiRooms={null}
             focusedPage={effectiveFocusedPage}
             focusedRoom={effectiveFocusedRoom}
-            flashRoom={flashRoom}
             eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
             onAiRoomClick={(room) => {
               // TODO: atidaryti modal'ą su pavadinimo / paskirties / ploto edit'u
@@ -241,21 +238,14 @@ export default function InteriorWorkspace({
             onJumpToPage?.(pageNr, room);
           }}
           onJumpToProvenance={(room) => {
-            if (room.plotas_source === 'eksplikacija') {
-              // Jump to the eksplikacija source page (room.eksplikacija_source_page
-              // OR project.eksplikacija_source_page). The EksplikacijaRowFlash overlay
-              // (Task 11) will pick up room.eksplikacija_row_bbox automatically.
-              const targetPage = room.eksplikacija_source_page
-                ?? project.eksplikacija_source_page
-                ?? 2;
-              if (onJumpToPage) onJumpToPage(targetPage, room);
-              setFlashRoom(room);
-            } else if (room.plotas_source === 'manual_polygon') {
-              // Manual polygons live on the room's own page; jump there.
+            // Eksplikacija chips open an in-place data popover (handled inside
+            // WorkspacePanel). Other sources (manual_polygon, vision, dimension)
+            // jump to the room's page so the user can find it visually.
+            const src = room.plotas_source;
+            if (src === 'manual_polygon') {
               const targetPage = room.page_nr ?? room.puslapio_nr;
               if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
-            } else {
-              // Vision/dimension/other: just go to the room's page.
+            } else if (src && src !== 'eksplikacija') {
               const targetPage = room.puslapio_nr ?? room.page_nr;
               if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
             }

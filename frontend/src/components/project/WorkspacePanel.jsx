@@ -16,6 +16,7 @@ import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
+import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { inferPlotasSource } from '@/lib/areaConfidence';
 
 function fmt(v, d = 2) {
@@ -103,6 +104,10 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
   // User can toggle via eye icon to inspect data sources when needed.
   const [showProvenance, setShowProvenance] = useState(false);
   const [collapsed, setCollapsed] = useState({});
+  // Phase C-2 follow-up (2026-05-02): chip click opens an honest data popover
+  // anchored to the chip itself. Replaces the random-flash halo that drew on
+  // unreliable PDF coords.
+  const [popoverState, setPopoverState] = useState(null);  // {room, anchorRect} | null
 
   const handleRemovePolygon = (id) => {
     if (!window.confirm('Ištrinti pažymėjimą?')) return;
@@ -322,7 +327,14 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
                       source={src}
                       onClick={(e) => {
                         e?.stopPropagation?.();
-                        if (onJumpToProvenance) onJumpToProvenance(r);
+                        if (src === 'eksplikacija') {
+                          // Honest popover with parsed row data — no PDF
+                          // coordinate guessing. Anchored to the chip.
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPopoverState({ room: r, anchorRect: rect });
+                        } else if (onJumpToProvenance) {
+                          onJumpToProvenance(r);
+                        }
                       }}
                     />
                   ) : null;
@@ -376,6 +388,13 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           <PlyteliuSpecsSection specs={project._plyteliu_specs} />
         )}
       </div>
+      {popoverState && (
+        <EksplikacijaSourcePopover
+          room={popoverState.room}
+          anchorRect={popoverState.anchorRect}
+          onClose={() => setPopoverState(null)}
+        />
+      )}
     </div>
   );
 }
