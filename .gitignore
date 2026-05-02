@@ -38,3 +38,9 @@ backend/data/
 *.db-wal
 *.db-shm
 .smoke
+
+# Bake-off artifacts (research-only, large binaries, regenerable)
+detector_bench/render_cache/
+legends/*/
+results/*.md
+!results/.gitkeep

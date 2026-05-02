@@ -13,3 +13,7 @@ pytest==8.3.4
 pytest-asyncio==0.25.0
 bcrypt>=5.0
 itsdangerous>=2.2
+
+# Symbol-detection bake-off (detector_bench/) — research-only deps
+replicate>=0.32.0
+pyyaml>=6.0
