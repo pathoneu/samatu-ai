@@ -114,34 +114,34 @@ function ToolBar({
   layers, setLayers,
 }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2 bg-card border-b border-border text-foreground">
+    <div className="flex items-center gap-1 px-3 py-1.5 bg-card border-b border-border text-foreground">
       {/* — Pagrindiniai įrankiai (visada matomi) — */}
 
       {/* Puslapio navigacija. Sprint H4: tooltips + keyboard hints. */}
       <button onClick={() => setPage(Math.max(1, page - 1))}
         disabled={page <= 1}
         title="Ankstesnis puslapis (klavišas [ )"
-        className="p-1.5 hover:bg-muted rounded disabled:opacity-30">
+        className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <span className="text-xs text-muted-foreground mx-1 tabular-nums">
+      <span className="text-xs text-muted-foreground tabular-nums px-1 min-w-[3.25rem] text-center">
         {page} / {totalPages || '—'}
       </span>
       <button onClick={() => setPage(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
         title="Kitas puslapis (klavišas ] )"
-        className="p-1.5 hover:bg-muted rounded disabled:opacity-30">
+        className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
         <ChevronRight className="w-4 h-4" />
       </button>
 
-      <div className="w-px h-5 bg-border mx-1.5" />
+      <div className="w-px h-5 bg-border/80 mx-0.5" />
 
       {/* Mastelio keitimas. Sprint H5 (2026-04-29): preset dropdown vietoj
           plain procento span'o. Visi pasirinkimai grąžina exact mastelio
           reikšmę kad nebūtų kumuliacinio drift'o. */}
       <button onClick={() => setScale(s => Math.max(0.3, +(s - 0.2).toFixed(2)))}
         title="Mažinti (klavišas −)"
-        className="p-1.5 hover:bg-muted rounded">
+        className="p-1.5 hover:bg-muted rounded transition-colors">
         <ZoomOut className="w-4 h-4" />
       </button>
       <select
@@ -176,22 +176,22 @@ function ToolBar({
       </select>
       <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))}
         title="Didinti (klavišas +)"
-        className="p-1.5 hover:bg-muted rounded">
+        className="p-1.5 hover:bg-muted rounded transition-colors">
         <ZoomIn className="w-4 h-4" />
       </button>
       <button onClick={() => setScale(1)}
-        title="100% (klavišas 0)"
-        className="p-1.5 hover:bg-muted rounded">
+        title="Pritaikyti pločiui (klavišas F)"
+        className="p-1.5 hover:bg-muted rounded transition-colors">
         <Maximize2 className="w-4 h-4" />
       </button>
 
       {showAdvanced && (
         <>
-          <div className="w-px h-5 bg-border mx-1.5" />
+          <div className="w-px h-5 bg-border/80 mx-0.5" />
 
           {/* Mastelio kalibracija */}
           <button onClick={() => setTool(tool === 'scale' ? 'select' : 'scale')}
-            className={`p-1.5 rounded flex items-center gap-1 ${tool === 'scale' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+            className={`p-1.5 rounded flex items-center gap-1 transition-colors ${tool === 'scale' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Nustatyti mastelį (paspaudus 2 taškus brėžinyje)">
             <Ruler className="w-4 h-4" />
             {pageScaleInfo
@@ -202,43 +202,43 @@ function ToolBar({
             }
           </button>
 
-          <div className="w-px h-5 bg-border mx-1.5" />
+          <div className="w-px h-5 bg-border/80 mx-0.5" />
 
           {/* Žymėjimo įrankiai */}
           <button onClick={() => setTool('select')}
-            className={`p-1.5 rounded ${tool === 'select' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+            className={`p-1.5 rounded transition-colors ${tool === 'select' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Pasirinkti / žymėti zoną (klavišas Esc — grįžta į pasirinkimą)">
             <Pencil className="w-4 h-4" />
           </button>
           <button onClick={() => setTool('comment')}
-            className={`p-1.5 rounded ${tool === 'comment' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+            className={`p-1.5 rounded transition-colors ${tool === 'comment' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
             title="Pridėti komentarą">
             <MessageSquare className="w-4 h-4" />
           </button>
           <button onClick={() => setTool('erase')}
-            className={`p-1.5 rounded ${tool === 'erase' ? 'bg-red-600 text-white' : 'hover:bg-muted'}`}
+            className={`p-1.5 rounded transition-colors ${tool === 'erase' ? 'bg-red-600 text-white' : 'hover:bg-muted'}`}
             title="Ištrinti žymėjimą">
             <Eraser className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-border mx-1.5" />
+          <div className="w-px h-5 bg-border/80 mx-0.5" />
 
           {/* Atšaukti / pakartoti */}
           <button onClick={onUndo} disabled={!undoOk}
-            className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+            className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
             title="Atšaukti (Cmd+Z)">
             <Undo2 className="w-4 h-4" />
           </button>
           <button onClick={onRedo} disabled={!redoOk}
-            className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+            className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
             title="Pakartoti (Cmd+Shift+Z)">
             <Redo2 className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-border mx-1.5" />
+          <div className="w-px h-5 bg-border/80 mx-0.5" />
 
           <button onClick={() => setShowMarkups(v => !v)}
-            className={`p-1.5 rounded ${showMarkups ? 'hover:bg-muted' : 'bg-muted'}`}
+            className={`p-1.5 rounded transition-colors ${showMarkups ? 'hover:bg-muted' : 'bg-muted'}`}
             title={showMarkups ? 'Slėpti žymėjimus' : 'Rodyti žymėjimus'}>
             {showMarkups ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </button>
@@ -254,7 +254,7 @@ function ToolBar({
           declutter top toolbar; full label on lg+. */}
       <button
         onClick={() => setShowAdvanced(v => !v)}
-        className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] ${
+        className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] transition-colors ${
           showAdvanced ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
         }`}
         title={showAdvanced ? 'Slėpti pažangiuosius įrankius' : 'Pažangu — mastelis, žymėjimas, atšaukti'}>
@@ -343,7 +343,7 @@ function LayersDropdown({ layers, setLayers }) {
       <button
         onClick={() => setOpen(v => !v)}
         title={`Sluoksniai (${visibleCount} iš ${totalCount} matomi)`}
-        className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] ${
+        className={`p-1.5 rounded inline-flex items-center gap-1 text-[11px] transition-colors ${
           open ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'
         }`}
       >
