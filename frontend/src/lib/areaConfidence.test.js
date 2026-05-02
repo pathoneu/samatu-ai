@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT,
+  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT, inferPlotasSource,
 } from './areaConfidence.js';
 
 test('computeAreaConfidence: room with eksplikacija + agreeing manual polygon → high', () => {
@@ -16,23 +16,23 @@ test('computeAreaConfidence: room with eksplikacija + agreeing manual polygon �
   assert.deepEqual(r.agreeingSources.sort(), ['eksplikacija', 'manual_polygon']);
 });
 
-test('computeAreaConfidence: eksplikacija only (no polygon) → medium', () => {
+test('computeAreaConfidence: eksplikacija only (no polygon) → high (deterministic source-of-truth)', () => {
   const room = {
     nr: '02', plotas_m2: 12.5, plotas_source: 'eksplikacija',
   };
   const r = computeAreaConfidence(room);
-  assert.equal(r.confidence, 'medium');
+  assert.equal(r.confidence, 'high');
   assert.equal(r.primarySource, 'eksplikacija');
   assert.deepEqual(r.agreeingSources, ['eksplikacija']);
 });
 
-test('computeAreaConfidence: manual polygon only → medium', () => {
+test('computeAreaConfidence: manual polygon only → high (user-set, authoritative)', () => {
   const room = {
     nr: '03', plotas_m2: 8.4, plotas_source: 'manual_polygon',
     polygon_pdf: [[0, 0], [10, 0], [5, 5]],
   };
   const r = computeAreaConfidence(room);
-  assert.equal(r.confidence, 'medium');
+  assert.equal(r.confidence, 'high');
   assert.equal(r.primarySource, 'manual_polygon');
 });
 
@@ -72,15 +72,33 @@ test('computeAreaConfidence: room with no plotas_m2 → unknown', () => {
   assert.equal(r.confidence, 'unknown');
 });
 
-test('computeAreaConfidence: legacy room with plotas_m2 but no plotas_source → backfilled as eksplikacija medium', () => {
+test('computeAreaConfidence: legacy room (plotas_m2 but no plotas_source) → backfilled to eksplikacija high', () => {
   // Simulates a project extracted before Phase C-2 Task 2 landed. The backend
   // didn't tag plotas_source on these, but pdfplumber eksplikacija was the
-  // dominant historical path. Backfill in collectSources keeps the badge from
-  // hiding (would otherwise return 'unknown').
+  // dominant historical path — single-source eksplikacija is high-confidence.
   const room = { nr: '08', plotas_m2: 7.36, pavadinimas: 'Tambūras' };
   const r = computeAreaConfidence(room);
-  assert.equal(r.confidence, 'medium');
+  assert.equal(r.confidence, 'high');
   assert.equal(r.primarySource, 'eksplikacija');
+});
+
+test('inferPlotasSource: explicit plotas_source → returned as-is', () => {
+  const room = { nr: '09', plotas_m2: 10, plotas_source: 'vision' };
+  assert.equal(inferPlotasSource(room), 'vision');
+});
+
+test('inferPlotasSource: legacy room → backfilled to eksplikacija', () => {
+  const room = { nr: '10', plotas_m2: 12 };
+  assert.equal(inferPlotasSource(room), 'eksplikacija');
+});
+
+test('inferPlotasSource: manual polygon takes precedence over missing flag', () => {
+  const room = { nr: '11', plotas_m2: 8, polygon_pdf: [[0,0],[1,0],[0,1]], polygon_source: 'manual' };
+  assert.equal(inferPlotasSource(room), 'manual_polygon');
+});
+
+test('inferPlotasSource: room with no plotas_m2 → null', () => {
+  assert.equal(inferPlotasSource({ nr: '12', plotas_m2: null }), null);
 });
 
 test('AREA_AGREEMENT_TOLERANCE_PCT is 5%', () => {

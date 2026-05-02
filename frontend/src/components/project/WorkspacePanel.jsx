@@ -16,6 +16,7 @@ import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
+import { inferPlotasSource } from '@/lib/areaConfidence';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -314,15 +315,18 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
               <span className="mono tabular text-foreground/90 whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
                 {fmt(r.plotas_m2)}
                 <span className="text-muted-foreground/70" style={{ fontSize: 9 }}>m²</span>
-                {r.plotas_source && (
-                  <ProvenanceChip
-                    source={r.plotas_source}
-                    onClick={(e) => {
-                      e?.stopPropagation?.();
-                      if (onJumpToProvenance) onJumpToProvenance(r);
-                    }}
-                  />
-                )}
+                {(() => {
+                  const src = inferPlotasSource(r);
+                  return src ? (
+                    <ProvenanceChip
+                      source={src}
+                      onClick={(e) => {
+                        e?.stopPropagation?.();
+                        if (onJumpToProvenance) onJumpToProvenance(r);
+                      }}
+                    />
+                  ) : null;
+                })()}
               </span>
             </div>
           );

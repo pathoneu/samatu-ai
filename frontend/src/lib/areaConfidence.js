@@ -62,13 +62,19 @@ export function computeAreaConfidence(room) {
   const primarySource = sources[0].type;
 
   if (sources.length === 1) {
-    // Single-source confidence depends on which source it is:
-    //   - vision alone → 'low' (Vision is unreliable on its own)
-    //   - eksplikacija or manual_polygon alone → 'medium'
-    //   - userVerified always promotes to 'high'
+    // Single-source confidence by source type. Eksplikacija and manual_polygon
+    // are deterministic / user-set — they ARE the source of truth, so a single
+    // hit is high-confidence. Vision is the only source that's unreliable
+    // alone and warrants a 🔴 prompt to verify.
+    //   - vision alone → 'low' (Vision pixel-coords are unreliable)
+    //   - eksplikacija alone → 'high' (deterministic pdfplumber extraction)
+    //   - manual_polygon alone → 'high' (user explicitly traced)
+    //   - dimension alone → 'medium' (depends on Vision OCR quality)
+    //   - userVerified always reaches 'high'
     let singleConfidence;
     if (userVerified) singleConfidence = 'high';
     else if (primarySource === 'vision') singleConfidence = 'low';
+    else if (primarySource === 'eksplikacija' || primarySource === 'manual_polygon') singleConfidence = 'high';
     else singleConfidence = 'medium';
     return {
       confidence: singleConfidence,
@@ -104,6 +110,27 @@ export function computeAreaConfidence(room) {
     disagreement: false,
     sources,
   };
+}
+
+/**
+ * Effective plotas_source for UI elements that need it directly (e.g. the
+ * ProvenanceChip). Handles the Phase C-2 backfill (legacy projects with
+ * plotas_m2 but no plotas_source flag → treat as 'eksplikacija') so chips
+ * appear correctly on pre-2026-05-02 projects too.
+ */
+export function inferPlotasSource(room) {
+  if (!room || room.plotas_m2 == null) return null;
+  if (room.plotas_source) return room.plotas_source;
+  // Manual polygon override: if a manual polygon exists, the area is from it.
+  if (
+    Array.isArray(room.polygon_pdf) &&
+    room.polygon_pdf.length >= 3 &&
+    room.polygon_source === 'manual'
+  ) {
+    return 'manual_polygon';
+  }
+  // Legacy backfill: pdfplumber HIT was the dominant historical path.
+  return 'eksplikacija';
 }
 
 function collectSources(room) {
