@@ -1177,6 +1177,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Didžiaformatės plytelės (>600×600) reikalauja papildomo darbo: extra
     # klijų sluoksnio, dvigubo padengimo (back-buttering), specialių įrankių.
     # rangovas premium projektai šitai itemize'ina su 2-3× kainos surcharge.
+    # BUG FIX (Sprint 0): pl_total must be defined BEFORE the didzformat_count
+    # check below. Previously it was assigned at line ~1213 (after its first use
+    # at line ~1185), causing a NameError that silently bypassed the entire
+    # _build_pozicijos_from_rooms function and fell back to Vision's stale
+    # pozicijos (containing the old "GKP lapai (12.5 mm)" single-line format).
+    pl_total = round(_sum("plyteles_sienos_m2") + _sum("plyteles_grindys_m2"), 2)
     plyteliu_specs = parsed.get("_plyteliu_specs") or []
     didzformat_count = sum(
         1 for s in plyteliu_specs
@@ -1210,7 +1216,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # 0.5×perim suggests we undercount; he counts grindys + lubų pjūvis +
     # dušo kabinos perim). Skylių gręžimas refactored to use symbol counts
     # when available, fallback to opening-count heuristic.
-    pl_total = round(_sum("plyteles_sienos_m2") + _sum("plyteles_grindys_m2"), 2)
+    # NOTE: pl_total is already assigned above (moved up to fix NameError bug).
     if pl_total > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
                               if (r.get("paskirtis") or "").lower() in WET), 2)
@@ -2175,8 +2181,21 @@ def extract_interior(
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
     except Exception as exc:
-        print(f"[extractor] pozicijos build failed: {exc}")
-        parsed["pozicijos"] = parsed.get("pozicijos") or []
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[extractor] pozicijos build failed: {exc}\n{tb}", flush=True)
+        # CRITICAL: do NOT fall back to Vision's pre-Sprint-0 pozicijos.
+        # Those contain stale labels (e.g. "GKP lapai (12.5 mm)") that
+        # Sprint 0 Fix 1 deliberately replaced with the wall/ceiling split.
+        # Better to ship empty pozicijos + visible warning than silently regress.
+        parsed["pozicijos"] = []
+        existing_warnings = parsed.get("warnings") or []
+        existing_warnings.append({
+            "level": "ERROR",
+            "source": "pozicijos_build_failure",
+            "message": f"Pozicijos rekonstrukcija nepavyko: {exc}. Reikia rankomis sukurti.",
+        })
+        parsed["warnings"] = existing_warnings
 
     # Step 3: Recompute santrauka from per-room values (single source of truth)
     # NOTE: this runs AFTER Python per-room compute so totals reflect deterministic dims.
