@@ -2143,6 +2143,43 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] cross_page_validator failed: {exc}")
 
+    # Step 4.06: Scale verification (Sprint 0 Fix 3) — warn when declared scale
+    # doesn't match actual rendered pixel dimensions.
+    # Adaptation note: Vision populates scale_source_page (int) but NOT a
+    # scale_source_text string. We scan puslapiai[].pavadinimas for "M 1:X"
+    # annotations as a best-effort text source. If nothing is found the check
+    # is silently skipped (no rooms have diagonal_px populated yet either, so
+    # validate_scale() is a no-op until the Vision prompt is extended in a
+    # future task to return pixel bounding-box dimensions).
+    try:
+        from .scale_validator import parse_scale_string, validate_scale
+        # Collect candidate scale text from page title blocks
+        scale_factor: float | None = None
+        for page in (parsed.get("puslapiai") or []):
+            sf = parse_scale_string(page.get("pavadinimas") or "")
+            if sf is not None:
+                scale_factor = sf
+                break  # use first page that declares a scale
+        if scale_factor:
+            scale_warnings = validate_scale(
+                scale_factor=scale_factor,
+                rendered_dpi=DPI,  # match render DPI used in pdf_to_b64_images
+                rooms=parsed.get("patalpos") or [],
+            )
+            if scale_warnings:
+                existing_warnings = parsed.get("warnings") or []
+                for msg in scale_warnings:
+                    existing_warnings.append({
+                        "level": "WARN",
+                        "message": msg,
+                        "source": "scale_validator",
+                    })
+                parsed["warnings"] = existing_warnings
+                print(f"[extractor] scale_validator emitted {len(scale_warnings)} warnings "
+                      f"(scale 1:{int(scale_factor)})")
+    except Exception as exc:
+        print(f"[extractor] scale_validator failed (non-fatal): {exc}")
+
     # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
     # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
     # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].
