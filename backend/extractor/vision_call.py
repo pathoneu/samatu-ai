@@ -770,25 +770,24 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
 
 
 def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
-                            section_average: float) -> list[dict]:
+                            section_average: float,
+                            name_key: str = "name") -> list[dict]:
     """Sprint 0 Fix 4: use Vision's per-room ceiling heights when available
     and the flag is enabled; otherwise apply section average to all rooms.
 
-    Args:
-        rooms: list of room dicts (each must have a "name" key for lookup).
-        per_room: dict of {room_name: ceiling_height_m} from Vision lubu_auksciai field.
-        section_average: fallback ceiling height (from Vision lubu_aukstis_m or default).
+    Returns a NEW list of room dicts (not in-place mutation).
 
-    Returns:
-        New list of room dicts with lubu_aukstis_m and lubu_aukstis_saltinis set.
+    name_key: which dict key holds the room name. Defaults to "name" for
+    test compatibility; production uses "pavadinimas" (LT convention).
     """
     from extractor.feature_flags import get_flags
     flag_on = get_flags()["per_room_ceiling"]
     out = []
     for r in rooms:
         room = {**r}
-        if flag_on and r.get("name") in per_room:
-            room["lubu_aukstis_m"] = per_room[r["name"]]
+        room_name = r.get(name_key)
+        if flag_on and room_name and room_name in per_room:
+            room["lubu_aukstis_m"] = per_room[room_name]
             room["lubu_aukstis_saltinis"] = "per_room"
         else:
             room["lubu_aukstis_m"] = section_average
@@ -2004,32 +2003,22 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] schedule anchor merge failed: {exc}")
 
-    # Step 2.45: PER-ROOM CEILING HEIGHTS (Sprint 0 Fix 4).
-    # When Vision returns `lubu_auksciai` dict (kambario_pavadinimas → aukstis_m),
-    # apply per-room heights when the feature flag is enabled; fall back to the
-    # section-level average for rooms not present in the dict.
+    # Step 2.45: Apply per-room ceiling heights when Vision provided them
+    # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
     try:
         per_room_heights = parsed.get("lubu_auksciai") or {}
         section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
         rooms_raw = parsed.get("patalpos") or []
-        # _apply_per_room_heights expects "name" key; rooms use "pavadinimas".
-        # Build a name-keyed lookup and apply, then write back to rooms in-place.
-        from extractor.feature_flags import get_flags as _get_flags
-        if _get_flags()["per_room_ceiling"] and per_room_heights:
-            for room in rooms_raw:
-                rname = room.get("pavadinimas") or room.get("name") or ""
-                if rname in per_room_heights:
-                    room["lubu_aukstis_m"] = float(per_room_heights[rname])
-                    room["lubu_aukstis_saltinis"] = "per_room"
-                elif "lubu_aukstis_m" not in room:
-                    room["lubu_aukstis_m"] = section_avg
-                    room["lubu_aukstis_saltinis"] = "section_average"
-            _emit({
-                "event": "per_room_ceiling_applied",
-                "rooms_with_per_room": sum(
-                    1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
-                ),
-            })
+        rooms_raw = _apply_per_room_heights(
+            rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
+        )
+        parsed["patalpos"] = rooms_raw
+        _emit({
+            "event": "per_room_ceiling_applied",
+            "rooms_with_per_room": sum(
+                1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
+            ),
+        })
     except Exception as exc:
         print(f"[extractor] per-room ceiling height apply failed: {exc}")
 

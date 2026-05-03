@@ -28,3 +28,16 @@ def test_flag_off_uses_average_for_all(monkeypatch):
     result = _apply_per_room_heights(rooms, per_room, avg)
     # Flag off → all rooms use the average
     assert all(r["lubu_aukstis_m"] == 2.70 for r in result)
+
+
+def test_apply_per_room_heights_with_pavadinimas_key(monkeypatch):
+    """Sprint 0 Fix 4: production uses 'pavadinimas' key (LT convention)."""
+    monkeypatch.setenv("ENABLE_PER_ROOM_CEILING", "1")
+    rooms = [{"pavadinimas": "Vonia"}, {"pavadinimas": "Virtuvė"}]
+    per_room = {"Vonia": 2.40}
+    avg = 2.70
+    result = _apply_per_room_heights(rooms, per_room, avg, name_key="pavadinimas")
+    assert result[0]["lubu_aukstis_m"] == 2.40
+    assert result[0]["lubu_aukstis_saltinis"] == "per_room"
+    assert result[1]["lubu_aukstis_m"] == 2.70
+    assert result[1]["lubu_aukstis_saltinis"] == "section_average"
