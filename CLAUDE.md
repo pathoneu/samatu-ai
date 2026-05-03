@@ -1,51 +1,90 @@
 # SĄMATŲ AI — Master Knowledge Base
 
-You are working on "Sąmatų AI" — a Lithuanian construction cost estimation web app. Its purpose is to save time for construction company owners by automatically reading project PDFs, extracting quantities, calculating areas/volumes/lengths, and generating kiekių žiniaraščiai (quantity schedules). The app replaces manual estimator (samatininko) work.
+**What this is:** A Lithuanian construction cost-estimation web app. It reads project PDFs, extracts quantities, calculates areas/volumes/lengths, and generates kiekių žiniaraščiai (quantity schedules). Replaces manual estimator (samatininko) work for construction company owners.
 
-## PROJECT STRUCTURE
-```
-~/samatu-ai/
-├── backend/          # Python FastAPI + pdfplumber + Anthropic API
-│   ├── main.py       # Endpoints: /extract, /extract-interior, /export/excel, /export/pdf
-│   └── tests/        # Test PDFs and expected JSON outputs
-├── frontend/         # React + Vite + Tailwind + shadcn/ui, dark theme, Lithuanian UI
-│   ├── src/
-│   │   ├── components/   # AssumptionsPanel.jsx, NewProject.jsx, etc.
-│   │   └── utils/        # interiorCalc.js (frontend recalculation engine)
-│   └── vite.config.js    # Proxy: /extract*, /export* → localhost:8000, allowedHosts: true
-```
+**Stack:** Python FastAPI backend + React/Vite/Tailwind/shadcn frontend. Anthropic Claude for vision + extraction. PDF→PNG via pdfplumber/pdf2image. Run `ls backend/`, `ls frontend/src/`, or `git log` to discover current code layout — don't trust a stale file tree here.
 
-## TECH STACK
-- Backend: Python FastAPI on localhost:8000
-- Frontend: React + Vite on localhost:5173
-- AI Models: claude-opus-4-7 for BOTH KŽ extraction AND interior Vision (accuracy > cost)
-- PDF→PNG: 300 DPI via pdfplumber/pdf2image
-- Frontend state: localStorage key "samatu_projects"
-- Vite proxy forwards /extract*, /export* to backend
+---
 
-## EXISTING FEATURES (ALREADY BUILT)
-1. **KŽ Extraction** (/extract) — upload construction PDF, AI extracts rows (nr, description, unit, quantity, section), user enters prices, totals with 21% VAT, exports to Excel/PDF
-2. **Interior Analysis** (/extract-interior) — upload interior design PDF, AI Vision reads dimensions, calculates: dažomas plotas, glaistymo kampai, angokraščiai, lubų perimetras, užuolaidų nišos, grindjuostės, dažų kiekis, GK lapai, glaistas
-3. **Assumptions UI** — Prielaidos tab where user can edit: sienos storis, Q lygis, langai, durys per room. Changes recalculate in real-time via interiorCalc.js
-4. **Window fallback** — when Vision finds 0 windows, shows warning and suggests standard windows per room type
-5. **Project type selection** — user picks: Automatinis / Interjero projektas / KŽ
+## How to work with me
 
-## KNOWN ISSUES
-- Window detection still unreliable (langai = 0 on many PDFs)
-- No facade, roof, earthworks, concrete modules yet
-- No F2/F3 export format
-- No Sistela normative integration
-- No auth/DB — everything in localStorage
+I do not want a yes-man. The single most valuable thing you can do is push back when I'm wrong.
 
-## RULES
-- All UI text MUST be in Lithuanian
-- Code comments and variable names in English
-- Use shadcn/ui components, dark theme (bg-gray-900/950)
-- Currency: EUR (€), always 21% PVM
-- Measurements: metric (m, m², m³, kg, l, vnt.)
-- Every calculation must show its assumptions to the user
-- Every API call must have retry logic (max 3 retries)
-- Every endpoint must have error handling
+- **Stress-test every proposal.** Before you say "yes, let's build that," ask out loud: *what's the worst case? what does this lock us into? where do the numbers stop working? what's the cheaper / smaller / dumber version that gets 80% of the value?* If you can't poke holes, you haven't thought hard enough.
+- **Argue, with reasons.** If I propose something that conflicts with the research below, with the bake-off results, or with what we already learned — say so directly and explain the tradeoff. "I disagree because X" beats "sure, I'll do it" every time.
+- **Don't preserve my ego over accuracy.** If a feature I love is empirically a dead end, say it. Cite the file/number.
+- **Research before committing.** When facing a non-trivial decision (new library, new pipeline, new pricing approach, new UX pattern), dispatch an Explore or research subagent first. Don't guess from training data — the answer often already exists in `docs/superpowers/research/`.
+- **Accuracy > code beauty.** Never refactor "for cleanliness" if the new pipeline scores below the existing one on real PDFs. Refactoring is allowed only when the new approach is at least as accurate.
+- **Verify before claiming success.** Type-check ≠ feature works. For UI changes, open a browser. For pipelines, run on real PDFs. Say "I couldn't test X" rather than implying you did.
+- **Honest disclosure beats clever fixes.** If something is brittle, AI-seeded, or measured against itself — flag it explicitly in the UI / report.
+
+---
+
+## What we built (working today on `main`)
+
+- **KŽ extraction** (`/extract`) — Claude reads construction PDF → rows (nr, description, unit, quantity, section). User enters prices. 21% PVM. Excel/PDF export.
+- **Interior analysis** (`/extract-interior`) — Claude Vision reads interior design PDFs → dažomas plotas, angokraščiai, glaistymo kampai, lubų perimetras, užuolaidų nišos, grindjuostės, dažų kiekis, GK lapai, glaistas.
+- **Assumptions panel** — `Prielaidos` tab; live recalculation via `frontend/src/utils/interiorCalc.js` when user edits sienos storis, Q lygis, langai, durys per kambarį.
+- **Window fallback** — when Vision returns 0 windows, warns + suggests standard sizes per room type.
+- **PDF viewer Phase C-1 / C-2 / C-4** — polygon editor (sienos/grindys redagavimas), trust signals (provenance popovers), visual polish (theme tokens, toolbar grouping, thumbnails, status bar).
+- **Project type selection** — Automatinis / Interjero projektas / KŽ.
+
+## What we tried — worked
+
+- **Deterministic refactor (2026-04-27)** — backend simplified, code audit passed (`docs/superpowers/research/2026-04-29-code-audit.md`).
+- **LT-pro pozicijų coverage** — rangovo audits + follow-up done (`docs/superpowers/research/2026-04-2[89]-rangovas-*`).
+- **Sonnet 4.6 vision for legend extraction** — clean per-symbol JSON; powers `detector_bench/core/legend_extractor.py`.
+- **Pipeline 1 (Claude Vision direct)** — 49.3% mean accuracy, $0.10/page, ~3s/symbol. Best of the 6 we tested.
+- **Pipeline 2 (pdfplumber regex)** — 41.8% accuracy, **$0**, fast. Solid free fallback for text-annotated PDFs.
+
+## What we tried — didn't work
+
+- **V1 isolated Vision calls** — ~30% accuracy, replaced.
+- **V2.1 prompts** (`docs/VISION_PROMPTS_V2_1_updated.md`) — superseded by deterministic refactor.
+- **Path A: XObject vector parsing** — all 3 LT test PDFs are flattened raster (Ghostscript / iLovePDF re-exports), no Form XObjects. Dead end (`docs/superpowers/research/2026-04-28-pdf-spike-findings.md`).
+- **Pipeline 3 (cv2.matchTemplate)** — over-counts 100× on busy drawings (1772 dvigubas_jungtukas where truth=5). Tiny ~30 px legend glyphs match anywhere.
+- **Pipeline 4 (hybrid text+template)** — 0% on P1: `pdfplumber.extract_words()` tokenization differs from `extract_text()`, no anchors found.
+- **Pipeline 5 (GroundingDINO via Replicate)** — credit ran out after 1 call, 60/72 returned `402 Insufficient Credit`. Inconclusive, retest pending.
+- **Pipeline 6 (Claude tool-orch)** — 23.3% accuracy at $1.20 (2× p1 cost). Inherits p3's fragility under expensive orchestration.
+- **Window detection** — still unreliable across drafting styles. Fallback warns, but root cause unsolved.
+
+Full bake-off: `detector_bench/README.md` + `results/2026-05-03-bakeoff.md`.
+
+## Open / next
+
+- **Ground truth is AI-seeded**, not human-confirmed. All accuracy numbers measure agreement-with-Claude, not absolute correctness. Highest-leverage work in the project right now: write `detector_bench/build_ground_truth.py` (the README points at it but it doesn't exist yet) and run the ~1h interactive flow.
+- **No count-correction UI on top of Pipeline 1.** The bake-off conclusion: ship 50% AI + a fast manual-correction tool, don't chase a perfect detector. This UI doesn't exist — it's the next concrete build.
+- **Phase C-3 click-to-fill walls** — plan complete (`docs/superpowers/plans/2026-05-02-phase-c-3-click-to-fill.md`), 12 tasks, not implemented.
+- **No auth / DB** — projects in `localStorage` only.
+- **No facade / roof / earthworks / concrete modules** — formulas exist below, code doesn't.
+- **No F2/F3 export, no Sistela integration.**
+
+## Research index — read before re-googling
+
+`docs/superpowers/research/` (21 files, all kept):
+- **PDF feasibility & vision:** `2026-04-28-pdf-spike-findings`, `2026-04-29-phase-c-{libraries,opencv-feasibility,competitor-tech}`, `vision-prompting-techniques`
+- **Competitor UX:** `2026-05-02-competitor-viewer-ui-deep-dive`, `togal-{ux-patterns,clickcount-ux}`, `industry-takeoff-tools`
+- **LT specifics:** `lt-drawing-conventions`, `2026-04-28-takeoff-standards-and-pdf-ux`, `rangovo-p1-position-analysis`, `2026-04-2{8,9}-rangovas-*`
+- **Polygon UX:** `2026-04-29-phase-c-polygon-ux`, `2026-04-29-isklotines-quality`
+- **Validation / formulas:** `formula-validation`, `2026-04-28-accuracy-priorities`
+- **Code state:** `2026-04-29-code-audit`
+
+`docs/superpowers/plans/` — implementation history (backend simplification, deterministic refactor, Phase C-1/C-2/C-3, bake-off).
+
+`docs/superpowers/specs/` — design docs (bidirectional plan traceability, PDF viewer trust).
+
+---
+
+## Operational rules
+
+- All **UI text in Lithuanian**. Code identifiers and comments in English.
+- shadcn/ui, dark theme (`bg-gray-900/950`).
+- Currency **EUR €**, always **21% PVM**. Renovation: reverse VAT.
+- Metric only: **m, m², m³, kg, l, vnt.**
+- Every calculation must show its assumptions to the user (and let them override → recalc live).
+- Every external API call: retry logic, max 3 retries.
+- Every endpoint: explicit error handling.
+- Confidence indicators on every quantity: 🟢 read directly, 🟡 partial+assumption, 🔴 fallback default.
 
 ---
 
@@ -527,27 +566,16 @@ Renovation: reverse VAT mechanism (atvirkštinis PVM)
 
 ---
 
-# ═══════════════════════════════════════════════
-# SECTION 10: APPROACH FOR NEW PROJECT PDF
-# ═══════════════════════════════════════════════
+# Standard pipeline for a new project PDF
 
-1. Identify construction type from document title/contents
-2. Classify each page (plan, section, elevation, išklotinė, etc.)
+1. Identify construction type from title/contents
+2. Classify each page (plan, section, elevation, išklotinė, etc. — see Section 4)
 3. Find and verify scale
 4. Extract room data (name, dimensions, area, ceiling height)
 5. Count openings (windows from elevations, doors from plans/schedules)
 6. Read finishes from wall developments (išklotinės) or finish schedule
-7. Calculate quantities using formulas from this file
-8. Apply waste factors
-9. Run validation checks
+7. Calculate quantities using formulas from Section 1
+8. Apply waste factors (Section 3)
+9. Run validation checks (Section 6) — surface failures to the user, don't hide them
 10. Present results WITH assumptions and confidence levels
-11. Let user override any assumption → recalculate in real-time
-
----
-
-When given a task:
-1. Read relevant existing code first
-2. Understand the current architecture  
-3. Make minimal, targeted changes
-4. Test that changes work
-5. Explain what you changed and why
+11. Let user override any assumption → recalculate live
