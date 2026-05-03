@@ -1,0 +1,50 @@
+[
+  {
+    "symbol_code": "viengubas_jungtukas",
+    "description_lt": "Viengubas jungiklis",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.045,
+      0.855,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "dvigubas_jungtukas",
+    "description_lt": "Dvigubas jungiklis",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.045,
+      0.87,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "kistukinis_lizdas",
+    "description_lt": "Kištukinis lizdas",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.045,
+      0.885,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "kistukinis_lizdas_hermetiskas",
+    "description_lt": "Kištukinis lizdas (lauko hermetiškas) (nuo švarių grindų)",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.045,
+      0.9,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  }
+]

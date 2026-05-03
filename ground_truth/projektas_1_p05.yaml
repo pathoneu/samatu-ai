@@ -1,0 +1,11 @@
+pdf_name: projektas_1_breziniai.pdf
+page_nr: 5
+dpi: 200
+symbols:
+  viengubas_jungtukas: 9
+  dvigubas_jungtukas: 5
+  kistukinis_lizdas: 18
+  kistukinis_lizdas_hermetiskas: 4
+confirmed_at: '2026-05-03T05:42:26+00:00'
+confirmed_by: claude_unverified_seed
+notes: P1 page 5 — santechnika — AI-seeded, NOT human-confirmed

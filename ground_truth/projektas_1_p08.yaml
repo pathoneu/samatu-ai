@@ -1,0 +1,11 @@
+pdf_name: projektas_1_breziniai.pdf
+page_nr: 8
+dpi: 200
+symbols:
+  viengubas_jungtukas: 6
+  dvigubas_jungtukas: 4
+  kistukinis_lizdas: 41
+  kistukinis_lizdas_hermetiskas: 3
+confirmed_at: '2026-05-03T05:42:22+00:00'
+confirmed_by: claude_unverified_seed
+notes: P1 page 8 — interjeras — AI-seeded, NOT human-confirmed

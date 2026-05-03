@@ -1,0 +1,27 @@
+pdf_name: projektas_3_breziniai.pdf
+page_nr: 23
+dpi: 200
+symbols:
+  iš.1: 3
+  pš.1: 2
+  led.1: 6
+  led.2: 1
+  in.led.1: 2
+  p.led.1: 4
+  p.led.1_2: 0
+  jls.1: 18
+  tš.1: 1
+  l.1: 3
+  lubinė_kolonėlė: 0
+  sieninis_reguliatorius: 1
+  jungtukas: 14
+  perjungiklis: 5
+  ventiliatorius: 1
+  rozetė_su_jungtuku: 3
+  baldinė_rozetė: 2
+  5_gyslų_laidas: 2
+  el_užuolaidų_parkavimo_vieta: 3
+  jungtukas_el_užuolaidoms: 2
+confirmed_at: '2026-05-03T05:42:30+00:00'
+confirmed_by: claude_unverified_seed
+notes: P3 page 23 — elektra 1 aukštas — AI-seeded, NOT human-confirmed

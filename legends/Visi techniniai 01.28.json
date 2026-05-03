@@ -1,0 +1,74 @@
+[
+  {
+    "symbol_code": "rozetė",
+    "description_lt": "Rozetė",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.792,
+      0.622,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "vartai",
+    "description_lt": "Vartai",
+    "category": "other",
+    "glyph_bbox_pct": [
+      0.792,
+      0.635,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "antena",
+    "description_lt": "Antena",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.792,
+      0.648,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "interneto_rozetė",
+    "description_lt": "Interneto rozetė",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.792,
+      0.661,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "pajungimas_prietaisui",
+    "description_lt": "Pajungimas prietaisui (šalia parašyta kam)",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.792,
+      0.674,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "usb-c",
+    "description_lt": "USB-C",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.792,
+      0.687,
+      0.018,
+      0.012
+    ],
+    "color_hint": null
+  }
+]

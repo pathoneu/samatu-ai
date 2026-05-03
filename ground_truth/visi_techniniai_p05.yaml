@@ -1,0 +1,13 @@
+pdf_name: Visi techniniai 01.28.pdf
+page_nr: 5
+dpi: 200
+symbols:
+  rozetė: 47
+  vartai: 1
+  antena: 0
+  interneto_rozetė: 3
+  pajungimas_prietaisui: 8
+  usb-c: 0
+confirmed_at: '2026-05-03T05:42:44+00:00'
+confirmed_by: claude_unverified_seed
+notes: VT page 5 — rozetės — AI-seeded, NOT human-confirmed
