@@ -19,6 +19,7 @@ import { Loader2, RefreshCw, AlertCircle, Building2, Calculator, ChevronDown, Ch
 import { logCorrection, updateProject } from '@/lib/projectStore';
 import { MIN_FLOORS, MAX_FLOORS, getFloorCount } from '@/lib/floorMultiplier';
 import { PRESETS, ROOM_DEFAULTS, WASTE_FACTORS, STANDARD_DIMENSIONS } from '@/lib/ltLibrary';
+import { recompute as recomputeQuantities } from '@/lib/recomputeApi';
 
 const API = '';
 
@@ -68,6 +69,27 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
           archetipas: project.archetipas,
           bendras_plotas_m2: project.bendras_plotas_m2,
         };
+
+        // Sprint 0 Fix 2: fire /api/recompute-quantities in parallel when
+        // paint_class is present, to update per-room dazai_l / dazai_luboms_l.
+        // Only paint_class is wired on the backend today (_VALID_FIELDS).
+        // Other override fields go only to /recompute-interior.
+        const paintClassChanged = 'paint_class' in newOverrides;
+        const quantitiesPromise = paintClassChanged
+          ? recomputeQuantities({
+              rooms: patalpos,
+              edits: [{ field: 'paint_class', new_value: newOverrides.paint_class }],
+              current_assumptions: {
+                paint_class: project._overrides?.paint_class ?? overrides.paint_class ?? 2,
+              },
+            }).catch(e => {
+              // Non-fatal — /recompute-interior already covers the full recompute.
+              // Log but don't surface to the user as a separate error.
+              console.warn('[recomputeQuantities] paint_class recompute failed:', e);
+              return null;
+            })
+          : Promise.resolve(null);
+
         const res = await fetch(`${API}/recompute-interior`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,13 +98,43 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = await res.json();
         if (result.status !== 'ok') throw new Error(result._error || 'Recompute klaida');
+
+        // Await quantities result (already resolved or in-flight)
+        const quantitiesResult = await quantitiesPromise;
+
+        // Merge per-room dazai_l / dazai_luboms_l from Fix 2 endpoint into the
+        // rooms returned by /recompute-interior, if available.
+        // Keyed by room index (both arrays share same patalpos order).
+        // pozicijos intentionally NOT overwritten — Fix 2 endpoint returns
+        // pozicijos:[] today; full pozicijos rebuild lives in /recompute-interior.
+        let mergedRooms = result.patalpos || result.v8_rooms || patalpos;
+        if (quantitiesResult?.rooms && Array.isArray(quantitiesResult.rooms)) {
+          mergedRooms = mergedRooms.map((room, idx) => {
+            const qRoom = quantitiesResult.rooms[idx];
+            if (!qRoom) return room;
+            const patch = {};
+            if (qRoom.dazai_l != null)       patch.dazai_l       = qRoom.dazai_l;
+            if (qRoom.dazai_luboms_l != null) patch.dazai_luboms_l = qRoom.dazai_luboms_l;
+            return Object.keys(patch).length ? { ...room, ...patch } : room;
+          });
+        }
+
         // Merge result back into project — preserve all original fields not in result
-        onProjectUpdate({
+        const updated = {
           ...project,
           ...result,
           _overrides: newOverrides,
           _per_room_overrides: newPerRoom,
-        });
+        };
+        // Splice in dazai_l-patched rooms (use whichever key the project uses)
+        if (result.patalpos) updated.patalpos = mergedRooms;
+        if (result.v8_rooms) updated.v8_rooms = mergedRooms;
+        // Merge Fix 2 assumptions (e.g. paint_class echo) into project prielaidos
+        if (quantitiesResult?.assumptions) {
+          updated.prielaidos = { ...(updated.prielaidos || {}), ...quantitiesResult.assumptions };
+        }
+
+        onProjectUpdate(updated);
       } catch (e) {
         console.error('Recompute failed:', e);
         setError(e.message || 'Nepavyko perskaičiuoti');
