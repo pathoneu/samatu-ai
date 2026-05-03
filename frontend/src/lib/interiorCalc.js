@@ -184,8 +184,12 @@ export function calculateInteriorQuantities(rawData, assumptions = {}) {
 
   // Additional metrics
   const dazymasVisoM2 = paintWallsM2 + lubosM2;
-  const dazaiSienoms  = round1(paintWallsM2 * 2 / 9);
-  const dazaiLuboms   = round1(lubosM2 * 2 / 10);
+  // REMOVED Sprint 0 Fix 2: paint formula moved to backend.
+  // Frontend should call recomputeApi.recompute() with paint_class to get correct values.
+  // These variables intentionally null so any consumer that still reads them gets a
+  // visible bug (rather than silently using stale wrong values).
+  const dazaiSienoms = null;
+  const dazaiLuboms = null;
   const gruntasL      = round1(dazymasVisoM2 * 0.15);
   const gkLapai       = Math.ceil(paintWallsM2 / 3.0 * 1.1);
   const qRate  = Q_RATES[glaistimo_lygis] || 1.0;

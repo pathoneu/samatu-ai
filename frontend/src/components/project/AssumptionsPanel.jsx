@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { recompute } from '../../lib/recomputeApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -97,10 +98,11 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData }) {
+export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, onRecomputed }) {
   const [open, setOpen] = useState(false);
   const [windowsExpanded, setWindowsExpanded] = useState(false);
   const [doorsExpanded, setDoorsExpanded] = useState(false);
+  const [recomputing, setRecomputing] = useState(false);
 
   const { sienos_storis_m, glaistimo_lygis, lubu_auksciai, custom_windows, custom_doors } = assumptions;
   const isFallback = prielaidos?.langai_fallback;
@@ -116,8 +118,29 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
   const setField = (field, val) => onChange({ ...assumptions, [field]: val });
 
-  const setLubuAukstis = (roomNr, val) =>
-    onChange({ ...assumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } });
+  const handleRecompute = useCallback(async (field, newValue) => {
+    if (!onRecomputed) return;  // Skip if parent doesn't accept results
+    setRecomputing(true);
+    try {
+      const result = await recompute({
+        rooms: rawData?.patalpos || [],
+        edits: [{ field, new_value: newValue }],
+        current_assumptions: assumptions || {},
+      });
+      onRecomputed(result);
+    } catch (err) {
+      console.error('Recompute failed:', err);
+      alert(`Klaida perskaičiuojant: ${err.message}`);
+    } finally {
+      setRecomputing(false);
+    }
+  }, [rawData?.patalpos, assumptions, onRecomputed]);
+
+  const setLubuAukstis = (roomNr, val) => {
+    const next = { ...assumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
+    onChange(next);
+    handleRecompute('lubu_auksciai', next.lubu_auksciai);
+  };
 
   const rooms = rawData?.patalpos || [];
   const avgH  = rooms.length > 0
@@ -165,7 +188,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           >
             <NumberInput
               value={sienos_storis_m}
-              onChange={v => setField('sienos_storis_m', v)}
+              onChange={v => { setField('sienos_storis_m', v); handleRecompute('sienos_storis_m', v); }}
               min={0.05} max={0.50} step={0.01} unit="m"
             />
           </Row>
@@ -176,7 +199,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               {['Q1','Q2','Q3','Q4'].map(q => (
                 <button
                   key={q}
-                  onClick={() => setField('glaistimo_lygis', q)}
+                  onClick={() => { setField('glaistimo_lygis', q); handleRecompute('glaistimo_lygis', q); }}
                   className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                     glaistimo_lygis === q
                       ? 'bg-primary text-primary-foreground border-primary'
@@ -236,7 +259,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             {windowsExpanded && (
               <OpeningEditor
                 items={displayWindows}
-                onChange={wins => setField('custom_windows', wins)}
+                onChange={wins => { setField('custom_windows', wins); handleRecompute('custom_windows', wins); }}
                 label="langą"
                 defaultItem={{ width_mm: 1200, height_mm: 1500 }}
               />
@@ -261,7 +284,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             {doorsExpanded && (
               <OpeningEditor
                 items={displayDoors}
-                onChange={ds => setField('custom_doors', ds)}
+                onChange={ds => { setField('custom_doors', ds); handleRecompute('custom_doors', ds); }}
                 label="duris"
                 defaultItem={{ width_mm: 800, height_mm: 2200 }}
               />
@@ -269,7 +292,9 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           </div>
 
           <p className="text-xs text-muted-foreground pt-1">
-            Kiekiai persiskaičiuoja automatiškai kiekvieną kartą keičiant prielaidas.
+            {recomputing
+              ? 'Perskaičiuojama...'
+              : 'Kiekiai persiskaičiuoja automatiškai kiekvieną kartą keičiant prielaidas.'}
           </p>
 
           <FormulasCard
