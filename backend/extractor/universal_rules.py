@@ -606,3 +606,14 @@ def calc_totals(rooms: list[dict]) -> dict:
             totals["hidroizoliacijos_vnt"] += 1
 
     return {k: round(v, 2) if isinstance(v, float) else v for k, v in totals.items()}
+
+
+def paint_coverage_for_class(paint_class: int) -> tuple[float, float]:
+    """Return (walls_coverage_m2_per_l, ceiling_coverage_m2_per_l) for a Q-class.
+
+    Class 1 = previously painted smooth (Q1 finish)
+    Class 2 = plastered Q2-Q3 (matte paint)
+    Class 3 = fresh plaster (Q4, lots of absorption)
+    """
+    table = {1: (11.0, 11.0), 2: (8.0, 11.0), 3: (4.0, 11.0)}
+    return table.get(paint_class, table[2])
