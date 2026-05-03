@@ -8,7 +8,7 @@ See docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §7 Fix 2.
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from extractor.universal_rules import paint_coverage_for_class
+from extractor.universal_rules import UNIVERSAL_RULES, paint_coverage_for_class
 
 router = APIRouter(prefix="/api", tags=["recompute"])
 
@@ -25,9 +25,16 @@ class RecomputeRequest(BaseModel):
     current_assumptions: dict
 
 
+# Sprint 0 scope: only `paint_class` is wired through to recompute output.
+# Other fields are accepted (forward-compat for Tasks 6, 7, and future sprints
+# that wire ceiling height, wall thickness, etc. into the formula stack), but
+# editing them today does not change returned quantities. Tracked as follow-up.
 _VALID_FIELDS = {
-    "paint_class", "lubu_aukstis", "sienos_storis",
-    "plyteliu_aukstis", "kampu_skaicius",
+    "paint_class",        # Sprint 0 — wired
+    "lubu_aukstis",       # Sprint 0 Fix 4 (Task 6) — accepted, will wire then
+    "sienos_storis",      # Future — accepted, no-op today
+    "plyteliu_aukstis",   # Future — accepted, no-op today
+    "kampu_skaicius",     # Future — accepted, no-op today
 }
 
 
@@ -55,9 +62,10 @@ def recompute(req: RecomputeRequest) -> dict:
         room = {**r}
         walls = float(r.get("dazomas_plotas_m2", 0) or 0)
         ceiling = float(r.get("lubu_dazomas_plotas_m2", 0) or 0)
-        # 2 coats with 1.8× absorption (NOT 2.0×)
-        room["dazai_l"] = round(walls * 1.8 / coverage_walls, 2) if walls else 0.0
-        room["dazai_luboms_l"] = round(ceiling * 1.8 / coverage_ceiling, 2) if ceiling else 0.0
+        # 2 coats with first_coat_factor absorption (NOT 2.0×)
+        absorption = float(UNIVERSAL_RULES["first_coat_factor"])
+        room["dazai_l"] = round(walls * absorption / coverage_walls, 2) if walls else 0.0
+        room["dazai_luboms_l"] = round(ceiling * absorption / coverage_ceiling, 2) if ceiling else 0.0
         out_rooms.append(room)
 
     return {

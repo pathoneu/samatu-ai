@@ -614,6 +614,13 @@ def paint_coverage_for_class(paint_class: int) -> tuple[float, float]:
     Class 1 = previously painted smooth (Q1 finish)
     Class 2 = plastered Q2-Q3 (matte paint)
     Class 3 = fresh plaster (Q4, lots of absorption)
+
+    Sourced from UNIVERSAL_RULES["paint_coverage"] — single source of truth.
     """
-    table = {1: (11.0, 11.0), 2: (8.0, 11.0), 3: (4.0, 11.0)}
-    return table.get(paint_class, table[2])
+    pc = UNIVERSAL_RULES["paint_coverage"]
+    walls_key = {
+        1: "smooth_repaint",
+        2: "plastered_q2_q3",
+        3: "fresh_plaster",
+    }.get(paint_class, "plastered_q2_q3")
+    return float(pc[walls_key]), float(pc["ceiling_smooth"])
