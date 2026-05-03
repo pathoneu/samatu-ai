@@ -1167,7 +1167,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         })
 
     _add_tile_lines(SK_PL, pl_sienos_vonia, "Vonios sienų")
-    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės backsplash")
+    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės atatvaro")
     _add_tile_lines(SK_PL, pl_sienos_kita, "Kitų sienų")
     _add_tile_lines(SK_PL, pl_grindys_vonia, "Vonios grindų")
     _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų")
