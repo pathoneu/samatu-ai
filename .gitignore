@@ -44,3 +44,4 @@ detector_bench/render_cache/
 legends/*/
 results/*.md
 !results/.gitkeep
+.playwright-mcp/

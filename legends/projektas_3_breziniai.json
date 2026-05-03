@@ -1,0 +1,242 @@
+[
+  {
+    "symbol_code": "iš.1",
+    "description_lt": "IŠVIRSINIS LUBINIS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.132,
+      0.04,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "pš.1",
+    "description_lt": "PAKABINAMAS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.158,
+      0.04,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "led.1",
+    "description_lt": "LED JUOSTA PROFILYJE PASLĖPTAM APŠVIETIMUI FORMUOTI",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.183,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "led.2",
+    "description_lt": "LED JUOSTA PROFILYJE PASLĖPTAM APŠVIETIMUI GRINDOJOSTĖJE FORMUOTI",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.208,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "in.led.1",
+    "description_lt": "IŠVIRSINIS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.233,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "p.led.1",
+    "description_lt": "PAKABINAMAS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.258,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "p.led.1_2",
+    "description_lt": "PASLEPTAS SONINIS LED",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.283,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "jls.1",
+    "description_lt": "Į LUBAS LEIDŽIAMAS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.308,
+      0.04,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "tš.1",
+    "description_lt": "TORSERINIS ŠVIESTUVAS",
+    "category": "lighting",
+    "glyph_bbox_pct": [
+      0.638,
+      0.333,
+      0.04,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "l.1",
+    "description_lt": "PALIKAMAS LAIDAS (jei nenurodytas kitaip, tai atstūmis - 2.00m)",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.638,
+      0.358,
+      0.06,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "lubinė_kolonėlė",
+    "description_lt": "LUBINĖ KOLONĖLĖ",
+    "category": "other",
+    "glyph_bbox_pct": [
+      0.832,
+      0.132,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "sieninis_reguliatorius",
+    "description_lt": "SIENINIS REGULIATORIUS",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.158,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "jungtukas",
+    "description_lt": "JUNGTUKAS ( jei nenurodytas prie jungtuko tai H= 0.9m )",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.183,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "perjungiklis",
+    "description_lt": "PERJUNGIKLIS ( jei nenurodytas prie jungtuko tai H= 0.9m )",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.208,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "ventiliatorius",
+    "description_lt": "VENTILIATORIU ( jei nenurodytas prie jungtuko tai H= 0.9m )",
+    "category": "hvac",
+    "glyph_bbox_pct": [
+      0.832,
+      0.233,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "rozetė_su_jungtuku",
+    "description_lt": "ROZETĖS MONTUOJAMOS KARTU SU JUNGTUKU VIENAME BLOKE",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.258,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "baldinė_rozetė",
+    "description_lt": "BALDINĖ ROZETĖ VALDOMA JUNGTUKU (JEI NENURODYTAS PRE ROZETĖS TAI H=0.3 )",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.283,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "5_gyslų_laidas",
+    "description_lt": "5 GYSLŲ LAIDAS EL. UŽUOLAIDAI TIKSLINAMAS SU PASIRINKTU UŽUOLAIDŲ SPECIALISTU",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.308,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "el_užuolaidų_parkavimo_vieta",
+    "description_lt": "EL. UŽUOLAIDŲ PARKAVIMO VIETA, JUDĖJIMO KRYPTIS",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.333,
+      0.04,
+      0.025
+    ],
+    "color_hint": null
+  },
+  {
+    "symbol_code": "jungtukas_el_užuolaidoms",
+    "description_lt": "JUNGTUKAS el. užuolaidoms ir el. roletams ( jei nenurodytas prie jungtuko tai H= 0.9m )",
+    "category": "electrical",
+    "glyph_bbox_pct": [
+      0.832,
+      0.358,
+      0.025,
+      0.025
+    ],
+    "color_hint": null
+  }
+]
