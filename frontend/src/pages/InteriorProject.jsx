@@ -1330,6 +1330,20 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             onChange={handleAssumptionsChange}
             prielaidos={prielaidos}
             rawData={rawData}
+            onRecomputed={(result) => {
+              // Sprint 0 Fix 2 wire-through: merge backend-recomputed rooms +
+              // assumptions into project state. pozicijos intentionally NOT
+              // overwritten — Task 3 endpoint returns pozicijos:[] today; full
+              // pozicijos rebuild is Sprint 1 work.
+              setAssumptions(result.assumptions);
+              setProject(prev => ({
+                ...prev,
+                raw_calc_data: prev.raw_calc_data
+                  ? { ...prev.raw_calc_data, patalpos: result.rooms }
+                  : prev.raw_calc_data,
+                prielaidos: { ...(prev.prielaidos || {}), ...result.assumptions },
+              }));
+            }}
           />
 
           {/* Summary of current assumptions */}
