@@ -1,5 +1,28 @@
 # Changelog
 
+## Sprint 1 — Tile-Based Rendering — 2026-05-03
+
+### Added
+- New `<TakeoffCanvas>` component (`frontend/src/components/canvas/`) with
+  mip-pyramid (3 fixed zoom levels: 0.5×, 1.5×, 3×) + CSS-transform-during-
+  interaction + OffscreenCanvas settle render. Zoom and pan should now hit
+  60 fps even on large PDFs.
+- New route `/project/:id/v2` mounts the takeoff workspace alongside the
+  legacy viewer at `/project/:id`. Default switches at end of Sprint 3;
+  legacy removed Sprint 4.
+- `MemoryWatchdog` auto-resets the PDF doc when JS heap exceeds 500 MB and
+  the user is idle for 30 s, addressing pdf.js #20198 leak.
+
+### Internal
+- New libs: `viewerStore.js` (zustand), `renderQueue.js` (p-limit(2)),
+  `tileCache.js` (LRU + ImageBitmap close-on-evict), `mipPyramid.js`
+  (zoom-level math + OffscreenCanvas page renderer).
+- 4 new frontend test files (16 new tests); pure-function math for mip
+  selection and cache eviction is fully unit-tested.
+
+### Known follow-ups
+See `docs/sprint-1-followups.md`.
+
 ## Sprint 0 — Math Fixes + Baseline Timing — 2026-05-03
 
 ### Changed (user-visible)
