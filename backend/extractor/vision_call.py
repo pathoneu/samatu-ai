@@ -1896,6 +1896,12 @@ def extract_interior(
         final_class, source = _resolve_paint_class(user_default, inferred_cls, inferred_text)
         parsed["paint_class"] = final_class
         parsed["paint_class_source"] = source
+        # Wire-through: inject resolved paint_class into rules_override so Step 2.9's
+        # _resolve_paint_class_from_prefs() picks it up. Without this, the inferred value
+        # was visible in metadata (parsed["paint_class"]) but never reached dazai_l math.
+        if rules_override is None:
+            rules_override = {}
+        rules_override["paint_class"] = final_class
     except Exception as exc:
         print(f"[extractor] paint_class inference resolve failed (non-fatal): {exc}")
 

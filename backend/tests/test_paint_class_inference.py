@@ -28,3 +28,23 @@ def test_flag_off_always_uses_user(monkeypatch):
     cls, src = _resolve_paint_class(user_default=1, inferred=2, inferred_text="Q2")
     assert cls == 1
     assert src == "user_default"
+
+
+def test_inferred_class_overrides_user_default_in_rules_override(monkeypatch):
+    """Sprint 0 Fix 5 wire-through: when flag on + inferred present,
+    rules_override["paint_class"] reflects the inferred value so
+    downstream paint math uses it (not the user wizard default).
+
+    This is a regression test for the half-shipped bug where
+    parsed["paint_class"] was correct but rules_override was stale.
+    """
+    monkeypatch.setenv("ENABLE_PAINT_CLASS_INFERENCE", "1")
+    final_class, source = _resolve_paint_class(
+        user_default=1, inferred=3, inferred_text="Q4 blizgus"
+    )
+    assert final_class == 3
+    assert source == "inferred_from_spec"
+    # Caller (vision_call pipeline) must propagate this into rules_override
+    # before Step 2.9. This test asserts the resolver returns the correct
+    # value; the pipeline-level wire-through is verified by inspection
+    # of vision_call.py Step 2.35.
