@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import os
 import re as _re
 import time
@@ -719,6 +720,55 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
     return parsed
 
 
+def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
+    """Build GKP pozicijos rows: separate wall (12.5mm) and ceiling (9.5mm) lines.
+
+    Input contract:
+      rooms — list of room dicts each with:
+        sienos_gkp_m2  — wall drywall area (12.5mm sheets)
+        lubos_gkp_m2   — ceiling drywall area (9.5mm sheets)
+
+    Sprint 0 Fix 1 — audit Fix 1 from spec §7.
+    Previously emitted a single hardcoded "GKP lapai (12.5 mm)" line for all
+    GKP (ceiling + wall combined). Now emits separate lines using the correct
+    thickness constants from UNIVERSAL_RULES.
+    """
+    from .universal_rules import UNIVERSAL_RULES
+
+    SHEET = UNIVERSAL_RULES["drywall_sheet_area_m2"]          # 3.0 m²
+    WASTE = 1.10
+    wall_thickness = UNIVERSAL_RULES["drywall_thickness_walls_mm"]      # 12.5
+    ceil_thickness = UNIVERSAL_RULES["drywall_thickness_ceilings_mm"]   # 9.5
+
+    walls_total = sum(float(r.get("sienos_gkp_m2") or 0) for r in rooms)
+    ceilings_total = sum(float(r.get("lubos_gkp_m2") or 0) for r in rooms)
+
+    # Constants used in pozicijos rows — mirror module-level naming in the caller
+    _SK_GKP = "GKP montavimas"
+    _SAL = "skaiciuota_is_brezinio"
+
+    pozicijos = []
+    if walls_total > 0:
+        wall_sheets = math.ceil(walls_total / SHEET * WASTE)
+        pozicijos.append({
+            "skyrius": _SK_GKP,
+            "aprasymas": f"GKP lapai sienoms ({wall_thickness} mm)",
+            "vnt": "vnt", "kiekis": wall_sheets, "saltinis": _SAL,
+            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            "medziagos_kiekis": wall_sheets, "medziagos_vnt": "vnt",
+        })
+    if ceilings_total > 0:
+        ceil_sheets = math.ceil(ceilings_total / SHEET * WASTE)
+        pozicijos.append({
+            "skyrius": _SK_GKP,
+            "aprasymas": f"GKP lapai luboms ({ceil_thickness} mm)",
+            "vnt": "vnt", "kiekis": ceil_sheets, "saltinis": _SAL,
+            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            "medziagos_kiekis": ceil_sheets, "medziagos_vnt": "vnt",
+        })
+    return pozicijos
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -994,8 +1044,6 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     gkp_high = _sum("gkp_lubu_virs_3m_m2")
     gkp_total = gkp_standart + gkp_high
     if gkp_total > 0:
-        # Lapai vnt = m² / 3.0 × 1.10 atliekų
-        lapai_vnt = round(gkp_total / 3.0 * 1.10)
         if gkp_standart > 0:
             pozicijos.append({
                 "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (standartinis aukštis)",
@@ -1006,11 +1054,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (virš 3 m aukščio)",
                 "vnt": "m2", "kiekis": gkp_high, "saltinis": SAL,
             })
+        # Sprint 0 Fix 1: separate 9.5mm ceiling sheets from 12.5mm wall sheets.
+        # Current data model only tracks ceiling GKP; sienos_gkp_m2=0 until wall
+        # GKP fields are added to the extraction schema.
+        pozicijos.extend(build_gkp_pozicijos([
+            {"sienos_gkp_m2": 0, "lubos_gkp_m2": gkp_total}
+        ]))
         pozicijos.extend([
-            {"skyrius": SK_GKP, "aprasymas": "GKP lapai (12.5 mm)",
-             "vnt": "vnt", "kiekis": lapai_vnt, "saltinis": SAL,
-             "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
-             "medziagos_kiekis": lapai_vnt, "medziagos_vnt": "vnt"},
             {"skyrius": SK_GKP, "aprasymas": "GKP karkaso profiliai (CD/UD)",
              "vnt": "m", "kiekis": round(gkp_total * 3.0, 2), "saltinis": SAL,
              "medziagos_aprasymas": "Profiliai (~3 m/m² lubų)",
