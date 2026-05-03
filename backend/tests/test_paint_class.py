@@ -9,7 +9,7 @@ import pytest
 
 from extractor.vision_call import (
     _calc_dazai_liters,
-    _resolve_paint_class,
+    _resolve_paint_class_from_prefs as _resolve_paint_class,
     _PAINT_CLASS_PROFILES,
     _PAINT_CLASS_DEFAULT,
 )

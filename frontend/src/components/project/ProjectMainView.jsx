@@ -20,7 +20,7 @@
  *   └───────────────────────────────────────────────────────┘
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
@@ -32,6 +32,7 @@ import ExportDropdown from './ExportDropdown';
 import ReextractButton from './ReextractButton';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import { useAuth } from '@/lib/authContext';
+import { createSession } from '@/lib/telemetry';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -175,6 +176,20 @@ function WorkRow({ item, onChange, onRemove }) {
 export default function ProjectMainView({ project, onProjectChange, onShowDrawing, onJumpToPage }) {
   const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
+
+  // Sprint 0 Fix 6: session telemetry — track time-on-task per project view
+  const sessionRef = useRef(null);
+  useEffect(() => {
+    const projectId = project?.id;
+    if (!projectId) return;
+    sessionRef.current = createSession({ projectId });
+    const onUnload = () => sessionRef.current?.finish({ exported: false });
+    window.addEventListener('beforeunload', onUnload);
+    return () => {
+      window.removeEventListener('beforeunload', onUnload);
+      sessionRef.current?.finish({ exported: false });
+    };
+  }, [project?.id]);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
 
   const grouped = useMemo(() => groupByCategory(darbai), [darbai]);

@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import os
 import re as _re
 import time
@@ -552,7 +553,7 @@ def _calc_dazai_liters(dazymo_plotas_m2: float, coats: int = 2,
     return round(dazymo_plotas_m2 * factor / _PAINT_COVERAGE_M2_PER_L, 2)
 
 
-def _resolve_paint_class(rules_or_overrides: dict | None) -> int:
+def _resolve_paint_class_from_prefs(rules_or_overrides: dict | None) -> int:
     """Read paint_class (1/2/3) from user prefs (Setup Wizard / Prielaidos).
     Falls back to LT default = 2. Accepts both raw user prefs and the
     translated rules dict (`_paint_class` meta key)."""
@@ -564,6 +565,18 @@ def _resolve_paint_class(rules_or_overrides: dict | None) -> int:
     except (ValueError, TypeError):
         cls = _PAINT_CLASS_DEFAULT
     return cls if cls in (1, 2, 3) else _PAINT_CLASS_DEFAULT
+
+
+def _resolve_paint_class(user_default: int, inferred: int | None,
+                         inferred_text: str | None) -> tuple[int, str]:
+    """Sprint 0 Fix 5: prefer paint class inferred from spec text,
+    falling back to user wizard default. Returns (class, source_label).
+    """
+    from extractor.feature_flags import get_flags
+    flag_on = get_flags()["paint_class_inference"]
+    if flag_on and inferred is not None:
+        return int(inferred), "inferred_from_spec"
+    return int(user_default), "user_default"
 
 
 # Lubų karnizas dedamas TIK gyvenamose patalpose su dekoratyvinėm lubom
@@ -688,7 +701,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
 
         # 4.2 Dažai (litrai) — paint class drives coats × coverage (Sprint §2A.5).
-        paint_class = _resolve_paint_class(rules_override)
+        paint_class = _resolve_paint_class_from_prefs(rules_override)
         room["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=paint_class)
         room["_paint_class"] = paint_class  # surface to UI / debug
 
@@ -717,6 +730,82 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             f"Skaičiavo Python (deterministinis)."
         )
     return parsed
+
+
+def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
+    """Build GKP pozicijos rows: separate wall (12.5mm) and ceiling (9.5mm) lines.
+
+    Input contract:
+      rooms — list of room dicts each with:
+        sienos_gkp_m2  — wall drywall area (12.5mm sheets)
+        lubos_gkp_m2   — ceiling drywall area (9.5mm sheets)
+
+    Sprint 0 Fix 1 — audit Fix 1 from spec §7.
+    Previously emitted a single hardcoded "GKP lapai (12.5 mm)" line for all
+    GKP (ceiling + wall combined). Now emits separate lines using the correct
+    thickness constants from UNIVERSAL_RULES.
+    """
+    from .universal_rules import UNIVERSAL_RULES
+
+    SHEET = UNIVERSAL_RULES["drywall_sheet_area_m2"]          # 3.0 m²
+    WASTE = 1.10
+    wall_thickness = UNIVERSAL_RULES["drywall_thickness_walls_mm"]      # 12.5
+    ceil_thickness = UNIVERSAL_RULES["drywall_thickness_ceilings_mm"]   # 9.5
+
+    walls_total = sum(float(r.get("sienos_gkp_m2") or 0) for r in rooms)
+    ceilings_total = sum(float(r.get("lubos_gkp_m2") or 0) for r in rooms)
+
+    # Constants used in pozicijos rows — mirror module-level naming in the caller
+    _SK_GKP = "GKP montavimas"
+    _SAL = "skaiciuota_is_brezinio"
+
+    pozicijos = []
+    if walls_total > 0:
+        wall_sheets = math.ceil(walls_total / SHEET * WASTE)
+        pozicijos.append({
+            "skyrius": _SK_GKP,
+            "aprasymas": f"GKP lapai sienoms ({wall_thickness} mm)",
+            "vnt": "vnt", "kiekis": wall_sheets, "saltinis": _SAL,
+            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            "medziagos_kiekis": wall_sheets, "medziagos_vnt": "vnt",
+        })
+    if ceilings_total > 0:
+        ceil_sheets = math.ceil(ceilings_total / SHEET * WASTE)
+        pozicijos.append({
+            "skyrius": _SK_GKP,
+            "aprasymas": f"GKP lapai luboms ({ceil_thickness} mm)",
+            "vnt": "vnt", "kiekis": ceil_sheets, "saltinis": _SAL,
+            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            "medziagos_kiekis": ceil_sheets, "medziagos_vnt": "vnt",
+        })
+    return pozicijos
+
+
+def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
+                            section_average: float,
+                            name_key: str = "name") -> list[dict]:
+    """Sprint 0 Fix 4: use Vision's per-room ceiling heights when available
+    and the flag is enabled; otherwise apply section average to all rooms.
+
+    Returns a NEW list of room dicts (not in-place mutation).
+
+    name_key: which dict key holds the room name. Defaults to "name" for
+    test compatibility; production uses "pavadinimas" (LT convention).
+    """
+    from extractor.feature_flags import get_flags
+    flag_on = get_flags()["per_room_ceiling"]
+    out = []
+    for r in rooms:
+        room = {**r}
+        room_name = r.get(name_key)
+        if flag_on and room_name and room_name in per_room:
+            room["lubu_aukstis_m"] = per_room[room_name]
+            room["lubu_aukstis_saltinis"] = "per_room"
+        else:
+            room["lubu_aukstis_m"] = section_average
+            room["lubu_aukstis_saltinis"] = "section_average"
+        out.append(room)
+    return out
 
 
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
@@ -994,8 +1083,6 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     gkp_high = _sum("gkp_lubu_virs_3m_m2")
     gkp_total = gkp_standart + gkp_high
     if gkp_total > 0:
-        # Lapai vnt = m² / 3.0 × 1.10 atliekų
-        lapai_vnt = round(gkp_total / 3.0 * 1.10)
         if gkp_standart > 0:
             pozicijos.append({
                 "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (standartinis aukštis)",
@@ -1006,11 +1093,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (virš 3 m aukščio)",
                 "vnt": "m2", "kiekis": gkp_high, "saltinis": SAL,
             })
+        # Sprint 0 Fix 1: separate 9.5mm ceiling sheets from 12.5mm wall sheets.
+        # Current data model only tracks ceiling GKP; sienos_gkp_m2=0 until wall
+        # GKP fields are added to the extraction schema.
+        pozicijos.extend(build_gkp_pozicijos([
+            {"sienos_gkp_m2": 0, "lubos_gkp_m2": gkp_total}
+        ]))
         pozicijos.extend([
-            {"skyrius": SK_GKP, "aprasymas": "GKP lapai (12.5 mm)",
-             "vnt": "vnt", "kiekis": lapai_vnt, "saltinis": SAL,
-             "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
-             "medziagos_kiekis": lapai_vnt, "medziagos_vnt": "vnt"},
             {"skyrius": SK_GKP, "aprasymas": "GKP karkaso profiliai (CD/UD)",
              "vnt": "m", "kiekis": round(gkp_total * 3.0, 2), "saltinis": SAL,
              "medziagos_aprasymas": "Profiliai (~3 m/m² lubų)",
@@ -1078,7 +1167,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         })
 
     _add_tile_lines(SK_PL, pl_sienos_vonia, "Vonios sienų")
-    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės backsplash")
+    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės atatvaro")
     _add_tile_lines(SK_PL, pl_sienos_kita, "Kitų sienų")
     _add_tile_lines(SK_PL, pl_grindys_vonia, "Vonios grindų")
     _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų")
@@ -1088,6 +1177,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Didžiaformatės plytelės (>600×600) reikalauja papildomo darbo: extra
     # klijų sluoksnio, dvigubo padengimo (back-buttering), specialių įrankių.
     # rangovas premium projektai šitai itemize'ina su 2-3× kainos surcharge.
+    # BUG FIX (Sprint 0): pl_total must be defined BEFORE the didzformat_count
+    # check below. Previously it was assigned at line ~1213 (after its first use
+    # at line ~1185), causing a NameError that silently bypassed the entire
+    # _build_pozicijos_from_rooms function and fell back to Vision's stale
+    # pozicijos (containing the old "GKP lapai (12.5 mm)" single-line format).
+    pl_total = round(_sum("plyteles_sienos_m2") + _sum("plyteles_grindys_m2"), 2)
     plyteliu_specs = parsed.get("_plyteliu_specs") or []
     didzformat_count = sum(
         1 for s in plyteliu_specs
@@ -1121,7 +1216,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # 0.5×perim suggests we undercount; he counts grindys + lubų pjūvis +
     # dušo kabinos perim). Skylių gręžimas refactored to use symbol counts
     # when available, fallback to opening-count heuristic.
-    pl_total = round(_sum("plyteles_sienos_m2") + _sum("plyteles_grindys_m2"), 2)
+    # NOTE: pl_total is already assigned above (moved up to fix NameError bug).
     if pl_total > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
                               if (r.get("paskirtis") or "").lower() in WET), 2)
@@ -1796,6 +1891,26 @@ def extract_interior(
         ],
     })
 
+    # Step 2.35: Sprint 0 Fix 5 — resolve paint class from spec inference (flag-gated).
+    # Vision may return inferred_paint_class + inferred_paint_class_evidence when the
+    # spec explicitly states a finish quality (e.g., 'Q2 matinis', 'Q4 blizgus').
+    # _resolve_paint_class gates on ENABLE_PAINT_CLASS_INFERENCE; falls back to user default.
+    try:
+        inferred_cls = parsed.get("inferred_paint_class")
+        inferred_text = parsed.get("inferred_paint_class_evidence")
+        user_default = int((rules_override or {}).get("paint_class", 2))
+        final_class, source = _resolve_paint_class(user_default, inferred_cls, inferred_text)
+        parsed["paint_class"] = final_class
+        parsed["paint_class_source"] = source
+        # Wire-through: inject resolved paint_class into rules_override so Step 2.9's
+        # _resolve_paint_class_from_prefs() picks it up. Without this, the inferred value
+        # was visible in metadata (parsed["paint_class"]) but never reached dazai_l math.
+        if rules_override is None:
+            rules_override = {}
+        rules_override["paint_class"] = final_class
+    except Exception as exc:
+        print(f"[extractor] paint_class inference resolve failed (non-fatal): {exc}")
+
     # Step 2.4: Merge eksplikacija ground truth into rooms by name match (case-insensitive).
     # Eksplikacija plotas/perimetras override Vision dimension-chain values when available.
     rooms = parsed.get("patalpos") or []
@@ -1926,6 +2041,25 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] schedule anchor merge failed: {exc}")
 
+    # Step 2.45: Apply per-room ceiling heights when Vision provided them
+    # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
+    try:
+        per_room_heights = parsed.get("lubu_auksciai") or {}
+        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
+        rooms_raw = parsed.get("patalpos") or []
+        rooms_raw = _apply_per_room_heights(
+            rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
+        )
+        parsed["patalpos"] = rooms_raw
+        _emit({
+            "event": "per_room_ceiling_applied",
+            "rooms_with_per_room": sum(
+                1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
+            ),
+        })
+    except Exception as exc:
+        print(f"[extractor] per-room ceiling height apply failed: {exc}")
+
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
     # crop the page region at 300 DPI / 2576px max, send to Vision with room
@@ -2047,8 +2181,21 @@ def extract_interior(
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
     except Exception as exc:
-        print(f"[extractor] pozicijos build failed: {exc}")
-        parsed["pozicijos"] = parsed.get("pozicijos") or []
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[extractor] pozicijos build failed: {exc}\n{tb}", flush=True)
+        # CRITICAL: do NOT fall back to Vision's pre-Sprint-0 pozicijos.
+        # Those contain stale labels (e.g. "GKP lapai (12.5 mm)") that
+        # Sprint 0 Fix 1 deliberately replaced with the wall/ceiling split.
+        # Better to ship empty pozicijos + visible warning than silently regress.
+        parsed["pozicijos"] = []
+        existing_warnings = parsed.get("warnings") or []
+        existing_warnings.append({
+            "level": "ERROR",
+            "source": "pozicijos_build_failure",
+            "message": f"Pozicijos rekonstrukcija nepavyko: {exc}. Reikia rankomis sukurti.",
+        })
+        parsed["warnings"] = existing_warnings
 
     # Step 3: Recompute santrauka from per-room values (single source of truth)
     # NOTE: this runs AFTER Python per-room compute so totals reflect deterministic dims.
@@ -2092,6 +2239,43 @@ def extract_interior(
             print(f"[extractor] cross_page_validator emitted {len(cross_warnings)} warnings")
     except Exception as exc:
         print(f"[extractor] cross_page_validator failed: {exc}")
+
+    # Step 4.06: Scale verification (Sprint 0 Fix 3) — warn when declared scale
+    # doesn't match actual rendered pixel dimensions.
+    # Adaptation note: Vision populates scale_source_page (int) but NOT a
+    # scale_source_text string. We scan puslapiai[].pavadinimas for "M 1:X"
+    # annotations as a best-effort text source. If nothing is found the check
+    # is silently skipped (no rooms have diagonal_px populated yet either, so
+    # validate_scale() is a no-op until the Vision prompt is extended in a
+    # future task to return pixel bounding-box dimensions).
+    try:
+        from .scale_validator import parse_scale_string, validate_scale
+        # Collect candidate scale text from page title blocks
+        scale_factor: float | None = None
+        for page in (parsed.get("puslapiai") or []):
+            sf = parse_scale_string(page.get("pavadinimas") or "")
+            if sf is not None:
+                scale_factor = sf
+                break  # use first page that declares a scale
+        if scale_factor:
+            scale_warnings = validate_scale(
+                scale_factor=scale_factor,
+                rendered_dpi=DPI,  # match render DPI used in pdf_to_b64_images
+                rooms=parsed.get("patalpos") or [],
+            )
+            if scale_warnings:
+                existing_warnings = parsed.get("warnings") or []
+                for msg in scale_warnings:
+                    existing_warnings.append({
+                        "level": "WARN",
+                        "message": msg,
+                        "source": "scale_validator",
+                    })
+                parsed["warnings"] = existing_warnings
+                print(f"[extractor] scale_validator emitted {len(scale_warnings)} warnings "
+                      f"(scale 1:{int(scale_factor)})")
+    except Exception as exc:
+        print(f"[extractor] scale_validator failed (non-fatal): {exc}")
 
     # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
     # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on

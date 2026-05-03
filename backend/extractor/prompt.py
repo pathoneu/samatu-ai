@@ -387,6 +387,11 @@ Jei eksplikacija turi `Perimetras` stulpelį — naudok jį.
 **`lubu_aukstis_m`** — pirmenybe iš pjūvio (Pjūvis A-A); tada lubų plano annotation'ų (+2800 = 2.80m).
 Default 2.82m moderniai LT statybai (post-2010). Pažymėk `lubu_aukstis_saltinis`.
 
+SVARBU: Jei kambariai turi skirtingus lubų aukščius (pvz., pakabintos lubos vonioje,
+soffit'as virš virtuvės baldų), grąžink kiekvieno kambario aukštį atskirai laukelyje
+`lubu_auksciai` kaip dict {kambario_pavadinimas: aukstis_m}. Jei visi vienodi —
+palik šį lauką tuščią ir naudosim section vidurkį.
+
 **`lubu_tipas`**:
 - `gkp` — GK lubos su dvigubo karkaso žymėjimu lubų plane (default modern LT)
 - `betonas` — atviras betonas (tambūras, garažas, tech)
@@ -606,6 +611,11 @@ Užrašyk `eksplikacija_source_page`.
 - Virtuvė: 8m²
 - Vonia: 3.8m²; WC: 1.1m²
 - Lubų aukščiai: gyvenamosios ≥2.50m; vonia/wc ≥2.20m
+
+**Dažomo paviršiaus kokybė**: jei brėžinio specifikacijoje aiškiai nurodyta finišo kokybė
+(pvz., 'Q2 matinis dažymas', 'Q3 pusiau matinis', 'Q4 blizgus aukšta klasė'), grąžink
+`inferred_paint_class` (1=Q1 perdažymas; 2=Q2/Q3 standartinis; 3=Q4 fresh plaster) ir
+`inferred_paint_class_evidence` su tiksliu spec'o tekstu. Jei nenurodyta — palik abu null.
 
 </cross_referencing>
 

@@ -193,6 +193,15 @@ async def _global_exception_handler(request, exc):
     )
 
 
+# ── Register config router (Sprint 0 Task 1) ──────────────────────────────────
+from api.config import router as config_router  # noqa: E402
+app.include_router(config_router)
+from api.recompute_quantities import router as recompute_router  # noqa: E402
+app.include_router(recompute_router)
+from api.telemetry import router as telemetry_router  # noqa: E402
+app.include_router(telemetry_router)
+
+
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
 class FrontendErrorPayload(BaseModel):
     message: str
