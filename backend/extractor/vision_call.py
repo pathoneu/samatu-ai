@@ -553,7 +553,7 @@ def _calc_dazai_liters(dazymo_plotas_m2: float, coats: int = 2,
     return round(dazymo_plotas_m2 * factor / _PAINT_COVERAGE_M2_PER_L, 2)
 
 
-def _resolve_paint_class(rules_or_overrides: dict | None) -> int:
+def _resolve_paint_class_from_prefs(rules_or_overrides: dict | None) -> int:
     """Read paint_class (1/2/3) from user prefs (Setup Wizard / Prielaidos).
     Falls back to LT default = 2. Accepts both raw user prefs and the
     translated rules dict (`_paint_class` meta key)."""
@@ -565,6 +565,18 @@ def _resolve_paint_class(rules_or_overrides: dict | None) -> int:
     except (ValueError, TypeError):
         cls = _PAINT_CLASS_DEFAULT
     return cls if cls in (1, 2, 3) else _PAINT_CLASS_DEFAULT
+
+
+def _resolve_paint_class(user_default: int, inferred: int | None,
+                         inferred_text: str | None) -> tuple[int, str]:
+    """Sprint 0 Fix 5: prefer paint class inferred from spec text,
+    falling back to user wizard default. Returns (class, source_label).
+    """
+    from extractor.feature_flags import get_flags
+    flag_on = get_flags()["paint_class_inference"]
+    if flag_on and inferred is not None:
+        return int(inferred), "inferred_from_spec"
+    return int(user_default), "user_default"
 
 
 # Lubų karnizas dedamas TIK gyvenamose patalpose su dekoratyvinėm lubom
@@ -689,7 +701,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
 
         # 4.2 Dažai (litrai) — paint class drives coats × coverage (Sprint §2A.5).
-        paint_class = _resolve_paint_class(rules_override)
+        paint_class = _resolve_paint_class_from_prefs(rules_override)
         room["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=paint_class)
         room["_paint_class"] = paint_class  # surface to UI / debug
 
@@ -1872,6 +1884,20 @@ def extract_interior(
             for r in _pass1_rooms
         ],
     })
+
+    # Step 2.35: Sprint 0 Fix 5 — resolve paint class from spec inference (flag-gated).
+    # Vision may return inferred_paint_class + inferred_paint_class_evidence when the
+    # spec explicitly states a finish quality (e.g., 'Q2 matinis', 'Q4 blizgus').
+    # _resolve_paint_class gates on ENABLE_PAINT_CLASS_INFERENCE; falls back to user default.
+    try:
+        inferred_cls = parsed.get("inferred_paint_class")
+        inferred_text = parsed.get("inferred_paint_class_evidence")
+        user_default = int((rules_override or {}).get("paint_class", 2))
+        final_class, source = _resolve_paint_class(user_default, inferred_cls, inferred_text)
+        parsed["paint_class"] = final_class
+        parsed["paint_class_source"] = source
+    except Exception as exc:
+        print(f"[extractor] paint_class inference resolve failed (non-fatal): {exc}")
 
     # Step 2.4: Merge eksplikacija ground truth into rooms by name match (case-insensitive).
     # Eksplikacija plotas/perimetras override Vision dimension-chain values when available.

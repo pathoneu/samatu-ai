@@ -612,6 +612,11 @@ Užrašyk `eksplikacija_source_page`.
 - Vonia: 3.8m²; WC: 1.1m²
 - Lubų aukščiai: gyvenamosios ≥2.50m; vonia/wc ≥2.20m
 
+**Dažomo paviršiaus kokybė**: jei brėžinio specifikacijoje aiškiai nurodyta finišo kokybė
+(pvz., 'Q2 matinis dažymas', 'Q3 pusiau matinis', 'Q4 blizgus aukšta klasė'), grąžink
+`inferred_paint_class` (1=Q1 perdažymas; 2=Q2/Q3 standartinis; 3=Q4 fresh plaster) ir
+`inferred_paint_class_evidence` su tiksliu spec'o tekstu. Jei nenurodyta — palik abu null.
+
 </cross_referencing>
 
 </extraction_rules>
