@@ -2460,3 +2460,26 @@ def extract_interior(
     parsed["status"] = "ok"
 
     return parsed
+
+
+def vision_polygon_at_click(project_id: str, page_idx: int,
+                            click_xy_pct: list[float]) -> dict:
+    """Sprint 2 G1 hook. Returns a stub polygon centered at click + low
+    confidence; Sprint 4 wires the real Pass-2 zoom Vision call.
+
+    The stub MUST return a valid 4-vertex CW polygon so frontend integration
+    can proceed. Mocked in tests via patch().
+    """
+    cx, cy = click_xy_pct
+    # 20% page-width square as a placeholder room outline
+    half = 0.10
+    return {
+        "polygon_pct": [
+            [max(0.0, cx - half), max(0.0, cy - half)],
+            [max(0.0, cx - half), min(1.0, cy + half)],
+            [min(1.0, cx + half), min(1.0, cy + half)],
+            [min(1.0, cx + half), max(0.0, cy - half)],
+        ],
+        "room_name_guess": None,
+        "confidence": "low",
+    }

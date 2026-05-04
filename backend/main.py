@@ -200,6 +200,8 @@ from api.recompute_quantities import router as recompute_router  # noqa: E402
 app.include_router(recompute_router)
 from api.telemetry import router as telemetry_router  # noqa: E402
 app.include_router(telemetry_router)
+from api.vision_fill import router as vision_fill_router  # noqa: E402
+app.include_router(vision_fill_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
