@@ -19,7 +19,7 @@ import { pickZoomLevel, tileKey, renderPageToImageBitmap } from '../../lib/mipPy
 
 const SETTLE_DEBOUNCE_MS = 150;
 
-export function TakeoffCanvas({ pdfDoc, pageIdx = 0 }) {
+export function TakeoffCanvas({ pdfDoc, pageIdx = 0, renderOverlay }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const settleTimerRef = useRef(null);
@@ -128,6 +128,12 @@ export function TakeoffCanvas({ pdfDoc, pageIdx = 0 }) {
       }}
     >
       <canvas ref={canvasRef} style={transformStyle} />
+      {renderOverlay?.({
+        canvasWidth: canvasRef.current?.width ?? 0,
+        canvasHeight: canvasRef.current?.height ?? 0,
+        canvasRef,
+        containerRef,
+      })}
     </div>
   );
 }
