@@ -18,24 +18,15 @@ References:
 - Sprint 2 risk register: spec §10 (validate against golden test PDFs)
 """
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import NamedTuple
 
 # Floating-point epsilon for collinearity test (in 0..1 page-fraction space).
-# 0.005 of a page corresponds to ~5mm at A3 — well below any real wall thickness.
+# At A3 (297×420 mm), 0.005 ≈ 1.5–2 mm — well below LT wall thickness (75–250 mm),
+# so we never falsely merge real walls but still tolerate Vision rounding noise.
 _COLLINEAR_EPS = 0.005
 
 
 Point = tuple[float, float]
 Segment = tuple[Point, Point]
-
-
-class EdgeKey(NamedTuple):
-    """A collinear-edge key, normalized to (lo_room_idx, hi_room_idx, axis, anchor)."""
-    lo_idx: int
-    hi_idx: int
-    axis: str        # "h" (horizontal) | "v" (vertical) | "d" (diagonal)
-    anchor: float    # the constant coordinate (y for h, x for v, intercept for d)
 
 
 def polygon_to_segments(poly: list[Point]) -> list[Segment]:

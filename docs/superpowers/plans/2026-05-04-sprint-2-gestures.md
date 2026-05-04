@@ -144,9 +144,9 @@ edges and fix grindjuostės double-counting on bordering rooms."
 # backend/tests/test_wall_adjacency.py
 """Sprint 2 wall_adjacency: deterministic shared-edge detection from polygon_pct."""
 import pytest
-from backend.extractor.wall_adjacency import (
+from extractor.wall_adjacency import (
     polygon_to_segments, segments_overlap_length, shared_edges_between,
-    apply_shared_edges, EdgeKey,
+    apply_shared_edges,
 )
 
 
@@ -214,24 +214,15 @@ References:
 - Sprint 2 risk register: spec §10 (validate against golden test PDFs)
 """
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import NamedTuple
 
 # Floating-point epsilon for collinearity test (in 0..1 page-fraction space).
-# 0.005 of a page corresponds to ~5mm at A3 — well below any real wall thickness.
+# At A3 (297×420 mm), 0.005 ≈ 1.5–2 mm — well below LT wall thickness (75–250 mm),
+# so we never falsely merge real walls but still tolerate Vision rounding noise.
 _COLLINEAR_EPS = 0.005
 
 
 Point = tuple[float, float]
 Segment = tuple[Point, Point]
-
-
-class EdgeKey(NamedTuple):
-    """A collinear-edge key, normalized to (lo_room_idx, hi_room_idx, axis, anchor)."""
-    lo_idx: int
-    hi_idx: int
-    axis: str        # "h" (horizontal) | "v" (vertical) | "d" (diagonal)
-    anchor: float    # the constant coordinate (y for h, x for v, intercept for d)
 
 
 def polygon_to_segments(poly: list[Point]) -> list[Segment]:
@@ -500,7 +491,7 @@ anisotropic pages. Bails out unchanged if any polygon_pct is missing."
 # backend/tests/test_wall_adjacency_pipeline.py
 """Sprint 2: vision_call applies wall_adjacency only when flag is on
 and bails out cleanly when polygons are missing."""
-from backend.extractor.vision_call import _apply_polygon_prepass
+from extractor.vision_call import _apply_polygon_prepass
 
 
 def test_prepass_applied_when_flag_on(monkeypatch):
@@ -562,8 +553,8 @@ Expected: FAIL — `_apply_polygon_prepass` not defined.
 Open `backend/extractor/vision_call.py`. Near the top imports add (or extend an existing block):
 
 ```python
-from backend.extractor.feature_flags import get_flags
-from backend.extractor.wall_adjacency import apply_shared_edges
+from .feature_flags import get_flags
+from .wall_adjacency import apply_shared_edges
 ```
 
 Add this private function near other `_apply_*` helpers (next to `_apply_per_room_heights` from Sprint 0):
@@ -638,7 +629,10 @@ matching spec §10 risk-register fallback strategy."
 # backend/tests/test_recompute_gestures.py
 """Sprint 2: /api/recompute-quantities accepts gesture edits."""
 from fastapi.testclient import TestClient
-from backend.main import app
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from main import app
 
 client = TestClient(app)
 
@@ -761,7 +755,7 @@ Spec: §4.5, §5.4
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
-from backend.extractor.universal_rules import paint_coverage_for_class
+from extractor.universal_rules import paint_coverage_for_class
 
 router = APIRouter(prefix="/api", tags=["recompute"])
 
@@ -926,7 +920,10 @@ the room's color_zones with the sampled RGB. Unknown fields → 400."
 """Sprint 2: POST /api/vision-fill — given click_xy_pct + page, return polygon."""
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from backend.main import app
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from main import app
 
 client = TestClient(app)
 
@@ -937,7 +934,7 @@ def test_vision_fill_calls_vision_with_crop_around_click():
         "room_name_guess": "Vonia",
         "confidence": "medium",
     }
-    with patch("backend.api.vision_fill.call_vision_for_polygon",
+    with patch("api.vision_fill.call_vision_for_polygon",
                return_value=fake_response) as mock:
         payload = {
             "project_id": "proj-1",
@@ -969,7 +966,7 @@ def test_vision_fill_validates_click_in_unit_square():
 
 
 def test_vision_fill_returns_structured_error_on_vision_failure():
-    with patch("backend.api.vision_fill.call_vision_for_polygon",
+    with patch("api.vision_fill.call_vision_for_polygon",
                side_effect=RuntimeError("anthropic 500")):
         payload = {
             "project_id": "proj-1", "page_idx": 0,
@@ -1041,7 +1038,7 @@ def call_vision_for_polygon(
     """
     # Sprint 2: minimal viable call. Uses crop-around-click prompt.
     # See backend/extractor/vision_call.py:zoom_pass for the existing helper.
-    from backend.extractor.vision_call import vision_polygon_at_click
+    from extractor.vision_call import vision_polygon_at_click
     return vision_polygon_at_click(project_id=project_id, page_idx=page_idx,
                                    click_xy_pct=click_xy_pct)
 
@@ -1102,7 +1099,7 @@ def vision_polygon_at_click(project_id: str, page_idx: int,
 In `backend/main.py`, near the top with other API imports add:
 
 ```python
-from backend.api.vision_fill import router as vision_fill_router
+from api.vision_fill import router as vision_fill_router
 ```
 
 And in the include_router section:
@@ -1143,7 +1140,10 @@ returns polygon_pct + confidence. Errors envelope per spec §4.8."
 """Sprint 2: POST /api/lasso-rerun — re-extract symbols inside a lasso polygon."""
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from backend.main import app
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from main import app
 
 client = TestClient(app)
 
@@ -1156,7 +1156,7 @@ def test_lasso_rerun_returns_detected_symbols():
         ],
         "polygons": [],
     }
-    with patch("backend.api.lasso_rerun.vision_lasso_extract", return_value=fake):
+    with patch("api.lasso_rerun.vision_lasso_extract", return_value=fake):
         payload = {
             "project_id": "proj-1", "page_idx": 0,
             "lasso_polygon_pct": [[0.3, 0.4], [0.4, 0.4], [0.4, 0.5], [0.3, 0.5]],
@@ -1178,7 +1178,7 @@ def test_lasso_polygon_must_have_3_or_more_vertices():
 
 
 def test_lasso_returns_structured_error_on_failure():
-    with patch("backend.api.lasso_rerun.vision_lasso_extract",
+    with patch("api.lasso_rerun.vision_lasso_extract",
                side_effect=RuntimeError("anthropic 503")):
         payload = {
             "project_id": "proj-1", "page_idx": 0,
@@ -1272,7 +1272,7 @@ def lasso_rerun(req: LassoRequest) -> dict:
 - [ ] **Step 6.4: Register in main.py**
 
 ```python
-from backend.api.lasso_rerun import router as lasso_rerun_router
+from api.lasso_rerun import router as lasso_rerun_router
 
 app.include_router(lasso_rerun_router)
 ```
@@ -3230,12 +3230,12 @@ Smoke-test findings in docs/sprint-2-followups.md."
 
 - [ ] **Step 21.1: Move all router imports to top of main.py**
 
-Run: `grep -n "from backend.api\." backend/main.py`
+Run: `grep -n "from api\." backend/main.py`
 
-Move every `from backend.api.X import router as X_router # noqa: E402` line to the top imports block. Remove `# noqa: E402`. Verify the file still loads:
+Move every `from api.X import router as X_router  # noqa: E402` line to the top imports block. Remove `# noqa: E402`. Verify the file still loads:
 
 ```bash
-cd backend && python -c "from backend.main import app; print('routes:', len(app.routes))"
+cd backend && python -c "from main import app; print('routes:', len(app.routes))"
 ```
 Expected: route count > 10 (existing + Sprint 0/1/2 endpoints).
 

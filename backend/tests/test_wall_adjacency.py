@@ -1,8 +1,8 @@
 """Sprint 2 wall_adjacency: deterministic shared-edge detection from polygon_pct."""
 import pytest
-from backend.extractor.wall_adjacency import (
+from extractor.wall_adjacency import (
     polygon_to_segments, segments_overlap_length, shared_edges_between,
-    apply_shared_edges, EdgeKey,
+    apply_shared_edges,
 )
 
 
