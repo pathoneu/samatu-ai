@@ -23,6 +23,42 @@ import { overrideQuantity } from '../../lib/gestureApi';
 import { abortRegistry } from '../../lib/abortRegistry';
 import { InlineEditor } from './InlineEditor';
 
+function polygonBoundingBox(poly) {
+  if (!poly || poly.length === 0) return null;
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  for (const [x, y] of poly) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function fitToBox(bbox, viewportW, viewportH, paddingPct = 0.30) {
+  // bbox in pdf-pct space; we want to compute scale + translate so the
+  // bbox (with padding) fits the viewport center.
+  if (!bbox) return null;
+  const bboxW = bbox.maxX - bbox.minX;
+  const bboxH = bbox.maxY - bbox.minY;
+  const padW = bboxW * paddingPct;
+  const padH = bboxH * paddingPct;
+  // canvas natural size unknown to wizard — use viewport dims directly,
+  // assuming canvas displays at scale 1.0 fills viewport
+  const targetWPct = bboxW + padW * 2;
+  const targetHPct = bboxH + padH * 2;
+  const scale = Math.min(
+    viewportW / (targetWPct * viewportW),
+    viewportH / (targetHPct * viewportH),
+  ) || 1;
+  const cx = (bbox.minX + bbox.maxX) / 2;
+  const cy = (bbox.minY + bbox.maxY) / 2;
+  // translate so the centroid lands at viewport center
+  const tx = viewportW / 2 - cx * viewportW * scale;
+  const ty = viewportH / 2 - cy * viewportH * scale;
+  return { scale, translate: { x: tx, y: ty } };
+}
+
 export function VerificationWizard({
   rooms = [], pozicijos = [], currentAssumptions = {},
   onRecomputed, onGestureEvent,
@@ -32,6 +68,7 @@ export function VerificationWizard({
   const setWizardItemPolygon = useStore(viewerStore, (s) => s.setWizardItemPolygon);
   const setLockOnConfirm = useStore(viewerStore, (s) => s.setLockOnConfirm);
   const setCurrentTool = useStore(viewerStore, (s) => s.setCurrentTool);
+  const setTransform = useStore(viewerStore, (s) => s.setTransform);
   const queue = useStore(viewerStore, (s) => s.verificationQueue);
   const index = useStore(viewerStore, (s) => s.verificationIndex);
   const advance = useStore(viewerStore, (s) => s.advanceVerification);
@@ -41,13 +78,19 @@ export function VerificationWizard({
   const item = queue[index];
 
   // Drive auto-zoom: whenever active item changes, set wizardItemPolygon
+  // and fit transform so polygon bbox + 30% padding lands centered in
+  // the canvas viewport (window dims minus chrome: 50px rail + 320px right
+  // panel, 48px topbar + 140px wizard).
   useEffect(() => {
     if (wizardOpen && item?.polygon) {
       setWizardItemPolygon(item.polygon);
+      const bbox = polygonBoundingBox(item.polygon);
+      const fit = fitToBox(bbox, window.innerWidth - 50 - 320, window.innerHeight - 48 - 140);
+      if (fit) setTransform(fit);
     } else {
       setWizardItemPolygon(null);
     }
-  }, [wizardOpen, item, setWizardItemPolygon]);
+  }, [wizardOpen, item, setWizardItemPolygon, setTransform]);
 
   // Esc closes wizard
   useEffect(() => {
