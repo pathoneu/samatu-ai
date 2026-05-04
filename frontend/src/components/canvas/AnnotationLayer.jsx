@@ -30,6 +30,9 @@ export function AnnotationLayer({
   const scale = useStore(viewerStore, (s) => s.scale);
   const translate = useStore(viewerStore, (s) => s.translate);
   const selection = useStore(viewerStore, (s) => s.selection);
+  const hoveredRoomId = useStore(viewerStore, (s) => s.hoveredRoomId);
+  const wizardOpen = useStore(viewerStore, (s) => s.wizardOpen);
+  const wizardItemPolygon = useStore(viewerStore, (s) => s.wizardItemPolygon);
   const transform = { scale, translate, canvasWidth, canvasHeight };
 
   return (
@@ -38,17 +41,22 @@ export function AnnotationLayer({
       <Layer listening={false}>
         {committedPolygons
           .filter((p) => !selection || selection.id !== p.id)
-          .map((poly) => (
-            <Line
-              key={poly.id}
-              points={pdfPctPolyToCanvasPxPoly(poly.points, transform).flat()}
-              closed
-              stroke={poly.color || '#3b82f6'}
-              strokeWidth={1.5}
-              fill={poly.color || '#3b82f6'}
-              opacity={poly.fillAlpha ?? 0.18}
-            />
-          ))}
+          .map((poly) => {
+            const isHovered = hoveredRoomId === poly.id;
+            return (
+              <Line
+                key={poly.id}
+                points={pdfPctPolyToCanvasPxPoly(poly.points, transform).flat()}
+                closed
+                stroke={poly.color || '#3b82f6'}
+                strokeWidth={isHovered ? 2.5 : 1.5}
+                fill={poly.color || '#3b82f6'}
+                opacity={(poly.fillAlpha ?? 0.18) * (isHovered ? 1.4 : 1)}
+                shadowColor={isHovered ? (poly.color || '#3b82f6') : undefined}
+                shadowBlur={isHovered ? 8 : 0}
+              />
+            );
+          })}
         {committedPoints.map((pt) => {
           const [px, py] = pdfPctPolyToCanvasPxPoly([pt.xy], transform)[0];
           return (
@@ -85,6 +93,22 @@ export function AnnotationLayer({
           />
         )}
       </Layer>
+
+      {wizardOpen && wizardItemPolygon && (
+        <Layer listening={false}>
+          <Line
+            points={pdfPctPolyToCanvasPxPoly(wizardItemPolygon, transform).flat()}
+            closed
+            stroke="#c97a2c"
+            strokeWidth={3}
+            fill="#c97a2c"
+            opacity={0.18}
+            shadowColor="#c97a2c"
+            shadowBlur={24}
+            shadowOpacity={0.55}
+          />
+        </Layer>
+      )}
     </Stage>
   );
 }
