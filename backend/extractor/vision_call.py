@@ -808,6 +808,26 @@ def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
     return out
 
 
+def _apply_polygon_prepass(vision_result: dict) -> dict:
+    """Sprint 2: feature-flag-gated. When enabled and every room has
+    polygon_pct, replace perimetras_m with the shared-walls-corrected value.
+
+    Spec §4.3 wall_adjacency, §10 risk register (golden-PDF validation).
+    """
+    from .feature_flags import get_flags
+    from .wall_adjacency import apply_shared_edges
+
+    if not get_flags()["polygon_prepass"]:
+        return vision_result
+    page_w = float(vision_result.get("page_width_m") or 0)
+    page_h = float(vision_result.get("page_height_m") or 0)
+    if page_w <= 0 or page_h <= 0:
+        return vision_result
+    rooms = vision_result.get("patalpos", []) or []
+    vision_result["patalpos"] = apply_shared_edges(rooms, page_w, page_h)
+    return vision_result
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -2040,6 +2060,21 @@ def extract_interior(
         })
     except Exception as exc:
         print(f"[extractor] schedule anchor merge failed: {exc}")
+
+    # Sprint 2: shared-walls polygon pre-pass (feature-flag-gated by
+    # ENABLE_POLYGON_PREPASS). Applies BEFORE per-room ceiling heights so
+    # corrected perimetras_m feeds into downstream calculations.
+    try:
+        parsed = _apply_polygon_prepass(parsed)
+        _emit({
+            "event": "polygon_prepass_applied",
+            "rooms_with_adjacency": sum(
+                1 for r in (parsed.get("patalpos") or [])
+                if r.get("perimetras_saltinis") == "polygon_adjacency"
+            ),
+        })
+    except Exception as exc:
+        print(f"[extractor] polygon prepass failed: {exc}")
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
