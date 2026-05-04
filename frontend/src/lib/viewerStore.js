@@ -22,6 +22,14 @@ export function createViewerStore() {
     setCurrentPage: (currentPage) => set({ currentPage }),
     setCurrentTool: (currentTool) => set({ currentTool }),
     setHoveredRoomId: (hoveredRoomId) => set({ hoveredRoomId }),
+
+    selection: null,                      // { kind: 'pozicija' | 'room', id: string }
+    setSelection: (selection) => set({ selection }),
+
+    verificationQueue: [],                // Sprint 3 fills with queue items
+    verificationIndex: 0,
+    setVerificationQueue: (verificationQueue) => set({ verificationQueue, verificationIndex: 0 }),
+    advanceVerification: () => set((s) => ({ verificationIndex: s.verificationIndex + 1 })),
   }));
 }
 

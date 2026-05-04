@@ -38,3 +38,20 @@ test('createViewerStore: setHoveredRoomId triggers single update', () => {
   assert.equal(store.getState().hoveredRoomId, 'K1');
   assert.ok(calls >= 1);
 });
+
+test('createViewerStore: selection defaults to null', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().selection, null);
+});
+
+test('createViewerStore: setSelection updates', () => {
+  const store = createViewerStore();
+  store.getState().setSelection({ kind: 'pozicija', id: 'p1' });
+  assert.deepEqual(store.getState().selection, { kind: 'pozicija', id: 'p1' });
+});
+
+test('createViewerStore: verificationQueue defaults to empty array', () => {
+  const store = createViewerStore();
+  assert.deepEqual(store.getState().verificationQueue, []);
+  assert.equal(store.getState().verificationIndex, 0);
+});
