@@ -72,6 +72,11 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
 
     for e in edits:
         if e.field == "add_symbol":
+            if not e.target_pozicija_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="add_symbol: target_pozicija_id is required",
+                )
             poz = poz_by_id.get(e.target_pozicija_id)
             if poz is None:
                 raise HTTPException(
@@ -84,6 +89,11 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
                 "xy_pct": e.point_xy_pct,
             })
         elif e.field == "remove_symbol":
+            if not e.target_pozicija_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="remove_symbol: target_pozicija_id is required",
+                )
             poz = poz_by_id.get(e.target_pozicija_id)
             if poz is None:
                 raise HTTPException(
@@ -93,6 +103,11 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
             new_kiekis = (poz.get("kiekis") or 0) - (e.delta or 1)
             poz["kiekis"] = max(0, new_kiekis)
         elif e.field == "color_zone":
+            if not e.target_room_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="color_zone: target_room_id is required",
+                )
             room = rooms_by_id.get(e.target_room_id)
             if room is None:
                 raise HTTPException(
@@ -104,6 +119,11 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
                 "polygons_pct": e.polygons_pct or [],
             })
         elif e.field == "override_pozicija":
+            if not e.target_pozicija_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="override_pozicija: target_pozicija_id is required",
+                )
             poz = poz_by_id.get(e.target_pozicija_id)
             if poz is None:
                 raise HTTPException(
@@ -115,7 +135,8 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
             poz["kiekis"] = float(e.new_value) if e.new_value is not None else poz["kiekis"]
             poz["override_locked"] = True
 
-    return list(rooms_by_id.values()) if rooms_by_id else rooms, pozicijos
+    out_rooms = [rooms_by_id[r["id"]] if r.get("id") in rooms_by_id else r for r in rooms]
+    return out_rooms, pozicijos
 
 
 @router.post("/recompute-quantities")

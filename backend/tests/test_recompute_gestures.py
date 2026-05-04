@@ -101,3 +101,37 @@ def test_unknown_gesture_field_returns_400():
     }
     r = client.post("/api/recompute-quantities", json=payload)
     assert r.status_code == 400
+
+
+def test_color_zone_preserves_id_less_rooms():
+    """Regression: id-less rooms must not be dropped when mixed with id-having rooms."""
+    payload = {
+        "rooms": [
+            {"name": "K0_no_id"},
+            {"name": "K1", "id": "room-1", "dazomas_plotas_m2": 50.0, "color_zones": []},
+        ],
+        "pozicijos": [],
+        "edits": [{"field": "color_zone", "target_room_id": "room-1",
+                   "color_rgb": [10, 20, 30], "polygons_pct": [[[0.1, 0.1], [0.2, 0.2], [0.3, 0.1]]]}],
+        "current_assumptions": {},
+    }
+    r = client.post("/api/recompute-quantities", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    names = [rr.get("name") for rr in body["rooms"]]
+    assert "K0_no_id" in names, f"id-less room dropped! got: {names}"
+    assert "K1" in names
+
+
+def test_add_symbol_missing_target_field_diagnostic():
+    """P1: missing target field is distinguishable from 'id not found'."""
+    payload = {
+        "rooms": [],
+        "pozicijos": [{"id": "poz-1", "skyrius": "elektra", "kiekis": 5, "vnt": "vnt"}],
+        "edits": [{"field": "add_symbol", "delta": 1}],  # missing target_pozicija_id entirely
+        "current_assumptions": {},
+    }
+    r = client.post("/api/recompute-quantities", json=payload)
+    assert r.status_code == 400
+    assert "target_pozicija_id" in r.json()["detail"], (
+        f"diagnostic should mention missing field, got: {r.json()}")
