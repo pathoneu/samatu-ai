@@ -109,6 +109,25 @@ OUTPUT_SCHEMA = {
                         },
                         "description": "Patalpos vieta puslapyje kaip 0.0-1.0 fractions of page width/height. Naudojama pass-2 zoom-in re-read'ui."
                     },
+                    "polygon_pct": {
+                        "type": ["array", "null"],
+                        "description": (
+                            "Patalpos sienų poligono viršūnės kaip 0.0-1.0 puslapio "
+                            "fractions [{x,y}, ...]. Naudojama Sprint 2 wall_adjacency "
+                            "shared-edge skaičiavimui (grindjuostės korekcijai). "
+                            "Užmesk pagal patalpos vidaus kontūrą eil. tvarka. Jei nėra "
+                            "aiškaus poligono — palik null; backend grįš prie perimetras_m."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["x", "y"],
+                            "properties": {
+                                "x": {"type": "number"},
+                                "y": {"type": "number"},
+                            },
+                        },
+                    },
                     "plotas_m2": {"type": "number"},
                     "plotas_saltinis": {
                         "type": "string",
@@ -689,6 +708,7 @@ type Room = {
   paskirtis: RoomType;                          // žr. enum below
   puslapio_nr: number | null;                   // 1-indexed puslapio numeris kur floor plan'as
   bbox_pct: {x: number, y: number, w: number, h: number} | null;  // patalpos vieta puslapyje (zoom re-read'ui)
+  polygon_pct: Array<{x: number, y: number}> | null;  // sienų vidinis kontūras 0..1 fractions; Sprint 2 wall_adjacency
   plotas_m2: number;                            // grindų plotas IŠ EKSPLIKACIJOS jei yra; kitaip iš matavimo
   plotas_saltinis: "eksplikacija" | "inline_label" | "wall_dim_calc" | "default_fallback";
   perimetras_m: number;                         // sienų perimetras
@@ -886,6 +906,11 @@ Pavyzdys: jei patalpa yra puslapio kairiame viršuje, užima ~30% pločio ir 25%
 
 Jei patalpa neturi atskiro floor plan'o (pvz. tik eksplikacijoje minima) —
 palik `puslapio_nr: null, bbox_pct: null`. Tokiai patalpai nebus zoom pass'o.
+
+Kiekvienai patalpai grąžink `polygon_pct` — sienų vidinio kontūro viršūnių sąrašas
+kaip {x,y} 0.0-1.0 fractions of page width/height, eil. tvarka (CW arba CCW, vienodai per
+visas patalpas). Reikia bent 4 viršūnių stačiakampėms patalpoms, daugiau jei sienos siaurėja.
+Jei brėžinys per neryškus arba pasluoksnio negalima patikimai apvesti — grąžink null.
 
 **SVARBU per kiekvieną patalpą — `eksplikacija_row_idx`:**
 Jei kambarys randasi eksplikacijoje, **PRIVALAI** grąžinti `eksplikacija_row_idx`
