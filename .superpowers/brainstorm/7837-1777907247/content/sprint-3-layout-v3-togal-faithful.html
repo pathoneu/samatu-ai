@@ -1,0 +1,211 @@
+<h2>Sprint 3 — togal-faithful versija</h2>
+<p class="subtitle">Real togal'o model'is: polygon-classification, du tab'ai dešinėje (AI / Kiekiai), AI = vienas mėlynas mygtukas top-bar'e, jokios verification queue. Mūsų light paletė.</p>
+
+<div style="background:#f6f5f2; border:1px solid #d4d2cb; border-radius:8px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); font-family: -apple-system, 'Inter', sans-serif; color:#171717;">
+
+  <!-- TOP BAR -->
+  <div style="display:flex; align-items:center; height:48px; background:#fbfaf7; border-bottom:1px solid #d4d2cb; padding:0 12px; gap:10px; font-size:13px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div style="width:26px;height:26px;background:#2a6fb5;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">SĄ</div>
+      <span style="font-weight:600;">Vilniaus 12</span>
+      <span style="opacity:0.4;">/</span>
+      <span style="opacity:0.7;">Vidaus apdaila</span>
+      <button style="background:transparent;border:0;color:#94a3b8;font-size:12px;cursor:pointer;">▾</button>
+    </div>
+    <div style="height:20px;width:1px;background:#d4d2cb;"></div>
+    <!-- Page nav (togal pattern) -->
+    <div style="display:flex; align-items:center; gap:4px;">
+      <button style="background:transparent;border:0;color:#171717;font-size:14px;cursor:pointer;padding:2px 4px;">←</button>
+      <button style="background:#fff;border:1px solid #d4d2cb;color:#171717;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:500;">3 / 12 ▾</button>
+      <button style="background:transparent;border:0;color:#171717;font-size:14px;cursor:pointer;padding:2px 4px;">→</button>
+    </div>
+    <span style="opacity:0.6;font-size:12px;">AP-03 Aukšto planas</span>
+    <div style="flex:1;"></div>
+    <!-- Zoom -->
+    <div style="display:flex; align-items:center; gap:0; background:#fff; border:1px solid #d4d2cb; border-radius:5px; padding:1px;">
+      <button style="background:transparent;border:0;color:#171717;padding:2px 8px;font-size:14px;cursor:pointer;">−</button>
+      <span style="font-variant-numeric:tabular-nums; min-width:42px; text-align:center; font-size:12px;">142%</span>
+      <button style="background:transparent;border:0;color:#171717;padding:2px 8px;font-size:14px;cursor:pointer;">+</button>
+    </div>
+    <!-- Search (togal text/image/pattern) -->
+    <button style="background:#fff;border:1px solid #d4d2cb;color:#3b3b3b;padding:5px 10px;border-radius:5px;font-size:12px;display:flex;align-items:center;gap:6px;">🔍 Ieškoti</button>
+    <!-- The big AI button — togal's signature green is replaced with our brand blue -->
+    <button style="background:#2a6fb5;border:1px solid #2a6fb5;color:#fff;padding:6px 14px;border-radius:5px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(42,111,181,0.3);">
+      ✨ Sąmatų AI
+    </button>
+    <button style="background:#fff;border:1px solid #d4d2cb;color:#3b3b3b;padding:5px 10px;border-radius:5px;font-size:12px;">⋯</button>
+  </div>
+
+  <!-- BODY ROW -->
+  <div style="display:flex; height:560px;">
+
+    <!-- LEFT TOOL RAIL — togal pattern, dense -->
+    <div style="width:50px;background:#fbfaf7;border-right:1px solid #d4d2cb;display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;font-size:15px;">
+      <div title="Selection (Esc)" style="width:38px;height:38px;background:#2a6fb5;color:#fff;border-radius:5px;display:flex;align-items:center;justify-content:center;">↖</div>
+      <div title="Pan (Space)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;">✥</div>
+      <div title="Liniuotė (matavimas)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">⊏</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <!-- Polygon edit tools (togal Merge/Split/Cut) -->
+      <div title="Sujungti (M)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;">⬢</div>
+      <div title="Padalinti (S)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">✂</div>
+      <div title="Iškirpti (C)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">⌗</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <!-- AI gestures (our Sprint 2 work) -->
+      <div title="Click-to-fill (1)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;">⌖<span style="position:absolute;top:0;right:1px;font-size:7px;color:#c97a2c;">✨</span></div>
+      <div title="Lasso (5)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;position:relative;">◌<span style="position:absolute;top:0;right:1px;font-size:7px;color:#c97a2c;">✨</span></div>
+      <div title="Eyedropper (4)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;">🎨</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <div title="+ Skaičiuoti (2)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;">＋</div>
+      <div title="− Šalinti (3)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;">−</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <div title="Atšaukti (Cmd+Z)" style="width:38px;height:38px;color:#6b6863;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">↶</div>
+      <div title="Markup" style="width:38px;height:38px;color:#6b6863;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;">✎</div>
+    </div>
+
+    <!-- CANVAS -->
+    <div style="flex:1;background:#f6f5f2;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background-image:linear-gradient(rgba(42,111,181,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(42,111,181,0.025) 1px, transparent 1px); background-size: 24px 24px;">
+      <div style="background:#fff;width:80%;height:90%;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,0.10);position:relative;color:#000;">
+        <div style="position:absolute;bottom:8px;right:8px;background:#f5f5f5;border:1px solid #888;padding:6px 10px;font-size:9px;color:#444;">AP-03 · M 1:50</div>
+        <!-- All polygons SAME color (togal pattern: classification = color, not category) -->
+        <!-- Selected room (highlighted blue stroke) -->
+        <div style="position:absolute;left:12%;top:18%;width:30%;height:35%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:42%;top:18%;width:25%;height:35%;border:2.5px solid #2a6fb5;background:rgba(42,111,181,0.20);box-shadow:0 0 0 1px #2a6fb5;"></div>
+        <div style="position:absolute;left:67%;top:18%;width:18%;height:35%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:12%;top:53%;width:42%;height:25%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:54%;top:53%;width:31%;height:25%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <!-- vertices visible on selected room (togal-style square markers) -->
+        <div style="position:absolute;left:42%;top:18%;width:6px;height:6px;background:#a855f7;border:1px solid #fff;transform:translate(-50%,-50%);"></div>
+        <div style="position:absolute;left:67%;top:18%;width:6px;height:6px;background:#a855f7;border:1px solid #fff;transform:translate(-50%,-50%);"></div>
+        <div style="position:absolute;left:67%;top:53%;width:6px;height:6px;background:#a855f7;border:1px solid #fff;transform:translate(-50%,-50%);"></div>
+        <div style="position:absolute;left:42%;top:53%;width:6px;height:6px;background:#a855f7;border:1px solid #fff;transform:translate(-50%,-50%);"></div>
+        <!-- electrical dots -->
+        <div style="position:absolute;left:18%;top:30%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:32%;top:40%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:48%;top:32%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:75%;top:46%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <!-- room labels -->
+        <div style="position:absolute;left:14%;top:26%;font-size:10px;color:#444;font-weight:500;">Svetainė<br><span style="opacity:0.7;">K1 · 18.3 m²</span></div>
+        <div style="position:absolute;left:44%;top:26%;font-size:10px;color:#2a6fb5;font-weight:600;">Vonia<br><span style="opacity:0.85;">K3 · 5.2 m²</span></div>
+        <div style="position:absolute;left:69%;top:26%;font-size:10px;color:#444;font-weight:500;">WC<br><span style="opacity:0.7;">K4 · 2.1 m²</span></div>
+      </div>
+      <!-- Scale badge bottom-left (Kreo pattern, also seen in Togal release notes) -->
+      <div style="position:absolute;bottom:14px;left:14px;background:#fff;border:1px solid #d4d2cb;padding:5px 10px;border-radius:14px;font-size:11px;color:#171717;font-weight:500;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+        Mastelis 1:50 🔒
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL — TABS (togal pattern: AI / Quantities) -->
+    <div style="width:320px;background:#fbfaf7;border-left:1px solid #d4d2cb;display:flex;flex-direction:column;font-size:12px;">
+      <!-- Tabs -->
+      <div style="display:flex; border-bottom:1px solid #d4d2cb;background:#f0eeea;">
+        <button style="flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 0;color:#6b6863;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;">
+          ✨ AI <span style="background:#fdf6e7;color:#9a5d20;font-size:9px;padding:1px 5px;border-radius:6px;">2</span>
+        </button>
+        <button style="flex:1;background:#fbfaf7;border:0;border-bottom:2px solid #2a6fb5;padding:10px 0;color:#171717;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;">
+          📋 Kiekiai <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 5px;border-radius:6px;">47</span>
+        </button>
+        <button style="flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 0;color:#6b6863;font-weight:500;font-size:12px;">📊 Suvestinė</button>
+      </div>
+
+      <!-- search -->
+      <div style="padding:8px 12px;border-bottom:1px solid #d4d2cb;display:flex;gap:6px;">
+        <input placeholder="Filtruoti pozicijas…" style="flex:1;padding:5px 8px;border:1px solid #d4d2cb;border-radius:5px;font-size:11px;background:#fff;">
+        <button style="background:#fff;border:1px solid #d4d2cb;color:#6b6863;padding:0 8px;border-radius:5px;font-size:12px;">⚙</button>
+      </div>
+
+      <!-- Tree -->
+      <div style="flex:1;overflow:auto;background:#fff;">
+        <!-- Apdaila (selected category, expanded) -->
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span>
+          <span style="font-weight:600;flex:1;">Apdaila</span>
+          <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">12</span>
+          <span style="font-size:10px;opacity:0.6;">4 832 €</span>
+          <span style="font-size:10px;opacity:0.5;">▾</span>
+        </div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;cursor:pointer;background:rgba(42,111,181,0.05);border-left:3px solid #2a6fb5;">
+          <span style="flex:1;color:#171717;font-weight:500;">Sienų dažymas Q2</span>
+          <span style="margin-right:8px;color:#3b3b3b;font-variant-numeric:tabular-nums;">145.2 m²</span>
+          <span title="🟢 read directly" style="width:7px;height:7px;background:#2f7d5b;border-radius:50%;"></span>
+        </div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="flex:1;">Sienų gruntavimas</span>
+          <span style="margin-right:8px;color:#3b3b3b;font-variant-numeric:tabular-nums;">145.2 m²</span>
+          <span title="🟡 derived" style="width:7px;height:7px;background:#c97a2c;border-radius:50%;"></span>
+        </div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="flex:1;">Lubų dažymas Q2</span>
+          <span style="margin-right:8px;color:#3b3b3b;font-variant-numeric:tabular-nums;">67.8 m² <span style="opacity:0.6;">🔒</span></span>
+          <span style="width:7px;height:7px;background:#6f5fa3;border-radius:50%;"></span>
+        </div>
+        <!-- Plytelės -->
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;border-top:1px solid #ebe8e3;cursor:pointer;">
+          <span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span>
+          <span style="font-weight:600;flex:1;">Plytelių darbai</span>
+          <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">8</span>
+          <span style="font-size:10px;opacity:0.6;">2 184 €</span>
+          <span style="font-size:10px;opacity:0.5;">▾</span>
+        </div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="flex:1;">Sienų plytelės · Vonia</span>
+          <span style="margin-right:8px;color:#3b3b3b;font-variant-numeric:tabular-nums;">23.4 m²</span>
+          <span style="width:7px;height:7px;background:#c97a2c;border-radius:50%;"></span>
+        </div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="flex:1;">Grindų plytelės · Vonia</span>
+          <span style="margin-right:8px;color:#3b3b3b;font-variant-numeric:tabular-nums;">5.2 m²</span>
+          <span style="width:7px;height:7px;background:#2f7d5b;border-radius:50%;"></span>
+        </div>
+        <!-- Other categories collapsed -->
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;border-top:1px solid #ebe8e3;cursor:pointer;">
+          <span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span>
+          <span style="font-weight:600;flex:1;">Elektra</span>
+          <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">15</span>
+          <span style="font-size:10px;opacity:0.6;">3 421 €</span>
+          <span style="font-size:10px;opacity:0.5;">▸</span>
+        </div>
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span>
+          <span style="font-weight:600;flex:1;">Gipskartonis</span>
+          <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">6</span>
+          <span style="font-size:10px;opacity:0.6;">1 102 €</span>
+          <span style="font-size:10px;opacity:0.5;">▸</span>
+        </div>
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;cursor:pointer;">
+          <span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span>
+          <span style="font-weight:600;flex:1;">Santechnika</span>
+          <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">6</span>
+          <span style="font-size:10px;opacity:0.6;">919 €</span>
+          <span style="font-size:10px;opacity:0.5;">▸</span>
+        </div>
+      </div>
+
+      <!-- Footer with totals (togal Quantities tab footer) -->
+      <div style="border-top:1px solid #d4d2cb;background:#fbfaf7;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:10px;opacity:0.6;">Σ neto</div>
+          <div style="font-size:14px;font-weight:600;">12 458 €</div>
+        </div>
+        <button style="background:#2a6fb5;border:1px solid #2a6fb5;color:#fff;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:500;">Eksportuoti</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h3 style="margin-top:24px;">Pagrindiniai pakeitimai vs v2</h3>
+<ul style="color:#6b6863;line-height:1.7;">
+  <li><strong>Drop'inau "AI nesitiki dėl 3 →" badge'ą</strong> — togal'as nedaro verification queue. Confidence dot'us palieku KŽ panelėje (per row), bet ne primygtinis prompt'as. User'is filtruoja sortina pats.</li>
+  <li><strong>"✨ Sąmatų AI" mygtukas top bar dešinėje</strong> — togal'o žalia vieta užimama mūsų brand'o mėlyna. Spustėjus: modal popup'as su checkbox'iais (Plotai / Linijos / Skaičiai / Plytelių zonos) → Go → AI processes → polygons appear.</li>
+  <li><strong>Kairė rail išgrupuota</strong>: Selection/Pan/Liniuotė · Polygon edit (Merge/Split/Cut — togal naming) · AI gestūros (G1/G5 lasso/G4 eyedropper su ✨ ikona) · Manual count (G2/G3 +/−) · Undo/Markup. Mūsų gestūros + togal'o polygon edit kartu.</li>
+  <li><strong>Dešinė panel TABBINA</strong>: AI / Kiekiai / Suvestinė (togal pattern). AI tab turės Vision history + recent AI runs. Kiekiai tab — KŽ medis. Suvestinė — totals/breakdown. Aktyvi šiame mockup'e Kiekiai (mėlyna apatinė strip).</li>
+  <li><strong>Vertices visible</strong> ant selected polygon (violetiniai kvadratiukai vonios kambaryje) — togal pattern, leidžia drag'inti corners.</li>
+  <li><strong>Footer dešinės panel'ės</strong>: Σ totals + Eksportuoti mygtukas (togal Quantities tab pattern).</li>
+</ul>
+
+<h3 style="margin-top:24px;">Pasirinkimai</h3>
+<ol style="color:#6b6863;line-height:1.8;">
+  <li><strong>"✨ Sąmatų AI" mygtukas modal popup'as</strong> — kaip togal'o "What would you like to takeoff?". Mūsų versija: checkbox'iai per skyrius (Apdaila / Plytelės / Elektra / Santechnika / GKP) — user'is gali per-page run'inti tik dažymą jei nori. Geras idėja?</li>
+  <li><strong>Kairė rail su Merge/Split/Cut</strong> — tai polygon edit tools'ai. Mums reikia? Jei ne (kol kas user'is dirba per G7 inline edit) — rail'as sutrumpėja iki Selection / Pan / Liniuotė / G1/G4/G5 / G2/G3 / Undo / Markup. ~10 ikonų vietoj ~15.</li>
+  <li><strong>3 tab'ai dešinėje (AI / Kiekiai / Suvestinė)</strong> ar 2 (AI / Kiekiai) — Suvestinė galėtų gyventi top-bar dropdown'e arba atskirame route'e.</li>
+</ol>

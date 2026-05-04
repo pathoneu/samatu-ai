@@ -1,0 +1,205 @@
+<h2>Sprint 3 — v4: free-form + wizard mygtuku</h2>
+<p class="subtitle">Du būsenos: <strong>(1)</strong> default free-form (togal-style)  ·  <strong>(2)</strong> wizard aktyvus (struktūruotas patvirtinimas).</p>
+
+<!-- ========== STATE 1: DEFAULT FREE-FORM ========== -->
+<h3 style="margin-top:18px;">Būsena 1 — default workspace (free-form)</h3>
+<p style="color:#6b6863;font-size:12px;margin-bottom:10px;">User'is dirba laisvai: hover'ina KŽ poziciją → polygon glow'ina, click'ina kiekį → G7 edit, lasso → G5, etc. Top bar dešinėje matosi <code>🟡 3 →</code> mygtukas — tai wizard'o entry point.</p>
+
+<div style="background:#f6f5f2; border:1px solid #d4d2cb; border-radius:8px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); font-family: -apple-system, 'Inter', sans-serif; color:#171717; margin-bottom:30px;">
+
+  <div style="display:flex; align-items:center; height:48px; background:#fbfaf7; border-bottom:1px solid #d4d2cb; padding:0 12px; gap:10px; font-size:13px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div style="width:26px;height:26px;background:#2a6fb5;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">SĄ</div>
+      <span style="font-weight:600;">Vilniaus 12</span><span style="opacity:0.4;">/</span><span style="opacity:0.7;">Vidaus apdaila</span>
+    </div>
+    <div style="height:20px;width:1px;background:#d4d2cb;"></div>
+    <div style="display:flex; align-items:center; gap:4px;">
+      <button style="background:transparent;border:0;color:#171717;font-size:14px;padding:2px 4px;">←</button>
+      <button style="background:#fff;border:1px solid #d4d2cb;color:#171717;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:500;">3 / 12 ▾</button>
+      <button style="background:transparent;border:0;color:#171717;font-size:14px;padding:2px 4px;">→</button>
+    </div>
+    <span style="opacity:0.6;font-size:12px;">AP-03 Aukšto planas</span>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:0;background:#fff;border:1px solid #d4d2cb;border-radius:5px;padding:1px;">
+      <button style="background:transparent;border:0;padding:2px 8px;font-size:14px;">−</button>
+      <span style="font-variant-numeric:tabular-nums;min-width:42px;text-align:center;font-size:12px;">142%</span>
+      <button style="background:transparent;border:0;padding:2px 8px;font-size:14px;">+</button>
+    </div>
+    <!-- The wizard ENTRY POINT -->
+    <button style="background:#fdf6e7;border:1px solid #c97a2c;color:#9a5d20;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:6px;height:6px;background:#c97a2c;border-radius:50%;"></span>
+      Patikrinti 3 →
+    </button>
+    <button style="background:#2a6fb5;border:1px solid #2a6fb5;color:#fff;padding:6px 14px;border-radius:5px;font-size:12px;font-weight:600;">✨ Sąmatų AI</button>
+  </div>
+
+  <div style="display:flex; height:480px;">
+    <!-- LEFT RAIL (slim, ~10 ikonų — jokių Merge/Split/Cut) -->
+    <div style="width:50px;background:#fbfaf7;border-right:1px solid #d4d2cb;display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;font-size:15px;">
+      <div title="Selection (Esc)" style="width:38px;height:38px;background:#2a6fb5;color:#fff;border-radius:5px;display:flex;align-items:center;justify-content:center;">↖</div>
+      <div title="Pan (V / Space)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;">✥</div>
+      <div title="Liniuotė" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">⊏</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <div title="Click-to-fill (1)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;">⌖<span style="position:absolute;top:0;right:1px;font-size:7px;color:#c97a2c;">✨</span></div>
+      <div title="Lasso (5)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;position:relative;">◌<span style="position:absolute;top:0;right:1px;font-size:7px;color:#c97a2c;">✨</span></div>
+      <div title="Eyedropper (4)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;">🎨</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <div title="+ Skaičiuoti (2)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;">＋</div>
+      <div title="− Šalinti (3)" style="width:38px;height:38px;color:#3b3b3b;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:16px;">−</div>
+      <div style="height:1px;width:30px;background:#d4d2cb;margin:4px 0;"></div>
+      <div title="Atšaukti" style="width:38px;height:38px;color:#6b6863;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;">↶</div>
+      <div title="Markup" style="width:38px;height:38px;color:#6b6863;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;">✎</div>
+    </div>
+
+    <!-- CANVAS — full plan -->
+    <div style="flex:1;background:#f6f5f2;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background-image:linear-gradient(rgba(42,111,181,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(42,111,181,0.025) 1px, transparent 1px); background-size: 24px 24px;">
+      <div style="background:#fff;width:80%;height:90%;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,0.10);position:relative;color:#000;">
+        <div style="position:absolute;bottom:8px;right:8px;background:#f5f5f5;border:1px solid #888;padding:6px 10px;font-size:9px;color:#444;">AP-03 · M 1:50</div>
+        <div style="position:absolute;left:12%;top:18%;width:30%;height:35%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:42%;top:18%;width:25%;height:35%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:67%;top:18%;width:18%;height:35%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:12%;top:53%;width:42%;height:25%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:54%;top:53%;width:31%;height:25%;border:1.5px solid #2a6fb5;background:rgba(42,111,181,0.10);"></div>
+        <div style="position:absolute;left:18%;top:30%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:32%;top:40%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:48%;top:32%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:75%;top:46%;width:7px;height:7px;background:#2f7d5b;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #2f7d5b;"></div>
+        <div style="position:absolute;left:14%;top:26%;font-size:10px;color:#444;font-weight:500;">Svetainė<br><span style="opacity:0.7;">K1 · 18.3 m²</span></div>
+        <div style="position:absolute;left:44%;top:26%;font-size:10px;color:#444;font-weight:500;">Vonia<br><span style="opacity:0.7;">K3 · 5.2 m²</span></div>
+        <div style="position:absolute;left:69%;top:26%;font-size:10px;color:#444;font-weight:500;">WC<br><span style="opacity:0.7;">K4 · 2.1 m²</span></div>
+      </div>
+      <div style="position:absolute;bottom:14px;left:14px;background:#fff;border:1px solid #d4d2cb;padding:5px 10px;border-radius:14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">Mastelis 1:50 🔒</div>
+    </div>
+
+    <!-- RIGHT PANEL (3 tabs) -->
+    <div style="width:300px;background:#fbfaf7;border-left:1px solid #d4d2cb;display:flex;flex-direction:column;font-size:12px;">
+      <div style="display:flex;border-bottom:1px solid #d4d2cb;background:#f0eeea;">
+        <button style="flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 0;color:#6b6863;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;">✨ AI</button>
+        <button style="flex:1;background:#fbfaf7;border:0;border-bottom:2px solid #2a6fb5;padding:10px 0;color:#171717;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;">📋 Kiekiai <span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 5px;border-radius:6px;">47</span></button>
+        <button style="flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 0;color:#6b6863;font-weight:500;font-size:12px;">📊 Suvestinė</button>
+      </div>
+      <div style="padding:8px 12px;border-bottom:1px solid #d4d2cb;display:flex;gap:6px;">
+        <input placeholder="Filtruoti pozicijas…" style="flex:1;padding:5px 8px;border:1px solid #d4d2cb;border-radius:5px;font-size:11px;background:#fff;">
+      </div>
+      <div style="flex:1;overflow:auto;background:#fff;font-size:11px;">
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;"><span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span><span style="font-weight:600;flex:1;">Apdaila</span><span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">12</span></div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;"><span style="flex:1;">Sienų dažymas Q2</span><span style="margin-right:8px;font-variant-numeric:tabular-nums;">145.2 m²</span><span style="width:7px;height:7px;background:#2f7d5b;border-radius:50%;"></span></div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;background:#fdf6e7;"><span style="flex:1;">Sienų gruntavimas</span><span style="margin-right:8px;font-variant-numeric:tabular-nums;">145.2 m²</span><span style="width:7px;height:7px;background:#c97a2c;border-radius:50%;"></span></div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;"><span style="flex:1;">Lubų dažymas Q2</span><span style="margin-right:8px;font-variant-numeric:tabular-nums;">67.8 m² <span style="opacity:0.6;">🔒</span></span><span style="width:7px;height:7px;background:#6f5fa3;border-radius:50%;"></span></div>
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;"><span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span><span style="font-weight:600;flex:1;">Plytelių darbai</span><span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">8</span></div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;background:#fdf6e7;"><span style="flex:1;">Sienų plytelės · Vonia</span><span style="margin-right:8px;font-variant-numeric:tabular-nums;">23.4 m²</span><span style="width:7px;height:7px;background:#c97a2c;border-radius:50%;"></span></div>
+        <div style="padding:7px 12px 7px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebe8e3;background:#fdf6e7;"><span style="flex:1;">Grindų plytelės · Vonia</span><span style="margin-right:8px;font-variant-numeric:tabular-nums;">5.2 m²</span><span style="width:7px;height:7px;background:#c97a2c;border-radius:50%;"></span></div>
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;"><span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span><span style="font-weight:600;flex:1;">Elektra</span><span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">15</span></div>
+        <div style="padding:8px 12px;background:#f6f5f2;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ebe8e3;"><span style="display:inline-block;width:8px;height:8px;background:#2a6fb5;border-radius:50%;"></span><span style="font-weight:600;flex:1;">Gipskartonis</span><span style="background:#e8e5df;color:#6b6863;font-size:9px;padding:1px 6px;border-radius:8px;">6</span></div>
+      </div>
+      <div style="border-top:1px solid #d4d2cb;background:#fbfaf7;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+        <div><div style="font-size:10px;opacity:0.6;">Σ neto</div><div style="font-size:14px;font-weight:600;">12 458 €</div></div>
+        <button style="background:#2a6fb5;border:1px solid #2a6fb5;color:#fff;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:500;">Eksportuoti</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ========== STATE 2: WIZARD ACTIVE ========== -->
+<h3 style="margin-top:30px;">Būsena 2 — wizard aktyvus (paspaudus "Patikrinti 3")</h3>
+<p style="color:#6b6863;font-size:12px;margin-bottom:10px;">Apačioje atsidaro wizard panel'ė (~140px). Canvas auto-zoom'inasi į einamąją poziciją (Vonios kambarys), polygon ryškiai highlight'inasi geltonai. Likusi UI — chrome + tool rail + KŽ panel — paslepta blur'inta, kad fokusas būtų ant klausimo.</p>
+
+<div style="background:#f6f5f2; border:1px solid #d4d2cb; border-radius:8px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); font-family: -apple-system, 'Inter', sans-serif; color:#171717;">
+
+  <!-- TOP BAR (semi-blur) -->
+  <div style="display:flex; align-items:center; height:48px; background:#fbfaf7; border-bottom:1px solid #d4d2cb; padding:0 12px; gap:10px; font-size:13px;opacity:0.55;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;background:#2a6fb5;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">SĄ</div>
+      <span style="font-weight:600;">Vilniaus 12</span>
+    </div>
+    <div style="flex:1;"></div>
+    <button style="background:#fdf6e7;border:1px solid #c97a2c;color:#9a5d20;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;">Patikrinimas: 1/3</button>
+    <button style="background:transparent;border:1px solid #d4d2cb;color:#6b6863;padding:5px 10px;border-radius:5px;font-size:11px;">✕ Uždaryti</button>
+  </div>
+
+  <div style="display:flex; height:380px;">
+    <!-- LEFT RAIL semi-blur (still visible but inactive) -->
+    <div style="width:50px;background:#fbfaf7;border-right:1px solid #d4d2cb;opacity:0.4;"></div>
+
+    <!-- CANVAS — auto-zoomed į Vonia -->
+    <div style="flex:1;background:#f6f5f2;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background-image:linear-gradient(rgba(42,111,181,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(42,111,181,0.025) 1px, transparent 1px); background-size: 24px 24px;">
+      <!-- zoomed-in PDF section — Vonia kambarys užima didesnę dalį -->
+      <div style="background:#fff;width:88%;height:90%;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,0.15);position:relative;color:#000;">
+        <!-- Vonia užima beveik visą zoomed view -->
+        <div style="position:absolute;left:8%;top:10%;width:84%;height:80%;border:3px solid #c97a2c;background:rgba(201,122,44,0.18);box-shadow:0 0 24px rgba(201,122,44,0.55);"></div>
+        <!-- Plytelių zone hatched -->
+        <div style="position:absolute;left:8%;top:10%;width:84%;height:25%;background:repeating-linear-gradient(45deg,rgba(249,115,22,0.20),rgba(249,115,22,0.20) 4px,transparent 4px,transparent 8px);border-bottom:1px dashed #f97316;"></div>
+        <!-- Dimensions -->
+        <div style="position:absolute;top:6%;left:50%;transform:translateX(-50%);font-size:10px;color:#444;">— 2.6 m —</div>
+        <div style="position:absolute;left:5%;top:50%;transform:translateY(-50%) rotate(-90deg);font-size:10px;color:#444;">2.0 m</div>
+        <!-- Label -->
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:14px;color:#9a5d20;font-weight:600;text-align:center;">Vonia<br><span style="font-size:11px;opacity:0.85;">5.2 m² · sienos plytelės iki 2.0m</span></div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL semi-blur -->
+    <div style="width:300px;background:#fbfaf7;border-left:1px solid #d4d2cb;opacity:0.4;"></div>
+  </div>
+
+  <!-- WIZARD BOTTOM PANEL — ~140px -->
+  <div style="background:#fff; border-top:2px solid #c97a2c; padding:14px 20px; box-shadow:0 -4px 12px rgba(0,0,0,0.06);">
+    <div style="display:flex; align-items:flex-start; gap:18px;">
+      <!-- Progress -->
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:60px;">
+        <div style="font-size:11px;color:#6b6863;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">1 / 3</div>
+        <div style="display:flex;gap:4px;margin-top:6px;">
+          <span style="width:16px;height:4px;background:#c97a2c;border-radius:2px;"></span>
+          <span style="width:16px;height:4px;background:#e8e5df;border-radius:2px;"></span>
+          <span style="width:16px;height:4px;background:#e8e5df;border-radius:2px;"></span>
+        </div>
+      </div>
+      <div style="height:50px;width:1px;background:#e8e5df;"></div>
+      <!-- Question -->
+      <div style="flex:1;">
+        <div style="font-size:11px;color:#9a5d20;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:6px;height:6px;background:#c97a2c;border-radius:50%;"></span>
+          🟡 Reikia patikrinti · Plytelių darbai
+        </div>
+        <div style="font-size:15px;font-weight:600;margin-top:4px;color:#171717;">
+          Vonioje rasta plytelių zona <span style="color:#9a5d20;">23.4 m²</span> (sienos iki 2.0 m).
+        </div>
+        <div style="font-size:12px;color:#6b6863;margin-top:3px;">
+          Šaltinis: AI iš spec'o lapo · vonios sienos perimetras 11.2 m × 2.0 m aukštis − durų angos = 23.4 m². <a href="#" style="color:#2a6fb5;">Detaliau</a>
+        </div>
+      </div>
+      <!-- Action buttons -->
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:200px;">
+        <div style="display:flex;gap:6px;">
+          <button style="flex:1;background:#2a6fb5;border:1px solid #2a6fb5;color:#fff;padding:8px 14px;border-radius:5px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;">✓ Taip</button>
+          <button style="flex:1;background:#fff;border:1px solid #c97a2c;color:#9a5d20;padding:8px 14px;border-radius:5px;font-size:12px;font-weight:600;">Pataisyti</button>
+        </div>
+        <button style="background:transparent;border:0;color:#6b6863;padding:4px 8px;border-radius:5px;font-size:11px;">Praleisti →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:30px;">Wizard'o detalės</h3>
+<ul style="color:#6b6863;line-height:1.7;">
+  <li><strong>Trigger</strong> — top-bar mygtukas <code>🟡 3 →</code> arba kategorijos antraštės klikinant ant `🟡 N` skaičiuko (filter'as → wizard'as)</li>
+  <li><strong>Layout</strong> — bottom panel ~140px, virš canvas. UI'aus likusios dalys (rail, KŽ panel) paslepiama blur'inant (opacity 0.4-0.55) — fokusas ant klausimo. Canvas auto-zoom'ina į einamąjį polygon'ą.</li>
+  <li><strong>Question struktūra</strong>: "🟡 Reikia patikrinti · [Skyrius]" antraštė + "Patalpoje X rastas Y plotas Z m²" pagrindinis tekstas + šaltinio paaiškinimas su "Detaliau" link'u (atveria provenance popover'ą — kaip Phase C-2).</li>
+  <li><strong>Mygtukai</strong>:
+    <ul>
+      <li><strong>Taip ✓</strong> (mėlynas, primary) — patvirtina, wizard pereina į next step. Pozicija pažymima kaip "checked" bet NE lock'inama (default behavior — gali AI vėl perskaičiuoti). Shift+Taip = + lock 🔒.</li>
+      <li><strong>Pataisyti</strong> (cream amber) — atitinkama gestūra triggerinasi. Jei dispute = skaičius → G7 inline editor atsidaro tiesiai bottom panel'e (input lauke, ne canvas'e). Jei dispute = polygon → canvas'e atsiranda G1 click hint. Po taisymo wizard auto-advance į next.</li>
+      <li><strong>Praleisti →</strong> (subtle text link) — pažymi kaip skipped, pereina toliau. Skipped pozicijos lieka 🟡, bet wizard'as jas peršoka per kitą "Patikrinti" click'ą.</li>
+    </ul>
+  </li>
+  <li><strong>Progress bar</strong> viršuje (1/3 + 3 dot'ai) — vizualus indikatorius kiek liko</li>
+  <li><strong>Užbaigus</strong> — bottom panel pasikeičia į: <em>"Visi 3 patikrinti! Σ 12 458 € + 21% PVM = 15 074 €. [Eksportuoti KŽ] [Grįžti į workspace]"</em>. Top bar mygtukas dingsta arba pakeičia tekstą į <code>✓ Patikrinta</code>.</li>
+  <li><strong>Vidury uždaryti</strong> — ✕ mygtukas top-right'e arba Esc. Likusios skipped pozicijos lieka 🟡, "Patikrinti" mygtukas top-bar'e rodo likusių skaičių.</li>
+</ul>
+
+<h3 style="margin-top:24px;">Klausimai prieš rašant spec'ą</h3>
+<ol style="color:#6b6863;line-height:1.8;">
+  <li><strong>"Taip ✓" default behavior</strong> — (a) lock'inti 🔒 (saugu, rigid) ar (b) palikti laisva (lankstu, AI gali perskaičiuoti). Mano siūlymas: (b) default + Shift+Taip = lock. Sutinki?</li>
+  <li><strong>"Pataisyti" UI surface</strong> — atsidaro tiesiog bottom panel'ėje (G7 inline editor vietoj klausimo) ar canvas'e (G1 click cursor)? Mano siūlymas: priklauso nuo dispute_type — skaičius → bottom panel input, polygon → canvas G1 cursor.</li>
+  <li><strong>Wizard'as gali rodyti tik 🟡 + 🔴 ar pridėti opciją "patikrinti viską" (ir 🟢)</strong> for paranoid users? Mano siūlymas: default tik 🟡 + 🔴. Settings → galima įjungti "viską peržiūrėti" jei nori.</li>
+</ol>
