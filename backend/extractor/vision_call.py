@@ -824,8 +824,7 @@ def _apply_polygon_prepass(vision_result: dict) -> dict:
     if page_w <= 0 or page_h <= 0:
         return vision_result
     rooms = vision_result.get("patalpos", []) or []
-    vision_result["patalpos"] = apply_shared_edges(rooms, page_w, page_h)
-    return vision_result
+    return {**vision_result, "patalpos": apply_shared_edges(rooms, page_w, page_h)}
 
 
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
