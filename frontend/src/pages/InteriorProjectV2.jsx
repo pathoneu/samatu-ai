@@ -25,6 +25,7 @@ import { useParams } from 'react-router-dom';
 import { pdfjs } from 'react-pdf';
 import { useStore } from 'zustand';
 import { getPdfBlob } from '../lib/pdfStore';
+import { getProject } from '../lib/projectStore';
 import { TakeoffCanvas } from '../components/canvas/TakeoffCanvas';
 import { MemoryWatchdog } from '../components/canvas/MemoryWatchdog';
 import { AnnotationLayer } from '../components/canvas/AnnotationLayer';
@@ -69,6 +70,18 @@ export default function InteriorProjectV2() {
   }, [id]);
 
   useEffect(() => { loadPdf(); }, [loadPdf]);
+
+  // Load existing project state (rooms / pozicijos / assumptions) so MiniKZPanel
+  // and gesture hooks have something to work with. Without this, KŽ panel shows
+  // 0 pozicijos and G2/G3/G7 can't run (they need a selection target).
+  useEffect(() => {
+    const project = getProject(id);
+    if (!project) return;
+    if (Array.isArray(project.darbu_sarasas)) setPozicijos(project.darbu_sarasas);
+    const projectRooms = project.raw_calc_data?.patalpos || project.v8_rooms || project.patalpos;
+    if (Array.isArray(projectRooms)) setRooms(projectRooms);
+    if (project.prielaidos) setAssumptions(project.prielaidos);
+  }, [id]);
 
   useEffect(() => {
     sessionRef.current = createSession({ projectId: id });
