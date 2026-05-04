@@ -1,0 +1,171 @@
+"""Sprint 2: deterministic polygon adjacency graph.
+
+Consumes per-room `polygon_pct[]` (optional Vision output, see prompt.py).
+For each pair of rooms whose polygons share collinear edge segments we
+compute the overlap length and subtract HALF the shared length from each
+room's perimetras_m (since each shared wall is otherwise counted once
+per room → twice total across the pair). The corrected perimetras_m
+also drives grindjuostės.
+
+Feature-flag gated: ENABLE_POLYGON_PREPASS=1. When off or when any room
+lacks polygon_pct, we leave perimetras_m unchanged.
+
+Coordinates: polygon_pct is in 0..1 page-fraction space. We convert to
+metric using page-level page_width_m / page_height_m supplied by caller.
+
+References:
+- Spec: docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §4.3 wall_adjacency
+- Sprint 2 risk register: spec §10 (validate against golden test PDFs)
+"""
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# Floating-point epsilon for collinearity test (in 0..1 page-fraction space).
+# 0.005 of a page corresponds to ~5mm at A3 — well below any real wall thickness.
+_COLLINEAR_EPS = 0.005
+
+
+Point = tuple[float, float]
+Segment = tuple[Point, Point]
+
+
+class EdgeKey(NamedTuple):
+    """A collinear-edge key, normalized to (lo_room_idx, hi_room_idx, axis, anchor)."""
+    lo_idx: int
+    hi_idx: int
+    axis: str        # "h" (horizontal) | "v" (vertical) | "d" (diagonal)
+    anchor: float    # the constant coordinate (y for h, x for v, intercept for d)
+
+
+def polygon_to_segments(poly: list[Point]) -> list[Segment]:
+    """Return closed polygon as list of segments, last one closing back to start."""
+    if len(poly) < 2:
+        return []
+    pts = [tuple(p) if not isinstance(p, tuple) else p for p in poly]
+    segs: list[Segment] = []
+    for i in range(len(pts)):
+        a = pts[i]
+        b = pts[(i + 1) % len(pts)]
+        segs.append((a, b))
+    return segs
+
+
+def _segment_axis(seg: Segment) -> tuple[str, float] | None:
+    """Classify segment as horizontal / vertical / diagonal. Returns (axis, anchor).
+
+    For diagonals we compute the slope-intercept anchor 'b' in y = mx + b form;
+    pairs with same (m, b) are collinear. We don't currently chase diagonals
+    (LT plans are nearly all rectilinear) → return None for non-axis-aligned.
+    """
+    (x1, y1), (x2, y2) = seg
+    if abs(x1 - x2) < _COLLINEAR_EPS:
+        return ("v", (x1 + x2) / 2)
+    if abs(y1 - y2) < _COLLINEAR_EPS:
+        return ("h", (y1 + y2) / 2)
+    return None
+
+
+def segments_overlap_length(a: Segment, b: Segment) -> float:
+    """Length of the collinear overlap between two axis-aligned segments.
+
+    Returns 0 if not collinear or if axes differ.
+    """
+    cls_a = _segment_axis(a)
+    cls_b = _segment_axis(b)
+    if cls_a is None or cls_b is None:
+        return 0.0
+    if cls_a[0] != cls_b[0]:
+        return 0.0
+    if abs(cls_a[1] - cls_b[1]) > _COLLINEAR_EPS:
+        return 0.0
+    # Project both segments onto the moving axis (x for h, y for v) and intersect.
+    if cls_a[0] == "h":
+        a_lo, a_hi = sorted([a[0][0], a[1][0]])
+        b_lo, b_hi = sorted([b[0][0], b[1][0]])
+    else:
+        a_lo, a_hi = sorted([a[0][1], a[1][1]])
+        b_lo, b_hi = sorted([b[0][1], b[1][1]])
+    overlap = max(0.0, min(a_hi, b_hi) - max(a_lo, b_lo))
+    return overlap
+
+
+def shared_edges_between(poly_a: list[Point], poly_b: list[Point]) -> float:
+    """Total length of edges shared between two polygons (pct units).
+
+    Sums collinear overlaps between every segment pair from A × B.
+    """
+    if not poly_a or not poly_b:
+        return 0.0
+    segs_a = polygon_to_segments(poly_a)
+    segs_b = polygon_to_segments(poly_b)
+    total = 0.0
+    for sa in segs_a:
+        for sb in segs_b:
+            total += segments_overlap_length(sa, sb)
+    return total
+
+
+def _shared_edge_metric_length(poly_a: list[Point], poly_b: list[Point],
+                               page_width_m: float, page_height_m: float) -> float:
+    """Sum collinear overlaps between A and B, each scaled to metric per its axis."""
+    if not poly_a or not poly_b:
+        return 0.0
+    segs_a = polygon_to_segments(poly_a)
+    segs_b = polygon_to_segments(poly_b)
+    total_m = 0.0
+    for sa in segs_a:
+        for sb in segs_b:
+            cls = _segment_axis(sa)
+            if cls is None:
+                continue
+            overlap_pct = segments_overlap_length(sa, sb)
+            if overlap_pct <= 0:
+                continue
+            # axis 'h' moves along x → scale by page_width_m
+            # axis 'v' moves along y → scale by page_height_m
+            scale = page_width_m if cls[0] == "h" else page_height_m
+            total_m += overlap_pct * scale
+    return total_m
+
+
+def apply_shared_edges(rooms: list[dict], page_width_m: float,
+                       page_height_m: float) -> list[dict]:
+    """Subtract half-shared-edge length from each room's perimetras_m.
+
+    Each shared wall belongs to two rooms; raw Vision perimetras counts it
+    in both. We split it 50/50 — the shared metres are still 'real' wall on
+    each side, but for grindjuostės (which runs along the floor of one room
+    only at any given physical wall) we want one count, hence the half.
+
+    Returns NEW list of room dicts. Original perimetras_m saved as
+    perimetras_orig_m. perimetras_saltinis flips to 'polygon_adjacency'.
+
+    Bails out (returns rooms unchanged) if ANY room lacks polygon_pct.
+    """
+    if any(r.get("polygon_pct") is None for r in rooms):
+        return [{**r} for r in rooms]
+
+    # Pair-wise shared metric length
+    n = len(rooms)
+    shared_per_room = [0.0] * n
+    for i in range(n):
+        for j in range(i + 1, n):
+            metres = _shared_edge_metric_length(
+                rooms[i]["polygon_pct"], rooms[j]["polygon_pct"],
+                page_width_m, page_height_m,
+            )
+            if metres > 0:
+                shared_per_room[i] += metres / 2.0
+                shared_per_room[j] += metres / 2.0
+
+    out: list[dict] = []
+    for i, r in enumerate(rooms):
+        room = {**r}
+        orig = float(r.get("perimetras_m") or 0.0)
+        if shared_per_room[i] > 0:
+            room["perimetras_m"] = max(0.0, orig - shared_per_room[i])
+            room["perimetras_orig_m"] = orig
+            room["perimetras_saltinis"] = "polygon_adjacency"
+        out.append(room)
+    return out
