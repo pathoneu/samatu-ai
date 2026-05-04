@@ -77,9 +77,19 @@ export default function InteriorProjectV2() {
   useEffect(() => {
     const project = getProject(id);
     if (!project) return;
-    if (Array.isArray(project.darbu_sarasas)) setPozicijos(project.darbu_sarasas);
+    // Synthesize stable ids: backend gesture handlers key off `id`, but legacy
+    // pozicijos use `eil_nr` and rooms use `nr` + `pavadinimas`.
+    if (Array.isArray(project.darbu_sarasas)) {
+      setPozicijos(project.darbu_sarasas.map((p, i) => ({
+        ...p, id: p.id || (p.eil_nr != null ? `poz-${p.eil_nr}` : `poz-${i}`),
+      })));
+    }
     const projectRooms = project.raw_calc_data?.patalpos || project.v8_rooms || project.patalpos;
-    if (Array.isArray(projectRooms)) setRooms(projectRooms);
+    if (Array.isArray(projectRooms)) {
+      setRooms(projectRooms.map((r, i) => ({
+        ...r, id: r.id || (r.nr ? `room-${r.nr}` : `room-${i}`),
+      })));
+    }
     if (project.prielaidos) setAssumptions(project.prielaidos);
   }, [id]);
 
