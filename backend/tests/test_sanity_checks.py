@@ -4,6 +4,7 @@ from extractor.sanity_checks import (
     check_ceiling_to_floor,
     check_baseboard_perimeter,
     check_paint_quantity,
+    check_gk_sheets_math,
     check_window_reveals,
     run_all_checks,
 )
@@ -117,3 +118,30 @@ def test_run_all_checks_swallows_exceptions():
     bad_room = {"perimetras_m": "not-a-number"}  # Forces ValueError on float()
     result = run_all_checks({"patalpos": [bad_room]})
     assert isinstance(result, list)  # didn't raise
+
+
+def test_gk_sheets_math_passes_when_pozicija_matches_formula():
+    rooms = [{"gkp_lubu_standart_m2": 148.88}]
+    # ceil(148.88/3.0) * 1.10 = ceil(49.6) * 1.10 = 50 * 1.10 = 55.0
+    pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 55}]
+    assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
+
+
+def test_gk_sheets_math_fires_when_pozicija_off_by_more_than_5pct():
+    rooms = [{"gkp_lubu_standart_m2": 148.88}]
+    # Expected ~55, actual 70 → ~27% off → should fire.
+    pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 70}]
+    w = check_gk_sheets_math(rooms, {"pozicijos": pozicijos})
+    assert w is not None
+    assert w.code == "gk_sheets_off"
+
+
+def test_gk_sheets_math_skipped_when_no_gkp_area():
+    rooms = [{"gkp_lubu_standart_m2": 0}]
+    pozicijos = [{"aprasymas": "GKP lapai luboms", "vnt": "vnt", "kiekis": 10}]
+    assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
+
+
+def test_gk_sheets_math_skipped_when_no_pozicija():
+    rooms = [{"gkp_lubu_standart_m2": 100}]
+    assert check_gk_sheets_math(rooms, {"pozicijos": []}) is None

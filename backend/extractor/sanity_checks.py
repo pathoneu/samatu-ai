@@ -137,19 +137,41 @@ def check_paint_quantity(rooms):
     )
 
 
-def check_gk_sheets_math(rooms):
-    """§6 #5: GK sheets = ceil(wall_area / 3.0) × 1.10. Exact identity check
-    on any GK pozicija we emit.
+def check_gk_sheets_math(rooms, vision_result=None):
+    """§6 #5: GK sheets = ceil(area_m2 / 3.0) × 1.10.
 
-    Looks at pozicijos[] for entries with vnt='vnt' and aprasymas mentioning
-    GK/GKP/gipskartonis. Verifies kiekis matches ceil(area/3.0)*1.10.
-
-    Currently a placeholder — we don't have direct sheet-area input here in
-    rooms, so this returns None until per-room gkp areas are tracked.
+    Sums per-room `gkp_lubu_standart_m2` (ceiling GKP), divides by sheet area
+    (3.0 m² for 1.2×2.5m sheet) and applies 10% waste. Compares against the
+    "GKP lapai luboms" pozicija. Tolerates ±5% slack since rounding propagates.
     """
-    # Real implementation would cross-reference pozicijos against per-room
-    # gkp areas. Simplified: skip if no per-room gkp data available.
-    return None
+    total_gkp_m2 = sum(float(r.get("gkp_lubu_standart_m2") or 0) for r in rooms)
+    if total_gkp_m2 <= 0:
+        return None
+
+    import math
+    expected_sheets = math.ceil(total_gkp_m2 / 3.0) * 1.10
+    pozicijos = (vision_result or {}).get("pozicijos") or []
+    actual_sheets = None
+    for p in pozicijos:
+        apr = (p.get("aprasymas") or "").lower()
+        vnt = (p.get("vnt") or "").lower()
+        if "gkp lapai" in apr and vnt == "vnt":
+            actual_sheets = float(p.get("kiekis") or 0)
+            break
+    if actual_sheets is None:
+        return None
+
+    diff_pct = abs(actual_sheets - expected_sheets) / max(expected_sheets, 1.0)
+    if diff_pct <= 0.05:
+        return None
+    return Warning(
+        code="gk_sheets_off",
+        message=f"GKP lapų skaičius nesutampa: pozicija {actual_sheets:.0f} vs apskaičiuota {expected_sheets:.1f} (±5% leistina)",
+        hint="ceil(GKP_lubu_plotas_m² / 3.0) × 1.10 = lapų skaičius. Patikrinkite per-room gkp_lubu_standart_m2.",
+        severity="low",
+        expected=f"≈{expected_sheets:.0f} vnt",
+        actual=f"{actual_sheets:.0f} vnt",
+    )
 
 
 def check_window_reveals(rooms):
@@ -210,7 +232,11 @@ def run_all_checks(vision_result: dict) -> list[dict]:
     warnings = []
     for check_fn in _ALL_CHECKS:
         try:
-            w = check_fn(rooms)
+            # check_gk_sheets_math also needs pozicijos[] from vision_result
+            if check_fn is check_gk_sheets_math:
+                w = check_fn(rooms, vision_result)
+            else:
+                w = check_fn(rooms)
             if w is not None:
                 warnings.append(w.to_dict())
         except Exception as exc:

@@ -145,7 +145,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
   const rooms = rawData?.patalpos || [];
   const avgH  = rooms.length > 0
-    ? rooms.reduce((s, r) => s + (r.lubu_aukstis_mm || 2800), 0) / rooms.length / 1000
+    ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
     : 2.80;
 
   return (
@@ -227,7 +227,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     </span>
                     <Input
                       type="number"
-                      value={lubu_auksciai[room.nr] ?? ((room.lubu_aukstis_mm || 2800) / 1000)}
+                      value={lubu_auksciai[room.nr] ?? (Number(room.lubu_aukstis_m) || 2.80)}
                       min={2.0} max={6.0} step={0.05}
                       onChange={e => setLubuAukstis(room.nr, parseFloat(e.target.value) || 2.8)}
                       className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
