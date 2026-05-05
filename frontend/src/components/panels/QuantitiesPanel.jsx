@@ -22,6 +22,7 @@ import { useStore } from 'zustand';
 import { viewerStore } from '../../lib/viewerStore';
 import { overrideQuantity } from '../../lib/gestureApi';
 import { abortRegistry } from '../../lib/abortRegistry';
+import { computePanToPolygon } from '../../lib/polygonPan';
 
 export function QuantitiesPanel({
   rooms = [], pozicijos = [], currentAssumptions = {},
@@ -29,6 +30,7 @@ export function QuantitiesPanel({
 }) {
   const setSelection = useStore(viewerStore, (s) => s.setSelection);
   const setHoveredRoomId = useStore(viewerStore, (s) => s.setHoveredRoomId);
+  const setTransform = useStore(viewerStore, (s) => s.setTransform);
   const selection = useStore(viewerStore, (s) => s.selection);
 
   const [search, setSearch] = useState('');
@@ -105,7 +107,20 @@ export function QuantitiesPanel({
               return (
                 <div
                   key={poz.id}
-                  onClick={() => setSelection({ kind: 'pozicija', id: poz.id, room_id: poz.room_id })}
+                  onClick={() => {
+                    setSelection({ kind: 'pozicija', id: poz.id, room_id: poz.room_id });
+                    if (poz.room_id) {
+                      const room = rooms.find(r => r.id === poz.room_id);
+                      if (room?.polygon_pct?.length >= 3) {
+                        const fit = computePanToPolygon(
+                          room.polygon_pct,
+                          window.innerWidth - 320,
+                          window.innerHeight - 48,
+                        );
+                        if (fit) setTransform(fit);
+                      }
+                    }
+                  }}
                   onMouseEnter={() => poz.room_id && setHoveredRoomId(poz.room_id)}
                   onMouseLeave={() => setHoveredRoomId(null)}
                   style={{

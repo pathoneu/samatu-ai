@@ -1,15 +1,16 @@
 // frontend/src/pages/InteriorProjectV2.jsx
 /**
  * Sprint 3 Task 16: full chrome mount. Sprint 3-B simplification trim.
+ * Sprint 3-D Option D: minimalist UI — ToolRail dropped, KŽ panel becomes
+ * navigation tool (click row → canvas pans/zooms to that room).
  *
  * URL: /project/:id/v2 — opt-in during Sprints 1-3, default at end of
  * Sprint 3, legacy /project/:id removed Sprint 4.
  *
  * Mounts:
  *   - TopBar (48px, top)               — page nav, zoom, search, AI
- *   - ToolRail (50px, left)            — gesture tool selection
  *   - TakeoffCanvas (center)           — Sprint 1 mip-pyramid renderer
- *   - GestureSurface + AnnotationLayer — gestures + Konva overlay
+ *   - AnnotationLayer overlay          — Konva polygons (non-interactive)
  *   - RightPanel (320px, right)        — single Kiekiai panel
  *   - MemoryWatchdog                   — Sprint 1 carryover
  *
@@ -18,13 +19,16 @@
  *   - Page nav drives viewerStore.currentPage
  *   - QuantitiesPanel hover → setHoveredRoomId → AnnotationLayer thickens
  *     polygon stroke + glow
+ *   - QuantitiesPanel click → setTransform pans canvas to room polygon
  *   - committedPolygons derived from rooms[] with polygon_pct
  *
- * Sprint 3-B notes:
- *   - VerificationWizard + buildQueue removed (confidence model upstream
- *     was unreliable; UI added complexity for no value).
- *   - AiPanel + SuvestinePanel files retained but no longer mounted; the
- *     RightPanel now renders QuantitiesPanel directly.
+ * Sprint 3-D notes:
+ *   - ToolRail removed (3/6 tools were stubs, 3/6 had confusing flow).
+ *   - GestureSurface helper + all useG1..useG5Handlers no longer mounted.
+ *   - keyboardShortcuts attachment dropped (no tools to switch to).
+ *   - Canvas itself only does pan/zoom (drag + wheel).
+ *   - Backend gesture endpoints + gestureApi.js retained for Sprint 4
+ *     revival (G1 click-to-fill once Vision Pass-2 is wired).
  *
  * Worker note: import pdfjs from react-pdf (4.8.69) rather than
  * standalone pdfjs-dist to avoid version drift. PdfViewer.jsx already
@@ -43,17 +47,10 @@ import { MemoryWatchdog } from '../components/canvas/MemoryWatchdog';
 import { AnnotationLayer } from '../components/canvas/AnnotationLayer';
 import { PageNavigator } from '../components/canvas/PageNavigator';
 import { TopBar } from '../components/workspace/TopBar';
-import { ToolRail } from '../components/workspace/ToolRail';
 import { RightPanel } from '../components/workspace/RightPanel';
 import { tileCache } from '../lib/tileCache';
 import { createSession } from '../lib/telemetry';
-import { attachShortcuts } from '../lib/keyboardShortcuts';
 import { categoryAccent } from '../lib/categoryColor';
-import { useG1Handler } from '../components/canvas/gestures/G1VisionFill';
-import { useG2Handler } from '../components/canvas/gestures/G2AddCount';
-import { useG3Handler } from '../components/canvas/gestures/G3RemoveCount';
-import { useG4Handler } from '../components/canvas/gestures/G4ColorSample';
-import { useG5Handlers } from '../components/canvas/gestures/G5Lasso';
 import { viewerStore } from '../lib/viewerStore';
 
 // Set workerSrc here so this route works even when PdfViewer.jsx is
@@ -69,14 +66,11 @@ export default function InteriorProjectV2() {
   const [rooms, setRooms] = useState([]);
   const [pozicijos, setPozicijos] = useState([]);
   const [assumptions, setAssumptions] = useState({});
-  const [committedPoints, setCommittedPoints] = useState([]);
-  const [preview, setPreview] = useState(null);
   const [aiRunning, setAiRunning] = useState(false);
   const [pageNavOpen, setPageNavOpen] = useState(false);
   const [pages, setPages] = useState([]);
   const sessionRef = useRef(null);
 
-  const setCurrentTool = useStore(viewerStore, (s) => s.setCurrentTool);
   const currentPage = useStore(viewerStore, (s) => s.currentPage);
   const setCurrentPage = useStore(viewerStore, (s) => s.setCurrentPage);
   const scale = useStore(viewerStore, (s) => s.scale);
@@ -117,22 +111,20 @@ export default function InteriorProjectV2() {
     if (proj.prielaidos) setAssumptions(proj.prielaidos);
   }, [id]);
 
-  // ─── Telemetry session + keyboard shortcuts ───────────────────────
+  // ─── Telemetry session lifecycle ──────────────────────────────────
   useEffect(() => {
     sessionRef.current = createSession({ projectId: id });
     const onUnload = () => sessionRef.current?.finish({ exported: false });
     window.addEventListener('beforeunload', onUnload);
-    const detachKb = attachShortcuts({ setCurrentTool });
     return () => {
       window.removeEventListener('beforeunload', onUnload);
       sessionRef.current?.finish({ exported: false });
-      detachKb();
     };
-  }, [id, setCurrentTool]);
+  }, [id]);
 
   const recordGesture = useCallback((g) => sessionRef.current?.recordGesture(g), []);
 
-  // ─── Recompute pipeline (G1..G7 callback) ─────────────────────────
+  // ─── Recompute pipeline (G7 inline-edit callback) ─────────────────
   const onRecomputed = useCallback((result) => {
     if (result.rooms) setRooms(result.rooms);
     if (result.pozicijos) setPozicijos(result.pozicijos);
@@ -259,42 +251,23 @@ export default function InteriorProjectV2() {
         />
       )}
 
-      {/* Center row: ToolRail | Canvas | RightPanel */}
+      {/* Center row: Canvas | RightPanel */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <ToolRail />
-
         {/* Canvas area */}
         <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
           <TakeoffCanvas
             pdfDoc={pdfDoc}
-            renderOverlay={({ canvasWidth, canvasHeight, canvasRef, containerRef }) => (
-              <GestureSurface
-                {...{
-                  projectId: id, pageIdx: currentPage,
-                  canvasWidth, canvasHeight, canvasRef, containerRef,
-                  rooms, pozicijos, currentAssumptions: assumptions,
-                  committedPolygons, committedPoints, preview,
-                  onPolygonAdded: (poly) => {
-                    // Polygons committed by G1 should also persist on rooms[]
-                    // (Sprint 4 will properly thread through projectStore).
-                    // For Sprint 3 we keep them in a dedicated overlay list:
-                    setRooms((rs) => [...rs, {
-                      id: poly.id,
-                      polygon_pct: poly.points,
-                      _ephemeral: true,
-                    }]);
-                  },
-                  onLassoResult: (result) => {
-                    const newPoints = (result.symbols || []).map((s, i) => ({
-                      id: `g5-${Date.now()}-${i}`, xy: s.xy_pct, color: '#22c55e', kind: s.type,
-                    }));
-                    setCommittedPoints((ps) => [...ps, ...newPoints]);
-                  },
-                  onRecomputed,
-                  onGestureEvent: recordGesture,
-                  onPreviewChange: setPreview,
-                }}
-              />
+            renderOverlay={({ canvasWidth, canvasHeight }) => (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none' }}>
+                <AnnotationLayer
+                  width={canvasWidth || 1}
+                  height={canvasHeight || 1}
+                  canvasWidth={canvasWidth || 1}
+                  canvasHeight={canvasHeight || 1}
+                  committedPolygons={committedPolygons}
+                  committedPoints={[]}
+                />
+              </div>
             )}
           />
         </div>
@@ -309,50 +282,5 @@ export default function InteriorProjectV2() {
         />
       </div>
     </div>
-  );
-}
-
-function GestureSurface({
-  projectId, pageIdx, canvasWidth, canvasHeight, canvasRef, containerRef,
-  rooms, pozicijos, currentAssumptions,
-  committedPolygons, committedPoints, preview,
-  onPolygonAdded, onLassoResult, onRecomputed, onGestureEvent, onPreviewChange,
-}) {
-  const onG1 = useG1Handler({ projectId, pageIdx, canvasWidth, canvasHeight,
-                              containerRef, onPolygonAdded, onGestureEvent });
-  const onG2 = useG2Handler({ rooms, pozicijos, currentAssumptions,
-                              canvasWidth, canvasHeight, containerRef,
-                              onRecomputed, onGestureEvent });
-  const onG3 = useG3Handler({ rooms, pozicijos, currentAssumptions,
-                              onRecomputed, onGestureEvent });
-  const onG4 = useG4Handler({ rooms, pozicijos, currentAssumptions,
-                              canvasRef, canvasWidth, canvasHeight,
-                              containerRef, onRecomputed, onGestureEvent });
-  const g5 = useG5Handlers({ projectId, pageIdx, canvasWidth, canvasHeight,
-                             containerRef, onLassoResult, onGestureEvent,
-                             onPreviewChange });
-
-  const onClick = (e) => { onG1(e) || onG2(e) || onG3(e) || onG4(e); };
-  return (
-    <>
-      <div
-        onClick={onClick}
-        onPointerDown={g5.onPointerDown}
-        onPointerMove={g5.onPointerMove}
-        onPointerUp={g5.onPointerUp}
-        style={{ position: 'absolute', inset: 0, zIndex: 2 }}
-      />
-      <div style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none' }}>
-        <AnnotationLayer
-          width={canvasWidth || 1}
-          height={canvasHeight || 1}
-          canvasWidth={canvasWidth || 1}
-          canvasHeight={canvasHeight || 1}
-          committedPolygons={committedPolygons}
-          committedPoints={committedPoints}
-          preview={preview}
-        />
-      </div>
-    </>
   );
 }
