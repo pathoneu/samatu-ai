@@ -1,17 +1,23 @@
 /**
- * Sprint 1: 3-level mip-pyramid for PDF page rendering.
+ * Sprint 1: 2-level mip-pyramid for PDF page rendering.
  *
  * Render each page at a small set of fixed zoom levels rather than
  * tile-by-tile. For viewport scale S, pick the closest level >= S so
  * blits look crisp on settle. CSS transform handles in-between scales
  * during interactive pan/zoom.
+ *
+ * Sprint 2 follow-up: dropped the 0.5× tier because rendering a page at
+ * 0.5× then having CSS scale it down further produced a pixelated mush
+ * when zoomed out. Floor at 1.5× canonical so the source bitmap is
+ * always at least as detailed as the target screen size.
  */
 
-export const MIP_LEVELS = [0.5, 1.5, 3.0];
+export const MIP_LEVELS = [1.5, 3.0];
 
 /**
  * Given the user's current viewport scale (e.g. 1.0 = 100% zoom),
- * return the mip-level we should render against.
+ * return the mip-level we should render against. Always at least the
+ * canonical 1.5× floor so zoomed-out renders stay crisp.
  */
 export function pickZoomLevel(scale) {
   for (const level of MIP_LEVELS) {

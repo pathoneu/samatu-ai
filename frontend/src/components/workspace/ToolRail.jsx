@@ -2,20 +2,18 @@
 /**
  * Sprint 3: vertical tool rail (50px wide).
  *
- * 10 buttons (top → bottom):
- *   ↖ Selection (Esc) — default active
- *   ✥ Pan (V or Space)
- *   ⊏ Liniuotė (matavimas)
+ * 6 buttons (top → bottom). Sprint 3-B trim: dropped the duplicate Pan,
+ * Liniuotė, Markup and Undo stubs that just alerted "Sprint 4". They
+ * were rail noise, not features.
+ *
+ *   ↖ Pan / select (Esc / V) — default active
  *   ───
  *   ⌖ G1 click-to-fill (1) — ✨ uses Vision
  *   ◌ G5 lasso (5)        — ✨ uses Vision
- *   🎨 G4 eyedropper (4)   — ✨ uses Vision
+ *   🎨 G4 spalvos pipetė (4) — ✨ uses Vision
  *   ───
- *   ＋ G2 add count (2)
- *   − G3 remove count (3)
- *   ───
- *   ↶ Undo (Cmd+Z)
- *   ✎ Markup
+ *   ＋ G2 pridėti skaičių (2)
+ *   − G3 šalinti skaičių (3)
  *
  * Reads viewerStore.currentTool; calls setCurrentTool on click.
  * Keyboard shortcuts (Sprint 2 keyboardShortcuts.js) still work.
@@ -26,29 +24,21 @@ import { useStore } from 'zustand';
 import { viewerStore } from '../../lib/viewerStore';
 
 const TOOLS = [
-  { id: 'pan',  label: 'Selection (Esc)',   icon: '↖', kind: 'pan' },
-  { id: 'pan2', label: 'Pan (V / Space)',   icon: '✥', kind: 'pan' },
-  { id: 'ruler', label: 'Liniuotė',         icon: '⊏', kind: 'ruler' },
+  { id: 'pan',  label: 'Pan (Esc / V)',     icon: '↖', kind: 'pan' },
   { divider: true },
-  { id: 'g1', label: 'Click-to-fill (1)',   icon: '⌖', kind: 'g1', ai: true },
-  { id: 'g5', label: 'Lasso (5)',           icon: '◌', kind: 'g5', ai: true },
-  { id: 'g4', label: 'Eyedropper (4)',      icon: '🎨', kind: 'g4', ai: true },
+  { id: 'g1', label: 'AI Click-to-fill (1)', icon: '⌖', kind: 'g1', ai: true },
+  { id: 'g5', label: 'AI Lasso (5)',         icon: '◌', kind: 'g5', ai: true },
+  { id: 'g4', label: 'Spalvos pipetė (4)',   icon: '🎨', kind: 'g4', ai: true },
   { divider: true },
-  { id: 'g2', label: 'Skaičiuoti (2)',      icon: '＋', kind: 'g2' },
-  { id: 'g3', label: 'Šalinti (3)',         icon: '−',  kind: 'g3' },
-  { divider: true },
-  { id: 'undo',   label: 'Atšaukti (Cmd+Z)', icon: '↶', kind: 'undo' },
-  { id: 'markup', label: 'Markup',          icon: '✎', kind: 'markup' },
+  { id: 'g2', label: 'Pridėti skaičių (2)',  icon: '＋', kind: 'g2' },
+  { id: 'g3', label: 'Šalinti skaičių (3)',  icon: '−',  kind: 'g3' },
 ];
 
-export function ToolRail({ onUndo, onMarkup, onRuler }) {
+export function ToolRail() {
   const currentTool = useStore(viewerStore, (s) => s.currentTool);
   const setCurrentTool = useStore(viewerStore, (s) => s.setCurrentTool);
 
   const handle = (tool) => {
-    if (tool.kind === 'undo') return onUndo?.();
-    if (tool.kind === 'markup') return onMarkup?.();
-    if (tool.kind === 'ruler') return onRuler?.();
     setCurrentTool(tool.kind);
   };
 
