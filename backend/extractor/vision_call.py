@@ -1150,6 +1150,23 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         parsed.setdefault("_meta", {})["grindjuosciu_pre_cap_m"] = round(grindjuostes_raw, 2)
         parsed["_meta"]["grindjuosciu_post_cap_m"] = round(grindjuostes_capped, 2)
         parsed["_meta"]["grindjuosciu_cap_ratio_m_per_m2"] = GRINDJUOSCIU_RATIO_CAP
+        # Surface to UI so user knows the empirical band-aid (not pure math)
+        # capped this number. Prepass should make the cap unnecessary; if it
+        # fires, polygon_pct/bbox_pct were missing or wall_adjacency bailed.
+        warnings_list = parsed.setdefault("warnings", [])
+        warnings_list.append({
+            "code": "grindjuosciu_cap_fired",
+            "severity": "low",
+            "message": (
+                f"Grindjuostės apriboti per empirinį 0.65 m/m² limitą: "
+                f"{grindjuostes_raw:.1f}m → {grindjuostes_capped:.1f}m. "
+                "Reiškia, kad polygon_pct/bbox_pct duomenų trūko ir "
+                "wall_adjacency negalėjo apskaičiuoti bendrų sienų."
+            ),
+            "hint": "Re-extract'ink projektą — naujas Vision prompt'as turėtų grąžinti polygon_pct visoms patalpoms.",
+            "expected": "≤0.65 m/m² (po wall_adjacency korekcijos ~0.55)",
+            "actual": f"{grindjuostes_raw / max(bendras_plotas_for_cap, 0.01):.3f} m/m² (pre-cap)",
+        })
     grindjuostes_total = round(grindjuostes_capped, 2)
     if grindjuostes_total > 0:
         pozicijos.extend([
