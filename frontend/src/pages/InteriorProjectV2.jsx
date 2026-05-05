@@ -106,9 +106,22 @@ export default function InteriorProjectV2() {
     }
     const projectRooms = proj.raw_calc_data?.patalpos || proj.v8_rooms || proj.patalpos;
     if (Array.isArray(projectRooms)) {
-      setRooms(projectRooms.map((r, i) => ({
-        ...r, id: r.id || (r.nr ? `room-${r.nr}` : `room-${i}`),
-      })));
+      setRooms(projectRooms.map((r, i) => {
+        // Synthesize polygon_pct from bbox_pct if missing (Block B fallback
+        // for projects extracted before backend polygon_prepass was activated).
+        // 99%+ LT residential rooms are axis-aligned rectangles; bbox is a
+        // good approximation for click-to-pan navigation.
+        let polygon_pct = r.polygon_pct;
+        if ((!polygon_pct || polygon_pct.length < 3) && r.bbox_pct?.w > 0 && r.bbox_pct?.h > 0) {
+          const { x, y, w, h } = r.bbox_pct;
+          polygon_pct = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+        }
+        return {
+          ...r,
+          polygon_pct,
+          id: r.id || (r.nr ? `room-${r.nr}` : `room-${i}`),
+        };
+      }));
     }
     if (proj.prielaidos) setAssumptions(proj.prielaidos);
     if (Array.isArray(proj.warnings)) setWarnings(proj.warnings);
@@ -135,16 +148,20 @@ export default function InteriorProjectV2() {
   }, []);
 
   // ─── Derived: committedPolygons from rooms[] ─────────────────────
+  // Filter by currentPage so polygons only render on the page they belong to
+  // (polygon_pct is page-relative). Rooms with no puslapio_nr fall back to
+  // showing on all pages so legacy projects without page metadata still work.
   const committedPolygons = useMemo(() => {
     return rooms
       .filter((r) => Array.isArray(r.polygon_pct) && r.polygon_pct.length >= 3)
+      .filter((r) => !Number.isFinite(r.puslapio_nr) || (r.puslapio_nr - 1) === currentPage)
       .map((r) => ({
         id: r.id,
         points: r.polygon_pct,
         color: categoryAccent(r.skyrius_enum),
         fillAlpha: 0.18,
       }));
-  }, [rooms]);
+  }, [rooms, currentPage]);
 
   // ─── Memory reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {

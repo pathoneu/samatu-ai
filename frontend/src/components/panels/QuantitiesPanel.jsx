@@ -31,12 +31,32 @@ export function QuantitiesPanel({
   const setSelection = useStore(viewerStore, (s) => s.setSelection);
   const setHoveredRoomId = useStore(viewerStore, (s) => s.setHoveredRoomId);
   const setTransform = useStore(viewerStore, (s) => s.setTransform);
+  const setCurrentPage = useStore(viewerStore, (s) => s.setCurrentPage);
+  const currentPage = useStore(viewerStore, (s) => s.currentPage);
   const selection = useStore(viewerStore, (s) => s.selection);
+
+  const panToRoom = useCallback((room) => {
+    if (!room) return;
+    setSelection({ kind: 'room', id: room.id });
+    const targetPageIdx = Number.isFinite(room.puslapio_nr) ? Math.max(0, room.puslapio_nr - 1) : null;
+    if (targetPageIdx !== null && targetPageIdx !== currentPage) {
+      setCurrentPage(targetPageIdx);
+    }
+    if (room.polygon_pct?.length >= 3) {
+      const fit = computePanToPolygon(
+        room.polygon_pct,
+        window.innerWidth - 320,
+        window.innerHeight - 48,
+      );
+      if (fit) setTransform(fit);
+    }
+  }, [setSelection, setCurrentPage, currentPage, setTransform]);
 
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [showWarnings, setShowWarnings] = useState(false);
+  const [showRooms, setShowRooms] = useState(true);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -136,6 +156,59 @@ export function QuantitiesPanel({
           style={{ width: '100%', padding: '5px 8px', border: '1px solid #d4d2cb', borderRadius: 5, fontSize: 11, background: '#fff', boxSizing: 'border-box' }}
         />
       </div>
+      {/* Rooms (navigation) — pozicijos are summed across rooms so click-to-pan
+          on a poziciją usually no-ops. Rooms have polygon_pct (synthesized
+          from bbox in Block B), so clicking a room name pans the canvas. */}
+      {rooms.length > 0 && (
+        <div style={{ background: '#fff', borderBottom: '1px solid #d4d2cb' }}>
+          <div
+            onClick={() => setShowRooms(v => !v)}
+            style={{
+              padding: '8px 12px', background: '#f6f5f2',
+              display: 'flex', alignItems: 'center', gap: 8,
+              borderBottom: '1px solid #ebe8e3', cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ display: 'inline-block', width: 8, height: 8, background: '#2a6fb5', borderRadius: '50%' }} />
+            <span style={{ flex: 1 }}>Patalpos</span>
+            <span style={{ background: '#e8e5df', color: '#6b6863', fontSize: 9, padding: '1px 6px', borderRadius: 8 }}>{rooms.length}</span>
+            <span style={{ opacity: 0.5, fontSize: 10 }}>{showRooms ? '▴' : '▾'}</span>
+          </div>
+          {showRooms && rooms.map(room => {
+            const isSelected = selection?.kind === 'room' && selection.id === room.id;
+            return (
+              <div
+                key={room.id}
+                onClick={() => panToRoom(room)}
+                onMouseEnter={() => setHoveredRoomId(room.id)}
+                onMouseLeave={() => setHoveredRoomId(null)}
+                style={{
+                  padding: '6px 12px 6px 30px', borderBottom: '1px solid #ebe8e3',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  cursor: 'pointer', fontSize: 11,
+                  background: isSelected ? 'rgba(42,111,181,0.08)' : 'transparent',
+                  borderLeft: isSelected ? '3px solid #2a6fb5' : '3px solid transparent',
+                }}
+              >
+                <span style={{
+                  color: isSelected ? '#171717' : '#3b3b3b',
+                  fontWeight: isSelected ? 500 : 400, flex: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {room.nr ? `${room.nr} · ` : ''}{room.pavadinimas || '—'}
+                </span>
+                <span style={{
+                  marginLeft: 8, color: '#6b6863',
+                  fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                }}>
+                  {Number(room.plotas_m2 || 0).toFixed(1)} m²
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {/* Tree */}
       <div style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
         {grouped.map(([skyrius, items]) => (
@@ -154,14 +227,7 @@ export function QuantitiesPanel({
                     setSelection({ kind: 'pozicija', id: poz.id, room_id: poz.room_id });
                     if (poz.room_id) {
                       const room = rooms.find(r => r.id === poz.room_id);
-                      if (room?.polygon_pct?.length >= 3) {
-                        const fit = computePanToPolygon(
-                          room.polygon_pct,
-                          window.innerWidth - 320,
-                          window.innerHeight - 48,
-                        );
-                        if (fit) setTransform(fit);
-                      }
+                      if (room) panToRoom(room);
                     }
                   }}
                   onMouseEnter={() => poz.room_id && setHoveredRoomId(poz.room_id)}

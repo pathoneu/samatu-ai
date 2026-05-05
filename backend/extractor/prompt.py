@@ -107,7 +107,7 @@ OUTPUT_SCHEMA = {
                             "w": {"type": "number"},
                             "h": {"type": "number"},
                         },
-                        "description": "Patalpos vieta puslapyje kaip 0.0-1.0 fractions of page width/height. Naudojama pass-2 zoom-in re-read'ui."
+                        "description": "Patalpos vieta puslapyje kaip 0.0-1.0 fractions of page width/height (top-left origin). PRIVALO būti TIK floor plan'e (kambarys iš viršaus su sienomis), NE elevation'e/mazge/eksplikacijoje. Naudojama pass-2 zoom-in re-read'ui ir UI click-to-pan'ui."
                     },
                     "polygon_pct": {
                         "type": ["array", "null"],
@@ -723,7 +723,8 @@ Per kiekvieną įvestą puslapį (1-indexed) sugeneruok įrašą `puslapiai[i]`:
 Šitas pipeline naudoja two-pass architektūrą. Po šito pirmojo pass'o, mes
 PRIZOOMUOSIM kiekvieną patalpą atskirai aukšta rezoliucija ir patiksinsim mm
 matmenis. Kad tai veiktų, **TU PRIVALAI** kiekvienai patalpai grąžinti:
-- `puslapio_nr` (1-indexed) — kuriame puslapyje matosi šios patalpos floor plan
+- `puslapio_nr` (1-indexed) — kuriame puslapyje matosi šios patalpos **floor plan
+  (planas iš viršaus, top-down view)**. NE elevation, NE pjūvis, NE mazgas.
 - `bbox_pct: {x, y, w, h}` — patalpos vieta tame puslapyje, kaip 0.0-1.0
   fractions nuo puslapio kairio viršaus (top-left origin: y=0 viršuje,
   y=1 apačioje, kaip rasterizuotame PNG). Apima TIK PATALPĄ (visas sienas),
@@ -732,7 +733,23 @@ matmenis. Kad tai veiktų, **TU PRIVALAI** kiekvienai patalpai grąžinti:
 Pavyzdys: jei patalpa yra puslapio kairiame viršuje, užima ~30% pločio ir 25% aukščio:
   `bbox_pct: {"x": 0.10, "y": 0.15, "w": 0.30, "h": 0.25}`
 
-Jei patalpa neturi atskiro floor plan'o (pvz. tik eksplikacijoje minima) —
+⚠ **DAŽNA KLAIDA — NEPADARYK ŠITAIP:** LT A0 brėžinio lapas dažnai turi tos
+pačios patalpos pavadinimą KELIOSE vietose:
+  1. ✓ Floor plan'e (kambarys nupieštas iš viršaus, su sienomis ir matmenimis) — **ŠITĄ NORIME**
+  2. ✗ Sienų išklotinėje / elevation'e (patalpos siena nupiešta iš šono)
+  3. ✗ Mazguose (detalūs konstrukcijos pjūviai su pavadinimu kaip "Miegamasis · niša")
+  4. ✗ Eksplikacijos lentelėje (eilutės tekstas)
+  5. ✗ Baldų išdėstymo plane (jei mato baldus, ne sienas)
+
+`bbox_pct` PRIVALO būti TIK floor plan'o vietoje (kambarys iš viršaus su
+sienomis). Jei tas pats kambario pavadinimas matosi keliose vietose toje
+pačioje pusėje, **pasirink TIK floor plan instance'ą** — jis atpažįstamas iš:
+- Sienos nupieštos kaip dvi lygiagrečios linijos (storis 100-300 mm)
+- Yra langų ir durų tarpai sienose
+- Yra dimension chain'ai aplink (matmenys mm)
+- NĖRA tekstinių aprašymų ar baldų vidaus detalių
+
+Jei patalpa yra TIK eksplikacijoje (nematoma jokiame plane) —
 palik `puslapio_nr: null, bbox_pct: null`. Tokiai patalpai nebus zoom pass'o.
 
 Kiekvienai patalpai grąžink `polygon_pct` — sienų vidinio kontūro viršūnių sąrašas

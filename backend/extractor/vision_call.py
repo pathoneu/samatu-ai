@@ -877,6 +877,52 @@ def _apply_polygon_prepass(vision_result: dict) -> dict:
     return {**vision_result, "patalpos": apply_shared_edges(rooms_with_poly, page_w, page_h)}
 
 
+def _validate_room_bboxes(vision_result: dict) -> dict:
+    """Sprint 4 follow-up: warn when room bbox_pct values look like Vision
+    pointed at label/elevation/eksplikacija text instances instead of the
+    floor plan room outlines.
+
+    Heuristic: on a typical LT residential A0/A1 sheet, the floor plan covers
+    a meaningful fraction of the page. If the union of all room bboxes covers
+    less than ~5% of the page, Vision likely emitted bboxes for small label
+    instances scattered across the sheet (e.g., elevation drawings, mazgai)
+    rather than the actual rooms. Emits a warning to vision_result["warnings"].
+
+    Does not mutate bbox_pct values — UI click-to-pan + pass-2 zoom still use
+    them, and the warning lets the user know the data is suspect.
+    """
+    rooms = vision_result.get("patalpos") or []
+    boxed = [r for r in rooms if isinstance(r.get("bbox_pct"), dict)
+             and float(r["bbox_pct"].get("w") or 0) > 0
+             and float(r["bbox_pct"].get("h") or 0) > 0]
+    if len(boxed) < 3:
+        return vision_result
+
+    union_area = sum(
+        float(r["bbox_pct"]["w"]) * float(r["bbox_pct"]["h"]) for r in boxed
+    )
+    if union_area >= 0.05:
+        return vision_result
+
+    warnings_list = list(vision_result.get("warnings") or [])
+    warnings_list.append({
+        "code": "bbox_pct_floor_plan_unlikely",
+        "severity": "warning",
+        "message": (
+            f"Patalpų bbox suma užima tik {union_area*100:.1f}% puslapio — "
+            "gali būti, kad AI nukreipė į pavadinimų etiketes ar elevation "
+            "brėžinius vietoje tikrojo floor plan'o."
+        ),
+        "hint": (
+            "Re-extract'ink projektą — sustiprintas prompt'as nukreipia AI "
+            "į floor plan'ą (top-down view), ne į išklotines/mazgus."
+        ),
+        "expected": "≥5% puslapio ploto kambariams",
+        "actual": f"{union_area*100:.2f}%",
+    })
+    return {**vision_result, "warnings": warnings_list}
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -2124,6 +2170,11 @@ def extract_interior(
         })
     except Exception as exc:
         print(f"[extractor] polygon prepass failed: {exc}")
+
+    try:
+        parsed = _validate_room_bboxes(parsed)
+    except Exception as exc:
+        print(f"[extractor] bbox validation failed: {exc}")
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
