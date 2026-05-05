@@ -8,26 +8,46 @@ See docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §8.
 import os
 
 _TRUTHY = {"1", "true", "yes", "on"}
+_FALSY = {"0", "false", "no", "off"}
 
-_FLAG_ENV_NAMES = {
-    "per_room_ceiling": "ENABLE_PER_ROOM_CEILING",         # Sprint 0 Fix 4
-    "paint_class_inference": "ENABLE_PAINT_CLASS_INFERENCE",  # Sprint 0 Fix 5
-    "verify_pass": "ENABLE_VERIFY_PASS",                   # Sprint 3
-    "polygon_prepass": "ENABLE_POLYGON_PREPASS",           # Sprint 2
-    "sonnet_pass1": "ENABLE_SONNET_PASS1",                 # Sprint 4
-    "grid_overlay": "ENABLE_GRID_OVERLAY",                 # Sprint 3
-    "proxy_gt": "ENABLE_PROXY_GT",                         # Sprint 4
+# (env_var_name, default_when_unset)
+_FLAG_DEFINITIONS = {
+    "per_room_ceiling":      ("ENABLE_PER_ROOM_CEILING", False),         # Sprint 0 Fix 4
+    "paint_class_inference": ("ENABLE_PAINT_CLASS_INFERENCE", False),    # Sprint 0 Fix 5
+    "verify_pass":           ("ENABLE_VERIFY_PASS", False),              # Sprint 3
+    # Sprint 4 Block B: activated default-on after wall_adjacency
+    # validated on P1+P3+P5 (grindjuostės ratio drops to 0.5-0.6 m/m²
+    # from 0.98 broken double-count). Override with ENABLE_POLYGON_PREPASS=0
+    # if regression suspected.
+    "polygon_prepass":       ("ENABLE_POLYGON_PREPASS", True),           # Sprint 2 → 4
+    "sonnet_pass1":          ("ENABLE_SONNET_PASS1", False),             # Sprint 4
+    "grid_overlay":          ("ENABLE_GRID_OVERLAY", False),             # Sprint 3
+    "proxy_gt":              ("ENABLE_PROXY_GT", False),                 # Sprint 4
 }
+
+
+def _resolve(env_value: str, default: bool) -> bool:
+    v = (env_value or "").strip().lower()
+    if v in _TRUTHY:
+        return True
+    if v in _FALSY:
+        return False
+    return default
 
 
 def get_flags() -> dict[str, bool]:
     """Return current feature flag state as {flag_name: bool}.
 
-    Reads from environment variables; each flag defaults to False.
-    Truthy values: "1", "true", "yes", "on" (case-insensitive).
-    All other values (including empty string) = False.
+    Reads from environment variables; defaults per-flag (most are False;
+    polygon_prepass defaults True after Sprint 4 Block B validation).
+    Truthy: "1"/"true"/"yes"/"on". Falsy: "0"/"false"/"no"/"off".
+    Any other value (incl. empty) → flag's default.
     """
     return {
-        name: os.environ.get(env, "").strip().lower() in _TRUTHY
-        for name, env in _FLAG_ENV_NAMES.items()
+        name: _resolve(os.environ.get(env, ""), default)
+        for name, (env, default) in _FLAG_DEFINITIONS.items()
     }
+
+
+# Back-compat alias for any old code reading _FLAG_ENV_NAMES
+_FLAG_ENV_NAMES = {name: env for name, (env, _default) in _FLAG_DEFINITIONS.items()}

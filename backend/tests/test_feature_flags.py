@@ -8,8 +8,9 @@ import pytest
 from extractor.feature_flags import get_flags
 
 
-def test_flags_default_to_false():
-    """All flags should default to False when env vars are unset."""
+def test_flags_default_when_unset():
+    """Flags default per definition. Most are False; polygon_prepass is True
+    after Sprint 4 Block B activation (wall_adjacency validated)."""
     # Clear env
     for k in ["ENABLE_PER_ROOM_CEILING", "ENABLE_PAINT_CLASS_INFERENCE",
               "ENABLE_VERIFY_PASS", "ENABLE_POLYGON_PREPASS",
@@ -19,10 +20,19 @@ def test_flags_default_to_false():
     assert flags["per_room_ceiling"] is False
     assert flags["paint_class_inference"] is False
     assert flags["verify_pass"] is False
-    assert flags["polygon_prepass"] is False
+    assert flags["polygon_prepass"] is True   # Sprint 4 Block B default-on
     assert flags["sonnet_pass1"] is False
     assert flags["grid_overlay"] is False
     assert flags["proxy_gt"] is False
+
+
+def test_polygon_prepass_can_be_disabled_via_env(monkeypatch):
+    """polygon_prepass defaults True but ENABLE_POLYGON_PREPASS=0 turns it off
+    (one-line revert per Sprint 4 plan)."""
+    monkeypatch.setenv("ENABLE_POLYGON_PREPASS", "0")
+    assert get_flags()["polygon_prepass"] is False
+    monkeypatch.setenv("ENABLE_POLYGON_PREPASS", "false")
+    assert get_flags()["polygon_prepass"] is False
 
 
 def test_flags_read_truthy_strings(monkeypatch):

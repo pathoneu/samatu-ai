@@ -809,22 +809,72 @@ def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
 
 
 def _apply_polygon_prepass(vision_result: dict) -> dict:
-    """Sprint 2: feature-flag-gated. When enabled and every room has
-    polygon_pct, replace perimetras_m with the shared-walls-corrected value.
+    """Sprint 2 + Sprint 4 Block B: shared-walls polygon prepass for
+    grindjuostės double-count fix.
 
-    Spec §4.3 wall_adjacency, §10 risk register (golden-PDF validation).
+    When `polygon_prepass` flag is on:
+    1. If a room has `polygon_pct` from Vision — use it directly.
+    2. Otherwise synthesize a 4-corner rectangle from `bbox_pct`. LT
+       residential rooms are 99%+ axis-aligned rectangles; for L-shapes
+       the bbox over-estimates outline edges, biasing toward MORE shared
+       edges than reality (conservative — slightly over-corrects grindjuostės
+       rather than under).
+    3. Estimate page metric extent as median(perimetras_m / bbox_perim_pct)
+       across rooms. Assumes isotropic scale (LT plans are square paper).
+    4. Pass to `apply_shared_edges` which subtracts half-shared-edge length
+       from each room's `perimetras_m`. Downstream `lt_rules.calc_room_quantities`
+       then computes grindjuostės from corrected perimetras (no more 0.98 m/m²
+       double-count → falls in LT industry expected 0.5-0.6 m/m² ratio).
+
+    Spec §4.3 wall_adjacency, §10 risk register.
     """
     from .feature_flags import get_flags
     from .wall_adjacency import apply_shared_edges
 
     if not get_flags()["polygon_prepass"]:
         return vision_result
+    rooms = vision_result.get("patalpos", []) or []
+    if not rooms:
+        return vision_result
+
+    # Estimate page extent (m) from median ratio of perimetras_m / bbox_perim_pct.
+    # Each ratio represents how many metres a 1.0 page-fraction edge spans.
+    ratios = []
+    for r in rooms:
+        bbox = r.get("bbox_pct")
+        perim = r.get("perimetras_m")
+        if bbox and perim and isinstance(bbox, dict):
+            bbox_perim_pct = 2 * (float(bbox.get("w") or 0) + float(bbox.get("h") or 0))
+            if bbox_perim_pct > 0.01:
+                ratios.append(float(perim) / bbox_perim_pct)
     page_w = float(vision_result.get("page_width_m") or 0)
     page_h = float(vision_result.get("page_height_m") or 0)
     if page_w <= 0 or page_h <= 0:
-        return vision_result
-    rooms = vision_result.get("patalpos", []) or []
-    return {**vision_result, "patalpos": apply_shared_edges(rooms, page_w, page_h)}
+        if not ratios:
+            return vision_result
+        ratios_sorted = sorted(ratios)
+        page_extent_m = ratios_sorted[len(ratios_sorted) // 2]
+        page_w = page_h = page_extent_m
+
+    # Synthesize polygon from bbox when room lacks explicit polygon_pct
+    rooms_with_poly = []
+    for r in rooms:
+        if r.get("polygon_pct"):
+            rooms_with_poly.append(r)
+        elif r.get("bbox_pct") and isinstance(r["bbox_pct"], dict):
+            b = r["bbox_pct"]
+            x, y, w, h = float(b.get("x") or 0), float(b.get("y") or 0), float(b.get("w") or 0), float(b.get("h") or 0)
+            if w > 0 and h > 0:
+                synth = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+                rooms_with_poly.append({**r, "polygon_pct": synth, "polygon_source": "synthesized_from_bbox"})
+            else:
+                rooms_with_poly.append(r)
+        else:
+            rooms_with_poly.append(r)
+
+    # apply_shared_edges bails (returns rooms unchanged) if any room still
+    # lacks polygon_pct — that's our safety fallback.
+    return {**vision_result, "patalpos": apply_shared_edges(rooms_with_poly, page_w, page_h)}
 
 
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
