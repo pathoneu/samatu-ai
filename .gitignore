@@ -46,3 +46,4 @@ results/*.md
 !results/.gitkeep
 .playwright-mcp/
 .claude/scheduled_tasks.lock
+.superpowers/
