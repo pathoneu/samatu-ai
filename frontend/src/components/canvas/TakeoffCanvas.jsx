@@ -31,6 +31,7 @@ export function TakeoffCanvas({ pdfDoc, renderOverlay }) {
   const setTransform = useStore(viewerStore, (s) => s.setTransform);
 
   const [renderedLevel, setRenderedLevel] = useState(null);
+  const [renderedKey, setRenderedKey] = useState(null);
 
   // Render the current page at the current mip-zoom level when scale settles.
   useEffect(() => {
@@ -38,13 +39,14 @@ export function TakeoffCanvas({ pdfDoc, renderOverlay }) {
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
     settleTimerRef.current = setTimeout(() => {
       const targetLevel = pickZoomLevel(scale);
-      if (targetLevel === renderedLevel) return;
-
       const key = tileKey(pageIdx, targetLevel);
+      if (key === renderedKey) return;
+
       const cached = tileCache.get(key);
       if (cached) {
         blit(canvasRef.current, cached);
         setRenderedLevel(targetLevel);
+        setRenderedKey(key);
         return;
       }
 
@@ -54,13 +56,14 @@ export function TakeoffCanvas({ pdfDoc, renderOverlay }) {
         tileCache.set(key, bitmap);
         blit(canvasRef.current, bitmap);
         setRenderedLevel(targetLevel);
+        setRenderedKey(key);
       }).catch((err) => {
         console.error('[TakeoffCanvas] render failed:', err);
       });
     }, SETTLE_DEBOUNCE_MS);
 
     return () => clearTimeout(settleTimerRef.current);
-  }, [pdfDoc, pageIdx, scale, renderedLevel]);
+  }, [pdfDoc, pageIdx, scale, renderedKey]);
 
   // CSS transform during interaction — GPU-accelerated, no re-render.
   // The canvas was rasterized at `renderedLevel`; if the live scale differs,
