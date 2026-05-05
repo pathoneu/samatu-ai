@@ -1,18 +1,27 @@
 // frontend/src/pages/InteriorProjectV2.jsx
 /**
- * Sprint 2: full takeoff workspace mount.
+ * Sprint 3 Task 16: full chrome mount.
  *
  * URL: /project/:id/v2 — opt-in during Sprints 1-3, default at end of
  * Sprint 3, legacy /project/:id removed Sprint 4.
  *
  * Mounts:
- *   - TakeoffCanvas (Sprint 1 mip-pyramid renderer) with renderOverlay
- *   - GestureSurface — dispatches click + pointer events through
- *     G1..G5 hooks, all sharing the same z-index-2 surface
- *   - AnnotationLayer (z-index 3, pointer-events: none) — paints
- *     committed polygons / points / live preview
- *   - MiniKZPanel — Sprint 3 chrome stand-in; hosts G7 inline override
- *   - MemoryWatchdog (Sprint 1 carryover)
+ *   - TopBar (48px, top)               — page nav, zoom, search, Patikrinti, AI
+ *   - ToolRail (50px, left)            — gesture tool selection
+ *   - TakeoffCanvas (center)           — Sprint 1 mip-pyramid renderer
+ *   - GestureSurface + AnnotationLayer — gestures + Konva overlay
+ *   - VerificationWizard (overlay)     — only when wizardOpen
+ *   - RightPanel (320px, right)        — AI / Kiekiai / Suvestinė tabs
+ *   - MemoryWatchdog                   — Sprint 1 carryover
+ *
+ * State plumbing:
+ *   - buildQueue() drives viewerStore.verificationQueue from rooms+pozicijos
+ *   - TopBar Patikrinti → setWizardOpen(true)
+ *   - AI Run button calls /extract-interior
+ *   - Page nav drives viewerStore.currentPage
+ *   - QuantitiesPanel hover → setHoveredRoomId → AnnotationLayer thickens
+ *     polygon stroke + glow
+ *   - committedPolygons derived from rooms[] with polygon_pct
  *
  * Worker note: import pdfjs from react-pdf (4.8.69) rather than
  * standalone pdfjs-dist to avoid version drift. PdfViewer.jsx already
@@ -20,19 +29,28 @@
  * we set it here too in case PdfViewer is tree-shaken into a different
  * chunk for this route.
  */
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { pdfjs } from 'react-pdf';
 import { useStore } from 'zustand';
 import { getPdfBlob } from '../lib/pdfStore';
-import { getProject } from '../lib/projectStore';
+import { getProject, updateProject } from '../lib/projectStore';
 import { TakeoffCanvas } from '../components/canvas/TakeoffCanvas';
 import { MemoryWatchdog } from '../components/canvas/MemoryWatchdog';
 import { AnnotationLayer } from '../components/canvas/AnnotationLayer';
-import { MiniKZPanel } from '../components/panels/MiniKZPanel';
+import { PageNavigator } from '../components/canvas/PageNavigator';
+import { TopBar } from '../components/workspace/TopBar';
+import { ToolRail } from '../components/workspace/ToolRail';
+import { RightPanel } from '../components/workspace/RightPanel';
+import { AiPanel } from '../components/panels/AiPanel';
+import { QuantitiesPanel } from '../components/panels/QuantitiesPanel';
+import { SuvestinePanel } from '../components/panels/SuvestinePanel';
+import { VerificationWizard } from '../components/wizard/VerificationWizard';
 import { tileCache } from '../lib/tileCache';
 import { createSession } from '../lib/telemetry';
 import { attachShortcuts } from '../lib/keyboardShortcuts';
+import { buildQueue } from '../lib/verificationQueue';
+import { categoryAccent } from '../lib/categoryColor';
 import { useG1Handler } from '../components/canvas/gestures/G1VisionFill';
 import { useG2Handler } from '../components/canvas/gestures/G2AddCount';
 import { useG3Handler } from '../components/canvas/gestures/G3RemoveCount';
@@ -49,16 +67,29 @@ export default function InteriorProjectV2() {
   const { id } = useParams();
   const [pdfDoc, setPdfDoc] = useState(null);
   const [error, setError] = useState(null);
+  const [project, setProject] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [pozicijos, setPozicijos] = useState([]);
   const [assumptions, setAssumptions] = useState({});
-  const [committedPolygons, setCommittedPolygons] = useState([]);
   const [committedPoints, setCommittedPoints] = useState([]);
   const [preview, setPreview] = useState(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [recentRuns, setRecentRuns] = useState([]);
+  const [pageNavOpen, setPageNavOpen] = useState(false);
+  const [pages, setPages] = useState([]);
   const sessionRef = useRef(null);
 
   const setCurrentTool = useStore(viewerStore, (s) => s.setCurrentTool);
+  const currentPage = useStore(viewerStore, (s) => s.currentPage);
+  const setCurrentPage = useStore(viewerStore, (s) => s.setCurrentPage);
+  const scale = useStore(viewerStore, (s) => s.scale);
+  const setScale = useStore(viewerStore, (s) => s.setScale);
+  const wizardOpen = useStore(viewerStore, (s) => s.wizardOpen);
+  const setWizardOpen = useStore(viewerStore, (s) => s.setWizardOpen);
+  const setVerificationQueue = useStore(viewerStore, (s) => s.setVerificationQueue);
+  const verificationQueue = useStore(viewerStore, (s) => s.verificationQueue);
 
+  // ─── PDF loading ──────────────────────────────────────────────────
   const loadPdf = useCallback(async () => {
     try {
       const blob = await getPdfBlob(id);
@@ -66,33 +97,34 @@ export default function InteriorProjectV2() {
       const buf = await blob.arrayBuffer();
       const doc = await pdfjs.getDocument({ data: buf }).promise;
       setPdfDoc(doc);
+      // Build pages list for PageNavigator (titles deferred to Sprint 4).
+      const total = doc.numPages || 1;
+      setPages(Array.from({ length: total }, (_, i) => ({ kind: `Puslapis ${i + 1}` })));
     } catch (err) { setError(`Nepavyko užkrauti PDF: ${err.message}`); }
   }, [id]);
 
   useEffect(() => { loadPdf(); }, [loadPdf]);
 
-  // Load existing project state (rooms / pozicijos / assumptions) so MiniKZPanel
-  // and gesture hooks have something to work with. Without this, KŽ panel shows
-  // 0 pozicijos and G2/G3/G7 can't run (they need a selection target).
+  // ─── Project load ─────────────────────────────────────────────────
   useEffect(() => {
-    const project = getProject(id);
-    if (!project) return;
-    // Synthesize stable ids: backend gesture handlers key off `id`, but legacy
-    // pozicijos use `eil_nr` and rooms use `nr` + `pavadinimas`.
-    if (Array.isArray(project.darbu_sarasas)) {
-      setPozicijos(project.darbu_sarasas.map((p, i) => ({
+    const proj = getProject(id);
+    if (!proj) return;
+    setProject(proj);
+    if (Array.isArray(proj.darbu_sarasas)) {
+      setPozicijos(proj.darbu_sarasas.map((p, i) => ({
         ...p, id: p.id || (p.eil_nr != null ? `poz-${p.eil_nr}` : `poz-${i}`),
       })));
     }
-    const projectRooms = project.raw_calc_data?.patalpos || project.v8_rooms || project.patalpos;
+    const projectRooms = proj.raw_calc_data?.patalpos || proj.v8_rooms || proj.patalpos;
     if (Array.isArray(projectRooms)) {
       setRooms(projectRooms.map((r, i) => ({
         ...r, id: r.id || (r.nr ? `room-${r.nr}` : `room-${i}`),
       })));
     }
-    if (project.prielaidos) setAssumptions(project.prielaidos);
+    if (proj.prielaidos) setAssumptions(proj.prielaidos);
   }, [id]);
 
+  // ─── Telemetry session + keyboard shortcuts ───────────────────────
   useEffect(() => {
     sessionRef.current = createSession({ projectId: id });
     const onUnload = () => sessionRef.current?.finish({ exported: false });
@@ -107,12 +139,32 @@ export default function InteriorProjectV2() {
 
   const recordGesture = useCallback((g) => sessionRef.current?.recordGesture(g), []);
 
+  // ─── Recompute pipeline (G1..G7 callback) ─────────────────────────
   const onRecomputed = useCallback((result) => {
     if (result.rooms) setRooms(result.rooms);
     if (result.pozicijos) setPozicijos(result.pozicijos);
     if (result.assumptions) setAssumptions(result.assumptions);
   }, []);
 
+  // ─── Build verification queue from rooms+pozicijos ───────────────
+  useEffect(() => {
+    const queue = buildQueue({ rooms, pozicijos });
+    setVerificationQueue(queue);
+  }, [rooms, pozicijos, setVerificationQueue]);
+
+  // ─── Derived: committedPolygons from rooms[] ─────────────────────
+  const committedPolygons = useMemo(() => {
+    return rooms
+      .filter((r) => Array.isArray(r.polygon_pct) && r.polygon_pct.length >= 3)
+      .map((r) => ({
+        id: r.id,
+        points: r.polygon_pct,
+        color: categoryAccent(r.skyrius_enum),
+        fillAlpha: 0.18,
+      }));
+  }, [rooms]);
+
+  // ─── Memory reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     pdfDoc?.destroy().catch(() => {});
     tileCache.clear();
@@ -120,47 +172,218 @@ export default function InteriorProjectV2() {
     loadPdf();
   }, [pdfDoc, loadPdf]);
 
+  // ─── AI Run handler ───────────────────────────────────────────────
+  const handleAiRun = useCallback(async () => {
+    if (aiRunning || !project) return;
+    setAiRunning(true);
+    const startedAt = Date.now();
+    try {
+      const blob = await getPdfBlob(id);
+      if (!blob) throw new Error('PDF nerastas');
+      const fd = new FormData();
+      fd.append('files', blob, (project.name || 'projektas') + '.pdf');
+      if (project._overrides) fd.append('rules_override', JSON.stringify(project._overrides));
+      const res = await fetch('/extract-interior', {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+        signal: AbortSignal.timeout(600_000),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      if (result?.status === 'error') throw new Error(result._error || 'Pipeline klaida');
+      if (!result.patalpos) throw new Error('AI grąžino netinkamą formatą');
+      const merged = {
+        ...project,
+        ...result,
+        name: project.name,
+        company_name: project.company_name,
+        vat_rate: project.vat_rate,
+        _reextracted_at: new Date().toISOString(),
+      };
+      updateProject(project.id, merged);
+      setProject(merged);
+      // Refresh local rooms / pozicijos / prielaidos
+      if (Array.isArray(merged.darbu_sarasas)) {
+        setPozicijos(merged.darbu_sarasas.map((p, i) => ({
+          ...p, id: p.id || (p.eil_nr != null ? `poz-${p.eil_nr}` : `poz-${i}`),
+        })));
+      }
+      const rs = merged.raw_calc_data?.patalpos || merged.v8_rooms || merged.patalpos;
+      if (Array.isArray(rs)) {
+        setRooms(rs.map((r, i) => ({
+          ...r, id: r.id || (r.nr ? `room-${r.nr}` : `room-${i}`),
+        })));
+      }
+      if (merged.prielaidos) setAssumptions(merged.prielaidos);
+      setRecentRuns((rs2) => [{
+        timestamp: Date.now(),
+        page_count: result.patalpos?.length || 0,
+        success: true,
+        duration_ms: Date.now() - startedAt,
+      }, ...rs2].slice(0, 10));
+    } catch (err) {
+      console.error('[AI run] failed:', err);
+      setRecentRuns((rs2) => [{
+        timestamp: Date.now(),
+        page_count: 0,
+        success: false,
+        error: err.message,
+        duration_ms: Date.now() - startedAt,
+      }, ...rs2].slice(0, 10));
+      alert(`AI klaida: ${err.message}`);
+    } finally {
+      setAiRunning(false);
+    }
+  }, [aiRunning, project, id]);
+
+  // ─── TopBar handlers ──────────────────────────────────────────────
+  const onPrevPage = useCallback(() => {
+    setCurrentPage(Math.max(0, currentPage - 1));
+  }, [currentPage, setCurrentPage]);
+  const onNextPage = useCallback(() => {
+    setCurrentPage(Math.min(pages.length - 1, currentPage + 1));
+  }, [currentPage, pages.length, setCurrentPage]);
+  const onZoomIn = useCallback(() => setScale(Math.min(scale * 1.1, 6)), [scale, setScale]);
+  const onZoomOut = useCallback(() => setScale(Math.max(scale / 1.1, 0.25)), [scale, setScale]);
+  const onPagePicker = useCallback(() => setPageNavOpen((v) => !v), []);
+  const onWizard = useCallback(() => setWizardOpen(true), [setWizardOpen]);
+
   if (error) return <div style={{ padding: 20, color: '#fff' }}>{error}</div>;
   if (!pdfDoc) return <div style={{ padding: 20, color: '#aaa' }}>Kraunamas brėžinys…</div>;
 
+  // Chrome dimming when wizard open: opacity 0.55 + pointer-events: none
+  const dimStyle = wizardOpen
+    ? { opacity: 0.55, pointerEvents: 'none', transition: 'opacity 0.15s ease' }
+    : { opacity: 1, transition: 'opacity 0.15s ease' };
+
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#0e1216', display: 'flex' }}>
+    <div style={{
+      width: '100vw', height: '100vh', background: '#0e1216',
+      display: 'flex', flexDirection: 'column',
+    }}>
       <MemoryWatchdog onReset={handleReset} />
 
-      <div style={{ flex: 1, position: 'relative' }}>
-        <TakeoffCanvas
-          pdfDoc={pdfDoc}
-          pageIdx={0}
-          renderOverlay={({ canvasWidth, canvasHeight, canvasRef, containerRef }) => (
-            <GestureSurface
-              {...{
-                projectId: id, pageIdx: 0,
-                canvasWidth, canvasHeight, canvasRef, containerRef,
-                rooms, pozicijos, currentAssumptions: assumptions,
-                committedPolygons, committedPoints, preview,
-                onPolygonAdded: (poly) => setCommittedPolygons((ps) => [...ps, poly]),
-                onLassoResult: (result) => {
-                  const newPoints = (result.symbols || []).map((s, i) => ({
-                    id: `g5-${Date.now()}-${i}`, xy: s.xy_pct, color: '#22c55e', kind: s.type,
-                  }));
-                  setCommittedPoints((ps) => [...ps, ...newPoints]);
-                },
-                onRecomputed,
-                onGestureEvent: recordGesture,
-                onPreviewChange: setPreview,
-              }}
-            />
-          )}
+      {/* TopBar */}
+      <div style={dimStyle}>
+        <TopBar
+          projectName={project?.name || 'Projektas'}
+          subtitle={project?.company_name}
+          pageTitle={pages[currentPage]?.title || pages[currentPage]?.kind}
+          totalPages={pages.length || 1}
+          queueCount={verificationQueue.length}
+          onPrevPage={onPrevPage}
+          onNextPage={onNextPage}
+          onPagePicker={onPagePicker}
+          onZoomIn={onZoomIn}
+          onZoomOut={onZoomOut}
+          onSearch={() => { /* Sprint 4 */ }}
+          onWizard={onWizard}
+          onAiRun={handleAiRun}
+          onMore={() => { /* Sprint 4 */ }}
         />
       </div>
 
-      <MiniKZPanel
-        rooms={rooms}
-        pozicijos={pozicijos}
-        currentAssumptions={assumptions}
-        onRecomputed={onRecomputed}
-        onGestureEvent={recordGesture}
-      />
+      {pageNavOpen && (
+        <div style={dimStyle}>
+          <PageNavigator
+            pages={pages}
+            currentPage={currentPage}
+            onSelect={setCurrentPage}
+            onClose={() => setPageNavOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Center row: ToolRail | Canvas | RightPanel */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <div style={dimStyle}>
+          <ToolRail
+            onUndo={() => { /* Sprint 4 */ }}
+            onMarkup={() => { /* Sprint 4 */ }}
+            onRuler={() => { /* Sprint 4 */ }}
+          />
+        </div>
+
+        {/* Canvas area + wizard overlay */}
+        <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+          <TakeoffCanvas
+            pdfDoc={pdfDoc}
+            renderOverlay={({ canvasWidth, canvasHeight, canvasRef, containerRef }) => (
+              <GestureSurface
+                {...{
+                  projectId: id, pageIdx: currentPage,
+                  canvasWidth, canvasHeight, canvasRef, containerRef,
+                  rooms, pozicijos, currentAssumptions: assumptions,
+                  committedPolygons, committedPoints, preview,
+                  onPolygonAdded: (poly) => {
+                    // Polygons committed by G1 should also persist on rooms[]
+                    // (Sprint 4 will properly thread through projectStore).
+                    // For Sprint 3 we keep them in a dedicated overlay list:
+                    setRooms((rs) => [...rs, {
+                      id: poly.id,
+                      polygon_pct: poly.points,
+                      _ephemeral: true,
+                    }]);
+                  },
+                  onLassoResult: (result) => {
+                    const newPoints = (result.symbols || []).map((s, i) => ({
+                      id: `g5-${Date.now()}-${i}`, xy: s.xy_pct, color: '#22c55e', kind: s.type,
+                    }));
+                    setCommittedPoints((ps) => [...ps, ...newPoints]);
+                  },
+                  onRecomputed,
+                  onGestureEvent: recordGesture,
+                  onPreviewChange: setPreview,
+                }}
+              />
+            )}
+          />
+
+          {/* Wizard renders only when open; lives inside canvas-area so
+              its absolute positioning anchors to the takeoff column. */}
+          <VerificationWizard
+            rooms={rooms}
+            pozicijos={pozicijos}
+            currentAssumptions={assumptions}
+            onRecomputed={onRecomputed}
+            onGestureEvent={recordGesture}
+          />
+        </div>
+
+        {/* RightPanel */}
+        <div style={dimStyle}>
+          <RightPanel
+            badges={{
+              ai: undefined,
+              kiekiai: pozicijos.length || undefined,
+              suvestine: undefined,
+            }}
+            ai={
+              <AiPanel
+                onRunAi={handleAiRun}
+                isRunning={aiRunning}
+                recentRuns={recentRuns}
+              />
+            }
+            kiekiai={
+              <QuantitiesPanel
+                rooms={rooms}
+                pozicijos={pozicijos}
+                currentAssumptions={assumptions}
+                onRecomputed={onRecomputed}
+                onGestureEvent={recordGesture}
+              />
+            }
+            suvestine={
+              <SuvestinePanel rooms={rooms} pozicijos={pozicijos} />
+            }
+          />
+        </div>
+      </div>
     </div>
   );
 }
