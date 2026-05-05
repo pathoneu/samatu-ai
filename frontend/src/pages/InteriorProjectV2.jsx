@@ -1,27 +1,30 @@
 // frontend/src/pages/InteriorProjectV2.jsx
 /**
- * Sprint 3 Task 16: full chrome mount.
+ * Sprint 3 Task 16: full chrome mount. Sprint 3-B simplification trim.
  *
  * URL: /project/:id/v2 — opt-in during Sprints 1-3, default at end of
  * Sprint 3, legacy /project/:id removed Sprint 4.
  *
  * Mounts:
- *   - TopBar (48px, top)               — page nav, zoom, search, Patikrinti, AI
+ *   - TopBar (48px, top)               — page nav, zoom, search, AI
  *   - ToolRail (50px, left)            — gesture tool selection
  *   - TakeoffCanvas (center)           — Sprint 1 mip-pyramid renderer
  *   - GestureSurface + AnnotationLayer — gestures + Konva overlay
- *   - VerificationWizard (overlay)     — only when wizardOpen
- *   - RightPanel (320px, right)        — AI / Kiekiai / Suvestinė tabs
+ *   - RightPanel (320px, right)        — single Kiekiai panel
  *   - MemoryWatchdog                   — Sprint 1 carryover
  *
  * State plumbing:
- *   - buildQueue() drives viewerStore.verificationQueue from rooms+pozicijos
- *   - TopBar Patikrinti → setWizardOpen(true)
  *   - AI Run button calls /extract-interior
  *   - Page nav drives viewerStore.currentPage
  *   - QuantitiesPanel hover → setHoveredRoomId → AnnotationLayer thickens
  *     polygon stroke + glow
  *   - committedPolygons derived from rooms[] with polygon_pct
+ *
+ * Sprint 3-B notes:
+ *   - VerificationWizard + buildQueue removed (confidence model upstream
+ *     was unreliable; UI added complexity for no value).
+ *   - AiPanel + SuvestinePanel files retained but no longer mounted; the
+ *     RightPanel now renders QuantitiesPanel directly.
  *
  * Worker note: import pdfjs from react-pdf (4.8.69) rather than
  * standalone pdfjs-dist to avoid version drift. PdfViewer.jsx already
@@ -42,14 +45,9 @@ import { PageNavigator } from '../components/canvas/PageNavigator';
 import { TopBar } from '../components/workspace/TopBar';
 import { ToolRail } from '../components/workspace/ToolRail';
 import { RightPanel } from '../components/workspace/RightPanel';
-import { AiPanel } from '../components/panels/AiPanel';
-import { QuantitiesPanel } from '../components/panels/QuantitiesPanel';
-import { SuvestinePanel } from '../components/panels/SuvestinePanel';
-import { VerificationWizard } from '../components/wizard/VerificationWizard';
 import { tileCache } from '../lib/tileCache';
 import { createSession } from '../lib/telemetry';
 import { attachShortcuts } from '../lib/keyboardShortcuts';
-import { buildQueue } from '../lib/verificationQueue';
 import { categoryAccent } from '../lib/categoryColor';
 import { useG1Handler } from '../components/canvas/gestures/G1VisionFill';
 import { useG2Handler } from '../components/canvas/gestures/G2AddCount';
@@ -74,7 +72,6 @@ export default function InteriorProjectV2() {
   const [committedPoints, setCommittedPoints] = useState([]);
   const [preview, setPreview] = useState(null);
   const [aiRunning, setAiRunning] = useState(false);
-  const [recentRuns, setRecentRuns] = useState([]);
   const [pageNavOpen, setPageNavOpen] = useState(false);
   const [pages, setPages] = useState([]);
   const sessionRef = useRef(null);
@@ -84,10 +81,6 @@ export default function InteriorProjectV2() {
   const setCurrentPage = useStore(viewerStore, (s) => s.setCurrentPage);
   const scale = useStore(viewerStore, (s) => s.scale);
   const setScale = useStore(viewerStore, (s) => s.setScale);
-  const wizardOpen = useStore(viewerStore, (s) => s.wizardOpen);
-  const setWizardOpen = useStore(viewerStore, (s) => s.setWizardOpen);
-  const setVerificationQueue = useStore(viewerStore, (s) => s.setVerificationQueue);
-  const verificationQueue = useStore(viewerStore, (s) => s.verificationQueue);
 
   // ─── PDF loading ──────────────────────────────────────────────────
   const loadPdf = useCallback(async () => {
@@ -146,12 +139,6 @@ export default function InteriorProjectV2() {
     if (result.assumptions) setAssumptions(result.assumptions);
   }, []);
 
-  // ─── Build verification queue from rooms+pozicijos ───────────────
-  useEffect(() => {
-    const queue = buildQueue({ rooms, pozicijos });
-    setVerificationQueue(queue);
-  }, [rooms, pozicijos, setVerificationQueue]);
-
   // ─── Derived: committedPolygons from rooms[] ─────────────────────
   const committedPolygons = useMemo(() => {
     return rooms
@@ -176,7 +163,6 @@ export default function InteriorProjectV2() {
   const handleAiRun = useCallback(async () => {
     if (aiRunning || !project) return;
     setAiRunning(true);
-    const startedAt = Date.now();
     try {
       const blob = await getPdfBlob(id);
       if (!blob) throw new Error('PDF nerastas');
@@ -219,21 +205,8 @@ export default function InteriorProjectV2() {
         })));
       }
       if (merged.prielaidos) setAssumptions(merged.prielaidos);
-      setRecentRuns((rs2) => [{
-        timestamp: Date.now(),
-        page_count: result.patalpos?.length || 0,
-        success: true,
-        duration_ms: Date.now() - startedAt,
-      }, ...rs2].slice(0, 10));
     } catch (err) {
       console.error('[AI run] failed:', err);
-      setRecentRuns((rs2) => [{
-        timestamp: Date.now(),
-        page_count: 0,
-        success: false,
-        error: err.message,
-        duration_ms: Date.now() - startedAt,
-      }, ...rs2].slice(0, 10));
       alert(`AI klaida: ${err.message}`);
     } finally {
       setAiRunning(false);
@@ -250,15 +223,9 @@ export default function InteriorProjectV2() {
   const onZoomIn = useCallback(() => setScale(Math.min(scale * 1.1, 6)), [scale, setScale]);
   const onZoomOut = useCallback(() => setScale(Math.max(scale / 1.1, 0.25)), [scale, setScale]);
   const onPagePicker = useCallback(() => setPageNavOpen((v) => !v), []);
-  const onWizard = useCallback(() => setWizardOpen(true), [setWizardOpen]);
 
   if (error) return <div style={{ padding: 20, color: '#fff' }}>{error}</div>;
   if (!pdfDoc) return <div style={{ padding: 20, color: '#aaa' }}>Kraunamas brėžinys…</div>;
-
-  // Chrome dimming when wizard open: opacity 0.55 + pointer-events: none
-  const dimStyle = wizardOpen
-    ? { opacity: 0.55, pointerEvents: 'none', transition: 'opacity 0.15s ease' }
-    : { opacity: 1, transition: 'opacity 0.15s ease' };
 
   return (
     <div style={{
@@ -268,47 +235,35 @@ export default function InteriorProjectV2() {
       <MemoryWatchdog onReset={handleReset} />
 
       {/* TopBar */}
-      <div style={dimStyle}>
-        <TopBar
-          projectName={project?.name || 'Projektas'}
-          subtitle={project?.company_name}
-          pageTitle={pages[currentPage]?.title || pages[currentPage]?.kind}
-          totalPages={pages.length || 1}
-          queueCount={verificationQueue.length}
-          onPrevPage={onPrevPage}
-          onNextPage={onNextPage}
-          onPagePicker={onPagePicker}
-          onZoomIn={onZoomIn}
-          onZoomOut={onZoomOut}
-          onSearch={() => { /* Sprint 4 */ }}
-          onWizard={onWizard}
-          onAiRun={handleAiRun}
-          onMore={() => { /* Sprint 4 */ }}
-        />
-      </div>
+      <TopBar
+        projectName={project?.name || 'Projektas'}
+        subtitle={project?.company_name}
+        pageTitle={pages[currentPage]?.title || pages[currentPage]?.kind}
+        totalPages={pages.length || 1}
+        onPrevPage={onPrevPage}
+        onNextPage={onNextPage}
+        onPagePicker={onPagePicker}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
+        onSearch={() => { /* Sprint 4 */ }}
+        onAiRun={handleAiRun}
+        onMore={() => { /* Sprint 4 */ }}
+      />
 
       {pageNavOpen && (
-        <div style={dimStyle}>
-          <PageNavigator
-            pages={pages}
-            currentPage={currentPage}
-            onSelect={setCurrentPage}
-            onClose={() => setPageNavOpen(false)}
-          />
-        </div>
+        <PageNavigator
+          pages={pages}
+          currentPage={currentPage}
+          onSelect={setCurrentPage}
+          onClose={() => setPageNavOpen(false)}
+        />
       )}
 
       {/* Center row: ToolRail | Canvas | RightPanel */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <div style={dimStyle}>
-          <ToolRail
-            onUndo={() => { /* Sprint 4 */ }}
-            onMarkup={() => { /* Sprint 4 */ }}
-            onRuler={() => { /* Sprint 4 */ }}
-          />
-        </div>
+        <ToolRail />
 
-        {/* Canvas area + wizard overlay */}
+        {/* Canvas area */}
         <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
           <TakeoffCanvas
             pdfDoc={pdfDoc}
@@ -342,47 +297,16 @@ export default function InteriorProjectV2() {
               />
             )}
           />
-
-          {/* Wizard renders only when open; lives inside canvas-area so
-              its absolute positioning anchors to the takeoff column. */}
-          <VerificationWizard
-            rooms={rooms}
-            pozicijos={pozicijos}
-            currentAssumptions={assumptions}
-            onRecomputed={onRecomputed}
-            onGestureEvent={recordGesture}
-          />
         </div>
 
         {/* RightPanel */}
-        <div style={dimStyle}>
-          <RightPanel
-            badges={{
-              ai: undefined,
-              kiekiai: pozicijos.length || undefined,
-              suvestine: undefined,
-            }}
-            ai={
-              <AiPanel
-                onRunAi={handleAiRun}
-                isRunning={aiRunning}
-                recentRuns={recentRuns}
-              />
-            }
-            kiekiai={
-              <QuantitiesPanel
-                rooms={rooms}
-                pozicijos={pozicijos}
-                currentAssumptions={assumptions}
-                onRecomputed={onRecomputed}
-                onGestureEvent={recordGesture}
-              />
-            }
-            suvestine={
-              <SuvestinePanel rooms={rooms} pozicijos={pozicijos} />
-            }
-          />
-        </div>
+        <RightPanel
+          rooms={rooms}
+          pozicijos={pozicijos}
+          currentAssumptions={assumptions}
+          onRecomputed={onRecomputed}
+          onGestureEvent={recordGesture}
+        />
       </div>
     </div>
   );

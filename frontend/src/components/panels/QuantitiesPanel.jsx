@@ -1,30 +1,27 @@
 // frontend/src/components/panels/QuantitiesPanel.jsx
 /**
- * Sprint 3: Kiekiai tab content. Replaces MiniKZPanel.
+ * Sprint 3 Kiekiai panel — minimalist (Sprint 3-B strip).
  *
- * - Filter pills (Visos / 🔴 N / 🟡 N / 🔒 N)
- * - Search filter
+ * Confidence model is currently broken upstream (everything reports
+ * "neaišku" or empty), so the dots, filter pills, and yellow/red row
+ * tints were noise. Trust by default, fix by exception:
+ *
+ * - Search filter (text only)
  * - Category-grouped tree (skyrius header + rows)
- * - Each row: aprasymas | kiekis vnt | confidence dot
+ * - Each row: aprasymas | kiekis vnt | (🔒 if override_locked)
  * - Click row → setSelection (drives G2/G3 target)
  * - Hover row → setHoveredRoomId (bidirectional highlight)
  * - Click kiekis text → G7 inline edit
  * - Footer: Σ neto + Eksportuoti
  *
- * Spec §5.6 Kiekiai tab.
+ * Sprint 4 may bring back confidence UI when the backend model is
+ * trustworthy. Until then the lock icon is the only per-row signal.
  */
 import { useState, useMemo, useCallback } from 'react';
 import { useStore } from 'zustand';
 import { viewerStore } from '../../lib/viewerStore';
 import { overrideQuantity } from '../../lib/gestureApi';
 import { abortRegistry } from '../../lib/abortRegistry';
-
-const FILTERS = [
-  { id: 'all',  label: 'Visos',  match: () => true,                 active: { bg: '#2a6fb5', fg: '#fff' } },
-  { id: 'low',  label: '🔴 N',  match: (p) => p.confidence === 'low' && !p.override_locked },
-  { id: 'med',  label: '🟡 N',  match: (p) => p.confidence === 'med' && !p.override_locked },
-  { id: 'lock', label: '🔒 N',  match: (p) => p.override_locked },
-];
 
 export function QuantitiesPanel({
   rooms = [], pozicijos = [], currentAssumptions = {},
@@ -34,23 +31,15 @@ export function QuantitiesPanel({
   const setHoveredRoomId = useStore(viewerStore, (s) => s.setHoveredRoomId);
   const selection = useStore(viewerStore, (s) => s.selection);
 
-  const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
 
-  const counts = useMemo(() => ({
-    all:  pozicijos.length,
-    low:  pozicijos.filter(p => p.confidence === 'low' && !p.override_locked).length,
-    med:  pozicijos.filter(p => p.confidence === 'med' && !p.override_locked).length,
-    lock: pozicijos.filter(p => p.override_locked).length,
-  }), [pozicijos]);
-
   const filtered = useMemo(() => {
-    const f = FILTERS.find(x => x.id === filter);
     const q = search.trim().toLowerCase();
-    return pozicijos.filter(p => f.match(p) && (!q || (p.aprasymas || '').toLowerCase().includes(q)));
-  }, [pozicijos, filter, search]);
+    if (!q) return pozicijos;
+    return pozicijos.filter((p) => (p.aprasymas || '').toLowerCase().includes(q));
+  }, [pozicijos, search]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -91,35 +80,8 @@ export function QuantitiesPanel({
     }
   }, [editValue, rooms, pozicijos, currentAssumptions, onRecomputed, onGestureEvent]);
 
-  const confDot = (poz) => {
-    if (poz.override_locked) return '#6f5fa3';
-    const map = { high: '#2f7d5b', med: '#c97a2c', low: '#a7493f' };
-    return map[poz.confidence] || '#94a3b8';
-  };
-
-  const rowBg = (poz) => {
-    if (poz.confidence === 'med') return '#fdf6e7';
-    if (poz.confidence === 'low') return '#fcecea';
-    return 'transparent';
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Filter pills */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #d4d2cb', display: 'flex', gap: 5, flexWrap: 'wrap', background: '#fbfaf7' }}>
-        {FILTERS.map(f => {
-          const isActive = filter === f.id;
-          const count = counts[f.id];
-          return (
-            <button key={f.id} onClick={() => setFilter(f.id)} style={{
-              background: isActive ? '#2a6fb5' : '#fff',
-              color: isActive ? '#fff' : '#3b3b3b',
-              border: `1px solid ${isActive ? '#2a6fb5' : '#d4d2cb'}`,
-              padding: '3px 9px', borderRadius: 12, fontSize: 10, fontWeight: 500, cursor: 'pointer',
-            }}>{f.label.replace('N', count)}</button>
-          );
-        })}
-      </div>
       {/* Search */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #d4d2cb', background: '#fbfaf7' }}>
         <input
@@ -150,7 +112,7 @@ export function QuantitiesPanel({
                     padding: '7px 12px 7px 30px', borderBottom: '1px solid #ebe8e3',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     cursor: 'pointer',
-                    background: isSelected ? 'rgba(42,111,181,0.08)' : rowBg(poz),
+                    background: isSelected ? 'rgba(42,111,181,0.08)' : 'transparent',
                     borderLeft: isSelected ? '3px solid #2a6fb5' : '3px solid transparent',
                   }}
                 >
@@ -178,7 +140,6 @@ export function QuantitiesPanel({
                       {poz.override_locked && ' 🔒'}
                     </span>
                   )}
-                  <span title={`confidence: ${poz.confidence || '—'}`} style={{ width: 7, height: 7, background: confDot(poz), borderRadius: '50%' }} />
                 </div>
               );
             })}

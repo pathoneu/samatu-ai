@@ -5,9 +5,10 @@
  * Layout (left → right):
  *   [logo] {projectName} / {subtitle}  |  ← {page/total ▾} →  {pageTitle}
  *   ...flex spacer...
- *   [− zoom% +]  [🔍 Ieškoti]  [🟡 N →]?  [✨ Sąmatų AI]  [⋯]
+ *   [− zoom% +]  [🔍 Ieškoti]  [✨ Sąmatų AI]  [⋯]
  *
- * Patikrinti button hidden when queueCount===0.
+ * Sprint 3-B: dropped the Patikrinti queue badge along with the
+ * verification wizard. Trust by default, fix by exception.
  *
  * Spec §5.4 top-bar behaviors.
  */
@@ -19,14 +20,12 @@ export function TopBar({
   subtitle,
   pageTitle,
   totalPages,
-  queueCount,
   onPrevPage,
   onNextPage,
   onPagePicker,
   onZoomOut,
   onZoomIn,
   onSearch,
-  onWizard,
   onAiRun,
   onMore,
 }) {
@@ -77,16 +76,6 @@ export function TopBar({
         background: '#fff', border: '1px solid #d4d2cb', color: '#3b3b3b',
         padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
       }}>🔍 Ieškoti</button>
-      {queueCount > 0 && (
-        <button onClick={onWizard} style={{
-          background: '#fdf6e7', border: '1px solid #c97a2c', color: '#9a5d20',
-          padding: '6px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600,
-          display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-        }}>
-          <span style={{ display: 'inline-block', width: 6, height: 6, background: '#c97a2c', borderRadius: '50%' }} />
-          Patikrinti {queueCount} →
-        </button>
-      )}
       <button onClick={onAiRun} style={{
         background: '#2a6fb5', border: '1px solid #2a6fb5', color: '#fff',
         padding: '6px 14px', borderRadius: 5, fontSize: 12, fontWeight: 600,
