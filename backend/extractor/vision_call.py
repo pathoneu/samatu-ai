@@ -2361,6 +2361,21 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] scale_validator failed (non-fatal): {exc}")
 
+    # Step 4.065: Sprint 4 Block C — Section 6 sanity checks.
+    # Pure LT-industry math validators (CLAUDE.md §6). Each check is a
+    # post-extraction suspicion, NOT a value mutation. Output is structured
+    # Warning dicts merged with existing scale/cross-page warnings (string +
+    # dict shapes coexist; frontend handles both).
+    try:
+        from .sanity_checks import run_all_checks
+        sanity_warnings = run_all_checks(parsed)
+        if sanity_warnings:
+            existing = parsed.get("warnings") or []
+            parsed["warnings"] = existing + sanity_warnings
+            print(f"[extractor] sanity_checks emitted {len(sanity_warnings)} warnings")
+    except Exception as exc:
+        print(f"[extractor] sanity_checks failed (non-fatal): {exc}")
+
     # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
     # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
     # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].

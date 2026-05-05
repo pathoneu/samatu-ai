@@ -7,7 +7,7 @@
  */
 import { QuantitiesPanel } from '../panels/QuantitiesPanel';
 
-export function RightPanel({ rooms, pozicijos, currentAssumptions, onRecomputed, onGestureEvent }) {
+export function RightPanel({ rooms, pozicijos, currentAssumptions, onRecomputed, onGestureEvent, warnings }) {
   return (
     <aside style={{
       width: 320, background: '#fbfaf7',
@@ -19,6 +19,7 @@ export function RightPanel({ rooms, pozicijos, currentAssumptions, onRecomputed,
         rooms={rooms} pozicijos={pozicijos}
         currentAssumptions={currentAssumptions}
         onRecomputed={onRecomputed} onGestureEvent={onGestureEvent}
+        warnings={warnings}
       />
     </aside>
   );

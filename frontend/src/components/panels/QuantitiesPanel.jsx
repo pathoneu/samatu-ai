@@ -26,7 +26,7 @@ import { computePanToPolygon } from '../../lib/polygonPan';
 
 export function QuantitiesPanel({
   rooms = [], pozicijos = [], currentAssumptions = {},
-  onRecomputed, onGestureEvent,
+  onRecomputed, onGestureEvent, warnings = [],
 }) {
   const setSelection = useStore(viewerStore, (s) => s.setSelection);
   const setHoveredRoomId = useStore(viewerStore, (s) => s.setHoveredRoomId);
@@ -36,6 +36,7 @@ export function QuantitiesPanel({
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
+  const [showWarnings, setShowWarnings] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -84,6 +85,48 @@ export function QuantitiesPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Sprint 4 Block C — sanity-check warnings banner. Renders both
+          Sprint 0 string warnings (scale_validator) and Block C dict
+          warnings (sanity_checks). Click to expand list. */}
+      {warnings.length > 0 && (
+        <div
+          onClick={() => setShowWarnings((v) => !v)}
+          style={{
+            background: '#fdf6e7', border: '1px solid #c97a2c', color: '#9a5d20',
+            padding: '8px 12px', fontSize: 11, display: 'flex', alignItems: 'center',
+            gap: 8, cursor: 'pointer',
+          }}
+        >
+          <span>⚠</span>
+          <span style={{ flex: 1, fontWeight: 600 }}>
+            {warnings.length} {warnings.length === 1 ? 'įspėjimas' : 'įspėjimai'} — math sanity check
+          </span>
+          <span>{showWarnings ? '▴' : '▾'}</span>
+        </div>
+      )}
+      {showWarnings && warnings.length > 0 && (
+        <div style={{ background: '#fff', borderBottom: '1px solid #d4d2cb', padding: 12 }}>
+          {warnings.map((w, i) => {
+            // Handle both string (Sprint 0) and dict (Block C) shapes
+            if (typeof w === 'string') {
+              return <div key={i} style={{ fontSize: 11, marginBottom: 6 }}>• {w}</div>;
+            }
+            return (
+              <div key={i} style={{ fontSize: 11, marginBottom: 8, padding: 6, background: '#fdf6e7', borderRadius: 4 }}>
+                <div style={{ fontWeight: 600 }}>{w.message}</div>
+                {w.hint && <div style={{ opacity: 0.7, marginTop: 2 }}>{w.hint}</div>}
+                {(w.expected || w.actual) && (
+                  <div style={{ opacity: 0.5, marginTop: 2, fontSize: 10 }}>
+                    {w.expected != null && <>tikėjomės: {w.expected}</>}
+                    {w.expected != null && w.actual != null && ' · '}
+                    {w.actual != null && <>gauta: {w.actual}</>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {/* Search */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #d4d2cb', background: '#fbfaf7' }}>
         <input

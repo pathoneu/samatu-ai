@@ -66,6 +66,8 @@ export default function InteriorProjectV2() {
   const [rooms, setRooms] = useState([]);
   const [pozicijos, setPozicijos] = useState([]);
   const [assumptions, setAssumptions] = useState({});
+  // Sprint 4 Block C — sanity-check warnings (string + dict shapes coexist)
+  const [warnings, setWarnings] = useState([]);
   const [aiRunning, setAiRunning] = useState(false);
   const [pageNavOpen, setPageNavOpen] = useState(false);
   const [pages, setPages] = useState([]);
@@ -109,6 +111,7 @@ export default function InteriorProjectV2() {
       })));
     }
     if (proj.prielaidos) setAssumptions(proj.prielaidos);
+    if (Array.isArray(proj.warnings)) setWarnings(proj.warnings);
   }, [id]);
 
   // ─── Telemetry session lifecycle ──────────────────────────────────
@@ -197,6 +200,8 @@ export default function InteriorProjectV2() {
         })));
       }
       if (merged.prielaidos) setAssumptions(merged.prielaidos);
+      // Sprint 4 Block C — refresh sanity warnings on AI re-run
+      setWarnings(Array.isArray(merged.warnings) ? merged.warnings : []);
     } catch (err) {
       console.error('[AI run] failed:', err);
       alert(`AI klaida: ${err.message}`);
@@ -279,6 +284,7 @@ export default function InteriorProjectV2() {
           currentAssumptions={assumptions}
           onRecomputed={onRecomputed}
           onGestureEvent={recordGesture}
+          warnings={warnings}
         />
       </div>
     </div>
