@@ -418,108 +418,6 @@ palik šį lauką tuščią ir naudosim section vidurkį.
 - `tempiamos` — tempiamos lubos (premium)
 </room_identification>
 
-<quantity_formulas>
-
-**A. dazymo_plotas_m2** (paintable wall + ceiling area, RICS NRM2 §29):
-
-```
-A1. dazymo_plotas_gross = perimetras × lubu_aukstis
-A2. deductions = []
-    - Per kiekvieną langą plotas ≥ 1.0 m²: atimti (langas.W × langas.H)
-    - Per kiekvienas duris plotas ≥ 1.0 m²: atimti (durys.W × durys.H)
-    - Vonia/WC/san: atimti (perimetras × plyteles_sienos_aukstis_m)  // default 2.0m
-    - Virtuvė backsplash: atimti (sienos_su_spintomis × 0.6m)
-    - Drabužinė su spintomis visose sienose: atimti perimetras × H × 0.5
-    - Garažas, tamburas: dazymo = 0 (nedažoma)
-A3. dazymo_walls_net = max(0, gross − Σ deductions)
-A4. lubu_dazymo = plotas_m2 jei lubu_tipas in (gkp, tempiamos); else 0
-A5. dazymo_plotas_m2 = dazymo_walls_net + lubu_dazymo
-
-NRM2 §29 PATAISA (žr. formula-validation.md):
-- Atimam tik angas ≥ 1.0 m² (CLAUDE.md §1.1 buvo klaidingai rašiusi 0.5)
-- Default langas 1200×1500 mm = 1.80 m² (ne 1.40 m²)
-- Default durys 900×2050 mm = 1.85 m²
-```
-
-`calculation_trace` pavyzdys:
-`"perim(15.4m) × H(2.82m) − 2×langas(1.2×1.5) − 1×durys(0.9×2.05)"`
-
-**B. kampu_metrai** (corner bead + paint corners, m) — V8 nuvertina ~30%, nes neįskaitė
-angokraščių briaunų. PILNA formulė:
-
-```
-kampai = perimetras                              # lubų periferija (lubų-sienų sandūra)
-       + 4 × lubu_aukstis                        # 4 vidiniai vert kampai (stačiakampės)
-       + (2 × išorinių_kampų × lubu_aukstis)    # išoriniai kampai (kolonos, atsikišmai, L)
-       + Σ langų(2 × langas.W + 2 × langas.H)   # 4-pusiai lango angokraščio briaunos
-       + Σ durų(2 × durys.W + durys.H)          # 3-pusiai durų angokraščio (be apatinės)
-
-L-formos: pridėk 2 × lubu_aukstis (papildomi vidiniai)
-T-formos: pridėk 4 × lubu_aukstis
-Vonia/wc PILNAI plytelėmis: kampai = 0 (silikonas, ne dažo)
-Garažas, tambūras: kampai = 0
-```
-
-**C. angokrasciu_gkp_m** (window/door reveal GKP finishing, m):
-
-```
-angokrasciai = 0
-PER KIEKVIENĄ paslėptas duris:
-  angokrasciai += (durys.W + 2 × durys.H) / 1000   # m
-PER KIEKVIENĄ premium langą (W ≥ 2.0m AR gkp_angokrastis = true):
-  angokrasciai += (2 × langas.W + 2 × langas.H) / 1000  # 4 sides!
-PER KIEKVIENĄ stoglangį:
-  angokrasciai += (2 × stoglangis.W + 2 × stoglangis.H) / 1000  # 4 reveal sides
-
-PATAISA (formula-validation §3.1): langai turi 4 reveal sides (top, bottom, L, R).
-CLAUDE.md §1.2 originaliai siūlė 3 sides — tai klaida ~29% per langą.
-```
-
-**D. pasleptu_duru_staktu_m** (hidden door frame, m):
-`Σ ((W + 2×H) / 1000) per kiekvieną PASLĖPTAS duris`
-
-**E. nisu_metrai** (LED / curtain niche linear, m):
-- LED niche: ilgis ≈ langas.W + 2 × 0.20m (overhang)
-- Lubų plane RAUDONA stačiakampė linija = LED niche (LT industry konvencija)
-- B&W brėžiniuose: žymėjimas "LED juosta", "el. nišelė"
-
-**F. plyteles_sienos_m2** (wall tile area, m²):
-```
-PER vonia/wc/san/skalbykla/katiline:
-  plyteles_sienos_m2 = perimetras × plyteles_sienos_aukstis_m
-plyteles_sienos_aukstis_m: prioritetas
-  1. Iš sienų išklotinės (INT-01) — tikriausias
-  2. Default 2.0m vonia/wc; 0.6m virtuvės backsplash
-```
-
-**G. plyteles_grindys_m2** (floor tile area, m²):
-`Per vonia, wc, san, virtuve, skalbykla, katiline, tamburas: plyteles_grindys_m2 = patalpa.plotas_m2`
-
-**H. grindjuosciu_m** (baseboard, m):
-`(perimetras − Σ durų_pločių) × 1.10  # +10% waste (NRM2 §27)`
-Vonia/wc: paprastai 0 (vietoje grindjuosčių — silikonas)
-
-**I. hidroizoliacija_m2** (waterproofing, m²):
-```
-PER vonia/wc/san/skalbykla:
-  hidroizoliacija_m2 = plotas_m2                    # visa grindis
-                     + perimetras × 0.30m            # splash zone
-                     + dušo_zonos_perimetras × H     # full height (jei dušas)
-hidroizoliacijos_vnt santraukoje = vonia/wc/dušo zonos kiekis
-```
-
-**J. isliginamasis_m2** (self-levelling screed):
-`Σ plotas_m2 visi kambariai išskyrus garažą` (default 5mm; 1.65 kg/mm/m²)
-
-**K. gkp_lubu_m2 / gkp_lubu_virs_3m_m2** (drywall ceiling, m²):
-```
-gkp_lubu_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis ≤ 3.0m
-gkp_lubu_virs_3m_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis > 3.0m
-```
-Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (LT industry konvencija: aukšto darbo režimas, papildomi pastoliai).
-
-</quantity_formulas>
-
 <symbol_recognition>
 
 **Durys (plan view):**
@@ -640,43 +538,6 @@ Užrašyk `eksplikacija_source_page`.
 
 </extraction_rules>
 
-<positions_list_guidance>
-
-`pozicijos` array yra **flat kiekių žiniaraštis** atvaizduojantis kaip LT rangovas surašytų sąmatos
-pozicijas. Skyriai (organizuok pozicijas pagal):
-
-1. **GKP montavimas** — GKP lubos (atskirai standart vs >3m), nišų formavimas iš GKP, pertvaros,
-   dėžutės, reviziniai dureliai (vnt by size: 600×600, 1500×500, 300×300), angokraščių apdirbimas GKP
-
-2. **Glaistymas dazymas** — Sienų lyginimas Rotband, sienų/lubų glaistymas/dažymas (kartu),
-   lubų >3m glaistymas (atskirai), durų angų paruošimas beapvasdinėms, **dažymo kampų montavimas**,
-   priglaistytų šviestuvų/difuzorių apdirbimas, revizinių durelių apdirbimas, LED nišų glaistymas
-
-3. **Plyteles** — Plytelių klijavimas su DYDŽIU (per tile size, jei matoma specifikacijoje:
-   1200×1200×6, 1200×600×9, didžiaformatės etc.), plytelės nišos angokraščiai, lentynėliai/nuolydis
-   dušo kabinoje, hidroizoliacija (vnt), skylių gręžimas, kampų silikonavimas, plytelių 45° pjovimas,
-   išlyginamojo pylimas
-
-4. **Hidroizoliacija** — visi vandentvarkai susiję darbai (atskirai nuo plytelių)
-
-5. **Pridetiniai elementai** — durų montavimas, palangė, akustinė izoliacija (jei multifam),
-   moldingų dažymas, stiklo audinio klijavimas
-
-6. **Out of scope** — rekuperacija (HVAC), santechnika (plumbing), elektros instaliacija. PAŽYMĖK
-   šiuos kaip `skyrius: "Out of scope"` su `kiekis: 0`. Mūsų pipeline'as fokusuotas į vidaus apdailą.
-
-Jei brėžinyje matoma SPECIFIKACIJA (plytelės pagal dydžius), pateik ATSKIRAS pozicijas.
-
-`saltinis` reikšmes:
-- `eksplikacija`: iš eksplikacijos lentelės
-- `isklotines`: iš sienų išklotinių
-- `lubu_planas`: iš lubų plano (LED, šviestuvai, GKP)
-- `specifikacija`: iš atskiros specifikacijų lentelės
-- `skaiciuota_is_brezinio`: skaičiavimas iš matmenų
-- `default_per_paskirtis`: fallback default
-
-</positions_list_guidance>
-
 <output_schema>
 Grąžink TIK šitą JSON struktūrą (TypeScript-style aprašymas).
 
@@ -767,7 +628,7 @@ VISADA pildyk visus laukus. Naudok 0 kai netaikoma. NIEKADA negrąžink markdown
 <examples>
 
 <example>
-Patalpa: vonia su pilna apdaila.
+Patalpa: vonia su pilna apdaila (PRIMITYVAI tik).
 Eksplikacija: "02 Vonia 6.4 m²"; pjūvis H=+2850; siena su PLYTELĖS hatching iki 2.0m;
 viena paslėpta durys 700×2000; vienas langas 600×1400; perimetras 10.2m.
 
@@ -782,37 +643,20 @@ viena paslėpta durys 700×2000; vienas langas 600×1400; perimetras 10.2m.
   "lubu_aukstis_m": 2.85,
   "lubu_aukstis_saltinis": "section_pjuvis",
   "lubu_tipas": "gkp",
-  "dazymo_plotas_gross_m2": 29.07,
-  "deductions": [
-    {"type": "plyteles_juosta", "area_m2": 20.4, "count": 1},
-    {"type": "langas", "area_m2": 0.84, "count": 1}
-  ],
-  "dazymo_plotas_m2": 14.23,
-  "kampu_metrai": 0,
-  "angokrasciu_gkp_m": 0,
-  "pasleptu_duru_staktu_m": 4.7,
-  "nisu_metrai": 0,
-  "pvc_grindys_m2": 0,
-  "plyteles_grindys_m2": 6.4,
-  "plyteles_sienos_m2": 20.4,
   "plyteles_sienos_aukstis_m": 2.0,
-  "isliginamasis_m2": 6.4,
-  "grindjuosciu_m": 0,
-  "hidroizoliacija_m2": 9.46,
   "elementai": [
     {"tipas": "pasleptos_duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000},
     {"tipas": "langas", "kiekis": 1, "plotis_mm": 600, "aukstis_mm": 1400}
   ],
-  "calculation_trace": "perim(10.2) × H(2.85) − plyteles(10.2×2.0) − langas(0.6×1.4 < 1m² → ne deduct) + lubos(6.4) = 14.23m²; vonia kampai=0",
   "confidence": "high",
   "pastabos": ""
 }
 </example>
 
 <example>
-Patalpa: stačiakampė miegamoji.
-Eksplikacija: "05 Miegamasis 14.5 m²"; pjūvis H=+2820; vienas langas 1200×1500; viena standart duris 800×2050;
-perimetras 15.4m.
+Patalpa: stačiakampė miegamoji (PRIMITYVAI tik).
+Eksplikacija: "05 Miegamasis 14.5 m²"; pjūvis H=+2820; vienas langas 1200×1500;
+viena standart duris 800×2050; perimetras 15.4m.
 
 {
   "nr": "05",
@@ -825,27 +669,11 @@ perimetras 15.4m.
   "lubu_aukstis_m": 2.82,
   "lubu_aukstis_saltinis": "section_pjuvis",
   "lubu_tipas": "gkp",
-  "dazymo_plotas_gross_m2": 43.43,
-  "deductions": [
-    {"type": "langas", "area_m2": 1.80, "count": 1},
-    {"type": "duris", "area_m2": 1.64, "count": 1}
-  ],
-  "dazymo_plotas_m2": 54.49,
-  "kampu_metrai": 33.34,
-  "angokrasciu_gkp_m": 0,
-  "pasleptu_duru_staktu_m": 0,
-  "nisu_metrai": 0,
-  "pvc_grindys_m2": 14.5,
-  "plyteles_grindys_m2": 0,
-  "plyteles_sienos_m2": 0,
-  "isliginamasis_m2": 14.5,
-  "grindjuosciu_m": 16.06,
-  "hidroizoliacija_m2": 0,
+  "plyteles_sienos_aukstis_m": 0,
   "elementai": [
     {"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500},
     {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2050}
   ],
-  "calculation_trace": "sienos: 15.4×2.82=43.43 − 1.8 − 1.64 = 39.99; lubos +14.5 = 54.49m². Kampai: perim(15.4) + 4×H(11.28) + langas reveals(2×1.2 + 2×1.5)=5.4 + durys reveals(2×0.8 + 2.05)=3.65 = 35.73m... apvalindami: 33.34",
   "confidence": "high",
   "pastabos": ""
 }
