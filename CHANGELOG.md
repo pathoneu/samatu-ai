@@ -1,5 +1,36 @@
 # Changelog
 
+## Sprint 4 followup — bbox accuracy + ergonomics — 2026-05-05
+
+### Added
+- `extractor/sanity_checks.py::check_gk_sheets_math` — was a placeholder;
+  now sums per-room `gkp_lubu_standart_m2`, applies `ceil(area/3.0)*1.10`
+  formula, compares against the "GKP lapai luboms" pozicija (warns at
+  >5% drift). 4 new tests.
+- `extractor/vision_call.py::_validate_room_bboxes` — runtime sanity
+  check that warns when union of room bboxes covers <5% of the page
+  (sign Vision picked label/elevation instances rather than floor plan
+  rooms). 5 new tests.
+- Empirical `GRINDJUOSCIU_RATIO_CAP=0.65` band-aid now appends a
+  user-visible warning when fired, pointing at re-extraction as the fix.
+- Page-aware click-to-pan: `QuantitiesPanel.panToRoom()` auto-switches
+  PDF page to `room.puslapio_nr` before panning.
+
+### Fixed
+- `AssumptionsPanel.jsx` was reading `rooms[].lubu_aukstis_mm` (didn't
+  exist) — backend emits `lubu_aukstis_m`. The fallback `|| 2800` always
+  fired so AI-extracted ceiling heights were ignored.
+- `prompt.py` Pass-1 — strengthened `bbox_pct` instructions with
+  explicit DAŽNA KLAIDA section + 5 negative examples (elevation /
+  mazgas / eksplikacija / baldai instances must NOT be selected — only
+  floor plan top-down view).
+- `InteriorProjectV2.jsx` — `committedPolygons` filtered by
+  `currentPage` so room polygons only render on the page they belong to.
+
+### Tests
+- Backend: 246 → 255 (+9 tests, all passing)
+- Frontend: 118/118 passing, vite build clean
+
 ## Sprint 3 — Chrome + Verification Wizard — 2026-05-04
 
 ### Added — frontend chrome
