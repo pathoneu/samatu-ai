@@ -98,7 +98,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, onRecomputed }) {
+export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed }) {
   const [open, setOpen] = useState(false);
   const [windowsExpanded, setWindowsExpanded] = useState(false);
   const [doorsExpanded, setDoorsExpanded] = useState(false);
@@ -124,6 +124,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     try {
       const result = await recompute({
         rooms: rawData?.patalpos || [],
+        pozicijos: pozicijos || [],
         edits: [{ field, new_value: newValue }],
         current_assumptions: assumptions || {},
       });
@@ -134,7 +135,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     } finally {
       setRecomputing(false);
     }
-  }, [rawData?.patalpos, assumptions, onRecomputed]);
+  }, [rawData?.patalpos, pozicijos, assumptions, onRecomputed]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...assumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };

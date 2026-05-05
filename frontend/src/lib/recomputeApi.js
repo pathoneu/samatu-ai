@@ -7,11 +7,15 @@
 
 const API_BASE = import.meta.env?.VITE_API_BASE || '';
 
-export async function recompute({ rooms, edits, current_assumptions }) {
+export async function recompute({ rooms, edits, current_assumptions, pozicijos }) {
+  const body = { rooms, edits, current_assumptions };
+  // Sprint 2: pozicijos optional — assumption-class edits don't need it,
+  // but G2/G3/G4/G7 gesture edits do. Forward when caller provides.
+  if (pozicijos !== undefined) body.pozicijos = pozicijos;
   const res = await fetch(`${API_BASE}/api/recompute-quantities`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rooms, edits, current_assumptions }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

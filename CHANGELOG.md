@@ -1,5 +1,113 @@
 # Changelog
 
+## Sprint 3 — Chrome + Verification Wizard — 2026-05-04
+
+### Added — frontend chrome
+- `<TopBar>` 48px chrome row with project name, page nav, zoom, Patikrinti
+  button (conditional on queue), Sąmatų AI button, ⋯ menu
+- `<ToolRail>` 50px vertical rail with 10 visible tool buttons replacing
+  Sprint 2's keyboard-only model. ✨ AI badges on G1/G4/G5
+- `<RightPanel>` 320px tabbed container (✨ AI / 📋 Kiekiai / 📊 Suvestinė)
+- `<QuantitiesPanel>` (replaces Sprint 2 MiniKZPanel) — category tree +
+  filter pills (Visos / 🔴 / 🟡 / 🔒) + search + bidirectional highlight +
+  G7 inline edit + Σ totals footer
+- `<AiPanel>` — Run Sąmatų AI button + recent-runs list (empty state)
+- `<SuvestinePanel>` — Σ neto + 21% PVM card + per-category horizontal bars
+- `<PageNavigator>` page picker dropdown
+- `<VerificationWizard>` — opt-in bottom panel (~140px) walking through
+  🟡+🔴 items step-by-step with auto-zoom, Taip/Pataisyti/Praleisti.
+  Shift+Taip locks 🔒. Pataisyti dispatches by dispute_type (number →
+  inline editor; count → G2/G3 cursor; polygon → G1 cursor)
+- `<InlineEditor>` — bottom-panel inline editor for number disputes
+
+### Added — frontend libs
+- `verificationQueue.js` — pure: builds queue from rooms+pozicijos,
+  orders 🔴 first, classifies dispute_type, supports skipped tracking
+- `categoryColor.js` — single primary blue (Sprint 3 spec §3 locked)
+- `scaleStore.js` — zustand sub-store for scale ratio + lock
+
+### Added — backend (Section 6 appendix)
+- `extractor/verify_pass.py` — Opus 4.7 self-verify shim returning
+  advisory corrections[] (Sprint 3 stub; Sprint 4 wires real SDK call).
+  Gated by `ENABLE_VERIFY_PASS=1`
+- `extractor/grid_overlay.py` — Pillow stamps faint 1m gridlines onto
+  page raster. Gated by `ENABLE_GRID_OVERLAY=1`
+- `prompt.py` — stripped 3,341 tokens (~28% of SYSTEM_TEXT) of unused
+  formula text + stale pozicijos guidance + outdated examples
+
+### Changed
+- `viewerStore` extended with `wizardOpen`, `wizardItemPolygon`,
+  `lockOnConfirm`, `currentPage` + setters
+- `<TakeoffCanvas>` reads `currentPage` from viewerStore (was hardcoded 0);
+  added subtle blueprint grid background (Kreo pattern); ScaleBadge
+  bottom-left placeholder
+- `<AnnotationLayer>` reads `hoveredRoomId` for stroke thicken + glow;
+  fourth layer draws `wizardItemPolygon` amber-glow during verification
+- `<InteriorProjectV2>` body fully rewritten: composes new chrome
+  (TopBar / ToolRail / Canvas / RightPanel / Wizard) with bidirectional
+  highlight wiring + per-tab badges + AI run handler
+- `MiniKZPanel.jsx` deleted (superseded by QuantitiesPanel)
+
+### Known follow-ups
+See `docs/sprint-3-followups.md`. Notable: Pataisyti polygon flow needs
+post-gesture wizard re-entry; scaleStore not yet wired to project; AI
+recent-runs persistence pending; grid_overlay caller integration into
+Pass-1 raster pipeline pending Sprint 4.
+
+### References
+- Spec: `docs/superpowers/specs/2026-05-04-sprint-3-chrome-design.md`
+- Plan: `docs/superpowers/plans/2026-05-04-sprint-3-chrome.md`
+- Brainstorm artifacts: `.superpowers/brainstorm/.../sprint-3-layout-{v1..v4}.html`
+
+## Sprint 2 — Gestures (G1–G5 + G7) + Shared-Walls Polygon Pre-Pass — 2026-05-04
+
+### Added — backend
+- `POST /api/vision-fill` (G1) — click-to-fill polygon endpoint (stub Vision shim;
+  real Pass-2 zoom call is Sprint 4).
+- `POST /api/lasso-rerun` (G5) — freehand-region symbol re-extract endpoint
+  (stub shim; real Vision crop is Sprint 4).
+- `/api/recompute-quantities` extended with G2/G3/G4/G7 edit fields:
+  `add_symbol`, `remove_symbol`, `color_zone`, `override_pozicija`.
+- `backend/extractor/wall_adjacency.py` — deterministic shared-edge math from
+  per-room `polygon_pct[]`. Subtracts half each shared wall from `perimetras_m`
+  to fix grindjuostės double-counting. Feature-flag-gated by
+  `ENABLE_POLYGON_PREPASS=1`. Bails out when any room lacks a polygon.
+- Vision schema gains optional `polygon_pct: [{x, y}, ...]` per room.
+
+### Added — frontend
+- `<AnnotationLayer>` Konva 3-layer overlay (committed `listening=false`,
+  active selected layer, preview hover/lasso layer).
+- Six gesture hooks: `useG1Handler` (Vision click), `useG2Handler` (add count),
+  `useG3Handler` (remove), `useG4Handler` (eyedropper), `useG5Handlers`
+  (lasso pointer trio), G7 inline-edit in `<MiniKZPanel>`.
+- Keyboard shortcuts V / 1–5 / Esc map to `viewerStore.currentTool`.
+- `abortRegistry` cancels prior gesture in-flight on each new same-kind call.
+- New libs: `coordTransform.js`, `gestureApi.js`, `abortRegistry.js`,
+  `keyboardShortcuts.js`, gesture sub-libs `g4-color-sample.js`,
+  `g5-lasso-geometry.js`.
+
+### Changed
+- `<TakeoffCanvas>` accepts `renderOverlay({ canvasWidth, canvasHeight, ... })`
+  so gesture surfaces mount on top without prop drilling.
+- `viewerStore` gains `selection`, `setSelection`, plus `verificationQueue` /
+  `verificationIndex` placeholders (Sprint 3 fills these).
+- `<AssumptionsPanel>` parent now consumes `onRecomputed` so Sprint 0 paint
+  formula delegation actually reaches the UI (was NaN-propagating;
+  follow-up #6 fixed).
+- `backend/main.py` router imports consolidated to top of file (Sprint 0
+  follow-up #2).
+
+### Known follow-ups
+See `docs/sprint-2-followups.md`. Notable: G4 polygon-detection is a
+placeholder (Sprint 4); G7 lives in MiniKZPanel only (full QuantitiesPanel
+in Sprint 3); ENABLE_POLYGON_PREPASS still needs golden-PDF validation
+(spec §10).
+
+### References
+- Spec: `docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md`
+  §4.1, §4.3, §4.5, §5.4, §6 Sprint 2.
+- Plan: `docs/superpowers/plans/2026-05-04-sprint-2-gestures.md`.
+
 ## Sprint 1 — Tile-Based Rendering — 2026-05-03
 
 ### Added

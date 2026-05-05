@@ -7,7 +7,7 @@ test('createViewerStore: defaults', () => {
   const state = store.getState();
   assert.equal(state.scale, 1);
   assert.deepEqual(state.translate, { x: 0, y: 0 });
-  assert.equal(state.currentPage, 1);
+  assert.equal(state.currentPage, 0);
   assert.equal(state.currentTool, 'pan');
   assert.equal(state.hoveredRoomId, null);
 });
@@ -37,4 +37,68 @@ test('createViewerStore: setHoveredRoomId triggers single update', () => {
   store.getState().setHoveredRoomId('K1');  // same value
   assert.equal(store.getState().hoveredRoomId, 'K1');
   assert.ok(calls >= 1);
+});
+
+test('createViewerStore: selection defaults to null', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().selection, null);
+});
+
+test('createViewerStore: setSelection updates', () => {
+  const store = createViewerStore();
+  store.getState().setSelection({ kind: 'pozicija', id: 'p1' });
+  assert.deepEqual(store.getState().selection, { kind: 'pozicija', id: 'p1' });
+});
+
+test('createViewerStore: verificationQueue defaults to empty array', () => {
+  const store = createViewerStore();
+  assert.deepEqual(store.getState().verificationQueue, []);
+  assert.equal(store.getState().verificationIndex, 0);
+});
+
+test('createViewerStore: wizardOpen defaults to false', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().wizardOpen, false);
+});
+
+test('createViewerStore: setWizardOpen toggles', () => {
+  const store = createViewerStore();
+  store.getState().setWizardOpen(true);
+  assert.equal(store.getState().wizardOpen, true);
+  store.getState().setWizardOpen(false);
+  assert.equal(store.getState().wizardOpen, false);
+});
+
+test('createViewerStore: wizardItemPolygon defaults to null', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().wizardItemPolygon, null);
+});
+
+test('createViewerStore: setWizardItemPolygon stores polygon array', () => {
+  const store = createViewerStore();
+  const poly = [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5], [0.1, 0.5]];
+  store.getState().setWizardItemPolygon(poly);
+  assert.deepEqual(store.getState().wizardItemPolygon, poly);
+});
+
+test('createViewerStore: lockOnConfirm defaults to false', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().lockOnConfirm, false);
+});
+
+test('createViewerStore: setLockOnConfirm flips for one click', () => {
+  const store = createViewerStore();
+  store.getState().setLockOnConfirm(true);
+  assert.equal(store.getState().lockOnConfirm, true);
+});
+
+test('createViewerStore: currentPage defaults to 0', () => {
+  const store = createViewerStore();
+  assert.equal(store.getState().currentPage, 0);
+});
+
+test('createViewerStore: setCurrentPage updates index', () => {
+  const store = createViewerStore();
+  store.getState().setCurrentPage(3);
+  assert.equal(store.getState().currentPage, 3);
 });

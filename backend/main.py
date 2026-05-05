@@ -138,6 +138,16 @@ from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv
 
+# ── API router imports (Sprint 0 Task 1 + Sprint 2 G1/G5) ────────────────────
+# Consolidated to top of file in Sprint 2 Task 21 (Sprint 0 follow-up #2).
+# Safe at module-top: routers depend only on FastAPI + sibling internal modules,
+# not on app instance, env vars, or load_dotenv() side effects.
+from api.config import router as config_router
+from api.recompute_quantities import router as recompute_router
+from api.telemetry import router as telemetry_router
+from api.vision_fill import router as vision_fill_router
+from api.lasso_rerun import router as lasso_rerun_router
+
 load_dotenv()
 
 # ── PDF result cache (in-memory, keyed by sha256 of PDF bytes) ───────────────
@@ -193,13 +203,12 @@ async def _global_exception_handler(request, exc):
     )
 
 
-# ── Register config router (Sprint 0 Task 1) ──────────────────────────────────
-from api.config import router as config_router  # noqa: E402
+# ── Register routers (imports consolidated to top — Sprint 2 Task 21) ────────
 app.include_router(config_router)
-from api.recompute_quantities import router as recompute_router  # noqa: E402
 app.include_router(recompute_router)
-from api.telemetry import router as telemetry_router  # noqa: E402
 app.include_router(telemetry_router)
+app.include_router(vision_fill_router)
+app.include_router(lasso_rerun_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

@@ -19,7 +19,8 @@ import { pickZoomLevel, tileKey, renderPageToImageBitmap } from '../../lib/mipPy
 
 const SETTLE_DEBOUNCE_MS = 150;
 
-export function TakeoffCanvas({ pdfDoc, pageIdx = 0 }) {
+export function TakeoffCanvas({ pdfDoc, renderOverlay }) {
+  const pageIdx = useStore(viewerStore, (s) => s.currentPage);
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const settleTimerRef = useRef(null);
@@ -111,6 +112,15 @@ export function TakeoffCanvas({ pdfDoc, pageIdx = 0 }) {
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
   };
 
+  const containerStyle = {
+    overflow: 'hidden', width: '100%', height: '100%', position: 'relative',
+    cursor: dragRef.current.active ? 'grabbing' : 'grab',
+    touchAction: 'none',
+    background: '#f6f5f2',
+    backgroundImage: 'linear-gradient(rgba(42,111,181,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(42,111,181,0.025) 1px, transparent 1px)',
+    backgroundSize: '24px 24px',
+  };
+
   return (
     <div
       ref={containerRef}
@@ -118,16 +128,32 @@ export function TakeoffCanvas({ pdfDoc, pageIdx = 0 }) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{
-        overflow: 'hidden',
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        cursor: 'grab',
-        touchAction: 'none',
-      }}
+      style={containerStyle}
     >
       <canvas ref={canvasRef} style={transformStyle} />
+      {renderOverlay?.({
+        canvasWidth: canvasRef.current?.width ?? 0,
+        canvasHeight: canvasRef.current?.height ?? 0,
+        canvasRef,
+        containerRef,
+      })}
+      <ScaleBadge />
+    </div>
+  );
+}
+
+function ScaleBadge() {
+  // Reads scale from a separate scaleStore (Task 3)
+  return (
+    <div style={{
+      position: 'absolute', bottom: 14, left: 14,
+      background: '#fff', border: '1px solid #d4d2cb',
+      padding: '5px 10px', borderRadius: 14, fontSize: 11,
+      color: '#171717', fontWeight: 500,
+      display: 'flex', alignItems: 'center', gap: 6,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08)', zIndex: 4,
+    }}>
+      Mastelis 1:50 🔒
     </div>
   );
 }
