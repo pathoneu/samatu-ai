@@ -431,7 +431,11 @@ export default function PlanViewer({
       setFillPdfUploaded(true);
       setFillResult(data);
     } catch (err) {
-      setFillError(err.userMessage || 'Nepavyko užpildyti.');
+      // Show friendly LT message + the raw backend detail in parens so
+      // the user can copy/paste it when reporting bugs.
+      const friendly = err.userMessage || 'Nepavyko užpildyti.';
+      const raw = err.rawDetail ? ` (${String(err.rawDetail).slice(0, 80)})` : '';
+      setFillError(friendly + raw);
       // If server lost cache (TTL expired), allow re-upload on next click.
       if ((err.userMessage || '').includes('cache')) setFillPdfUploaded(false);
     } finally {

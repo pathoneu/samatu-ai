@@ -44,10 +44,11 @@ const SOURCE_META = {
 export default function ProvenanceChip({ source, onClick }) {
   const meta = SOURCE_META[source];
   if (!meta) return null;
-  // Phase C-4-bis: ✨ badge for AI-powered or AI-adjacent sources.
-  // 'eksplikacija' is rules-based but sits inside an AI pipeline; 'vision'
-  // is direct Vision output. Manual / dimension sources do NOT get the badge.
-  const isAi = source === 'eksplikacija' || source === 'vision';
+  // 2026-05-06: ✨ badge ONLY for direct Vision output. Eksplikacija is
+  // deterministic pdfplumber extraction (NOT AI inference), so it does not
+  // deserve the AI sparkle. Showing it on eksplikacija rooms was creating
+  // visual clutter and misrepresenting the data flow.
+  const isAi = source === 'vision';
   return (
     <span className="inline-flex items-center gap-1" data-testid={`provenance-chip-${source}`}>
       <button

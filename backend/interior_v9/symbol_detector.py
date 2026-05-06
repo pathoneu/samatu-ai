@@ -24,6 +24,51 @@ import anthropic
 VISION_MODEL = "claude-opus-4-7"
 
 
+def _parse_vision_json(text: str) -> dict:
+    """Robust parser for Vision responses that may include trailing text,
+    code fences, or unquoted keys. Always returns a dict; never raises.
+
+    2026-05-06: hardened after 'Extra data: line 6 column 1' bug — Vision
+    occasionally appends explanatory prose AFTER the JSON. raw_decode()
+    extracts the first complete object and ignores the rest.
+    """
+    cleaned = re.sub(r'^```(?:json)?\s*\n', '', text or '')
+    cleaned = re.sub(r'\n```\s*$', '', cleaned).strip()
+    if not cleaned:
+        return {}
+    decoder = json.JSONDecoder()
+    # Try strict parse first.
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # Fall back: scan for first `{` and use raw_decode (tolerates trailing).
+    brace_idx = cleaned.find('{')
+    if brace_idx >= 0:
+        try:
+            obj, _ = decoder.raw_decode(cleaned[brace_idx:])
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+    # Last resort: try to fix unquoted keys + trailing commas (legacy path).
+    fixed = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', cleaned)
+    fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        # Try raw_decode on the fixed text too.
+        b = fixed.find('{')
+        if b >= 0:
+            try:
+                obj, _ = decoder.raw_decode(fixed[b:])
+                if isinstance(obj, dict):
+                    return obj
+            except json.JSONDecodeError:
+                pass
+    return {"_parse_failed": True, "_raw_excerpt": cleaned[:200]}
+
+
 SYMBOL_TYPES = {
     # ── ELEKTROS PLANAS — sutartiniai ženklai pagal LST EN 60617 ──
     "rozetes": {
@@ -272,14 +317,7 @@ Output JSON:
             }],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-        cleaned = re.sub(r'^```(?:json)?\s*\n', '', text)
-        cleaned = re.sub(r'\n```\s*$', '', cleaned)
-        try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError:
-            fixed = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', cleaned)
-            fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
-            parsed = json.loads(fixed)
+        parsed = _parse_vision_json(text)
         return parsed
     except Exception as e:
         return {"error": str(e)}
@@ -385,14 +423,7 @@ Output JSON (TIK JSON, be markdown):
             }],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-        cleaned = re.sub(r'^```(?:json)?\s*\n', '', text)
-        cleaned = re.sub(r'\n```\s*$', '', cleaned)
-        try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError:
-            fixed = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', cleaned)
-            fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
-            parsed = json.loads(fixed)
+        parsed = _parse_vision_json(text)
 
         # Group by type
         by_type: dict[str, dict] = {}
@@ -621,14 +652,7 @@ Output JSON:
             }],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-        cleaned = re.sub(r'^```(?:json)?\s*\n', '', text)
-        cleaned = re.sub(r'\n```\s*$', '', cleaned)
-        try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError:
-            fixed = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', cleaned)
-            fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
-            parsed = json.loads(fixed)
+        parsed = _parse_vision_json(text)
         return parsed
     except Exception as e:
         return {"error": str(e)}

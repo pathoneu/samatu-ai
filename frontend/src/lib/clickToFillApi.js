@@ -39,9 +39,14 @@ export async function clickToFill({
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      const err = new Error(data.detail || `HTTP ${res.status}`);
+      const detail = data.detail || `HTTP ${res.status}`;
+      const err = new Error(detail);
       err.userMessage = friendlyMessage(data.detail, res.status);
       err.status = res.status;
+      err.rawDetail = detail;
+      // 2026-05-06: log the real backend error for debugging — friendly
+      // message hides it but devs need to see what actually failed.
+      console.warn('[click-to-fill] backend error:', res.status, detail);
       throw err;
     }
     return await res.json();

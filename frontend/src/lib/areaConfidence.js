@@ -120,8 +120,13 @@ export function computeAreaConfidence(room) {
  */
 export function inferPlotasSource(room) {
   if (!room || room.plotas_m2 == null) return null;
+  // 2026-05-06: plotas_saltinis is authoritative — it overrides plotas_source
+  // because the old backend fallback wrote plotas_source="vision" even for
+  // eksplikacija rooms. saltinis comes from the deterministic eksplikacija
+  // reader and never lies.
+  const saltinis = (room.plotas_saltinis || '').trim();
+  if (saltinis === 'eksplikacija') return 'eksplikacija';
   if (room.plotas_source) return room.plotas_source;
-  // Manual polygon override: if a manual polygon exists, the area is from it.
   if (
     Array.isArray(room.polygon_pdf) &&
     room.polygon_pdf.length >= 3 &&
@@ -129,19 +134,19 @@ export function inferPlotasSource(room) {
   ) {
     return 'manual_polygon';
   }
-  // 2026-05-06 backfill: Sprint 4 backend writes plotas_saltinis (LT field)
-  // but ConfidenceBadge reads plotas_source (EN field). Without this mirror,
-  // every eksplikacija-sourced room shows 🔴 neaišku.
-  const saltinis = (room.plotas_saltinis || '').trim();
-  if (saltinis === 'eksplikacija') return 'eksplikacija';
   if (saltinis === 'wall_dim_calc' || saltinis === 'vision') return 'vision';
-  // Legacy backfill: pdfplumber HIT was the dominant historical path.
   return 'eksplikacija';
 }
 
 function collectSources(room) {
   const out = [];
-  if (room.plotas_source === 'eksplikacija' && room.plotas_m2 != null) {
+  // 2026-05-06: plotas_saltinis (LT, set by deterministic eksplikacija reader)
+  // is authoritative — it overrides legacy plotas_source="vision" that the
+  // old backend fallback wrote even for eksplikacija rooms. This fixes the
+  // cached-project 🔴 neaišku bug visible in user screenshot.
+  const saltinisIsEksplikacija =
+    (room.plotas_saltinis || '').trim() === 'eksplikacija';
+  if ((room.plotas_source === 'eksplikacija' || saltinisIsEksplikacija) && room.plotas_m2 != null) {
     out.push({ type: 'eksplikacija', value: room.plotas_m2, label: SOURCE_LABEL_LT.eksplikacija });
   }
   // A room counts as having a manual_polygon source if EITHER
@@ -156,14 +161,15 @@ function collectSources(room) {
     const value = room._polygon_area_m2 != null ? room._polygon_area_m2 : room.plotas_m2;
     out.push({ type: 'manual_polygon', value, label: SOURCE_LABEL_LT.manual_polygon });
   }
-  if (room.plotas_source === 'vision' && room.plotas_m2 != null) {
+  // Vision source — only when plotas_saltinis ALSO does not say eksplikacija
+  // (saltinis is the deterministic truth; legacy plotas_source may lie).
+  if (room.plotas_source === 'vision' && room.plotas_m2 != null && !saltinisIsEksplikacija) {
     out.push({ type: 'vision', value: room.plotas_m2, label: SOURCE_LABEL_LT.vision });
   }
-  // Phase C-2 backfill: projects extracted before the plotas_source audit (Task 2)
+  // Phase C-2 backfill: projects extracted before the plotas_source audit
   // landed have plotas_m2 but no plotas_source flag. pdfplumber eksplikacija HIT
-  // is the dominant historical path (deterministic, $0 cost, runs first), so we
-  // treat missing-source-with-area as legacy eksplikacija. New extractions get
-  // the explicit flag from the backend; this only affects pre-2026-05-02 data.
+  // is the dominant historical path; treat missing-source-with-area as legacy
+  // eksplikacija. New extractions get the explicit flag from the backend.
   if (out.length === 0 && room.plotas_m2 != null && !room.plotas_source) {
     out.push({ type: 'eksplikacija', value: room.plotas_m2, label: SOURCE_LABEL_LT.eksplikacija });
   }

@@ -4771,6 +4771,63 @@ async def v9_symbols_detect(
     return {"status": "ok", **result}
 
 
+@app.post("/v9/symbols/detect-page")
+async def v9_symbols_detect_page(
+    files: list[UploadFile] = File(...),
+    page_nr: int = Form(1),
+    page_type: str = Form(""),
+):
+    """Detect all likely symbol types on one page in a single Vision call.
+
+    Used by PlanViewer 'AI nuskaityti puslapį' button — bundles
+    rozetes/jungikliai/sviestuvai/etc. detection so the user gets one
+    response with all symbol types at once.
+    """
+    if not files:
+        return {"status": "error", "error": "Nepateiktas PDF"}
+    pdf_bytes = await files[0].read()
+
+    try:
+        from interior_v9 import (
+            detect_symbols_bundled,
+            list_symbol_types_for_page_type,
+            SYMBOL_TYPES,
+        )
+    except ImportError as e:
+        return {"status": "error", "error": f"V9 import: {e}"}
+
+    symbol_types = list_symbol_types_for_page_type(page_type)
+    if not symbol_types:
+        # Default: electrical-plan symbols (most common interior project request).
+        symbol_types = [
+            "rozetes", "jungikliai", "sviestuvai", "pakabinami_sviestuvai",
+            "led_juostos", "difuzoriai",
+        ]
+    symbol_types = [st for st in symbol_types if st in SYMBOL_TYPES]
+
+    import asyncio
+    loop = asyncio.get_running_loop()
+    try:
+        by_type = await loop.run_in_executor(
+            None,
+            lambda: detect_symbols_bundled(pdf_bytes, page_nr, symbol_types),
+        )
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+    if isinstance(by_type, dict) and by_type.get("_error"):
+        return {"status": "error", "error": by_type["_error"]}
+    summary = {st: info.get("count", 0) for st, info in (by_type or {}).items()}
+    return {
+        "status": "ok",
+        "page_nr": page_nr,
+        "page_type": page_type,
+        "symbol_types": symbol_types,
+        "by_type": by_type or {},
+        "summary": summary,
+    }
+
+
 @app.post("/v9/symbols/count-by-template")
 async def v9_symbols_count_by_template(
     files: list[UploadFile] = File(...),
