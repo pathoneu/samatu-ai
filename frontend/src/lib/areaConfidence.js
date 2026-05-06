@@ -129,6 +129,12 @@ export function inferPlotasSource(room) {
   ) {
     return 'manual_polygon';
   }
+  // 2026-05-06 backfill: Sprint 4 backend writes plotas_saltinis (LT field)
+  // but ConfidenceBadge reads plotas_source (EN field). Without this mirror,
+  // every eksplikacija-sourced room shows 🔴 neaišku.
+  const saltinis = (room.plotas_saltinis || '').trim();
+  if (saltinis === 'eksplikacija') return 'eksplikacija';
+  if (saltinis === 'wall_dim_calc' || saltinis === 'vision') return 'vision';
   // Legacy backfill: pdfplumber HIT was the dominant historical path.
   return 'eksplikacija';
 }

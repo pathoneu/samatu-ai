@@ -2561,11 +2561,26 @@ def extract_interior(
     # tag it as 'vision' (came from Anthropic Vision response, not eksplikacija).
     # Eksplikacija reader sets 'eksplikacija' explicitly; manual polygons set
     # 'manual_polygon' on the frontend. Anything left over is Vision.
+    #
+    # 2026-05-06: Mirror plotas_saltinis (LT field name written by deterministic
+    # pipeline) to plotas_source (EN field name read by frontend ConfidenceBadge).
+    # Without this, eksplikacija-sourced rooms show 🔴 neaišku because the
+    # frontend never sees the source flag — bug visible in user's screenshot.
+    _SALTINIS_TO_SOURCE = {
+        "eksplikacija": "eksplikacija",
+        "wall_dim_calc": "vision",  # zoom-derived dimension calc
+        "vision": "vision",
+        "polygon_adjacency": "vision",  # synthesized from prepass
+    }
     try:
         patalpos = parsed.get("patalpos") or []
         for p in patalpos:
-            if p.get("plotas_m2") is not None and not p.get("plotas_source"):
-                p["plotas_source"] = "vision"
+            if p.get("plotas_m2") is None:
+                continue
+            if p.get("plotas_source"):
+                continue
+            saltinis = (p.get("plotas_saltinis") or "").strip()
+            p["plotas_source"] = _SALTINIS_TO_SOURCE.get(saltinis, "vision")
     except Exception as exc:
         print(f"[extractor] plotas_source fallback failed: {exc}")
 
