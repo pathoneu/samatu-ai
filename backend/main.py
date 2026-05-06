@@ -5245,7 +5245,10 @@ async def click_to_fill_endpoint(
     except PolygonValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    h, w = raster.shape
+    # pdf2image with grayscale=True still returns 3-channel RGB on some PDFs
+    # (depends on Poppler version + source PDF color profile). Take h,w from
+    # the first 2 dims only.
+    h, w = raster.shape[:2]
     px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
     polygon_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt]
                    for x, y in result.polygon_px]

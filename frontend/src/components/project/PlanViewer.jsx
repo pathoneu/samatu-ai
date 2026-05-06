@@ -660,19 +660,29 @@ export default function PlanViewer({
             <Maximize2 className="w-4 h-4 inline mr-1.5" />
             Plotis
           </button>
-          <button
-            type="button"
-            onClick={() => setSymbolToolsOpen(v => !v)}
-            className={`h-9 px-3 rounded-md border text-sm ${
-              symbolToolsOpen
-                ? 'border-red-300 bg-red-50 text-red-950'
-                : 'border-[#d8d2c8] bg-white hover:bg-[#f1eee8]'
-            }`}
-            title="Sutartiniai ženklai"
-          >
-            <Zap className="w-4 h-4 inline mr-1.5" />
-            Ženklai
-          </button>
+          {/* 2026-05-06: Ženklai toolbar (symbol counting + click-to-fill)
+              hidden by default — accuracy isn't production-ready yet.
+              Re-enable via DevTools:
+                localStorage.setItem('samatu_experimental_tools', '1')
+              Symbol counting via Vision was 49% accurate in bake-off;
+              cv2.matchTemplate over-counts 100×. Will rewire when a
+              commercial CAD-aware backend is integrated. */}
+          {(typeof window !== 'undefined' &&
+            window.localStorage?.getItem('samatu_experimental_tools') === '1') && (
+            <button
+              type="button"
+              onClick={() => setSymbolToolsOpen(v => !v)}
+              className={`h-9 px-3 rounded-md border text-sm ${
+                symbolToolsOpen
+                  ? 'border-red-300 bg-red-50 text-red-950'
+                  : 'border-[#d8d2c8] bg-white hover:bg-[#f1eee8]'
+              }`}
+              title="Sutartiniai ženklai (eksperimentinis)"
+            >
+              <Zap className="w-4 h-4 inline mr-1.5" />
+              Ženklai (β)
+            </button>
+          )}
         </div>
       </div>
 
