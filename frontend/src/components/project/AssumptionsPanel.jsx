@@ -150,6 +150,18 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     handleRecompute('lubu_auksciai', next.lubu_auksciai);
   };
 
+  // Bulk override — set the same height for ALL rooms at once. Useful when
+  // the house has uniform ceilings and the user doesn't want to edit each
+  // row individually.
+  const setLubuAukstisAll = (val) => {
+    const rooms = rawData?.patalpos || [];
+    const next_lubu = {};
+    rooms.forEach(r => { if (r.nr != null) next_lubu[String(r.nr)] = val; });
+    const next = { ...safeAssumptions, lubu_auksciai: next_lubu };
+    onChange(next);
+    handleRecompute('lubu_auksciai', next_lubu);
+  };
+
   const rooms = rawData?.patalpos || [];
   const avgH  = rooms.length > 0
     ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
@@ -226,6 +238,37 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               <p className="text-sm text-foreground mb-2">
                 Lubų aukštis <span className="text-xs text-muted-foreground">(numatytasis: {avgH.toFixed(2)} m)</span>
               </p>
+
+              {/* 2026-05-06: bulk override — set all rooms' aukštis at once.
+                  Works for the common case where the whole house has the same
+                  height; user can then tweak individual rooms below if needed. */}
+              <div className="mb-3 flex items-center gap-2 px-2 py-2 rounded-md bg-muted/40 border border-border/60">
+                <span className="text-xs font-medium text-foreground flex-1">
+                  Visiems kambariams:
+                </span>
+                <Input
+                  type="number"
+                  defaultValue=""
+                  placeholder={avgH.toFixed(2)}
+                  min={2.0} max={6.0} step={0.05}
+                  onBlur={e => {
+                    const v = parseFloat(e.target.value);
+                    if (Number.isFinite(v) && v >= 1.5 && v <= 8.0) {
+                      setLubuAukstisAll(v);
+                      e.target.value = '';
+                    }
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.target.blur();
+                    }
+                  }}
+                  className="h-7 w-20 text-xs bg-card border-border text-right tabular-nums"
+                  title="Įveskite vieną aukštį, paspauskite Enter — bus pritaikytas visiems kambariams"
+                />
+                <span className="text-xs text-muted-foreground">m</span>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {rooms.map(room => (
                   <div key={room.nr} className="flex items-center gap-2">
