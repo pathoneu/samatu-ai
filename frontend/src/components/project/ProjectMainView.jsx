@@ -24,7 +24,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
-  Edit2, Check, X, Trash2, AlertCircle, Search,
+  Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
+  CircleDollarSign, PencilRuler, Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,20 @@ import ReextractButton from './ReextractButton';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import { useAuth } from '@/lib/authContext';
 import { createSession } from '@/lib/telemetry';
+import {
+  acceptPositionQuantity,
+  adjustPositionQuantity,
+  updatePositionQuantity,
+} from '@/lib/quantityOverride';
+import {
+  TAKEOFF_FILTER_MODES,
+  filterTakeoffRows,
+  getFirstReviewRow,
+  getQuantitySourceKind,
+  getQuantitySourceLabel,
+  getRowTargetPage,
+  summarizeTakeoffWorkflow,
+} from '@/lib/takeoffWorkflow';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,8 +74,10 @@ function groupByCategory(darbu_sarasas) {
 
 // ── Vienas darbo eilutės redaktorius (inline) ────────────────────────────────
 
-function WorkRow({ item, onChange, onRemove }) {
+function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   const [editing, setEditing] = useState(false);
+  const [editingQty, setEditingQty] = useState(false);
+  const [draftQty, setDraftQty] = useState('');
   const [draft, setDraft] = useState({
     aprasymas: item.aprasymas || '',
     kiekis: item.kiekis || 0,
@@ -69,6 +86,19 @@ function WorkRow({ item, onChange, onRemove }) {
 
   const suma = (Number(draft.kiekis) || 0) * (Number(draft.kaina) || 0);
   const itemSuma = (item.kiekis || 0) * (item.kaina || 0);
+  const isManualQty = item.manual_override === true || item.quantity_source === 'manual_override';
+  const sourceKind = getQuantitySourceKind(item);
+  const sourceLabel = getQuantitySourceLabel(item);
+  const sourceClass = {
+    manual: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    ai_symbol: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+    assumption: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    formula_estimate: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    formula: 'border-slate-500/20 bg-slate-500/10 text-muted-foreground',
+  }[sourceKind] || 'border-slate-500/20 bg-slate-500/10 text-muted-foreground';
+  const rowId = item._id || `${item.eil_nr}-${item.aprasymas}`;
+  const isCountUnit = String(item.mato_vnt || '').toLowerCase().includes('vnt');
 
   const handleSave = () => {
     onChange({
@@ -88,6 +118,23 @@ function WorkRow({ item, onChange, onRemove }) {
       kaina: item.kaina || 0,
     });
     setEditing(false);
+  };
+
+  const beginQtyEdit = () => {
+    setDraftQty(String(item.kiekis ?? 0).replace('.', ','));
+    setEditingQty(true);
+  };
+
+  const commitQty = () => {
+    const num = parseFloat(String(draftQty).replace(',', '.'));
+    if (!isNaN(num) && num >= 0) {
+      onChange(updatePositionQuantity([item], rowId, num)[0]);
+    }
+    setEditingQty(false);
+  };
+
+  const adjustQty = (delta) => {
+    onChange(adjustPositionQuantity([item], rowId, delta)[0]);
   };
 
   if (editing) {
@@ -142,11 +189,74 @@ function WorkRow({ item, onChange, onRemove }) {
         <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
           <span className="truncate">{item.aprasymas}</span>
+          <span
+            className={`shrink-0 text-[9px] uppercase font-semibold border rounded px-1 py-0.5 ${sourceClass}`}
+            title={item.review_reason || item.calculation_basis || sourceLabel}
+          >
+            {sourceLabel}
+          </span>
           {confDot}
         </div>
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
-      <td className="px-3 py-2 text-sm text-foreground text-right tabular-nums">{fmt(item.kiekis)}</td>
+      <td className="px-3 py-2 text-sm text-foreground text-right tabular-nums">
+        {editingQty ? (
+          <input
+            autoFocus
+            type="number"
+            step="0.01"
+            value={draftQty}
+            onChange={e => setDraftQty(e.target.value)}
+            onBlur={commitQty}
+            onKeyDown={e => {
+              if (e.key === 'Enter') commitQty();
+              if (e.key === 'Escape') setEditingQty(false);
+            }}
+            className="w-24 px-2 py-1 border border-primary bg-background rounded text-sm text-right tabular-nums"
+          />
+        ) : (
+          <span className="inline-flex items-center justify-end gap-1">
+            {isCountUnit && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); adjustQty(-1); }}
+                className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-red-400 hover:text-red-400 transition-all"
+                title="Atimti 1"
+              >
+                −
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={beginQtyEdit}
+              className="inline-flex items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-primary/10 hover:text-primary transition-colors"
+              title="Spausk pataisyti kiekį"
+            >
+              <span>{fmt(item.kiekis)}</span>
+              {isManualQty && (
+                <span className="text-[9px] uppercase font-semibold text-emerald-500 border border-emerald-500/30 rounded px-1">
+                  rank.
+                </span>
+              )}
+            </button>
+            {isCountUnit && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); adjustQty(1); }}
+                className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-emerald-400 hover:text-emerald-400 transition-all"
+                title="Pridėti 1"
+              >
+                +
+              </button>
+            )}
+          </span>
+        )}
+        {isManualQty && item.ai_kiekis_original != null && (
+          <div className="text-[10px] text-muted-foreground leading-tight">
+            AI: {fmt(item.ai_kiekis_original)}
+          </div>
+        )}
+      </td>
       <td className="px-3 py-2 text-sm text-right tabular-nums">
         {item.kaina
           ? fmtEur(item.kaina)
@@ -156,6 +266,12 @@ function WorkRow({ item, onChange, onRemove }) {
         {item.kaina ? fmtEur(itemSuma) : '—'}
       </td>
       <td className="px-3 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+        {onJumpToSource && targetPage && (
+          <button onClick={() => onJumpToSource(targetPage, item)}
+            className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1" title={`Atidaryti šaltinį psl. ${targetPage}`}>
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+        )}
         <button onClick={() => setEditing(true)}
           className="p-1 hover:bg-muted rounded text-muted-foreground" title="Redaguoti">
           <Edit2 className="w-3.5 h-3.5" />
@@ -191,9 +307,28 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     };
   }, [project?.id]);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
+  const [reviewDraftQty, setReviewDraftQty] = useState('');
+  const [takeoffQuery, setTakeoffQuery] = useState('');
+  const [takeoffMode, setTakeoffMode] = useState(TAKEOFF_FILTER_MODES.all);
 
-  const grouped = useMemo(() => groupByCategory(darbai), [darbai]);
+  const visibleDarbai = useMemo(() => filterTakeoffRows(darbai, {
+    query: takeoffQuery,
+    mode: takeoffMode,
+  }), [darbai, takeoffQuery, takeoffMode]);
+  const grouped = useMemo(() => groupByCategory(visibleDarbai), [visibleDarbai]);
   const categories = Object.keys(grouped);
+  const workflowSummary = useMemo(() => summarizeTakeoffWorkflow(project, {
+    hasPdf: !!onShowDrawing,
+  }), [project, onShowDrawing]);
+  const reviewRows = useMemo(
+    () => filterTakeoffRows(darbai, { mode: TAKEOFF_FILTER_MODES.review }),
+    [darbai],
+  );
+  const currentReview = useMemo(() => getFirstReviewRow(darbai), [darbai]);
+
+  useEffect(() => {
+    if (currentReview) setReviewDraftQty(String(currentReview.kiekis ?? 0).replace('.', ','));
+  }, [currentReview?._id, currentReview?.eil_nr, currentReview?.aprasymas, currentReview?.kiekis]);
 
   const totals = useMemo(() => {
     let darbo = 0, medz = 0, count = 0;
@@ -213,6 +348,13 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   const handleRowChange = (idx, newItem) => {
     const updated = [...darbai];
     updated[idx] = newItem;
+    setDarbai(updated);
+    onProjectChange?.({ ...project, darbu_sarasas: updated });
+  };
+
+  const updateRowsById = (updater, row) => {
+    const rowId = row._id || `${row.eil_nr}-${row.aprasymas}`;
+    const updated = updater(darbai, rowId);
     setDarbai(updated);
     onProjectChange?.({ ...project, darbu_sarasas: updated });
   };
@@ -238,6 +380,14 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   };
 
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
+  const reviewTargetPage = currentReview ? getRowTargetPage(currentReview, project) : null;
+
+  const filterButtons = [
+    { mode: TAKEOFF_FILTER_MODES.all, label: 'Visos', count: darbai.length },
+    { mode: TAKEOFF_FILTER_MODES.review, label: 'Patikra', count: workflowSummary.reviewRows },
+    { mode: TAKEOFF_FILTER_MODES.missing_price, label: 'Be kainos', count: workflowSummary.missingPrices },
+    { mode: TAKEOFF_FILTER_MODES.manual, label: 'Rankinės', count: workflowSummary.manualOverrides },
+  ];
 
   return (
     <div className="space-y-4">
@@ -294,6 +444,194 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
       {/* LT sanity warnings — Sprint 2: vartotojas mato kur AI gali būti suklydęs */}
       {project.lt_sanity && (
         <SanityWarningsBanner sanity={project.lt_sanity} />
+      )}
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-md border border-border bg-background flex items-center justify-center">
+              <Target className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-foreground">Takeoff kontrolė</div>
+              <div className="text-xs text-muted-foreground">
+                {workflowSummary.totalRows} pozicijų · {workflowSummary.totalRooms} patalpų · {fmt(workflowSummary.totalArea)} m²
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Paruošimas</span>
+            <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full ${
+                  workflowSummary.readinessScore >= 85
+                    ? 'bg-emerald-500'
+                    : workflowSummary.readinessScore >= 60
+                      ? 'bg-amber-500'
+                      : 'bg-red-500'
+                }`}
+                style={{ width: `${workflowSummary.readinessScore}%` }}
+              />
+            </div>
+            <span className="mono tabular font-semibold text-foreground">{workflowSummary.readinessScore}%</span>
+          </div>
+          {(workflowSummary.aiSymbolRows > 0 || workflowSummary.assumptionRows > 0) && (
+            <div className="w-full text-[11px] text-muted-foreground text-right">
+              AI ženklai: <span className="mono tabular text-foreground">{workflowSummary.aiSymbolRows}</span>
+              <span className="mx-1.5">·</span>
+              Prielaidos: <span className="mono tabular text-foreground">{workflowSummary.assumptionRows}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.review)}
+              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                Patikrai
+              </div>
+              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.reviewRows}</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.missing_price)}
+              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <CircleDollarSign className="w-3.5 h-3.5" />
+                Be kainos
+              </div>
+              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.missingPrices}</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.manual)}
+              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-emerald-400 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <PencilRuler className="w-3.5 h-3.5" />
+                Rankiniai
+              </div>
+              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.manualOverrides}</div>
+            </button>
+            <button
+              type="button"
+              onClick={onShowDrawing || undefined}
+              disabled={!onShowDrawing}
+              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-primary transition-colors disabled:opacity-50 disabled:hover:border-border"
+            >
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Eye className="w-3.5 h-3.5" />
+                Brėžinys
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">
+                {workflowSummary.hasPdf ? `${workflowSummary.totalPages || 'PDF'} psl.` : 'prisegti PDF'}
+              </div>
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-2 min-w-[260px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                value={takeoffQuery}
+                onChange={e => setTakeoffQuery(e.target.value)}
+                placeholder="Ieškoti pozicijų..."
+                className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {filterButtons.map(btn => (
+                <button
+                  key={btn.mode}
+                  type="button"
+                  onClick={() => setTakeoffMode(btn.mode)}
+                  className={`h-8 px-2.5 rounded-md border text-xs transition-colors ${
+                    takeoffMode === btn.mode
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                  }`}
+                >
+                  {btn.label} <span className="mono tabular">{btn.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {currentReview ? (
+        <div className="border border-amber-400/40 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-4 py-3 flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300 font-semibold">
+              Patikros režimas · liko {reviewRows.length}
+            </div>
+            <div className="text-sm text-foreground truncate">
+              {currentReview.eil_nr}. {currentReview.aprasymas}
+              <span className="text-muted-foreground ml-2">
+                {getQuantitySourceLabel(currentReview)}: {fmt(currentReview.kiekis)} {currentReview.mato_vnt || ''}
+              </span>
+            </div>
+            {currentReview.review_reason && (
+              <div className="text-xs text-amber-800 dark:text-amber-200 truncate">
+                {currentReview.review_reason}
+              </div>
+            )}
+          </div>
+          <input
+            value={reviewDraftQty}
+            onChange={e => setReviewDraftQty(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const qty = parseFloat(String(reviewDraftQty).replace(',', '.'));
+                if (!isNaN(qty) && qty >= 0) {
+                  updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
+                }
+              }
+            }}
+            className="w-24 h-8 px-2 border border-border bg-background rounded text-sm text-right tabular-nums"
+            title="Pataisytas kiekis"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-border"
+            onClick={() => {
+              const qty = parseFloat(String(reviewDraftQty).replace(',', '.'));
+              if (!isNaN(qty) && qty >= 0) {
+                updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
+              }
+            }}
+          >
+            Pataisyti
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => updateRowsById(acceptPositionQuantity, currentReview)}
+          >
+            Patvirtinti
+          </Button>
+          {onJumpToPage && reviewTargetPage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border"
+              onClick={() => onJumpToPage(reviewTargetPage, currentReview)}
+            >
+              Šaltinis
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="border border-emerald-500/25 bg-emerald-50 dark:bg-emerald-950/15 rounded-lg px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+          Visi žemo / vidutinio pasitikėjimo kiekiai patikrinti.
+        </div>
       )}
 
       {/* Analizės metadata — tik admin'ams (debugging). Eiliniam vartotojui
@@ -482,6 +820,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
           <div className="p-12 text-center text-muted-foreground text-sm">
             Darbų sąrašas tuščias. Spauskite „Pridėti eilutę".
           </div>
+        ) : visibleDarbai.length === 0 ? (
+          <div className="p-12 text-center text-muted-foreground text-sm">
+            Pagal pasirinktą filtrą pozicijų nėra.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -514,12 +856,15 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                       </tr>
                       {grouped[cat].map((item) => {
                         const idx = itemIndexMap.get(item) ?? 0;
+                        const targetPage = getRowTargetPage(item, project);
                         return (
                           <WorkRow
                             key={`${item.eil_nr}-${idx}`}
                             item={item}
                             onChange={(newItem) => handleRowChange(idx, newItem)}
                             onRemove={() => handleRowRemove(idx)}
+                            targetPage={targetPage}
+                            onJumpToSource={onJumpToPage}
                           />
                         );
                       })}

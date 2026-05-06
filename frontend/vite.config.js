@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
-const BACKEND = 'http://localhost:8000';
+const BACKEND = process.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 export default defineConfig({
   plugins: [

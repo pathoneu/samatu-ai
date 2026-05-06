@@ -46,6 +46,8 @@ import AiBadge from './AiBadge';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { updateRoomPolygon } from '@/lib/projectStore';
+import { shouldCollapseThumbnails } from '@/lib/viewerPrefs';
+import { getAnchoredZoomScroll, nextWheelScale } from '@/lib/viewerViewport';
 import { toast } from 'sonner';
 
 // Worker is copied to /pdf.worker.mjs via vite-plugin-static-copy in vite.config.
@@ -672,8 +674,14 @@ function ThumbnailItem({ pageNr, currentPage, setPage, meta }) {
 // preference holds across sessions.
 function PageThumbnails({ totalPages, currentPage, setPage, pageMeta, fileUrl, missingTypes }) {
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem('samatu_thumbs_collapsed') === '1'; }
-    catch { return false; }
+    try {
+      return shouldCollapseThumbnails({
+        savedValue: localStorage.getItem('samatu_thumbs_collapsed'),
+        totalPages,
+      });
+    } catch {
+      return shouldCollapseThumbnails({ savedValue: null, totalPages });
+    }
   });
   const toggle = () => {
     setCollapsed(c => {
@@ -1883,8 +1891,28 @@ export default function PdfViewer({
             // Ctrl+wheel (or Cmd+wheel on Mac) → zoom; plain wheel → scroll
             if (!(e.ctrlKey || e.metaKey)) return;
             e.preventDefault();
-            const delta = e.deltaY < 0 ? 0.1 : -0.1;
-            setScale(s => Math.max(0.3, Math.min(3, +(s + delta).toFixed(2))));
+            const el = containerRef.current;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const viewportX = e.clientX - rect.left;
+            const viewportY = e.clientY - rect.top;
+            setScale(oldScale => {
+              const newScale = nextWheelScale(oldScale, e.deltaY);
+              if (newScale === oldScale) return oldScale;
+              const targetScroll = getAnchoredZoomScroll({
+                scrollLeft: el.scrollLeft,
+                scrollTop: el.scrollTop,
+                viewportX,
+                viewportY,
+                oldScale,
+                newScale,
+              });
+              requestAnimationFrame(() => {
+                el.scrollLeft = targetScroll.scrollLeft;
+                el.scrollTop = targetScroll.scrollTop;
+              });
+              return newScale;
+            });
           }}
         >
           {/* Phase C-1 Task 13: first-time polygon trace mode hint overlay */}
