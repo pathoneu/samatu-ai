@@ -104,7 +104,14 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   const [doorsExpanded, setDoorsExpanded] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
 
-  const { sienos_storis_m, glaistimo_lygis, lubu_auksciai, custom_windows, custom_doors } = assumptions;
+  // 2026-05-06: defensive defaults so a fresh project (assumptions={}) doesn't
+  // throw when accessing lubu_auksciai[room.nr] etc.
+  const safeAssumptions = assumptions || {};
+  const sienos_storis_m = safeAssumptions.sienos_storis_m;
+  const glaistimo_lygis = safeAssumptions.glaistimo_lygis;
+  const lubu_auksciai = safeAssumptions.lubu_auksciai || {};
+  const custom_windows = safeAssumptions.custom_windows;
+  const custom_doors = safeAssumptions.custom_doors;
   const isFallback = prielaidos?.langai_fallback;
 
   // Derive display windows list: custom or fallback-suggested or empty
@@ -116,7 +123,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   const metaDoors = rawData?.meta?.doors || [];
   const displayDoors = custom_doors ?? metaDoors;
 
-  const setField = (field, val) => onChange({ ...assumptions, [field]: val });
+  const setField = (field, val) => onChange({ ...safeAssumptions, [field]: val });
 
   const handleRecompute = useCallback(async (field, newValue) => {
     if (!onRecomputed) return;  // Skip if parent doesn't accept results
@@ -138,7 +145,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   }, [rawData?.patalpos, pozicijos, assumptions, onRecomputed]);
 
   const setLubuAukstis = (roomNr, val) => {
-    const next = { ...assumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
+    const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
     onChange(next);
     handleRecompute('lubu_auksciai', next.lubu_auksciai);
   };
