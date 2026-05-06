@@ -79,6 +79,7 @@ function App() {
             <Routes>
               {/* Public routes (no auth required) */}
               <Route path="/" element={<RootRoute />} />
+              <Route path="/about" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/privacy" element={<Privacy />} />
