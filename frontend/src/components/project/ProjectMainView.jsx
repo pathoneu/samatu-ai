@@ -25,8 +25,10 @@ import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
   Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
-  CircleDollarSign, PencilRuler, Target,
+  CircleDollarSign, PencilRuler, Target, Sliders,
 } from 'lucide-react';
+import { getPriceLists } from '@/lib/projectStore';
+import { applyPriceListToPositions } from '@/lib/applyPriceList';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
@@ -420,8 +422,9 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               </div>
             </div>
 
-            {/* Right: re-extract + export */}
+            {/* Right: apply pricelist + re-extract + export */}
             <div className="flex items-center gap-2 shrink-0">
+              <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
               <ReextractButton project={project} onComplete={onProjectChange} />
               <ExportDropdown project={projectWithDarbai} />
             </div>
@@ -432,9 +435,8 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <div>
-                <strong>Kainos neįvestos.</strong> Spauskite ant kainos stulpelio bet kurioje eilutėje
-                ir įveskite €/vnt — bendra suma atsinaujins automatiškai.
-                Kainynų automatinis užpildymas — ateinančioje versijoje.
+                <strong>Kainos neįvestos.</strong> Spauskite "Taikyti kainyną" jeigu turite įkeltą
+                kainynę, arba ant kainos stulpelio bet kurioje eilutėje ir įveskite €/vnt rankomis.
               </div>
             </div>
           )}
@@ -887,6 +889,101 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
           AI tikslumas ~85–95%. Patikrink ir pataisyk reikšmes prieš eksportuodamas.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ── Apply Price List dropdown — Sprint 9 (2026-05-06) ────────────────────────
+// Lists user's saved price lists (from Kainynai page). On click, runs
+// fuzzy match against project pozicijos and writes back kaina per row.
+// Shows toast with count applied / skipped. Manual prices preserved
+// unless user holds Shift while picking.
+
+function ApplyPriceListButton({ project, onProjectChange }) {
+  const [open, setOpen] = useState(false);
+  const [priceLists, setPriceLists] = useState([]);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    setPriceLists(getPriceLists());
+  }, [open]);
+
+  useEffect(() => {
+    const onClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  const handleApply = (priceList, opts = {}) => {
+    setOpen(false);
+    const positions = project.pozicijos || project.darbu_sarasas || [];
+    const result = applyPriceListToPositions(positions, priceList.items || [], opts);
+    if (result.applied === 0) {
+      // eslint-disable-next-line no-alert
+      alert(
+        `Iš kainyno „${priceList.name}" nepavyko pritaikyti nė vienos eilutės. ` +
+        `Patikrinkite ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).`,
+      );
+      return;
+    }
+    const updated = { ...project };
+    if (project.pozicijos) updated.pozicijos = result.items;
+    if (project.darbu_sarasas) updated.darbu_sarasas = result.items;
+    updated._last_applied_pricelist = { id: priceList.id, name: priceList.name, applied_at: new Date().toISOString() };
+    onProjectChange?.(updated);
+    // eslint-disable-next-line no-alert
+    alert(`Pritaikyta: ${result.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${result.skipped}.`);
+  };
+
+  if (priceLists.length === 0) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        title="Kainynas dar neįkeltas. Spauskite Kainynai šoninėje juostoje."
+      >
+        <Sliders className="w-3.5 h-3.5 mr-1.5" />
+        Taikyti kainyną
+      </Button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(v => !v)}
+        title="Pritaikyti įkeltą kainyną pozicijoms (fuzzy match pagal aprašymą)"
+      >
+        <Sliders className="w-3.5 h-3.5 mr-1.5" />
+        Taikyti kainyną
+        <ChevronDown className="w-3 h-3 ml-1" />
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[260px] bg-popover border border-border rounded-md shadow-lg py-1">
+          {priceLists.map((pl) => (
+            <button
+              key={pl.id}
+              type="button"
+              onClick={() => handleApply(pl)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between gap-3"
+            >
+              <span className="truncate">{pl.name}</span>
+              <span className="text-xs text-muted-foreground tabular shrink-0">
+                {(pl.items || []).length} eil.
+              </span>
+            </button>
+          ))}
+          <div className="px-3 pt-1.5 pb-1 text-[10px] text-muted-foreground border-t border-border mt-1">
+            Rankomis įvestos kainos lieka nepakeistos. Žemo pasitikėjimo
+            atitikmenys praleidžiami.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
