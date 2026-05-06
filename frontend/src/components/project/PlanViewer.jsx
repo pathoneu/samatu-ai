@@ -4,8 +4,9 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import {
   ArrowLeft, ArrowRight, BookOpen, Check, Crosshair, Loader2, Maximize2, Minus, Plus,
-  Search, SidebarClose, SidebarOpen, Target, Trash2, Zap,
+  Search, SidebarClose, SidebarOpen, Target, Trash2, Wand2, Zap,
 } from 'lucide-react';
+import { clickToFill } from '@/lib/clickToFillApi';
 import { pageTypeColor, pageTypeLabel } from '@/lib/pageTypes';
 import {
   clampPlanScale,
@@ -193,6 +194,36 @@ function PlanOverlayLayer({ room, page, eksplikacijaPage, renderedSize, pdfSize,
   );
 }
 
+// Phase C-3: simple SVG polygon overlay drawn after click-to-fill returns.
+// No editing in v1 — visual confirmation only. User dismisses via toolbar.
+function FillPolygonOverlay({
+  polygon_pdf, page_width_pdf, page_height_pdf,
+  pdfSize, renderedSize, confidence,
+}) {
+  if (!polygon_pdf?.length || !pdfSize || !renderedSize) return null;
+  const sx = renderedSize.width / page_width_pdf;
+  const sy = renderedSize.height / page_height_pdf;
+  const points = polygon_pdf.map(([x, y]) => `${x * sx},${y * sy}`).join(' ');
+  const stroke = confidence === 'high' ? '#10b981' : confidence === 'medium' ? '#f59e0b' : '#ef4444';
+  return (
+    <svg
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 27, width: renderedSize.width, height: renderedSize.height }}
+      viewBox={`0 0 ${renderedSize.width} ${renderedSize.height}`}
+    >
+      <polygon
+        points={points}
+        fill={stroke}
+        fillOpacity="0.18"
+        stroke={stroke}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+
 function SymbolOverlayLayer({ result, renderedSize, onRemovePoint = null }) {
   const points = getSymbolPoints(result);
   if (!points.length || !renderedSize) return null;
@@ -264,6 +295,18 @@ export default function PlanViewer({
   const [symbolResult, setSymbolResult] = useState(null);
   const [symbolError, setSymbolError] = useState(null);
   const [symbolType, setSymbolType] = useState(null);
+  // Phase C-3 click-to-fill state
+  const [fillMode, setFillMode] = useState(false);
+  const [fillLoading, setFillLoading] = useState(false);
+  const [fillResult, setFillResult] = useState(null); // {polygon_pdf, page_width_pdf, page_height_pdf, confidence}
+  const [fillError, setFillError] = useState(null);
+  // Cache the project_id used for fill cache. We mint one once per session
+  // since the upstream caller doesn't always know the persisted project id.
+  const fillProjectIdRef = useRef(null);
+  if (!fillProjectIdRef.current) {
+    fillProjectIdRef.current = `fill-session-${Math.random().toString(36).slice(2, 12)}`;
+  }
+  const [fillPdfUploaded, setFillPdfUploaded] = useState(false);
   const symbolVisibleCount = getSymbolVisibleCount(symbolResult);
   const symbolConfirmCounts = useMemo(() => getConfirmableSymbolCounts(symbolResult), [symbolResult]);
 
@@ -362,6 +405,37 @@ export default function PlanViewer({
       setSymbolError(error.message || 'Nepavyko nuskaityti puslapio ženklų');
     } finally {
       setSymbolLoading(false);
+    }
+  };
+
+  const runFillFromClick = async (event) => {
+    if (!fillMode || !pdfFile || !renderedSize) return;
+    const pageEl = event.currentTarget;
+    const rect = pageEl.getBoundingClientRect();
+    const xPct = (event.clientX - rect.left) / rect.width;
+    const yPct = (event.clientY - rect.top) / rect.height;
+    if (xPct < 0 || xPct > 1 || yPct < 0 || yPct > 1) return;
+    setFillLoading(true);
+    setFillError(null);
+    setFillResult(null);
+    try {
+      const data = await clickToFill({
+        projectId: fillProjectIdRef.current,
+        pageNr: pageNumber,
+        clickXPct: xPct,
+        clickYPct: yPct,
+        sensitivity: 0.7,
+        // First click sends PDF; subsequent clicks rely on server cache.
+        pdfBlob: fillPdfUploaded ? null : pdfFile,
+      });
+      setFillPdfUploaded(true);
+      setFillResult(data);
+    } catch (err) {
+      setFillError(err.userMessage || 'Nepavyko užpildyti.');
+      // If server lost cache (TTL expired), allow re-upload on next click.
+      if ((err.userMessage || '').includes('cache')) setFillPdfUploaded(false);
+    } finally {
+      setFillLoading(false);
     }
   };
 
@@ -628,6 +702,49 @@ export default function PlanViewer({
               <Crosshair className="w-3.5 h-3.5 inline mr-1.5" />
               AI nuskaityti puslapį
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFillMode(v => !v);
+                setFillError(null);
+                setFillResult(null);
+                if (symbolPickMode) setSymbolPickMode(false);
+              }}
+              className={`h-8 px-3 rounded-md border text-xs font-medium ${
+                fillMode
+                  ? 'border-violet-500 bg-violet-50 text-violet-950'
+                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
+              } disabled:opacity-50`}
+              disabled={fillLoading || !pdfFile}
+              title="Spustelėk patalpos viduje — sistema apves sienas automatiškai (eksperimentinis)"
+            >
+              <Wand2 className="w-3.5 h-3.5 inline mr-1.5" />
+              {fillMode ? 'Spauskite patalpos viduje' : 'Užpildyti polygoną'}
+            </button>
+            {fillLoading && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#70685d]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Užpildoma...
+              </span>
+            )}
+            {fillError && !fillLoading && (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs text-red-950">
+                {fillError}
+              </span>
+            )}
+            {fillResult && !fillLoading && (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
+                ✓ {fillResult.polygon_pdf.length} taškų · pasitikėjimas: {fillResult.confidence}
+                <button
+                  type="button"
+                  onClick={() => { setFillResult(null); setFillError(null); }}
+                  className="ml-1 hover:text-violet-700"
+                  title="Atmesti"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <div className="h-6 w-px bg-[#d8d2c8]" />
             {currentSymbolTypes.map(item => (
               <button
@@ -807,6 +924,26 @@ export default function PlanViewer({
                     onClick={runTemplateCount}
                     className="absolute inset-0 z-[30] cursor-crosshair bg-red-500/0"
                     aria-label="Pasirinkti sutartinį ženklą"
+                  />
+                )}
+
+                {fillMode && (
+                  <button
+                    type="button"
+                    onClick={runFillFromClick}
+                    className="absolute inset-0 z-[30] cursor-crosshair bg-violet-500/0"
+                    aria-label="Spustelėkite patalpos viduje"
+                  />
+                )}
+
+                {fillResult && pageSize && renderedSize && (
+                  <FillPolygonOverlay
+                    polygon_pdf={fillResult.polygon_pdf}
+                    page_width_pdf={fillResult.page_width_pdf}
+                    page_height_pdf={fillResult.page_height_pdf}
+                    pdfSize={pageSize}
+                    renderedSize={renderedSize}
+                    confidence={fillResult.confidence}
                   />
                 )}
 
