@@ -757,30 +757,32 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           </div>
           {/* 2026-05-06 (#7): per-room ceiling height + glaistymo lygis +
               langų/durų assumptions live in AssumptionsPanel. Was unreachable
-              from the Prielaidos tab — only RulesOverridePanel was rendered. */}
-          <div className="border border-border rounded-xl bg-card p-6">
-            <AssumptionsPanel
-              assumptions={project._overrides || {}}
-              onChange={(updated) => {
-                const nextProject = { ...project, _overrides: updated };
-                setProject(nextProject);
-                updateProject(project.id, nextProject);
-              }}
-              prielaidos={project.prielaidos || {}}
-              rawData={project}
-              pozicijos={project.pozicijos || []}
-              onRecomputed={(result) => {
-                const nextProject = {
-                  ...project,
-                  patalpos: result.rooms || project.patalpos,
-                  pozicijos: result.pozicijos || project.pozicijos,
-                  _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
-                };
-                setProject(nextProject);
-                updateProject(project.id, nextProject);
-              }}
-            />
-          </div>
+              from the Prielaidos tab — only RulesOverridePanel was rendered.
+              Open by default + custom title so user lands directly on the
+              per-room aukštis inputs without another click. */}
+          <AssumptionsPanel
+            defaultOpen={true}
+            title="Lubų aukštis ir glaistymo lygis"
+            assumptions={project._overrides || {}}
+            onChange={(updated) => {
+              const nextProject = { ...project, _overrides: updated };
+              setProject(nextProject);
+              updateProject(project.id, nextProject);
+            }}
+            prielaidos={project.prielaidos || {}}
+            rawData={project}
+            pozicijos={project.pozicijos || []}
+            onRecomputed={(result) => {
+              const nextProject = {
+                ...project,
+                patalpos: result.rooms || project.patalpos,
+                pozicijos: result.pozicijos || project.pozicijos,
+                _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
+              };
+              setProject(nextProject);
+              updateProject(project.id, nextProject);
+            }}
+          />
         </div>
       )}
 

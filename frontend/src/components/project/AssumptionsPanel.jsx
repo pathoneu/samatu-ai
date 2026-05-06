@@ -98,8 +98,8 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed }) {
-  const [open, setOpen] = useState(false);
+export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed, defaultOpen = false, title = 'Prielaidos' }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [windowsExpanded, setWindowsExpanded] = useState(false);
   const [doorsExpanded, setDoorsExpanded] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
@@ -156,7 +156,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Info className="w-4 h-4 text-muted-foreground" />
-          Prielaidos
+          {title}
           {isFallback && (
             <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200 border font-normal">
               langai — prielaida
