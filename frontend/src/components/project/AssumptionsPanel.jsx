@@ -342,16 +342,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground pt-1">
-            {recomputing
-              ? 'Perskaičiuojama...'
-              : 'Kiekiai persiskaičiuoja automatiškai kiekvieną kartą keičiant prielaidas.'}
-          </p>
-
-          <FormulasCard
-            sienosStorisM={sienos_storis_m}
-            glaistimoLygis={glaistimo_lygis}
-          />
+          {recomputing && (
+            <p className="text-xs text-muted-foreground pt-1">
+              Perskaičiuojama...
+            </p>
+          )}
         </div>
       )}
     </div>
