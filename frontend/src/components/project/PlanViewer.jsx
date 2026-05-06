@@ -310,9 +310,20 @@ export default function PlanViewer({
   const symbolVisibleCount = getSymbolVisibleCount(symbolResult);
   const symbolConfirmCounts = useMemo(() => getConfirmableSymbolCounts(symbolResult), [symbolResult]);
 
+  // 2026-05-06: track dismissed room (Esc key) so user can navigate pages
+  // freely after focusing a room without the marker re-snapping.
+  const [dismissedRoomKey, setDismissedRoomKey] = useState(null);
+  const focusedRoomKey = focusedRoom ? String(focusedRoom.id || focusedRoom.nr || '') : null;
+  // Reset dismiss state when a NEW room is selected (different key from prior).
   useEffect(() => {
-    if (focusedPage) setPageNumber(focusedPage);
-  }, [focusedPage]);
+    if (focusedRoomKey && focusedRoomKey !== dismissedRoomKey) {
+      setDismissedRoomKey(null);
+    }
+  }, [focusedRoomKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (focusedPage && focusedRoomKey !== dismissedRoomKey) setPageNumber(focusedPage);
+  }, [focusedPage, focusedRoomKey, dismissedRoomKey]);
 
   useEffect(() => {
     if (!numPages || didAutoPickPage || focusedPage) return;
@@ -331,10 +342,15 @@ export default function PlanViewer({
       if (event.key === '+' || event.key === '=') setScale(s => clampPlanScale(s + 0.15));
       if (event.key === '-') setScale(s => clampPlanScale(s - 0.15));
       if (event.key.toLowerCase() === 'f') fitPage('width');
+      // Esc: clear focused room marker so user can navigate freely.
+      if (event.key === 'Escape' && focusedRoomKey) {
+        setDismissedRoomKey(focusedRoomKey);
+        setTextLabelRect(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [numPages, pageSize]);
+  }, [numPages, pageSize, focusedRoomKey]);
 
   const visiblePages = useMemo(() => getVisiblePlanPages({
     totalPages: numPages || 0,
@@ -519,10 +535,57 @@ export default function PlanViewer({
         if (cancelled) return;
         const viewport = page.getViewport({ scale });
         const target = String(focusedRoom.nr).trim();
-        const found = (textContent.items || [])
+        // 2026-05-06: page may have multiple "01" text instances — title
+        // block "Lapas: 01", page header, eksplikacija row, mazgas callout,
+        // AND the actual floor plan room number. Filter + pick the one most
+        // likely to be on the floor plan:
+        //   1. exact-match string (already)
+        //   2. NOT in the right 22% of page (LT title blocks live here)
+        //   3. NOT in the bottom 5% (page numbers live here)
+        //   4. Among survivors, pick closest to bbox_pct center if known,
+        //      else the one with the most "isolated" text neighbourhood
+        //      (room numbers are alone; eksplikacija rows have nearby text)
+        const allRects = (textContent.items || [])
           .map(item => textItemRectFromPdfItem(item, viewport))
-          .find(item => String(item?.str || '').trim() === target);
-        const nextRect = getTextLabelRect(found, { roomNr: target, padding: 14 });
+          .filter(Boolean);
+        const exactMatches = allRects.filter(
+          r => String(r.str || '').trim() === target,
+        );
+        const pageW = viewport.width || 1;
+        const pageH = viewport.height || 1;
+        const onFloorPlan = exactMatches.filter(r => {
+          const rightPct = (r.x + r.width) / pageW;
+          const bottomPct = (r.y + r.height) / pageH;
+          return rightPct < 0.78 && bottomPct < 0.95;
+        });
+        const candidates = onFloorPlan.length > 0 ? onFloorPlan : exactMatches;
+
+        let chosen = candidates[0];
+        if (candidates.length > 1) {
+          const bb = focusedRoom.bbox_pct;
+          if (bb && typeof bb.x === 'number' && typeof bb.y === 'number') {
+            const cx = (bb.x + (bb.w || 0) / 2) * pageW;
+            const cy = (bb.y + (bb.h || 0) / 2) * pageH;
+            chosen = candidates.reduce((best, r) => {
+              const d = Math.hypot(r.x + r.width / 2 - cx, r.y + r.height / 2 - cy);
+              const bestD = Math.hypot(best.x + best.width / 2 - cx, best.y + best.height / 2 - cy);
+              return d < bestD ? r : best;
+            });
+          } else {
+            // No bbox — prefer the most "isolated" instance: minimum number
+            // of other text rects within 60 px (eksplikacija rows have many
+            // neighbours; floor-plan numbers are alone).
+            chosen = candidates.reduce((best, r) => {
+              const score = (rect) => allRects.filter(o =>
+                o !== rect &&
+                Math.abs((o.y + o.height / 2) - (rect.y + rect.height / 2)) < 30 &&
+                Math.abs((o.x + o.width / 2) - (rect.x + rect.width / 2)) < 60,
+              ).length;
+              return score(r) < score(best) ? r : best;
+            });
+          }
+        }
+        const nextRect = getTextLabelRect(chosen, { roomNr: target, padding: 14 });
         if (nextRect) setTextLabelRect(nextRect);
       })
       .catch(() => {
@@ -545,6 +608,7 @@ export default function PlanViewer({
   }, [focusedRoom, renderedSize, pageSize, pageNumber, eksplikacija_source_page, textLabelRect]);
 
   useEffect(() => {
+    if (focusedRoomKey === dismissedRoomKey) return;  // Esc-dismissed: don't auto-scroll
     const rect = activeOverlayRect;
     if (!rect) return;
     const el = viewportRef.current;
@@ -553,7 +617,7 @@ export default function PlanViewer({
       el.scrollLeft = Math.max(0, rect.left + rect.width / 2 - el.clientWidth / 2 + 32);
       el.scrollTop = Math.max(0, rect.top + rect.height / 2 - el.clientHeight / 2 + 32);
     });
-  }, [activeOverlayRect]);
+  }, [activeOverlayRect, focusedRoomKey, dismissedRoomKey]);
 
   const fitPage = (mode) => {
     const el = viewportRef.current;
@@ -969,15 +1033,31 @@ export default function PlanViewer({
                   />
                 )}
 
-                {renderedSize && pageSize && (
-                  <PlanOverlayLayer
-                    room={focusedRoom}
-                    page={pageNumber}
-                    eksplikacijaPage={eksplikacija_source_page}
-                    renderedSize={renderedSize}
-                    pdfSize={pageSize}
-                    textLabelRect={textLabelRect}
-                  />
+                {renderedSize && pageSize && focusedRoomKey !== dismissedRoomKey && (
+                  <>
+                    <PlanOverlayLayer
+                      room={focusedRoom}
+                      page={pageNumber}
+                      eksplikacijaPage={eksplikacija_source_page}
+                      renderedSize={renderedSize}
+                      pdfSize={pageSize}
+                      textLabelRect={textLabelRect}
+                    />
+                    {focusedRoom && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDismissedRoomKey(focusedRoomKey);
+                          setTextLabelRect(null);
+                        }}
+                        className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-md border border-[#d8d2c8] bg-white px-2.5 py-1 text-[11px] text-[#3b3b3b] hover:bg-[#f1eee8] shadow"
+                        title="Pašalinti pažymėjimą (Esc)"
+                      >
+                        ✕ Atšaukti pažymėjimą
+                        <span className="text-[#9a948a] text-[10px] ml-1">Esc</span>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

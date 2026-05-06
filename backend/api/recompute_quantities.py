@@ -35,9 +35,13 @@ class RecomputeRequest(BaseModel):
 
 
 # Sprint 0: assumption-class fields. Sprint 2 adds gesture fields below.
+# 2026-05-06 (#7): lubu_auksciai (per-room dict, plural) added so the
+# AssumptionsPanel per-room ceiling-height inputs trigger backend recompute.
 _ASSUMPTION_FIELDS = {
     "paint_class", "lubu_aukstis", "sienos_storis",
     "plyteliu_aukstis", "kampu_skaicius",
+    "lubu_auksciai", "glaistimo_lygis", "sienos_storis_m",
+    "custom_windows", "custom_doors",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -49,15 +53,44 @@ _VALID_FIELDS = _ASSUMPTION_FIELDS | _GESTURE_FIELDS
 
 
 def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
-    """Sprint 0: paint formula recompute from class."""
+    """Sprint 0: paint formula recompute from class.
+    2026-05-06: per-room aukštis (lubu_auksciai dict) triggers full
+    walls_paintable_m2 + ceiling_paintable_m2 recompute via calc_room_quantities.
+    """
     paint_class = int(assumptions.get("paint_class", 1))
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
     absorption = float(UNIVERSAL_RULES["first_coat_factor"])
+    per_room_h = assumptions.get("lubu_auksciai") or {}
+    default_h = float(assumptions.get("lubu_aukstis") or 2.82)
+
     out = []
     for r in rooms:
         room = {**r}
-        walls = float(r.get("dazomas_plotas_m2", 0) or 0)
-        ceiling = float(r.get("lubu_dazomas_plotas_m2", 0) or 0)
+        # If user overrode this room's ceiling, swap it in BEFORE the calc.
+        nr = str(r.get("nr") or "")
+        if isinstance(per_room_h, dict) and nr in per_room_h:
+            try:
+                new_h = float(per_room_h[nr])
+                if 1.5 <= new_h <= 8.0:
+                    room["lubu_aukstis_m"] = round(new_h, 2)
+                    room["lubu_aukstis_saltinis"] = "user_override"
+                    # Recompute geometry-derived fields with the new height.
+                    try:
+                        from extractor.universal_rules import calc_room_quantities
+                        recalc = calc_room_quantities(room, ceiling_height_m=new_h)
+                        # Carry forward the recomputed wall/ceiling/cornice fields.
+                        for k in ("walls_gross_m2", "walls_paintable_m2",
+                                  "ceiling_paintable_m2", "dazymo_plotas_m2",
+                                  "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                                  "glaistas_kg", "gruntas_l"):
+                            if k in recalc:
+                                room[k] = recalc[k]
+                    except Exception:
+                        pass
+            except (ValueError, TypeError):
+                pass
+        walls = float(room.get("dazomas_plotas_m2", 0) or room.get("walls_paintable_m2", 0) or 0)
+        ceiling = float(room.get("lubu_dazomas_plotas_m2", 0) or room.get("ceiling_paintable_m2", 0) or 0)
         room["dazai_l"] = round(walls * absorption / cov_walls, 2) if walls else 0.0
         room["dazai_luboms_l"] = round(ceiling * absorption / cov_ceil, 2) if ceiling else 0.0
         out.append(room)
