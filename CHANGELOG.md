@@ -1,5 +1,51 @@
 # Changelog
 
+## Sprint 6 — post-launch deferrals — 2026-05-06
+
+### Phase C-3 — click-to-fill walls (deterministic, replaces Vision bbox)
+- Backend `extractor/cv_polygon.py` — 6-step OpenCV pipeline as pure
+  functions: `binarize_page` (adaptive threshold) → `gap_fill_doors`
+  (morph close) → `flood_fill_from_click` → `extract_polygon` (contour
+  + Douglas-Peucker) → `validate_polygon` (area + jaggedness) →
+  `click_to_fill_pipeline` (orchestrator with sensitivity slider).
+- `page_raster_cache.py` — LRU cache for rendered PDF pages (200 DPI,
+  32 entries) + per-project PDF byte cache (8 entries, 1h TTL,
+  sha256-tagged) so repeat clicks don't re-upload.
+- `POST /api/click-to-fill` — multipart endpoint (project_id, page_nr,
+  click_x/y_pct, sensitivity, optional pdf_file). First click uploads
+  PDF, server caches; subsequent clicks reuse.
+- Frontend `clickToFillApi.js` — fetch wrapper with timeout +
+  Lithuanian error mapping.
+- `PlanViewer.jsx` — toolbar button "Užpildyti polygoną"; click
+  overlay; SVG polygon rendered in confidence color (green/amber/red).
+  v1: visual confirmation only; v2 will add "apply to room" picker.
+- 18 new tests in `test_cv_polygon.py`. Plan deviation: synthetic door
+  gap reduced 30→8 px to match kernel sizes that bridge it (plan's
+  math was wrong).
+
+### Multi-floor reconciliation (#53)
+- `cross_page_validator._rule_multi_floor_reconciliation` — groups
+  rooms by `aukstas` (or inferred from nr prefix), emits info
+  breakdown per floor: '1A=20 m² (4 pat.) + 2A=18 m² (3 pat.) =
+  38 m² iš viso'. WARN if any floor sum < 10 m² (Vision dropped
+  rooms). WARN per-floor mismatch when `_eksplikacija` has matching
+  data. 4 new tests; cross-page suite 12 → 16.
+
+### GKP frame profile split (M3 deferral)
+- Single `GKP karkaso profiliai (CD/UD)` line at 3.0 m/m² split into:
+  - CD profiliai (laikantieji, 60×27 mm @ 625 mm c/c) — 1.6 m/m²
+  - UW profiliai (pakraščio kontūras, 28×27 mm) — 0.4 m/m²
+- Total drops 3.0 → 2.0 m/m² (within audit's 1.8–2.5 range).
+  Previously over-spec'd ~50%.
+
+### Tests
+- Backend: 255 → 277 (+22 from cv_polygon 18 + multi-floor 4)
+
+### Deferred (depend on Pipeline 3 detector accuracy)
+- #51 Symbol counting workflow — current Pipeline 3 was 100×-overcount
+  in bake-off. UX redesign won't help if base detection is unreliable.
+- #54 Per-project legend memory — depends on #51.
+
 ## Launch package M1–M5 — 2026-05-06
 
 ### M1 — Codex PlanViewer layout port
