@@ -109,11 +109,20 @@ function buildPayload(project, allowedSkyriai = null) {
 async function downloadFile(endpoint, project, filename, allowedSkyriai) {
   // Sprint §AUDIT (2026-04-29): credentials: 'include' required after backend
   // export endpoints became auth-gated.
+  // 2026-05-06: include company_name from project (override) or global Settings.
+  let companyName = project.company_name || '';
+  if (!companyName) {
+    try {
+      const s = JSON.parse(localStorage.getItem('samatu_settings') || '{}');
+      companyName = s.company_name || '';
+    } catch { /* ignore */ }
+  }
+  const payload = { ...buildPayload(project, allowedSkyriai), imone: companyName };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildPayload(project, allowedSkyriai)),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Klaida (${res.status})`);
   const blob = await res.blob();

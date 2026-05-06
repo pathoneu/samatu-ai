@@ -38,6 +38,19 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+// 2026-05-06: AdminRoute restricts /admin to is_admin users. Non-admin
+// hitting /admin URL directly gets bounced to /dashboard. Backend admin
+// endpoints already 403; this prevents the empty-page UX.
+function AdminRoute({ children }) {
+  const { user, isAdmin, isLoading } = useAuth();
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Kraunama...</div>;
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 // M5 (2026-05-06): show Landing for unauthenticated visitors at "/",
 // Dashboard for logged-in users. Avoids forcing first-time visitors
 // straight to a login form with no marketing context.
@@ -81,7 +94,7 @@ function App() {
                 <Route path="/project/:id/v2" element={<InteriorProjectV2 />} />
                 <Route path="/price-lists" element={<PriceLists />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Route>
               <Route path="*" element={<PageNotFound />} />
             </Routes>

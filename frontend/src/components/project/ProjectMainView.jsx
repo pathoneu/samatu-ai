@@ -459,24 +459,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Paruošimas</span>
-            <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full ${
-                  workflowSummary.readinessScore >= 85
-                    ? 'bg-emerald-500'
-                    : workflowSummary.readinessScore >= 60
-                      ? 'bg-amber-500'
-                      : 'bg-red-500'
-                }`}
-                style={{ width: `${workflowSummary.readinessScore}%` }}
-              />
-            </div>
-            <span className="mono tabular font-semibold text-foreground">{workflowSummary.readinessScore}%</span>
-          </div>
+          {/* 2026-05-06: Paruošimas % bar removed — misleading when prices
+              not entered (always read 50%). 'AI ženklai / Prielaidos' counter
+              kept; gives user a sense of what AI inferred vs read directly. */}
           {(workflowSummary.aiSymbolRows > 0 || workflowSummary.assumptionRows > 0) && (
-            <div className="w-full text-[11px] text-muted-foreground text-right">
+            <div className="text-[11px] text-muted-foreground">
               AI ženklai: <span className="mono tabular text-foreground">{workflowSummary.aiSymbolRows}</span>
               <span className="mx-1.5">·</span>
               Prielaidos: <span className="mono tabular text-foreground">{workflowSummary.assumptionRows}</span>

@@ -3808,6 +3808,7 @@ async def generate_excel(request: Request, data: dict):
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     projektas    = data.get("projektas", "Projektas")
+    imone        = (data.get("imone") or data.get("company_name") or "").strip()
     eilutes      = data.get("eilutes", [])
     prielaidos   = data.get("prielaidos") or {}
     patalpos     = data.get("patalpos") or []
@@ -3824,7 +3825,10 @@ async def generate_excel(request: Request, data: dict):
         # removed from data rows; header banner shouldn't extend past Suma.
         ws.merge_cells(f"A1:F1")
         c = ws["A1"]
-        c.value     = f"{title}  ·  {projektas}"
+        # 2026-05-06: prepend imone if set so the company appears in the
+        # banner: 'UAB Statyba · Pasiūlymas · Projekto pavadinimas'.
+        prefix = f"{imone}  ·  " if imone else ""
+        c.value     = f"{prefix}{title}  ·  {projektas}"
         c.font      = Font(bold=True, size=12, color="FFFFFF")
         c.fill      = PatternFill("solid", fgColor=C_DARK)
         c.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4184,6 +4188,7 @@ async def generate_pdf(request: Request, data: dict):
 
     from datetime import date as _date
     projektas    = data.get("projektas", "Projektas")
+    imone        = (data.get("imone") or data.get("company_name") or "").strip()
     doc_date     = _date.today().strftime("%Y-%m-%d")
     eilutes      = data.get("eilutes", [])
     prielaidos   = data.get("prielaidos") or {}
@@ -4229,9 +4234,11 @@ async def generate_pdf(request: Request, data: dict):
         ("BOTTOMPADDING",(0,0),(-1,-1), 4),
     ]))
 
+    # 2026-05-06: surface company name in header sub-line if provided.
+    header_sub = f"{imone} · {projektas} · {doc_date}" if imone else f"{projektas} · Sąmatų AI · {doc_date}"
     title_block = Table(
         [[Paragraph(doc_title, title_style)],
-         [Paragraph(f"{projektas} · Sąmatų AI · {doc_date}", sub_style)]],
+         [Paragraph(header_sub, sub_style)]],
         colWidths=[PAGE_W - 4*cm],
     )
     title_block.setStyle(TableStyle([

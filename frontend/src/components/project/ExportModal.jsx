@@ -121,8 +121,19 @@ async function downloadFromBackend(endpoint, project, filename) {
         skyrius: skyrius || '',
       }));
 
+  // 2026-05-06: surface company_name in export. Per-project override wins;
+  // global Settings (Įmonės pavadinimas) is the fallback.
+  let companyName = project.company_name || '';
+  if (!companyName) {
+    try {
+      const s = JSON.parse(localStorage.getItem('samatu_settings') || '{}');
+      companyName = s.company_name || '';
+    } catch { /* ignore */ }
+  }
+
   const payload = {
     projektas:   project.name,
+    imone:       companyName,
     eilutes:     rows,
     prielaidos:  project.prielaidos || {},
     patalpos:    project.patalpos || [],

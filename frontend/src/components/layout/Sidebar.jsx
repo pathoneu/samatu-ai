@@ -13,16 +13,17 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Home, FileText, Plus, Sliders, Download, Settings, ShieldCheck, LogOut,
+  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 
+// 2026-05-06: removed '/exports' — route never existed (404). Eksportai
+// are accessible from each project's top-bar 'Eksportuoti' button instead.
 const NAV_ITEMS = [
   { path: '/', icon: Home, label: 'Projektai' },
   { path: '/active-project', icon: FileText, label: 'Aktyvus projektas', requiresProject: true },
   { path: '/new-project', icon: Plus, label: 'Naujas projektas' },
   { path: '/price-lists', icon: Sliders, label: 'Kainynai' },
-  { path: '/exports', icon: Download, label: 'Eksportai' },
 ];
 
 function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
