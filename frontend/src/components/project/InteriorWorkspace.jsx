@@ -22,11 +22,11 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Layers } from 'lucide-react';
-import PdfViewer from './PdfViewer';
+import { Layers, Upload } from 'lucide-react';
+import PlanViewer from './PlanViewer';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
-import { getPdfUrl, getPdfBlob } from '@/lib/pdfStore';
+import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
 
@@ -44,6 +44,10 @@ const SYMBOL_LABELS = {
   gyvatukai: 'Gyvatuko (rankšluosčių džiovintuvo) montavimas',
   durys: 'Durys (vidaus)',
   langai: 'Langai',
+  template_symbol: 'Sutartinis ženklas (paspaudimu)',
+  led_juostos: 'LED juostos / nišos',
+  skalbimo_masinos: 'Skalbimo mašinos prijungimas',
+  radiatoriai: 'Radiatoriai',
 };
 
 const SYMBOL_CATEGORIES = {
@@ -60,6 +64,10 @@ const SYMBOL_CATEGORIES = {
   gyvatukai: 'Santechnika',
   durys: 'GKP',
   langai: 'GKP',
+  template_symbol: 'Sutartiniai ženklai',
+  led_juostos: 'Apšvietimas',
+  skalbimo_masinos: 'Santechnika',
+  radiatoriai: 'Šildymas',
 };
 
 export default function InteriorWorkspace({
@@ -75,6 +83,7 @@ export default function InteriorWorkspace({
   // Resizer still allows 40-75 range so user can adjust if their panel is dense.
   const [splitRatio, setSplitRatio] = useState(70);
   const [pdfMissing, setPdfMissing] = useState(false);
+  const [attachingPdf, setAttachingPdf] = useState(false);
   // Local override: when user clicks a room in the right-side panel while
   // already on this view, bump local focused page/room (in addition to
   // bubbling up). Prop changes take priority — local override resets on prop.
@@ -136,19 +145,14 @@ export default function InteriorWorkspace({
         style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
       >
         {pdfUrl ? (
-          <PdfViewer
+          <PlanViewer
             fileUrl={pdfUrl}
             projectId={project.id}
             pageMeta={pageMetaDict}
             missingTypes={missingTypes}
-            aiRooms={null}
             focusedPage={effectiveFocusedPage}
             focusedRoom={effectiveFocusedRoom}
             eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
-            onAiRoomClick={(room) => {
-              // TODO: atidaryti modal'ą su pavadinimo / paskirties / ploto edit'u
-              console.log('[ai-room] click:', room);
-            }}
             pdfFile={pdfBlob}
             onSymbolCountResult={(symbolType, result) => {
               // Pridedam į projekto darbų sąrašą kaip naują eilutę.
@@ -195,6 +199,34 @@ export default function InteriorWorkspace({
               Šis projektas sukurtas anksčiau ir PDF nebuvo išsaugotas. Sukurkite
               naują projektą, kad galėtumėte naudoti brėžinio matavimo įrankius.
             </p>
+            <label
+              className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              {attachingPdf ? 'Prisegama…' : 'Prisegti PDF prie projekto'}
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                disabled={attachingPdf}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setAttachingPdf(true);
+                  try {
+                    await savePdf(project.id, file);
+                    const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
+                    setPdfUrl(u);
+                    setPdfBlob(b);
+                    setPdfMissing(!u);
+                    onProjectChange?.({ ...project, pdf_name: file.name, has_pdf: true });
+                  } finally {
+                    setAttachingPdf(false);
+                    event.target.value = '';
+                  }
+                }}
+              />
+            </label>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">

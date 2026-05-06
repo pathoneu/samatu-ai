@@ -11,6 +11,7 @@
  */
 
 const STORAGE_KEY = (projectId) => `samatu_takeoff_${projectId}`;
+export const TAKEOFF_CHANGE_EVENT = 'samatu:takeoff-change';
 
 // ── Defaults ────────────────────────────────────────────────────────────────
 
@@ -51,10 +52,43 @@ export function saveTakeoff(projectId, takeoff) {
         last_modified: new Date().toISOString(),
       },
     };
-    localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify(updated));
+    const storageKey = STORAGE_KEY(projectId);
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    emitTakeoffChange(projectId, storageKey);
   } catch (e) {
     console.error('Failed to save takeoff', e);
   }
+}
+
+export function subscribeTakeoff(projectId, callback) {
+  if (typeof window === 'undefined' || !projectId || typeof callback !== 'function') {
+    return () => {};
+  }
+
+  const onChange = (event) => {
+    if (event?.detail?.projectId === projectId) callback(event);
+  };
+  const onStorage = (event) => {
+    if (event.key === STORAGE_KEY(projectId)) {
+      callback(new CustomEvent(TAKEOFF_CHANGE_EVENT, {
+        detail: { projectId, storageKey: event.key },
+      }));
+    }
+  };
+
+  window.addEventListener(TAKEOFF_CHANGE_EVENT, onChange);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(TAKEOFF_CHANGE_EVENT, onChange);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function emitTakeoffChange(projectId, storageKey) {
+  if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(TAKEOFF_CHANGE_EVENT, {
+    detail: { projectId, storageKey },
+  }));
 }
 
 // ── Mastelio operacijos ─────────────────────────────────────────────────────

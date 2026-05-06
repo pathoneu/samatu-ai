@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Upload, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', label = 'PDF arba Excel failas' }) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -44,7 +45,21 @@ export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', l
   const clearFile = () => {
     setSelectedFile(null);
     onFileSelect(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
+
+  const openFileDialog = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openFileDialog();
+    }
+  }, [openFileDialog]);
 
   if (selectedFile) {
     return (
@@ -71,25 +86,32 @@ export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', l
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Pasirinkti projekto failą"
       onDragOver={handleDrag}
       onDragEnter={handleDragIn}
       onDragLeave={handleDragOut}
       onDrop={handleDrop}
+      onClick={openFileDialog}
+      onKeyDown={handleKeyDown}
       className={cn(
-        "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200",
+        "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2",
         isDragging
           ? "border-primary bg-primary/5"
           : "border-border hover:border-primary/40 hover:bg-card"
       )}
     >
       <input
+        ref={fileInputRef}
         type="file"
         accept={accept}
         onChange={handleChange}
-        className="hidden"
+        className="sr-only"
         id="file-upload"
+        tabIndex={-1}
       />
-      <label htmlFor="file-upload" className="cursor-pointer">
+      <div aria-hidden="true">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
           <Upload className="w-7 h-7 text-primary" />
         </div>
@@ -98,7 +120,7 @@ export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', l
         </p>
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="text-xs text-muted-foreground mt-1">Maks. 50 MB</p>
-      </label>
+      </div>
     </div>
   );
 }

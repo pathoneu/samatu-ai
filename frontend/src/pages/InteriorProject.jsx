@@ -714,7 +714,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       <div className="flex-1 px-4 py-4 space-y-5">
 
       {/* ── TAB: BRĖŽINYS (default — PDF viewer + AI overlay) ───────── */}
-      {tab === 'brezinys' && pdfUrl && (
+      {tab === 'brezinys' && (
         <InteriorWorkspace
           project={project}
           focusedPage={focusedPage}
@@ -723,13 +723,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           onProjectChange={(updated) => {
             updateProject(project.id, updated);
             setProject(updated);
+            getPdfUrl(project.id).then((url) => setPdfUrl(url));
           }}
         />
-      )}
-      {tab === 'brezinys' && !pdfUrl && (
-        <div className="flex items-center justify-center h-96 border border-border rounded-xl bg-card text-muted-foreground text-sm">
-          Brėžinys nepasiekiamas. Sukurkite naują projektą su PDF.
-        </div>
       )}
 
       {/* ── TAB: KIEKIAI (suvestinė + darbų sąrašas) ────────────────────── */}
@@ -1330,14 +1326,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             onChange={handleAssumptionsChange}
             prielaidos={prielaidos}
             rawData={rawData}
-            pozicijos={project.darbu_sarasas || []}
             onRecomputed={(result) => {
-              // Sprint 0 Fix 2 + Sprint 2 Task 19: merge backend-recomputed
-              // rooms + assumptions into project state so dazai_l / dazai_luboms_l
-              // updates propagate to the UI (no more null+null=NaN). Sprint 2
-              // Task 4 extended the endpoint to also echo pozicijos for
-              // gesture edits — we accept those when non-empty so G2/G3/G4/G7
-              // changes from any caller flow back into project.darbu_sarasas.
+              // Sprint 0 Fix 2 wire-through: merge backend-recomputed rooms +
+              // assumptions into project state. pozicijos intentionally NOT
+              // overwritten — Task 3 endpoint returns pozicijos:[] today; full
+              // pozicijos rebuild is Sprint 1 work.
               setAssumptions(result.assumptions);
               setProject(prev => ({
                 ...prev,
@@ -1345,9 +1338,6 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                   ? { ...prev.raw_calc_data, patalpos: result.rooms }
                   : prev.raw_calc_data,
                 prielaidos: { ...(prev.prielaidos || {}), ...result.assumptions },
-                darbu_sarasas: result.pozicijos?.length
-                  ? result.pozicijos
-                  : prev.darbu_sarasas,
               }));
             }}
           />

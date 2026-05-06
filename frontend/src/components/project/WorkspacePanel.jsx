@@ -11,7 +11,9 @@ import { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff,
 } from 'lucide-react';
-import { loadTakeoff, removePolygon } from '@/lib/takeoffStore';
+import { loadTakeoff, removePolygon, subscribeTakeoff } from '@/lib/takeoffStore';
+import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
+import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
@@ -63,31 +65,16 @@ const CONF_TITLE = {
 function useTakeoff(projectId) {
   const [takeoff, setTakeoff] = useState(() => loadTakeoff(projectId));
   useEffect(() => {
-    // Sprint §AUDIT (2026-04-29): pause polling when tab hidden — was firing
-    // every 800ms forever even in background tabs (~50KB JSON parse on 100+
-    // polygon projects = wasted CPU). Refresh once when tab becomes visible
-    // again so user sees latest state.
-    let id = null;
-    const start = () => {
-      if (id != null) return;
-      id = setInterval(() => setTakeoff(loadTakeoff(projectId)), 800);
-    };
-    const stop = () => {
-      if (id != null) { clearInterval(id); id = null; }
-    };
+    setTakeoff(loadTakeoff(projectId));
+    const unsubscribe = subscribeTakeoff(projectId, () => {
+      setTakeoff(loadTakeoff(projectId));
+    });
     const onVisChange = () => {
-      if (document.hidden) {
-        stop();
-      } else {
-        // Refresh immediately + resume polling
-        setTakeoff(loadTakeoff(projectId));
-        start();
-      }
+      if (!document.hidden) setTakeoff(loadTakeoff(projectId));
     };
-    if (!document.hidden) start();
     document.addEventListener('visibilitychange', onVisChange);
     return () => {
-      stop();
+      unsubscribe();
       document.removeEventListener('visibilitychange', onVisChange);
     };
   }, [projectId]);
@@ -189,6 +176,22 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
     onProjectChange({ ...project, darbu_sarasas: updated });
   }, [project, onProjectChange]);
 
+  const handleQuantityChange = useCallback((rowId, newQuantity) => {
+    if (!onProjectChange) return;
+    try {
+      const updated = updatePositionQuantity(project.darbu_sarasas || [], rowId, newQuantity);
+      onProjectChange({ ...project, darbu_sarasas: updated });
+    } catch {
+      // Invalid input is kept local in the row editor; no project mutation.
+    }
+  }, [project, onProjectChange]);
+
+  const handleQuantityAdjust = useCallback((rowId, delta) => {
+    if (!onProjectChange) return;
+    const updated = adjustPositionQuantity(project.darbu_sarasas || [], rowId, delta);
+    onProjectChange({ ...project, darbu_sarasas: updated });
+  }, [project, onProjectChange]);
+
   // Stable row click — same memo logic
   const handleRowClick = useCallback((row) => {
     const r = (project.v8_rooms || project.patalpos || []).find(rr => rr.nr === row._room_nr);
@@ -269,8 +272,7 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           top={0}
         />
         {!collapsed.rooms && filteredRooms.map((r, i) => {
-          const eksPage = project?._eksplikacija?.eksplikacija_source_page;
-          const targetPage = (r.eksplikacija_row_bbox && eksPage) || r.puslapio_nr;
+          const targetPage = r.puslapio_nr ?? r.page_nr;
           const canJump = !!(onJumpToPage && targetPage);
           const isWet = WET_PASKIRTYS.has((r.paskirtis || '').toLowerCase());
           return (
@@ -367,6 +369,8 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
             onToggle={() => toggleSection(`sk:${group.skyrius}`)}
             showProvenance={showProvenance}
             onRowClick={handleRowClick}
+            onQuantityChange={handleQuantityChange}
+            onQuantityAdjust={handleQuantityAdjust}
             onPriceChange={handlePriceChange}
           />
         ))}
@@ -536,7 +540,16 @@ function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle,
 // Memo'd: only re-renders when its own group data, collapsed state, or
 // callbacks change. Filter / scroll / room hover in parent doesn't ripple
 // down to all groups.
-const PositionGroup = memo(function PositionGroup({ group, collapsed, onToggle, showProvenance, onRowClick, onPriceChange }) {
+const PositionGroup = memo(function PositionGroup({
+  group,
+  collapsed,
+  onToggle,
+  showProvenance,
+  onRowClick,
+  onQuantityChange,
+  onQuantityAdjust,
+  onPriceChange,
+}) {
   return (
     <div>
       <button
@@ -573,6 +586,8 @@ const PositionGroup = memo(function PositionGroup({ group, collapsed, onToggle, 
           row={row}
           showProvenance={showProvenance}
           onClick={() => onRowClick?.(row)}
+          onQuantityChange={(q) => onQuantityChange(row._id || `${row.eil_nr}-${row.aprasymas}`, q)}
+          onQuantityAdjust={(delta) => onQuantityAdjust(row._id || `${row.eil_nr}-${row.aprasymas}`, delta)}
           onPriceChange={(p) => onPriceChange(row._id || `${row.eil_nr}-${row.aprasymas}`, p)}
         />
       ))}
@@ -583,19 +598,72 @@ const PositionGroup = memo(function PositionGroup({ group, collapsed, onToggle, 
 // ── Position row — primary unit, prototype style ─────────────────────────
 // Memo'd: editing one row's price doesn't re-render adjacent rows. Saves
 // significant work on 80+ row projects.
-const PositionRow = memo(function PositionRow({ row, showProvenance, onClick, onPriceChange }) {
+const PositionRow = memo(function PositionRow({
+  row,
+  showProvenance,
+  onClick,
+  onQuantityChange,
+  onQuantityAdjust,
+  onPriceChange,
+}) {
   const [editing, setEditing] = useState(false);
   const [draftPrice, setDraftPrice] = useState('');
+  const [editingQty, setEditingQty] = useState(false);
+  const [draftQty, setDraftQty] = useState('');
 
   const sourceClass = `dot-${classifySource(row)}`;
+  const sourceKind = getQuantitySourceKind(row);
+  const sourceLabel = getQuantitySourceLabel(row);
+  const sourceBadgeStyle = {
+    ai_symbol: {
+      border: '1px solid hsl(var(--destructive) / 0.35)',
+      color: 'hsl(var(--destructive))',
+      background: 'hsl(var(--destructive) / 0.08)',
+    },
+    assumption: {
+      border: '1px solid hsl(var(--warning, 38 92% 50%) / 0.45)',
+      color: 'hsl(var(--warning, 38 92% 50%))',
+      background: 'hsl(var(--warning, 38 92% 50%) / 0.08)',
+    },
+    manual: {
+      border: '1px solid hsl(var(--source-table) / 0.35)',
+      color: 'hsl(var(--source-table))',
+      background: 'hsl(var(--source-table) / 0.08)',
+    },
+    verified: {
+      border: '1px solid hsl(var(--source-table) / 0.35)',
+      color: 'hsl(var(--source-table))',
+      background: 'hsl(var(--source-table) / 0.08)',
+    },
+  }[sourceKind] || {
+    border: '1px solid hsl(var(--border))',
+    color: 'hsl(var(--muted-foreground))',
+    background: 'hsl(var(--muted) / 0.35)',
+  };
   const conf = (row.confidence || 'high').toLowerCase();
   const confClass = conf === 'medium' ? 'dot-med' : conf === 'low' ? 'dot-low' : null;
   const sum = (row.kiekis || 0) * (row.kaina || 0);
+  const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
+  const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
 
   const beginEdit = (e) => {
     e.stopPropagation();
     setDraftPrice(String(row.kaina || 0).replace('.', ','));
     setEditing(true);
+  };
+
+  const beginQtyEdit = (e) => {
+    e.stopPropagation();
+    setDraftQty(String(row.kiekis ?? 0).replace('.', ','));
+    setEditingQty(true);
+  };
+
+  const commitQty = () => {
+    const num = parseFloat(String(draftQty).replace(',', '.'));
+    if (!isNaN(num) && num >= 0) {
+      onQuantityChange(num);
+    }
+    setEditingQty(false);
   };
 
   const commit = () => {
@@ -611,7 +679,7 @@ const PositionRow = memo(function PositionRow({ row, showProvenance, onClick, on
       onClick={onClick}
       className="grid items-center cursor-pointer hover:bg-muted/40 transition-colors group"
       style={{
-        gridTemplateColumns: '12px 36px 1fr 90px 86px 86px',
+        gridTemplateColumns: '12px 36px 1fr 104px 86px 86px',
         gap: 6, padding: '7px 12px', fontSize: 12,
         borderBottom: '1px solid hsl(var(--border) / 0.5)',
       }}
@@ -628,15 +696,77 @@ const PositionRow = memo(function PositionRow({ row, showProvenance, onClick, on
       </span>
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="text-foreground/90 truncate">{row.aprasymas}</span>
+        <span
+          className="uppercase font-semibold shrink-0"
+          title={row.review_reason || row.calculation_basis || sourceLabel}
+          style={{ ...sourceBadgeStyle, fontSize: 8, lineHeight: '12px', borderRadius: 4, padding: '0 4px' }}
+        >
+          {sourceLabel}
+        </span>
         {/* Confidence dot removed — duplicate info with ReviewQueueSidebar */}
       </div>
-      <span
-        className="mono tabular text-foreground/90 whitespace-nowrap"
-        style={{ fontSize: 11, textAlign: 'right' }}
-      >
-        {fmt(row.kiekis)}
-        <span className="text-muted-foreground/70 ml-1" style={{ fontSize: 9 }}>{row.mato_vnt}</span>
-      </span>
+      {editingQty ? (
+        <input
+          autoFocus
+          value={draftQty}
+          onChange={e => setDraftQty(e.target.value)}
+          onBlur={commitQty}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commitQty();
+            if (e.key === 'Escape') setEditingQty(false);
+          }}
+          onClick={e => e.stopPropagation()}
+          className="mono tabular bg-card border border-primary rounded outline-none text-right"
+          style={{ fontSize: 11, height: 22, padding: '2px 6px' }}
+        />
+      ) : (
+        <div className="flex items-center justify-end gap-1">
+          {isCountUnit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onQuantityAdjust(-1); }}
+              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-red-400 hover:text-red-400 transition-all"
+              title="Atimti 1"
+            >
+              −
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={beginQtyEdit}
+            className="mono tabular text-foreground/90 whitespace-nowrap text-right rounded px-1 py-0.5 hover:bg-primary/10 hover:text-primary transition-colors"
+            style={{ fontSize: 11 }}
+            title="Spausk pataisyti kiekį"
+          >
+            {fmt(row.kiekis)}
+            <span className="text-muted-foreground/70 ml-1" style={{ fontSize: 9 }}>{row.mato_vnt}</span>
+            {isManualQty && (
+              <span
+                className="ml-1 px-1 rounded uppercase font-semibold"
+                style={{
+                  fontSize: 8,
+                  lineHeight: '12px',
+                  border: '1px solid hsl(var(--source-table) / 0.35)',
+                  color: 'hsl(var(--source-table))',
+                  background: 'hsl(var(--source-table) / 0.08)',
+                }}
+              >
+                rank.
+              </span>
+            )}
+          </button>
+          {isCountUnit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onQuantityAdjust(1); }}
+              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-emerald-400 hover:text-emerald-400 transition-all"
+              title="Pridėti 1"
+            >
+              +
+            </button>
+          )}
+        </div>
+      )}
       {editing ? (
         <input
           autoFocus
@@ -684,6 +814,18 @@ const PositionRow = memo(function PositionRow({ row, showProvenance, onClick, on
           {row._detail_juostele_m != null && (
             <span className="mono tabular">{row._detail_juostele_m.toFixed(2)} m juostelės</span>
           )}
+        </div>
+      )}
+      {isManualQty && row.ai_kiekis_original != null && (
+        <div
+          className="col-span-6 text-muted-foreground"
+          style={{
+            gridColumn: 'span 6 / span 6',
+            fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
+          }}
+        >
+          AI kiekis buvo <span className="mono tabular">{fmt(row.ai_kiekis_original)}</span>
+          {row.mato_vnt && <span className="ml-1">{row.mato_vnt}</span>}
         </div>
       )}
     </div>
