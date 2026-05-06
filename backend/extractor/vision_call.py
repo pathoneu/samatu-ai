@@ -1240,11 +1240,22 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.extend(build_gkp_pozicijos([
             {"sienos_gkp_m2": 0, "lubos_gkp_m2": gkp_total}
         ]))
+        # 2026-05-06 formula audit: split CD (laikantieji, ~1.6-1.8 m/m²)
+        # vs UW (pakraščio, ~0.4 m/m²) so the bill of materials shows
+        # different profile types separately. Total ~2.0 m/m² (was 3.0,
+        # within audit's 1.8-2.5 range for ceiling GKP). Source:
+        # docs/formulas/2026-05-06-formula-audit.md §8 (Knauf W111).
+        cd_total = round(gkp_total * 1.6, 2)
+        uw_total = round(gkp_total * 0.4, 2)
         pozicijos.extend([
-            {"skyrius": SK_GKP, "aprasymas": "GKP karkaso profiliai (CD/UD)",
-             "vnt": "m", "kiekis": round(gkp_total * 3.0, 2), "saltinis": SAL,
-             "medziagos_aprasymas": "Profiliai (~3 m/m² lubų)",
-             "medziagos_kiekis": round(gkp_total * 3.0, 2), "medziagos_vnt": "m"},
+            {"skyrius": SK_GKP, "aprasymas": "GKP karkaso CD profiliai (laikantieji)",
+             "vnt": "m", "kiekis": cd_total, "saltinis": SAL,
+             "medziagos_aprasymas": "CD 60×27 mm (~1.6 m/m² lubų, ~625 mm c/c)",
+             "medziagos_kiekis": cd_total, "medziagos_vnt": "m"},
+            {"skyrius": SK_GKP, "aprasymas": "GKP karkaso UW profiliai (pakraščio)",
+             "vnt": "m", "kiekis": uw_total, "saltinis": SAL,
+             "medziagos_aprasymas": "UW 28×27 mm pakraščio kontūras",
+             "medziagos_kiekis": uw_total, "medziagos_vnt": "m"},
             {"skyrius": SK_GKP, "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
              "vnt": "m", "kiekis": round(gkp_total * 1.5, 2), "saltinis": SAL,
              "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
