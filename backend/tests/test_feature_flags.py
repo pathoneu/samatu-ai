@@ -9,15 +9,15 @@ from extractor.feature_flags import get_flags
 
 
 def test_flags_default_when_unset():
-    """Flags default per definition. Most are False; polygon_prepass is True
-    after Sprint 4 Block B activation (wall_adjacency validated)."""
+    """Flags default per definition. polygon_prepass + per_room_ceiling are
+    True after activation; rest are False."""
     # Clear env
     for k in ["ENABLE_PER_ROOM_CEILING", "ENABLE_PAINT_CLASS_INFERENCE",
               "ENABLE_VERIFY_PASS", "ENABLE_POLYGON_PREPASS",
               "ENABLE_SONNET_PASS1", "ENABLE_GRID_OVERLAY", "ENABLE_PROXY_GT"]:
         os.environ.pop(k, None)
     flags = get_flags()
-    assert flags["per_room_ceiling"] is False
+    assert flags["per_room_ceiling"] is True   # 2026-05-06 default-on (>3m extraction)
     assert flags["paint_class_inference"] is False
     assert flags["verify_pass"] is False
     assert flags["polygon_prepass"] is True   # Sprint 4 Block B default-on

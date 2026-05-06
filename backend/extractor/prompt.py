@@ -406,10 +406,22 @@ Jei eksplikacija turi `Perimetras` stulpelį — naudok jį.
 **`lubu_aukstis_m`** — pirmenybe iš pjūvio (Pjūvis A-A); tada lubų plano annotation'ų (+2800 = 2.80m).
 Default 2.82m moderniai LT statybai (post-2010). Pažymėk `lubu_aukstis_saltinis`.
 
-SVARBU: Jei kambariai turi skirtingus lubų aukščius (pvz., pakabintos lubos vonioje,
-soffit'as virš virtuvės baldų), grąžink kiekvieno kambario aukštį atskirai laukelyje
-`lubu_auksciai` kaip dict {kambario_pavadinimas: aukstis_m}. Jei visi vienodi —
-palik šį lauką tuščią ir naudosim section vidurkį.
+⚠ **PRIVALOMAI** ieškok skirtingų aukščių per kambarius. LT projektuose dažnai:
+- Svetainė / virtuvė turi **virš 3m** aukštį (atviras dvigubas / mansardinis)
+- Vonios, drabužinės, koridoriai turi pakabinamas lubas (~2.5m) net jei pjūvis
+  rodo 2.82m bendrą aukštį
+- Lubų plane „+3000" arba „+3.20" žymos prie konkrečių kambarių = TAI tikras
+  kambario aukštis, NE section vidurkis
+- Tekste „Patalpos virš 3m" / „Aukštos lubos" / „Mansardinė" = dokumentacija
+  to kambario aukščio
+
+Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink `lubu_auksciai` dict:
+`{"Svetainė": 3.20, "Virtuvė": 2.55, "Vonia": 2.50, ...}`. Naudok tikslų
+kambario pavadinimą iš eksplikacijos. Backend'as šias vertes naudos vietoj
+section vidurkio (taip dažomas plotas, glaistas, dažai apskaičiuojami tiksliai).
+
+Tik jei VISI kambariai TIKRAI vienodo aukščio (vienos plokštumos lubos visur
+be soffit'ų / niche'ų / atvirų erdvių) — palik `lubu_auksciai` tuščią.
 
 **`lubu_tipas`**:
 - `gkp` — GK lubos su dvigubo karkaso žymėjimu lubų plane (default modern LT)
