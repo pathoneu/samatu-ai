@@ -10,7 +10,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test:units": "node --test src/lib/*.test.js src/lib/gestures/*.test.js"
+    "test:units": "node --test src/lib/*.test.js"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

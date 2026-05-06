@@ -23,7 +23,6 @@ const Terms = lazy(() => import('@/pages/Terms'));
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
-const InteriorProjectV2 = lazy(() => import('@/pages/InteriorProjectV2'));
 const Landing = lazy(() => import('@/pages/Landing'));
 
 function ProtectedRoute({ children }) {
@@ -91,7 +90,6 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
-                <Route path="/project/:id/v2" element={<InteriorProjectV2 />} />
                 <Route path="/price-lists" element={<PriceLists />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
