@@ -24,6 +24,7 @@ const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const InteriorProjectV2 = lazy(() => import('@/pages/InteriorProjectV2'));
+const Landing = lazy(() => import('@/pages/Landing'));
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -35,6 +36,18 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
+}
+
+// M5 (2026-05-06): show Landing for unauthenticated visitors at "/",
+// Dashboard for logged-in users. Avoids forcing first-time visitors
+// straight to a login form with no marketing context.
+function RootRoute() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Kraunama...</div>;
+  }
+  if (!user) return <Landing />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 function RouteFallback() {
@@ -53,6 +66,7 @@ function App() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes (no auth required) */}
+              <Route path="/" element={<RootRoute />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/privacy" element={<Privacy />} />
@@ -61,7 +75,7 @@ function App() {
 
               {/* Protected — wrapped in AppLayout (sidebar) */}
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
                 <Route path="/project/:id/v2" element={<InteriorProjectV2 />} />

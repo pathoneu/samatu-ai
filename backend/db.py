@@ -345,6 +345,25 @@ def list_extractions(project_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def user_recent_spend_eur(user_id: str, hours: int = 24) -> tuple[float, int]:
+    """Sum cost_eur of extractions for a user's projects within the last N hours.
+    Returns (total_eur, extraction_count). Used by per-user spend cap (M5)."""
+    if not user_id:
+        return (0.0, 0)
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    with _conn() as c:
+        row = c.execute("""
+            SELECT COALESCE(SUM(e.cost_eur), 0) AS total_eur,
+                   COUNT(e.id) AS n
+              FROM extractions e
+              JOIN projects p ON p.id = e.project_id
+             WHERE p.user_id = ?
+               AND e.extracted_at >= ?
+        """, (user_id, cutoff)).fetchone()
+        return (float(row["total_eur"] or 0), int(row["n"] or 0))
+
+
 # ── Corrections (audit log for future learning-loop) ──────────────────────────
 
 def log_correction(project_id: str, field_path: str,

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 import logging
+import os
 import time as _time
 from collections import defaultdict, deque
 
@@ -69,6 +70,41 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
 _RATE_BUCKET: dict[str, deque] = defaultdict(deque)
 _RATE_LIMIT_PER_MIN = 30  # generous; one estimator might do 5-10/hour normally
 _RATE_BUCKET_LAST_GC = [0.0]  # mutable cell so we can update from inside func
+
+# M5 (2026-05-06): per-user daily Vision spend cap. Default disabled; set
+# SAMATU_USER_DAILY_SPEND_EUR=0.50 in production .env to cap each user.
+_USER_DAILY_SPEND_CAP_EUR = float(os.environ.get("SAMATU_USER_DAILY_SPEND_EUR", "0") or 0)
+_USER_HOURLY_EXTRACTS = int(os.environ.get("SAMATU_USER_HOURLY_EXTRACTS", "20") or 20)
+
+
+def _check_user_spend_cap(user_id: str | None) -> None:
+    """Raise 429 if user is over daily Vision spend cap or hourly extract count.
+    Anonymous (no user_id) requests are not capped here — they hit per-IP
+    rate limit instead. Cap enabled only when env var set > 0."""
+    if not user_id:
+        return
+    try:
+        spend_24h, n_24h = db.user_recent_spend_eur(user_id, hours=24)
+        spend_1h, n_1h = db.user_recent_spend_eur(user_id, hours=1)
+    except Exception:
+        return  # never block on spend-check failure
+    if _USER_DAILY_SPEND_CAP_EUR > 0 and spend_24h >= _USER_DAILY_SPEND_CAP_EUR:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Pasiekta dienos AI biudžeto riba ({spend_24h:.2f} € / "
+                f"{_USER_DAILY_SPEND_CAP_EUR:.2f} €). Bandykite rytoj arba "
+                "kreipkitės į administratorių."
+            ),
+        )
+    if _USER_HOURLY_EXTRACTS > 0 and n_1h >= _USER_HOURLY_EXTRACTS:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Per daug analizių per valandą ({n_1h} / {_USER_HOURLY_EXTRACTS}). "
+                "Palaukite valandą."
+            ),
+        )
 
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     """Sliding-window rate limit. Raises 429 on overflow.
@@ -161,6 +197,11 @@ from starlette.middleware.sessions import SessionMiddleware
 import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
 
+# M5 (2026-05-06): production hardening flags via ENV
+_PROD_ENV = (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").lower() in (
+    "prod", "production"
+)
+
 # Session middleware FIRST (before CORS) — signed HTTPOnly cookies for auth.
 # In production, set SAMATU_SECRET_KEY env to a strong random string.
 app.add_middleware(
@@ -169,18 +210,56 @@ app.add_middleware(
     session_cookie=_auth.SESSION_COOKIE,
     max_age=_auth.SESSION_MAX_AGE_S,
     same_site="lax",
-    https_only=False,  # TODO: set True in production
+    https_only=_PROD_ENV,  # secure cookies only when ENV=production
 )
 
 # CORS — for cross-origin frontend (Vite dev on :5173, prod same-origin)
 # allow_credentials=True so session cookie traverses the proxy
+_CORS_ORIGINS_ENV = os.environ.get("SAMATU_CORS_ORIGINS", "")
+_CORS_ORIGINS = (
+    [o.strip() for o in _CORS_ORIGINS_ENV.split(",") if o.strip()]
+    if _CORS_ORIGINS_ENV
+    else ["http://localhost:5173", "http://127.0.0.1:5173"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# M5: Security response headers — defense-in-depth for clickjacking,
+# MIME-sniffing, and referrer leakage. CSP is intentionally relaxed during
+# development (allows inline styles for shadcn) but tightens in production.
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if _PROD_ENV:
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+        # CSP — adjust as the app evolves. 'unsafe-inline' for styles is
+        # required by shadcn/ui radix components; eval is forbidden.
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self' https://accounts.google.com",
+        )
+    return response
 
 
 # ── Global unhandled-exception handler ─────────────────────────────────────────
@@ -4379,6 +4458,9 @@ async def extract_interior_endpoint(
     """
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
+    # M5: per-user daily Vision spend cap (when configured)
+    _user = _auth.get_current_user(request)
+    _check_user_spend_cap(_user["id"] if _user else None)
 
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
@@ -4435,6 +4517,9 @@ async def extract_interior_stream_endpoint(
 ):
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
+    # M5: per-user daily Vision spend cap (when configured)
+    _user = _auth.get_current_user(request)
+    _check_user_spend_cap(_user["id"] if _user else None)
 
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
