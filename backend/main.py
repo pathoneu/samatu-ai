@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 import logging
 import time as _time
@@ -366,6 +366,118 @@ async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
             (payload.name, payload.company_name, user["id"]),
         )
     return {"user": db.get_user_by_id(user["id"]) or {}}
+
+
+# ── M4: Google OAuth (2026-05-06) ──────────────────────────────────────
+# Lights up only when GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars are
+# set. Without them, /api/auth/google returns 503 and the frontend hides
+# the button. User-supplied env vars stay out of the repo (.env).
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.environ.get(
+    "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback"
+)
+GOOGLE_OAUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+
+@app.get("/api/auth/google/status")
+async def api_google_oauth_status():
+    """Frontend polls this to decide whether to show Sign-in-with-Google."""
+    return {"enabled": GOOGLE_OAUTH_ENABLED}
+
+
+@app.get("/api/auth/google")
+async def api_google_login(request: Request):
+    """Start Google OAuth flow. Redirects to Google's consent screen."""
+    if not GOOGLE_OAUTH_ENABLED:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
+    import secrets
+    state = secrets.token_urlsafe(24)
+    request.session["google_oauth_state"] = state
+    # Capture intended redirect after success (default = "/")
+    next_url = request.query_params.get("next", "/")
+    request.session["google_oauth_next"] = next_url
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    from urllib.parse import urlencode
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+    return RedirectResponse(url=url, status_code=302)
+
+
+@app.get("/api/auth/google/callback")
+async def api_google_callback(request: Request, code: str | None = None,
+                              state: str | None = None, error: str | None = None):
+    """Google OAuth redirect target. Exchanges code → token → user info,
+    then creates/links the local user and starts a session."""
+    if error:
+        return RedirectResponse(url=f"/login?oauth_error={error}", status_code=302)
+    if not GOOGLE_OAUTH_ENABLED:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
+    expected_state = request.session.pop("google_oauth_state", None)
+    next_url = request.session.pop("google_oauth_next", "/")
+    if not state or state != expected_state:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    import httpx  # lazy import — only loaded when OAuth is used
+    async with httpx.AsyncClient(timeout=10) as client:
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+            },
+        )
+        if token_resp.status_code != 200:
+            log.error("Google token exchange failed: %s", token_resp.text[:300])
+            raise HTTPException(status_code=502, detail="Token exchange failed")
+        access_token = token_resp.json().get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=502, detail="No access token returned")
+        userinfo = await client.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if userinfo.status_code != 200:
+            raise HTTPException(status_code=502, detail="Failed to fetch userinfo")
+        info = userinfo.json()
+
+    google_sub = info.get("sub")
+    email = (info.get("email") or "").lower().strip()
+    name = info.get("name")
+    avatar = info.get("picture")
+    if not google_sub or not email:
+        raise HTTPException(status_code=502, detail="Incomplete userinfo")
+
+    # Match priority: existing google_sub → existing email → create new user.
+    user = db.get_user_by_google_sub(google_sub)
+    if user is None:
+        existing = db.get_user_by_email(email)
+        if existing:
+            db.link_google_to_user(existing["id"], google_sub, avatar)
+            user = db.get_user_by_id(existing["id"])
+        else:
+            # First-ever user becomes admin (matches /api/auth/register policy).
+            is_first = len(db.list_users()) == 0
+            user = db.create_user_oauth(
+                email=email, google_sub=google_sub, name=name,
+                avatar_url=avatar, is_admin=is_first,
+            )
+    request.session["user_id"] = user["id"]
+    db.update_user_login(user["id"])
+    return RedirectResponse(url=next_url or "/", status_code=302)
 
 
 # ── Project endpoints (per-user isolation) ──────────────────────────────────

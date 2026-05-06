@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Logo from '@/components/layout/Logo';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
 export default function Login() {
   const { login } = useAuth();
@@ -73,6 +74,8 @@ export default function Login() {
               Prisijungti
             </Button>
           </form>
+
+          <GoogleSignInButton next={from} />
 
           <div className="mt-4 text-sm text-muted-foreground text-center">
             Neturite paskyros?{' '}

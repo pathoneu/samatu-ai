@@ -141,6 +141,44 @@ def get_user_by_email(email: str) -> dict | None:
         return dict(row) if row else None
 
 
+def get_user_by_google_sub(google_sub: str) -> dict | None:
+    """Look up a user by their Google `sub` (stable account identifier).
+    Used by the OAuth callback to find an existing OAuth user."""
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE google_sub = ?", (google_sub,)).fetchone()
+        return dict(row) if row else None
+
+
+def create_user_oauth(email: str, google_sub: str, name: str | None = None,
+                      avatar_url: str | None = None, is_admin: bool = False) -> dict:
+    """Create a user with no password (OAuth-only). password_hash is set to
+    a sentinel '!oauth' so the column NOT NULL constraint is satisfied while
+    making clear this user cannot log in via password. verify_password() will
+    always return False for these accounts."""
+    import uuid
+    user_id = str(uuid.uuid4())
+    now = _now_iso()
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO users (id, email, password_hash, name, company_name,
+                               is_admin, is_active, created_at,
+                               google_sub, avatar_url)
+            VALUES (?, ?, '!oauth', ?, NULL, ?, 1, ?, ?, ?)
+        """, (user_id, email.lower().strip(), name,
+              1 if is_admin else 0, now, google_sub, avatar_url))
+    return get_user_by_id(user_id) or {}
+
+
+def link_google_to_user(user_id: str, google_sub: str, avatar_url: str | None = None) -> None:
+    """When a Google login matches an existing email-password user, link the
+    Google account to the existing user instead of creating a duplicate."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE users SET google_sub = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?",
+            (google_sub, avatar_url, user_id),
+        )
+
+
 def get_user_by_id(user_id: str) -> dict | None:
     with _conn() as c:
         row = c.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -392,6 +430,15 @@ def _migrate_schema() -> None:
             c.execute("ALTER TABLE projects ADD COLUMN share_view_count INTEGER DEFAULT 0")
         if cols and "share_last_viewed_at" not in cols:
             c.execute("ALTER TABLE projects ADD COLUMN share_last_viewed_at TEXT")
+        # M4 (2026-05-06): Google OAuth users — google_sub stable subject ID,
+        # avatar URL, and password_hash NULL allowed (OAuth-only users have
+        # no password).
+        ucols = {row["name"] for row in c.execute("PRAGMA table_info(users)").fetchall()}
+        if ucols and "google_sub" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL")
+        if ucols and "avatar_url" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────

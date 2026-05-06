@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import Logo from '@/components/layout/Logo';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
 export default function Register() {
   const { register } = useAuth();
@@ -134,6 +135,8 @@ export default function Register() {
               Sukurti paskyrą
             </Button>
           </form>
+
+          <GoogleSignInButton next="/" label="Registruotis su Google" />
 
           <div className="mt-4 text-sm text-muted-foreground text-center">
             Jau turite paskyrą?{' '}
