@@ -190,13 +190,13 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
       <td className="px-3 py-2 text-sm text-foreground">
         <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
-          <span className="truncate">{item.aprasymas}</span>
           <span
-            className={`shrink-0 text-[9px] uppercase font-semibold border rounded px-1 py-0.5 ${sourceClass}`}
+            className="truncate"
             title={item.review_reason || item.calculation_basis || sourceLabel}
           >
-            {sourceLabel}
+            {item.aprasymas}
           </span>
+          {/* 2026-05-06: source badge removed per user — visual clutter. */}
           {confDot}
         </div>
       </td>

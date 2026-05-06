@@ -695,15 +695,15 @@ const PositionRow = memo(function PositionRow({
         {row.eil_nr || ''}
       </span>
       <div className="flex items-center gap-1.5 min-w-0">
-        <span className="text-foreground/90 truncate">{row.aprasymas}</span>
         <span
-          className="uppercase font-semibold shrink-0"
+          className="text-foreground/90 truncate"
           title={row.review_reason || row.calculation_basis || sourceLabel}
-          style={{ ...sourceBadgeStyle, fontSize: 8, lineHeight: '12px', borderRadius: 4, padding: '0 4px' }}
         >
-          {sourceLabel}
+          {row.aprasymas}
         </span>
-        {/* Confidence dot removed — duplicate info with ReviewQueueSidebar */}
+        {/* 2026-05-06: source badge (FORMULĖ / PRIELAIDA / AI ŽENKLAS / RANKINIS)
+            removed per user request — visual clutter, no actionable signal.
+            Tooltip on aprašymas keeps the source readable on hover. */}
       </div>
       {editingQty ? (
         <input
