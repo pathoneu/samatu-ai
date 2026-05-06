@@ -225,6 +225,96 @@ def _rule_total_area_vs_eksplikacija(rooms: list[dict], parsed: dict) -> list[di
     return out
 
 
+def _rule_multi_floor_reconciliation(rooms: list[dict], parsed: dict) -> list[dict]:
+    """Sprint 6 #53: per-floor reconciliation when project has 2+ aukštai.
+
+    Single-floor projects: skipped (covered by _rule_total_area_vs_eksplikacija).
+    Multi-floor: groups rooms by `aukstas` (or inferred from nr prefix), sums
+    each floor's plotas_m2 + perimetras_m, emits an INFO breakdown so the user
+    can verify each floor is correctly extracted independently.
+
+    Also surfaces a WARN if any floor sum is suspiciously small (<10 m²) — a
+    sign Vision dropped most rooms on that floor.
+    """
+    from .universal_rules import group_rooms_by_floor
+
+    out = []
+    if not rooms:
+        return out
+    grouped = group_rooms_by_floor(rooms)
+    if len(grouped) < 2:
+        return out  # single-floor — handled elsewhere
+
+    breakdown_parts = []
+    grand_total = 0.0
+    for floor_nr in sorted(grouped):
+        floor_rooms = grouped[floor_nr]
+        floor_area = round(sum(float(r.get("plotas_m2") or 0) for r in floor_rooms), 2)
+        grand_total += floor_area
+        breakdown_parts.append(
+            f"{floor_nr}A={floor_area} m² ({len(floor_rooms)} pat.)"
+        )
+        if floor_area > 0 and floor_area < 10:
+            out.append({
+                "level": "warning",
+                "field": f"aukstas_{floor_nr}.plotas_m2",
+                "message_lt": (
+                    f"Aukšto {floor_nr} bendras plotas tik {floor_area} m² — "
+                    f"galimai praleistos patalpos. Tikėjomės ≥10 m²."
+                ),
+                "discrepancy_pct": 0.0,
+                "suggestion": (
+                    "Patikrinkite ar visos patalpos to aukšto eksplikacijos perėjo "
+                    "į galutinį sąrašą."
+                ),
+            })
+
+    out.append({
+        "level": "info",
+        "field": "aukstai.bendras_plotas_m2",
+        "message_lt": (
+            f"Daugia-aukštis projektas ({len(grouped)} aukštai): "
+            + " + ".join(breakdown_parts)
+            + f" = {round(grand_total, 2)} m² iš viso."
+        ),
+        "discrepancy_pct": 0.0,
+        "suggestion": (
+            "Kiekvienas aukštas turi savo eksplikaciją; patikrinkite kiekvieno "
+            "aukšto kiekius atskirai."
+        ),
+    })
+
+    # If we have eksplikacija data, also reconcile per-floor sum to multi-eks total.
+    eks = parsed.get("_eksplikacija") or {}
+    eks_rooms = eks.get("patalpos") or []
+    if eks_rooms:
+        eks_grouped = group_rooms_by_floor(eks_rooms)
+        for floor_nr in sorted(grouped):
+            if floor_nr not in eks_grouped:
+                continue
+            final_sum = round(sum(float(r.get("plotas_m2") or 0)
+                                  for r in grouped[floor_nr]), 2)
+            eks_sum = round(sum(float(r.get("plotas_m2") or 0)
+                                for r in eks_grouped[floor_nr]), 2)
+            if final_sum > 0 and eks_sum > 0:
+                diff_pct = _abs_pct_diff(final_sum, eks_sum)
+                if diff_pct > TOLERANCE_PCT:
+                    out.append({
+                        "level": "warning",
+                        "field": f"aukstas_{floor_nr}.plotas_m2",
+                        "message_lt": (
+                            f"Aukšto {floor_nr}: galutinis sąrašas {final_sum} m² vs "
+                            f"eksplikacija {eks_sum} m² ({diff_pct:.1f}% skirtumas)."
+                        ),
+                        "discrepancy_pct": round(diff_pct, 1),
+                        "suggestion": (
+                            f"Patikrinkite to aukšto eksplikaciją — galimai "
+                            f"praleistos arba dubliuotos patalpos."
+                        ),
+                    })
+    return out
+
+
 def _rule_hidroizoliacija_in_wet_rooms(rooms: list[dict]) -> list[dict]:
     """Visos drėgnos patalpos turi turėti hidroizoliacija_m2 > 0. Jei ne —
     perspėjimas kad ji praleista."""
@@ -429,6 +519,7 @@ def validate_consistency(parsed: dict) -> list[dict]:
     warnings.extend(_rule_doors_consistency(rooms, schedule))
     warnings.extend(_rule_windows_consistency(rooms, schedule))
     warnings.extend(_rule_total_area_vs_eksplikacija(rooms, parsed))
+    warnings.extend(_rule_multi_floor_reconciliation(rooms, parsed))
     warnings.extend(_rule_hidroizoliacija_in_wet_rooms(rooms))
     warnings.extend(_rule_plyteles_in_vonios(rooms))
     warnings.extend(_rule_paint_consumption_sane(rooms))

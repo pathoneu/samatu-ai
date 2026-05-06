@@ -159,6 +159,64 @@ def test_paint_consumption_outlier():
     assert dazai[0]["level"] == "info"
 
 
+def test_multi_floor_emits_breakdown_info():
+    """Sprint 6 #53: 2+ aukštai → emit info breakdown per floor."""
+    parsed = {"patalpos": [
+        _dry_room_template(nr="1F-01", plotas_m2=20.0, dazymo_plotas_m2=80.0, dazai_l=18.0),
+        _dry_room_template(nr="1F-02", plotas_m2=15.0, dazymo_plotas_m2=60.0, dazai_l=13.0),
+        _dry_room_template(nr="2F-01", plotas_m2=18.0, dazymo_plotas_m2=72.0, dazai_l=16.0),
+        _dry_room_template(nr="2F-02", plotas_m2=12.0, dazymo_plotas_m2=48.0, dazai_l=11.0),
+    ]}
+    out = validate_consistency(parsed)
+    multi = [w for w in out if w["field"] == "aukstai.bendras_plotas_m2"]
+    assert len(multi) == 1
+    assert multi[0]["level"] == "info"
+    assert "1A=35" in multi[0]["message_lt"]
+    assert "2A=30" in multi[0]["message_lt"]
+    assert "65" in multi[0]["message_lt"]
+
+
+def test_multi_floor_warns_when_floor_suspiciously_small():
+    """Floor with <10 m² total → warning that rooms may be missing."""
+    parsed = {"patalpos": [
+        _dry_room_template(nr="1F-01", plotas_m2=50.0, dazymo_plotas_m2=200.0, dazai_l=44.0),
+        _dry_room_template(nr="2F-01", plotas_m2=5.0, dazymo_plotas_m2=20.0, dazai_l=4.5),
+    ]}
+    out = validate_consistency(parsed)
+    small = [w for w in out if w["field"] == "aukstas_2.plotas_m2" and w["level"] == "warning"]
+    assert len(small) == 1
+    assert "5" in small[0]["message_lt"]
+
+
+def test_multi_floor_warns_per_floor_eks_mismatch():
+    """When eksplikacija has per-floor data, mismatch surfaces per floor."""
+    parsed = {
+        "patalpos": [
+            _dry_room_template(nr="1F-01", plotas_m2=20.0, dazymo_plotas_m2=80.0, dazai_l=18.0),
+            _dry_room_template(nr="2F-01", plotas_m2=18.0, dazymo_plotas_m2=72.0, dazai_l=16.0),
+        ],
+        "_eksplikacija": {"patalpos": [
+            {"nr": "1F-01", "plotas_m2": 30.0},  # 10 m² off vs final 20 m² (50%)
+            {"nr": "2F-01", "plotas_m2": 18.0},
+        ]},
+    }
+    out = validate_consistency(parsed)
+    eks_mismatch = [w for w in out if w["field"] == "aukstas_1.plotas_m2"
+                    and w["level"] == "warning"
+                    and "eksplikacija" in w["message_lt"]]
+    assert len(eks_mismatch) == 1
+
+
+def test_single_floor_skips_multi_reconciliation():
+    """Single-floor project → no multi-floor breakdown info."""
+    parsed = {"patalpos": [
+        _dry_room_template(nr="01", plotas_m2=20.0, dazymo_plotas_m2=80.0, dazai_l=18.0),
+        _dry_room_template(nr="02", plotas_m2=15.0, dazymo_plotas_m2=60.0, dazai_l=13.0),
+    ]}
+    out = validate_consistency(parsed)
+    assert not any(w["field"] == "aukstai.bendras_plotas_m2" for w in out)
+
+
 def test_warnings_sorted_by_level():
     """Output must be sorted: error → warning → info."""
     parsed = {
