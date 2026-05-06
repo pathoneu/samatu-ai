@@ -743,23 +743,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         />
       )}
 
-      {/* ── TAB: PRIELAIDOS — vartotojo override'ai (per-paskirtis + per-room) ─ */}
+      {/* ── TAB: PRIELAIDOS — per-room aukštis + glaistymo lygis + langai/durys ─
+          2026-05-06: per user request, removed the heavier RulesOverridePanel
+          (templates, LT library viewer, formula card, multi-floor multipliers,
+          duplicate Prielaidos header). AssumptionsPanel alone — the editable
+          inputs the user actually needs. */}
       {tab === 'rules' && (
         <div className="space-y-4">
-          <div className="border border-border rounded-xl bg-card p-6">
-            <RulesOverridePanel
-              project={project}
-              onProjectUpdate={(updated) => {
-                setProject(updated);
-                updateProject(project.id, updated);
-              }}
-            />
-          </div>
-          {/* 2026-05-06 (#7): per-room ceiling height + glaistymo lygis +
-              langų/durų assumptions live in AssumptionsPanel. Was unreachable
-              from the Prielaidos tab — only RulesOverridePanel was rendered.
-              Open by default + custom title so user lands directly on the
-              per-room aukštis inputs without another click. */}
           <AssumptionsPanel
             defaultOpen={true}
             title="Lubų aukštis ir glaistymo lygis"

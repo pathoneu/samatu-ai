@@ -383,31 +383,12 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
         </div>
       </div>
 
-      {/* SM03 — LT klasifikacijos biblioteka (presets + read-only viewer) */}
-      <PresetsSection
-        currentOverrides={overrides}
-        onApplyPreset={(presetOverrides) => {
-          const next = { ...overrides, ...presetOverrides };
-          setOverrides(next);
-          triggerRecompute(next, perRoomOverrides);
-          logCorrection(project.id, {
-            field_path: 'rules_override.preset',
-            old_value: null,
-            new_value: presetOverrides,
-            source: 'preset_apply',
-          });
-        }}
-      />
-      <LibraryViewer />
-
-      {/* SM02 — Daugiabučių aukštų pakartojimas */}
-      <FloorMultiplierSection project={project} onProjectUpdate={onProjectUpdate} />
-
-      {/* QW03 — Skaičiavimo formulės (universalios LT) */}
-      <FormulasCard
-        sienosStorisM={Number(overrides.sienos_storis_m ?? project.prielaidos?.sienos_storis_m ?? 0.10)}
-        glaistimoLygis={overrides.glaistas_q_lygis ?? project.prielaidos?.glaistimo_lygis ?? 'Q2'}
-      />
+      {/* 2026-05-06: per user request, removed:
+            - SM03 Šablonai (presets) + LibraryViewer
+            - SM02 Daugiabučių aukštų pakartojimas
+            - QW03 Skaičiavimo formulės card
+          Components stay in this file but are not rendered. Re-enable here
+          if needed; nothing else imports them. */}
 
       {/* Per-room overrides — anchor */}
       {candidateRooms.length > 0 && (
