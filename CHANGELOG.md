@@ -1,5 +1,81 @@
 # Changelog
 
+## Launch package M1–M5 — 2026-05-06
+
+### M1 — Codex PlanViewer layout port
+- Replaced Sprint 1 mip-pyramid `TakeoffCanvas` (broken at low zoom)
+  with codex's `react-pdf`-based `PlanViewer`. New tabs at top
+  (Brėžinys / Kiekiai / AI Chat) + page thumbnails sidebar + right
+  panel with provenance pills and review queue.
+- Click on a room number deterministically pulses a marker on the
+  drawing (via pdfplumber-located digit text) — replaces unreliable
+  Vision bbox-based click-to-pan.
+- Imported 16 codex lib files (planOverlayGeometry, planSymbolTypes,
+  planViewerState, quantityOverride, symbolOverlay, takeoffWorkflow,
+  viewerPrefs, viewerViewport + their tests). Frontend test count
+  118 → 160.
+
+### M2 — Subtle provenance + trust UI
+- `ProvenanceChip` already shipped via codex (eksplikacija/manual/
+  vision/dimension pills); kept default-trust totals (no review wizard
+  per user feedback).
+- Bug fix: backend wrote `plotas_saltinis` (LT) but frontend
+  `ConfidenceBadge` read `plotas_source` (EN) — every eksplikacija
+  room rendered as 🔴 neaišku. Added saltinis→source mirror on both
+  sides so eksplikacija rooms now correctly show 🟢 tikslus.
+
+### M3 — Formula audit
+- Research agent produced 6,700-word audit
+  (`docs/formulas/2026-05-06-formula-audit.md`) + 1-page summary
+  citing 27 sources (RICS NRM2, DIN 18181/18299/18350/18363/18365/
+  18534-1, EN 13300/14891, ISO 13007, Merkblatt Nr.2, Knauf, Mapei,
+  Tikkurila, Caparol, TCNA, NKBA, LT STR 1.05.06/2.04.01).
+- Critical fixes shipped:
+  - Window reveal `2H + W` → `2H + 2W` (4 sides, 29% undercount).
+    Doors stay 3-side. Sources: NRM2 §29.10, DIN 18363 §4.2.4.
+  - Tile straight waste 0.08 → 0.10 per NRM2 §28 + LT QS practice.
+  - Sanity check `check_window_reveals` expectation 4.0–6.0 m → 4.5–7.5 m.
+- Deferred to Sprint 6: GKP CW+UW frame split, acoustic insulation,
+  paint coverage by plaster type, hidro consumption tuning.
+
+### M4 — Auth: Google OAuth + open registration
+- Backend `GET /api/auth/google` + `/api/auth/google/callback` —
+  state CSRF guard, code→token→userinfo, matches by google_sub then
+  email then creates new user. Activates only when GOOGLE_CLIENT_ID
+  + GOOGLE_CLIENT_SECRET env vars set.
+- DB schema: `users.google_sub` (UNIQUE WHERE NOT NULL) +
+  `users.avatar_url` via append-only migration. New helpers
+  `get_user_by_google_sub`, `create_user_oauth`, `link_google_to_user`.
+- Frontend `<GoogleSignInButton next=…/>` polls
+  `/api/auth/google/status` and renders nothing when disabled.
+- Email/password registration was already open (no beta codes).
+
+### M5 — Production prep + landing
+- `backend/.env.example` documenting all env vars
+  (ANTHROPIC_API_KEY, SAMATU_SECRET_KEY, ENV, GOOGLE_CLIENT_*,
+  SAMATU_USER_DAILY_SPEND_EUR, SAMATU_USER_HOURLY_EXTRACTS,
+  SAMATU_CORS_ORIGINS, feature flags).
+- Per-user daily Vision spend cap + hourly extract count enforcement
+  on `/extract-interior`. `db.user_recent_spend_eur(user_id, hours)`
+  joins extractions × projects.
+- Security headers middleware: `X-Content-Type-Options=nosniff`,
+  `X-Frame-Options=DENY`, `Referrer-Policy`, `Permissions-Policy`.
+  In `ENV=production`: HSTS + CSP (default-src self, allows Google
+  OAuth domains).
+- Session cookie `https_only=true` when `ENV=production` (was always
+  false). CORS origins from `SAMATU_CORS_ORIGINS` env (was hardcoded
+  localhost).
+- New public landing page at `/` with hero + 3 feature cards + 4
+  audience cards + CTA + footer. RootRoute redirects logged-in users
+  to `/dashboard` (Dashboard moved from `/`).
+- Privacy + Terms pages already existed.
+
+### Tests
+- Backend: 246 → **255** (+9 from sanity + bbox-validator additions
+  earlier in week)
+- Frontend: 118 → **160** (+42 from codex lib tests)
+- Build: vite ✓, FastAPI loads cleanly with new OAuth + middleware
+
 ## Sprint 4 followup — bbox accuracy + ergonomics — 2026-05-05
 
 ### Added
