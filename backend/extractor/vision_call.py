@@ -1105,7 +1105,16 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             opening_area = W * H if (W > 0 and H > 0) else 0
             if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
                 if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
-                    angokrasciai_m += (2 * H + W) * kiekis
+                    # 2026-05-06 formula audit: window/skylight reveals are
+                    # 4 sides (top + bottom palangė + 2 šonai) → 2H + 2W.
+                    # Doors are 3 sides (top + 2 šonai, no bottom — yra
+                    # slenkstis) → 2H + W. CLAUDE.md §1.2 had this wrong
+                    # for windows (29% undercount). Sources: RICS NRM2 §29.10,
+                    # DIN 18363 §4.2.4. Audit: docs/formulas/2026-05-06-formula-audit.md.
+                    if tipas == "duris":
+                        angokrasciai_m += (2 * H + W) * kiekis
+                    else:
+                        angokrasciai_m += (2 * H + 2 * W) * kiekis
             if tipas == "pasleptos_duris" and W > 0 and H > 0:
                 # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
                 # paruošimo nepriklausomai nuo size threshold (LT-specific

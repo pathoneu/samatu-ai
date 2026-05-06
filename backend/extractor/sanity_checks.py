@@ -175,10 +175,13 @@ def check_gk_sheets_math(rooms, vision_result=None):
 
 
 def check_window_reveals(rooms):
-    """§6 #10: window reveals ≈ 5m per standard window (±20%).
+    """§6 #10: window reveals ≈ 5.4m per standard window (±20%).
 
-    Standard window: 1.2m × 1.5m → reveal_length = 2*1.5 + 1.2 = 4.2m
-    Wide window (2.1m × 1.5m) → 5.1m. Average ~5m per window.
+    Window has 4 sides (top + palangė + 2 šonai): reveal = 2H + 2W.
+    Standard 1.2m × 1.5m → 2*1.5 + 2*1.2 = 5.4 m.
+    Wide 2.1m × 1.5m → 2*1.5 + 2*2.1 = 7.2 m.
+    Average ~5–7 m. (Pre-2026-05-06 audit had this as 4.2 m using a
+    3-side door formula — undercount of 29% per window.)
     """
     total_reveals = 0.0
     window_count = 0
@@ -196,11 +199,11 @@ def check_window_reveals(rooms):
             message=f"Rasta {window_count} langų, bet angokraščių ilgis 0m",
             hint="Tikriausiai nesusijungia langai → angokraščių pozicija. Sprint 4 sekantis darbas.",
             severity="med",
-            expected=f"~{window_count*5:.0f}m (~5m per window)",
+            expected=f"~{window_count*5.4:.0f}m (~5–7m per window: 2H + 2W)",
             actual="0m",
         )
     avg = total_reveals / window_count
-    if 4.0 <= avg <= 6.0:
+    if 4.5 <= avg <= 7.5:
         return None
     return Warning(
         code="window_reveal_avg_off",
