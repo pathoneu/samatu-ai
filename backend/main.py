@@ -5124,6 +5124,94 @@ async def detect_scale_hint(payload: DetectScalePayload):
     return {"found": False, "page": None, "scale_ratio": None, "scale_text": None, "confidence": "low"}
 
 
+# ── Phase C-3: click-to-fill walls (OpenCV flood-fill) ───────────────────────
+
+@app.post("/api/click-to-fill")
+async def click_to_fill_endpoint(
+    request: Request,
+    project_id: str = Form(...),
+    page_nr: int = Form(...),
+    click_x_pct: float = Form(...),
+    click_y_pct: float = Form(...),
+    sensitivity: float = Form(0.7),
+    pdf_file: UploadFile | None = File(None),
+):
+    """Phase C-3 — server-side OpenCV flood-fill from a user's click.
+
+    Accepts multipart form: project_id, page_nr, click coords, sensitivity,
+    optional pdf_file. If pdf_file is provided, it's cached server-side for
+    this project_id. Subsequent clicks for the same project can omit pdf_file
+    and reuse the cached PDF (~1h TTL). Returns polygon in PDF point space.
+    """
+    _user = _auth.get_current_user(request)
+    _check_rate_limit(
+        request.client.host if request.client else "unknown",
+        "click-to-fill",
+    )
+
+    from extractor.cv_polygon import (
+        click_to_fill_pipeline, PolygonValidationError,
+    )
+    import page_raster_cache as _cache
+
+    pdf_bytes: bytes | None = None
+    if pdf_file is not None:
+        pdf_bytes = await pdf_file.read()
+        if pdf_bytes:
+            _cache.store_pdf(project_id, pdf_bytes)
+    if pdf_bytes is None:
+        pdf_bytes = _cache.get_pdf(project_id)
+    if pdf_bytes is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "PDF byte cache nerasta — pridėkite pdf_file laukelį pirmoje "
+                "click-to-fill užklausoje. Vėliau client'as gali kviesti be PDF."
+            ),
+        )
+    if not pdf_bytes[:4].startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="pdf_file nėra galiojantis PDF")
+
+    try:
+        raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+    except Exception as e:
+        log.exception("click-to-fill page render failed")
+        raise HTTPException(status_code=500, detail=f"page render failed: {e}")
+
+    try:
+        result = click_to_fill_pipeline(
+            raster=raster,
+            click_x_pct=click_x_pct,
+            click_y_pct=click_y_pct,
+            sensitivity=sensitivity,
+        )
+    except PolygonValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    h, w = raster.shape
+    px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
+    polygon_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt]
+                   for x, y in result.polygon_px]
+    page_width_pdf = float(w) * px_to_pt
+    page_height_pdf = float(h) * px_to_pt
+
+    log.info(
+        "click-to-fill: project=%s page=%d click=(%.3f,%.3f) sens=%.2f "
+        "vertices=%d confidence=%s user=%s",
+        project_id, page_nr, click_x_pct, click_y_pct, sensitivity,
+        len(polygon_pdf), result.confidence,
+        (_user or {}).get("id", "anon"),
+    )
+
+    return {
+        "polygon_pdf": polygon_pdf,
+        "page_width_pdf": page_width_pdf,
+        "page_height_pdf": page_height_pdf,
+        "confidence": result.confidence,
+        "fill_method": result.fill_method,
+    }
+
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
