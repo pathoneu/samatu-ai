@@ -127,3 +127,16 @@ export function getFocusedRoomRect({
   }
   return null;
 }
+
+// Priority: polygon ('room') > text label on plan > eksplikacija row.
+// The eksplikacija fallback is useful only when label search is unavailable
+// (raster PDF) or when the user is viewing the eksplikacija on a page that
+// doesn't also contain the floor plan; otherwise circling the number on the
+// drawing communicates "where this room is" much better than highlighting a
+// row in the corner table.
+export function pickOverlayRect(focusedRect, textLabelRect) {
+  if (focusedRect && focusedRect.type === 'room') return focusedRect;
+  if (textLabelRect) return { type: 'label', ...textLabelRect };
+  if (focusedRect) return focusedRect;
+  return null;
+}

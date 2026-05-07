@@ -15,7 +15,7 @@ import {
   getPlanFitScale,
   getVisiblePlanPages,
 } from '@/lib/planViewerState';
-import { getFocusedRoomRect, getPolygonPdfPoints, getTextLabelRect } from '@/lib/planOverlayGeometry';
+import { getFocusedRoomRect, getPolygonPdfPoints, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
 import { getAnchoredZoomScroll, nextWheelScale } from '@/lib/viewerViewport';
 import {
   getConfirmableSymbolCounts,
@@ -96,7 +96,7 @@ function PlanOverlayLayer({ room, page, eksplikacijaPage, renderedSize, pdfSize,
     renderedSize,
     pdfSize,
   });
-  const rect = focusedRect || (textLabelRect ? { type: 'label', ...textLabelRect } : null);
+  const rect = pickOverlayRect(focusedRect, textLabelRect);
 
   if (!rect) return null;
 
@@ -525,7 +525,11 @@ export default function PlanViewer({
       renderedSize,
       pdfSize: pageSize,
     });
-    if (rect) return () => { cancelled = true; };
+    // Only short-circuit when we already have the BEST overlay (precise
+    // polygon). When the only match is an eksplikacija row, keep going so
+    // the text-layer label search can still find the room number on the
+    // drawing — the label is preferred over a row in the corner table.
+    if (rect && rect.type === 'room') return () => { cancelled = true; };
 
     const roomPage = focusedRoom.page_nr ?? focusedRoom.puslapio_nr;
     if (roomPage !== pageNumber || !focusedRoom.nr) return () => { cancelled = true; };
@@ -605,7 +609,7 @@ export default function PlanViewer({
       renderedSize,
       pdfSize: pageSize,
     });
-    return rect || (textLabelRect ? { type: 'label', ...textLabelRect } : null);
+    return pickOverlayRect(rect, textLabelRect);
   }, [focusedRoom, renderedSize, pageSize, pageNumber, eksplikacija_source_page, textLabelRect]);
 
   useEffect(() => {

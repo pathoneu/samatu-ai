@@ -7,6 +7,7 @@ import {
   getTextLabelRect,
   getPolygonPdfPoints,
   getPolygonPdfRect,
+  pickOverlayRect,
 } from './planOverlayGeometry.js';
 
 test('getBboxPctRect: converts fractional room bbox to rendered page pixels', () => {
@@ -109,4 +110,39 @@ test('getTextLabelRect: pads a PDF text item so room-number clicks have a visibl
 test('getTextLabelRect: rejects unrelated text and empty dimensions', () => {
   assert.equal(getTextLabelRect({ str: 'A-103', x: 1, y: 2, width: 3, height: 4 }, { roomNr: '103' }), null);
   assert.equal(getTextLabelRect({ str: '103', x: 1, y: 2, width: 0, height: 4 }, { roomNr: '103' }), null);
+});
+
+test('pickOverlayRect: precise polygon match wins over everything', () => {
+  const focused = { type: 'room', left: 0, top: 0, width: 10, height: 10 };
+  const label = { left: 99, top: 99, width: 8, height: 8 };
+  assert.deepEqual(pickOverlayRect(focused, label), focused);
+});
+
+test('pickOverlayRect: text label on plan wins over eksplikacija row when both present', () => {
+  // Regression for screenshot bug: floor plan and eksplikacija share a page,
+  // getFocusedRoomRect returns type 'eksplikacija', but the room number is
+  // also drawn on the plan and was found by the PDF text-layer search.
+  const focused = { type: 'eksplikacija', left: 100, top: 50, width: 200, height: 40 };
+  const label = { left: 600, top: 400, width: 30, height: 30 };
+  assert.deepEqual(
+    pickOverlayRect(focused, label),
+    { type: 'label', left: 600, top: 400, width: 30, height: 30 },
+  );
+});
+
+test('pickOverlayRect: eksplikacija row used as last resort when no label found', () => {
+  const focused = { type: 'eksplikacija', left: 100, top: 50, width: 200, height: 40 };
+  assert.deepEqual(pickOverlayRect(focused, null), focused);
+});
+
+test('pickOverlayRect: text label alone surfaces when nothing else matches', () => {
+  const label = { left: 600, top: 400, width: 30, height: 30 };
+  assert.deepEqual(
+    pickOverlayRect(null, label),
+    { type: 'label', left: 600, top: 400, width: 30, height: 30 },
+  );
+});
+
+test('pickOverlayRect: returns null when both inputs are missing', () => {
+  assert.equal(pickOverlayRect(null, null), null);
 });
