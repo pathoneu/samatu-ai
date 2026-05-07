@@ -22,6 +22,8 @@ httpx>=0.27
 opencv-python-headless==4.10.0.84
 numpy>=1.26.0
 
-# Symbol-detection bake-off (detector_bench/) — research-only deps
-replicate>=0.32.0
+# pyyaml — used by detector_bench/ ground_truth files (read-only at runtime).
+# replicate dep removed 2026-05-07 — Pipeline 5 (GroundingDINO) abandoned;
+# detector_bench/detectors/p5_grounding_dino.py kept for future retest but
+# requires re-adding the dep manually if you want to run it.
 pyyaml>=6.0
