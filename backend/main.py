@@ -1646,7 +1646,7 @@ def _postprocess_eilutes(all_eilutes: list) -> list:
 async def extract(request: Request, file: UploadFile = File(...)):
     _billable_user(request)
     try:
-        async with asyncio.timeout(300):  # 5 min – daug chunks gali užtrukti
+        async with asyncio.timeout(900):  # 15 min – 65-page interior PDFs run ~9-10 min
 
             contents = await file.read()
 
@@ -3640,7 +3640,7 @@ async def _run_vision_on_pages(
 async def extract_facade(request: Request, file: UploadFile = File(...)):
     _billable_user(request)
     try:
-        async with asyncio.timeout(300):
+        async with asyncio.timeout(900):
             contents = await file.read()
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
@@ -3673,7 +3673,7 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
 async def extract_roof(request: Request, file: UploadFile = File(...)):
     _billable_user(request)
     try:
-        async with asyncio.timeout(300):
+        async with asyncio.timeout(900):
             contents = await file.read()
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
@@ -3713,7 +3713,7 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
 async def extract_earthworks(request: Request, file: UploadFile = File(...)):
     _billable_user(request)
     try:
-        async with asyncio.timeout(300):
+        async with asyncio.timeout(900):
             contents = await file.read()
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
@@ -3756,7 +3756,7 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
 async def extract_concrete(request: Request, file: UploadFile = File(...)):
     _billable_user(request)
     try:
-        async with asyncio.timeout(300):
+        async with asyncio.timeout(900):
             contents = await file.read()
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
@@ -4579,10 +4579,21 @@ async def extract_interior_stream_endpoint(
 
         # Bridge the sync generator to async — pull items in a worker thread
         # one-at-a-time so cancellations propagate quickly.
+        # 2026-05-07: emit `: heartbeat` SSE comments every 10s while a slow
+        # next(gen) call is in flight. Vercel's proxy + most browsers close
+        # idle SSE connections after ~30-60s, which on a 65-page interior PDF
+        # would drop the stream mid-extraction. Comments don't trigger event
+        # listeners on the client, so they're a free keep-alive signal.
         sentinel = object()
         while True:
+            future = loop.run_in_executor(None, lambda: next(gen, sentinel))
             try:
-                ev = await loop.run_in_executor(None, lambda: next(gen, sentinel))
+                while True:
+                    try:
+                        ev = await asyncio.wait_for(asyncio.shield(future), timeout=10.0)
+                        break
+                    except asyncio.TimeoutError:
+                        yield b": heartbeat\n\n"
             except Exception as exc:
                 yield _format_sse({"event": "error", "message": str(exc)})
                 yield _format_sse({"event": "done", "result": {
