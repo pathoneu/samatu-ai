@@ -11,8 +11,10 @@ Spec §4.5 vision-fill, §5.4 G1, §4.8 error envelope.
 """
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+
+import auth as _auth
 
 router = APIRouter(prefix="/api", tags=["vision_fill"])
 log = logging.getLogger(__name__)
@@ -53,7 +55,10 @@ def call_vision_for_polygon(
 
 
 @router.post("/vision-fill")
-def vision_fill(req: VisionFillRequest) -> dict:
+def vision_fill(
+    req: VisionFillRequest,
+    user: dict = Depends(_auth.require_user),
+) -> dict:
     try:
         result = call_vision_for_polygon(
             req.project_id, req.page_idx, req.click_xy_pct,

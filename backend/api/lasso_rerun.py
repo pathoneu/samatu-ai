@@ -9,8 +9,10 @@ Spec §4.5 lasso-rerun, §5.4 G5, §4.8 error envelope.
 """
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+
+import auth as _auth
 
 router = APIRouter(prefix="/api", tags=["lasso_rerun"])
 log = logging.getLogger(__name__)
@@ -45,7 +47,10 @@ def vision_lasso_extract(project_id: str, page_idx: int,
 
 
 @router.post("/lasso-rerun")
-def lasso_rerun(req: LassoRequest) -> dict:
+def lasso_rerun(
+    req: LassoRequest,
+    user: dict = Depends(_auth.require_user),
+) -> dict:
     try:
         result = vision_lasso_extract(
             project_id=req.project_id,

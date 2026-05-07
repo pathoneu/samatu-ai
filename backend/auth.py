@@ -33,7 +33,21 @@ import db
 
 # Read secret from env (production) OR generate a stable fallback for dev.
 # CRITICAL: in production, SAMATU_SECRET_KEY must be set to a 32+ byte random string.
-SECRET_KEY = os.environ.get("SAMATU_SECRET_KEY", "dev-secret-CHANGE-ME-in-production")
+_DEV_SECRET_FALLBACK = "dev-secret-CHANGE-ME-in-production"
+SECRET_KEY = os.environ.get("SAMATU_SECRET_KEY", _DEV_SECRET_FALLBACK)
+
+# Pre-launch audit (2026-05-07): refuse to boot in production with the dev
+# fallback secret. A typo in the env var name would otherwise leave attackers
+# able to forge session cookies signed with a public, well-known key.
+_BOOT_ENV = (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+if _BOOT_ENV in ("production", "prod") and SECRET_KEY == _DEV_SECRET_FALLBACK:
+    import sys
+    sys.stderr.write(
+        "\n\n!!! FATAL: SAMATU_SECRET_KEY is unset (or equals the dev fallback) "
+        "with ENV=production. Refusing to start — set SAMATU_SECRET_KEY to a "
+        "32+ byte random string before retrying.\n\n"
+    )
+    sys.exit(2)
 
 # Cookie name + lifetime (30 days)
 SESSION_COOKIE = "samatu_session"

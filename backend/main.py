@@ -197,6 +197,21 @@ from starlette.middleware.sessions import SessionMiddleware
 import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
 
+
+def _billable_user(request: Request) -> dict:
+    """Auth + spend cap in one call. Use for any endpoint that hits Anthropic.
+
+    Why: pre-launch audit (2026-05-07) found _check_user_spend_cap was applied
+    only on 2 of 15 Vision endpoints, so a single logged-in user could loop
+    /v9/symbols/detect or /chat-project and drain the API key. This helper
+    enforces the cap consistently — call instead of `_auth.require_user`
+    everywhere a request triggers a paid Claude call.
+    """
+    user = _auth.require_user(request)
+    _check_user_spend_cap(user["id"])
+    return user
+
+
 # M5 (2026-05-06): production hardening flags via ENV
 _PROD_ENV = (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").lower() in (
     "prod", "production"
@@ -1629,8 +1644,7 @@ def _postprocess_eilutes(all_eilutes: list) -> list:
 
 @app.post("/extract")
 async def extract(request: Request, file: UploadFile = File(...)):
-    # 2026-05-06 security audit: require auth (Vision call cost).
-    _auth.require_user(request)
+    _billable_user(request)
     try:
         async with asyncio.timeout(300):  # 5 min – daug chunks gali užtrukti
 
@@ -3170,8 +3184,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
 @app.post("/detect-type")
 async def detect_type(request: Request, file: UploadFile = File(...)):
     """Quick peek — classify PDF as 'kz', 'interior', or 'unknown'."""
-    # 2026-05-06 security audit: require auth.
-    _auth.require_user(request)
+    _billable_user(request)
     contents = await file.read()
     proj_type = await asyncio.to_thread(_detect_project_type, contents)
     return {"type": proj_type}
@@ -3625,8 +3638,7 @@ async def _run_vision_on_pages(
 
 @app.post("/extract-facade")
 async def extract_facade(request: Request, file: UploadFile = File(...)):
-    # 2026-05-06 security audit: require auth (Vision call cost).
-    _auth.require_user(request)
+    _billable_user(request)
     try:
         async with asyncio.timeout(300):
             contents = await file.read()
@@ -3659,7 +3671,7 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
 
 @app.post("/extract-roof")
 async def extract_roof(request: Request, file: UploadFile = File(...)):
-    _auth.require_user(request)
+    _billable_user(request)
     try:
         async with asyncio.timeout(300):
             contents = await file.read()
@@ -3699,7 +3711,7 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
 
 @app.post("/extract-earthworks")
 async def extract_earthworks(request: Request, file: UploadFile = File(...)):
-    _auth.require_user(request)
+    _billable_user(request)
     try:
         async with asyncio.timeout(300):
             contents = await file.read()
@@ -3742,7 +3754,7 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
 
 @app.post("/extract-concrete")
 async def extract_concrete(request: Request, file: UploadFile = File(...)):
-    _auth.require_user(request)
+    _billable_user(request)
     try:
         async with asyncio.timeout(300):
             contents = await file.read()
@@ -4472,13 +4484,9 @@ async def extract_interior_endpoint(
     versijavimo, jokių pipeline'ų, jokių Tier-fallback'ų. Gali būti
     used backend'ui ir tiesiogiai (Python import).
     """
-    # 2026-05-06 security audit: was unauthenticated — anyone with URL could
-    # drain Anthropic budget. Now requires login.
-    _user = _auth.require_user(request)
+    _billable_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
-    # M5: per-user daily Vision spend cap (when configured)
-    _check_user_spend_cap(_user["id"])
 
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
@@ -4533,11 +4541,9 @@ async def extract_interior_stream_endpoint(
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
 ):
-    # 2026-05-06 security audit: require auth to prevent Anthropic budget drain.
-    _user = _auth.require_user(request)
+    _billable_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
-    _check_user_spend_cap(_user["id"])
 
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
@@ -4637,8 +4643,7 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     Returns the same shape as /extract-interior (sans _meta zoom/cost stats).
     Used by AssumptionsPanel — user edits a toggle, we recompute synchronously.
     """
-    # 2026-05-06 security audit: require auth (deterministic but server CPU).
-    _auth.require_user(request)
+    _billable_user(request)
     from extractor.universal_rules import (
         calc_room_quantities, normalize_paskirtis,
         ROOM_TYPE_RULES, translate_user_prefs_to_room_rules, UNIVERSAL_RULES,
@@ -4770,8 +4775,7 @@ async def v9_symbols_detect(
 
     symbol_type: durys | langai | rozetes | jungikliai | sviestuvai | trapai | radiatoriai
     """
-    # 2026-05-06 security audit: require auth (Vision call cost).
-    _auth.require_user(request)
+    _billable_user(request)
     if not files:
         return {"status": "error", "error": "Nepateiktas PDF"}
     pdf_bytes = await files[0].read()
@@ -4807,8 +4811,7 @@ async def v9_symbols_detect_page(
     rozetes/jungikliai/sviestuvai/etc. detection so the user gets one
     response with all symbol types at once.
     """
-    # 2026-05-06 security audit: require auth (Vision call cost).
-    _auth.require_user(request)
+    _billable_user(request)
     if not files:
         return {"status": "error", "error": "Nepateiktas PDF"}
     pdf_bytes = await files[0].read()
@@ -4867,8 +4870,7 @@ async def v9_symbols_count_by_template(
 
     Vartotojas paspauskite ant simbolio brėžinyje, sistema suranda visus panašius.
     """
-    # 2026-05-06 security audit: require auth (Vision call cost).
-    _auth.require_user(request)
+    _billable_user(request)
     if not files:
         return {"status": "error", "error": "Nepateiktas PDF"}
     pdf_bytes = await files[0].read()
@@ -5080,7 +5082,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     - {"project_id": "...", "messages": [{role, content}, ...]}   (with conversation history)
     - {"project_context": {...}, "question": "..."}               (legacy fallback — uses passed data)
     """
-    user = _auth.require_user(request)
+    user = _billable_user(request)
     _check_rate_limit(request.client.host if request.client else "unknown", "chat")
 
     question = (payload.get("question") or "").strip()
@@ -5234,8 +5236,7 @@ async def click_to_fill_endpoint(
     this project_id. Subsequent clicks for the same project can omit pdf_file
     and reuse the cached PDF (~1h TTL). Returns polygon in PDF point space.
     """
-    # 2026-05-06 security audit: require auth.
-    _user = _auth.require_user(request)
+    _user = _billable_user(request)
     _check_rate_limit(
         request.client.host if request.client else "unknown",
         "click-to-fill",
