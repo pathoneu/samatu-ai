@@ -1,13 +1,12 @@
 # Railway deployment config for Sąmatų AI backend.
 # https://docs.railway.com/reference/config-as-code
 #
-# IMPORTANT: This file lives at repo root, but Railway is configured with
-# `Root Directory = backend` in the service settings. So all build/start
-# commands run with cwd = backend/. Nixpacks auto-detects Python from
-# requirements.txt; we just need the start command.
+# Build is driven by nixpacks.toml at repo root (paths reference backend/
+# explicitly because Root Directory setting did not stick). startCommand
+# below activates the venv that nixpacks installs into /opt/venv.
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = ". /opt/venv/bin/activate && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"

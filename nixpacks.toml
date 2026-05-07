@@ -1,0 +1,30 @@
+# Nixpacks build plan for Sąmatų AI backend.
+# Lives at repo root because Railway's Root Directory setting did not stick.
+# Paths reference backend/ explicitly. Builds inside a venv to keep deps
+# isolated; activates it for both install + start.
+#
+# pdf2image needs poppler binaries; opencv-python-headless needs libGL +
+# libglib2 at runtime; both declared below.
+
+providers = ["python"]
+
+[phases.setup]
+nixPkgs = [
+  "python312",
+  "python312Packages.pip",
+  "poppler_utils",
+]
+aptPkgs = [
+  "libgl1",
+  "libglib2.0-0",
+]
+
+[phases.install]
+cmds = [
+  "python3 -m venv /opt/venv",
+  ". /opt/venv/bin/activate && pip install --upgrade pip",
+  ". /opt/venv/bin/activate && pip install -r backend/requirements.txt",
+]
+
+[start]
+cmd = ". /opt/venv/bin/activate && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
