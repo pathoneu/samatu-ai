@@ -188,6 +188,15 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       {open && (
         <div className="px-4 pb-4 pt-3 space-y-1">
 
+          {/* Intro: explain that edits live-recalculate everything in the
+              right panel (Kiekiai). Without this, users don't know whether
+              they need to click a "save / apply" button. */}
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+            Kiekvienas pakeitimas šioje skiltyje iš karto perskaičiuoja kiekius dešinėje
+            (sienų dažymas, glaistas, angokraščiai, grindjuostės, plytelės ir t.t.).
+            Mygtuko „Išsaugoti" nereikia.
+          </p>
+
           {/* Window fallback warning */}
           {isFallback && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 mb-3">
@@ -204,7 +213,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           {/* Sienos storis */}
           <Row
             label="Sienos storis (pertvaros)"
-            note="Naudojama angokraščių ploto skaičiavimui"
+            note="Naudojama angokraščių (langų / durų rėmo perimetro) ploto skaičiavimui. LT pertvaroms tipiniai 0.075–0.10 m, blokeliams 0.20–0.25 m."
           >
             <NumberInput
               value={sienos_storis_m}
@@ -214,7 +223,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           </Row>
 
           {/* Glaistymo lygis */}
-          <Row label="Glaistymo lygis" note="Naudojama glaisto kiekio skaičiavimui">
+          <Row
+            label="Glaistymo lygis"
+            note="Q1 — po sunkiais tapetais (0.8 kg/m²/mm); Q2 — po matiniais dažais (1.0); Q3 — po pusiau blizgiais (1.2); Q4 — po blizgiais/lakuotais, pilnas glaistymas (1.5). Aukštesnis lygis = daugiau glaisto + šlifavimo darbų."
+          >
             <div className="flex gap-1">
               {['Q1','Q2','Q3','Q4'].map(q => (
                 <button
@@ -235,8 +247,13 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           {/* Lubų aukštis per kambarį */}
           {rooms.length > 0 && (
             <div className="py-2">
-              <p className="text-sm text-foreground mb-2">
+              <p className="text-sm text-foreground mb-1">
                 Lubų aukštis <span className="text-xs text-muted-foreground">(numatytasis: {avgH.toFixed(2)} m)</span>
+              </p>
+              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                Tiesiogiai veikia sienų dažomą plotą (perimetras × aukštis) ir GKP lubų lapų kiekį.
+                Jei vienas namas — naudok „Visiems kambariams" lauką žemiau; jei skirtingi aukščiai (pvz. mansarda, garažas) —
+                įvesk per kambarį atskirai.
               </p>
 
               {/* 2026-05-06: bulk override — set all rooms' aukštis at once.

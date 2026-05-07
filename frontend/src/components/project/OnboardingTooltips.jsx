@@ -1,14 +1,12 @@
 /**
- * OnboardingTooltips — first-time 3-step walkthrough (Sprint H8, 2026-04-29).
+ * OnboardingTooltips — first-time 3-step walkthrough.
  *
- * Shows lightweight balloon tooltips pointing at:
- *   1. Left tool rail — „Pasirink tool kairėje"
- *   2. PDF brėžinys — „Pažymėk plotą / spausk patalpą"
- *   3. Right panel — „Patikrink kiekius ir eksportuok"
+ * Walks the user through the actual production workflow:
+ *   1. Brėžinys + patalpų sąrašas (PDF center, page rail left, rooms right)
+ *   2. Kiekiai + šaltinio žymekliai (provenance chips per row)
+ *   3. Prielaidos + eksportas (header buttons drive recalculation + export)
  *
  * Persists `samatu_onboarding_done` in localStorage. Skip + Done buttons.
- * Auto-skips if user has 0 projects (probably first onboarding handled
- * elsewhere) or already completed once.
  */
 
 import { useState, useEffect } from 'react';
@@ -18,23 +16,23 @@ const STORAGE_KEY = 'samatu_onboarding_done';
 
 const STEPS = [
   {
-    id: 'tools',
-    title: '1. Pasirink įrankį',
-    body: 'Kairėje pusėje yra įrankių juosta. Pradžioje — „Pasirinkti" (rodyklė). Kitiems veiksmams: „Polygon" pažymėt plotą, „Mastelis" — kalibruoti brėžinį.',
-    targetSel: '[data-onboarding="tool-rail"]',
-    side: 'right',
-  },
-  {
     id: 'pdf',
-    title: '2. Brėžinys ir patalpos',
-    body: 'Centre — brėžinys. Spustelk patalpą dešiniame sąraše ir matysi kaip ji paryškinama brėžinyje. Naudok klavišus + / − / F / [ / ] greitai naviguoti.',
-    targetSel: null, // center generic
+    title: '1. Brėžinys ir patalpos',
+    body: 'Centre — projekto PDF. Kairėje — visų puslapių miniatiūros (spustelk, kad atidarytum). Dešinėje — patalpų sąrašas iš eksplikacijos lentelės. Spustelk patalpą — jos numeris brėžinyje paryškinamas raudonu ratu. Klavišai: [ / ] keičia puslapius, + / − / F valdo mastelį.',
+    targetSel: null,
     side: 'top',
   },
   {
-    id: 'panel',
-    title: '3. Kiekiai ir eksportas',
-    body: 'Dešinėje — patalpų ir kiekių sąrašas. „Peržiūra" rodo, ką patikrinti rankiniu būdu. „Eksportuoti" (viršuje) sukuria Excel arba PDF su sąmata.',
+    id: 'kiekiai',
+    title: '2. Kiekiai ir šaltinio žymekliai',
+    body: 'Po patalpomis — apskaičiuoti kiekiai pagal kategorijas (sienų dažymas, plytelės, GKP, santechnika ir t.t.). Kiekvienos eilutės žymeklis rodo, iš kur skaičius: „iš eksplikacijos" — paimtas iš lentelės, „Formulė" — apskaičiuotas iš ploto pagal LT taisykles, „AI ženklas" — AI suskaičiavo brėžinyje, „Prielaida" — standartinis numatytasis, „Rankinis" — tu pakeitei.',
+    targetSel: null,
+    side: 'top',
+  },
+  {
+    id: 'prielaidos',
+    title: '3. Prielaidos ir eksportas',
+    body: 'Viršuje „Prielaidos" mygtukas atveria nustatymus: sienos storis, glaistymo lygis (Q1–Q4), lubų aukštis kiekvienai patalpai atskirai, langai, durys. Pakeitus — kiekiai perskaičiuojami iš karto. „Eksportuoti" sugeneruoja Excel arba PDF su KŽ ir sąmata.',
     targetSel: null,
     side: 'left',
   },

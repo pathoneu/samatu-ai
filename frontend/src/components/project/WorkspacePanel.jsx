@@ -361,6 +361,14 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           onToggle={null}
           top={0}
         />
+        {totalPositions > 0 && (
+          <div className="px-3 py-2 text-[11px] leading-relaxed text-muted-foreground border-b border-border/60 bg-muted/20">
+            Užvedus pelę ant darbo pavadinimo matysi <strong className="text-foreground/80">šaltinį</strong>:
+            „Formulė" — apskaičiuota iš ploto pagal LT taisykles · „AI ženklas" — AI suskaičiavo brėžinyje
+            (patikrink) · „Prielaida" — standartinis numatytasis · „Rankinis" — tu pakeitei.
+            Spustelėjęs eilutę gali keisti kiekį ar kainą; vnt. pozicijoms — − / + mygtukais.
+          </div>
+        )}
         {positionGroups.map(group => (
           <PositionGroup
             key={group.skyrius}
