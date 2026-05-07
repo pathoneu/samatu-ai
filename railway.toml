@@ -1,17 +1,13 @@
-# Railway deployment config for Sąmatų AI.
+# Railway deployment config for Sąmatų AI backend.
 # https://docs.railway.com/reference/config-as-code
 #
-# This file declares ONE service (FastAPI backend). The frontend ships
-# separately to Vercel/Netlify (free) or as a second Railway static service.
-# Postgres can be attached as a Railway plugin OR pointed at Supabase free
-# tier via DATABASE_URL.
-
-[build]
-builder = "nixpacks"
-buildCommand = "pip install -r backend/requirements.txt"
+# IMPORTANT: This file lives at repo root, but Railway is configured with
+# `Root Directory = backend` in the service settings. So all build/start
+# commands run with cwd = backend/. Nixpacks auto-detects Python from
+# requirements.txt; we just need the start command.
 
 [deploy]
-startCommand = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
