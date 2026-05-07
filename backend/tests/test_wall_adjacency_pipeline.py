@@ -50,3 +50,28 @@ def test_prepass_bails_when_polygon_missing(monkeypatch):
     # No room had its perimetras corrected.
     assert out["patalpos"][0]["perimetras_m"] == 20.0
     assert out["patalpos"][1]["perimetras_m"] == 40.0
+
+
+def test_prepass_survives_string_polygon_coords(monkeypatch):
+    """Regression: Vision occasionally returns polygon_pct entries with string
+    coordinates (`"0.25"` vs `0.25`). The old code path crashed inside
+    `_segment_axis` with `unsupported operand type(s) for -: 'str' and 'str'`
+    and the silent except in vision_call.py swallowed it, leaving rooms with
+    no perimetras correction and (more importantly) hiding the failure from
+    operators."""
+    monkeypatch.setenv("ENABLE_POLYGON_PREPASS", "1")
+    result = {
+        "page_width_m": 10.0,
+        "page_height_m": 10.0,
+        "patalpos": [
+            {"name": "A",
+             "polygon_pct": [["0.0", "0.0"], ["0.0", "0.5"], ["0.5", "0.5"], ["0.5", "0.0"]],
+             "perimetras_m": 20.0},
+            {"name": "B",
+             "polygon_pct": [["0.5", "0.0"], ["0.5", "0.5"], ["1.0", "0.5"], ["1.0", "0.0"]],
+             "perimetras_m": 20.0},
+        ],
+    }
+    out = _apply_polygon_prepass(result)
+    assert out["patalpos"][0]["perimetras_m"] == 17.5
+    assert out["patalpos"][1]["perimetras_saltinis"] == "polygon_adjacency"

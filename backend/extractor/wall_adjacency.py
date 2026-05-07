@@ -30,10 +30,24 @@ Segment = tuple[Point, Point]
 
 
 def polygon_to_segments(poly: list[Point]) -> list[Segment]:
-    """Return closed polygon as list of segments, last one closing back to start."""
-    if len(poly) < 2:
+    """Return closed polygon as list of segments, last one closing back to start.
+
+    Coerces point coordinates to float defensively: Vision occasionally emits
+    polygon_pct entries as JSON strings (`"0.25"`) instead of numbers, and the
+    downstream arithmetic in `_segment_axis` would crash with
+    `unsupported operand type(s) for -: 'str' and 'str'`. Malformed entries
+    (missing axis, non-numeric, wrong shape) cause us to drop the polygon and
+    return an empty segment list — `apply_shared_edges` then sees zero shared
+    edges for that room and leaves its perimetras unchanged.
+    """
+    if not poly or len(poly) < 2:
         return []
-    pts = [tuple(p) if not isinstance(p, tuple) else p for p in poly]
+    pts: list[Point] = []
+    for p in poly:
+        try:
+            pts.append((float(p[0]), float(p[1])))
+        except (TypeError, ValueError, IndexError, KeyError):
+            return []
     segs: list[Segment] = []
     for i in range(len(pts)):
         a = pts[i]
