@@ -5,7 +5,7 @@
  * ignored paint class and 1.8× absorption.
  */
 
-const API_BASE = import.meta.env?.VITE_API_BASE || '';
+import { API_BASE } from './apiBase';
 
 export async function recompute({ rooms, edits, current_assumptions, pozicijos }) {
   const body = { rooms, edits, current_assumptions };
@@ -14,6 +14,7 @@ export async function recompute({ rooms, edits, current_assumptions, pozicijos }
   if (pozicijos !== undefined) body.pozicijos = pozicijos;
   const res = await fetch(`${API_BASE}/api/recompute-quantities`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });

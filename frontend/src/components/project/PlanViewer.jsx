@@ -24,6 +24,7 @@ import {
   removeSymbolPoint,
 } from '@/lib/symbolOverlay';
 import { getPlanSymbolTypes } from '@/lib/planSymbolTypes';
+import { API_BASE } from '@/lib/apiBase';
 
 if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   console.error(`[PlanViewer] pdfjs version drift detected: API=${pdfjs.version}, expected 4.8.69`);
@@ -380,7 +381,7 @@ export default function PlanViewer({
       form.append('files', pdfFile, 'project.pdf');
       form.append('symbol_type', nextType);
       form.append('page_nr', String(pageNumber));
-      const res = await fetch('/v9/symbols/detect', { method: 'POST', body: form });
+      const res = await fetch(`${API_BASE}/v9/symbols/detect`, { method: 'POST', credentials: 'include', body: form });
       const json = await res.json();
       if (!res.ok || json.status === 'error' || json.error) {
         throw new Error(json.error || `HTTP ${res.status}`);
@@ -409,7 +410,7 @@ export default function PlanViewer({
       form.append('files', pdfFile, 'project.pdf');
       form.append('page_nr', String(pageNumber));
       form.append('page_type', currentType);
-      const res = await fetch('/v9/symbols/detect-page', { method: 'POST', body: form });
+      const res = await fetch(`${API_BASE}/v9/symbols/detect-page`, { method: 'POST', credentials: 'include', body: form });
       const json = await res.json();
       if (!res.ok || json.status === 'error' || json.error) {
         throw new Error(json.error || `HTTP ${res.status}`);
@@ -476,7 +477,7 @@ export default function PlanViewer({
       form.append('template_y_pct', String(yPct));
       form.append('template_size_pct', '0.024');
       form.append('page_nr', String(pageNumber));
-      const res = await fetch('/v9/symbols/count-by-template', { method: 'POST', body: form });
+      const res = await fetch(`${API_BASE}/v9/symbols/count-by-template`, { method: 'POST', credentials: 'include', body: form });
       const json = await res.json();
       if (!res.ok || json.status === 'error' || json.error) {
         throw new Error(json.error || `HTTP ${res.status}`);

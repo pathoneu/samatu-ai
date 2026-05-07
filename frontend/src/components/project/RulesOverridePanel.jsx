@@ -20,8 +20,7 @@ import { logCorrection, updateProject } from '@/lib/projectStore';
 import { MIN_FLOORS, MAX_FLOORS, getFloorCount } from '@/lib/floorMultiplier';
 import { PRESETS, ROOM_DEFAULTS, WASTE_FACTORS, STANDARD_DIMENSIONS } from '@/lib/ltLibrary';
 import { recompute as recomputeQuantities } from '@/lib/recomputeApi';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 // Per-paskirtis flagai. Frontend mapuojami į backend rules_override.
 const PASKIRTIS_TOGGLES = [
@@ -92,6 +91,7 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
 
         const res = await fetch(`${API}/recompute-interior`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });

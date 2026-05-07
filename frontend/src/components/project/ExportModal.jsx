@@ -3,8 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, FileText, AlertCircle, FileCode, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -143,6 +142,7 @@ async function downloadFromBackend(endpoint, project, filename) {
 
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });

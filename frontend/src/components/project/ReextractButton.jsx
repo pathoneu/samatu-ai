@@ -15,8 +15,7 @@ import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ReextractButton({ project, onComplete }) {
   const [confirming, setConfirming] = useState(false);

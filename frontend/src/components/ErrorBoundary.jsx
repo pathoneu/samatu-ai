@@ -8,6 +8,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { API_BASE } from '@/lib/apiBase';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -24,7 +25,7 @@ export default class ErrorBoundary extends React.Component {
 
     // Best-effort report to backend (don't block on failure)
     try {
-      fetch('/api/log-error', {
+      fetch(`${API_BASE}/api/log-error`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initErrorTracker } from '@/lib/errorTracker'
+import { API_BASE } from '@/lib/apiBase'
 import '@/index.css'
 
 // Sprint §24 (2026-04-29): localStorage error log so users can export
@@ -32,7 +33,7 @@ const reportError = (msg, stack, component) => {
     }
   }
   try {
-    fetch('/api/log-error', {
+    fetch(`${API_BASE}/api/log-error`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg, stack, component, url: location.href, user_agent: navigator.userAgent }),

@@ -10,13 +10,14 @@
  *   GET  /api/auth/google/callback →  302 back to `next` after token exchange
  */
 import { useEffect, useState } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 
 export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su Google' }) {
   const [enabled, setEnabled] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/auth/google/status')
+    fetch(`${API_BASE}/api/auth/google/status`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : { enabled: false })
       .then(data => { if (!cancelled) setEnabled(!!data.enabled); })
       .catch(() => { if (!cancelled) setEnabled(false); });
@@ -25,7 +26,7 @@ export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su
 
   if (!enabled) return null;
 
-  const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
+  const href = `${API_BASE}/api/auth/google?next=${encodeURIComponent(next)}`;
   return (
     <>
       <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">

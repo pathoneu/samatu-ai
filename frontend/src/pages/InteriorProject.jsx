@@ -24,6 +24,7 @@ import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject, getProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
 import { toast } from 'sonner';
+import { API_BASE } from '@/lib/apiBase';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -615,7 +616,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
     if (!Array.isArray(newRooms)) return;
     setIsRecomputing(true);
     try {
-      const res = await fetch('/recompute-interior', {
+      const res = await fetch(`${API_BASE}/recompute-interior`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

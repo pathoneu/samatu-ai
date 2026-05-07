@@ -9,6 +9,8 @@
  * Throws Error with `.userMessage` (Lithuanian) for direct toast.
  */
 
+import { API_BASE } from './apiBase';
+
 const TIMEOUT_MS = 15000;
 
 export async function clickToFill({
@@ -31,7 +33,7 @@ export async function clickToFill({
     fd.set('pdf_file', pdfBlob, pdfBlob.name || 'project.pdf');
   }
   try {
-    const res = await fetch('/api/click-to-fill', {
+    const res = await fetch(`${API_BASE}/api/click-to-fill`, {
       method: 'POST',
       credentials: 'include',
       signal: controller.signal,

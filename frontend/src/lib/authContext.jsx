@@ -8,6 +8,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sanitizeHeaders } from '@/lib/safeHeaders';
+import { API_BASE as API } from './apiBase';
 
 const AuthCtx = createContext({
   user: null,
@@ -17,8 +18,6 @@ const AuthCtx = createContext({
   register: async () => {},
   logout: async () => {},
 });
-
-const API = '';
 
 async function apiCall(path, opts = {}) {
   // Merge order: defaults → caller opts → headers (caller can't override

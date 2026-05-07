@@ -15,11 +15,11 @@
  * localStorage still works and sync resumes when online.
  */
 
+import { API_BASE as API } from './apiBase';
+
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
 const SETTINGS_KEY = 'samatu_settings';
-
-const API = '';
 
 // P7: Legacy ASCII-stripped skyrius names → modern LT-with-diacritics. Used
 // to migrate old projects in localStorage so UI shows consistent names.

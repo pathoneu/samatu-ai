@@ -8,8 +8,7 @@
 import { useState } from 'react';
 import { Share2, Check, Copy, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ShareButton({ project }) {
   const [open, setOpen] = useState(false);

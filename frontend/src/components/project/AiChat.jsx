@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
+import { API_BASE } from '@/lib/apiBase';
 
 // Sprint §15 (2026-04-29): suggestions atnaujintos po naujų schema laukų
 // (paint_class, NRM2 standard, _wall_elevations, plytelių specifikacija).
@@ -50,8 +51,9 @@ export default function AiChat({ project, inline = false }) {
     setLoading(true);
 
     try {
-      const res = await fetch('/chat-project', {
+      const res = await fetch(`${API_BASE}/chat-project`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question,

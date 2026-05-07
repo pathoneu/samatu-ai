@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { Edit2, Check, X, AlertCircle, Eye, BookOpen, Palette, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { getPdfBlob } from '@/lib/pdfStore';
 import ConfidenceBadge from './ConfidenceBadge';
+import { API_BASE } from '@/lib/apiBase';
 
 // ── Confidence dot (žalia/geltona/raudona) ────────────────────────────────────
 
@@ -439,7 +440,7 @@ function DesignerMaterialSpecs({ room, project }) {
       const fd = new FormData();
       fd.append('files', blob, 'project.pdf');
       fd.append('room_nr', room.nr);
-      const res = await fetch(`/api/projects/${project.id}/material-specs`, {
+      const res = await fetch(`${API_BASE}/api/projects/${project.id}/material-specs`, {
         method: 'POST',
         credentials: 'include',
         body: fd,

@@ -4,7 +4,7 @@
  * Backend persists to JSONL; Sprint 4 reads to compare against manual baseline.
  */
 
-const API_BASE = import.meta.env?.VITE_API_BASE || '';
+import { API_BASE } from './apiBase';
 
 export function createSession({ projectId, now = () => Date.now() }) {
   const startedAt = now();
@@ -38,6 +38,7 @@ export function createSession({ projectId, now = () => Date.now() }) {
       try {
         await fetch(`${API_BASE}/api/telemetry/session`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });

@@ -12,8 +12,7 @@ import { savePdf } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 // Pirmoji versija: Interjero projektas yra DEFAULT. Kiti tipai (KŽ, Fasadai,
 // Stogas, Žemės, Betonas) — paslėpti į "Kitas tipas" advanced.
@@ -47,7 +46,7 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
     try {
       const dtFd = new FormData();
       dtFd.append('file', file);
-      const dtRes = await fetch(`${API}/detect-type`, { method: 'POST', body: dtFd, signal });
+      const dtRes = await fetch(`${API}/detect-type`, { method: 'POST', credentials: 'include', body: dtFd, signal });
       if (dtRes.ok) {
         const dt = await dtRes.json();
         if (dt.type === 'interior') projType = 'interior';
@@ -109,7 +108,7 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
     fd.append('file', file);
   }
 
-  const res = await fetch(`${API}${endpoint}`, { method: 'POST', body: fd, signal });
+  const res = await fetch(`${API}${endpoint}`, { method: 'POST', credentials: 'include', body: fd, signal });
   const json = await res.json();
   return { json, res, projType };
 }
@@ -152,7 +151,7 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
   }
 
   let finalResult = null;
-  await postSse('/extract-interior-stream', fd, {
+  await postSse(`${API}/extract-interior-stream`, fd, {
     signal,
     onEvent: (ev) => {
       if (ev.event === 'done') {
@@ -365,7 +364,7 @@ export default function NewProject() {
             reader.onerror = () => reject(reader.error);
             reader.readAsDataURL(new Blob([pdfBytes], { type: 'application/pdf' }));
           });
-          const scaleResp = await fetch('/detect-scale-hint', {
+          const scaleResp = await fetch(`${API}/detect-scale-hint`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

@@ -8,8 +8,7 @@ import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucid
 import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings

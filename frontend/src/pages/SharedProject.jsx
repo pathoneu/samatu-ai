@@ -9,8 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Eye, ArrowLeft, Building2 } from 'lucide-react';
-
-const API = '';
+import { API_BASE as API } from '../lib/apiBase';
 
 function fmtEur(v) {
   return v != null ? `${Number(v).toFixed(2)} €` : '—';

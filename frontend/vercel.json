@@ -4,11 +4,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://samatu-api-production.up.railway.app/api/:path*"
-    },
-    {
-      "source": "/((?!api|assets|.*\\..*).*)",
+      "source": "/((?!assets|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],

@@ -6,6 +6,7 @@
  */
 
 import { getPdfBlob } from './pdfStore';
+import { API_BASE } from './apiBase';
 
 const _cache = new Map();  // key = `${projectId}:${page}` → lines array
 
@@ -21,7 +22,7 @@ export async function fetchPageLines(projectId, page) {
   fd.append('page', String(page));
 
   try {
-    const res = await fetch('/pdf-lines', { method: 'POST', body: fd });
+    const res = await fetch(`${API_BASE}/pdf-lines`, { method: 'POST', credentials: 'include', body: fd });
     const json = await res.json();
     if (json.status !== 'ok' && !json.lines) return null;
     const data = {

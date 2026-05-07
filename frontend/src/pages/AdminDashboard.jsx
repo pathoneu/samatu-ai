@@ -12,8 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, FolderKanban, Receipt, Activity, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { Navigate } from 'react-router-dom';
-
-const API = '';
+import { API_BASE as API } from '@/lib/apiBase';
 
 async function fetchAdmin(path) {
   const res = await fetch(`${API}${path}`, { credentials: 'include' });

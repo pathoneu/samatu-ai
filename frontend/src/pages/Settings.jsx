@@ -13,6 +13,7 @@ import {
 import { downloadErrorLog, getErrorLog, clearErrorLog } from '@/lib/errorTracker';
 import { ltPlural } from '@/lib/ltPlural';
 import { useAuth } from '@/lib/authContext';
+import { API_BASE } from '@/lib/apiBase';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -54,7 +55,7 @@ export default function Settings() {
   const handleProfileSave = async () => {
     setProfileSaving(true);
     try {
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -83,7 +84,7 @@ export default function Settings() {
     }
     setPwSaving(true);
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
