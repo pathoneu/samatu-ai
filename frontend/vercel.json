@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://samatu-api.up.railway.app/api/:path*"
+      "destination": "https://samatu-api-production.up.railway.app/api/:path*"
     },
     {
       "source": "/((?!api|assets|.*\\..*).*)",
