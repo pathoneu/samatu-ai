@@ -2213,6 +2213,52 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] bbox validation failed: {exc}")
 
+    # Step 2.4.5: Page-1 deterministic ceiling-height fallback.
+    # Vision sometimes misses tall ceilings (>3 m) annotated as `+3.000` on
+    # the cover/section page, defaulting to ~2.80 m and skewing every
+    # wall-paint quantity downstream. Run a deterministic pdfplumber scan as
+    # a fallback — only override when Vision missed entirely OR returned a
+    # value that disagrees with a page-1 marker by more than 0.3 m, so we
+    # don't trample legitimate Soviet-era 2.50 m readings.
+    # See docs/2026-05-07-launch-status.md §3.
+    try:
+        from extractor.height_markers import (
+            best_ceiling_candidate,
+            scan_page_height_markers,
+        )
+        markers = scan_page_height_markers(pdf_bytes, page_nrs=(1,))
+        candidate = best_ceiling_candidate(markers)
+        if candidate is not None:
+            cand_m = candidate["value_m"]
+            section_h = parsed.get("lubu_aukstis_m")
+            should_override = (
+                section_h is None
+                or float(section_h) < cand_m - 0.3
+            )
+            if should_override:
+                parsed["lubu_aukstis_m"] = cand_m
+                warnings_list = list(parsed.get("warnings") or [])
+                marker_raw = candidate["raw"]
+                warnings_list.append({
+                    "code": "ceiling_height_from_page1_marker",
+                    "severity": "info",
+                    "message": (
+                        f"Lubų aukštis paimtas iš pjūvio žymeklio "
+                        f"{marker_raw} → {cand_m:.2f} m. "
+                        f"Patikrink Prielaidose."
+                    ),
+                })
+                parsed["warnings"] = warnings_list
+                _emit({
+                    "event": "ceiling_height_from_marker",
+                    "value_m": cand_m,
+                    "raw": candidate["raw"],
+                    "page": candidate["page"],
+                    "previous": section_h,
+                })
+    except Exception as exc:
+        print(f"[extractor] height marker scan failed: {exc}")
+
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
     try:
