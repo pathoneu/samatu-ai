@@ -45,5 +45,18 @@ legends/*/
 results/*.md
 !results/.gitkeep
 .playwright-mcp/
-.claude/scheduled_tasks.lock
+.claude/
+.claire/
+.agents/
+AGENTS.md
 .superpowers/
+
+# Local debug screenshots in repo root
+/*.png
+/smoke-*.png
+/click-*.png
+/page1-*.png
+/after-*.png
+
+# Backend nested copy artifact
+backend/backend/
