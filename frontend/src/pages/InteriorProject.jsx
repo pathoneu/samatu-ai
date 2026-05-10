@@ -734,6 +734,12 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         <ProjectMainView
           project={project}
           onProjectChange={(updated) => {
+            // Update both local state (so React re-renders the banner /
+            // cards immediately) and persisted store (so the next page
+            // reload picks up the same data). Pre-2026-05-10 this only
+            // hit the store, leaving the UI showing stale lt_sanity until
+            // a full reload — the revalidate button looked like a no-op.
+            setProject(updated);
             updateProject(project.id, updated);
           }}
           onShowDrawing={pdfUrl ? () => setTab('brezinys') : null}
