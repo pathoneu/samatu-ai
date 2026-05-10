@@ -259,13 +259,20 @@ def stairwell_wall_area_m2(perimeter_m: float, max_height_m: float,
 
 
 def room_aukstas_from_nr(nr) -> int:
-    """Extract floor number from room nr (Sprint §16, 2026-04-29).
+    """Extract floor number from room nr (Sprint §16, 2026-04-29; revised 2026-05-10).
 
     Convention used in LT projects:
-      "1F-01", "01", "I-01"   → 1   (first floor)
-      "2F-05", "II-12"        → 2
-      "3F-02", "III-08"       → 3
-      "0F-01", "0-01", "P-01" → 0   (cellar / parter / požeminis)
+      "1F-01", "01", "I-01"     → 1   (first floor)
+      "2F-05", "II-12", "X.2"   → 2
+      "3F-02", "III-08", "X.3"  → 3
+      "0F-01", "0-01", "P-01"   → 0   (cellar / parter / požeminis)
+
+    Bare sequential room numbers ("1", "2", ..., "11") are floor 1 — that's
+    the most common LT residential convention. The "X.Y" compound notation
+    used by samatininkai means "room X on floor Y", so floor comes from the
+    digit AFTER the dot. The previous "first digit wins" heuristic split a
+    real 2-storey project into 9 phantom floors (Playwright regression
+    2026-05-10).
 
     Returns 1 by default (single-floor or unknown). Used by frontend filters
     + cross-page validator to spot mixed-floor extractions.
@@ -273,10 +280,35 @@ def room_aukstas_from_nr(nr) -> int:
     s = str(nr or "").strip().upper()
     if not s:
         return 1
-    # "2F-05", "2F05", "2-05"
-    if s[0].isdigit():
-        return int(s[0])
-    # Roman: "I-01", "II-12", "III-08"
+
+    # LT compound notation: "X.Y" → floor Y (room X on floor Y).
+    if "." in s:
+        try:
+            after_dot = s.split(".", 1)[1]
+            # Take leading digit run after the dot.
+            digits = ""
+            for ch in after_dot:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            if digits:
+                return int(digits)
+        except (ValueError, IndexError):
+            pass
+
+    # Explicit floor prefix:
+    #   "XF-NN" / "XF NN" / "XFNN"  — letter F right after the digit
+    #   "X-NN"                       — single digit then hyphen
+    if len(s) >= 2 and s[0].isdigit():
+        if s[1] == "F" or s[1] == "-":
+            return int(s[0])
+        # Otherwise this is a bare room number ("11", "01", "5"). Floor 1.
+        return 1
+    if len(s) == 1 and s[0].isdigit():
+        return 1
+
+    # Roman: "I-01", "II-12", "III-08" — order matters (longest first).
     if s.startswith("III"): return 3
     if s.startswith("II"):  return 2
     if s.startswith("I"):   return 1
