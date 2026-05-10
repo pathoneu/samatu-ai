@@ -184,13 +184,15 @@ export function calculateInteriorQuantities(rawData, assumptions = {}) {
 
   // Additional metrics
   const dazymasVisoM2 = paintWallsM2 + lubosM2;
-  // REMOVED Sprint 0 Fix 2: paint formula moved to backend.
-  // Frontend should call recomputeApi.recompute() with paint_class to get correct values.
-  // These variables intentionally null so any consumer that still reads them gets a
-  // visible bug (rather than silently using stale wrong values).
-  const dazaiSienoms = null;
-  const dazaiLuboms = null;
-  const gruntasL      = round1(dazymasVisoM2 * 0.15);
+  // Sprint 0 Fix 2: paint formula moved to backend POST /api/recompute-quantities.
+  // Hotfix 2026-05-10 (Week 1 Task 1.2): the previous `null` placeholders here
+  // were summed downstream, producing `NaN` in `dazai.viso_l` for live beta
+  // users. Until `useDebouncedRecalculate` is wired everywhere, surface 0 from
+  // the local calc — the backend recompute is the canonical source.
+  const safeNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const dazaiSienoms = 0; // backend canonical: paint_class × walls coverage
+  const dazaiLuboms = 0;  // backend canonical: paint_class × ceiling coverage
+  const gruntasL      = round1(safeNumber(dazymasVisoM2) * 0.15);
   const gkLapai       = Math.ceil(paintWallsM2 / 3.0 * 1.1);
   const qRate  = Q_RATES[glaistimo_lygis] || 1.0;
   const qThick = Q_THICK[glaistimo_lygis] || 1.25;
@@ -240,7 +242,9 @@ export function calculateInteriorQuantities(rawData, assumptions = {}) {
       sienos_l:  dazaiSienoms,
       lubos_l:   dazaiLuboms,
       gruntas_l: gruntasL,
-      viso_l:    round1(dazaiSienoms + dazaiLuboms + gruntasL),
+      // Hotfix 2026-05-10 (Week 1 Task 1.2): use safeNumber to never emit NaN,
+      // even if a future caller bypasses the placeholders above.
+      viso_l:    round1(safeNumber(dazaiSienoms) + safeNumber(dazaiLuboms) + safeNumber(gruntasL)),
     },
     gk_lapai: { vnt: gkLapai },
     glaistas: {

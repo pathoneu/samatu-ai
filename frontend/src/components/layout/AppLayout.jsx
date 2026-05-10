@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
+import BetaDisclosureBanner from '@/components/BetaDisclosureBanner';
 
 /**
  * AppLayout — fixed 56px icon sidebar + content area.
@@ -47,6 +48,8 @@ export default function AppLayout() {
       {/* Main content — left margin only on md+ where sidebar is fixed.
           Mobile gets top padding so hamburger doesn't overlap page titles. */}
       <main className="min-h-screen md:ml-14 pt-14 md:pt-0">
+        {/* Week 1 Task 1.1 (D1): liability disclosure to live beta users. */}
+        <BetaDisclosureBanner />
         <Outlet />
       </main>
     </div>

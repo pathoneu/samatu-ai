@@ -1,0 +1,110 @@
+{
+  "pdf_id": "pdf_07",
+  "pdf_hash": "",
+  "project_type": "interior_finishing",
+  "city": "Kaunas",
+  "floor_area_m2": 0,
+  "vat_mode": "be_pvm",
+  "lines": [
+    {
+      "code": "glaistymas_dazymas_bundle",
+      "label_lt": "Sienų + lubų glaistymas + dažymas (bundled)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 14,
+      "bundled_group": "glaistymas_dazymas",
+      "verified_by": "",
+      "notes": "Σ paintable wall area + ceiling area, Q2/Q3 default"
+    },
+    {
+      "code": "plyteles_sienos_m2",
+      "label_lt": "Plytelių klijavimas sienoms (darbas)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 22,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "plyteles_grindys_m2",
+      "label_lt": "Plytelių klijavimas grindims (darbas)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 14,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "grindys_laminatas_m2",
+      "label_lt": "Grindys (laminatas/parketas/vinilas, darbas)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 7,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "pasleptu_duru_kompl",
+      "label_lt": "Paslėptos durys (komplektas + apdirbimas)",
+      "unit": "kompl",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 250,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "lubos_virs_3m_m2",
+      "label_lt": "Lubų darbai virš 3m (scaffolding adder)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 18,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "grindjuostes_m",
+      "label_lt": "Grindjuostės",
+      "unit": "m",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 5,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "angokrasciai_gkp_m",
+      "label_lt": "Angokraščių apdaila GKP",
+      "unit": "m",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 12,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "hidroizoliacija_m2",
+      "label_lt": "Hidroizoliacija (m², ne vnt)",
+      "unit": "m²",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 10,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    },
+    {
+      "code": "silikonas_m",
+      "label_lt": "Plytelių silikonavimas",
+      "unit": "m",
+      "quantity": 0,
+      "unit_price_eur_be_pvm": 2.5,
+      "bundled_group": null,
+      "verified_by": "",
+      "notes": ""
+    }
+  ]
+}

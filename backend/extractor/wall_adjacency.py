@@ -2,27 +2,49 @@
 
 Consumes per-room `polygon_pct[]` (optional Vision output, see prompt.py).
 For each pair of rooms whose polygons share collinear edge segments we
-compute the overlap length and subtract HALF the shared length from each
-room's perimetras_m (since each shared wall is otherwise counted once
-per room → twice total across the pair). The corrected perimetras_m
-also drives grindjuostės.
+compute the overlap length.
 
-Feature-flag gated: ENABLE_POLYGON_PREPASS=1. When off or when any room
-lacks polygon_pct, we leave perimetras_m unchanged.
+**Week 1 Task 1.4 (canonical plan, 2026-05-10):** the half-subtraction
+mutation of `perimetras_m` is **disabled by default** because interior
+finishing (paint, baseboard, plaster corners) needs BOTH faces of a shared
+wall — each room's polygon describes that room's own inner contour, so
+naive A.perim + B.perim is the correct linear footage for finishes. Only
+GK partition CONSTRUCTION (not finishing) needs the deduplicated count.
+
+Set `ENABLE_LEGACY_HALF_SUBTRACT=1` to restore the pre-2026-05-10 behavior
+during migration (e.g. to A/B compare a single project against the old
+output). Default is OFF in beta and production.
+
+When the wall-faces-vs-cores graph (Week 6 Task 6.1) lands, the audit
+information here moves into the new model. For now we still compute the
+shared-edge metric and surface it as `shared_with_neighbors_m` per room
+for debugging, but we never reduce `perimetras_m`.
+
+Feature-flag gated: ENABLE_POLYGON_PREPASS=1 turns on the prepass at all.
+When ENABLE_POLYGON_PREPASS is off or any room lacks polygon_pct, no work
+happens.
 
 Coordinates: polygon_pct is in 0..1 page-fraction space. We convert to
 metric using page-level page_width_m / page_height_m supplied by caller.
 
 References:
 - Spec: docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §4.3 wall_adjacency
+- Canonical plan: docs/superpowers/plans/2026-05-10-canonical-plan.md Task 1.4
 - Sprint 2 risk register: spec §10 (validate against golden test PDFs)
 """
 from __future__ import annotations
+
+import os
 
 # Floating-point epsilon for collinearity test (in 0..1 page-fraction space).
 # At A3 (297×420 mm), 0.005 ≈ 1.5–2 mm — well below LT wall thickness (75–250 mm),
 # so we never falsely merge real walls but still tolerate Vision rounding noise.
 _COLLINEAR_EPS = 0.005
+
+# Week 1 Task 1.4: default OFF. Set ENABLE_LEGACY_HALF_SUBTRACT=1 only as a
+# rollback safety hatch. The plan's Week 6 wall-graph rewrite removes the flag
+# entirely once the faces-vs-cores model is live.
+_ENABLE_LEGACY_HALF_SUBTRACT = os.environ.get("ENABLE_LEGACY_HALF_SUBTRACT", "0") == "1"
 
 
 Point = tuple[float, float]
@@ -136,16 +158,21 @@ def _shared_edge_metric_length(poly_a: list[Point], poly_b: list[Point],
 
 def apply_shared_edges(rooms: list[dict], page_width_m: float,
                        page_height_m: float) -> list[dict]:
-    """Subtract half-shared-edge length from each room's perimetras_m.
+    """Compute shared-edge metric length per room from polygon_pct.
 
-    Each shared wall belongs to two rooms; raw Vision perimetras counts it
-    in both. We split it 50/50 — the shared metres are still 'real' wall on
-    each side, but for grindjuostės (which runs along the floor of one room
-    only at any given physical wall) we want one count, hence the half.
+    Default behaviour (Week 1 Task 1.4, 2026-05-10): DOES NOT reduce
+    `perimetras_m`. Each room's polygon already describes its own face of any
+    shared wall, so the room-local perimeter is the correct length for paint,
+    baseboard, and plaster-corners. We surface the shared length as
+    `shared_with_neighbors_m` (audit-only) so the UI can explain what was
+    detected.
 
-    Returns NEW list of room dicts. Original perimetras_m saved as
-    perimetras_orig_m. perimetras_saltinis flips to 'polygon_adjacency'.
+    Legacy behaviour (when `ENABLE_LEGACY_HALF_SUBTRACT=1`): subtract half of
+    the shared length from each room's perimetras_m — this was the pre-2026-05-10
+    default but mis-counts finish quantities. Kept behind the env flag so a
+    single project can be A/B-compared during migration.
 
+    Returns a NEW list of room dicts. `perimetras_m` is never set to NaN.
     Bails out (returns rooms unchanged) if ANY room lacks polygon_pct.
     """
     if any(r.get("polygon_pct") is None for r in rooms):
@@ -169,8 +196,16 @@ def apply_shared_edges(rooms: list[dict], page_width_m: float,
         room = {**r}
         orig = float(r.get("perimetras_m") or 0.0)
         if shared_per_room[i] > 0:
-            room["perimetras_m"] = max(0.0, orig - shared_per_room[i])
-            room["perimetras_orig_m"] = orig
-            room["perimetras_saltinis"] = "polygon_adjacency"
+            # Always expose the audit metric (full length on this room's side =
+            # 2 × half-share, since shared_per_room already split 50/50).
+            room["shared_with_neighbors_m"] = round(shared_per_room[i] * 2.0, 3)
+            room.setdefault(
+                "shared_edges_provenance",
+                "polygon_adjacency_audit",
+            )
+            if _ENABLE_LEGACY_HALF_SUBTRACT:
+                room["perimetras_m"] = max(0.0, orig - shared_per_room[i])
+                room["perimetras_orig_m"] = orig
+                room["perimetras_saltinis"] = "polygon_adjacency_legacy"
         out.append(room)
     return out
