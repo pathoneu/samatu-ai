@@ -2215,20 +2215,33 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] bbox validation failed: {exc}")
 
-    # Step 2.4.5: Page-1 deterministic ceiling-height fallback.
+    # Step 2.4.5: deterministic ceiling-height fallback.
     # Vision sometimes misses tall ceilings (>3 m) annotated as `+3.000` on
-    # the cover/section page, defaulting to ~2.80 m and skewing every
-    # wall-paint quantity downstream. Run a deterministic pdfplumber scan as
-    # a fallback — only override when Vision missed entirely OR returned a
-    # value that disagrees with a page-1 marker by more than 0.3 m, so we
+    # section / ceiling-plan pages, defaulting to ~2.80 m and skewing every
+    # wall-paint quantity downstream. Run a deterministic pdfplumber scan
+    # as a fallback — only override when Vision missed entirely OR returned
+    # a value that disagrees with the marker by more than 0.3 m, so we
     # don't trample legitimate Soviet-era 2.50 m readings.
-    # See docs/2026-05-07-launch-status.md §3.
+    # 2026-05-10 (benchmark Task 7.2 #3): scan ALL pjūvis + lubų plan pages
+    # (per page_classifier output), plus page 1 as a cover-sheet fallback.
+    # Floor plans are NOT scanned — height markers are not a floor-plan
+    # convention in LT drafting; pjūviai are the canonical source.
+    # See docs/2026-05-07-launch-status.md §3 + reports/benchmark/
+    # findings_2026-05-10.md issue #3.
     try:
         from extractor.height_markers import (
             best_ceiling_candidate,
             scan_page_height_markers,
         )
-        markers = scan_page_height_markers(pdf_bytes, page_nrs=(1,))
+        section_pages: tuple[int, ...] = tuple(sorted({
+            int(p["nr"]) for p in (parsed.get("puslapiai") or [])
+            if (p.get("tipas") or "").lower() in ("section", "ceiling_plan")
+            and p.get("nr") is not None
+        }))
+        # Always include page 1 — many LT projects put a section drawing
+        # on the cover sheet without a separate "section" page.
+        scan_pages = section_pages + ((1,) if 1 not in section_pages else ())
+        markers = scan_page_height_markers(pdf_bytes, page_nrs=scan_pages)
         candidate = best_ceiling_candidate(markers)
         if candidate is not None:
             cand_m = candidate["value_m"]

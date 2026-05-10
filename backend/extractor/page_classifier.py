@@ -23,6 +23,7 @@ class PageType(str, Enum):
     FLOOR_PLAN = "floor_plan"
     CEILING_PLAN = "ceiling_plan"
     WALL_ELEVATION = "wall_elevation"
+    SECTION = "section"          # Pjūvis: vertical cut + slab height markers (+0.000 / +2.800)
     ELECTRICAL = "electrical"
     PLUMBING = "plumbing"
     EKSPLIKACIJA = "eksplikacija"
@@ -43,7 +44,8 @@ _CLASSIFIER_SYSTEM = """You classify a Lithuanian construction drawing page.
 Return strict JSON:
   {
     "page_type": "floor_plan" | "ceiling_plan" | "wall_elevation" |
-                 "electrical" | "plumbing" | "eksplikacija" | "legend" | "unknown",
+                 "section" | "electrical" | "plumbing" | "eksplikacija" |
+                 "legend" | "unknown",
     "confidence": 0.0-1.0,
     "top_2": same enum or null
   }
@@ -52,6 +54,8 @@ Hints:
 - "Aukšto planas" / wall hatching + room polygons → floor_plan
 - "Lubų planas" / dropped-ceiling zones + light fixtures → ceiling_plan
 - "Sienų išklotinė" / vertical wall view + tile zones → wall_elevation
+- "Pjūvis" / vertical building cross-section with `±0.000`/`+2.800`
+  level markers → section  (canonical source for ceiling slab heights)
 - "Rozečių/apšvietimo planas" / electrical symbols → electrical
 - "Santechnikos planas" / plumbing fixtures → plumbing
 - "Patalpų eksplikacija" / room schedule table → eksplikacija
