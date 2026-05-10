@@ -1,0 +1,123 @@
+{
+  "pdf_id": "projektas_p2",
+  "pdf_hash": "",
+  "project_type": "interior_finishing",
+  "city": "",
+  "floor_area_m2": 0,
+  "vat_mode": "be_pvm",
+  "lines": [
+    {
+      "code": "glaistymas_dazymas_bundle",
+      "label_lt": "Sienų + lubų glaistymas + dažymas (bundled)",
+      "unit": "m²",
+      "quantity": 388.01,
+      "unit_price_eur_be_pvm": 14.0,
+      "bundled_group": "glaistymas_dazymas",
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "plyteles_sienos_m2",
+      "label_lt": "Plytelių klijavimas sienoms",
+      "unit": "m²",
+      "quantity": 55.27,
+      "unit_price_eur_be_pvm": 22.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "plyteles_grindys_m2",
+      "label_lt": "Plytelių klijavimas grindims",
+      "unit": "m²",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 14.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "grindys_laminatas_m2",
+      "label_lt": "Grindų danga (laminatas/parketas/vinilas)",
+      "unit": "m²",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 7.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "pasleptu_duru_kompl",
+      "label_lt": "Paslėptos durys (komplektas)",
+      "unit": "kompl",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 250.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "lubos_virs_3m_m2",
+      "label_lt": "Lubų darbai virš 3m",
+      "unit": "m²",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 18.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "grindjuostes_m",
+      "label_lt": "Grindjuostės",
+      "unit": "m",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 5.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "angokrasciai_gkp_m",
+      "label_lt": "Angokraščių apdaila GKP",
+      "unit": "m",
+      "quantity": 34.53,
+      "unit_price_eur_be_pvm": 12.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "hidroizoliacija_m2",
+      "label_lt": "Hidroizoliacija",
+      "unit": "m²",
+      "quantity": 0.0,
+      "unit_price_eur_be_pvm": 10.0,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    },
+    {
+      "code": "silikonas_m",
+      "label_lt": "Silikonavimas",
+      "unit": "m",
+      "quantity": 38.15,
+      "unit_price_eur_be_pvm": 2.5,
+      "bundled_group": null,
+      "verified_by": "samatininkas (parsed_pasiulymai/P2)",
+      "notes": ""
+    }
+  ],
+  "_unmatched_count": 30,
+  "_unmatched_sample": [
+    "m2       GKP monatavimas ant lubų, įrengiant dvigubą karkasą",
+    "m        Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)",
+    "vnt      Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti (dviguba)",
+    "vnt      Smulkūs papildomi darbai",
+    "m        Dažymo kampų montavimas",
+    "m        Durų angos į rūbinę glaistymas dažymas",
+    "vnt      Priglaistomo plyšinio difūzoriaus apdirbimas",
+    "m        Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+    "vnt      Nuolydžio formavimas dušo kabinoje",
+    "vnt      Skylių gręžimas plytelėse"
+  ]
+}
