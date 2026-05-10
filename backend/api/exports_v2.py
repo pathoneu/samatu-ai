@@ -22,9 +22,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
-from backend.api.corrections_v2 import load_correction_events
-from backend.extractor.audit_trail import audit_trail_rows
-from backend.extractor.f2_export import (
+from api.corrections_v2 import load_correction_events
+from extractor.audit_trail import audit_trail_rows
+from extractor.f2_export import (
     build_f2_export,
     export_to_csv,
 )
