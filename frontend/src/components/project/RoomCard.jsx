@@ -154,6 +154,10 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
   const plytSienos = room.plyteles_sienos_m2 || 0;
   const plytGrindys = room.plyteles_grindys_m2 || 0;
   const grindjuostes = room.grindjuostes_m || 0;
+  const angokrasciaiM2 = room.angokrasciai_m2 || 0;
+  const angokrasciaiLm = room.angokrasciai_lm || 0;
+  const pasleptosKompl = room.pasleptu_duru_kompl || 0;
+  const pasleptosStaktosM = room.pasleptu_duru_staktu_m || 0;
   const isHigh = (room.lubu_aukstis_m || 2.82) > 3.0;
 
   return (
@@ -328,6 +332,26 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
             <div className="flex justify-between">
               <span className="text-stone-600">Grindjuostės</span>
               <span className="font-medium text-stone-800">{grindjuostes.toFixed(2)} m</span>
+            </div>
+          )}
+          {angokrasciaiM2 > 0 && (
+            <div className="flex justify-between">
+              <span className="text-stone-600" title="Langų ir durų angokraščiai (apdailai)">
+                Angokraščiai
+              </span>
+              <span className="font-medium text-stone-800">
+                {angokrasciaiM2.toFixed(2)} m² <span className="text-stone-400 text-xs">({angokrasciaiLm.toFixed(2)} m)</span>
+              </span>
+            </div>
+          )}
+          {pasleptosKompl > 0 && (
+            <div className="flex justify-between">
+              <span className="text-stone-600" title="Paslėptos durys (be matomos staktos)">
+                Paslėptos durys
+              </span>
+              <span className="font-medium text-stone-800">
+                {pasleptosKompl} kompl. <span className="text-stone-400 text-xs">({pasleptosStaktosM.toFixed(2)} m staktų)</span>
+              </span>
             </div>
           )}
         </div>

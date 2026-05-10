@@ -347,6 +347,17 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     return rooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
   }, [project]);
 
+  // Project-wide hidroizoliacijos plotas. Backend stores it on every room
+  // (denormalized so any /recompute response carries it); read once.
+  const projectHidroM2 = useMemo(() => {
+    const rooms = project.v8_rooms || project.patalpos || [];
+    for (const r of rooms) {
+      const v = r._project_hidroizoliacija_m2;
+      if (typeof v === 'number' && v > 0) return v;
+    }
+    return 0;
+  }, [project]);
+
   const handleRowChange = (idx, newItem) => {
     const updated = [...darbai];
     updated[idx] = newItem;
@@ -419,6 +430,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 <span><span className="tabular font-medium text-foreground">{(project.v8_rooms || project.patalpos || []).length}</span> patalpų</span>
                 <span><span className="tabular font-medium text-foreground">{fmt(totalArea)}</span> m²</span>
                 <span><span className="tabular font-medium text-foreground">{totals.count}</span> pozicijų</span>
+                {projectHidroM2 > 0 && (
+                  <span title="Hidroizoliacijos plotas (visi šlapieji kambariai sumoje)">
+                    <span className="tabular font-medium text-foreground">{fmt(projectHidroM2)}</span> m² hidroiz.
+                  </span>
+                )}
               </div>
             </div>
 

@@ -13,12 +13,27 @@ caller's downstream merge is a no-op.
 See spec §4.3 verify_pass.py + parent spec §10 risk register.
 """
 from __future__ import annotations
+import json
 import logging
 import os
 from dataclasses import dataclass, field
+
+import anthropic
+
 from extractor.feature_flags import get_flags
+from extractor.prompt import MODEL
 
 log = logging.getLogger(__name__)
+
+_VERIFY_SYSTEM = (
+    "You are a senior Lithuanian construction estimator (LT samatininkas) "
+    "performing an advisory verification pass. Reply ONLY with strict JSON "
+    "matching the schema {\"corrections\": [{\"pozicija_id\": str, "
+    "\"suggested_value\": number, \"reason\": str, "
+    "\"confidence\": \"high\"|\"med\"|\"low\"}]}. No prose, no markdown, "
+    "no code fences. If everything looks reasonable return "
+    "{\"corrections\": []}. Be conservative — only flag genuine errors."
+)
 
 
 @dataclass
@@ -27,15 +42,50 @@ class VerifyResult:
     error: str | None = None
 
 
-def _call_opus(prompt: str) -> dict:
-    """Invoke Anthropic Opus 4.7 with the verify prompt. Returns parsed
-    JSON response with `corrections[]` key.
+def _extract_text(message) -> str:
+    """Concatenate text blocks from an Anthropic Messages response."""
+    return "".join(
+        getattr(b, "text", "") for b in (message.content or [])
+        if getattr(b, "type", None) == "text"
+    )
 
-    Stub for Sprint 3 — Sprint 4 wires the actual SDK call. Tests patch
-    this function directly. Real call uses the existing `extractor.stream`
-    helper or anthropic SDK client.
+
+def _call_opus(prompt: str) -> dict:
+    """Invoke Opus 4.7 with the verify prompt. Returns the parsed JSON
+    response (always a dict; missing `corrections` defaults to []).
+
+    Tests patch this function directly. The real call goes through the
+    same anthropic SDK client used everywhere else in the extractor;
+    output is constrained to the response schema by the system prompt
+    and parsed defensively (model may emit a fenced block on rare bad
+    days even after being told not to).
     """
-    raise NotImplementedError("verify_pass real call wires in Sprint 4")
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY not set; cannot run verify_pass live."
+        )
+    client = anthropic.Anthropic()
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=4096,
+        system=[{"type": "text", "text": _VERIFY_SYSTEM,
+                 "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = _extract_text(resp).strip()
+    # Strip ```json fences if the model added them despite the system prompt.
+    if text.startswith("```"):
+        first_nl = text.find("\n")
+        if first_nl != -1:
+            text = text[first_nl + 1 :]
+        if text.endswith("```"):
+            text = text[: -3]
+        text = text.strip()
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise ValueError(f"verify_pass response is not a JSON object: {type(parsed)!r}")
+    parsed.setdefault("corrections", [])
+    return parsed
 
 
 def _build_prompt(rooms: list[dict], pozicijos: list[dict]) -> str:
