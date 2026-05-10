@@ -186,6 +186,9 @@ from api.lasso_rerun import router as lasso_rerun_router
 # Week 5 Task 5.1 + 5.4 (canonical plan): per-quantity corrections + legends D4
 from api.corrections_v2 import router as corrections_v2_router
 from api.legends import router as legends_router
+# Week 7 (canonical plan): F2/F3 export + billing gate stub
+from api.exports_v2 import router as exports_v2_router
+from api.billing_v2 import router as billing_v2_router
 
 load_dotenv()
 
@@ -308,6 +311,8 @@ app.include_router(vision_fill_router)
 app.include_router(lasso_rerun_router)
 app.include_router(corrections_v2_router)
 app.include_router(legends_router)
+app.include_router(exports_v2_router)
+app.include_router(billing_v2_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
