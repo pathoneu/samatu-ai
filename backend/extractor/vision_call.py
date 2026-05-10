@@ -1075,9 +1075,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         kampai_vidiniai = round(kampai_total * 0.7, 2)
         kampai_isoriniai = round(kampai_total * 0.3, 2)
         pozicijos.extend([
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai (perimetras + lubų-sienų ribos)",
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai",
              "vnt": "m", "kiekis": kampai_vidiniai, "saltinis": SAL},
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai (angokraščiai + nišos)",
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai",
              "vnt": "m", "kiekis": kampai_isoriniai, "saltinis": SAL,
              "medziagos_aprasymas": "PVC kampuotės",
              "medziagos_kiekis": kampai_isoriniai, "medziagos_vnt": "m"},
@@ -1127,7 +1127,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
         pozicijos.append({
-            "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas (langai + durys)",
+            "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas",
             "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
         })
         # P2 fix: GKP skyriaus eilutė (struktūrinis darbas — angokraščio formavimas).
