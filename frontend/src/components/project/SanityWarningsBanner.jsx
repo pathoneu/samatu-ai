@@ -10,7 +10,9 @@
  */
 
 import { useState, useMemo } from 'react';
-import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, RefreshCw } from 'lucide-react';
+
+import { revalidateProject } from '../../lib/revalidateApi';
 
 const LEVEL_META = {
   ERROR:   { icon: AlertCircle,   color: 'text-red-700 bg-red-50 border-red-200',   label: 'Klaidos',     order: 0 },
@@ -40,9 +42,11 @@ function warningKey(w) {
   return `${w.level}|${w.room || ''}|${w.field || ''}|${(w.message || '').slice(0, 100)}`;
 }
 
-export default function SanityWarningsBanner({ sanity }) {
+export default function SanityWarningsBanner({ sanity, projectId, onRevalidated }) {
   const [dismissed, setDismissed] = useState(loadDismissed);
   const [expandedGroups, setExpandedGroups] = useState({ ERROR: true, WARNING: true, INFO: false });
+  const [revalidating, setRevalidating] = useState(false);
+  const [revalidateError, setRevalidateError] = useState(null);
 
   if (!sanity || !sanity.warnings || sanity.warnings.length === 0) return null;
 
@@ -105,13 +109,43 @@ export default function SanityWarningsBanner({ sanity }) {
     (a, b) => (LEVEL_META[a]?.order ?? 99) - (LEVEL_META[b]?.order ?? 99)
   );
 
+  const handleRevalidate = async () => {
+    if (!projectId || revalidating) return;
+    setRevalidating(true);
+    setRevalidateError(null);
+    try {
+      const fresh = await revalidateProject(projectId);
+      onRevalidated?.(fresh);
+    } catch (err) {
+      setRevalidateError(err.message || 'Nepavyko atnaujinti');
+    } finally {
+      setRevalidating(false);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>AI patikrinimas: <strong className="text-foreground">{active.length}</strong> aktyvūs įspėjimai</span>
         <span>·</span>
         <span>{summary.rooms_count} patalpų, {summary.total_area_m2} m²</span>
+        {projectId && (
+          <button
+            onClick={handleRevalidate}
+            disabled={revalidating}
+            className="ml-auto inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 underline disabled:opacity-50 disabled:no-underline"
+            title="Iš naujo paleisti AI patikrinimus su naujausia validatoriaus versija"
+          >
+            <RefreshCw className={`w-3 h-3 ${revalidating ? 'animate-spin' : ''}`} />
+            {revalidating ? 'Atnaujinama…' : 'Atnaujinti AI patikrinimus'}
+          </button>
+        )}
       </div>
+      {revalidateError && (
+        <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+          {revalidateError}
+        </div>
+      )}
 
       {sortedLevels.map(level => {
         const meta = LEVEL_META[level] || LEVEL_META.INFO;

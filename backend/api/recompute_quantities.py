@@ -126,7 +126,43 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                 # raise during a UI-driven assumption tweak.
                 pass
 
+        # Wire Week 2 line_items helpers (angokraščiai_m², hidden door frames,
+        # real hidroizoliacija m²) into the response so the recompute path
+        # surfaces the missing line items the canonical plan added back. These
+        # helpers are deterministic + tested; before this hook they only ever
+        # ran inside isolated unit tests.
+        try:
+            from extractor.line_items import (
+                opening_reveal_lm, opening_reveal_area_m2,
+                hidden_door_count, hidden_door_frame_lm,
+            )
+            wall_thickness = float(assumptions.get("sienos_storis_m") or 0.10)
+            window_sides = int(assumptions.get("window_sides") or 3)
+            openings = room.get("elementai") or []
+            room["angokrasciai_lm"] = opening_reveal_lm(openings, window_sides=window_sides)
+            room["angokrasciai_m2"] = opening_reveal_area_m2(
+                openings, wall_thickness_m=wall_thickness, window_sides=window_sides,
+            )
+            room["pasleptu_duru_kompl"] = hidden_door_count(openings)
+            room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings)
+        except Exception:
+            # Don't block the recompute on a helper hiccup.
+            pass
+
         out.append(room)
+
+    # Also surface the project-wide hidroizoliacija m² (was a wet-room count
+    # before the Week 2 fix; now actual square metres per STR 2.04.01).
+    try:
+        from extractor.line_items import hidroizoliacija_m2
+        hidro_total, hidro_warns = hidroizoliacija_m2(out)
+        for r in out:
+            r["_project_hidroizoliacija_m2"] = hidro_total
+            if hidro_warns:
+                r["_project_hidroizoliacija_warnings"] = hidro_warns
+    except Exception:
+        pass
+
     return out
 
 

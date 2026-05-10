@@ -445,7 +445,18 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
 
       {/* LT sanity warnings — Sprint 2: vartotojas mato kur AI gali būti suklydęs */}
       {project.lt_sanity && (
-        <SanityWarningsBanner sanity={project.lt_sanity} />
+        <SanityWarningsBanner
+          sanity={project.lt_sanity}
+          projectId={project.id}
+          onRevalidated={(fresh) => {
+            // Backend returns a partial project (lt_sanity, patalpos,
+            // warnings_count) — merge so we keep v8_rooms and other state.
+            const next = { ...project };
+            if (fresh.lt_sanity) next.lt_sanity = fresh.lt_sanity;
+            if (Array.isArray(fresh.patalpos)) next.patalpos = fresh.patalpos;
+            onProjectChange?.(next);
+          }}
+        />
       )}
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">

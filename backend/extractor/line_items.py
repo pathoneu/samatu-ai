@@ -48,15 +48,40 @@ def _as_float(value, default: float = 0.0) -> float:
     return f
 
 
+_LT_TO_EN_OPENING_TYPE = {
+    "duris": "door",
+    "durys": "door",
+    "pasleptos_duris": "hidden_door",
+    "pasleptos_durys": "hidden_door",
+    "paslepta_duris": "hidden_door",
+    "paslepta_durys": "hidden_door",
+    "hidden_door": "hidden_door",
+    "langas": "window",
+    "stoglangis": "window",
+    "window": "window",
+    "door": "door",
+}
+
+
 def _opening_type(op) -> str:
-    return (_get(op, "type") or _get(op, "tipas") or "unknown").lower()
+    raw = (_get(op, "type") or _get(op, "tipas") or "unknown").lower()
+    return _LT_TO_EN_OPENING_TYPE.get(raw, raw)
 
 
 def _opening_dims(op) -> tuple[float, float, int]:
     """Return (width_m, height_m, count) with LT default fallbacks per type."""
     t = _opening_type(op)
+    # Accept metres OR millimetres (Vision returns plotis_mm/aukstis_mm).
     w = _get(op, "width_m") or _get(op, "plotis_m")
     h = _get(op, "height_m") or _get(op, "aukstis_m")
+    if w is None:
+        mm = _get(op, "width_mm") or _get(op, "plotis_mm")
+        if mm:
+            w = _as_float(mm) / 1000.0
+    if h is None:
+        mm = _get(op, "height_mm") or _get(op, "aukstis_mm")
+        if mm:
+            h = _as_float(mm) / 1000.0
     count = int(_get(op, "count") or _get(op, "kiekis") or 1)
     if t in ("door", "hidden_door"):
         return (
