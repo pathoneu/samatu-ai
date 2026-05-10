@@ -62,7 +62,13 @@ def main() -> int:
         gt = _load_lines(gt_file)
         pred = _load_lines(pred_file)
         err = eur_weighted_error(pred, gt)
-        rows.append({"pdf_id": pdf_id, "status": "ok", "error": err})
+        err_in_scope = eur_weighted_error(pred, gt, in_scope_only=True)
+        rows.append({
+            "pdf_id": pdf_id,
+            "status": "ok",
+            "error": err,
+            "error_in_scope": err_in_scope,
+        })
         for impact in per_line_eur_impact(pred, gt)[:5]:
             aggregate_misses[impact["code"]] = (
                 aggregate_misses.get(impact["code"], 0.0) + impact["abs_eur_impact"]
@@ -70,15 +76,32 @@ def main() -> int:
 
     with out_path.open("w", encoding="utf-8") as f:
         f.write("# EUR-weighted benchmark report\n\n")
-        f.write("| PDF | Status | EUR-weighted error |\n|---|---|---|\n")
+        f.write("| PDF | Status | All-codes error | In-scope error |\n"
+                "|---|---|---|---|\n")
         ok_rows = [r for r in rows if r["status"] == "ok"]
         for r in rows:
-            err = r["error"]
-            err_text = f"{err*100:.1f}%" if err is not None else "—"
-            f.write(f"| {r['pdf_id']} | {r['status']} | {err_text} |\n")
+            if r["status"] != "ok":
+                f.write(f"| {r['pdf_id']} | {r['status']} | — | — |\n")
+                continue
+            f.write(
+                f"| {r['pdf_id']} | ok "
+                f"| {r['error']*100:.1f}% "
+                f"| {r['error_in_scope']*100:.1f}% |\n"
+            )
         if ok_rows:
-            mean_err = sum(r["error"] for r in ok_rows) / len(ok_rows)
-            f.write(f"\n**Mean across {len(ok_rows)} PDFs: {mean_err*100:.1f}%**\n")
+            mean_all = sum(r["error"] for r in ok_rows) / len(ok_rows)
+            mean_scope = sum(r["error_in_scope"] for r in ok_rows) / len(ok_rows)
+            f.write(
+                f"\n**Mean across {len(ok_rows)} PDFs:** "
+                f"all-codes {mean_all*100:.1f}% · "
+                f"**in-scope {mean_scope*100:.1f}%** "
+                f"(target ≤ 8% per R4)\n"
+            )
+            f.write(
+                "\n_In-scope counts only codes where GT > 0. Use this when "
+                "samatininkas bid only a partial scope; otherwise the metric "
+                "explodes on every category they didn't price._\n"
+            )
 
         if aggregate_misses:
             f.write("\n## Top EUR misses across corpus (sum of abs deltas)\n\n")

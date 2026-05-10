@@ -32,11 +32,18 @@ def eur_weighted_error(
     pred: dict[str, float],
     gt: dict[str, float],
     prices_config: dict | None = None,
+    in_scope_only: bool = False,
 ) -> float:
     """Return EUR-weighted absolute percentage error in 0..1+ range.
 
     `prices_config` defaults to the on-disk LT prices fixture; tests pass a
     dict directly.
+
+    `in_scope_only=True` restricts comparison to codes where GT quantity > 0.
+    Prevents the metric from exploding when samatininkas bid only a partial
+    scope (e.g. glaistymas-only) but the AI extracted full project. The
+    out-of-scope predictions are still surfaced via per_line_eur_impact for
+    audit, just not summed into the score.
     """
     cfg = prices_config or load_prices()
     weights: dict[str, float] = cfg["weights"]
@@ -53,6 +60,8 @@ def eur_weighted_error(
             continue
         gt_qty = float(gt.get(code, 0))
         pred_qty = float(pred.get(code, 0))
+        if in_scope_only and gt_qty == 0:
+            continue
         weighted_err += abs(pred_qty - gt_qty) * price * weight
         weighted_total += gt_qty * price * weight
     if weighted_total == 0:

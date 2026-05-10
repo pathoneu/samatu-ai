@@ -1105,16 +1105,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             opening_area = W * H if (W > 0 and H > 0) else 0
             if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
                 if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
-                    # 2026-05-06 formula audit: window/skylight reveals are
-                    # 4 sides (top + bottom palangė + 2 šonai) → 2H + 2W.
-                    # Doors are 3 sides (top + 2 šonai, no bottom — yra
-                    # slenkstis) → 2H + W. CLAUDE.md §1.2 had this wrong
-                    # for windows (29% undercount). Sources: RICS NRM2 §29.10,
-                    # DIN 18363 §4.2.4. Audit: docs/formulas/2026-05-06-formula-audit.md.
-                    if tipas == "duris":
-                        angokrasciai_m += (2 * H + W) * kiekis
-                    else:
-                        angokrasciai_m += (2 * H + 2 * W) * kiekis
+                    # 3-sided for ALL openings: top + 2 šonai → 2H + W.
+                    # Doors don't have a bottom reveal (slenkstis = the
+                    # threshold/floor). Windows DO have a bottom but in LT
+                    # samatininkų convention it's priced separately as
+                    # palangė (window sill line item) — so the bundle
+                    # angokraščiai_glaistymas-dažymas line stays 3-sided.
+                    # Reverted from 2026-05-06's 4-sided window formula
+                    # after benchmark P1+P2 showed +115% / +60% over-count
+                    # against samatininkų pasiūlymai (€4.4k aggregate
+                    # corpus EUR impact). See reports/benchmark/findings_
+                    # 2026-05-10.md issue #2.
+                    angokrasciai_m += (2 * H + W) * kiekis
             if tipas == "pasleptos_duris" and W > 0 and H > 0:
                 # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
                 # paruošimo nepriklausomai nuo size threshold (LT-specific
@@ -2662,6 +2664,24 @@ def extract_interior(
     # Step 6: Attach rules_override for downstream UI use
     if rules_override is not None:
         parsed["_overrides"] = rules_override
+
+    # Step 6.5: Optional verify pass (gated by ENABLE_VERIFY_PASS).
+    # Runs Opus on the Pass-1 result, asks "what would you disagree with?".
+    # Result is ADVISORY — never auto-applied; surfaced to UI as suggestions.
+    # When the flag is OFF (default), this returns empty corrections fast.
+    try:
+        from .verify_pass import run_verify_pass
+        verify = run_verify_pass(
+            rooms=parsed.get("patalpos") or [],
+            pozicijos=parsed.get("pozicijos") or [],
+        )
+        parsed["_verify_pass"] = {
+            "corrections": verify.corrections,
+            "error": verify.error,
+        }
+    except Exception as exc:
+        # Never break extraction over an advisory pass.
+        parsed["_verify_pass"] = {"corrections": [], "error": str(exc)}
 
     # Step 7: Finalize
     elapsed = round(time.time() - t0, 1)
