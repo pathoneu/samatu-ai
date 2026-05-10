@@ -85,6 +85,21 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                                   "glaistas_kg", "gruntas_l"):
                             if k in recalc:
                                 room[k] = recalc[k]
+                        # Regenerate the human-readable trace so it matches
+                        # the new H (Playwright regression 2026-05-10).
+                        existing = room.get("elementai") or []
+                        n_doors = sum(int(e.get("kiekis") or 1) for e in existing
+                                      if (e.get("tipas") or "").lower().startswith("dur"))
+                        n_windows = sum(int(e.get("kiekis") or 1) for e in existing
+                                        if (e.get("tipas") or "").lower().startswith("lang"))
+                        perim = float(room.get("perimetras_m") or 0)
+                        room["calculation_trace"] = (
+                            f"perim({perim:.2f}) × H({new_h:.2f}) = "
+                            f"{perim * new_h:.2f} m² "
+                            f"− {n_windows} lang./{n_doors} dur. atimimai → "
+                            f"dažymas {room.get('dazymo_plotas_m2', 0):.2f} m². "
+                            f"Skaičiavo Python (deterministinis)."
+                        )
                     except Exception:
                         pass
             except (ValueError, TypeError):
@@ -93,6 +108,24 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
         ceiling = float(room.get("lubu_dazomas_plotas_m2", 0) or room.get("ceiling_paintable_m2", 0) or 0)
         room["dazai_l"] = round(walls * absorption / cov_walls, 2) if walls else 0.0
         room["dazai_luboms_l"] = round(ceiling * absorption / cov_ceil, 2) if ceiling else 0.0
+
+        # Recompute glaistas_kg from glaistimo_lygis (Q1-Q4) if assumption set.
+        # Playwright regression 2026-05-10: the Q-toggle in Prielaidos was
+        # saving glaistimo_lygis but never recomputing the putty kg, so the
+        # UI buttons looked dead. CLAUDE.md §1.11 owns the canonical
+        # consumption table; vision_call._calc_glaistas_kg implements it.
+        q_level = assumptions.get("glaistimo_lygis")
+        if q_level:
+            try:
+                from extractor.vision_call import _calc_glaistas_kg
+                dazymo = float(room.get("dazymo_plotas_m2") or 0)
+                if dazymo > 0:
+                    room["glaistas_kg"] = _calc_glaistas_kg(dazymo, str(q_level))
+            except Exception:
+                # Recompute is best-effort — leave the prior value rather than
+                # raise during a UI-driven assumption tweak.
+                pass
+
         out.append(room)
     return out
 
