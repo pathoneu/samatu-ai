@@ -12,14 +12,14 @@ import pytest  # noqa: E402
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import backend.api.legends as legends  # noqa: E402
+import api.legends as legends  # noqa: E402
 
 
 @pytest.fixture
 def client(tmp_path: Path):
     with patch.object(legends, "LEGENDS_DIR", tmp_path), \
          patch.object(legends, "ARCHITECT_DIR", tmp_path / "architect"):
-        from backend.main import app
+        from main import app
         yield TestClient(app)
 
 

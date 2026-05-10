@@ -9,12 +9,12 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from backend.extractor.page_classifier import (  # noqa: E402
+from extractor.page_classifier import (  # noqa: E402
     PageType,
     PageClassification,
     parse_classification,
 )
-from backend.extractor.prompts import PROMPTS_BY_PAGE_TYPE  # noqa: E402
+from extractor.prompts import PROMPTS_BY_PAGE_TYPE  # noqa: E402
 
 
 def test_all_page_types_present():
@@ -54,7 +54,7 @@ def test_routing_table_covers_six_specialized_pages():
 
 
 def test_all_specialized_prompts_share_base_rules():
-    from backend.extractor.prompts.base_system import BASE_RULES
+    from extractor.prompts.base_system import BASE_RULES
     for name, prompt in PROMPTS_BY_PAGE_TYPE.items():
         assert BASE_RULES[:60] in prompt, f"{name} prompt missing base rules"
 

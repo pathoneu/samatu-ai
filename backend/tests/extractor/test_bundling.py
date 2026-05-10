@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from backend.extractor.bundling import (  # noqa: E402
+from extractor.bundling import (  # noqa: E402
     collapse_to_bundled,
     expand_to_q_level,
     BUNDLE_GLAISTYMAS_DAZYMAS,

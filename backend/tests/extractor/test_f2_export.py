@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor.f2_export import (  # noqa: E402
+from extractor.f2_export import (  # noqa: E402
     build_f2_rows,
     build_f2_export,
     export_to_csv,

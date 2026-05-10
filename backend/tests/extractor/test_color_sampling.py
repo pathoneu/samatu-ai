@@ -9,7 +9,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor.color_sampling import (  # noqa: E402
+from extractor.color_sampling import (  # noqa: E402
     sample_dominant_color,
     classify_against_legend,
     lab_distance,

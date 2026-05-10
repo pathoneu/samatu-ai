@@ -21,10 +21,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from backend.extractor.universal_rules import room_aukstas_from_nr  # noqa: E402
+from extractor.universal_rules import room_aukstas_from_nr  # noqa: E402
 
 
 # ── LT compound notation: room.floor ────────────────────────────────────────

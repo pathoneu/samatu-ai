@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 # Patch the module-level CORRECTIONS_DIR before app import so each test
 # gets its own filesystem-backed state without poisoning real data.
-import backend.api.corrections_v2 as corrections_v2  # noqa: E402
+import api.corrections_v2 as corrections_v2  # noqa: E402
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def client(tmp_path: Path):
     with patch.object(corrections_v2, "CORRECTIONS_DIR", tmp_path):
         # Re-import main only after the patch is active so it sees the
         # tmp dir. (TestClient builds the app fresh.)
-        from backend.main import app
+        from main import app
         yield TestClient(app)
 
 

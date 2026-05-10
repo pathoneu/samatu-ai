@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor.scale_validator import (  # noqa: E402
+from extractor.scale_validator import (  # noqa: E402
     validate_scale_by_doors,
     ScaleValidationResult,
 )

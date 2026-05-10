@@ -8,8 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor import legend_injection  # noqa: E402
-from backend.extractor.prompts.floor_plan import FLOOR_PLAN_PROMPT  # noqa: E402
+from extractor import legend_injection  # noqa: E402
+from extractor.prompts.floor_plan import FLOOR_PLAN_PROMPT  # noqa: E402
 
 
 def test_module_has_no_hardcoded_color_semantics():

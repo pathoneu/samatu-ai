@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from backend.extractor.benchmark.eur_weighted import (  # noqa: E402
+from extractor.benchmark.eur_weighted import (  # noqa: E402
     eur_weighted_error,
     per_line_eur_impact,
     load_prices,

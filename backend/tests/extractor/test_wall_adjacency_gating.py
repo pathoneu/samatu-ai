@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import backend.extractor.wall_adjacency as wa  # noqa: E402
+import extractor.wall_adjacency as wa  # noqa: E402
 
 
 def _square(x, y, size):

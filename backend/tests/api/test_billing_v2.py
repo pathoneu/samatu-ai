@@ -11,7 +11,7 @@ import pytest  # noqa: E402
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend.main import app  # noqa: E402
+from main import app  # noqa: E402
 
 client = TestClient(app)
 

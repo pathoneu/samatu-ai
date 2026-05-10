@@ -4,12 +4,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest  # noqa: E402
 
-from backend.extractor.line_items import (  # noqa: E402
+from extractor.line_items import (  # noqa: E402
     opening_reveal_lm,
     opening_reveal_area_m2,
     plaster_corners_lm,

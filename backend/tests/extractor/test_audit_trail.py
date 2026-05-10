@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor.audit_trail import (  # noqa: E402
+from extractor.audit_trail import (  # noqa: E402
     audit_trail_rows,
     audit_history_strings,
 )

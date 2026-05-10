@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.extractor.wall_graph import build_wall_graph  # noqa: E402
+from extractor.wall_graph import build_wall_graph  # noqa: E402
 
 
 def _square(x, y, size):
