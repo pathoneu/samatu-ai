@@ -22,6 +22,11 @@ httpx>=0.27
 opencv-python-headless==4.10.0.84
 numpy>=1.26.0
 
+# Drawing analysis tools (Task 1) — fast PDF rasterization for the CV
+# render cache. pypdfium2 is the same engine browsers use, ~3× faster
+# than pdf2image+poppler for the dpi/grayscale path. Apache 2.0 / BSD.
+pypdfium2>=4.30
+
 # pyyaml — used by detector_bench/ ground_truth files (read-only at runtime).
 # replicate dep removed 2026-05-07 — Pipeline 5 (GroundingDINO) abandoned;
 # detector_bench/detectors/p5_grounding_dino.py kept for future retest but
