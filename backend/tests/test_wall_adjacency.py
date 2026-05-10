@@ -1,9 +1,29 @@
-"""Sprint 2 wall_adjacency: deterministic shared-edge detection from polygon_pct."""
+"""Sprint 2 wall_adjacency: deterministic shared-edge detection from polygon_pct.
+
+2026-05-10 (Week 1 Task 1.4): tests that lock the LEGACY half-subtract
+behavior must explicitly enable `ENABLE_LEGACY_HALF_SUBTRACT=1` and reload
+the module so the runtime flag re-reads from env. Default behavior leaves
+`perimetras_m` unchanged because interior finishes need both wall faces.
+"""
+import importlib
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import pytest
 from extractor.wall_adjacency import (
     polygon_to_segments, segments_overlap_length, shared_edges_between,
     apply_shared_edges,
 )
+
+
+def _reload_legacy_on():
+    for modname in ("extractor.wall_adjacency", "backend.extractor.wall_adjacency"):
+        if modname in sys.modules:
+            importlib.reload(sys.modules[modname])
 
 
 def test_polygon_to_segments_closes_polygon():
@@ -63,23 +83,23 @@ def test_shared_edges_partial_overlap():
     assert shared_edges_between(a, b) == pytest.approx(0.5)
 
 
-def test_apply_shared_edges_subtracts_half_per_pair():
-    # Two adjacent rooms each with naive perimetras = 4 (unit square scaled to 5m × 5m page).
-    # Page is 10m × 10m, so 1 pct unit = 10m. Each side of unit square = 1 pct = 10m.
-    # Naive perimetras_m for each room = 4 × (1 pct × 10m/pct) = 40m? No — too coarse.
-    # Use a smaller example: page 1m × 1m, each room is 0.5×0.5 pct, adjacent.
+def test_apply_shared_edges_subtracts_half_per_pair(monkeypatch):
+    """Locks the LEGACY half-subtract path. Default behavior leaves
+    `perimetras_m` unchanged (Week 1 Task 1.4)."""
+    monkeypatch.setenv("ENABLE_LEGACY_HALF_SUBTRACT", "1")
+    _reload_legacy_on()
+    from extractor.wall_adjacency import apply_shared_edges as _apply
     rooms = [
         {"name": "A", "polygon_pct": [(0.0, 0.0), (0.0, 0.5), (0.5, 0.5), (0.5, 0.0)],
-         "perimetras_m": 2.0},  # 4 sides × 0.5 page-pct × 1m/page-pct = 2m
+         "perimetras_m": 2.0},
         {"name": "B", "polygon_pct": [(0.5, 0.0), (0.5, 0.5), (1.0, 0.5), (1.0, 0.0)],
          "perimetras_m": 2.0},
     ]
-    out = apply_shared_edges(rooms, page_width_m=1.0, page_height_m=1.0)
-    # They share a 0.5 pct edge = 0.5m. Each room loses HALF (0.25m) per shared edge.
-    # → corrected perimetras = 2.0 - 0.25 = 1.75 each.
+    out = _apply(rooms, page_width_m=1.0, page_height_m=1.0)
+    # Shared 0.5 pct edge = 0.5m. Each room loses HALF (0.25m) per shared edge.
     assert out[0]["perimetras_m"] == pytest.approx(1.75)
     assert out[1]["perimetras_m"] == pytest.approx(1.75)
-    assert out[0]["perimetras_saltinis"] == "polygon_adjacency"
+    assert out[0]["perimetras_saltinis"] == "polygon_adjacency_legacy"
     assert out[0]["perimetras_orig_m"] == pytest.approx(2.0)
 
 
@@ -96,18 +116,19 @@ def test_apply_shared_edges_skips_when_polygon_missing():
     assert out[0].get("perimetras_saltinis") != "polygon_adjacency"
 
 
-def test_apply_shared_edges_anisotropic_page_dimensions():
-    # Page is 2m wide × 1m tall. The horizontal edge (Δx=1.0 pct) maps to 2m,
-    # vertical edge (Δy=1.0 pct) maps to 1m. Apply_shared_edges must use the
-    # correct axis scale, not a single page-extent.
+def test_apply_shared_edges_anisotropic_page_dimensions(monkeypatch):
+    """Anisotropic page metric scaling — locked behind the LEGACY flag."""
+    monkeypatch.setenv("ENABLE_LEGACY_HALF_SUBTRACT", "1")
+    _reload_legacy_on()
+    from extractor.wall_adjacency import apply_shared_edges as _apply
     rooms = [
         {"name": "A", "polygon_pct": [(0.0, 0.0), (0.0, 1.0), (0.5, 1.0), (0.5, 0.0)],
-         "perimetras_m": 6.0},  # 0.5*2 + 1*1 + 0.5*2 + 1*1 = 4 — but say Vision said 6
+         "perimetras_m": 6.0},
         {"name": "B", "polygon_pct": [(0.5, 0.0), (0.5, 1.0), (1.0, 1.0), (1.0, 0.0)],
          "perimetras_m": 6.0},
     ]
-    out = apply_shared_edges(rooms, page_width_m=2.0, page_height_m=1.0)
-    # Shared edge is vertical (axis "v") at x=0.5, length=1.0 pct → 1.0m metric.
+    out = _apply(rooms, page_width_m=2.0, page_height_m=1.0)
+    # Shared edge is vertical at x=0.5, length=1.0 pct → 1.0m metric.
     # Each room loses half = 0.5m.
     assert out[0]["perimetras_m"] == pytest.approx(5.5)
     assert out[1]["perimetras_m"] == pytest.approx(5.5)
