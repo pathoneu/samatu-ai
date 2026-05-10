@@ -183,6 +183,9 @@ from api.recompute_quantities import router as recompute_router
 from api.telemetry import router as telemetry_router
 from api.vision_fill import router as vision_fill_router
 from api.lasso_rerun import router as lasso_rerun_router
+# Week 5 Task 5.1 + 5.4 (canonical plan): per-quantity corrections + legends D4
+from api.corrections_v2 import router as corrections_v2_router
+from api.legends import router as legends_router
 
 load_dotenv()
 
@@ -303,6 +306,8 @@ app.include_router(recompute_router)
 app.include_router(telemetry_router)
 app.include_router(vision_fill_router)
 app.include_router(lasso_rerun_router)
+app.include_router(corrections_v2_router)
+app.include_router(legends_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
