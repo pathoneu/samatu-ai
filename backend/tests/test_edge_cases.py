@@ -91,7 +91,11 @@ def test_nrm2_q4_class3_combined():
     rooms = [{
         "nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia",
         "plotas_m2": 8.0, "perimetras_m": 12.0, "lubu_aukstis_m": 2.65,
-        "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.4,
+        # Tile to 1.5m only — full-height 2.4m tiles + default 1 door +
+        # 1 window deductions take walls_net below zero (clamped) → no
+        # šlifavimas pozicija fires. Pre-2026-05-10 calc ignored
+        # plyteles_sienos_aukstis_m so this was an accidental pass.
+        "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 1.5,
         "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}],
         "confidence": "high",
     }]

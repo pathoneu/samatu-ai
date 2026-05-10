@@ -5,14 +5,14 @@
       "code": "glaistymas_dazymas_bundle",
       "label_lt": "Sienų + lubų glaistymas + dažymas (bundled)",
       "unit": "m²",
-      "quantity": 488.01,
+      "quantity": 502.77,
       "unit_price_eur_be_pvm": 14.0
     },
     {
       "code": "plyteles_sienos_m2",
       "label_lt": "Plytelių klijavimas sienoms",
       "unit": "m²",
-      "quantity": 70.0,
+      "quantity": 68.0,
       "unit_price_eur_be_pvm": 22.0
     },
     {
@@ -47,28 +47,28 @@
       "code": "grindjuostes_m",
       "label_lt": "Grindjuostės",
       "unit": "m",
-      "quantity": 137.76,
+      "quantity": 146.18,
       "unit_price_eur_be_pvm": 5.0
     },
     {
       "code": "angokrasciai_gkp_m",
       "label_lt": "Angokraščių apdaila GKP",
       "unit": "m",
-      "quantity": 202.48,
+      "quantity": 169.62,
       "unit_price_eur_be_pvm": 12.0
     },
     {
       "code": "hidroizoliacija_m2",
       "label_lt": "Hidroizoliacija",
       "unit": "m²",
-      "quantity": 65.54,
+      "quantity": 65.39,
       "unit_price_eur_be_pvm": 10.0
     },
     {
       "code": "silikonas_m",
       "label_lt": "Silikonavimas",
       "unit": "m",
-      "quantity": 49.0,
+      "quantity": 47.6,
       "unit_price_eur_be_pvm": 2.5
     }
   ]

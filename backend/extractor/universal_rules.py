@@ -471,8 +471,16 @@ def calc_room_quantities(room: dict,
     doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
 
-    # Plytelinės sienos (vonia / virtuvė backsplash)
-    tile_height = float(rt_rules.get("tile_walls_to_m") or 0)
+    # Plytelinės sienos (vonia / virtuvė backsplash).
+    # Priority: Vision pass-2 zoom reads actual tile height from išklotinės
+    # (e.g. premium projects often go full-height, 2.4–2.8m). Fall back to
+    # room-type default only when Vision didn't detect the explicit height.
+    # 2026-05-10 benchmark Task 7.2 #1: prior code IGNORED
+    # plyteles_sienos_aukstis_m → undercount vs samatininkų 30-67% on
+    # vonios with full-wall tiles.
+    vision_tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
+    default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
+    tile_height = vision_tile_h if vision_tile_h > 0 else default_tile_h
     tile_walls_area = perim * tile_height if tile_height > 0 else 0
 
     # Sienos NETO (dažomos)
