@@ -1,12 +1,19 @@
-"""Sprint 0 Fix 3: verify the scale claimed in title block matches
-the actual rendered page dimensions.
+"""Sprint 0 Fix 3 + Week 2 Task 2.4: verify drawing scale.
 
-Catches user uploads of wrong-scale copies (e.g., 1:100 PDF re-exported
-and labeled "M 1:50") which would otherwise produce 4× systematic errors
-in every quantity.
+Two complementary checks:
+  1. `validate_scale` (original): compare claimed scale × room diagonal against
+     measured pixel diagonal. Requires Vision to populate `diagonal_px`, which
+     it doesn't yet — so this remained dormant until Vision pass adds it.
+  2. `validate_scale_by_doors` (Week 2): cross-check claimed `px_per_m` against
+     the median pixel width of detected doors, assuming standard interior
+     door = 0.9 m. Catches the 4× scale-mismatch failure mode (1:100 re-exported
+     and labeled "M 1:50") even when `diagonal_px` is missing.
 
-See docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §7 Fix 3.
+See docs/superpowers/specs/2026-05-03-takeoff-workspace-design.md §7 Fix 3
+and docs/superpowers/plans/2026-05-10-canonical-plan.md Task 2.4.
 """
+from dataclasses import dataclass
+from statistics import median
 import math
 import re
 
@@ -19,6 +26,21 @@ _TOLERANCE_PCT = 0.05
 class ScaleMismatch(Exception):
     """Raised when scale validation fails hard (currently warnings-only)."""
     pass
+
+
+@dataclass(frozen=True)
+class ScaleValidationResult:
+    """Outcome of a scale check.
+
+    severity:
+      green  — within ±15% of expected (valid).
+      yellow — 0.5×–2× off (suspicious, likely mis-classification).
+      red    — >2× or <0.5× off (almost certainly the wrong scale).
+    """
+    valid: bool
+    severity: str
+    factor: float | None
+    message: str
 
 
 _SCALE_RE = re.compile(r"(?:M|Mastelis)?\s*1\s*:\s*(\d+)", re.IGNORECASE)
@@ -72,3 +94,41 @@ def validate_scale(scale_factor: float, rendered_dpi: int,
                 f"(nukrypimas {deviation*100:.1f}%). Patikrink M 1:{int(scale_factor)}."
             )
     return warnings
+
+
+def validate_scale_by_doors(
+    door_pixel_widths: list[float],
+    claimed_px_per_m: float,
+    expected_door_width_m: float = 0.9,
+) -> ScaleValidationResult:
+    """Door-as-ruler scale check (Week 2 Task 2.4).
+
+    Standard LT interior door is 0.9 m. Given a list of detected door pixel
+    widths and the claimed pixels-per-metre, compute the implied door width
+    and compare to the expected. Use the median to dodge a single mis-detected
+    door spike.
+
+    No-op (yellow) when no doors found — Vision lacks a ruler this run.
+    """
+    if not door_pixel_widths or claimed_px_per_m <= 0:
+        return ScaleValidationResult(
+            valid=False, severity="yellow", factor=None,
+            message="No door ruler available — scale cannot be cross-checked.",
+        )
+    median_px = median(door_pixel_widths)
+    implied_width_m = median_px / claimed_px_per_m
+    factor = implied_width_m / expected_door_width_m
+    if 0.85 <= factor <= 1.15:
+        return ScaleValidationResult(
+            valid=True, severity="green", factor=factor,
+            message=f"Scale matches door ruler (factor {factor:.2f}).",
+        )
+    severity = "red" if (factor < 0.5 or factor > 2.0) else "yellow"
+    return ScaleValidationResult(
+        valid=False, severity=severity, factor=factor,
+        message=(
+            f"Scale mismatch: implied door width {implied_width_m:.2f} m "
+            f"vs expected {expected_door_width_m:.2f} m (factor {factor:.2f}). "
+            f"Patikrink ar PDF deklaruotas mastelis sutampa su tikrove."
+        ),
+    )
