@@ -83,15 +83,18 @@ UNIVERSAL_RULES = {
     # 2026-05-06 audit: tile straight bumped 0.08 → 0.10 per NRM2 §28 + LT QS
     # convention; 8% only for very simple rectangular rooms.
     # Source: docs/formulas/2026-05-06-formula-audit.md §3-4.
+    # 2026-05-11 W1 audit: tiles_herringbone 0.18 → 0.13 (CLAUDE.md §3
+    # max 0.15 for herringbone; §1.7 specifies +12%). parquet_herringbone
+    # 0.20 → 0.16 (CLAUDE.md §1.6 +12-16%, picked upper for safety).
     "waste_factors": {
         "paint": 0.07,                # 5-10% standard
         "drywall": 0.12,              # 10-15%
         "tiles_straight": 0.10,       # 2026-05-06: was 0.08 (under-spec per NRM2)
         "tiles_diagonal": 0.13,
-        "tiles_herringbone": 0.18,
+        "tiles_herringbone": 0.13,    # CLAUDE.md §1.7 +12%, §3 cap 10-15%
         "laminate_straight": 0.10,
         "laminate_diagonal": 0.13,
-        "parquet_herringbone": 0.20,
+        "parquet_herringbone": 0.16,  # CLAUDE.md §1.6 +12-16% range
     },
 
     # Wallpaper

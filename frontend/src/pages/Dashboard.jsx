@@ -21,10 +21,29 @@ export default function Dashboard() {
 
   // On first mount, pull DB projects into localStorage (Phase 12.3).
   // Handles: cross-device, localStorage cleared, edit-from-other-tab.
+  //
+  // W1 Day 1 (2026-05-11): also re-pull on window focus + visibility
+  // change. Before this fix, opening a project in tab A, editing it,
+  // then returning to Dashboard tab B showed the stale localStorage
+  // snapshot from first mount. Real users hit this on the 2026-05-07
+  // prod test.
   React.useEffect(() => {
-    pullProjectsFromBackend().then((merged) => {
-      if (merged) queryClient.invalidateQueries({ queryKey: ['projects'] });
-    });
+    const refresh = () => {
+      pullProjectsFromBackend().then((merged) => {
+        if (merged) queryClient.invalidateQueries({ queryKey: ['projects'] });
+      });
+    };
+    refresh();
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [queryClient]);
 
   const { data: projects = [], isLoading } = useQuery({

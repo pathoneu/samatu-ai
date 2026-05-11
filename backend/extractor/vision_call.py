@@ -2218,49 +2218,65 @@ def extract_interior(
     # Step 2.4.5: deterministic ceiling-height fallback.
     # Vision sometimes misses tall ceilings (>3 m) annotated as `+3.000` on
     # section / ceiling-plan pages, defaulting to ~2.80 m and skewing every
-    # wall-paint quantity downstream. Run a deterministic pdfplumber scan
-    # as a fallback — only override when Vision missed entirely OR returned
-    # a value that disagrees with the marker by more than 0.3 m, so we
-    # don't trample legitimate Soviet-era 2.50 m readings.
-    # 2026-05-10 (benchmark Task 7.2 #3): scan ALL pjūvis + lubų plan pages
-    # (per page_classifier output), plus page 1 as a cover-sheet fallback.
-    # Floor plans are NOT scanned — height markers are not a floor-plan
-    # convention in LT drafting; pjūviai are the canonical source.
-    # See docs/2026-05-07-launch-status.md §3 + reports/benchmark/
-    # findings_2026-05-10.md issue #3.
+    # wall-paint quantity downstream.
+    #
+    # 2026-05-11 W1 audit (reports/2026-05-11-w1-audit.md §3): the prior
+    # "section_pages + (1,)" coverage was wrong for real LT PDFs — pjūviai
+    # sit on back pages (verified: 1_BD.pdf p128, Projektas..pdf p119,
+    # 03_SA.pdf p36), never p1. And page_classifier may not see those
+    # back pages at all (cost-gated to first N pages). Scanner is cheap
+    # text extraction; scan ALL pages, let best_ceiling_candidate filter
+    # to [2.0, 4.5] m range.
+    #
+    # Override threshold tightened 0.30 → 0.15 (asymmetric "going up"):
+    # if Vision said 2.80 and marker says 3.00, diff 0.20 — used to be
+    # ignored, now overrides correctly. Soviet 2.50m default protected
+    # by `cand_m > 2.95` guard.
     try:
         from extractor.height_markers import (
             best_ceiling_candidate,
             scan_page_height_markers,
         )
-        section_pages: tuple[int, ...] = tuple(sorted({
-            int(p["nr"]) for p in (parsed.get("puslapiai") or [])
-            if (p.get("tipas") or "").lower() in ("section", "ceiling_plan")
-            and p.get("nr") is not None
-        }))
-        # Always include page 1 — many LT projects put a section drawing
-        # on the cover sheet without a separate "section" page.
-        scan_pages = section_pages + ((1,) if 1 not in section_pages else ())
+        # Scan every page. Filter to plausible ceiling values happens in
+        # height_markers.MIN_CEILING_M / MAX_CEILING_M. Cost: ~50ms/page
+        # in pdfplumber for text extraction (no Vision call).
+        try:
+            import pdfplumber as _pp
+            import io as _io
+            with _pp.open(_io.BytesIO(pdf_bytes)) as _doc:
+                num_pages = len(_doc.pages)
+        except Exception:
+            num_pages = 0
+        scan_pages = tuple(range(1, num_pages + 1)) if num_pages else (1,)
         markers = scan_page_height_markers(pdf_bytes, page_nrs=scan_pages)
+        if not markers:
+            _emit({
+                "event": "no_height_markers",
+                "reason": "text_layer_empty_or_flattened_or_no_markers",
+                "scan_pages_count": len(scan_pages),
+            })
         candidate = best_ceiling_candidate(markers)
         if candidate is not None:
             cand_m = candidate["value_m"]
             section_h = parsed.get("lubu_aukstis_m")
+            # Asymmetric guard: only override "going up" to a clearly
+            # taller value (>2.95m). Prevents trampling legitimate
+            # Soviet-era 2.50m readings with a stray +2.40 beam marker.
             should_override = (
                 section_h is None
-                or float(section_h) < cand_m - 0.3
+                or (cand_m > 2.95 and float(section_h) < cand_m - 0.15)
             )
             if should_override:
                 parsed["lubu_aukstis_m"] = cand_m
                 warnings_list = list(parsed.get("warnings") or [])
                 marker_raw = candidate["raw"]
                 warnings_list.append({
-                    "code": "ceiling_height_from_page1_marker",
+                    "code": "ceiling_height_from_section_marker",
                     "severity": "info",
                     "message": (
                         f"Lubų aukštis paimtas iš pjūvio žymeklio "
-                        f"{marker_raw} → {cand_m:.2f} m. "
-                        f"Patikrink Prielaidose."
+                        f"{marker_raw} → {cand_m:.2f} m "
+                        f"(psl. {candidate['page']}). Patikrink Prielaidose."
                     ),
                 })
                 parsed["warnings"] = warnings_list
