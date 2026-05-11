@@ -2296,6 +2296,13 @@ def extract_interior(
     # lubų plan annotations (e.g. "102=+3400") and can't map them to
     # eksplikacija names. Accept lubu_auksciai_by_nr as a second source
     # and merge into lubu_auksciai via patalpa.nr lookup.
+    #
+    # 2026-05-11 W2 (afternoon): even with imperative prompt iteration,
+    # Vision still narrates height info in warnings[] text on 2/5 corpus
+    # PDFs (projektas_3 "švarus lubų aukštis 300cm", projektas_4(2)
+    # "3200mm visose voniose"). Add a regex salvage pass that mines
+    # warning text for height patterns and merges them into
+    # lubu_auksciai when the model didn't structure them itself.
     try:
         per_room_heights = dict(parsed.get("lubu_auksciai") or {})
         per_room_by_nr = parsed.get("lubu_auksciai_by_nr") or {}
@@ -2315,6 +2322,23 @@ def extract_interior(
                 if name and name not in per_room_heights:
                     per_room_heights[name] = float(h_for_nr)
             parsed["lubu_auksciai"] = per_room_heights
+
+        # Salvage from narrative warnings[]: when prompt iteration didn't
+        # fully prevent Vision from describing heights in free text, we
+        # mine the text for known patterns and apply them deterministically.
+        if not per_room_heights and rooms_raw:
+            from extractor.height_markers import salvage_heights_from_warnings
+            salvaged = salvage_heights_from_warnings(
+                parsed.get("warnings") or [], rooms_raw
+            )
+            if salvaged:
+                per_room_heights.update(salvaged)
+                parsed["lubu_auksciai"] = per_room_heights
+                _emit({
+                    "event": "lubu_auksciai_salvaged_from_warnings",
+                    "salvaged_count": len(salvaged),
+                    "rooms": list(salvaged.keys()),
+                })
         section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
         rooms_raw = _apply_per_room_heights(
             rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"

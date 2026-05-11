@@ -87,3 +87,158 @@ def best_ceiling_candidate(markers: list[dict]) -> dict | None:
     if not markers:
         return None
     return max(markers, key=lambda m: m["value_m"])
+
+
+# 2026-05-11 W2: salvage heights from Vision warnings[] narrative.
+#
+# Even with the imperative prompt iteration that fixed projektas_1
+# (commit be422a7), Vision still narrates rather than structures on
+# some PDFs — specifically when there's value-ambiguity ("švarus
+# lubų aukštis" = clean/finished vs raw) or room-mapping ambiguity
+# ("3200mm visose voniose" — which bathrooms exactly). This salvage
+# pass mines the free-text warnings for known height patterns and
+# applies them deterministically.
+
+# "300cm", "320cm", "294cm" — centimetres
+_HEIGHT_CM_RE = re.compile(r'(\d{3})\s*cm\b')
+# "3.20m", "2,82 m", "5,7m" — explicit metres
+_HEIGHT_M_RE = re.compile(r'(\d[.,]\d{1,2})\s*m\b')
+# "3200mm", "2800mm" — millimetres
+_HEIGHT_MM_RE = re.compile(r'(\d{4})\s*mm\b')
+# "+3000", "+3.000", "+3,000" — drafting marker
+_HEIGHT_MARKER_RE = re.compile(r'\+\s*(\d[.,]?\d{1,3})')
+
+
+def _to_metres(raw: str, unit: str) -> float | None:
+    """Convert raw numeric string + unit to metres. Returns None if outside
+    plausible ceiling range to keep noise out of structured data."""
+    try:
+        val = float(raw.replace(',', '.'))
+    except ValueError:
+        return None
+    if unit == "cm":
+        val = val / 100.0
+    elif unit == "mm":
+        val = val / 1000.0
+    elif unit == "marker":
+        # "+3000" → 3.000 m; "+3.000" → 3.000 m; "+3,2" → 3.2 m
+        if val > 100:        # bare integer like 3000
+            val = val / 1000.0
+    if not (MIN_CEILING_M <= val <= MAX_CEILING_M):
+        return None
+    return val
+
+
+def salvage_heights_from_warnings(
+    warnings: list,
+    rooms: list[dict],
+) -> dict:
+    """Mine height info out of Vision's free-text warnings when the
+    structured `lubu_auksciai` / `lubu_auksciai_by_nr` fields stayed
+    empty.
+
+    Strategy: for each warning text, scan for room names (from
+    `rooms[].pavadinimas`) that co-occur with a height pattern within
+    the same warning. If a clear pairing exists, write into the
+    returned dict.
+
+    Conservative: only emits a mapping when room name + height appear
+    in the SAME warning text. We don't try to be clever across multiple
+    warnings or rooms.
+    """
+    if not warnings or not rooms:
+        return {}
+    result: dict[str, float] = {}
+
+    # Index room names (case-insensitive, longest first to win against
+    # partial overlaps like "Vonia" vs "Vaikų vonia").
+    room_names = sorted(
+        {(r.get("pavadinimas") or "").strip() for r in rooms if r.get("pavadinimas")},
+        key=lambda n: -len(n),
+    )
+
+    for w in warnings:
+        if isinstance(w, dict):
+            text = " ".join(filter(None, [
+                w.get("message"),
+                w.get("code"),
+            ])) or ""
+        else:
+            text = str(w)
+        if not text:
+            continue
+
+        # Collect every plausible height value from this single warning
+        heights: list[float] = []
+        for m in _HEIGHT_MARKER_RE.finditer(text):
+            v = _to_metres(m.group(1), "marker")
+            if v is not None:
+                heights.append(v)
+        for m in _HEIGHT_M_RE.finditer(text):
+            v = _to_metres(m.group(1), "m")
+            if v is not None:
+                heights.append(v)
+        for m in _HEIGHT_CM_RE.finditer(text):
+            v = _to_metres(m.group(1), "cm")
+            if v is not None:
+                heights.append(v)
+        for m in _HEIGHT_MM_RE.finditer(text):
+            v = _to_metres(m.group(1), "mm")
+            if v is not None:
+                heights.append(v)
+
+        if not heights:
+            continue
+
+        # Pick the height most likely to be the "main" reading in this
+        # warning: max value (since the bug being salvaged is
+        # always "Vision saw a non-default height" — the default 2.82
+        # would not have been worth narrating).
+        height = max(heights)
+
+        # Find every room name mentioned in this warning text.
+        # Apply the height to all rooms named here. If none named,
+        # try paskirtis-based generic phrases ("vonios", "gyvenamosios").
+        text_lc = text.lower()
+        matched_rooms: list[str] = []
+        for name in room_names:
+            if name.lower() in text_lc:
+                matched_rooms.append(name)
+
+        # Paskirtis-based fallback. Generic phrases like "visose voniose"
+        # or "gyvenamoms patalpoms" map to all rooms with the matching
+        # paskirtis. Order matters: more-specific phrases first.
+        if not matched_rooms:
+            paskirtis_phrases = {
+                "vonia": ["voniose", "vonios", "vonioje", "vonioms",
+                          "san. mazgu", "san. mazguose"],
+                "wc": ["wc", "tualet"],
+                "virtuve": ["virtuv"],
+                "gyvenamoji": ["gyvenamiems patalp", "gyvenamomis", "gyvenamose"],
+                "miegamoji": ["miegam"],
+                "koridorius": ["koridor"],
+                "skalbykla": ["skalb"],
+                "garazas": ["garaž"],
+            }
+            for canonical_p, triggers in paskirtis_phrases.items():
+                if not any(t in text_lc for t in triggers):
+                    continue
+                for room in rooms:
+                    name = (room.get("pavadinimas") or "").strip()
+                    room_p = (room.get("paskirtis") or "").lower()
+                    if not name or name in result:
+                        continue
+                    # Match by paskirtis OR by name keyword (e.g.
+                    # "vonia" room named "Vaikų san. mazgas" has
+                    # paskirtis "vonia" or "san_mazgas")
+                    if canonical_p in room_p or any(
+                        t in name.lower() for t in triggers
+                    ):
+                        matched_rooms.append(name)
+
+        for name in matched_rooms:
+            # First match wins per room — keep the height from the
+            # warning that explicitly named it.
+            result.setdefault(name, height)
+
+    return result
