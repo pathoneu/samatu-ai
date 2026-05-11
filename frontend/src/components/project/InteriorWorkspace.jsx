@@ -147,7 +147,6 @@ export default function InteriorWorkspace({
         {pdfUrl ? (
           <PlanViewer
             fileUrl={pdfUrl}
-            projectId={project.id}
             pageMeta={pageMetaDict}
             missingTypes={missingTypes}
             focusedPage={effectiveFocusedPage}
@@ -188,53 +187,6 @@ export default function InteriorWorkspace({
                   confidence: 'medium',
                 });
               }
-              updateProject(project.id, { ...project, darbu_sarasas: darbai });
-            }}
-            onCvCountAccepted={({ page, klass, candidates, wandPolygon }) => {
-              // Drawing-analysis-tools (W2 of 2026-05-10): two callback
-              // shapes — count finishes with `candidates[]`, wand finishes
-              // with a `wandPolygon`. Both append a darbu_sarasas pozicija
-              // so the user sees the result in Kiekiai.
-              if (wandPolygon) {
-                // Magic-wand polygon → log a placeholder pozicija. Future
-                // iteration can compute area from polygon + page scale and
-                // surface it as a real m² row.
-                const darbai = [...(project.darbu_sarasas || [])];
-                const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
-                darbai.push({
-                  eil_nr: maxNr + 1,
-                  skyrius: 'CV — patalpos',
-                  aprasymas: `Patalpos polygon (psl. ${page}, ${wandPolygon.length} taškų, magic-wand)`,
-                  mato_vnt: 'vnt',
-                  kiekis: 1,
-                  kaina: 0,
-                  suma: 0,
-                  detected: true,
-                  source: 'magic_wand',
-                  confidence: 'medium',
-                });
-                updateProject(project.id, { ...project, darbu_sarasas: darbai });
-                return;
-              }
-              if (!candidates?.length) return;
-              const darbai = [...(project.darbu_sarasas || [])];
-              const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
-              const klasName = klass || 'simbolis';
-              const aprasymas = `${klasName} (rasta ${candidates.length} vnt., click-to-count, psl. ${page})`;
-              darbai.push({
-                eil_nr: maxNr + 1,
-                skyrius: 'CV — pridėtiniai elementai',
-                aprasymas,
-                mato_vnt: 'vnt',
-                kiekis: candidates.length,
-                kaina: 0,
-                suma: 0,
-                detected: true,
-                source: 'click_to_count',
-                confidence: 'medium',
-                _markers: candidates.map(c => ({ x: c.x, y: c.y, bbox: c.bbox })),
-                source_pages: [page],
-              });
               updateProject(project.id, { ...project, darbu_sarasas: darbai });
             }}
           />

@@ -25,11 +25,6 @@ import {
 } from '@/lib/symbolOverlay';
 import { getPlanSymbolTypes } from '@/lib/planSymbolTypes';
 import { API_BASE } from '@/lib/apiBase';
-import CountTool from './CountTool';
-import CountReviewPanel from './CountReviewPanel';
-import MagicWandTool from './MagicWandTool';
-import DrawingOverlay from './DrawingOverlay';
-import { uploadPdf as cvUploadPdf } from '@/lib/cvToolsApi';
 
 if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   console.error(`[PlanViewer] pdfjs version drift detected: API=${pdfjs.version}, expected 4.8.69`);
@@ -277,12 +272,7 @@ function SymbolOverlayLayer({ result, renderedSize, onRemovePoint = null }) {
 export default function PlanViewer({
   fileUrl,
   pdfFile = null,
-  projectId = null,
   onSymbolCountResult = null,
-  // Drawing-analysis-tools (W2 of 2026-05-10): when CV count completes,
-  // bubble accepted candidates so the parent (InteriorWorkspace) can
-  // append them to darbu_sarasas as a Kiekiai pozicija.
-  onCvCountAccepted = null,
   pageMeta = {},
   missingTypes = [],
   focusedPage = null,
@@ -320,50 +310,12 @@ export default function PlanViewer({
   const [fillPdfUploaded, setFillPdfUploaded] = useState(false);
   const symbolVisibleCount = getSymbolVisibleCount(symbolResult);
   const symbolConfirmCounts = useMemo(() => getConfirmableSymbolCounts(symbolResult), [symbolResult]);
-
-  // Drawing-analysis-tools (Tasks 7–9, 2026-05-10): click-to-count +
-  // magic wand. CV layer renders pages at this DPI; matches backend
-  // Pydantic default. Larger DPI = more accurate but slower matching.
-  const CV_DPI = 200;
-  const [cvCountMode, setCvCountMode] = useState(false);
-  const [cvWandMode, setCvWandMode] = useState(false);
-  const [cvPdfUploaded, setCvPdfUploaded] = useState(false);
-  const [cvCount, setCvCount] = useState({
-    candidates: [],
-    klass: '',
-    templateBbox: null,
-    templateDpi: CV_DPI,
-    panelOpen: false,
-    decisionOverlay: [],
-  });
-  const [wandPolygon, setWandPolygon] = useState(null); // [[x,y]...] in image px
-  // Stable session id for the CV cache. We piggy-back on the real
-  // project.id when InteriorWorkspace passes it, otherwise mint one
-  // (mirrors fillProjectIdRef for older callers without project_id).
-  const cvProjectIdRef = useRef(null);
-  if (!cvProjectIdRef.current) {
-    cvProjectIdRef.current = projectId || `cv-session-${Math.random().toString(36).slice(2, 12)}`;
-  }
-  const cvProjectId = projectId || cvProjectIdRef.current;
-  const ensureCvPdfUploaded = useCallback(async () => {
-    if (cvPdfUploaded || !pdfFile) return;
-    await cvUploadPdf({ projectId: cvProjectId, pdfFile });
-    setCvPdfUploaded(true);
-  }, [cvPdfUploaded, pdfFile, cvProjectId]);
-  const closeCvCountPanel = useCallback(() => {
-    setCvCount({
-      candidates: [], klass: '', templateBbox: null, templateDpi: CV_DPI,
-      panelOpen: false, decisionOverlay: [],
-    });
-  }, []);
-  const pdfToImage = useCallback((x, y) => {
-    const k = CV_DPI / 72;
-    return [Math.round(x * k), Math.round(y * k)];
-  }, []);
-  const imageToPdf = useCallback((x, y) => {
-    const k = 72 / CV_DPI;
-    return [x * k, y * k];
-  }, []);
+  // CV V2 tools (Skaičiuoti pažymint / Pažymėti patalpą) were unwired
+  // from this viewer on 2026-05-11 after real-PDF testing exposed the
+  // pdf.js drag-interaction limit. Components, backend, and training-
+  // data writer remain on disk — see
+  // docs/superpowers/research/2026-05-11-cv-tools-real-world-limits.md
+  // and 2026-05-11-session-handoff.md for next-session context.
 
   // 2026-05-06: track dismissed room (Esc key) so user can navigate pages
   // freely after focusing a room without the marker re-snapping.
@@ -790,12 +742,11 @@ export default function PlanViewer({
               Symbol counting via Vision was 49% accurate in bake-off;
               cv2.matchTemplate over-counts 100×. Will rewire when a
               commercial CAD-aware backend is integrated. */}
-          {/* Auto-visible in local dev (vite import.meta.env.DEV) so the
-              tester doesn't have to set localStorage by hand. Production
-              still requires the explicit flag. */}
-          {(import.meta.env?.DEV ||
-            (typeof window !== 'undefined' &&
-              window.localStorage?.getItem('samatu_experimental_tools') === '1')) && (
+          {/* Experimental Ženklai panel — stays gated behind localStorage
+              flag (no dev auto-show) since 2026-05-11. CV V2 buttons were
+              unwired; the panel still exposes the working V1 flows. */}
+          {(typeof window !== 'undefined' &&
+            window.localStorage?.getItem('samatu_experimental_tools') === '1') && (
             <button
               type="button"
               onClick={() => setSymbolToolsOpen(v => !v)}
@@ -873,52 +824,6 @@ export default function PlanViewer({
                 {fillError}
               </span>
             )}
-            {/* CV V2 (2026-05-10): click-to-count + magic wand on top of
-                /api/cv/* (OpenCV template match + flood fill). Lives in the
-                same experimental panel; replaces the V1 cv2.matchTemplate
-                approach that over-counted 100×. */}
-            <button
-              type="button"
-              onClick={async () => {
-                try { await ensureCvPdfUploaded(); } catch (err) {
-                  // surface in a single inline error chip; non-fatal
-                  console.warn('[cv] upload-pdf failed', err);
-                }
-                setCvCountMode(v => !v);
-                setCvWandMode(false);
-              }}
-              className={`h-8 px-3 rounded-md border text-xs font-medium ${
-                cvCountMode
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-950'
-                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
-              } disabled:opacity-50`}
-              disabled={!pdfFile}
-              title="Vilkite stačiakampį aplink simbolį — sistema suras panašius visame puslapy"
-            >
-              <Search className="w-3.5 h-3.5 inline mr-1.5" />
-              {cvCountMode ? '✏️ Vilkite aplink simbolį' : 'Skaičiuoti pažymint'}
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                try { await ensureCvPdfUploaded(); } catch (err) {
-                  console.warn('[cv] upload-pdf failed', err);
-                }
-                setCvWandMode(v => !v);
-                setCvCountMode(false);
-                setWandPolygon(null);
-              }}
-              className={`h-8 px-3 rounded-md border text-xs font-medium ${
-                cvWandMode
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-950'
-                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
-              } disabled:opacity-50`}
-              disabled={!pdfFile}
-              title="Paspauskite patalpos viduje — sistema apves jos sienas"
-            >
-              <Wand2 className="w-3.5 h-3.5 inline mr-1.5" />
-              {cvWandMode ? '👆 Paspauskite patalpos viduje' : 'Pažymėti patalpą'}
-            </button>
             {fillResult && !fillLoading && (
               <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
                 ✓ {fillResult.polygon_pdf.length} taškų · pasitikėjimas: {fillResult.confidence}
@@ -1123,81 +1028,6 @@ export default function PlanViewer({
                   />
                 )}
 
-                {/* CV count tool — drag-rect over a symbol → /api/cv/match-template */}
-                {cvCountMode && renderedSize && (
-                  <CountTool
-                    projectId={cvProjectId}
-                    pageIdx={pageNumber - 1}
-                    width={renderedSize.width}
-                    height={renderedSize.height}
-                    pageScale={scale}
-                    pdfToImage={pdfToImage}
-                    dpi={CV_DPI}
-                    onCandidates={(candidates, meta) => {
-                      setCvCount({
-                        candidates,
-                        klass: '',
-                        templateBbox: meta?.bbox || null,
-                        templateDpi: meta?.dpi || CV_DPI,
-                        panelOpen: true,
-                        decisionOverlay: candidates.map(c => ({ ...c, status: 'pending' })),
-                      });
-                    }}
-                  />
-                )}
-
-                {/* CV wand — click inside a room → /api/cv/magic-wand */}
-                {cvWandMode && renderedSize && (
-                  <MagicWandTool
-                    projectId={cvProjectId}
-                    pageIdx={pageNumber - 1}
-                    width={renderedSize.width}
-                    height={renderedSize.height}
-                    pageScale={scale}
-                    pdfToImage={pdfToImage}
-                    imageToPdf={imageToPdf}
-                    dpi={CV_DPI}
-                    onPolygon={(pdfPts) => {
-                      // Stash the polygon for the user to confirm — render
-                      // immediately via DrawingOverlay so it's visible.
-                      setWandPolygon(pdfPts);
-                      setCvWandMode(false);
-                    }}
-                  />
-                )}
-
-                {/* Committed CV markers (count) — render above MarkupCanvas-equiv */}
-                {cvCount.decisionOverlay.length > 0 && renderedSize && (
-                  <DrawingOverlay
-                    width={renderedSize.width}
-                    height={renderedSize.height}
-                    enabled={false}
-                    items={cvCount.decisionOverlay.map(c => {
-                      const [pdfX, pdfY] = imageToPdf(c.x, c.y);
-                      return {
-                        kind: 'count_marker',
-                        x: pdfX * scale,
-                        y: pdfY * scale,
-                        confidence: c.confidence,
-                        status: c.status,
-                      };
-                    })}
-                  />
-                )}
-
-                {/* Wand-suggested polygon preview */}
-                {wandPolygon && renderedSize && (
-                  <DrawingOverlay
-                    width={renderedSize.width}
-                    height={renderedSize.height}
-                    enabled={false}
-                    items={[{
-                      kind: 'polygon',
-                      points: wandPolygon.map(p => [p.x * scale, p.y * scale]),
-                    }]}
-                  />
-                )}
-
                 {fillResult && pageSize && renderedSize && (
                   <FillPolygonOverlay
                     polygon_pdf={fillResult.polygon_pdf}
@@ -1263,73 +1093,7 @@ export default function PlanViewer({
             )}
           </div>
         </main>
-
-        {/* CV count — review queue (right sidebar). Mounted as a flex
-            sibling so the page area shrinks rather than overlapping. */}
-        {cvCount.panelOpen && (
-          <CountReviewPanel
-            projectId={cvProjectId}
-            pageIdx={pageNumber - 1}
-            candidates={cvCount.candidates}
-            klass={cvCount.klass}
-            setKlass={(k) => setCvCount(prev => ({ ...prev, klass: k }))}
-            templateBbox={cvCount.templateBbox}
-            templateDpi={cvCount.templateDpi}
-            onClose={closeCvCountPanel}
-            onUpdateMarkers={(decisionOverlay) => setCvCount(prev => ({ ...prev, decisionOverlay }))}
-            onComplete={(accepted, meta) => {
-              if (accepted.length > 0 && onCvCountAccepted) {
-                onCvCountAccepted({
-                  page: pageNumber,
-                  klass: meta?.klass || cvCount.klass,
-                  candidates: accepted,
-                  templateBbox: meta?.templateBbox || cvCount.templateBbox,
-                });
-              }
-              closeCvCountPanel();
-              setCvCountMode(false);
-            }}
-          />
-        )}
       </div>
-
-      {/* CV wand — confirm/discard chip floats over the page area until
-          the user accepts or discards the suggested room. */}
-      {wandPolygon && (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 rounded-lg border-2 border-emerald-400 bg-white shadow-xl px-4 py-3 text-sm max-w-sm">
-          <div className="font-semibold text-emerald-900">
-            ✓ Patalpa pažymėta brėžinyje
-          </div>
-          <div className="text-xs text-[#3b3b3b]">
-            Žalias punktyras rodo, kur sistema rado sienas. Ar pridėti šią patalpą į kiekius?
-          </div>
-          <div className="flex gap-2 mt-1">
-            <button
-              type="button"
-              onClick={() => {
-                if (onCvCountAccepted) {
-                  onCvCountAccepted({
-                    page: pageNumber,
-                    klass: 'patalpa',
-                    wandPolygon,
-                  });
-                }
-                setWandPolygon(null);
-              }}
-              className="flex-1 px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700"
-            >
-              ✓ Pridėti į kiekius
-            </button>
-            <button
-              type="button"
-              onClick={() => setWandPolygon(null)}
-              className="px-3 py-1.5 rounded border border-[#d8d2c8] text-xs hover:bg-[#f1eee8]"
-            >
-              ✕ Atmesti
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
