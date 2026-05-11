@@ -394,11 +394,20 @@ Imame tiksliai iš eksplikacijos arba inline label'io brėžinyje.
 - techpatalpa = techninė patalpa
 - laiptai = laiptinė
 
-**`plotas_m2`** — pirmenybės tvarka:
+**`plotas_m2`** — pirmenybės tvarka. **NEGALIMA grąžinti 0** —
+kiekvienam kambariui PRIVALOMAI turi būti reikšmė > 0:
 1. **Eksplikacija lentelė** (jei egzistuoja) → `plotas_saltinis: "eksplikacija"` (patikimiausia)
 2. Inline label brėžinyje ("Miegamasis 14.5m²") → `"inline_label"`
-3. Skaičiuojamas iš sienų matmenų (mm) → `"wall_dim_calc"`
+3. Skaičiuojamas iš sienų matmenų (mm) → `"wall_dim_calc"`. PRIVALOMAI
+   pereik į šitą path'ą, jei nei eksplikacijos, nei inline label nėra.
+   Konvertuok sienų matmenis mm → m, dauginimas → m². Plotas niekada
+   nėra 0 jei kambarys turi fizinę plotą plane.
 4. Default per paskirtis (last resort) → `"default_fallback"`. Confidence = "low".
+
+🔴 **Jei grąžini `plotas_m2: 0` — tai BUG'AS.** Backend skaičiuos visus
+kiekius (dažymą, plyteles, grindis, hidroizoliaciją) kaip nulinį → vartotojas
+gaus tuščią pasiūlymą. Geriau jau low-confidence default_fallback (pvz.,
+15 m² miegamajam, 25 m² svetainei) nei 0.
 
 **`perimetras_m`** — sumavimas iš sienų ilgių (mm) brėžinyje. Konvertuok į metrus.
 Jei eksplikacija turi `Perimetras` stulpelį — naudok jį.
@@ -446,15 +455,30 @@ Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink:
 - IR/ARBA `lubu_auksciai_by_nr` dict: `{"102": 3.40, "105": 3.00, "108": 2.50}` —
   raktai = kambario numeriai iš lubų plano žymėjimų.
 
-🔴 **NEDĖK INFORMACIJOS Į warnings[] tekstinį pranešimą.** Jei matai
-"102=+3400" lubų plane, grąžink jį STRUKTŪRUOTAI:
-- `lubu_auksciai_by_nr: {"102": 3.40}` (visada, jei numeriai matomi)
-- IR `lubu_auksciai: {"<pavadinimas iš eksplikacijos>": 3.40}` (jei galima
-  mapping'ą iš eksplikacijos atlikti)
+🔴 **NEDĖK INFORMACIJOS Į warnings[] tekstinį pranešimą.** Visos
+ceiling-height observacijos PRIVALO eiti į `lubu_auksciai` ARBA
+`lubu_auksciai_by_nr`. Warning'as su tekstu yra duomenų **praradimas** —
+backend'as negali apdoroti teksto, todėl kambario aukštis lieka
+default 2.82. **VISADA STRUKTŪRIZUOK.**
 
-Warning'as su tekstu "lubų plane 102=+3400" yra duomenų **praradimas** —
-backend'as negali apdoroti tokio teksto, todėl kambario aukštis lieka
-default 2.82. Visada struktūrizuok.
+Atpažink VISUS formatus, kuriais aukščiai gali būti pateikti:
+
+| Formatas brėžinyje                | Pavyzdys                | Reikšmė |
+|-----------------------------------|-------------------------|---------|
+| `+X.XXX` / `+XXXX` (pjūvis)       | `+3.000` / `+3000`      | 3.00 m |
+| `HXXXX` (height label)            | `H2400` / `H2750`       | 2.40 / 2.75 m |
+| Tekstas "Svarus lubų aukštis"     | "Svarus lubų aukštis: 300cm" | 3.00 m |
+| Tekstas "Patalpos virš 3m"        | —                       | 3.00 m (apytiksliai) |
+| Tekstas "Lubos ~XXm" / "~3m"      | "Svetainė ~3.0 m"       | 3.00 m |
+| Annotacija prie patalpos plane    | `+3.20`                 | 3.20 m |
+| Sija nuo konstrukcijos: "300mm"   | "300mm sija nuo lubų"   | floor-to-ceiling − 0.30 m |
+
+JEI MATAI **bet kurį** iš šių — grąžink struktūrą:
+- `lubu_auksciai_by_nr: {"102": 3.40}` (jei numeris matomas — VISADA dėk)
+- `lubu_auksciai: {"<vardas>": 3.40}` (jei vardas iš eksplikacijos žinomas)
+
+NEGALI būti situacijos: "Vision pastebėjo aukštį 3.0 m svetainėje, bet
+nieko nepateikė struktūroje". Jei pastebėjai — STRUKTŪRIZUOK.
 
 Backend'as šias vertes naudos vietoj section vidurkio (taip dažomas
 plotas, glaistas, dažai apskaičiuojami tiksliai).
