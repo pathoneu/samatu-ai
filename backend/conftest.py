@@ -12,3 +12,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+def pytest_configure(config):
+    """Register custom marks so pytest doesn't warn on first use.
+    `integration` gates real-PDF / real-API tests; CI runs them via
+    `pytest -m integration` separately from the fast unit suite."""
+    config.addinivalue_line(
+        "markers",
+        "integration: marks tests that hit real PDFs or external services",
+    )
