@@ -469,6 +469,21 @@ Warning'as su tekstu "lubų plane 102=+3400" arba "Svetainė ~3.0m" yra
 duomenų **praradimas** — backend'as negali apdoroti tokio teksto,
 todėl kambario aukštis lieka default 2.82. Visada struktūrizuok.
 
+🔴 **Neaiškumas dėl kambario pavadinimo NĖRA pateisinimas pereiti į
+narrative.** Jei pjūvyje matosi "Svetainė ~5.7m" arba "atvira erdvė
+3.0m" arba "dvigubo aukščio holas" — DARYK best-guess mapping'ą į
+eksplikacijoje matomą kambarį (dažniausiai "Svetainė", "Svetainė/
+valgomasis", "Holas", "Atvira erdvė") ir grąžink jį strukturoje:
+
+  `lubu_auksciai: {"Svetainė/valgomasis/virtuvė": 5.7}`
+
+Net jei nesi 100% tikras dėl mapping'o — partial knowledge struktūroje
+yra daug naudingesnė nei tobula informacija tekste. Backend'as
+naudoja struktūrą; tekstas dingsta default 2.82'ame.
+
+Bottom line: jei matei aukštį → STRUKTŪRIZUOK. Jei nesi tikras
+dėl raktų — vis tiek STRUKTŪRIZUOK su geriausiu spėjimu.
+
 Backend'as šias vertes naudos vietoj section vidurkio (taip dažomas
 plotas, glaistas, dažai apskaičiuojami tiksliai).
 
