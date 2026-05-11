@@ -23,6 +23,29 @@ def _preload_pdf(project_id: str = "test-cv") -> None:
     page_raster_cache.store_pdf(project_id, pdf)
 
 
+def test_upload_pdf_primes_cache():
+    pdf = Path(__file__).resolve().parents[2].joinpath(
+        "test_pdfs/vidaus_apdaila.pdf"
+    ).read_bytes()
+    resp = client.post(
+        "/api/cv/upload-pdf",
+        data={"project_id": "upload-test"},
+        files={"pdf_file": ("test.pdf", pdf, "application/pdf")},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "ok"
+    assert page_raster_cache.get_pdf("upload-test") == pdf
+
+
+def test_upload_pdf_rejects_non_pdf():
+    resp = client.post(
+        "/api/cv/upload-pdf",
+        data={"project_id": "bad"},
+        files={"pdf_file": ("notpdf.txt", b"not a pdf", "text/plain")},
+    )
+    assert resp.status_code == 400
+
+
 def test_match_template_returns_candidates():
     _preload_pdf()
     # dpi=100 keeps the rendered page small so the 5×4 scale/rotation

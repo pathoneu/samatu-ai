@@ -1,20 +1,23 @@
-"""HTTP API for the CV layer. Three endpoints:
+"""HTTP API for the CV layer. Four endpoints:
 
+  POST /api/cv/upload-pdf     — prime the PDF cache for a session
   POST /api/cv/match-template — click → count similar symbols on a page
   POST /api/cv/magic-wand     — click → suggest room polygon
   POST /api/cv/record-decision — append accept/reject as training data
 
-Each endpoint is thin: parse → load page from the in-memory PDF cache →
-call CV layer → return. Heavy multi-page jobs (run match across every
-floor plan) belong in a future RQ-backed batch route; out of MVP scope.
+Each compute endpoint is thin: parse → load page from the in-memory
+PDF cache → call CV layer → return. Heavy multi-page jobs (run match
+across every floor plan) belong in a future RQ-backed batch route;
+out of MVP scope.
 
-PDFs come from `page_raster_cache._PDF_CACHE` (1h LRU). When the cache
-has evicted, the endpoint returns 409 so the frontend can re-upload
-from local browser state.
+PDFs come from `page_raster_cache._PDF_CACHE` (1h LRU). The frontend
+primes the cache once via `/upload-pdf`; subsequent JSON calls reuse
+it. When the cache has evicted, compute endpoints return 409 so the
+frontend can re-upload from local browser state.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 import page_raster_cache as _pdf_cache
@@ -50,6 +53,21 @@ class RecordDecisionBody(BaseModel):
     decision: str  # "accept" | "reject"
     confidence: float | None = None
     dpi: int = 200
+
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    project_id: str = Form(...),
+    pdf_file: UploadFile = File(...),
+) -> dict:
+    """Prime the PDF cache for a session. Frontend calls once before the
+    first match-template / magic-wand request; subsequent JSON calls
+    reuse the cached bytes. Same pattern as /v9/click-to-fill."""
+    pdf_bytes = await pdf_file.read()
+    if not pdf_bytes or not pdf_bytes[:4].startswith(b"%PDF"):
+        raise HTTPException(400, "pdf_file is not a valid PDF")
+    _pdf_cache.store_pdf(project_id, pdf_bytes)
+    return {"status": "ok", "size": len(pdf_bytes)}
 
 
 def _load_project_pdf(project_id: str) -> bytes:
