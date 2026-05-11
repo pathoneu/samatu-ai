@@ -406,6 +406,30 @@ Jei eksplikacija turi `Perimetras` stulpelį — naudok jį.
 **`lubu_aukstis_m`** — pirmenybe iš pjūvio (Pjūvis A-A); tada lubų plano annotation'ų (+2800 = 2.80m).
 Default 2.82m moderniai LT statybai (post-2010). Pažymėk `lubu_aukstis_saltinis`.
 
+🔴 **KRITIŠKAI SVARBU — aukščio žymeklių skaitymas (W1 2026-05-11 bug fix):**
+
+Pjūvyje (Pjūvis A-A, B-B …) yra VERTIKALŪS aukščio žymekliai prie horizontalių
+linijų. Skaityk JUOS, ne defaultink:
+
+  `±0.000`    → grindys (NE lubos)
+  `+2.400`    → sija po lubomis (NE lubos)
+  `+2.800`    → standartinės lubos (modern LT)
+  `+3.000`    → svetainės / virtuvės aukštos lubos
+  `+3.200`    → mansardinis pirmas aukštas
+  `+5.700`    → 2-as aukštas
+  `+6.500`    → stogas (NE lubos)
+
+Pirmas aukštas lubos = DIDŽIAUSIA atžyma intervale tarp `±0.000` ir kitos
+floor-level žymos (jei pastatas turi 2 aukštus). NE sija, NE stogas.
+
+**JEI MATAI `+3.000`+ žymeklį šalia lubų linijos** — grąžink TĄ skaičių (3.00),
+NE defaultink 2.82. NE prarask jo nematydamas. NE bandyk pateisinti "modern LT
+default" jei žymeklis aiškiai sako kitką.
+
+**JEI NEMATAI žymeklio nė vienam puslapy** — grąžink `null`, NE 2.82. Backend'as
+turės warning logikai. Tylus defaulting yra didžiausia accuracy klaida šitame
+sistemoje.
+
 ⚠ **PRIVALOMAI** ieškok skirtingų aukščių per kambarius. LT projektuose dažnai:
 - Svetainė / virtuvė turi **virš 3m** aukštį (atviras dvigubas / mansardinis)
 - Vonios, drabužinės, koridoriai turi pakabinamas lubas (~2.5m) net jei pjūvis

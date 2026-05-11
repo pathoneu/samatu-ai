@@ -43,12 +43,15 @@ def test_parse_classification_low_confidence_exposes_top_2():
     assert c.top_2 == PageType.WALL_ELEVATION
 
 
-def test_routing_table_covers_six_specialized_pages():
-    """Six specialized prompts: floor_plan, ceiling_plan, wall_elevation,
-    electrical, plumbing, eksplikacija. legend + unknown are routed elsewhere."""
+def test_routing_table_covers_specialized_pages():
+    """Specialized prompts cover every PageType that has a dedicated brief.
+    2026-05-11: added `section` (W2 lubų >3m fix — Vision-side marker
+    reading on rendered pjūvis pages, since text-layer scan is blind on
+    flattened-raster interior PDFs). legend + unknown are routed
+    elsewhere."""
     expected_keys = {
         "floor_plan", "ceiling_plan", "wall_elevation",
-        "electrical", "plumbing", "eksplikacija",
+        "electrical", "plumbing", "eksplikacija", "section",
     }
     assert expected_keys == set(PROMPTS_BY_PAGE_TYPE.keys())
 

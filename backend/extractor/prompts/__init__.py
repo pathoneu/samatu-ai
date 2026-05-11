@@ -14,6 +14,7 @@ from .wall_elevation import WALL_ELEVATION_PROMPT
 from .electrical import ELECTRICAL_PROMPT
 from .plumbing import PLUMBING_PROMPT
 from .eksplikacija import EKSPLIKACIJA_PROMPT
+from .section import SECTION_PROMPT
 
 
 PROMPTS_BY_PAGE_TYPE = {
@@ -23,6 +24,7 @@ PROMPTS_BY_PAGE_TYPE = {
     "electrical": ELECTRICAL_PROMPT,
     "plumbing": PLUMBING_PROMPT,
     "eksplikacija": EKSPLIKACIJA_PROMPT,
+    "section": SECTION_PROMPT,
 }
 
 __all__ = [
@@ -33,5 +35,6 @@ __all__ = [
     "ELECTRICAL_PROMPT",
     "PLUMBING_PROMPT",
     "EKSPLIKACIJA_PROMPT",
+    "SECTION_PROMPT",
     "PROMPTS_BY_PAGE_TYPE",
 ]
