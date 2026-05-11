@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Council verdict — Accuracy 4-week plan (2026-05-11)</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --paper: #ffffff;
+    --ink: #1f2937;
+    --ink-soft: #4b5563;
+    --rule: #e5e1d8;
+    --accent: #2a6fb5;
+    --emerald: #16a34a;
+    --amber: #d97706;
+    --red: #b91c1c;
+    --tag: #f1eee8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  .container { max-width: 880px; margin: 0 auto; }
+  header { margin-bottom: 32px; }
+  header h1 { font-size: 22px; margin: 0 0 4px 0; }
+  header .meta { color: var(--ink-soft); font-size: 12px; }
+  .question {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+  .question .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 6px; }
+  .question p { margin: 6px 0; }
+  .verdict {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 22px 26px;
+    margin-bottom: 28px;
+  }
+  .verdict h2 { font-size: 18px; margin: 0 0 12px 0; color: var(--accent); }
+  .verdict h3 { font-size: 14px; margin: 18px 0 6px 0; color: var(--ink); }
+  .verdict ul { margin: 6px 0 6px 18px; padding: 0; }
+  .verdict li { margin: 4px 0; }
+  .verdict .one-thing {
+    background: #fff8eb;
+    border: 1px solid #f3d791;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .verdict .one-thing strong { color: var(--amber); }
+
+  .alignment {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+  .alignment h2 { font-size: 16px; margin: 0 0 14px 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr 0.7fr 0.7fr;
+    gap: 6px;
+    align-items: center;
+    font-size: 12.5px;
+  }
+  .grid .h { font-weight: 600; color: var(--ink-soft); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; padding: 4px; }
+  .grid .row-label { font-weight: 500; padding: 6px 6px; border-top: 1px solid var(--rule); }
+  .grid .cell { padding: 6px 6px; border-top: 1px solid var(--rule); text-align: center; }
+  .yes { color: var(--emerald); font-weight: 700; }
+  .no  { color: var(--red); font-weight: 700; }
+  .mid { color: var(--amber); font-weight: 700; }
+
+  .advisors h2 { font-size: 16px; margin: 0 0 12px 0; }
+  details {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 12px 18px;
+  }
+  details > summary { cursor: pointer; font-weight: 600; outline: none; padding: 4px 0; }
+  details[open] > summary { margin-bottom: 8px; }
+  details p, details li { margin: 6px 0; }
+  details .role { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-right: 6px; }
+  details .tag {
+    display: inline-block;
+    background: var(--tag);
+    color: var(--ink-soft);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    margin-right: 6px;
+  }
+  .strongest { color: var(--emerald); font-weight: 700; }
+  .blindspot { color: var(--red); font-weight: 700; }
+
+  footer { color: var(--ink-soft); font-size: 11.5px; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--rule); }
+
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  pre { background: #f8f6f0; padding: 10px 12px; border-radius: 6px; overflow-x: auto; }
+  blockquote { margin: 6px 0; padding: 6px 14px; border-left: 3px solid var(--rule); color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Council verdict — Accuracy 4-week plan</h1>
+  <div class="meta">Sąmatų AI · 2026-05-11 · 5 advisors + 5 peer reviewers + chairman</div>
+</header>
+
+<section class="question">
+  <div class="label">Klausimas</div>
+  <p>Konkretus 4-savaičių planas accuracy pakelti. Du nauji constraint'ai: <strong>(1)</strong> rangovas yra <em>reference corpus</em>, ne 100% ground truth — kiekvienas LT rangovas skaičiuoja kitaip; yardstick'as turi būti universal math (RICS NRM2 + DIN + LT STR + CLAUDE.md §1). <strong>(2)</strong> Lygiagrečiai sesijoje veikiantis council priėmė Option F: no-CV MVP, fokusas — prod bugs + customer discovery + inline-number hypothesis.</p>
+</section>
+
+<section class="verdict">
+  <h2>Verdict</h2>
+
+  <h3>Kur council sutiko</h3>
+  <ul>
+    <li><strong>EUR-weighted rangovas-derived benchmark — užmušti.</strong> 3 iš 5 advisorių (Contrarian, First Principles, Outsider) ir 3 iš 5 reviewerių: tai ne accuracy, o mimicry. CLAUDE.md jau įspėjo apie AI-seeded GT spąstus — beveik ką tik buvome bepakartoja klaidą.</li>
+    <li><strong>Week 1 = prod bugs + customer discovery.</strong> 4 iš 5 advisorių (visi išskyrus Expansionist). Niekas iš accuracy darbų neturi prasmės be paying-user signal.</li>
+    <li><strong>Vision = perception only, Python = arithmetic.</strong> Visi advisor'iai pritaria principui; tik laikas skiriasi (Executor sako pirmadienio 20 min, First Principles sako W3).</li>
+    <li><strong>Universal-math-as-product (Expansionist) — atmetama.</strong> Unanimous peer-review verdict'as: regulatorinė vizija remiasi ant zero buyer signal'o.</li>
+  </ul>
+
+  <h3>Kur council nesutarė</h3>
+  <ul>
+    <li><strong>L1100 timing.</strong> Executor: pirmadienio rytas, 20 min. First Principles: W3 cheap-correctness work. Reviewer 4: <em>symptom, not task</em> — visą Vision-grąžinamų agregatų klasę reikia audit'inti, ne vieną lauką.</li>
+    <li><strong>Universal-math benchmark — building or skipping?</strong> Executor: 10-line pytest, ship'inam. First Principles: skip W1, build W4 contingent. Contrarian: kill entirely. Reviewer 2: real GT problemas yra `build_ground_truth.py` failas, kuris egzistuoja bet niekas jo nepaleido.</li>
+    <li><strong>1-2 month MVP deadline.</strong> Du reviewer'iai užklausė: ar šis deadline'as apskritai pateisinamas, jei demand'as nepatvirtintas?</li>
+  </ul>
+
+  <h3>Blind spots, kuriuos peer review pagavo</h3>
+  <ul>
+    <li><strong>2026-05-07 prod user yra realiausias signalas projekte</strong> — 3 reviewer'iai pažymėjo, nė vienas advisor'ius neminėjo. Vienas realus user'is su konkrečiais bug'ais > 5 hipotetiniai cold-call'ai.</li>
+    <li><strong>"Drawing prints its own ground truth"</strong> — First Principles paminėjo, visi 5 reviewer'iai pažymėjo kaip strongest insight. Brėžinys turi dimensijas ant savęs; tai realus GT Vision extraction'ui be jokio AI-seed'inimo.</li>
+    <li><strong>L1100 yra carrying cost, ne one-time fix</strong> — kiekvienas būsimas Vision pakeitimas moka palūkanas, kol Vision/Python boundary'inis turi nuolatinį pažeidimą.</li>
+    <li><strong>"MVP launch" be auth'o / DB'os — neshippable</strong> — localStorage neparduosi.</li>
+  </ul>
+
+  <h3>Rekomendacija</h3>
+  <p>Priimti <strong>Response E + B sintezę</strong> (problemų dekompoziciją + pirmadienio konkretumą), atmesti D (compliance moat fantazija), papildyti peer-review įžvalga: <strong>pradėk nuo 2026-05-07 user'io</strong>, ne nuo 5 šaltų skambučių.</p>
+
+  <p><strong>Korekuotas 4-savaičių planas:</strong></p>
+  <ul>
+    <li><strong>W1 (5 dienų):</strong> (a) Pirmadienio rytas — pataisyk lubų >3m bug'ą (vision_call.py prompt'as + Python post-check) + frontend stale cards (localStorage useEffect). (b) Pirmadienio popietė — kontaktuok 2026-05-07 user'į, paklausk ar gali kartu peržiūrėti naują pasiūlymą šią savaitę. (c) Antrad-trečiad — inline-number prototype'as (Vision output → KŽ rows, jokio canvas'o). (d) Ketvirt-penktad — 3-5 builder calls (pradėk nuo 2026-05-07 user'io face-to-face peržiūros).</li>
+    <li><strong>W2:</strong> Ship'inkit tai, ką call'ai parodė kaip prioritetą. Jei accuracy — building dimensions-from-drawing fixture (E's insight). Jei UX/speed — to.</li>
+    <li><strong>W3:</strong> Problem A (formula unit tests test_universal_math.py 10 lines per CLAUDE.md §1) + Vision/Python boundary AUDIT (ne tik L1100 — visus aggregated Vision returns). Tai cheap correctness work, ne "accuracy."</li>
+    <li><strong>W4:</strong> Contingent — arba Problem B (dimensions-from-drawing fixture jei accuracy patvirtinta blocker'iu), arba toliau ship'inam ką call'ai prašo.</li>
+  </ul>
+
+  <p><strong>Atmesti dalykai:</strong></p>
+  <ul>
+    <li>EUR-weighted rangovas-derived benchmark (mimicry, ne accuracy)</li>
+    <li>"Universal math as product" pivot į regulatorius/bankus/teismus (zero signal)</li>
+    <li>Pre-planned accuracy fixes prieš customer signal'ą</li>
+  </ul>
+
+  <div class="one-thing">
+    <strong>Vienas dalykas, kurį pradėti pirma:</strong> Susisiekt su 2026-05-07 prod test user'iu šiandien. Paprašyk laiko jo sekantį pasiūlymą peržiūrėti kartu — laikrodyk, kiek užtruko, žiūrėk, kur jis ranka tvarkė AI rezultatą. Tai šio projekto highest-signal contact'as. <em>Tas signal'as nustato W1-W4 prioritetus, ne jokia advisor council.</em>
+  </div>
+</section>
+
+<section class="alignment">
+  <h2>Advisor alignment</h2>
+  <div class="grid">
+    <div class="h">Klausimas</div>
+    <div class="h">Contrarian</div>
+    <div class="h">First Principles</div>
+    <div class="h">Expansionist</div>
+    <div class="h">Outsider</div>
+    <div class="h">Executor</div>
+
+    <div class="row-label">Kill EUR-weighted benchmark?</div>
+    <div class="cell yes">YES</div>
+    <div class="cell yes">YES</div>
+    <div class="cell mid">repurpose</div>
+    <div class="cell yes">YES</div>
+    <div class="cell mid">10-line pytest, no framework</div>
+
+    <div class="row-label">W1 = prod bugs + customer calls?</div>
+    <div class="cell yes">YES</div>
+    <div class="cell yes">YES</div>
+    <div class="cell no">NO (pivot)</div>
+    <div class="cell yes">YES</div>
+    <div class="cell yes">YES</div>
+
+    <div class="row-label">Universal math = product?</div>
+    <div class="cell no">NO</div>
+    <div class="cell no">NO</div>
+    <div class="cell yes">YES</div>
+    <div class="cell no">NO</div>
+    <div class="cell no">NO</div>
+
+    <div class="row-label">L1100 fix Monday?</div>
+    <div class="cell mid">defer</div>
+    <div class="cell mid">W3</div>
+    <div class="cell no">irrelevant</div>
+    <div class="cell mid">irrelevant to buyer</div>
+    <div class="cell yes">YES (20 min)</div>
+
+    <div class="row-label">4-week plan even valid?</div>
+    <div class="cell no">premature</div>
+    <div class="cell mid">W4 contingent</div>
+    <div class="cell yes">YES (different)</div>
+    <div class="cell no">demo first</div>
+    <div class="cell mid">1 week good enough</div>
+  </div>
+</section>
+
+<section class="advisors">
+  <h2>Atskirai (collapsed) — kiekvieno advisor'iaus pilnas tekstas</h2>
+
+  <details>
+    <summary><span class="role">Contrarian</span> Fatal flaw — no customer, building accuracy plan; kill EUR benchmark <span class="tag">peer-pick: 1× honorable</span></summary>
+    <p><strong>Fatal flaw:</strong> 2026-05-07 prod test was N=1. Zero paying users. Building accuracy against RICS/DIN that no LT contractor cites. What you're avoiding: customer discovery calls.</p>
+    <p><strong>W2 will break:</strong> lubų bug = 8 more page-classification edges; L1100 refactor = 200 LOC cascade. W4 ships nothing.</p>
+    <p><strong>EUR benchmark:</strong> kill it. rangovas-weighted prices = AI-seeded GT problem rebranded.</p>
+    <p><strong>Order:</strong> W1 = prod bugs + 3 calls BEFORE code. W2 = smallest thing calls demand. W3-4 TBD.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">First Principles Thinker</span> 3 conflated problems; drawing prints its own GT <span class="strongest tag">peer-pick: STRONGEST (5/5)</span></summary>
+    <p><strong>Problem A:</strong> Math correct given inputs? Unit test, afternoon.</p>
+    <p><strong>Problem B:</strong> Vision extracts right inputs? Benchmark vs <em>dimensions printed on the drawing</em>, not rangovas. Drawing literally has GT printed.</p>
+    <p><strong>Problem C:</strong> WTP? Unknown, dominant pre-revenue risk.</p>
+    <p>Accuracy ≠ north star at pre-revenue. <strong>W1:</strong> bugs + 5 calls. <strong>W2:</strong> ship inline-number to those 5. <strong>W3:</strong> Problem A + L1100. <strong>W4:</strong> contingent on calls. Kill EUR benchmark.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">Expansionist</span> Universal-math IS the product — APVA/banks/courts <span class="blindspot tag">peer-pick: BIGGEST BLIND SPOT (5/5)</span></summary>
+    <p>Universal math = product, not QA. Encoded RICS NRM2 + DIN + STR = compliance product for insurance adjusters, APVA, banks, courts.</p>
+    <p>rangovas corpus = "LT Contractor Variance Index" — builders pay to see where they're leaving money on the table.</p>
+    <p>Inline-number positive = PDF is structured DB → F2/F3, defektinis aktas, Sistela. Moat = regulatory truth + bidding variance data.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">Outsider</span> Buyer cares about "lost the job because I was too slow", demo not metrics</summary>
+    <p>Buyer doesn't know "universal math" / "angokrasciai" / "inline-number hypothesis." Half the brief is gibberish to a buyer.</p>
+    <p>"Lubų >3m not auto-detected" — buyer translation: <em>"app got ceiling wrong, I fixed it manually."</em></p>
+    <p>Buyer's benchmark: "saved 3 hours, total looks right enough to email client." Different from "matches universal math."</p>
+    <p>W1 = call 5, time their last quote, watch face on 90-sec demo.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">Executor</span> Monday hour-by-hour; 10-line pytest is the benchmark</summary>
+    <p><strong>09:00:</strong> Delete L1100 aggregated field (20 min).</p>
+    <p><strong>09:30:</strong> Lubų >3m fix — add prompt sentence + Python post-check.</p>
+    <p><strong>13:00:</strong> Frontend stale-cards bug, 2 hours max.</p>
+    <p><strong>15:00:</strong> 5 builder emails out.</p>
+    <p>Universal-math benchmark = <code>test_universal_math.py</code>, 10 lines, hand-coded rooms, assert formula within 2%. No framework.</p>
+    <p>If 1 week only: bugs Mon, inline-number Tue-Wed, calls Thu-Fri. Benchmark deferred to W2.</p>
+  </details>
+</section>
+
+<section class="advisors">
+  <h2>Peer-review highlights (5/5 reviewers)</h2>
+  <details>
+    <summary>Click to expand all 5 peer reviews</summary>
+    <p><strong>Strongest (unanimous 5/5):</strong> First Principles (Response E). Only one to cleanly separate three problems and identify drawing-prints-its-own-GT as the AI-seed escape.</p>
+    <p><strong>Biggest blind spot (unanimous 5/5):</strong> Expansionist (Response D). Compliance pivot to APVA/banks/courts is "strategy fiction at MVP stage" / "Series A pitch deck, not a 4-week plan" / "procrastination disguised as engineering."</p>
+    <p><strong>What ALL 5 advisors missed:</strong></p>
+    <ul>
+      <li>The 2026-05-07 prod user is the highest-signal contact in the project — re-engage them before cold calls (3 reviewers)</li>
+      <li>Ground truth bottleneck — <code>build_ground_truth.py</code> exists but never run; CLAUDE.md flags this as project's #1 open issue</li>
+      <li>L1100 is symptom of a Vision-returns-aggregated-values pattern, not one isolated field</li>
+      <li>"MVP launch" without auth/DB is meaningless — localStorage isn't shippable</li>
+      <li>1-2 month deadline is self-imposed; nobody asked whether 2 more weeks of discovery beats shipping in 4</li>
+      <li>L1100 priced as one-time fix; in reality it's carrying cost (every future Vision change pays interest)</li>
+    </ul>
+  </details>
+</section>
+
+<footer>
+  Generated 2026-05-11 by LLM Council skill · transcript at <code>council-transcript-2026-05-11-accuracy.md</code> · 5 advisors, 5 peer reviewers, 1 chairman.
+</footer>
+
+</div>
+</body>
+</html>
