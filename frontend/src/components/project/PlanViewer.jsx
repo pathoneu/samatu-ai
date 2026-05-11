@@ -790,8 +790,12 @@ export default function PlanViewer({
               Symbol counting via Vision was 49% accurate in bake-off;
               cv2.matchTemplate over-counts 100×. Will rewire when a
               commercial CAD-aware backend is integrated. */}
-          {(typeof window !== 'undefined' &&
-            window.localStorage?.getItem('samatu_experimental_tools') === '1') && (
+          {/* Auto-visible in local dev (vite import.meta.env.DEV) so the
+              tester doesn't have to set localStorage by hand. Production
+              still requires the explicit flag. */}
+          {(import.meta.env?.DEV ||
+            (typeof window !== 'undefined' &&
+              window.localStorage?.getItem('samatu_experimental_tools') === '1')) && (
             <button
               type="button"
               onClick={() => setSymbolToolsOpen(v => !v)}
@@ -889,10 +893,10 @@ export default function PlanViewer({
                   : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
               } disabled:opacity-50`}
               disabled={!pdfFile}
-              title="Apvesk simbolį pelės žyma — CV ieškos panašių visam puslapy"
+              title="Vilkite stačiakampį aplink simbolį — sistema suras panašius visame puslapy"
             >
               <Search className="w-3.5 h-3.5 inline mr-1.5" />
-              {cvCountMode ? 'Apvesk simbolį (CV)' : 'Skaičiuoti CV'}
+              {cvCountMode ? '✏️ Vilkite aplink simbolį' : 'Skaičiuoti pažymint'}
             </button>
             <button
               type="button"
@@ -910,10 +914,10 @@ export default function PlanViewer({
                   : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
               } disabled:opacity-50`}
               disabled={!pdfFile}
-              title="Spausk patalpos vidury — CV pasiūlys polygon"
+              title="Paspauskite patalpos viduje — sistema apves jos sienas"
             >
               <Wand2 className="w-3.5 h-3.5 inline mr-1.5" />
-              {cvWandMode ? 'Spausk patalpos vidury (CV)' : 'Aptikti patalpą CV'}
+              {cvWandMode ? '👆 Paspauskite patalpos viduje' : 'Pažymėti patalpą'}
             </button>
             {fillResult && !fillLoading && (
               <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
@@ -1262,7 +1266,7 @@ export default function PlanViewer({
 
         {/* CV count — review queue (right sidebar). Mounted as a flex
             sibling so the page area shrinks rather than overlapping. */}
-        {cvCount.panelOpen && cvCount.candidates.length > 0 && (
+        {cvCount.panelOpen && (
           <CountReviewPanel
             projectId={cvProjectId}
             pageIdx={pageNumber - 1}
@@ -1290,33 +1294,40 @@ export default function PlanViewer({
       </div>
 
       {/* CV wand — confirm/discard chip floats over the page area until
-          the user accepts or discards the suggested polygon. */}
+          the user accepts or discards the suggested room. */}
       {wandPolygon && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-md border border-emerald-300 bg-white shadow-lg px-3 py-2 text-xs">
-          <span>Pasiūlytas polygon ({wandPolygon.length} taškų)</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (onCvCountAccepted) {
-                onCvCountAccepted({
-                  page: pageNumber,
-                  klass: 'patalpa',
-                  wandPolygon,
-                });
-              }
-              setWandPolygon(null);
-            }}
-            className="px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-          >
-            Priimti
-          </button>
-          <button
-            type="button"
-            onClick={() => setWandPolygon(null)}
-            className="px-2 py-1 rounded border border-[#d8d2c8] hover:bg-[#f1eee8]"
-          >
-            Atmesti
-          </button>
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 rounded-lg border-2 border-emerald-400 bg-white shadow-xl px-4 py-3 text-sm max-w-sm">
+          <div className="font-semibold text-emerald-900">
+            ✓ Patalpa pažymėta brėžinyje
+          </div>
+          <div className="text-xs text-[#3b3b3b]">
+            Žalias punktyras rodo, kur sistema rado sienas. Ar pridėti šią patalpą į kiekius?
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (onCvCountAccepted) {
+                  onCvCountAccepted({
+                    page: pageNumber,
+                    klass: 'patalpa',
+                    wandPolygon,
+                  });
+                }
+                setWandPolygon(null);
+              }}
+              className="flex-1 px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700"
+            >
+              ✓ Pridėti į kiekius
+            </button>
+            <button
+              type="button"
+              onClick={() => setWandPolygon(null)}
+              className="px-3 py-1.5 rounded border border-[#d8d2c8] text-xs hover:bg-[#f1eee8]"
+            >
+              ✕ Atmesti
+            </button>
+          </div>
         </div>
       )}
     </div>

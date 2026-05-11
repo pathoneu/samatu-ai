@@ -52,7 +52,10 @@ export default function CountTool({
     const y = Math.min(drag.sy, drag.ey);
     setDrag(null);
     if (w < 8 || h < 8) {
-      setError('Per maža sritis — apvesk visą simbolį.');
+      setError(
+        'Per maža sritis. Reikia VILKTI pelę: paspauskite simbolio kairėje viršuje, '
+        + 'palaikykite ir patempkite per visą simbolį.',
+      );
       return;
     }
     setBusy(true);
@@ -127,17 +130,33 @@ export default function CountTool({
           position: 'absolute',
           top: 8,
           left: 8,
-          background: 'rgba(255,255,255,0.92)',
-          border: '1px solid #cbd5e1',
-          borderRadius: 4,
-          padding: '4px 8px',
-          fontSize: 12,
-          color: '#0f172a',
+          background: 'rgba(255, 251, 235, 0.97)',
+          border: '2px solid #f59e0b',
+          borderRadius: 6,
+          padding: '8px 12px',
+          fontSize: 13,
+          color: '#78350f',
           pointerEvents: 'none',
+          maxWidth: 360,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
         }}
       >
-        {busy ? 'Ieškoma…' : 'Apvesk simbolį pelės žyma'}
-        {error && <span style={{ color: '#b91c1c', marginLeft: 8 }}>{error}</span>}
+        {busy ? (
+          <span>Ieškoma panašių simbolių visame puslapy…</span>
+        ) : (
+          <>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>
+              ✏️ VILKITE pelę aplink simbolį
+            </div>
+            <div style={{ fontSize: 11, color: '#92400e' }}>
+              Paspauskite kairiajame viršutiniame kampe → palaikykite → patempkite
+              per dešinį apatinį. (NE tik paspausti.)
+            </div>
+          </>
+        )}
+        {error && (
+          <div style={{ color: '#b91c1c', marginTop: 6, fontSize: 11 }}>{error}</div>
+        )}
       </div>
     </div>
   );

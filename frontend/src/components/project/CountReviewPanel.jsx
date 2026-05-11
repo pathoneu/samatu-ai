@@ -90,33 +90,42 @@ export default function CountReviewPanel({
   return (
     <div className="border-l border-border w-80 p-3 space-y-3 text-sm bg-background flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between">
-        <div className="font-semibold">Rasta {candidates.length} kandidatų</div>
+        <div className="font-semibold">Rasta {candidates.length} panašių</div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">
           ✕
         </button>
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        🟢 {high.length} aukšto · 🟡 {med.length} vidutinio · 🔴 {low.length} žemo
-      </div>
+      {candidates.length === 0 ? (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+          Brėžinyje nieko panašaus nerasta. Pabandykite apvesti simbolį tiksliau
+          (be papildomų linijų aplinkui), arba pasirinkite kitą simbolį.
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">
+          🟢 {high.length} tikrai panašūs · 🟡 {med.length} galbūt panašūs · 🔴 {low.length} mažai panašūs
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-xs">
-        <span className="w-16 shrink-0">Klasė</span>
+        <span className="w-24 shrink-0">Pavadinimas</span>
         <input
           type="text"
           value={klass}
           onChange={(e) => setKlass(e.target.value)}
-          placeholder="pvz., rozete"
+          placeholder="pvz., rozetė"
           className="flex-1 px-2 py-1 border border-input rounded text-xs"
         />
       </label>
 
-      <button
-        onClick={acceptAllHigh}
-        className="w-full bg-emerald-600 text-white py-1.5 rounded text-xs hover:bg-emerald-700 transition-colors"
-      >
-        Priimti visus aukšto pasitikėjimo ({high.length})
-      </button>
+      {high.length > 0 && (
+        <button
+          onClick={acceptAllHigh}
+          className="w-full bg-emerald-600 text-white py-1.5 rounded text-xs hover:bg-emerald-700 transition-colors"
+        >
+          Priimti visus tikrai panašius ({high.length})
+        </button>
+      )}
 
       <ul className="flex-1 space-y-1 overflow-y-auto">
         {candidates.map((c, i) => {
@@ -160,7 +169,7 @@ export default function CountReviewPanel({
 
       <button
         onClick={finish}
-        disabled={acceptedCount === 0 || !klass}
+        disabled={acceptedCount === 0}
         className="w-full bg-blue-600 text-white py-2 rounded text-xs hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Užbaigti — pridėti {acceptedCount} į Kiekius

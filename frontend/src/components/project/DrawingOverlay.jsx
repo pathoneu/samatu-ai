@@ -48,9 +48,12 @@ export default function DrawingOverlay({
         if (status === 'accept') ctx.fill();
         ctx.stroke();
       } else if (item.kind === 'polygon') {
-        ctx.strokeStyle = '#2563eb';
-        ctx.fillStyle = 'rgba(37, 99, 235, 0.10)';
-        ctx.lineWidth = 2;
+        // Bright, thick, dashed outline so the user always sees the
+        // suggestion — earlier the faint blue was easy to miss.
+        ctx.strokeStyle = '#16a34a';
+        ctx.fillStyle = 'rgba(22, 163, 74, 0.18)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([10, 6]);
         ctx.beginPath();
         item.points.forEach(([x, y], i) => {
           if (i === 0) ctx.moveTo(x, y);
@@ -59,6 +62,7 @@ export default function DrawingOverlay({
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
   }, [items, width, height]);

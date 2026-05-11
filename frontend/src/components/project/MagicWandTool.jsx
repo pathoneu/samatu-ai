@@ -48,8 +48,25 @@ export default function MagicWandTool({
         dpi,
       });
       if (!out.polygon) {
-        setError('Paspaudei ant sienos arba per arti tarpo. Pabandyk kitur arba padidink jautrumą.');
+        setError('Paspaudėte ant sienos. Pabandykite paspausti tuščioje patalpos vietoje (toliau nuo sienų).');
         return;
+      }
+      // Sanity check: if polygon covers most of the page, flood fill leaked
+      // through a door gap. Tell the user to bump the sensitivity slider
+      // instead of showing them a useless full-page rectangle.
+      if (out.page_size && out.polygon.length > 0) {
+        const [pageW, pageH] = out.page_size;
+        const xs = out.polygon.map(p => p[0]);
+        const ys = out.polygon.map(p => p[1]);
+        const bboxArea = (Math.max(...xs) - Math.min(...xs))
+          * (Math.max(...ys) - Math.min(...ys));
+        if (bboxArea > pageW * pageH * 0.6) {
+          setError(
+            'Patalpa "ištekėjo" pro tarpus tarp sienų. Pakelkite jautrumą '
+            + '(stumkite šliaužiklį į dešinę) ir bandykite dar kartą.',
+          );
+          return;
+        }
       }
       // image px → PDF pt for the editor
       const pdfPts = out.polygon.map(([x, y]) => {
@@ -104,9 +121,11 @@ export default function MagicWandTool({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div>{busy ? 'Aptinkama…' : 'Spausk patalpos vidury'}</div>
+        <div style={{ fontWeight: 600 }}>
+          {busy ? 'Ieškoma patalpos sienų…' : '👆 Paspauskite TUŠČIOJE patalpos vietoje'}
+        </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 60 }}>Jautrumas</span>
+          <span style={{ width: 110 }}>Sienų užpildymas</span>
           <input
             type="range"
             min="3"
@@ -118,6 +137,9 @@ export default function MagicWandTool({
           />
           <span style={{ width: 20, textAlign: 'right' }}>{closeKernel}</span>
         </label>
+        <div style={{ fontSize: 10, color: '#6b7280' }}>
+          Jei patalpa "išteka" už sienų — pakelkite šliaužiklį į dešinę.
+        </div>
         {error && <div style={{ color: '#b91c1c', fontSize: 11 }}>{error}</div>}
       </div>
     </div>
