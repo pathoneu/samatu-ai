@@ -207,17 +207,25 @@ def test_slope_factor_45deg_returns_1_414():
 # ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(
-    reason="CLAUDE.md §1.10: 'for 2 coats multiply by 1.8× (not 2.0×) — first "
-           "coat absorbs more'. Current code doesn't expose paint-liters "
-           "calc as a separate function; covered by line_items.py compute. "
-           "W2 backlog: expose calc_paint_liters() + test 1.8x rule."
-)
 def test_paint_liters_2coats_uses_1_8x_multiplier():
-    from extractor.universal_rules import calc_paint_liters  # noqa: F401
-    # If function exists: 50 m², coverage 9 m²/L, 2 coats
-    # liters = 50 × (1.8 / 9) = 10.0 L (not 50 × 2/9 = 11.11)
-    pytest.fail("calc_paint_liters not implemented as a standalone helper yet")
+    """CLAUDE.md §1.10: 'for 2 coats multiply by 1.8× (not 2.0×) — first
+    coat absorbs more'. Standalone helper landed W2 alongside this test.
+    50 m² × 1.8 / 9 m²/L = 10.0 L (not 50 × 2/9 = 11.11 L).
+    """
+    from extractor.universal_rules import calc_paint_liters
+    liters = calc_paint_liters(area_m2=50.0, coats=2, coverage_m2_per_liter=9.0)
+    assert abs(liters - 10.0) < 0.01, (
+        f"Expected 10.0 L per CLAUDE.md §1.10 (50 × 1.8 / 9), got {liters}"
+    )
+
+
+def test_paint_liters_3coats_adds_full_coat_each():
+    """3 coats = 1.8 (first two) + 1.0 (third) = 2.8× effective.
+    50 m² × 2.8 / 9 = 15.56 L.
+    """
+    from extractor.universal_rules import calc_paint_liters
+    liters = calc_paint_liters(area_m2=50.0, coats=3, coverage_m2_per_liter=9.0)
+    assert abs(liters - 50.0 * 2.8 / 9.0) < 0.01
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -273,15 +281,26 @@ def test_cornice_perim_plus_5pct_in_living():
 # ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(
-    reason="CLAUDE.md §1.8: GK sheets = ceil(wall_area / 3.0) × 1.10. "
-           "Current code emits GKP m² via gkp_lubu_standart_m2 + "
-           "gkp_lubu_virs_3m_m2, but the sheet-count conversion is in "
-           "line_items.py, not universal_rules. W2 backlog: factor out a "
-           "calc_gkp_sheets() helper + test."
-)
 def test_gkp_sheets_ceil_div_3_x_1_1():
-    """3.0 m² per sheet (1.2×2.5), +10% waste."""
-    from extractor.universal_rules import calc_gkp_sheets  # noqa: F401
-    # 50 m² → ceil(50/3.0) × 1.10 = 17 × 1.10 = 18.7 ≈ 19 sheets
-    pytest.fail("calc_gkp_sheets not implemented as a standalone helper yet")
+    """CLAUDE.md §1.8: GK sheets = ceil(wall_area / 3.0) × 1.10.
+    50 m² → ceil(50/3.0) = 17 → 17 × 1.10 = 18.7 → ceil(18.7) = 19 sheets.
+    Standalone helper landed W2 alongside this test.
+    """
+    from extractor.universal_rules import calc_gkp_sheets
+    assert calc_gkp_sheets(50.0) == 19, (
+        f"50 m² should need 19 sheets per CLAUDE.md §1.8, got "
+        f"{calc_gkp_sheets(50.0)}"
+    )
+
+
+def test_gkp_sheets_small_area_min_one():
+    """Even 2 m² should round up to 1 sheet (+10% waste → still 1)."""
+    from extractor.universal_rules import calc_gkp_sheets
+    assert calc_gkp_sheets(2.0) == 2  # ceil(2/3)=1 × 1.10 → ceil(1.1)=2
+
+
+def test_gkp_sheets_zero_area_zero_sheets():
+    """Edge case: no wall area → no sheets."""
+    from extractor.universal_rules import calc_gkp_sheets
+    assert calc_gkp_sheets(0.0) == 0
+    assert calc_gkp_sheets(-5.0) == 0

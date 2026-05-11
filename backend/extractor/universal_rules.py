@@ -103,6 +103,81 @@ UNIVERSAL_RULES = {
 
 
 # ═════════════════════════════════════════════════════════════════════════
+# Material-quantity helpers (CLAUDE.md §1.8 + §1.10)
+#
+# Standalone helpers so the regression suite in test_universal_math.py can
+# anchor against CLAUDE.md spec values without going through the full
+# pozicijos pipeline. Used by line_items.py for actual paint/sheet rows.
+# ═════════════════════════════════════════════════════════════════════════
+
+
+def calc_paint_liters(
+    area_m2: float,
+    coats: int = 2,
+    coverage_m2_per_liter: float | None = None,
+    *,
+    first_coat_factor: float | None = None,
+) -> float:
+    """Paint litrai per CLAUDE.md §1.10.
+
+    Formula: ``liters = area × effective_coats / coverage``.
+
+    For 2 coats the effective multiplier is **1.8** (not 2.0) because
+    the first coat absorbs more material — §1.10 explicitly: *"for 2
+    coats multiply by 1.8× (not 2.0×)"*. For 3+ coats we use ``(coats -
+    0.2)`` (each additional coat adds 1.0× since the surface is
+    sealed after coat 1).
+
+    Args:
+        area_m2: paintable surface area (m²).
+        coats: number of finish coats (NRM2 default 2).
+        coverage_m2_per_liter: m²/L per coat. Defaults to "plastered
+            Q2-Q3" = 8 m²/L per CLAUDE.md §1.10.
+        first_coat_factor: override the 1.8× multiplier for testing.
+
+    Returns:
+        Liters (float, NOT rounded — caller rounds up to container size).
+    """
+    if area_m2 <= 0 or coats <= 0:
+        return 0.0
+    cov = coverage_m2_per_liter or UNIVERSAL_RULES["paint_coverage"]["plastered_q2_q3"]
+    factor = first_coat_factor or UNIVERSAL_RULES["first_coat_factor"]
+    if coats == 1:
+        eff = 1.0
+    elif coats == 2:
+        eff = factor          # 1.8 (NOT 2.0)
+    else:
+        # First coat 1.0× absorption-equivalent, then (coats-1) at 1.0×
+        # minus a small first-coat saving of (2.0 - factor) = 0.2.
+        eff = float(coats) - (2.0 - factor)
+    return area_m2 * eff / cov
+
+
+def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
+    """Gipso kartono lapai per CLAUDE.md §1.8.
+
+    Formula: ``sheets = ceil(wall_area / 3.0) × (1 + waste_factor)``,
+    rounded up to whole sheets.
+
+    1 sheet = 1.2 × 2.5 m = 3.0 m². Waste default +10% (NRM2 §27 + LT
+    convention; CLAUDE.md §1.8 says ×1.10).
+
+    Args:
+        wall_area_m2: total area to clad with GKP (m²).
+        waste_factor: waste multiplier (default 0.10).
+
+    Returns:
+        Whole-sheet count (int).
+    """
+    import math
+    if wall_area_m2 <= 0:
+        return 0
+    sheet_area = UNIVERSAL_RULES["drywall_sheet_area_m2"]
+    bare = math.ceil(wall_area_m2 / sheet_area)
+    return math.ceil(bare * (1.0 + waste_factor))
+
+
+# ═════════════════════════════════════════════════════════════════════════
 # PER PATALPOS TIPĄ — universal taisyklės
 # ═════════════════════════════════════════════════════════════════════════
 
