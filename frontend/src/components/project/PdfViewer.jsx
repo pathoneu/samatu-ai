@@ -43,6 +43,10 @@ import FirstTimePolygonHint from './FirstTimePolygonHint';
 import TraceModeBanner from './TraceModeBanner';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import AiBadge from './AiBadge';
+import CountTool from './CountTool';
+import CountReviewPanel from './CountReviewPanel';
+import MagicWandTool from './MagicWandTool';
+import DrawingOverlay from './DrawingOverlay';
 import { fetchPageLines } from '@/lib/pdfLinesApi';
 import { orthoSnap, selfIntersects } from '@/lib/polygonGeometry';
 import { updateRoomPolygon } from '@/lib/projectStore';
@@ -412,6 +416,8 @@ function LeftToolRail({ tool, setTool, showAdvanced, setShowAdvanced }) {
     { id: 'select',  Icon: MousePointer2, label: 'Pasirinkti',         hint: 'Pasirinkti / pan (Esc)' },
     ...(isCoarse ? [] : [
       { id: 'polygon', Icon: PenTool,     label: 'Polygon (zona)',     hint: 'Brūkšnioti zoną — Enter užbaigti, Backspace anuliuoti tašką' },
+      { id: 'count',   Icon: Search,      label: 'Skaičiuoti simbolius', hint: 'Apvesk simbolį — bus rasti panašūs visam puslapy' },
+      { id: 'wand',    Icon: Hand,        label: 'Aptikti patalpą',    hint: 'Spausk patalpos vidury — bus pasiūlytas polygon' },
     ]),
     { id: 'scale',   Icon: Ruler,         label: 'Mastelis',           hint: 'Nustatyti mastelį — paspausk 2 taškus brėžinyje, įrašyk metrų atstumą' },
     { id: 'comment', Icon: MessageSquare, label: 'Komentaras',         hint: 'Pridėti komentaro žymą' },
@@ -1331,6 +1337,10 @@ function MarkupCanvas({
 
 export default function PdfViewer({
   fileUrl, projectId, onMarkupChange,
+  // Drawing-analysis-tools (W2 of 2026-05-10 plan): when the user accepts
+  // CV count candidates, bubble them up so the parent can fold them into
+  // Kiekiai pozicijos.
+  onCvCountAccepted = null,
   // Sprint F4: focusedRoom carries the room user just clicked. When user is
   // viewing the eksplikacija page and the room has bbox info from pdfplumber,
   // we overlay a highlight on its table row.
@@ -1473,6 +1483,37 @@ export default function PdfViewer({
   // Vector PDF linijos snap'ui — fetch'inamos kai polygon mode aktyvuotas
   const [pageLines, setPageLines] = useState(null);  // {lines, page_width_pdf, page_height_pdf}
   const [linesLoading, setLinesLoading] = useState(false);
+
+  // Drawing-analysis-tools (Tasks 7–9): click-to-count + magic wand.
+  // CV layer renders pages at this DPI; matches the backend Pydantic
+  // default. Larger DPI = more accurate but slower template matching.
+  const CV_DPI = 200;
+  const [cvCount, setCvCount] = useState({
+    candidates: [],         // raw response from /api/cv/match-template (image px)
+    klass: '',              // user-named symbol class (training-data label)
+    templateBbox: null,     // [x, y, w, h] in image px
+    templateDpi: CV_DPI,
+    panelOpen: false,
+    decisionOverlay: [],    // mirrored candidates with status: 'accept'|'reject'|'pending'
+  });
+  const closeCvCount = useCallback(() => {
+    setCvCount({
+      candidates: [], klass: '', templateBbox: null, templateDpi: CV_DPI,
+      panelOpen: false, decisionOverlay: [],
+    });
+  }, []);
+
+  // PDF-pt → CV-image px and inverse, derived from CV_DPI. Pure scalar
+  // conversion — bypasses useCanvasOverlay's viewport state since the
+  // PdfViewer doesn't pass the PDFPageProxy to a hook.
+  const pdfToImage = useCallback((x, y) => {
+    const k = CV_DPI / 72;
+    return [Math.round(x * k), Math.round(y * k)];
+  }, []);
+  const imageToPdf = useCallback((x, y) => {
+    const k = 72 / CV_DPI;
+    return [x * k, y * k];
+  }, []);
 
   useEffect(() => {
     if (tool !== 'polygon') return;
@@ -2063,8 +2104,108 @@ export default function PdfViewer({
               onPolygonVertexInsert={onPolygonVertexInsert}
               onPolygonVertexDelete={onPolygonVertexDelete}
             />
+
+            {/* Drawing-analysis-tools (Tasks 7–9): committed CV markers
+                ride above MarkupCanvas. Their coords come from the API
+                in image px (cv DPI) → converted to screen px here. */}
+            {cvCount.decisionOverlay.length > 0 && pageDims.width > 0 && (
+              <DrawingOverlay
+                width={pageDims.width}
+                height={pageDims.height}
+                enabled={false}
+                items={cvCount.decisionOverlay.map(c => {
+                  const [pdfX, pdfY] = imageToPdf(c.x, c.y);
+                  return {
+                    kind: 'count_marker',
+                    x: pdfX * scale,
+                    y: pdfY * scale,
+                    confidence: c.confidence,
+                    status: c.status,
+                  };
+                })}
+              />
+            )}
+
+            {/* Click-to-count drag-rect tool — only mounts in 'count' mode.
+                Sits above markers so user can re-run a query over them. */}
+            {tool === 'count' && pageDims.width > 0 && (
+              <CountTool
+                projectId={projectId}
+                pageIdx={pageNumber - 1}
+                width={pageDims.width}
+                height={pageDims.height}
+                pageScale={scale}
+                pdfToImage={pdfToImage}
+                dpi={CV_DPI}
+                onCandidates={(candidates, meta) => {
+                  setCvCount(prev => ({
+                    ...prev,
+                    candidates,
+                    templateBbox: meta?.bbox || null,
+                    templateDpi: meta?.dpi || CV_DPI,
+                    panelOpen: true,
+                    decisionOverlay: candidates.map(c => ({ ...c, status: 'pending' })),
+                  }));
+                }}
+              />
+            )}
+
+            {/* Magic-wand tool — click inside a room → polygon goes into
+                polygonDraft so the existing editor finalises it. */}
+            {tool === 'wand' && pageDims.width > 0 && (
+              <MagicWandTool
+                projectId={projectId}
+                pageIdx={pageNumber - 1}
+                width={pageDims.width}
+                height={pageDims.height}
+                pageScale={scale}
+                pdfToImage={pdfToImage}
+                imageToPdf={imageToPdf}
+                dpi={CV_DPI}
+                onPolygon={(pdfPts) => {
+                  // PDF pt → screen px (current zoom). Hand off to the
+                  // existing polygon system: switch to polygon tool with
+                  // a draft pre-populated; user can edit + Enter to finish.
+                  const screenPts = pdfPts.map(p => ({
+                    x: p.x * scale,
+                    y: p.y * scale,
+                  }));
+                  setPolygonDraft({ points: screenPts });
+                  setTool('polygon');
+                  toast('Polygon pasiūlytas — paspausk Enter išsaugoti arba taisyk vertex\'us', { duration: 4000 });
+                }}
+              />
+            )}
           </div>
         </div>
+
+        {/* CountReviewPanel — right sidebar with accept/reject queue.
+            Visible only after a count run produced candidates. */}
+        {cvCount.panelOpen && cvCount.candidates.length > 0 && (
+          <CountReviewPanel
+            projectId={projectId}
+            pageIdx={pageNumber - 1}
+            candidates={cvCount.candidates}
+            klass={cvCount.klass}
+            setKlass={(k) => setCvCount(prev => ({ ...prev, klass: k }))}
+            templateBbox={cvCount.templateBbox}
+            templateDpi={cvCount.templateDpi}
+            onClose={closeCvCount}
+            onUpdateMarkers={(decisionOverlay) => setCvCount(prev => ({ ...prev, decisionOverlay }))}
+            onComplete={(accepted, meta) => {
+              if (onCvCountAccepted && accepted.length > 0) {
+                onCvCountAccepted({
+                  page: pageNumber,
+                  klass: meta?.klass || cvCount.klass,
+                  candidates: accepted,
+                  templateBbox: meta?.templateBbox || cvCount.templateBbox,
+                });
+              }
+              closeCvCount();
+              toast.success(`Pridėta ${accepted.length} ${meta?.klass || ''} į Kiekius`);
+            }}
+          />
+        )}
       </div>
 
       {/* Sprint H3 (2026-04-29): bottom status bar — ALWAYS visible.
@@ -2076,7 +2217,8 @@ export default function PdfViewer({
           <span>
             Įrankis: <strong className="text-viewer-chrome-foreground font-medium">{
               { select: 'Žymėjimas', polygon: 'Polygon', scale: 'Mastelis',
-                comment: 'Komentaras', erase: 'Trinti' }[tool] || tool
+                comment: 'Komentaras', erase: 'Trinti',
+                count: 'Skaičiuoti simbolius', wand: 'Aptikti patalpą' }[tool] || tool
             }</strong>
           </span>
           <span className="text-viewer-chrome-border">·</span>
