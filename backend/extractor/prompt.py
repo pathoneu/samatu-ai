@@ -439,10 +439,25 @@ sistemoje.
 - Tekste „Patalpos virš 3m" / „Aukštos lubos" / „Mansardinė" = dokumentacija
   to kambario aukščio
 
-Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink `lubu_auksciai` dict:
-`{"Svetainė": 3.20, "Virtuvė": 2.55, "Vonia": 2.50, ...}`. Naudok tikslų
-kambario pavadinimą iš eksplikacijos. Backend'as šias vertes naudos vietoj
-section vidurkio (taip dažomas plotas, glaistas, dažai apskaičiuojami tiksliai).
+Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink:
+
+- `lubu_auksciai` dict: `{"Svetainė": 3.20, "Virtuvė": 2.55, "Vonia": 2.50}` —
+  raktai = tikslūs kambario pavadinimai iš eksplikacijos.
+- IR/ARBA `lubu_auksciai_by_nr` dict: `{"102": 3.40, "105": 3.00, "108": 2.50}` —
+  raktai = kambario numeriai iš lubų plano žymėjimų.
+
+🔴 **NEDĖK INFORMACIJOS Į warnings[] tekstinį pranešimą.** Jei matai
+"102=+3400" lubų plane, grąžink jį STRUKTŪRUOTAI:
+- `lubu_auksciai_by_nr: {"102": 3.40}` (visada, jei numeriai matomi)
+- IR `lubu_auksciai: {"<pavadinimas iš eksplikacijos>": 3.40}` (jei galima
+  mapping'ą iš eksplikacijos atlikti)
+
+Warning'as su tekstu "lubų plane 102=+3400" yra duomenų **praradimas** —
+backend'as negali apdoroti tokio teksto, todėl kambario aukštis lieka
+default 2.82. Visada struktūrizuok.
+
+Backend'as šias vertes naudos vietoj section vidurkio (taip dažomas
+plotas, glaistas, dažai apskaičiuojami tiksliai).
 
 Tik jei VISI kambariai TIKRAI vienodo aukščio (vienos plokštumos lubos visur
 be soffit'ų / niche'ų / atvirų erdvių) — palik `lubu_auksciai` tuščią.

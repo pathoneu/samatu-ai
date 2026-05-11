@@ -2291,10 +2291,31 @@ def extract_interior(
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
+    #
+    # 2026-05-11 W2: Vision sometimes only reads room *numbers* from the
+    # lubų plan annotations (e.g. "102=+3400") and can't map them to
+    # eksplikacija names. Accept lubu_auksciai_by_nr as a second source
+    # and merge into lubu_auksciai via patalpa.nr lookup.
     try:
-        per_room_heights = parsed.get("lubu_auksciai") or {}
-        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
+        per_room_heights = dict(parsed.get("lubu_auksciai") or {})
+        per_room_by_nr = parsed.get("lubu_auksciai_by_nr") or {}
         rooms_raw = parsed.get("patalpos") or []
+        # Map numeric keys → room names via patalpa.nr; merge so any name
+        # the model emitted directly via lubu_auksciai wins (model already
+        # did the mapping reliably).
+        if per_room_by_nr:
+            for room in rooms_raw:
+                room_nr = str(room.get("nr") or "").strip()
+                if not room_nr:
+                    continue
+                h_for_nr = per_room_by_nr.get(room_nr) or per_room_by_nr.get(int(room_nr) if room_nr.isdigit() else None)
+                if h_for_nr is None:
+                    continue
+                name = room.get("pavadinimas")
+                if name and name not in per_room_heights:
+                    per_room_heights[name] = float(h_for_nr)
+            parsed["lubu_auksciai"] = per_room_heights
+        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
         rooms_raw = _apply_per_room_heights(
             rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
         )
@@ -2304,6 +2325,8 @@ def extract_interior(
             "rooms_with_per_room": sum(
                 1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
             ),
+            "source_count_by_nr": len(per_room_by_nr),
+            "source_count_by_name": len(parsed.get("lubu_auksciai") or {}),
         })
     except Exception as exc:
         print(f"[extractor] per-room ceiling height apply failed: {exc}")
