@@ -2220,13 +2220,12 @@ def extract_interior(
     # section / ceiling-plan pages, defaulting to ~2.80 m and skewing every
     # wall-paint quantity downstream.
     #
-    # 2026-05-11 W1 audit (reports/2026-05-11-w1-audit.md §3): the prior
-    # "section_pages + (1,)" coverage was wrong for real LT PDFs — pjūviai
-    # sit on back pages (verified: 1_BD.pdf p128, Projektas..pdf p119,
-    # 03_SA.pdf p36), never p1. And page_classifier may not see those
-    # back pages at all (cost-gated to first N pages). Scanner is cheap
-    # text extraction; scan ALL pages, let best_ceiling_candidate filter
-    # to [2.0, 4.5] m range.
+    # 2026-05-11 W1 audit: the prior "section_pages + (1,)" coverage was
+    # wrong for real LT projects — pjūviai routinely sit on back pages
+    # (verified empirically against the interior corpus), not p1. And
+    # page_classifier may not see those back pages at all (cost-gated
+    # to first N pages). Scanner is cheap text extraction; scan ALL
+    # pages, let best_ceiling_candidate filter to [2.0, 4.5] m range.
     #
     # Override threshold tightened 0.30 → 0.15 (asymmetric "going up"):
     # if Vision said 2.80 and marker says 3.00, diff 0.20 — used to be
