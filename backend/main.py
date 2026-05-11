@@ -192,6 +192,9 @@ from api.billing_v2 import router as billing_v2_router
 # Audit re-run on saved project (2026-05-10): re-run cross_page_validator +
 # apply_lt_sanity without re-uploading the PDF, so post-fix warnings refresh.
 from api.revalidate import router as revalidate_router
+# Drawing analysis tools (W1-3 of 2026-05-10 plan): click-to-count +
+# magic-wand polygon suggestion + accept/reject training-data writer.
+from api.cv_tools import router as cv_tools_router
 
 load_dotenv()
 
@@ -317,6 +320,7 @@ app.include_router(legends_router)
 app.include_router(exports_v2_router)
 app.include_router(billing_v2_router)
 app.include_router(revalidate_router)
+app.include_router(cv_tools_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

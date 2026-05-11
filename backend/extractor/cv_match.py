@@ -12,6 +12,11 @@ import numpy as np
 
 DEFAULT_SCALES = (0.85, 0.95, 1.0, 1.05, 1.15)
 DEFAULT_ROTATIONS = (0, 90, 180, 270)
+# Cap candidates per (scale, rotation) before NMS. Featureless templates
+# (mostly-white background patches) match ~everywhere and would blow NMS
+# into O(n²) over millions of points. Real LT plans rarely have >50
+# instances of one symbol on a page; 500 is generous headroom.
+MAX_CANDIDATES_PER_VARIANT = 500
 
 
 def _rotate(template: np.ndarray, deg: int) -> np.ndarray:
@@ -76,6 +81,14 @@ def find_similar_symbols(
                 continue
             result = cv2.matchTemplate(page, rotated, cv2.TM_CCOEFF_NORMED)
             ys, xs = np.where(result >= threshold)
+            if len(xs) > MAX_CANDIDATES_PER_VARIANT:
+                # Cap by top confidence so a featureless template can't
+                # explode pre-NMS into millions of points.
+                scores = result[ys, xs]
+                top_idx = np.argpartition(-scores, MAX_CANDIDATES_PER_VARIANT)[
+                    :MAX_CANDIDATES_PER_VARIANT
+                ]
+                xs, ys = xs[top_idx], ys[top_idx]
             for x, y in zip(xs, ys):
                 candidates.append({
                     "x": int(x + rotated.shape[1] // 2),
