@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-05-13 — Stogai V1 Phase 0 complete
+
+- Geometric engine reproduces both in-hand stogininko sąmatas within tolerance:
+  - **A LAIDA** (keturšlaitis, A4-pair-axis 8.70×12.87 m, slopes 22°/25°): 4/4 line items PASS
+    - Perdanga 117.4 m² (vs 117 actual)
+    - Stogas 185.6 m² (vs 185 actual, +5% waste)
+    - Latakai 51.5 m (vs 52 actual)
+    - Kraigai 37.0 m (vs 36 actual)
+  - **0039 patikslinta** (dvišlaitis, 25.34×7.5 m, slope 30°): 8/8 line items PASS
+    - Stogas 230.4 m² (vs 231 actual)
+    - Sienos (gablai+soflitas) 124.1 m² (vs 135 actual)
+    - Vėjalentės 17.3 m, Kraigas 25.3 m, Latakai 50.7 m, Apsauginė tvorelė 50.7 m
+    - Langų apdirbimas 12 vnt, Kaminėlis 1 (pass-through)
+- 25 unit tests on geometric math (slope_factor, hip_valley_factor,
+  keturslaitis_quantities, dvislaitis_quantities), all PASS.
+- 6 strategy tests (DvislaitisStrategy + KeturslaitisStrategy), all PASS.
+- CLI `python -m extractor.roof.cli <ground_truth.yaml>` verifies output against
+  roofer ground truth, exits 0 if all tolerances met.
+- **Acceptance gate passed.** Next: show CLI output to roofer-friend who provided
+  the sąmatos and get thumbs-up on whether these tolerances + line-item structure
+  match real-world expectation. After verbal sign-off, proceed to Phase 1
+  (page classifier refactor + Vision wiring).
+- Key learning from Phase 0: `eaves_overhang_m` API in geometry functions means
+  "from outer wall face" (NOT from structural axis). LT brėžiniai annotate from
+  axis — subtract `wall_thickness/2` when feeding into the API.
+
 ## Sprint 6 — post-launch deferrals — 2026-05-06
 
 ### Phase C-3 — click-to-fill walls (deterministic, replaces Vision bbox)
