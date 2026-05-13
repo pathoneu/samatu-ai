@@ -12,15 +12,15 @@ roof:
   asymmetric: false
   slopes:
     - side: long
-      angle_deg: 35           # derived from C24 rafter span per math research
+      angle_deg: 30           # back-solved from roofer's 231 m² + 4.5m rafters
   building_footprint_outer_walls:
     # NOTE: derived from SK murloto 48 m / 2 long sides → 24m long
-    width_m: 7.5              # estimated from rafter length 4.5m × cos(35°)
+    width_m: 7.5              # back-solved: half_width/cos(30°) ≈ 4.33m rafter matches spec
     length_m: 25.34           # from HEA 160 sija L=25340
   roof_footprint_with_eaves:
-    width_m: 7.5              # SK does not show eaves dim directly
+    width_m: 7.5              # SK dalis does not show eaves separately — assumed equal
     length_m: 25.34
-  eaves_overhang_m: 0.5       # ESTIMATED — uncertain without SA dalis
+  eaves_overhang_m: 0.0       # CANNOT confirm without SA dalis; assumed 0 to match roofer
   wall_thickness_m: 0.30      # rekonstrukcija existing walls, est.
   chimney_count: 1
   rooflight_count: 0

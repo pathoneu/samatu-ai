@@ -144,3 +144,99 @@ def keturslaitis_quantities(
         hip_surface_per_corner_m=hip_surface_per_corner,
         waste_factor=waste_factor,
     )
+
+
+@dataclass
+class DvislaitisQuantities:
+    """Computed quantities for a gable (dvišlaitis) roof."""
+    stogas_m2: float
+    sienos_m2: float
+    vejalentes_m: float
+    kraigai_m: float
+    latakai_m: float
+    apsaugine_tvorele_m: float
+    rafter_surface_length_m: float
+    gable_triangle_height_m: float
+    waste_factor: float
+
+
+def dvislaitis_quantities(
+    *,
+    building_length_m: float,
+    building_width_m: float,
+    eaves_overhang_m: float,
+    slope_deg: float,
+    wall_thickness_m: float = 0.0,
+    eaves_to_ground_m: float = 0.0,
+    soflitas_depth_m: float = 0.0,
+    waste_factor: float = 0.05,
+) -> DvislaitisQuantities:
+    """Compute dvišlaitis (2-pitch gable) roof quantities.
+
+    Args:
+        building_length_m: building length along ridge direction.
+        building_width_m: building width perpendicular to ridge.
+        eaves_overhang_m: eaves projection from OUTER WALL FACE on long sides.
+            Gable end overhang assumed equal here for V1.
+            NOTE: LT brėžiniai often annotate from AXIS — subtract half wall
+            thickness if needed: eaves_from_wall = eaves_from_axis - wall_thickness/2.
+        slope_deg: roof pitch.
+        wall_thickness_m: kept for API symmetry, unused in core geometry.
+        eaves_to_ground_m: wall height (for sienos m² calc, optional).
+        soflitas_depth_m: soffit depth under eaves (for sienos calc, optional).
+        waste_factor: skardos cuts/overlap allowance (default 5%).
+
+    Returns:
+        DvislaitisQuantities dataclass.
+    """
+    # Roof footprint (long sides extend by eaves; gable ends extend too for
+    # vėjalentės length but NOT for latakai)
+    roof_length = building_length_m + 2 * eaves_overhang_m
+    half_width_with_eaves = building_width_m / 2 + eaves_overhang_m
+
+    # Rafter length on surface (eaves to ridge along slope)
+    rafter_surface = half_width_with_eaves / math.cos(math.radians(slope_deg))
+
+    # Stogas: 2 long faces, each = roof_length × rafter_surface
+    stogas_no_waste = 2 * roof_length * rafter_surface
+    stogas_m2 = stogas_no_waste * (1 + waste_factor)
+
+    # Latakai: long sides only (gable ends have no eaves)
+    latakai_m = 2 * roof_length
+
+    # Apsauginė tvorelė: same length as latakai (safety along eaves)
+    apsaugine_tvorele_m = latakai_m
+
+    # Kraigas: 1 horizontal ridge along building length (no eaves on gable ends)
+    kraigai_m = building_length_m
+
+    # Vėjalentės: 4 raker boards (2 gables × 2 sides), each = rafter_surface
+    vejalentes_m = 4 * rafter_surface
+
+    # Gable triangle: rise = half_width_with_eaves × tan(slope)
+    gable_triangle_height = half_width_with_eaves * math.tan(math.radians(slope_deg))
+
+    # Sienos area (per advisory: 2 gables × full wall height + triangle + soflitas)
+    if eaves_to_ground_m > 0:
+        # Gable wall area = rectangle (length × wall_height) + triangle (½ × base × rise)
+        gable_rect = building_width_m * eaves_to_ground_m
+        gable_triangle = 0.5 * building_width_m * gable_triangle_height
+        gable_full = gable_rect + gable_triangle
+        sienos_gables = 2 * gable_full
+        # Soflitas (under eaves on long sides)
+        sienos_soflitas = 2 * roof_length * soflitas_depth_m
+        sienos_m2 = sienos_gables + sienos_soflitas
+    else:
+        sienos_m2 = 0.0   # caller didn't request
+
+    return DvislaitisQuantities(
+        stogas_m2=stogas_m2,
+        sienos_m2=sienos_m2,
+        vejalentes_m=vejalentes_m,
+        kraigai_m=kraigai_m,
+        latakai_m=latakai_m,
+        apsaugine_tvorele_m=apsaugine_tvorele_m,
+        rafter_surface_length_m=rafter_surface,
+        gable_triangle_height_m=gable_triangle_height,
+        waste_factor=waste_factor,
+    )

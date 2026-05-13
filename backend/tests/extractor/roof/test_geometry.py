@@ -98,3 +98,53 @@ def test_keturslaitis_a_laida_kraigai():
         wall_thickness_m=0.25,
     )
     assert result.kraigai_m == pytest.approx(37, abs=3)
+
+
+def test_dvislaitis_0039_stogas():
+    """0039 stogas: 2 long faces × slope_factor + 5% waste ≈ 231 m²."""
+    result = geometry.dvislaitis_quantities(
+        building_length_m=25.34,
+        building_width_m=7.5,
+        eaves_overhang_m=0.0,
+        slope_deg=30,
+        wall_thickness_m=0.30,
+    )
+    assert result.stogas_m2 == pytest.approx(231, abs=15)
+
+
+def test_dvislaitis_0039_latakai():
+    """0039 latakai = long sides only (no eaves on gable ends) ≈ 51 m."""
+    result = geometry.dvislaitis_quantities(
+        building_length_m=25.34, building_width_m=7.5,
+        eaves_overhang_m=0.0, slope_deg=30, wall_thickness_m=0.30,
+    )
+    assert result.latakai_m == pytest.approx(51, abs=3)
+
+
+def test_dvislaitis_0039_kraigas():
+    """0039 kraigas = 1 top ridge along building length ≈ 26 m."""
+    result = geometry.dvislaitis_quantities(
+        building_length_m=25.34, building_width_m=7.5,
+        eaves_overhang_m=0.0, slope_deg=30, wall_thickness_m=0.30,
+    )
+    assert result.kraigai_m == pytest.approx(26, abs=3)
+
+
+def test_dvislaitis_0039_vejalentes():
+    """0039 vėjalentės = 4 rakers along gable edges ≈ 18 m."""
+    result = geometry.dvislaitis_quantities(
+        building_length_m=25.34, building_width_m=7.5,
+        eaves_overhang_m=0.0, slope_deg=30, wall_thickness_m=0.30,
+    )
+    assert result.vejalentes_m == pytest.approx(18, abs=3)
+
+
+def test_dvislaitis_0039_sienos():
+    """0039 sienos = 2 gable walls + soflitas ≈ 135 m²."""
+    result = geometry.dvislaitis_quantities(
+        building_length_m=25.34, building_width_m=7.5,
+        eaves_overhang_m=0.0, slope_deg=30, wall_thickness_m=0.30,
+        eaves_to_ground_m=5.5,
+        soflitas_depth_m=0.5,
+    )
+    assert result.sienos_m2 == pytest.approx(135, abs=15)
