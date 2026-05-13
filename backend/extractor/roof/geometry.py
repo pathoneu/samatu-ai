@@ -26,3 +26,28 @@ def slope_factor(angle_deg: float) -> float:
     if not (0 <= angle_deg < 90):
         raise ValueError(f"angle_deg must be in [0, 90), got {angle_deg}")
     return 1.0 / math.cos(math.radians(angle_deg))
+
+
+def hip_valley_factor(angle_deg: float) -> float:
+    """Length ratio: 3D hip/valley length / plan-projected length.
+
+    Hips and valleys travel diagonally on a sloped roof. Their 3D length
+    on the roof surface is longer than the plan-projected diagonal because
+    they rise as they travel inward.
+
+    Formula: √(sec²α + 1), where α = slope angle of the adjacent slopes
+    (assuming 90° plan-angle between intersecting slopes).
+
+    Args:
+        angle_deg: slope angle of the planes meeting at this hip/valley.
+
+    Returns:
+        Multiplier > 1.0. At 30° slope = 1.528, at 45° = 1.732.
+
+    Raises:
+        ValueError: if angle_deg outside [0, 90).
+    """
+    if not (0 <= angle_deg < 90):
+        raise ValueError(f"angle_deg must be in [0, 90), got {angle_deg}")
+    sec_a = 1.0 / math.cos(math.radians(angle_deg))
+    return math.sqrt(sec_a ** 2 + 1)

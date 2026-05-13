@@ -39,3 +39,16 @@ def test_slope_factor_zero_angle():
 def test_slope_factor_invalid():
     with pytest.raises(ValueError, match="must be in"):
         geometry.slope_factor(90)
+
+
+@pytest.mark.parametrize("angle_deg,expected", [
+    (15, 1.439),
+    (22, 1.469),
+    (25, 1.489),
+    (30, 1.528),
+    (35, 1.578),
+    (45, 1.732),
+])
+def test_hip_valley_factor(angle_deg, expected):
+    """hvf = √(sec²α + 1) — sloped hip/valley length / plan-projected length."""
+    assert geometry.hip_valley_factor(angle_deg) == pytest.approx(expected, abs=0.002)
