@@ -12,3 +12,30 @@ from extractor.roof import geometry  # noqa: E402
 def test_module_loads():
     """Sentinel — confirms module is importable."""
     assert geometry.__doc__ is not None
+
+
+import math
+import pytest
+
+
+@pytest.mark.parametrize("angle_deg,expected", [
+    (0,  1.000),
+    (15, 1.035),
+    (22, 1.079),
+    (25, 1.103),
+    (30, 1.155),
+    (35, 1.221),
+    (45, 1.414),
+])
+def test_slope_factor(angle_deg, expected):
+    """slope_factor = 1/cos(angle) — sloped area / plan area."""
+    assert geometry.slope_factor(angle_deg) == pytest.approx(expected, abs=0.001)
+
+
+def test_slope_factor_zero_angle():
+    assert geometry.slope_factor(0) == 1.0
+
+
+def test_slope_factor_invalid():
+    with pytest.raises(ValueError, match="must be in"):
+        geometry.slope_factor(90)
