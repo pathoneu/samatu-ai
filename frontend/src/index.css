@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -209,4 +209,95 @@
   outline: 1px solid hsl(var(--primary) / 0.45);
   outline-offset: -1px;
   background: hsl(var(--primary) / 0.05);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Landing page — drafting-anchored aesthetic (2026-05-12).
+   Highlighted noun pill, ghost numerals, floor plan reveal animation.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Highlighted noun pill — wraps one word per H1/H2 in soft accent bg.
+   `display: inline` + `box-decoration-break: clone` keeps the background
+   tight to the glyph height across line wraps, not the full line-box. */
+.h-pill {
+  display: inline;
+  background: hsl(var(--primary) / 0.12);
+  padding: 0.03em 0.22em;
+  border-radius: 4px;
+  color: inherit;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Anchor offset for sticky nav */
+section[id] { scroll-margin-top: 80px; }
+
+/* Ghost numeral — giant background number, low opacity, decorative */
+.ghost-numeral {
+  position: absolute;
+  right: -20px;
+  top: -60px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(140px, 18vw, 220px);
+  line-height: 1;
+  color: hsl(var(--foreground));
+  opacity: 0.04;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+/* Hero floor plan reveal animation. Triggered when `.hero-plan.in`. */
+.hero-plan .sheet-border {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  transition: stroke-dashoffset 700ms cubic-bezier(.16, 1, .3, 1);
+}
+.hero-plan .wall {
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  transition: stroke-dashoffset 900ms cubic-bezier(.16, 1, .3, 1) 200ms;
+}
+.hero-plan .opening {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  transition: stroke-dashoffset 300ms cubic-bezier(.16, 1, .3, 1) 900ms;
+}
+.hero-plan .room-label,
+.hero-plan .meta-element {
+  opacity: 0;
+  transition: opacity 320ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.hero-plan.in .sheet-border,
+.hero-plan.in .wall,
+.hero-plan.in .opening { stroke-dashoffset: 0; }
+
+.hero-plan.in .room-label,
+.hero-plan.in .meta-element { opacity: 1; }
+
+/* Staggered room reveals */
+.hero-plan.in .room-1 { transition-delay: 1100ms; }
+.hero-plan.in .room-2 { transition-delay: 1180ms; }
+.hero-plan.in .room-3 { transition-delay: 1260ms; }
+.hero-plan.in .room-4 { transition-delay: 1340ms; }
+.hero-plan.in .room-5 { transition-delay: 1420ms; }
+.hero-plan.in .room-6 { transition-delay: 1500ms; }
+
+/* Meta elements (title block, scale bar, north arrow) appear last */
+.hero-plan.in .meta-element { transition-delay: 1600ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-plan .sheet-border,
+  .hero-plan .wall,
+  .hero-plan .opening {
+    stroke-dashoffset: 0 !important;
+    transition: none !important;
+  }
+  .hero-plan .room-label,
+  .hero-plan .meta-element {
+    opacity: 1 !important;
+    transition: none !important;
+  }
 }

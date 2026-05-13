@@ -89,7 +89,9 @@ export default function Sidebar({ onNavigate = null }) {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login', { replace: true });
+    // After logout, send user to public Landing at `/`, not /login.
+    // RootRoute will detect no user and render <Landing />.
+    navigate('/', { replace: true });
   };
 
   return (
@@ -103,20 +105,24 @@ export default function Sidebar({ onNavigate = null }) {
         flexShrink: 0,
       }}
     >
-      {/* SĄ Logo — accent square */}
+      {/* North arrow logo — matches landing + brėžinių stilius */}
       <Link
         to="/"
         title="Sąmatų AI — į pradžią"
         className="mx-auto mb-4 flex items-center justify-center"
         style={{
-          width: 32, height: 32, borderRadius: 6,
-          background: 'hsl(var(--sidebar-primary))',
-          color: 'hsl(var(--sidebar-primary-foreground))',
-          fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13,
-          letterSpacing: '0.02em',
+          width: 32, height: 32,
+          color: 'hsl(var(--foreground))',
         }}
       >
-        SĄ
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+          stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"
+          strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="10.5" strokeOpacity="0.4" />
+          <path d="M12 4 L8.5 17 L12 14 L15.5 17 Z" fill="currentColor" />
+          <text x="12" y="3" textAnchor="middle" fontSize="3.4"
+            fontFamily="JetBrains Mono, monospace" fill="currentColor" stroke="none">Š</text>
+        </svg>
       </Link>
 
       {/* Nav items */}

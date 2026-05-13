@@ -72,7 +72,9 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
-          <Logo />
+          <Link to="/" title="Į pradžią" className="no-underline">
+            <Logo />
+          </Link>
         </div>
 
         <div className="border border-border bg-card rounded-xl p-6">

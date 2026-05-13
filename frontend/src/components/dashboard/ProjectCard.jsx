@@ -54,7 +54,7 @@ export default function ProjectCard({ project }) {
       style={{
         background: 'hsl(var(--card))',
         border: '1px solid ' + (hover && isReady ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--border))'),
-        borderRadius: 6, padding: 16,
+        borderRadius: 2, padding: 16,
         cursor: isReady ? 'pointer' : 'default',
         transform: hover && isReady ? 'translateY(-1px)' : 'none',
       }}
@@ -76,7 +76,7 @@ export default function ProjectCard({ project }) {
         <span
           className="font-medium uppercase tracking-wide whitespace-nowrap"
           style={{
-            fontSize: 10, padding: '2px 7px', borderRadius: 3,
+            fontSize: 10, padding: '2px 7px', borderRadius: 2,
             border: '1px solid ' + (isReady
               ? 'hsl(var(--primary) / 0.3)'
               : 'hsl(var(--source-ai) / 0.4)'),

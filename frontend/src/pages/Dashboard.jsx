@@ -79,7 +79,10 @@ export default function Dashboard() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Projektai</h1>
+          <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            00 / Projektai
+          </div>
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Projektai</h1>
           <p className="text-sm text-muted-foreground mt-1">Statybų sąmatų valdymas</p>
         </div>
         <div className="flex items-center gap-2">
