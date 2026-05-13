@@ -82,3 +82,35 @@ def test_dvislaitis_matches_0039_quantities():
     assert by_pos["Apsauginė tvorelė"].kiekis == pytest.approx(51, abs=3)
     assert by_pos["Langų apdirbimas"].kiekis == 12
     assert by_pos["Kaminėlis"].kiekis == 1
+
+
+from extractor.roof.strategies.keturslaitis import KeturslaitisStrategy
+
+
+def test_keturslaitis_produces_4_line_items():
+    """A LAIDA (keturšlaitis) expected: perdanga, stogas, latakai, kraigai."""
+    inp = RoofInput(
+        roof_type="keturslaitis",
+        building_length_m=13.12, building_width_m=8.95,
+        eaves_overhang_m=0.925,                # from OUTER WALL face, not axis
+        slopes_deg=[25, 22],                   # [long, short]
+        wall_thickness_m=0.25,
+    )
+    out = KeturslaitisStrategy().compute(inp)
+    positions = {li.pozicija for li in out.line_items}
+    assert positions == {"Perdanga", "Stogas (danga)", "Latakai", "Kraigai"}
+
+
+def test_keturslaitis_matches_a_laida_quantities():
+    inp = RoofInput(
+        roof_type="keturslaitis",
+        building_length_m=13.12, building_width_m=8.95,
+        eaves_overhang_m=0.925, slopes_deg=[25, 22],
+        wall_thickness_m=0.25,
+    )
+    out = KeturslaitisStrategy().compute(inp)
+    by_pos = {li.pozicija: li for li in out.line_items}
+    assert by_pos["Perdanga"].kiekis == pytest.approx(117, abs=3)
+    assert by_pos["Stogas (danga)"].kiekis == pytest.approx(185, abs=5)
+    assert by_pos["Latakai"].kiekis == pytest.approx(52, abs=2)
+    assert by_pos["Kraigai"].kiekis == pytest.approx(37, abs=3)
