@@ -30,13 +30,8 @@ const ADVANCED_PROJECT_TYPES = [
   { id: 'betonas',  label: 'Betonas',             desc: 'Betono kiekiai' },
 ];
 
-// Sub-tipai per Interjero projektą (Sprint 1, Q3).
-// AI gauna tipologijos kontekstą — skirtingos formulės.
-const INTERIOR_SUBTYPES = [
-  { id: 'naujas',    label: 'Naujas namas',  desc: 'Visi kiekiai 100%, naujos sienos, naujos pertvaros' },
-  { id: 'renovacija', label: 'Renovacija',   desc: 'Dažniausiai 80% sienų lieka, daugiau ardymo, mažesni dažomi plotai' },
-  { id: 'komercinis', label: 'Komercinė',    desc: 'Accessibility vonios, daugiau šviestuvų, nukabinamos lubos' },
-];
+// Interior sub-type still flows to backend (default 'naujas'). UI selector
+// removed 2026-05-13; backend formula branches kept for future re-introduction.
 
 async function detectAndExtract(file, forcedType, signal, opts = {}) {
   let projType = forcedType;
@@ -172,7 +167,8 @@ export default function NewProject() {
   const [companyName, setCompanyName]   = useState('');
   const [file, setFile]                 = useState(null);
   const [projTypeChoice, setProjType]   = useState('interior');
-  const [interiorSubtype, setInteriorSubtype] = useState('naujas');
+  // Default interior subtype, no setter — UI selector removed 2026-05-13.
+  const [interiorSubtype] = useState('naujas');
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -525,29 +521,6 @@ export default function NewProject() {
             </div>
           )}
         </div>
-
-        {/* Sub-tipas — tik kai pasirinktas Interjero arba Auto (kuris dažniausiai tampa interior) */}
-        {(projTypeChoice === 'interior' || projTypeChoice === 'auto') && (
-          <div>
-            <Label className="text-sm text-muted-foreground mb-2 block">Objekto tipas</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {INTERIOR_SUBTYPES.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setInteriorSubtype(s.id)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    interiorSubtype === s.id
-                      ? 'border-primary bg-primary/5 text-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
-                  }`}
-                >
-                  <p className="text-xs font-semibold">{s.label}</p>
-                  <p className="text-[11px] mt-0.5 opacity-70 leading-tight">{s.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>

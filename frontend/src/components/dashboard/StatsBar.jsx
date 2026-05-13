@@ -12,8 +12,8 @@ function StatCell({ label, value, suffix, sub }) {
         {label}
       </div>
       <div
-        className="tabular"
-        style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.015em' }}
+        className="tabular mono"
+        style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em' }}
       >
         {value}
         {suffix && (
@@ -68,7 +68,7 @@ export default function StatsBar({ projects }) {
 
   return (
     <div
-      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border border-border rounded-md overflow-hidden mb-6"
+      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border border-border overflow-hidden mb-6"
       style={{ gap: 1, background: 'hsl(var(--border))' }}
     >
       <StatCell

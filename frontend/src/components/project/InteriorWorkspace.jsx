@@ -147,7 +147,6 @@ export default function InteriorWorkspace({
         {pdfUrl ? (
           <PlanViewer
             fileUrl={pdfUrl}
-            projectId={project.id}
             pageMeta={pageMetaDict}
             missingTypes={missingTypes}
             focusedPage={effectiveFocusedPage}

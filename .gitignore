@@ -60,3 +60,15 @@ AGENTS.md
 
 # Backend nested copy artifact
 backend/backend/
+
+# CV V2 + benchmark runtime artifacts (training data, predictions,
+# corrections, legends) — generated at runtime by Vision pipeline and
+# CV tools, not source. 2026-05-11 W1 audit cleanup.
+data/corrections/
+data/legends/
+data/predictions/
+data/human_gt/
+
+# W1 baseline batch outputs — large JSON dumps regenerable via
+# scripts/w1_baseline_batch.py (each run costs ~$5)
+reports/baseline/

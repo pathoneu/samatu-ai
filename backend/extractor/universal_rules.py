@@ -83,20 +83,98 @@ UNIVERSAL_RULES = {
     # 2026-05-06 audit: tile straight bumped 0.08 → 0.10 per NRM2 §28 + LT QS
     # convention; 8% only for very simple rectangular rooms.
     # Source: docs/formulas/2026-05-06-formula-audit.md §3-4.
+    # 2026-05-11 W1 audit: tiles_herringbone 0.18 → 0.13 (CLAUDE.md §3
+    # max 0.15 for herringbone; §1.7 specifies +12%). parquet_herringbone
+    # 0.20 → 0.16 (CLAUDE.md §1.6 +12-16%, picked upper for safety).
     "waste_factors": {
         "paint": 0.07,                # 5-10% standard
         "drywall": 0.12,              # 10-15%
         "tiles_straight": 0.10,       # 2026-05-06: was 0.08 (under-spec per NRM2)
         "tiles_diagonal": 0.13,
-        "tiles_herringbone": 0.18,
+        "tiles_herringbone": 0.13,    # CLAUDE.md §1.7 +12%, §3 cap 10-15%
         "laminate_straight": 0.10,
         "laminate_diagonal": 0.13,
-        "parquet_herringbone": 0.20,
+        "parquet_herringbone": 0.16,  # CLAUDE.md §1.6 +12-16% range
     },
 
     # Wallpaper
     "wallpaper_roll_usable_area_m2": 4.5,  # 0.53×10.05m gross, ~4-5 useful
 }
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# Material-quantity helpers (CLAUDE.md §1.8 + §1.10)
+#
+# Standalone helpers so the regression suite in test_universal_math.py can
+# anchor against CLAUDE.md spec values without going through the full
+# pozicijos pipeline. Used by line_items.py for actual paint/sheet rows.
+# ═════════════════════════════════════════════════════════════════════════
+
+
+def calc_paint_liters(
+    area_m2: float,
+    coats: int = 2,
+    coverage_m2_per_liter: float | None = None,
+    *,
+    first_coat_factor: float | None = None,
+) -> float:
+    """Paint litrai per CLAUDE.md §1.10.
+
+    Formula: ``liters = area × effective_coats / coverage``.
+
+    For 2 coats the effective multiplier is **1.8** (not 2.0) because
+    the first coat absorbs more material — §1.10 explicitly: *"for 2
+    coats multiply by 1.8× (not 2.0×)"*. For 3+ coats we use ``(coats -
+    0.2)`` (each additional coat adds 1.0× since the surface is
+    sealed after coat 1).
+
+    Args:
+        area_m2: paintable surface area (m²).
+        coats: number of finish coats (NRM2 default 2).
+        coverage_m2_per_liter: m²/L per coat. Defaults to "plastered
+            Q2-Q3" = 8 m²/L per CLAUDE.md §1.10.
+        first_coat_factor: override the 1.8× multiplier for testing.
+
+    Returns:
+        Liters (float, NOT rounded — caller rounds up to container size).
+    """
+    if area_m2 <= 0 or coats <= 0:
+        return 0.0
+    cov = coverage_m2_per_liter or UNIVERSAL_RULES["paint_coverage"]["plastered_q2_q3"]
+    factor = first_coat_factor or UNIVERSAL_RULES["first_coat_factor"]
+    if coats == 1:
+        eff = 1.0
+    elif coats == 2:
+        eff = factor          # 1.8 (NOT 2.0)
+    else:
+        # First coat 1.0× absorption-equivalent, then (coats-1) at 1.0×
+        # minus a small first-coat saving of (2.0 - factor) = 0.2.
+        eff = float(coats) - (2.0 - factor)
+    return area_m2 * eff / cov
+
+
+def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
+    """Gipso kartono lapai per CLAUDE.md §1.8.
+
+    Formula: ``sheets = ceil(wall_area / 3.0) × (1 + waste_factor)``,
+    rounded up to whole sheets.
+
+    1 sheet = 1.2 × 2.5 m = 3.0 m². Waste default +10% (NRM2 §27 + LT
+    convention; CLAUDE.md §1.8 says ×1.10).
+
+    Args:
+        wall_area_m2: total area to clad with GKP (m²).
+        waste_factor: waste multiplier (default 0.10).
+
+    Returns:
+        Whole-sheet count (int).
+    """
+    import math
+    if wall_area_m2 <= 0:
+        return 0
+    sheet_area = UNIVERSAL_RULES["drywall_sheet_area_m2"]
+    bare = math.ceil(wall_area_m2 / sheet_area)
+    return math.ceil(bare * (1.0 + waste_factor))
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -259,13 +337,20 @@ def stairwell_wall_area_m2(perimeter_m: float, max_height_m: float,
 
 
 def room_aukstas_from_nr(nr) -> int:
-    """Extract floor number from room nr (Sprint §16, 2026-04-29).
+    """Extract floor number from room nr (Sprint §16, 2026-04-29; revised 2026-05-10).
 
     Convention used in LT projects:
-      "1F-01", "01", "I-01"   → 1   (first floor)
-      "2F-05", "II-12"        → 2
-      "3F-02", "III-08"       → 3
-      "0F-01", "0-01", "P-01" → 0   (cellar / parter / požeminis)
+      "1F-01", "01", "I-01"     → 1   (first floor)
+      "2F-05", "II-12", "X.2"   → 2
+      "3F-02", "III-08", "X.3"  → 3
+      "0F-01", "0-01", "P-01"   → 0   (cellar / parter / požeminis)
+
+    Bare sequential room numbers ("1", "2", ..., "11") are floor 1 — that's
+    the most common LT residential convention. The "X.Y" compound notation
+    used by samatininkai means "room X on floor Y", so floor comes from the
+    digit AFTER the dot. The previous "first digit wins" heuristic split a
+    real 2-storey project into 9 phantom floors (Playwright regression
+    2026-05-10).
 
     Returns 1 by default (single-floor or unknown). Used by frontend filters
     + cross-page validator to spot mixed-floor extractions.
@@ -273,10 +358,35 @@ def room_aukstas_from_nr(nr) -> int:
     s = str(nr or "").strip().upper()
     if not s:
         return 1
-    # "2F-05", "2F05", "2-05"
-    if s[0].isdigit():
-        return int(s[0])
-    # Roman: "I-01", "II-12", "III-08"
+
+    # LT compound notation: "X.Y" → floor Y (room X on floor Y).
+    if "." in s:
+        try:
+            after_dot = s.split(".", 1)[1]
+            # Take leading digit run after the dot.
+            digits = ""
+            for ch in after_dot:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            if digits:
+                return int(digits)
+        except (ValueError, IndexError):
+            pass
+
+    # Explicit floor prefix:
+    #   "XF-NN" / "XF NN" / "XFNN"  — letter F right after the digit
+    #   "X-NN"                       — single digit then hyphen
+    if len(s) >= 2 and s[0].isdigit():
+        if s[1] == "F" or s[1] == "-":
+            return int(s[0])
+        # Otherwise this is a bare room number ("11", "01", "5"). Floor 1.
+        return 1
+    if len(s) == 1 and s[0].isdigit():
+        return 1
+
+    # Roman: "I-01", "II-12", "III-08" — order matters (longest first).
     if s.startswith("III"): return 3
     if s.startswith("II"):  return 2
     if s.startswith("I"):   return 1
@@ -439,8 +549,16 @@ def calc_room_quantities(room: dict,
     doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
 
-    # Plytelinės sienos (vonia / virtuvė backsplash)
-    tile_height = float(rt_rules.get("tile_walls_to_m") or 0)
+    # Plytelinės sienos (vonia / virtuvė backsplash).
+    # Priority: Vision pass-2 zoom reads actual tile height from išklotinės
+    # (e.g. premium projects often go full-height, 2.4–2.8m). Fall back to
+    # room-type default only when Vision didn't detect the explicit height.
+    # 2026-05-10 benchmark Task 7.2 #1: prior code IGNORED
+    # plyteles_sienos_aukstis_m → undercount vs samatininkų 30-67% on
+    # vonios with full-wall tiles.
+    vision_tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
+    default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
+    tile_height = vision_tile_h if vision_tile_h > 0 else default_tile_h
     tile_walls_area = perim * tile_height if tile_height > 0 else 0
 
     # Sienos NETO (dažomos)

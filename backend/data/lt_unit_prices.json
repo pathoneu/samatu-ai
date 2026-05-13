@@ -1,0 +1,34 @@
+{
+  "currency": "EUR",
+  "vat_mode": "be_pvm",
+  "_source": "rangovas P2-P5 invoice audit (Kaunas mid-market) + R4 council research 2026-05-10",
+  "weights": {
+    "glaistymas_dazymas_bundle": 0.30,
+    "plyteles_sienos_m2": 0.10,
+    "plyteles_grindys_m2": 0.10,
+    "grindys_laminatas_m2": 0.15,
+    "pasleptu_duru_kompl": 0.10,
+    "lubos_virs_3m_m2": 0.05,
+    "_other": 0.20
+  },
+  "unit_prices": {
+    "glaistymas_dazymas_bundle": 14.0,
+    "plyteles_sienos_m2": 22.0,
+    "plyteles_grindys_m2": 14.0,
+    "grindys_laminatas_m2": 7.0,
+    "pasleptu_duru_kompl": 250.0,
+    "lubos_virs_3m_m2": 18.0,
+    "grindjuostes_m": 5.0,
+    "angokrasciai_gkp_m": 12.0,
+    "hidroizoliacija_m2": 10.0,
+    "silikonas_lm": 2.5,
+    "plyteliu_45_suleidimas_lm": 12.0,
+    "plyteliu_profiliai_lm": 8.0,
+    "pasleptu_duru_staktu_m": 15.0,
+    "angokrasciai_lm": 10.0,
+    "angokrasciai_m2": 25.0,
+    "kampai_lm": 4.0,
+    "walls_gross_m2": 14.0,
+    "ceilings_total_m2": 11.0
+  }
+}

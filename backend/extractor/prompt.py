@@ -394,17 +394,50 @@ Imame tiksliai iš eksplikacijos arba inline label'io brėžinyje.
 - techpatalpa = techninė patalpa
 - laiptai = laiptinė
 
-**`plotas_m2`** — pirmenybės tvarka:
+**`plotas_m2`** — pirmenybės tvarka. **NEGALIMA grąžinti 0** —
+kiekvienam kambariui PRIVALOMAI turi būti reikšmė > 0:
 1. **Eksplikacija lentelė** (jei egzistuoja) → `plotas_saltinis: "eksplikacija"` (patikimiausia)
 2. Inline label brėžinyje ("Miegamasis 14.5m²") → `"inline_label"`
-3. Skaičiuojamas iš sienų matmenų (mm) → `"wall_dim_calc"`
+3. Skaičiuojamas iš sienų matmenų (mm) → `"wall_dim_calc"`. PRIVALOMAI
+   pereik į šitą path'ą, jei nei eksplikacijos, nei inline label nėra.
+   Konvertuok sienų matmenis mm → m, dauginimas → m². Plotas niekada
+   nėra 0 jei kambarys turi fizinę plotą plane.
 4. Default per paskirtis (last resort) → `"default_fallback"`. Confidence = "low".
+
+🔴 **Jei grąžini `plotas_m2: 0` — tai BUG'AS.** Backend skaičiuos visus
+kiekius (dažymą, plyteles, grindis, hidroizoliaciją) kaip nulinį → vartotojas
+gaus tuščią pasiūlymą. Geriau jau low-confidence default_fallback (pvz.,
+15 m² miegamajam, 25 m² svetainei) nei 0.
 
 **`perimetras_m`** — sumavimas iš sienų ilgių (mm) brėžinyje. Konvertuok į metrus.
 Jei eksplikacija turi `Perimetras` stulpelį — naudok jį.
 
 **`lubu_aukstis_m`** — pirmenybe iš pjūvio (Pjūvis A-A); tada lubų plano annotation'ų (+2800 = 2.80m).
 Default 2.82m moderniai LT statybai (post-2010). Pažymėk `lubu_aukstis_saltinis`.
+
+🔴 **KRITIŠKAI SVARBU — aukščio žymeklių skaitymas (W1 2026-05-11 bug fix):**
+
+Pjūvyje (Pjūvis A-A, B-B …) yra VERTIKALŪS aukščio žymekliai prie horizontalių
+linijų. Skaityk JUOS, ne defaultink:
+
+  `±0.000`    → grindys (NE lubos)
+  `+2.400`    → sija po lubomis (NE lubos)
+  `+2.800`    → standartinės lubos (modern LT)
+  `+3.000`    → svetainės / virtuvės aukštos lubos
+  `+3.200`    → mansardinis pirmas aukštas
+  `+5.700`    → 2-as aukštas
+  `+6.500`    → stogas (NE lubos)
+
+Pirmas aukštas lubos = DIDŽIAUSIA atžyma intervale tarp `±0.000` ir kitos
+floor-level žymos (jei pastatas turi 2 aukštus). NE sija, NE stogas.
+
+**JEI MATAI `+3.000`+ žymeklį šalia lubų linijos** — grąžink TĄ skaičių (3.00),
+NE defaultink 2.82. NE prarask jo nematydamas. NE bandyk pateisinti "modern LT
+default" jei žymeklis aiškiai sako kitką.
+
+**JEI NEMATAI žymeklio nė vienam puslapy** — grąžink `null`, NE 2.82. Backend'as
+turės warning logikai. Tylus defaulting yra didžiausia accuracy klaida šitame
+sistemoje.
 
 ⚠ **PRIVALOMAI** ieškok skirtingų aukščių per kambarius. LT projektuose dažnai:
 - Svetainė / virtuvė turi **virš 3m** aukštį (atviras dvigubas / mansardinis)
@@ -415,10 +448,44 @@ Default 2.82m moderniai LT statybai (post-2010). Pažymėk `lubu_aukstis_saltini
 - Tekste „Patalpos virš 3m" / „Aukštos lubos" / „Mansardinė" = dokumentacija
   to kambario aukščio
 
-Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink `lubu_auksciai` dict:
-`{"Svetainė": 3.20, "Virtuvė": 2.55, "Vonia": 2.50, ...}`. Naudok tikslų
-kambario pavadinimą iš eksplikacijos. Backend'as šias vertes naudos vietoj
-section vidurkio (taip dažomas plotas, glaistas, dažai apskaičiuojami tiksliai).
+Jei matomi skirtingi aukščiai, **PRIVALOMAI** grąžink:
+
+- `lubu_auksciai` dict: `{"Svetainė": 3.20, "Virtuvė": 2.55, "Vonia": 2.50}` —
+  raktai = tikslūs kambario pavadinimai iš eksplikacijos.
+- IR/ARBA `lubu_auksciai_by_nr` dict: `{"102": 3.40, "105": 3.00, "108": 2.50}` —
+  raktai = kambario numeriai iš lubų plano žymėjimų.
+
+🔴 **NEDĖK INFORMACIJOS Į warnings[] tekstinį pranešimą.** Jei matai
+"102=+3400" lubų plane, grąžink jį STRUKTŪRUOTAI:
+- `lubu_auksciai_by_nr: {"102": 3.40}` (visada, jei numeriai matomi)
+- IR `lubu_auksciai: {"<pavadinimas iš eksplikacijos>": 3.40}` (jei galima
+  mapping'ą iš eksplikacijos atlikti)
+
+Tas pats principas galioja **bet kuriam** aukščio formatui — ne tik
+`+3000`, bet ir `H2400`, "Svarus lubų aukštis: 300cm", "Lubos ~3.0m",
+"3.20m išvestas iš sienų išklotinių", etc. Visi formatai → struktūra.
+
+Warning'as su tekstu "lubų plane 102=+3400" arba "Svetainė ~3.0m" yra
+duomenų **praradimas** — backend'as negali apdoroti tokio teksto,
+todėl kambario aukštis lieka default 2.82. Visada struktūrizuok.
+
+🔴 **Neaiškumas dėl kambario pavadinimo NĖRA pateisinimas pereiti į
+narrative.** Jei pjūvyje matosi "Svetainė ~5.7m" arba "atvira erdvė
+3.0m" arba "dvigubo aukščio holas" — DARYK best-guess mapping'ą į
+eksplikacijoje matomą kambarį (dažniausiai "Svetainė", "Svetainė/
+valgomasis", "Holas", "Atvira erdvė") ir grąžink jį strukturoje:
+
+  `lubu_auksciai: {"Svetainė/valgomasis/virtuvė": 5.7}`
+
+Net jei nesi 100% tikras dėl mapping'o — partial knowledge struktūroje
+yra daug naudingesnė nei tobula informacija tekste. Backend'as
+naudoja struktūrą; tekstas dingsta default 2.82'ame.
+
+Bottom line: jei matei aukštį → STRUKTŪRIZUOK. Jei nesi tikras
+dėl raktų — vis tiek STRUKTŪRIZUOK su geriausiu spėjimu.
+
+Backend'as šias vertes naudos vietoj section vidurkio (taip dažomas
+plotas, glaistas, dažai apskaičiuojami tiksliai).
 
 Tik jei VISI kambariai TIKRAI vienodo aukščio (vienos plokštumos lubos visur
 be soffit'ų / niche'ų / atvirų erdvių) — palik `lubu_auksciai` tuščią.

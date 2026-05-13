@@ -361,14 +361,6 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           onToggle={null}
           top={0}
         />
-        {totalPositions > 0 && (
-          <div className="px-3 py-2 text-[11px] leading-relaxed text-muted-foreground border-b border-border/60 bg-muted/20">
-            Užvedus pelę ant darbo pavadinimo matysi <strong className="text-foreground/80">šaltinį</strong>:
-            „Formulė" — apskaičiuota iš ploto pagal LT taisykles · „AI ženklas" — AI suskaičiavo brėžinyje
-            (patikrink) · „Prielaida" — standartinis numatytasis · „Rankinis" — tu pakeitei.
-            Spustelėjęs eilutę gali keisti kiekį ar kainą; vnt. pozicijoms — − / + mygtukais.
-          </div>
-        )}
         {positionGroups.map(group => (
           <PositionGroup
             key={group.skyrius}
@@ -685,9 +677,15 @@ const PositionRow = memo(function PositionRow({
   return (
     <div
       onClick={onClick}
-      className="grid items-center cursor-pointer hover:bg-muted/40 transition-colors group"
+      className="grid items-start cursor-pointer hover:bg-muted/40 transition-colors group"
       style={{
-        gridTemplateColumns: '12px 36px 1fr 104px 86px 86px',
+        // Narrowed kiekis/kaina/suma columns from 104/86/86 → 88/72/76 so
+        // the description column gets back ~40 px when the right-side
+        // Kiekiai panel is half-width (Brėžinys tab). Description also
+        // wraps now (whitespace-normal below) instead of truncating with
+        // ellipsis, so a name like "Sienų antrinis glaistymas Q2" fits on
+        // two lines rather than being cut to "Sienų antrinis g...".
+        gridTemplateColumns: '12px 32px 1fr 88px 72px 76px',
         gap: 6, padding: '7px 12px', fontSize: 12,
         borderBottom: '1px solid hsl(var(--border) / 0.5)',
       }}
@@ -702,9 +700,9 @@ const PositionRow = memo(function PositionRow({
       <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
         {row.eil_nr || ''}
       </span>
-      <div className="flex items-center gap-1.5 min-w-0">
+      <div className="flex items-start gap-1.5 min-w-0">
         <span
-          className="text-foreground/90 truncate"
+          className="text-foreground/90 leading-snug break-words"
           title={row.review_reason || row.calculation_basis || sourceLabel}
         >
           {row.aprasymas}

@@ -21,10 +21,17 @@ class TestAukstasFromNr:
         assert room_aukstas_from_nr("0-01") == 0
 
     def test_plain_numbers_default_to_1(self):
-        # "01", "12" — no floor prefix → assume single-floor
-        assert room_aukstas_from_nr("01") == 0  # leading 0 → cellar (0F)
+        # 2026-05-10: bare room numbers ("01", "12", "99") with no floor
+        # prefix must default to floor 1. Pre-fix the function naively took
+        # the first digit ("99" → floor 9) which split a real 2-storey LT
+        # project into 9 phantom floors — see test_room_aukstas_from_nr.py
+        # for the fuller LT-convention coverage including "X.Y" compound nrs.
+        assert room_aukstas_from_nr("01") == 1
         assert room_aukstas_from_nr("12") == 1
-        assert room_aukstas_from_nr("99") == 9  # ambiguous; first digit wins
+        assert room_aukstas_from_nr("99") == 1
+        # Explicit cellar prefix still wins:
+        assert room_aukstas_from_nr("0F-01") == 0
+        assert room_aukstas_from_nr("P-01") == 0
 
     def test_empty_or_none(self):
         assert room_aukstas_from_nr("") == 1

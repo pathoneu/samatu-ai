@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Council verdict — Executable 4-week plan (2026-05-11 R2)</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --paper: #ffffff;
+    --ink: #1f2937;
+    --ink-soft: #4b5563;
+    --rule: #e5e1d8;
+    --accent: #2a6fb5;
+    --emerald: #16a34a;
+    --amber: #d97706;
+    --red: #b91c1c;
+    --tag: #f1eee8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 24px; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14.5px; line-height: 1.55;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 32px; }
+  header h1 { font-size: 22px; margin: 0 0 4px 0; }
+  header .meta { color: var(--ink-soft); font-size: 12px; }
+  section.block { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 18px 22px; margin-bottom: 22px; }
+  section.verdict { border-left: 4px solid var(--accent); }
+  section h2 { font-size: 18px; margin: 0 0 12px 0; color: var(--accent); }
+  section h3 { font-size: 14.5px; margin: 18px 0 6px 0; color: var(--ink); }
+  ul { margin: 6px 0 6px 20px; padding: 0; }
+  li { margin: 4px 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: #f8f6f0; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #1f1e1a; color: #e5e1d8; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5; }
+  .one-thing { background: #fff8eb; border: 1px solid #f3d791; border-radius: 6px; padding: 14px 16px; margin-top: 14px; }
+  .one-thing strong { color: var(--amber); }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--ink-soft); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  details { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 10px; padding: 12px 18px; }
+  details > summary { cursor: pointer; font-weight: 600; outline: none; padding: 4px 0; }
+  details[open] > summary { margin-bottom: 8px; }
+  .role { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-right: 6px; }
+  .tag { display: inline-block; background: var(--tag); color: var(--ink-soft); border-radius: 999px; padding: 2px 8px; font-size: 11px; margin-right: 6px; }
+  .strongest { color: var(--emerald); font-weight: 700; }
+  .blindspot { color: var(--red); font-weight: 700; }
+  footer { color: var(--ink-soft); font-size: 11.5px; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .verified { color: var(--emerald); font-weight: 700; }
+  .falsified { color: var(--red); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Council verdict — Executable 4-week plan</h1>
+  <div class="meta">Sąmatų AI · 2026-05-11 R2 · 5 advisors (skill-enabled) + 5 peer reviewers + chairman</div>
+</header>
+
+<section class="block">
+  <h2 style="color: var(--ink);">Klausimas</h2>
+  <p>Pateikite konkretų 4-savaičių EXECUTABLE planą su failais, funkcijomis, testais, acceptance criteria, <code>[RESEARCH]</code> items, ir risk register'iu. Prior decisions locked: CV V2 unwired (Option F), EUR-rangovas benchmark killed, universal math + drawing-printed dims = GT. Live prod user nepasiekiamas (rangovas pending). Bug'ai: lubų >3m p1, stale localStorage cards. Vision/Python boundary violation prie <code>vision_call.py:1100</code>. <code>test_universal_math.py</code> neegzistuoja. 5 rangovas PDFs available.</p>
+</section>
+
+<section class="block verdict">
+  <h2>Verdict</h2>
+
+  <h3>Council convergence</h3>
+  <ul>
+    <li><strong>D (Contrarian) yra strongest — 4/5 reviewer'ių.</strong> Vienintelis kuris faktiškai grep'ino kodą ir falsifikavo prompt'o framing'ą. <span class="verified">VERIFIED:</span> 26 <code>_total"</code> aggregate'ai, ne tik L1100 (chairman patikrino su grep'u). Pattern simetrija L424-434 ↔ L1850-1860.</li>
+    <li><strong>C (Executor) plan'as struktūriškai stiprus, BET targets unverified — 2/5 reviewer'ių pažymėjo kaip biggest blind spot.</strong> Hour-by-hour neturi vertės, jei taikoma neteisingam target'ui (L1100 vs 26 sites).</li>
+    <li><strong>A (Outsider) ir D abu sutinka: customer signal'as yra W1 AC, ne "N bug'ų uždaryta".</strong> A nori "burn the plan and drive there", D nori "contractor X re-engaged with prod link". Realistically A premise'as locked (rangovas pending, ne available), todėl D versija laimi.</li>
+    <li><strong>B (First Principles) sąžinė: 3 problemos painiojamos.</strong> Math correctness (unit test, šiandien) ≠ Vision input correctness (hand-GT, probabilistic) ≠ confidence-blocking bugs (felt pain). Skirtingi feedback loops.</li>
+  </ul>
+
+  <h3>Chairman verifikacijos (post-debate)</h3>
+  <table>
+    <tr><th>Claim</th><th>Source</th><th>Status</th></tr>
+    <tr><td><code>vision_call.py</code> turi 26 <code>_total"</code> aggregate'us, ne 1 (L1100)</td><td>D R1</td><td><span class="verified">✓ VERIFIED (26 hits, L424-434 + L1850-1860 mirror set)</span></td></tr>
+    <tr><td><code>Dashboard.jsx:24</code> mount-only useEffect (cards stale)</td><td>C R1</td><td><span class="verified">✓ VERIFIED (<code>}, [queryClient])</code>)</span></td></tr>
+    <tr><td><code>universal_rules.py:553</code> +10% inline, CLAUDE.md §1.4 says split 10%/5%</td><td>D R1</td><td><span class="verified">✓ VERIFIED (line exists; cornice not computed at all)</span></td></tr>
+    <tr><td>Files don't exist at <code>backend/api/</code> path</td><td>Reviewer 3</td><td><span class="falsified">✗ FALSIFIED (reviewer looked in wrong path; correct path <code>backend/extractor/</code> was in brief)</span></td></tr>
+  </table>
+
+  <h3>Blind spots peer review pagavo</h3>
+  <ul>
+    <li><strong>Branch state contradiction</strong> — <code>data/corrections/</code> + <code>data/legends/</code> untracked, contradicts "Option F locked" claim. Reviewer 1 catch. Action: <code>git status</code> + add to .gitignore or stage explicitly before W1 starts.</li>
+    <li><strong>Lubų >3m bug needs DIAGNOSIS, not assumed prompt fix.</strong> Reviewer 2 catch — nobody ran the failing PDF through pipeline to see WHERE 2.5m default wins. May be page-classifier issue, not prompt issue. Instrument first.</li>
+    <li><strong>rangovas PDFs may not be representative of pending contractor's CAD style.</strong> Reviewer 4 catch. Mitigation: assume nothing about contractor's PDF; design W1 fixes against drawing-printed dimensions (universal), not rangovas-specific quirks.</li>
+    <li><strong><code>build_ground_truth.py</code> flow exists but nobody runs it.</strong> Reviewer 5 catch (CLAUDE.md "Open/next" §). Highest-leverage W1 item per project's own documentation.</li>
+    <li><strong>Constants audit must precede TDD or tests calcify bugs.</strong> D R1 + 2 reviewers. Cornice missing from <code>calc_room_quantities</code>; +10%/+5% split per CLAUDE.md §1.4.</li>
+  </ul>
+
+  <h3>Galutinis 4-savaičių planas</h3>
+
+  <h3 style="color: var(--accent);">W1 — diagnose, then fix the bugs that audit confirmed</h3>
+
+  <p><strong>Day 1 (Pirmad) — AUDIT (3h, read-only)</strong></p>
+  <ul>
+    <li><strong>09:00–10:00 — <code>_total"</code> inventory.</strong> Run <code>grep -nE '_total"' backend/extractor/vision_call.py</code>; for each of 26 sites, classify: (a) Vision returns aggregate (boundary violation), (b) Python derives aggregate (legit), (c) re-export of aggregate (passthrough). Output: <code>reports/2026-05-11-total-audit.md</code> with 26 rows.</li>
+    <li><strong>10:00–11:00 — Constants audit.</strong> Run <code>grep -nE "\* (1\.0[58]|1\.10|1\.12|1\.15|1\.16|1\.17|2\.0)" backend/extractor/universal_rules.py</code>; for each, cite CLAUDE.md §1.X line that justifies (or contradicts) the multiplier. Output appended to audit report. <strong>Especially:</strong> verify <code>:553</code> grindjuostės +10% vs CLAUDE.md §1.4 (which also requires cornice +5% — a missing pozicija).</li>
+    <li><strong>11:00–12:00 — Lubų >3m instrumentation.</strong> Pick one failing PDF (from internal testing). Run extraction with <code>--log-level DEBUG</code> + <code>print()</code> hooks before <code>vision_call.py:2218-2270</code> marker fallback. Determine: (a) is p1 classified as floor_plan or section? (b) does <code>scan_page_height_markers</code> get called for p1? (c) what does Vision return for <code>lubu_aukstis_m</code>? (d) where does 2.5m default win? Output: <code>reports/2026-05-11-lubai-diag.md</code>.</li>
+  </ul>
+
+  <p><strong>Day 1 (Pirmad) — FIX (afternoon, narrowly scoped)</strong></p>
+  <ul>
+    <li><strong>13:00–14:30 — Lubų >3m fix</strong> (per Day 1 morning diagnosis only). If diagnosis says prompt: add Vision instruction as per Executor R1; threshold from <code>cand_m - 0.3</code> → <code>cand_m - 0.15</code> with asymmetric guard (<code>cand_m > 2.95</code>) per Executor R1 risk register. If diagnosis says page classifier: fix <code>page_classifier.py</code>; prompt untouched. <strong>Acceptance:</strong> failing PDF now returns correct ceiling on p1.</li>
+    <li><strong>14:30–15:30 — Stale cards fix.</strong> <code>frontend/src/pages/Dashboard.jsx:24</code> — useEffect dependency stays <code>[queryClient]</code>, but add window-focus listener: <code>window.addEventListener('focus', () => pullProjectsFromBackend().then(invalidate))</code> + cleanup. <strong>Acceptance:</strong> edit project name in tab A, switch to tab B, focus → card updates without page reload.</li>
+    <li><strong>15:30–16:30 — Re-ping contractor.</strong> Email + prod link offered. Even if no response, the contact attempt itself is the W1 AC (per D R1).</li>
+  </ul>
+
+  <p><strong>Day 2-3 (Antrad-Trečiad) — Math correctness</strong></p>
+  <ul>
+    <li>Create <code>backend/tests/test_universal_math.py</code>. <strong>Critical:</strong> each test asserts against CLAUDE.md §1 SPEC value with line citation (e.g., <code># CLAUDE.md §1.1 line 47: openings <0.5m² NOT deducted</code>), NOT against current code output. Where current output disagrees with spec, mark <code>@pytest.mark.xfail(reason="known bug: cornice not emitted, CLAUDE.md §1.4")</code>.</li>
+    <li>12 tests minimum: dažomas plotas (NRM2 deduct rule), angokrasciai (2H+W), grindjuostės (perim − doors + 10%), kornizai (perim + 5% — likely XFAIL), paint liters (2 coats × 1.8), glaistas Q4 (1.5 kg/m²/mm), GK sheets (ceil/3.0 × 1.1), hidroizoliacija full floor + splash, šukšlių išvežimas, isliginamasis grindims, slope factor flat 1.00, dur reveal.</li>
+    <li><strong>Acceptance:</strong> all tests either GREEN or XFAIL with documented CLAUDE.md citation; no tests that just match current output without spec backing.</li>
+  </ul>
+
+  <p><strong>Day 4-5 (Ketv-Penkt) — Boundary pattern fix (only after audit)</strong></p>
+  <ul>
+    <li>Per Day 1 audit's 26-site inventory, refactor the boundary as a PATTERN: Vision returns ONLY raw geometric primitives (room perim, ceiling height, opening dims, kambario polygon), Python aggregates in <code>universal_rules.calc_room_quantities</code> or <code>_build_pozicijos_from_rooms</code>. <strong>Don't touch all 26 sites at once</strong> — pick 3-5 highest-EUR-impact (rough heuristic: ones that feed pozicijos with prices), fix as one PR, verify all tests pass, commit, then next batch. Use feature branch.</li>
+    <li>Run 5-rangovas batch end of W1 as Branch trigger detection (Executor R1). Categorize errors. Tag <code>w1-baseline</code>.</li>
+  </ul>
+
+  <h3 style="color: var(--accent);">W2-W4 contingent branches</h3>
+  <ul>
+    <li><strong>Branch A (Vision wrong > formulas):</strong> if W1 5-rangovas batch shows >40% errors from bad Vision inputs. W2 typed Pydantic schema at vision/python boundary; W3 split <code>vision_call.py</code> by extracting <code>_build_pozicijos_*</code>; W4 prompt iteration with golden-set regression.</li>
+    <li><strong>Branch B (Formulas wrong > Vision):</strong> if >40% errors are formula bugs. W2 expand <code>test_universal_math.py</code> to 40 tests; W3 implement missing §1 items (cornice +5%, hidroizoliacija full coverage, Q4 sanding, LED juostos); W4 cross-page validator improvements.</li>
+    <li><strong>Branch C (Both ~equal) — Wow-by-W2 (Expansionist R1):</strong> ship confidence-annotated quantities with source dimension inline ("Lubų: 3.20 m 🟢 from pjūvis p.4") per CLAUDE.md §7. Plus inline-edit count-correction UI from CLAUDE.md "Open/next". W2 UI; W3 persist corrections to <code>data/corrections/</code>; W4 dogfood rangovas PDF #4+#5.</li>
+  </ul>
+
+  <h3 style="color: var(--accent);"><code>[RESEARCH]</code> items</h3>
+  <ol>
+    <li><strong>Page classifier reliability on p1.</strong> Read <code>backend/extractor/page_classifier.py</code>. Run on 5 rangovas PDFs, log classification per p1. If p1 ever mis-tagged, height-marker scan misses it.</li>
+    <li><strong>Vision boundary surface area inventory.</strong> Done in W1 Day 1 audit; output is <code>reports/2026-05-11-total-audit.md</code>.</li>
+    <li><strong>Constants audit vs CLAUDE.md §1.</strong> Done in W1 Day 1 audit.</li>
+    <li><strong>Hand-build drawing-printed GT for 5 rangovas PDFs.</strong> ~2h work. Output: <code>training-data/gt/projektas_N.yaml</code> with every dimension stamped on the drawing (lubų aukštis, kambario plotas, langų matmenys). REPLACES AI-seeded GT flagged in CLAUDE.md "Open/next".</li>
+    <li><strong>Pending contractor's CAD style sample.</strong> If/when contractor sends test PDF, add to corpus and verify W1 fixes still hold. Risk per Reviewer 4: he may draw differently than rangovas.</li>
+    <li><strong>Branch state cleanup.</strong> <code>data/corrections/</code> and <code>data/legends/</code> untracked — decide stage or gitignore. Per Reviewer 1.</li>
+  </ol>
+
+  <h3 style="color: var(--accent);">Risk register</h3>
+  <table>
+    <tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr>
+    <tr><td><code>vision_call.py</code> 2732 LOC regression on boundary refactor</td><td>HIGH</td><td>Audit-first (W1 Day 1); batch-3-to-5 sites per PR; tests must pass before next batch; feature branch with revert plan</td></tr>
+    <tr><td>TDD tests calcify wrong values</td><td>HIGH</td><td>Each test cites CLAUDE.md §1.X line; <code>@pytest.mark.xfail</code> for known bugs with reason</td></tr>
+    <tr><td>Lubų prompt fix breaks Soviet 2.50m default</td><td>MED</td><td>Asymmetric guard: only override when <code>cand_m > 2.95</code></td></tr>
+    <tr><td>5-rangovas batch result doesn't transfer to pending contractor's CAD</td><td>MED</td><td>Design fixes against drawing-printed dims (universal), not rangovas-specific quirks</td></tr>
+    <tr><td><code>refetchOnWindowFocus</code> price-edit thrash</td><td>LOW</td><td>Scope to Dashboard route only; ProjectMainView has separate scan logic per comment</td></tr>
+    <tr><td>Branch state confusion (uncommitted CV files)</td><td>LOW</td><td>Day 1 first task: <code>git status</code> + decide</td></tr>
+  </table>
+
+  <div class="one-thing">
+    <strong>Vienas dalykas, kurį pradėti pirma (W1 Day 1 09:00):</strong> 3-valandų read-only AUDIT pass. Tris grep'us → trys report'ai į <code>reports/2026-05-11-w1-audit.md</code>: (1) <code>_total"</code> 26-site inventory su klasifikacija; (2) constants vs CLAUDE.md §1 cross-reference; (3) lubų >3m diagnosis su print() hooks per pipeline. <em>Po šio 3h audit'o žinai TIKSLIAI kur taikyti fix'us. Be jo — C plan'as gali pataisyti L1100 ir regress'inti L425+L1851.</em>
+  </div>
+</section>
+
+<section class="block">
+  <h2 style="color: var(--ink);">Advisor alignment</h2>
+  <table>
+    <tr><th>Klausimas</th><th>Contrarian (D)</th><th>First Principles (B)</th><th>Expansionist (E)</th><th>Outsider (A)</th><th>Executor (C)</th></tr>
+    <tr><td>Audit BEFORE fix?</td><td><strong style="color: var(--emerald)">YES</strong></td><td>partial</td><td>no</td><td>no</td><td>no (jumps to fix)</td></tr>
+    <tr><td>L1100 boundary fix Monday?</td><td><strong style="color: var(--red)">NO — 26 sites</strong></td><td>defer</td><td>W3</td><td>tonight</td><td><strong style="color: var(--red)">YES (wrong)</strong></td></tr>
+    <tr><td>TDD test_universal_math.py W1?</td><td>only after constants audit</td><td>YES, primary</td><td>YES, compounding asset</td><td>bureaucracy</td><td>Monday morning</td></tr>
+    <tr><td>5-rangovas as customer substitute?</td><td>partial; AC must include contractor re-engagement</td><td>1 PDF deep > 5 shallow</td><td>bug-class detector</td><td><strong style="color: var(--red)">NO</strong></td><td>yes (Tue-Fri)</td></tr>
+    <tr><td>Wow-by-W2 feature?</td><td>not addressed</td><td>not addressed</td><td><strong style="color: var(--emerald)">confidence-annotated quantities</strong></td><td>90-sec WhatsApp demo</td><td>not addressed</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2 style="color: var(--ink);">Atskirai (collapsed) — advisor responses</h2>
+
+  <details>
+    <summary><span class="role">Contrarian</span> 26 <code>_total"</code> sites, not 1; constants audit BEFORE tests; contractor re-engaged = W1 AC <span class="strongest tag">peer-pick: STRONGEST (4/5)</span></summary>
+    <p>(1) "Vision/Python boundary at vision_call.py:1100" is mis-scoped. Grepped: <code>angokrasciu_gkp_m_total</code> appears at L425, L1831, L1851. Pattern is "Vision returns _total aggregate, Python re-derives." Single-site fix regresses two. Audit grep entire 2732 LOC first.</p>
+    <p>(2) "Write test_universal_math.py W1" — wrong if you skip the gap. <code>universal_rules.py:553</code> +10% inline; CLAUDE.md §1.4 splits 10% baseboard / 5% cornice. Tests will lock current wrong values. Audit constants first.</p>
+    <p>(3) "5 rangovas = customer substitute" — dangerous framing. Batch reveals bug distribution, not WTP. W1 AC must include "contractor X re-engaged with prod link."</p>
+    <p><strong>Risk if ignored:</strong> W4 ends with green tests, clean audit, 5 perfect rangovas reproductions — and zero users.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">First Principles</span> 3 conflated problems; pick feedback loop before plan</summary>
+    <p>Math correctness, Vision input correctness, confidence-blocking bugs — three different feedback loops, time-to-truth, ROI. Bundling is the trap.</p>
+    <p>Real W1 question: <em>if no contractor calls back for 4 weeks, what evidence in W1 would convince you the app is closer to shippable?</em></p>
+    <p>(a) "math is provably right" → write test_universal_math.py against §1.<br>
+       (b) "Vision reads p1 of rangovas-1 correctly" → hand-extract GT from ONE PDF and diff.<br>
+       (c) "I trust the demo" → fix two bugs, ignore accuracy.</p>
+    <p>Vote: (a) unit tests first. Math bugs invalidate every Vision measurement above them.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">Expansionist</span> Wow-by-W2: confidence-annotated quantities with inline source (CLAUDE.md §7)</summary>
+    <p>(1) 5-PDF batch = bug-class detector. One class probably owns 40%+ variance.</p>
+    <p>(2) test_universal_math.py = compounding asset. Replaces killed EUR benchmark. By W4 it's the only honest accuracy number; future prompt tweaks = 30-sec pytest. 2× speedup.</p>
+    <p>(3) L1100 boundary fix unlocks deterministic A/B prompt tuning W3-W4.</p>
+    <p>(4) <strong>Wow-by-W2:</strong> "Lubų aukštis: 3.20 m 🟢 (read from pjūvis p.4)". CLAUDE.md §7 already specifies confidence indicators. Bigger contractor "wow" than +10% accuracy he can't audit.</p>
+  </details>
+
+  <details>
+    <summary><span class="role">Outsider</span> Burn the 4-week plan; drive to contractor; 90-sec WhatsApp demo Friday <span class="blindspot tag">peer-pick: BLIND SPOT (2/5)</span></summary>
+    <p>Zero paying users → no accuracy problem, only nobody-tried-it problem. Lubų >3m fix is tonight item, not W1 item. Same with stale cards.</p>
+    <p>Real plan one page: today/tomorrow fix bugs deploy; this week drive to contractor, watch one quote; next 3 weeks write themselves from what you saw.</p>
+    <p><em>Chairman: premise rejected. User locked "no live user, contractor pending." A burns the question instead of answering it.</em></p>
+  </details>
+
+  <details>
+    <summary><span class="role">Executor</span> Hour-by-hour Monday + Branch A/B/C contingent + risk register <span class="blindspot tag">peer-pick: BLIND SPOT (2/5)</span></summary>
+    <p>Full hour-by-hour Monday plan covering TDD test_universal_math.py first, lubų >3m prompt fix with threshold 0.15, Dashboard.jsx:24 refetchOnWindowFocus, vision_call.py:1100 boundary move. Tue-Fri 5-rangovas batch + visual diff + tag w1-baseline. W2-W4 Branch A (Vision wrong)/B (formulas wrong)/C (count-correction UI).</p>
+    <p><em>Chairman: plan structure is excellent, targets are wrong. C jumps to L1100 fix before D's audit reveals 26 sites; TDD-RED-first against current output (not §1 spec) calcifies bugs. Adopted with modifications.</em></p>
+  </details>
+</section>
+
+<section class="block">
+  <h2 style="color: var(--ink);">Peer review highlights</h2>
+  <details>
+    <summary>Click to expand peer-review summary</summary>
+    <p><strong>Strongest (4/5):</strong> Contrarian (D). Only response that actually grep'd code; falsified prompt framing; named contractor-re-engaged as W1 AC.</p>
+    <p><strong>Biggest blind spot (2/5 each):</strong> Executor (C) for executing-confidently-against-wrong-target; Outsider (A) for ignoring locked premise.</p>
+    <p><strong>Reviewer 3 invalid:</strong> hallucinated file paths (looked in <code>backend/api/</code> instead of <code>backend/extractor/</code>; correct path was in brief).</p>
+    <p><strong>Blind spots ALL advisors missed:</strong></p>
+    <ul>
+      <li>Branch state: uncommitted <code>data/corrections/</code> + <code>data/legends/</code> contradict "Option F locked"</li>
+      <li>Lubų >3m needs DIAGNOSIS, not assumed prompt fix</li>
+      <li>5 rangovas PDFs may not represent pending contractor's CAD style</li>
+      <li><code>build_ground_truth.py</code> flow exists but unused (CLAUDE.md "Open/next" #1)</li>
+      <li>Constants audit must precede TDD</li>
+    </ul>
+  </details>
+</section>
+
+<footer>
+  Generated 2026-05-11 R2 · transcript at <code>council-transcript-2026-05-11-execution.md</code> · 5 advisors (skill-enabled), 5 peer reviewers (with verification), 1 chairman (post-debate code verification).
+</footer>
+
+</div>
+</body>
+</html>

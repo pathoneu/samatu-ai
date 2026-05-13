@@ -1075,9 +1075,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         kampai_vidiniai = round(kampai_total * 0.7, 2)
         kampai_isoriniai = round(kampai_total * 0.3, 2)
         pozicijos.extend([
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai (perimetras + lubų-sienų ribos)",
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai",
              "vnt": "m", "kiekis": kampai_vidiniai, "saltinis": SAL},
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai (angokraščiai + nišos)",
+            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai",
              "vnt": "m", "kiekis": kampai_isoriniai, "saltinis": SAL,
              "medziagos_aprasymas": "PVC kampuotės",
              "medziagos_kiekis": kampai_isoriniai, "medziagos_vnt": "m"},
@@ -1105,16 +1105,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             opening_area = W * H if (W > 0 and H > 0) else 0
             if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
                 if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
-                    # 2026-05-06 formula audit: window/skylight reveals are
-                    # 4 sides (top + bottom palangė + 2 šonai) → 2H + 2W.
-                    # Doors are 3 sides (top + 2 šonai, no bottom — yra
-                    # slenkstis) → 2H + W. CLAUDE.md §1.2 had this wrong
-                    # for windows (29% undercount). Sources: RICS NRM2 §29.10,
-                    # DIN 18363 §4.2.4. Audit: docs/formulas/2026-05-06-formula-audit.md.
-                    if tipas == "duris":
-                        angokrasciai_m += (2 * H + W) * kiekis
-                    else:
-                        angokrasciai_m += (2 * H + 2 * W) * kiekis
+                    # 3-sided for ALL openings: top + 2 šonai → 2H + W.
+                    # Doors don't have a bottom reveal (slenkstis = the
+                    # threshold/floor). Windows DO have a bottom but in LT
+                    # samatininkų convention it's priced separately as
+                    # palangė (window sill line item) — so the bundle
+                    # angokraščiai_glaistymas-dažymas line stays 3-sided.
+                    # Reverted from 2026-05-06's 4-sided window formula
+                    # after benchmark P1+P2 showed +115% / +60% over-count
+                    # against samatininkų pasiūlymai (€4.4k aggregate
+                    # corpus EUR impact). See reports/benchmark/findings_
+                    # 2026-05-10.md issue #2.
+                    angokrasciai_m += (2 * H + W) * kiekis
             if tipas == "pasleptos_duris" and W > 0 and H > 0:
                 # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
                 # paruošimo nepriklausomai nuo size threshold (LT-specific
@@ -1125,7 +1127,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
         pozicijos.append({
-            "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas (langai + durys)",
+            "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas",
             "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
         })
         # P2 fix: GKP skyriaus eilutė (struktūrinis darbas — angokraščio formavimas).
@@ -2213,39 +2215,67 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] bbox validation failed: {exc}")
 
-    # Step 2.4.5: Page-1 deterministic ceiling-height fallback.
+    # Step 2.4.5: deterministic ceiling-height fallback.
     # Vision sometimes misses tall ceilings (>3 m) annotated as `+3.000` on
-    # the cover/section page, defaulting to ~2.80 m and skewing every
-    # wall-paint quantity downstream. Run a deterministic pdfplumber scan as
-    # a fallback — only override when Vision missed entirely OR returned a
-    # value that disagrees with a page-1 marker by more than 0.3 m, so we
-    # don't trample legitimate Soviet-era 2.50 m readings.
-    # See docs/2026-05-07-launch-status.md §3.
+    # section / ceiling-plan pages, defaulting to ~2.80 m and skewing every
+    # wall-paint quantity downstream.
+    #
+    # 2026-05-11 W1 audit: the prior "section_pages + (1,)" coverage was
+    # wrong for real LT projects — pjūviai routinely sit on back pages
+    # (verified empirically against the interior corpus), not p1. And
+    # page_classifier may not see those back pages at all (cost-gated
+    # to first N pages). Scanner is cheap text extraction; scan ALL
+    # pages, let best_ceiling_candidate filter to [2.0, 4.5] m range.
+    #
+    # Override threshold tightened 0.30 → 0.15 (asymmetric "going up"):
+    # if Vision said 2.80 and marker says 3.00, diff 0.20 — used to be
+    # ignored, now overrides correctly. Soviet 2.50m default protected
+    # by `cand_m > 2.95` guard.
     try:
         from extractor.height_markers import (
             best_ceiling_candidate,
             scan_page_height_markers,
         )
-        markers = scan_page_height_markers(pdf_bytes, page_nrs=(1,))
+        # Scan every page. Filter to plausible ceiling values happens in
+        # height_markers.MIN_CEILING_M / MAX_CEILING_M. Cost: ~50ms/page
+        # in pdfplumber for text extraction (no Vision call).
+        try:
+            import pdfplumber as _pp
+            import io as _io
+            with _pp.open(_io.BytesIO(pdf_bytes)) as _doc:
+                num_pages = len(_doc.pages)
+        except Exception:
+            num_pages = 0
+        scan_pages = tuple(range(1, num_pages + 1)) if num_pages else (1,)
+        markers = scan_page_height_markers(pdf_bytes, page_nrs=scan_pages)
+        if not markers:
+            _emit({
+                "event": "no_height_markers",
+                "reason": "text_layer_empty_or_flattened_or_no_markers",
+                "scan_pages_count": len(scan_pages),
+            })
         candidate = best_ceiling_candidate(markers)
         if candidate is not None:
             cand_m = candidate["value_m"]
             section_h = parsed.get("lubu_aukstis_m")
+            # Asymmetric guard: only override "going up" to a clearly
+            # taller value (>2.95m). Prevents trampling legitimate
+            # Soviet-era 2.50m readings with a stray +2.40 beam marker.
             should_override = (
                 section_h is None
-                or float(section_h) < cand_m - 0.3
+                or (cand_m > 2.95 and float(section_h) < cand_m - 0.15)
             )
             if should_override:
                 parsed["lubu_aukstis_m"] = cand_m
                 warnings_list = list(parsed.get("warnings") or [])
                 marker_raw = candidate["raw"]
                 warnings_list.append({
-                    "code": "ceiling_height_from_page1_marker",
+                    "code": "ceiling_height_from_section_marker",
                     "severity": "info",
                     "message": (
                         f"Lubų aukštis paimtas iš pjūvio žymeklio "
-                        f"{marker_raw} → {cand_m:.2f} m. "
-                        f"Patikrink Prielaidose."
+                        f"{marker_raw} → {cand_m:.2f} m "
+                        f"(psl. {candidate['page']}). Patikrink Prielaidose."
                     ),
                 })
                 parsed["warnings"] = warnings_list
@@ -2261,10 +2291,55 @@ def extract_interior(
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
+    #
+    # 2026-05-11 W2: Vision sometimes only reads room *numbers* from the
+    # lubų plan annotations (e.g. "102=+3400") and can't map them to
+    # eksplikacija names. Accept lubu_auksciai_by_nr as a second source
+    # and merge into lubu_auksciai via patalpa.nr lookup.
+    #
+    # 2026-05-11 W2 (afternoon): even with imperative prompt iteration,
+    # Vision still narrates height info in warnings[] text on 2/5 corpus
+    # PDFs (projektas_3 "švarus lubų aukštis 300cm", projektas_4(2)
+    # "3200mm visose voniose"). Add a regex salvage pass that mines
+    # warning text for height patterns and merges them into
+    # lubu_auksciai when the model didn't structure them itself.
     try:
-        per_room_heights = parsed.get("lubu_auksciai") or {}
-        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
+        per_room_heights = dict(parsed.get("lubu_auksciai") or {})
+        per_room_by_nr = parsed.get("lubu_auksciai_by_nr") or {}
         rooms_raw = parsed.get("patalpos") or []
+        # Map numeric keys → room names via patalpa.nr; merge so any name
+        # the model emitted directly via lubu_auksciai wins (model already
+        # did the mapping reliably).
+        if per_room_by_nr:
+            for room in rooms_raw:
+                room_nr = str(room.get("nr") or "").strip()
+                if not room_nr:
+                    continue
+                h_for_nr = per_room_by_nr.get(room_nr) or per_room_by_nr.get(int(room_nr) if room_nr.isdigit() else None)
+                if h_for_nr is None:
+                    continue
+                name = room.get("pavadinimas")
+                if name and name not in per_room_heights:
+                    per_room_heights[name] = float(h_for_nr)
+            parsed["lubu_auksciai"] = per_room_heights
+
+        # Salvage from narrative warnings[]: when prompt iteration didn't
+        # fully prevent Vision from describing heights in free text, we
+        # mine the text for known patterns and apply them deterministically.
+        if not per_room_heights and rooms_raw:
+            from extractor.height_markers import salvage_heights_from_warnings
+            salvaged = salvage_heights_from_warnings(
+                parsed.get("warnings") or [], rooms_raw
+            )
+            if salvaged:
+                per_room_heights.update(salvaged)
+                parsed["lubu_auksciai"] = per_room_heights
+                _emit({
+                    "event": "lubu_auksciai_salvaged_from_warnings",
+                    "salvaged_count": len(salvaged),
+                    "rooms": list(salvaged.keys()),
+                })
+        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
         rooms_raw = _apply_per_room_heights(
             rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
         )
@@ -2274,6 +2349,8 @@ def extract_interior(
             "rooms_with_per_room": sum(
                 1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
             ),
+            "source_count_by_nr": len(per_room_by_nr),
+            "source_count_by_name": len(parsed.get("lubu_auksciai") or {}),
         })
     except Exception as exc:
         print(f"[extractor] per-room ceiling height apply failed: {exc}")
@@ -2662,6 +2739,24 @@ def extract_interior(
     # Step 6: Attach rules_override for downstream UI use
     if rules_override is not None:
         parsed["_overrides"] = rules_override
+
+    # Step 6.5: Optional verify pass (gated by ENABLE_VERIFY_PASS).
+    # Runs Opus on the Pass-1 result, asks "what would you disagree with?".
+    # Result is ADVISORY — never auto-applied; surfaced to UI as suggestions.
+    # When the flag is OFF (default), this returns empty corrections fast.
+    try:
+        from .verify_pass import run_verify_pass
+        verify = run_verify_pass(
+            rooms=parsed.get("patalpos") or [],
+            pozicijos=parsed.get("pozicijos") or [],
+        )
+        parsed["_verify_pass"] = {
+            "corrections": verify.corrections,
+            "error": verify.error,
+        }
+    except Exception as exc:
+        # Never break extraction over an advisory pass.
+        parsed["_verify_pass"] = {"corrections": [], "error": str(exc)}
 
     # Step 7: Finalize
     elapsed = round(time.time() - t0, 1)

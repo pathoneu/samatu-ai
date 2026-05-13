@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -310,6 +310,12 @@ export default function PlanViewer({
   const [fillPdfUploaded, setFillPdfUploaded] = useState(false);
   const symbolVisibleCount = getSymbolVisibleCount(symbolResult);
   const symbolConfirmCounts = useMemo(() => getConfirmableSymbolCounts(symbolResult), [symbolResult]);
+  // CV V2 tools (Skaičiuoti pažymint / Pažymėti patalpą) were unwired
+  // from this viewer on 2026-05-11 after real-PDF testing exposed the
+  // pdf.js drag-interaction limit. Components, backend, and training-
+  // data writer remain on disk — see
+  // docs/superpowers/research/2026-05-11-cv-tools-real-world-limits.md
+  // and 2026-05-11-session-handoff.md for next-session context.
 
   // 2026-05-06: track dismissed room (Esc key) so user can navigate pages
   // freely after focusing a room without the marker re-snapping.
@@ -736,6 +742,9 @@ export default function PlanViewer({
               Symbol counting via Vision was 49% accurate in bake-off;
               cv2.matchTemplate over-counts 100×. Will rewire when a
               commercial CAD-aware backend is integrated. */}
+          {/* Experimental Ženklai panel — stays gated behind localStorage
+              flag (no dev auto-show) since 2026-05-11. CV V2 buttons were
+              unwired; the panel still exposes the working V1 flows. */}
           {(typeof window !== 'undefined' &&
             window.localStorage?.getItem('samatu_experimental_tools') === '1') && (
             <button

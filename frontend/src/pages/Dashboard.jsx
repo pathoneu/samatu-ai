@@ -21,10 +21,29 @@ export default function Dashboard() {
 
   // On first mount, pull DB projects into localStorage (Phase 12.3).
   // Handles: cross-device, localStorage cleared, edit-from-other-tab.
+  //
+  // W1 Day 1 (2026-05-11): also re-pull on window focus + visibility
+  // change. Before this fix, opening a project in tab A, editing it,
+  // then returning to Dashboard tab B showed the stale localStorage
+  // snapshot from first mount. Real users hit this on the 2026-05-07
+  // prod test.
   React.useEffect(() => {
-    pullProjectsFromBackend().then((merged) => {
-      if (merged) queryClient.invalidateQueries({ queryKey: ['projects'] });
-    });
+    const refresh = () => {
+      pullProjectsFromBackend().then((merged) => {
+        if (merged) queryClient.invalidateQueries({ queryKey: ['projects'] });
+      });
+    };
+    refresh();
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [queryClient]);
 
   const { data: projects = [], isLoading } = useQuery({
@@ -60,7 +79,10 @@ export default function Dashboard() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Projektai</h1>
+          <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            00 / Projektai
+          </div>
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Projektai</h1>
           <p className="text-sm text-muted-foreground mt-1">Statybų sąmatų valdymas</p>
         </div>
         <div className="flex items-center gap-2">
