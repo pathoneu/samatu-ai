@@ -59,7 +59,7 @@ def test_keturslaitis_a_laida_perdanga():
     result = geometry.keturslaitis_quantities(
         footprint_outer_w=8.95,
         footprint_outer_l=13.12,
-        eaves_overhang_m=1.05,
+        eaves_overhang_m=0.925,        # from outer wall face, NOT axis
         slope_long_deg=25,
         slope_short_deg=22,
         wall_thickness_m=0.25,
@@ -71,18 +71,18 @@ def test_keturslaitis_a_laida_stogas():
     """A LAIDA stogas: 2 long faces (i=25°) + 2 short hips (i=22°) + 5% waste ≈ 185 m²."""
     result = geometry.keturslaitis_quantities(
         footprint_outer_w=8.95, footprint_outer_l=13.12,
-        eaves_overhang_m=1.05,
+        eaves_overhang_m=0.925,        # from outer wall face, NOT axis
         slope_long_deg=25, slope_short_deg=22,
         wall_thickness_m=0.25,
     )
-    assert result.stogas_m2 == pytest.approx(185, abs=10)
+    assert result.stogas_m2 == pytest.approx(185, abs=5)
 
 
 def test_keturslaitis_a_laida_latakai():
     """A LAIDA latakai = full eaves perimeter = 2×(10.80+14.97) ≈ 51.5 m."""
     result = geometry.keturslaitis_quantities(
         footprint_outer_w=8.95, footprint_outer_l=13.12,
-        eaves_overhang_m=1.05,
+        eaves_overhang_m=0.925,        # from outer wall face, NOT axis
         slope_long_deg=25, slope_short_deg=22,
         wall_thickness_m=0.25,
     )
@@ -93,7 +93,7 @@ def test_keturslaitis_a_laida_kraigai():
     """A LAIDA kraigai = top ridge + 4 hip surface lengths ≈ 37 m."""
     result = geometry.keturslaitis_quantities(
         footprint_outer_w=8.95, footprint_outer_l=13.12,
-        eaves_overhang_m=1.05,
+        eaves_overhang_m=0.925,        # from outer wall face, NOT axis
         slope_long_deg=25, slope_short_deg=22,
         wall_thickness_m=0.25,
     )

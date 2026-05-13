@@ -20,7 +20,8 @@ roof:
   roof_footprint_with_eaves:
     width_m: 10.80
     length_m: 14.97
-  eaves_overhang_m: 1.05
+  eaves_overhang_from_axis_m: 1.05      # as shown on STOGO PLANAS
+  eaves_overhang_from_outer_wall_m: 0.925   # = 1.05 - wall_thickness/2
   wall_thickness_m: 0.25       # blokeliai 25cm per medž. žiniaraštis
   chimney_count: 0             # not visible in this project
   rooflight_count: 0

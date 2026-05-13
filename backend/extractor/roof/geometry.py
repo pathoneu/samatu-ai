@@ -83,7 +83,11 @@ def keturslaitis_quantities(
 
     Args:
         footprint_outer_w, footprint_outer_l: outer-wall footprint (m).
-        eaves_overhang_m: eaves projection from outer wall face (m).
+        eaves_overhang_m: eaves projection measured from OUTER WALL FACE (m).
+            NOTE: LT brėžiniai (STOGO PLANAS) typically annotate eaves from the
+            structural AXIS. If your dim chain shows axis-based overhangs,
+            subtract half the wall thickness before passing here:
+            eaves_from_wall = eaves_from_axis - (wall_thickness / 2)
         slope_long_deg: pitch on the two long slopes (deg).
         slope_short_deg: pitch on the two short (hip) slopes (deg).
         wall_thickness_m: unused here (kept for API symmetry).
