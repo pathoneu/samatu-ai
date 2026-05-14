@@ -291,6 +291,7 @@ def build_roof_input(
             ("axis_to_axis_width_m", RoofInputField.AXIS_WIDTH),
             ("eaves_overhang_from_axis_m", RoofInputField.EAVES_OVERHANG),
             ("wall_thickness_m", RoofInputField.WALL_THICKNESS),
+            ("eaves_height_m", RoofInputField.EAVES_TO_GROUND),
             ("roof_type", RoofInputField.ROOF_TYPE),
             ("chimney_count", RoofInputField.CHIMNEY_COUNT),
             ("rooflight_count", RoofInputField.ROOFLIGHT_COUNT),
@@ -430,6 +431,28 @@ def build_roof_input(
 
     eaves_outer = max(0.0, eaves_axis - wt / 2)
 
+    # eaves_to_ground_m: SECTION-authoritative (annotated as +X.XXX eaves
+    # height marker on pjūvis). Drives sienos formula on dvislaitis —
+    # missing this zeros out the gable wall line item (~33% of project
+    # euros on 0039). Default 0.0 with NO_AUTHORITATIVE_SOURCE flag if
+    # no section page reports it.
+    eaves_to_ground = first_or_none(RoofInputField.EAVES_TO_GROUND)
+    if eaves_to_ground is None:
+        eaves_to_ground = 0.0
+        flags.append(HITLFlag(
+            field=RoofInputField.EAVES_TO_GROUND,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message=(
+                "eaves_to_ground_m not annotated on any section page — "
+                "defaulted to 0.0. Dvislaitis sienos (gable wall) calc "
+                "will be 0 m². Read +X.XXX eaves height marker from pjūvis."
+            ),
+            evidence=[],
+            eur_impact_estimate=2000.0,
+        ))
+    else:
+        eaves_to_ground = float(eaves_to_ground)
+
     return (
         RoofInput(
             roof_type=roof_type,
@@ -438,6 +461,7 @@ def build_roof_input(
             eaves_overhang_m=eaves_outer,
             slopes_deg=slopes_deg,
             wall_thickness_m=wt,
+            eaves_to_ground_m=eaves_to_ground,
             chimney_count=int(first_or_none(RoofInputField.CHIMNEY_COUNT) or 0),
             rooflight_count=int(first_or_none(RoofInputField.ROOFLIGHT_COUNT) or 0),
             windows_count=int(first_or_none(RoofInputField.WINDOWS_COUNT) or 0),

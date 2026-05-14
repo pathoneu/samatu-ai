@@ -33,6 +33,7 @@ pages:
     fields:
       slope_angles_deg: [30]
       ridge_height_m: 8.45
+      eaves_height_m: 5.5    # +5.50 eaves height marker on pjūvis
 
 roofer_samata:
   source: 0039_roofer_samata

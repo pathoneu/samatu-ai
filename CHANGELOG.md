@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-05-14 — Stogai V1.1: eaves_to_ground_m plumbing fix
+
+Fixed missed field-plumbing in the T3 typed merger refactor: vision
+was extracting `eaves_height_m` from SECTION pages, but the merger
+never copied it into `RoofInput.eaves_to_ground_m`. Result on 0039:
+dvislaitis sienos formula (perimeter × eaves_to_ground × ...) zeroed
+out → sienos line = 0 m² vs roofer's 135 m² → 33% of project euros
+silently lost.
+
+Fix (this commit):
+- Added `RoofInputField.EAVES_TO_GROUND` enum value.
+- Granted `PageType.SECTION` authority over it in `PAGE_AUTHORITY`.
+- Wired `eaves_height_m` extraction in `build_roof_input`; falls back
+  to 0.0 with a NO_AUTHORITATIVE_SOURCE HITLFlag (€2000 impact).
+- Pass `eaves_to_ground_m=...` to `RoofInput(...)` in the merger.
+
+Re-ran `scripts/eval_roof_e2e.py --all` end-to-end (live Vision):
+- A LAIDA (keturslaitis, SA): **WAPE 1.06% — PASS** (unchanged)
+- 0039 (dvislaitis, SK only): **WAPE 5.05%** — still FAIL on the
+  ≤2% gate, but **down from 33.20%** (sienos went from 0 m² to
+  155 m² vs roofer's 135 m², Δ +14.8%). Vision extracted
+  eaves_height_m = 5.50m from pjūvis p49.
+
+Backend suite: **598 PASS** (no regressions; +4 from the new
+EAVES_TO_GROUND parametrization in `test_every_field_has_at_least_one_authority`).
+
+Next: tighten 0039 sienos (+14.8% over roofer) — likely a slope
+asymmetry / soflitas-depth issue, not a plumbing one. The wedge
+gating bug is resolved.
+
 ## 2026-05-14 — Stogai V1 Accuracy Wedge complete
 
 End-to-end Vision → typed merger → strategy pipeline run against both

@@ -26,6 +26,7 @@ class RoofInputField(str, Enum):
     EAVES_OVERHANG = "eaves_overhang_from_axis_m"
     WALL_THICKNESS = "wall_thickness_m"
     SLOPE = "slope_angle_deg"
+    EAVES_TO_GROUND = "eaves_to_ground_m"
     CHIMNEY_COUNT = "chimney_count"
     ROOFLIGHT_COUNT = "rooflight_count"
     WINDOWS_COUNT = "windows_count"
@@ -42,6 +43,7 @@ PAGE_AUTHORITY: dict[PageType, set[RoofInputField]] = {
     PageType.SECTION: {
         RoofInputField.SLOPE,
         RoofInputField.WALL_THICKNESS,
+        RoofInputField.EAVES_TO_GROUND,
     },
     PageType.STOGO_PLANAS: {
         RoofInputField.ROOF_TYPE,
