@@ -289,27 +289,37 @@ def build_roof_input(
     building_length_m = axis_len + wt
     building_width_m = axis_wid + wt
 
-    # 3. Eaves overhang — axis-to-edge minus half a wall.
+    # 3. Eaves overhang — axis-to-edge minus half a wall. Some SK-only
+    # PDFs don't annotate eaves on any visible page (the architectural
+    # roof plan with eaves callouts may live in a missing SA dalis).
+    # Default to 0 with a warning rather than crashing — downstream
+    # validation will surface the 0 to the user.
     eaves_axis = stogo.get("eaves_overhang_from_axis_m")
     if eaves_axis is None:
-        raise ValueError("eaves_overhang_from_axis_m missing")
+        eaves_axis = 0.0
+        warnings.append(
+            "eaves_overhang_from_axis_m not visible — defaulted to 0.0 "
+            "(roof flush with outer wall). Verify in plan."
+        )
     eaves_outer = eaves_axis - wt / 2
 
-    # 4. Slope angles — prefer stogo planas (often shows both per side).
+    # 4. Slope angles — pjūvis is the canonical source (direct angular
+    # measurement from the drawing). Stogo planas labels are
+    # supplementary; if they disagree with pjūvis by >2°, trust pjūvis.
     stogo_slopes = stogo.get("visible_slope_angles_deg") or []
     pjuvis_slopes = (pjuvis or {}).get("slope_angles_deg") or []
-    if stogo_slopes:
-        slopes = stogo_slopes
-        if pjuvis_slopes:
-            # Cross-check: pjūvis should match at least one stogo planas angle.
-            for ps in pjuvis_slopes:
-                if not any(abs(ps - ss) <= 1.5 for ss in stogo_slopes):
-                    warnings.append(
-                        f"pjūvis reports {ps}° not present in stogo planas {stogo_slopes}"
-                    )
-    elif pjuvis_slopes:
+    if pjuvis_slopes:
         slopes = pjuvis_slopes
-        warnings.append("slope_angles fell back to pjūvis (stogo planas had none)")
+        if stogo_slopes:
+            for ss in stogo_slopes:
+                if not any(abs(ss - ps) <= 2.0 for ps in pjuvis_slopes):
+                    warnings.append(
+                        f"stogo planas labels slope {ss}° but pjūvis shows "
+                        f"{pjuvis_slopes} — trusting pjūvis (direct measurement)"
+                    )
+    elif stogo_slopes:
+        slopes = stogo_slopes
+        warnings.append("slope_angles from stogo planas only (no pjūvis available)")
     else:
         raise ValueError("no slope angles found in either page")
 

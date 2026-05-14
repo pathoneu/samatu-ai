@@ -324,7 +324,17 @@ def classify_page(
     """
     result = _call_haiku(image_b64, client=client, model=model)
     if pdf_path is not None and page_num is not None:
-        text_dalis = _extract_antspaudas_text(pdf_path, page_num)
+        try:
+            text_dalis = _extract_antspaudas_text(pdf_path, page_num)
+        except (ValueError, IndexError):
+            # Bad page_num — caller error, surface it.
+            raise
+        except Exception:
+            # pdfplumber/pdfminer crashes on CID-encoded fonts on raster-only
+            # pages. That's exactly the case where vision fallback was meant
+            # to kick in, so swallow the crash silently. The vision answer
+            # already lives in `result`.
+            text_dalis = None
         if text_dalis is not None:
             result = replace(result, dalis=Dalis(text_dalis))
     return result
