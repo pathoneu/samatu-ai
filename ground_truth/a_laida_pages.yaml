@@ -1,0 +1,131 @@
+# Page-level expected labels for A LAIDA project (stogai V1 bake-off).
+# Source PDF: backend/tests/fixtures/stogai/a_laida.pdf (symlink)
+#
+# Confidence per label:
+#   HIGH = text title clearly extractable via pdfplumber (e.g. "STOGO PLANAS")
+#   MED  = inferred from page text + position in document
+#   LOW  = guessed (cover pages, details without titles)
+#
+# Pages where confidence is LOW are EXCLUDED from accuracy scoring —
+# they're listed for completeness but flagged `skip_in_eval: true`.
+
+project: a_laida
+source_pdf: backend/tests/fixtures/stogai/a_laida.pdf
+expected_dalis: SA           # whole project is SA dalis per a_laida_roof.yaml
+expected_roof_type: keturslaitis
+
+pages:
+  - page_num: 1
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Cover (TAURO)"
+
+  - page_num: 2
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Sutikimas letter"
+
+  - page_num: 3
+    expected_page_type: unknown    # AIŠKINAMASIS RAŠTAS — no enum match
+    confidence: HIGH
+    skip_in_eval: true             # ambiguous mapping until we add a real enum
+    note: "Aiškinamasis raštas (explanatory text)"
+
+  - page_num: 4
+    expected_page_type: unknown    # situacijos schema — no enum match
+    confidence: HIGH
+    skip_in_eval: true
+    note: "Situacijos schema (site plan)"
+
+  - page_num: 5
+    expected_page_type: unknown
+    confidence: HIGH
+    skip_in_eval: true
+    note: "Situacijos schema (continued)"
+
+  - page_num: 6
+    expected_page_type: eksplikacija
+    confidence: HIGH
+    note: "Medžiagų žiniaraštis (materials schedule)"
+
+  - page_num: 7
+    expected_page_type: eksplikacija
+    confidence: HIGH
+    note: "Patalpų eksplikacija (room schedule)"
+
+  - page_num: 8
+    expected_page_type: wall_elevation    # FASADAS — exterior elevation
+    confidence: MED
+    note: "Fasadas (facade elevation)"
+
+  - page_num: 9
+    expected_page_type: section
+    confidence: HIGH
+    note: "Pjūvis (cross-section)"
+
+  - page_num: 10
+    expected_page_type: stogo_planas
+    confidence: HIGH
+    note: "STOGO PLANAS — primary roof plan; roof_type_hint=keturslaitis"
+    expected_roof_type_hint: keturslaitis
+
+  - page_num: 11
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail drawing (no clear title)"
+
+  - page_num: 12
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "PS-1 detail"
+
+  - page_num: 13
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail drawing"
+
+  - page_num: 14
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Fasado detail (wall/floor/cokolio assembly)"
+
+  - page_num: 15
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail drawing"
+
+  - page_num: 16
+    expected_page_type: section
+    confidence: HIGH
+    note: "Pjūvis (second cross-section)"
+
+  - page_num: 17
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail drawing"
+
+  - page_num: 18
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Fasado detail (tiles)"
+
+  - page_num: 19
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail (+ marker only)"
+
+  - page_num: 20
+    expected_page_type: unknown
+    confidence: LOW
+    skip_in_eval: true
+    note: "Detail (M 1:100 scale marker)"

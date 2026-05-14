@@ -72,3 +72,5 @@ data/human_gt/
 # W1 baseline batch outputs — large JSON dumps regenerable via
 # scripts/w1_baseline_batch.py (each run costs ~$5)
 reports/baseline/
+# Local PDF symlinks for stogai bake-off — point at user-local files
+backend/tests/fixtures/stogai/*.pdf

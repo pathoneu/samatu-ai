@@ -19,7 +19,14 @@ import re
 import anthropic
 import pdfplumber
 
+# Model tiers — pick at call site. Default is the historical Haiku
+# choice, but stogai V1 bake-off (2026-05-14) treats this as a
+# parameter, not a default. Promote based on empirical evaluation
+# results, not assumption.
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+SONNET_MODEL = "claude-sonnet-4-6"
+OPUS_MODEL = "claude-opus-4-7"
+DEFAULT_MODEL = HAIKU_MODEL
 
 # LT statybų projektų dalies (sections) — codes as they appear in the
 # `Dokumento žymuo` field of the antspaudas (title block):
@@ -50,6 +57,7 @@ class PageType(str, Enum):
     CEILING_PLAN = "ceiling_plan"
     WALL_ELEVATION = "wall_elevation"
     SECTION = "section"          # Pjūvis: vertical cut + slab height markers (+0.000 / +2.800)
+    STOGO_PLANAS = "stogo_planas"  # Roof plan — top-down view of roof with slopes/ridges
     ELECTRICAL = "electrical"
     PLUMBING = "plumbing"
     EKSPLIKACIJA = "eksplikacija"
@@ -100,8 +108,8 @@ _CLASSIFIER_SYSTEM = """You classify a Lithuanian construction drawing page.
 Return strict JSON:
   {
     "page_type": "floor_plan" | "ceiling_plan" | "wall_elevation" |
-                 "section" | "electrical" | "plumbing" | "eksplikacija" |
-                 "legend" | "unknown",
+                 "section" | "stogo_planas" | "electrical" | "plumbing" |
+                 "eksplikacija" | "legend" | "unknown",
     "confidence": 0.0-1.0,
     "top_2": same enum or null,
     "dalis": "BD" | "SP" | "SA" | "SK" | "VVN" | "ŠVOK" | "E" | "unknown" | null,
@@ -115,6 +123,9 @@ Hints — page_type:
 - "Sienų išklotinė" / vertical wall view + tile zones → wall_elevation
 - "Pjūvis" / vertical building cross-section with `±0.000`/`+2.800`
   level markers → section  (canonical source for ceiling slab heights)
+- "Stogo planas" / top-down view of the roof showing slopes, ridges
+  (kraigai), valleys (latakai), chimneys → stogo_planas  (canonical
+  source for roof geometry: footprint, eaves, roof type)
 - "Rozečių/apšvietimo planas" / electrical symbols → electrical
 - "Santechnikos planas" / plumbing fixtures → plumbing
 - "Patalpų eksplikacija" / room schedule table → eksplikacija
@@ -144,18 +155,15 @@ _SCHEMA = {
     "properties": {
         "page_type": {"type": "string", "enum": [pt.value for pt in PageType]},
         "confidence": {"type": "number"},
-        "top_2": {
-            "type": ["string", "null"],
-            "enum": [pt.value for pt in PageType] + [None],
-        },
-        "dalis": {
-            "type": ["string", "null"],
-            "enum": [d.value for d in Dalis] + [None],
-        },
-        "roof_type_hint": {
-            "type": ["string", "null"],
-            "enum": [r.value for r in RoofTypeHint] + [None],
-        },
+        # All enums include the "unknown" sentinel — Anthropic's
+        # structured-output engine rejects `["string", "null"]` type
+        # arrays, so we use "unknown" as the in-band null. Parser
+        # collapses `top_2 == "unknown"` to None (no second candidate),
+        # but preserves UNKNOWN for `dalis` / `roof_type_hint` (semantic:
+        # model tried and couldn't tell, vs. wasn't asked).
+        "top_2": {"type": "string", "enum": [pt.value for pt in PageType]},
+        "dalis": {"type": "string", "enum": [d.value for d in Dalis]},
+        "roof_type_hint": {"type": "string", "enum": [r.value for r in RoofTypeHint]},
     },
 }
 
@@ -168,30 +176,44 @@ def _coerce_enum(enum_cls, raw):
 
 
 def parse_classification(payload: dict) -> PageClassification:
-    """Convert Haiku JSON output into a typed `PageClassification`.
+    """Convert vision-model JSON output into a typed `PageClassification`.
 
     Tolerant of pre-T2 payloads (no `dalis` / `roof_type_hint` keys) and
-    of explicit nulls. The string `"unknown"` is preserved as the
-    enum's UNKNOWN sentinel (NOT collapsed to None — Haiku may use it
-    to signal an explicit "couldn't tell").
+    of explicit nulls. For `page_type` / `dalis` / `roof_type_hint` the
+    string `"unknown"` is preserved as the enum's UNKNOWN sentinel (NOT
+    collapsed to None — model tried and couldn't tell). For `top_2`
+    only, `"unknown"` collapses to None (a "second-best of unknown"
+    is meaningless).
     """
+    top_2_raw = payload.get("top_2")
+    top_2 = (
+        PageType(top_2_raw)
+        if top_2_raw and top_2_raw != "unknown"
+        else None
+    )
     return PageClassification(
         page_type=PageType(payload["page_type"]),
         confidence=float(payload["confidence"]),
-        top_2=PageType(payload["top_2"]) if payload.get("top_2") else None,
+        top_2=top_2,
         dalis=_coerce_enum(Dalis, payload.get("dalis")),
         roof_type_hint=_coerce_enum(RoofTypeHint, payload.get("roof_type_hint")),
     )
 
 
-def _call_haiku(image_b64: str, client: anthropic.Anthropic | None = None) -> PageClassification:
-    """Single-page classification via Haiku 4.5.
+def _call_haiku(
+    image_b64: str,
+    client: anthropic.Anthropic | None = None,
+    model: str = DEFAULT_MODEL,
+) -> PageClassification:
+    """Single-page classification via a Claude vision model.
 
-    Production callers pass their own client; tests inject a fake.
+    Function name kept for backward compatibility — `model` may be Haiku,
+    Sonnet, or Opus. Production callers pass their own client; tests
+    inject a fake.
     """
     client = client or anthropic.Anthropic()
     resp = client.messages.create(
-        model=HAIKU_MODEL,
+        model=model,
         max_tokens=200,
         system=[{
             "type": "text",
@@ -215,9 +237,8 @@ def _call_haiku(image_b64: str, client: anthropic.Anthropic | None = None) -> Pa
         output_config={
             "format": {
                 "type": "json_schema",
-                "json_schema": {"name": "PageClassification", "schema": _SCHEMA},
+                "schema": _SCHEMA,
             },
-            "effort": "low",
         },
     )
     payload = json.loads(resp.content[0].text)
@@ -274,23 +295,28 @@ def classify_page(
     *,
     pdf_path: str | Path | None = None,
     page_num: int | None = None,
+    model: str = DEFAULT_MODEL,
 ) -> PageClassification:
-    """Public entry: classify one rendered page (hybrid text-first + Haiku).
+    """Public entry: classify one rendered page (hybrid text-first + vision).
 
-    Pure-image callers (legacy) get Haiku-only behaviour. When BOTH
+    Pure-image callers (legacy) get vision-only behaviour. When BOTH
     `pdf_path` and `page_num` are supplied, `_extract_antspaudas_text`
-    runs first; if it finds a dalis code, that value OVERRIDES Haiku's
-    answer for `dalis` (text is deterministic, Haiku is probabilistic).
-    Page type and roof-type hint always come from Haiku.
+    runs first; if it finds a dalis code, that value OVERRIDES the
+    vision model's answer for `dalis` (text is deterministic, vision is
+    probabilistic). Page type and roof-type hint always come from the
+    vision model.
+
+    `model` selects Haiku/Sonnet/Opus — empirical bake-off result drives
+    the choice in production.
 
     Raster-flattened pages whose antspaudas can't be read by pdfplumber
-    silently fall through to Haiku's value — this is the "vision
-    fallback" the plan calls out for studios that flatten their PDFs.
+    silently fall through to the vision model's value — this is the
+    fallback the plan calls out for studios that flatten their PDFs.
 
     Errors propagate — we'd rather surface a failed classification than
     silently route to the wrong downstream prompt.
     """
-    result = _call_haiku(image_b64, client=client)
+    result = _call_haiku(image_b64, client=client, model=model)
     if pdf_path is not None and page_num is not None:
         text_dalis = _extract_antspaudas_text(pdf_path, page_num)
         if text_dalis is not None:

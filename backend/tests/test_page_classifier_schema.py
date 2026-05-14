@@ -74,11 +74,14 @@ def test_classification_defaults_new_fields_to_none():
 # ---------------------------------------------------------------------------
 
 def test_json_schema_declares_dalis_field():
+    """All 7 LT dalies + UNKNOWN sentinel. Anthropic structured-output
+    rejects `["string","null"]` type arrays, so `"unknown"` is the
+    in-band null."""
     assert "dalis" in _SCHEMA["properties"]
     enum_vals = _SCHEMA["properties"]["dalis"]["enum"]
     for code in ("BD", "SP", "SA", "SK", "VVN", "ŠVOK", "E", "unknown"):
         assert code in enum_vals
-    assert None in enum_vals  # nullable so Haiku can abstain
+    assert _SCHEMA["properties"]["dalis"]["type"] == "string"
 
 
 def test_json_schema_declares_roof_type_hint_field():
@@ -93,7 +96,7 @@ def test_json_schema_declares_roof_type_hint_field():
         "unknown",
     ):
         assert rt in enum_vals
-    assert None in enum_vals
+    assert _SCHEMA["properties"]["roof_type_hint"]["type"] == "string"
 
 
 def test_new_fields_not_required():
