@@ -20,7 +20,9 @@ from typing import Any
 
 import anthropic
 
-from extractor.page_classifier import OPUS_MODEL
+from extractor.page_classifier import OPUS_MODEL, PageType
+from extractor.roof.evidence import DimensionEvidence, HITLFlag, HITLFlagReason
+from extractor.roof.page_authority import PAGE_AUTHORITY, RoofInputField
 from extractor.roof.strategies import RoofInput
 
 
@@ -249,98 +251,199 @@ _PJUVIS_SCHEMA: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 def build_roof_input(
-    stogo: dict,
-    pjuvis: dict | None = None,
+    pages: list[dict],
     *,
     default_wall_thickness_m: float = _DEFAULT_WALL_THICKNESS_M,
-) -> tuple[RoofInput, list[str]]:
-    """Merge Vision JSON outputs into a `RoofInput` ready for strategy dispatch.
+    default_eaves_overhang_m: float = 0.0,
+) -> tuple[RoofInput, list[DimensionEvidence], list[HITLFlag]]:
+    """Typed merger — populates RoofInput using Semantic Routing.
 
-    Returns the input plus a list of warnings (fields that fell back to
-    defaults or were cross-validated with disagreement).
+    `pages` is a list of dicts. Each dict is one page's Vision extraction
+    output PLUS two routing keys:
+        - `_page_num`: 1-indexed page number
+        - `_page_class`: extractor.page_classifier.PageType for that page
 
-    Field provenance:
-      - `roof_type`: stogo planas (cross-checked against pjūvis if angles count).
-      - `building_length_m`/`width_m`: axis + wall_thickness (outer-to-outer).
-      - `eaves_overhang_m`: axis value − wall_thickness/2 (from-outer-wall).
-      - `slopes_deg`: stogo planas annotations first; fall back to pjūvis.
-      - `wall_thickness_m`: pjūvis section first; default if both missing.
-      - Counts: stogo planas directly.
+    Returns:
+        - `RoofInput` ready for strategy dispatch
+        - `list[DimensionEvidence]` — every extracted value (authoritative
+          AND non-authoritative) with provenance, for the patikrinkite UI
+        - `list[HITLFlag]` — mismatches and fallbacks that need user review
+
+    Rules:
+      1. Each RoofInput field is populated ONLY from pages whose page_class
+         is in PAGE_AUTHORITY[page_class] for that field.
+      2. SLOPE: pjūvis (SECTION) wins; flag raised if stogo planas labels
+         disagree by >2°.
+      3. If no authoritative page exists for an axis, fall back to
+         stogo_planas with NO_AUTHORITATIVE_SOURCE flag.
+      4. wall_thickness/eaves default with flag if missing.
     """
-    warnings: list[str] = []
+    evidence: list[DimensionEvidence] = []
+    flags: list[HITLFlag] = []
 
-    # 1. Wall thickness — pjūvis is the canonical source; stogo planas
-    # rarely has it. Fall back to a documented default.
-    wt = (pjuvis or {}).get("wall_thickness_m") or stogo.get("wall_thickness_m")
+    # Collect ALL evidence first.
+    for page in pages:
+        page_num = page["_page_num"]
+        page_class = page["_page_class"]
+
+        for raw_key, fld in (
+            ("axis_to_axis_length_m", RoofInputField.AXIS_LENGTH),
+            ("axis_to_axis_width_m", RoofInputField.AXIS_WIDTH),
+            ("eaves_overhang_from_axis_m", RoofInputField.EAVES_OVERHANG),
+            ("wall_thickness_m", RoofInputField.WALL_THICKNESS),
+            ("roof_type", RoofInputField.ROOF_TYPE),
+            ("chimney_count", RoofInputField.CHIMNEY_COUNT),
+            ("rooflight_count", RoofInputField.ROOFLIGHT_COUNT),
+            ("windows_count", RoofInputField.WINDOWS_COUNT),
+        ):
+            value = page.get(raw_key)
+            if value is None:
+                continue
+            evidence.append(DimensionEvidence(
+                field=fld, value=value,
+                page_num=page_num, page_class=page_class,
+                source_crop_bbox=None,
+                raw_label_text=str(value),
+                confidence=page.get("confidence", 0.5),
+            ))
+
+        for slope in (page.get("visible_slope_angles_deg") or []) + \
+                     (page.get("slope_angles_deg") or []):
+            evidence.append(DimensionEvidence(
+                field=RoofInputField.SLOPE, value=float(slope),
+                page_num=page_num, page_class=page_class,
+                source_crop_bbox=None,
+                raw_label_text=f"{slope}°",
+                confidence=page.get("confidence", 0.5),
+            ))
+
+    def authoritative(fld: RoofInputField) -> list[DimensionEvidence]:
+        return [e for e in evidence if e.field == fld and e.is_authoritative()]
+
+    def first_or_none(fld: RoofInputField):
+        auth = authoritative(fld)
+        return auth[0].value if auth else None
+
+    def axis_with_fallback(fld: RoofInputField, axis_name: str) -> float:
+        auth = authoritative(fld)
+        if auth:
+            return float(auth[0].value)
+        stogo_evs = [
+            e for e in evidence
+            if e.field == fld and e.page_class == PageType.STOGO_PLANAS
+        ]
+        if stogo_evs:
+            flags.append(HITLFlag(
+                field=fld, reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+                message=(
+                    f"No floor_plan available; using stogo_planas {axis_name} "
+                    f"= {stogo_evs[0].value}m. Confirm this matches the full "
+                    "building footprint, not just a partial detail."
+                ),
+                evidence=stogo_evs,
+                eur_impact_estimate=200.0,
+            ))
+            return float(stogo_evs[0].value)
+        raise ValueError(f"No source for {fld.value}")
+
+    axis_length = axis_with_fallback(RoofInputField.AXIS_LENGTH, "length")
+    axis_width = axis_with_fallback(RoofInputField.AXIS_WIDTH, "width")
+
+    wt = first_or_none(RoofInputField.WALL_THICKNESS)
     if wt is None:
         wt = default_wall_thickness_m
-        warnings.append(
-            f"wall_thickness_m not visible in either page — using LT default {wt}m"
-        )
-
-    # 2. Footprint — axis + wall = outer-to-outer.
-    axis_len = stogo.get("axis_to_axis_length_m")
-    axis_wid = stogo.get("axis_to_axis_width_m")
-    if axis_len is None or axis_wid is None:
-        raise ValueError(
-            "axis_to_axis_length_m / axis_to_axis_width_m missing — "
-            "stogo planas extraction failed"
-        )
-    building_length_m = axis_len + wt
-    building_width_m = axis_wid + wt
-
-    # 3. Eaves overhang — axis-to-edge minus half a wall. Some SK-only
-    # PDFs don't annotate eaves on any visible page (the architectural
-    # roof plan with eaves callouts may live in a missing SA dalis).
-    # Default to 0 with a warning rather than crashing — downstream
-    # validation will surface the 0 to the user.
-    eaves_axis = stogo.get("eaves_overhang_from_axis_m")
-    if eaves_axis is None:
-        eaves_axis = 0.0
-        warnings.append(
-            "eaves_overhang_from_axis_m not visible — defaulted to 0.0 "
-            "(roof flush with outer wall). Verify in plan."
-        )
-    eaves_outer = eaves_axis - wt / 2
-
-    # 4. Slope angles — pjūvis is the canonical source (direct angular
-    # measurement from the drawing). Stogo planas labels are
-    # supplementary; if they disagree with pjūvis by >2°, trust pjūvis.
-    stogo_slopes = stogo.get("visible_slope_angles_deg") or []
-    pjuvis_slopes = (pjuvis or {}).get("slope_angles_deg") or []
-    if pjuvis_slopes:
-        slopes = pjuvis_slopes
-        if stogo_slopes:
-            for ss in stogo_slopes:
-                if not any(abs(ss - ps) <= 2.0 for ps in pjuvis_slopes):
-                    warnings.append(
-                        f"stogo planas labels slope {ss}° but pjūvis shows "
-                        f"{pjuvis_slopes} — trusting pjūvis (direct measurement)"
-                    )
-    elif stogo_slopes:
-        slopes = stogo_slopes
-        warnings.append("slope_angles from stogo planas only (no pjūvis available)")
+        flags.append(HITLFlag(
+            field=RoofInputField.WALL_THICKNESS,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message=(
+                f"wall_thickness not annotated in any section — using LT "
+                f"default {default_wall_thickness_m}m. Verify in plan."
+            ),
+            evidence=[],
+            eur_impact_estimate=80.0,
+        ))
     else:
-        raise ValueError("no slope angles found in either page")
+        wt = float(wt)
 
-    # 5. Roof type from stogo planas.
-    roof_type = stogo.get("roof_type", "unknown")
-    if roof_type == "unknown":
-        warnings.append("roof_type is 'unknown' — strategy dispatch will refuse")
+    section_slopes = [
+        float(e.value) for e in evidence
+        if e.field == RoofInputField.SLOPE and e.page_class == PageType.SECTION
+    ]
+    stogo_slopes = [
+        float(e.value) for e in evidence
+        if e.field == RoofInputField.SLOPE and e.page_class == PageType.STOGO_PLANAS
+    ]
+    if section_slopes:
+        slopes_deg = section_slopes
+        if stogo_slopes:
+            mismatches = [
+                ss for ss in stogo_slopes
+                if not any(abs(ss - ps) <= 2.0 for ps in section_slopes)
+            ]
+            if mismatches:
+                flags.append(HITLFlag(
+                    field=RoofInputField.SLOPE,
+                    reason=HITLFlagReason.CONFLICTING_AUTHORITATIVE_SOURCES,
+                    message=(
+                        f"Stogo planas labels slope(s) {mismatches}° but "
+                        f"pjūvis reads {section_slopes}° — using pjūvis."
+                    ),
+                    evidence=[
+                        e for e in evidence
+                        if e.field == RoofInputField.SLOPE
+                    ],
+                    eur_impact_estimate=300.0,
+                ))
+    elif stogo_slopes:
+        slopes_deg = stogo_slopes
+        flags.append(HITLFlag(
+            field=RoofInputField.SLOPE,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message="No pjūvis available; using stogo_planas labelled slopes.",
+            evidence=[
+                e for e in evidence
+                if e.field == RoofInputField.SLOPE
+            ],
+            eur_impact_estimate=300.0,
+        ))
+    else:
+        raise ValueError("No slope angles found in any page")
+
+    roof_type = first_or_none(RoofInputField.ROOF_TYPE) or "unknown"
+
+    eaves_axis = first_or_none(RoofInputField.EAVES_OVERHANG)
+    if eaves_axis is None:
+        eaves_axis = default_eaves_overhang_m
+        flags.append(HITLFlag(
+            field=RoofInputField.EAVES_OVERHANG,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message=(
+                "eaves_overhang_from_axis_m not annotated — defaulted to "
+                f"{default_eaves_overhang_m}m (roof flush with outer wall). "
+                "Verify in plan."
+            ),
+            evidence=[],
+            eur_impact_estimate=400.0,
+        ))
+    else:
+        eaves_axis = float(eaves_axis)
+
+    eaves_outer = max(0.0, eaves_axis - wt / 2)
 
     return (
         RoofInput(
             roof_type=roof_type,
-            building_length_m=building_length_m,
-            building_width_m=building_width_m,
+            building_length_m=axis_length + wt,
+            building_width_m=axis_width + wt,
             eaves_overhang_m=eaves_outer,
-            slopes_deg=slopes,
+            slopes_deg=slopes_deg,
             wall_thickness_m=wt,
-            chimney_count=stogo.get("chimney_count", 0),
-            rooflight_count=stogo.get("rooflight_count", 0),
-            windows_count=stogo.get("windows_count", 0),
+            chimney_count=int(first_or_none(RoofInputField.CHIMNEY_COUNT) or 0),
+            rooflight_count=int(first_or_none(RoofInputField.ROOFLIGHT_COUNT) or 0),
+            windows_count=int(first_or_none(RoofInputField.WINDOWS_COUNT) or 0),
         ),
-        warnings,
+        evidence,
+        flags,
     )
 
 
