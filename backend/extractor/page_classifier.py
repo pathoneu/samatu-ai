@@ -26,12 +26,13 @@ import pdfplumber
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 SONNET_MODEL = "claude-sonnet-4-6"
 OPUS_MODEL = "claude-opus-4-7"
-# Empirical default (set 2026-05-14 from A LAIDA bake-off, commit e7f99f3):
-# Sonnet matches Opus on `roof_type_hint` (the safety-critical signal —
-# Haiku failed) at 5× lower cost. Opus stays available for premium /
-# customer-facing extractions where the 5× cost is worth absolute max
-# accuracy. Re-validate this default whenever the eval set grows.
-DEFAULT_MODEL = SONNET_MODEL
+# Default: Opus 4.7 — aligned with the interior pipeline. LT brėžiniai
+# are stricter than generic floor plans (LT abbreviations, dense
+# annotations, hand-drawn-style scans); user policy is "use the
+# strongest model for these tasks, don't optimise cost when accuracy
+# stakes are high." Sonnet/Haiku stay available as `model=...` overrides
+# for low-stakes batch / debugging / cost-sensitive paths only.
+DEFAULT_MODEL = OPUS_MODEL
 
 # LT statybų projektų dalies (sections) — codes as they appear in the
 # `Dokumento žymuo` field of the antspaudas (title block):
