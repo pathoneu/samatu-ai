@@ -10,7 +10,7 @@ can handle the wrong-page-type case without a full re-classify roundtrip.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 import json
@@ -268,11 +268,31 @@ def _extract_antspaudas_text(pdf_path: str | Path, page_num: int) -> str | None:
     return "ŠVOK" if code == "SVOK" else code
 
 
-def classify_page(image_b64: str, client: anthropic.Anthropic | None = None) -> PageClassification:
-    """Public entry: route a single rendered page to its type.
+def classify_page(
+    image_b64: str,
+    client: anthropic.Anthropic | None = None,
+    *,
+    pdf_path: str | Path | None = None,
+    page_num: int | None = None,
+) -> PageClassification:
+    """Public entry: classify one rendered page (hybrid text-first + Haiku).
 
-    Caller is responsible for batching pages and dispatching to the
-    appropriate specialised Opus prompt. Errors propagate — we'd rather
-    surface a failed classification than silently route to the wrong prompt.
+    Pure-image callers (legacy) get Haiku-only behaviour. When BOTH
+    `pdf_path` and `page_num` are supplied, `_extract_antspaudas_text`
+    runs first; if it finds a dalis code, that value OVERRIDES Haiku's
+    answer for `dalis` (text is deterministic, Haiku is probabilistic).
+    Page type and roof-type hint always come from Haiku.
+
+    Raster-flattened pages whose antspaudas can't be read by pdfplumber
+    silently fall through to Haiku's value — this is the "vision
+    fallback" the plan calls out for studios that flatten their PDFs.
+
+    Errors propagate — we'd rather surface a failed classification than
+    silently route to the wrong downstream prompt.
     """
-    return _call_haiku(image_b64, client=client)
+    result = _call_haiku(image_b64, client=client)
+    if pdf_path is not None and page_num is not None:
+        text_dalis = _extract_antspaudas_text(pdf_path, page_num)
+        if text_dalis is not None:
+            result = replace(result, dalis=Dalis(text_dalis))
+    return result
