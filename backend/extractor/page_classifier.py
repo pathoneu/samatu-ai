@@ -57,12 +57,42 @@ class PageType(str, Enum):
     UNKNOWN = "unknown"
 
 
+class Dalis(str, Enum):
+    """LT statybų projekto dalies (building-section codes) — values
+    match what appears in the antspaudas `Dokumento žymuo` field."""
+    BD = "BD"        # Bendroji dalis
+    SP = "SP"        # Sklypo planas
+    SA = "SA"        # Statybinė architektūra
+    SK = "SK"        # Statybinės konstrukcijos
+    VVN = "VVN"      # Vandentiekio ir nuotekynių
+    SVOK = "ŠVOK"    # Šildymas, vėdinimas, oro kondicionavimas
+    E = "E"          # Elektrotechnika
+    UNKNOWN = "unknown"
+
+
+class RoofTypeHint(str, Enum):
+    """Roof-shape hint extracted from drawings — drives strategy dispatch."""
+    DVISLAITIS = "dvislaitis"            # two-slope gable
+    KETURSLAITIS = "keturslaitis"        # four-slope hip
+    VIENSLAITIS = "vienslaitis"          # mono-pitch shed
+    MANSARDINIS = "mansardinis"          # mansard
+    PLOKSCIAS = "plokscias"              # flat
+    UNKNOWN = "unknown"
+
+
 @dataclass(frozen=True)
 class PageClassification:
-    """Output of one page classification."""
+    """Output of one page classification.
+
+    `dalis` and `roof_type_hint` are additive (Phase 1 T2). Image-only
+    callers may leave them as None; the hybrid classifier (T3) populates
+    `dalis` from antspaudas text and asks Haiku for `roof_type_hint`.
+    """
     page_type: PageType
     confidence: float
     top_2: PageType | None = None
+    dalis: Dalis | None = None
+    roof_type_hint: RoofTypeHint | None = None
 
 
 _CLASSIFIER_SYSTEM = """You classify a Lithuanian construction drawing page.
@@ -73,10 +103,13 @@ Return strict JSON:
                  "section" | "electrical" | "plumbing" | "eksplikacija" |
                  "legend" | "unknown",
     "confidence": 0.0-1.0,
-    "top_2": same enum or null
+    "top_2": same enum or null,
+    "dalis": "BD" | "SP" | "SA" | "SK" | "VVN" | "ŠVOK" | "E" | "unknown" | null,
+    "roof_type_hint": "dvislaitis" | "keturslaitis" | "vienslaitis" |
+                      "mansardinis" | "plokscias" | "unknown" | null
   }
 
-Hints:
+Hints — page_type:
 - "Aukšto planas" / wall hatching + room polygons → floor_plan
 - "Lubų planas" / dropped-ceiling zones + light fixtures → ceiling_plan
 - "Sienų išklotinė" / vertical wall view + tile zones → wall_elevation
@@ -86,6 +119,20 @@ Hints:
 - "Santechnikos planas" / plumbing fixtures → plumbing
 - "Patalpų eksplikacija" / room schedule table → eksplikacija
 - Symbol legend with key-value rows → legend
+
+Hints — dalis (LT building-section code from the antspaudas title block):
+- BD = Bendroji dalis     SP = Sklypo planas     SA = Statybinė architektūra
+- SK = Statybinės konstrukcijos    VVN = Vandentiekio/ nuotekynių
+- ŠVOK = Šildymas, vėdinimas, oro kondicionavimas    E = Elektrotechnika
+Return null if no antspaudas is visible or the code cannot be read.
+
+Hints — roof_type_hint (only set when the page shows a roof plan or
+roof-relevant pjūvis; otherwise null):
+- Two slopes meeting at a single ridge + two gable walls → dvislaitis
+- Four slopes meeting at a ridge or apex, all sides slope → keturslaitis
+- Single sloped plane, one high wall and one low → vienslaitis
+- Double slope on each side with a break line → mansardinis
+- Roof pitch ≤ 3° with parapet → plokscias
 
 If confidence < 0.95, set top_2 to the second-best candidate.
 """
@@ -101,16 +148,39 @@ _SCHEMA = {
             "type": ["string", "null"],
             "enum": [pt.value for pt in PageType] + [None],
         },
+        "dalis": {
+            "type": ["string", "null"],
+            "enum": [d.value for d in Dalis] + [None],
+        },
+        "roof_type_hint": {
+            "type": ["string", "null"],
+            "enum": [r.value for r in RoofTypeHint] + [None],
+        },
     },
 }
 
 
+def _coerce_enum(enum_cls, raw):
+    """Map a JSON value to an enum member, or None if absent/null."""
+    if raw is None:
+        return None
+    return enum_cls(raw)
+
+
 def parse_classification(payload: dict) -> PageClassification:
-    """Convert Haiku JSON output into a typed `PageClassification`."""
+    """Convert Haiku JSON output into a typed `PageClassification`.
+
+    Tolerant of pre-T2 payloads (no `dalis` / `roof_type_hint` keys) and
+    of explicit nulls. The string `"unknown"` is preserved as the
+    enum's UNKNOWN sentinel (NOT collapsed to None — Haiku may use it
+    to signal an explicit "couldn't tell").
+    """
     return PageClassification(
         page_type=PageType(payload["page_type"]),
         confidence=float(payload["confidence"]),
         top_2=PageType(payload["top_2"]) if payload.get("top_2") else None,
+        dalis=_coerce_enum(Dalis, payload.get("dalis")),
+        roof_type_hint=_coerce_enum(RoofTypeHint, payload.get("roof_type_hint")),
     )
 
 
