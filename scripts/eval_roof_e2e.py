@@ -93,6 +93,30 @@ def evaluate(gt_path: Path) -> tuple[float, float, list[dict], bool]:
 
     inp, evidence, flags = build_roof_input(pages_data)
 
+    # Log actual RoofInput values that will hit the strategy — this is
+    # the load-bearing diagnostic for accuracy debugging. Without it,
+    # silent default fallbacks (e.g. soflitas_depth_m = 0.5) are invisible.
+    print("  RoofInput received by strategy:")
+    print(
+        f"    roof_type={inp.roof_type} | "
+        f"building {inp.building_length_m:.2f} × {inp.building_width_m:.2f} | "
+        f"eaves {inp.eaves_overhang_m:.2f} | "
+        f"slopes {inp.slopes_deg}"
+    )
+    print(
+        f"    wall={inp.wall_thickness_m:.2f} | "
+        f"eaves_to_ground={inp.eaves_to_ground_m:.2f} | "
+        f"soflitas={inp.soflitas_depth_m:.2f}"
+    )
+    print(
+        f"    chimneys={inp.chimney_count}, "
+        f"rooflights={inp.rooflight_count}, "
+        f"windows={inp.windows_count}"
+    )
+    print(f"  Flags raised: {len(flags)}")
+    for fl in flags:
+        print(f"    - {fl.field.value}: {fl.reason.value}")
+
     out = STRATEGIES[gt["roof_type"]].compute(inp)
     expected = {li["position"]: li for li in gt["roofer_samata"]["line_items"]}
     total_actual = sum(li["sum_eur"] for li in gt["roofer_samata"]["line_items"])

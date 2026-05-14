@@ -260,6 +260,7 @@ def build_roof_input(
     *,
     default_wall_thickness_m: float = _DEFAULT_WALL_THICKNESS_M,
     default_eaves_overhang_m: float = 0.0,
+    default_soflitas_depth_m: float = _DEFAULT_SOFLITAS_DEPTH_M,
 ) -> tuple[RoofInput, list[DimensionEvidence], list[HITLFlag]]:
     """Typed merger — populates RoofInput using Semantic Routing.
 
@@ -474,6 +475,28 @@ def build_roof_input(
     else:
         eaves_to_ground = float(eaves_to_ground)
 
+    # soflitas_depth_m: SECTION-authoritative (annotated on pjūvis as a
+    # small horizontal dim across the soffit panel under the eaves).
+    # Drives sienos formula on dvislaitis (perimeter × soflitas × 2) —
+    # missing this silently uses the 0.5 default. Default 0.5 with
+    # NO_AUTHORITATIVE_SOURCE flag if no section page reports it.
+    soflitas_depth = first_or_none(RoofInputField.SOFLITAS_DEPTH)
+    if soflitas_depth is None:
+        soflitas_depth = default_soflitas_depth_m
+        flags.append(HITLFlag(
+            field=RoofInputField.SOFLITAS_DEPTH,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message=(
+                "soflitas_depth_m not annotated on any section page — "
+                f"defaulted to {default_soflitas_depth_m}m. Drives sienos "
+                "(soffit) calc on dvislaitis; verify in pjūvis."
+            ),
+            evidence=[],
+            eur_impact_estimate=600.0,
+        ))
+    else:
+        soflitas_depth = float(soflitas_depth)
+
     return (
         RoofInput(
             roof_type=roof_type,
@@ -483,6 +506,7 @@ def build_roof_input(
             slopes_deg=slopes_deg,
             wall_thickness_m=wt,
             eaves_to_ground_m=eaves_to_ground,
+            soflitas_depth_m=soflitas_depth,
             chimney_count=int(first_or_none(RoofInputField.CHIMNEY_COUNT) or 0),
             rooflight_count=int(first_or_none(RoofInputField.ROOFLIGHT_COUNT) or 0),
             windows_count=int(first_or_none(RoofInputField.WINDOWS_COUNT) or 0),

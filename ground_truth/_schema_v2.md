@@ -53,6 +53,8 @@ pages:
       slope_angles_deg: [30]
       ridge_height_m: 8.45
       eaves_height_m: 3.20
+      wall_thickness_m: 0.30
+      soflitas_depth_m: 0.50
 
 # Roofer's manual sąmata for end-to-end comparison
 roofer_samata:
@@ -80,6 +82,10 @@ roofer_samata:
 - `eaves_height_m` on SECTION pages: height of eaves (drip line) above
   ground/datum, in metres. Used by dvislaitis sienos formula to compute
   the gable wall area; missing this zeros out a major line item.
+- `soflitas_depth_m` on SECTION pages: depth of the horizontal soffit
+  panel under the eaves overhang (outer wall face → drip edge), in
+  metres. Used by dvislaitis sienos formula (perimeter × soflitas × 2)
+  to compute the soffit panel area.
 - `sum_eur` on `roofer_samata.line_items`: total € for this line item
   (= `qty` × `eur_per_unit`). Required — used by the eval harness to
   cross-check against the roofer's quoted `total_eur_no_vat`.

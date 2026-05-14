@@ -25,6 +25,7 @@ def test_section_owns_slope_and_heights():
     assert can_write(PageType.SECTION, RoofInputField.SLOPE)
     assert can_write(PageType.SECTION, RoofInputField.WALL_THICKNESS)
     assert can_write(PageType.SECTION, RoofInputField.EAVES_TO_GROUND)
+    assert can_write(PageType.SECTION, RoofInputField.SOFLITAS_DEPTH)
 
 
 def test_stogo_planas_owns_topology_and_eaves():
