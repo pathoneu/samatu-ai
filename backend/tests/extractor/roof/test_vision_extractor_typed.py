@@ -57,10 +57,10 @@ def test_a_laida_typed_merger_uses_stogo_fallback_with_flag():
         pages=[A_LAIDA_STOGO_P10, A_LAIDA_PJUVIS_P9],
     )
     assert inp.roof_type == "keturslaitis"
-    assert inp.slopes_deg == [25, 22] or inp.slopes_deg == [25]
-    # Either slopes from stogo_planas labels (if section provides only 1)
-    # or section's [25]; both acceptable. The merger should at minimum
-    # produce keturslaitis-compatible slope info.
+    assert inp.slopes_deg == [25.0], (
+        f"slopes_deg should be [25.0] from section p9 (only authoritative source); "
+        f"got {inp.slopes_deg}"
+    )
     fallback_flags = [f for f in flags if f.field == RoofInputField.AXIS_WIDTH]
     assert len(fallback_flags) >= 1
 

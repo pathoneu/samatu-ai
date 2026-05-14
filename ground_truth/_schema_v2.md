@@ -52,6 +52,7 @@ pages:
     fields:
       slope_angles_deg: [30]
       ridge_height_m: 8.45
+      eaves_height_m: 3.20
 
 # Roofer's manual sąmata for end-to-end comparison
 roofer_samata:
@@ -62,6 +63,7 @@ roofer_samata:
       qty: 231
       unit: m2
       eur_per_unit: 20.00
+      sum_eur: 4620.00
     # ... etc
   total_eur_no_vat: 20458.00
 ```
@@ -75,6 +77,12 @@ roofer_samata:
 - `visible_slope_angles_deg` on stogo_planas pages records WHAT THE
   DRAWING LABELS (even if wrong); the actual slope used in computation
   goes in the section page's `slope_angles_deg`.
-- A field deliberately absent from a page entry signals "the system
-  should not extract that field from this page." If the system DOES
-  extract it, that's a false-positive recall and the eval reports it.
+- `eaves_height_m` on SECTION pages: height of eaves (drip line) above
+  ground/datum, in metres. Used by dvislaitis sienos formula to compute
+  the gable wall area; missing this zeros out a major line item.
+- `sum_eur` on `roofer_samata.line_items`: total € for this line item
+  (= `qty` × `eur_per_unit`). Required — used by the eval harness to
+  cross-check against the roofer's quoted `total_eur_no_vat`.
+- Fields absent from a page entry mean "not visible on this page; system
+  should not extract from there." If the system DOES extract it, that's
+  a false-positive recall and the eval reports it.

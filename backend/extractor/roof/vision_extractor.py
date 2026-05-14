@@ -27,6 +27,7 @@ from extractor.roof.strategies import RoofInput
 
 
 _DEFAULT_WALL_THICKNESS_M = 0.25  # LT blokeliai typical (per CLAUDE.md §2)
+_DEFAULT_SOFLITAS_DEPTH_M = 0.5  # soffit overhang depth — matches RoofInput dataclass default
 
 
 # ---------------------------------------------------------------------------
@@ -47,10 +48,6 @@ LT antspaudas conventions you MUST respect:
 - Eaves overhang (karnizo iškyša) is annotated from the wall axis to the
   drip edge. Return `eaves_overhang_from_axis_m` literally — the downstream
   code subtracts wall_thickness/2 to get the from-outer-wall value.
-- Wall thickness is shown in section details OR called out in a
-  "MEDŽIAGŲ ŽINIARAŠTIS" (materials list). Common LT exterior walls:
-  blokeliai 0.20-0.25m, blokeliai+EPS 0.30-0.50m. If not visible, set to
-  null and explain in `notes`.
 - Roof type from the plan shape:
     * Single rectangle with ONE ridge running long-side, two gables → dvislaitis
     * Single rectangle with FOUR hip slopes meeting at central ridge → keturslaitis
@@ -92,7 +89,6 @@ _STOGO_PLANAS_SCHEMA: dict[str, Any] = {
         "axis_to_axis_length_m",
         "axis_to_axis_width_m",
         "eaves_overhang_from_axis_m",
-        "wall_thickness_m",
         "visible_slope_angles_deg",
         "chimney_count",
         "rooflight_count",
@@ -118,7 +114,6 @@ _STOGO_PLANAS_SCHEMA: dict[str, Any] = {
         "axis_to_axis_length_m": {"type": ["number", "null"]},
         "axis_to_axis_width_m": {"type": ["number", "null"]},
         "eaves_overhang_from_axis_m": {"type": ["number", "null"]},
-        "wall_thickness_m": {"type": ["number", "null"]},
         # Slope angles annotated on the roof plan itself (LT studios
         # commonly mark each slope's angle next to the slope surface).
         # Empty list if no angles visible — pjūvis is then the source.
@@ -211,6 +206,14 @@ Return in metres (e.g. 0.25). Common LT values: 0.20-0.25m (blokeliai),
 0.30-0.50m (blokeliai + EPS insulation). If not shown in the section,
 return null — the downstream code will fall back to a default.
 
+Soffit depth / overhang width (soflitas / karnizo plotis) — the depth
+of the horizontal soffit panel under the eaves overhang, measured from
+the outer wall face to the drip edge. Typically annotated as a small
+horizontal dimension on the section near the eaves, often the same as
+or close to the eaves_overhang_from_axis value. Common LT values:
+0.30-0.80m. Return in metres (e.g. 0.50). If not shown in the section,
+return null — the downstream code will fall back to a default.
+
 Return strict JSON. If a value isn't confidently readable, set null
 and explain in `notes`. NEVER guess slope angles or thicknesses — null
 is honest.
@@ -225,6 +228,7 @@ _PJUVIS_SCHEMA: dict[str, Any] = {
         "ridge_height_m",
         "eaves_height_m",
         "wall_thickness_m",
+        "soflitas_depth_m",
         "confidence",
         "notes",
     ],
@@ -240,6 +244,7 @@ _PJUVIS_SCHEMA: dict[str, Any] = {
         "ridge_height_m": {"type": ["number", "null"]},
         "eaves_height_m": {"type": ["number", "null"]},
         "wall_thickness_m": {"type": ["number", "null"]},
+        "soflitas_depth_m": {"type": ["number", "null"]},
         "confidence": {"type": "number"},
         "notes": {"type": "string"},
     },
@@ -292,6 +297,7 @@ def build_roof_input(
             ("eaves_overhang_from_axis_m", RoofInputField.EAVES_OVERHANG),
             ("wall_thickness_m", RoofInputField.WALL_THICKNESS),
             ("eaves_height_m", RoofInputField.EAVES_TO_GROUND),
+            ("soflitas_depth_m", RoofInputField.SOFLITAS_DEPTH),
             ("roof_type", RoofInputField.ROOF_TYPE),
             ("chimney_count", RoofInputField.CHIMNEY_COUNT),
             ("rooflight_count", RoofInputField.ROOFLIGHT_COUNT),
@@ -366,28 +372,30 @@ def build_roof_input(
     else:
         wt = float(wt)
 
-    section_slopes = [
-        float(e.value) for e in evidence
-        if e.field == RoofInputField.SLOPE and e.page_class == PageType.SECTION
+    # Slope angles — authoritative source wins; non-authoritative stogo
+    # labels become cross-check evidence for CONFLICTING_AUTHORITATIVE_SOURCES.
+    authoritative_slope_evs = authoritative(RoofInputField.SLOPE)
+    section_slopes = [float(e.value) for e in authoritative_slope_evs]
+    non_auth_slope_evs = [
+        e for e in evidence
+        if e.field == RoofInputField.SLOPE and not e.is_authoritative()
     ]
-    stogo_slopes = [
-        float(e.value) for e in evidence
-        if e.field == RoofInputField.SLOPE and e.page_class == PageType.STOGO_PLANAS
-    ]
+    non_auth_slopes = [float(e.value) for e in non_auth_slope_evs]
+
     if section_slopes:
         slopes_deg = section_slopes
-        if stogo_slopes:
+        if non_auth_slopes:
             mismatches = [
-                ss for ss in stogo_slopes
-                if not any(abs(ss - ps) <= 2.0 for ps in section_slopes)
+                ns for ns in non_auth_slopes
+                if not any(abs(ns - ps) <= 2.0 for ps in section_slopes)
             ]
             if mismatches:
                 flags.append(HITLFlag(
                     field=RoofInputField.SLOPE,
                     reason=HITLFlagReason.CONFLICTING_AUTHORITATIVE_SOURCES,
                     message=(
-                        f"Stogo planas labels slope(s) {mismatches}° but "
-                        f"pjūvis reads {section_slopes}° — using pjūvis."
+                        f"Non-authoritative source labels slope(s) {mismatches}° but "
+                        f"authoritative pjūvis reads {section_slopes}° — using authoritative value."
                     ),
                     evidence=[
                         e for e in evidence
@@ -395,12 +403,12 @@ def build_roof_input(
                     ],
                     eur_impact_estimate=300.0,
                 ))
-    elif stogo_slopes:
-        slopes_deg = stogo_slopes
+    elif non_auth_slopes:
+        slopes_deg = non_auth_slopes
         flags.append(HITLFlag(
             field=RoofInputField.SLOPE,
             reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
-            message="No pjūvis available; using stogo_planas labelled slopes.",
+            message="No authoritative source (section) for slopes; using non-authoritative fallback.",
             evidence=[
                 e for e in evidence
                 if e.field == RoofInputField.SLOPE
@@ -410,7 +418,20 @@ def build_roof_input(
     else:
         raise ValueError("No slope angles found in any page")
 
-    roof_type = first_or_none(RoofInputField.ROOF_TYPE) or "unknown"
+    roof_type = first_or_none(RoofInputField.ROOF_TYPE)
+    if roof_type is None or roof_type == "unknown":
+        flags.append(HITLFlag(
+            field=RoofInputField.ROOF_TYPE,
+            reason=HITLFlagReason.NO_AUTHORITATIVE_SOURCE,
+            message=(
+                "roof_type could not be determined from any STOGO_PLANAS page. "
+                "Strategy dispatch will refuse unknown roof types — confirm "
+                "the project's roof shape before proceeding."
+            ),
+            evidence=[e for e in evidence if e.field == RoofInputField.ROOF_TYPE],
+            eur_impact_estimate=5000.0,
+        ))
+        roof_type = "unknown"
 
     eaves_axis = first_or_none(RoofInputField.EAVES_OVERHANG)
     if eaves_axis is None:
