@@ -12,11 +12,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 import json
+import re
 
 import anthropic
+import pdfplumber
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+
+# LT statybų projektų dalies (sections) — codes as they appear in the
+# `Dokumento žymuo` field of the antspaudas (title block):
+#   BD = Bendroji dalis             SP = Sklypo planas
+#   SA = Statybinė architektūra     SK = Statybinės konstrukcijos
+#   VVN = Vandentiekio ir nuotekynių     E = Elektrotechnika
+#   ŠVOK = Šildymas, vėdinimas, oro kondicionavimas (ASCII fallback: SVOK)
+_DALIES = ("BD", "SP", "SA", "SK", "VVN", "ŠVOK", "SVOK", "E")
+
+# Lower-right crop covers most LT studio antspaudai (40-100% width, 70-100%
+# height). Tuned empirically against `1_BD.pdf`, `03_SA.pdf`, `SA-02.pdf`.
+_ANTSPAUDAS_BBOX = (0.40, 0.70, 1.00, 1.00)
+
+# Match the document-code pattern `*-DALIS{sep}DOCTYPE` where the
+# separator between dalis and doc-type is either `.` or `-`. LT studios
+# differ: `P2515-TDP-SA.ŽN` (Endive/Jektera-style) vs `ARCH-22-12-TS-BD-TS`
+# (Mai-style). The dalis must be preceded by `-` or whitespace (so we
+# don't match LT capitals appearing mid-word) and followed by 1-4
+# capital letters (the doc-type suffix: AR aiškinamasis raštas, ŽN
+# žiniaraštis, TS techninės specifikacijos, BR brėžinys, …).
+_DOC_CODE_RE = re.compile(
+    r"[-\s]\s*(" + "|".join(_DALIES) + r")[.\-][A-ZŠŽĄČĘĖĮŲŪ]{1,4}"
+)
 
 
 class PageType(str, Enum):
@@ -126,6 +152,50 @@ def _call_haiku(image_b64: str, client: anthropic.Anthropic | None = None) -> Pa
     )
     payload = json.loads(resp.content[0].text)
     return parse_classification(payload)
+
+
+def _extract_antspaudas_text(pdf_path: str | Path, page_num: int) -> str | None:
+    """Extract the LT dalis code from a page's antspaudas (title block).
+
+    LT brėžiniai stamp the dalis code in the lower-right title block via a
+    document number like `P2515-TDP-SA.ŽN`. This function crops to the
+    lower-right region, extracts text via pdfplumber, and matches the
+    document-code pattern. Raster-flattened pages (no text layer) and
+    cover sheets (no antspaudas) return None — Haiku vision fallback
+    (Phase 1 T3) handles those.
+
+    Args:
+        pdf_path: Path to the PDF file.
+        page_num: 1-indexed page number.
+
+    Returns:
+        Detected dalis code (one of BD/SP/SA/SK/VVN/ŠVOK/E) or None if no
+        recognisable code is present. The ASCII variant `SVOK` is
+        normalised to `ŠVOK`.
+
+    Raises:
+        ValueError: if `page_num < 1`.
+        IndexError: if `page_num` exceeds the PDF's page count.
+    """
+    if page_num < 1:
+        raise ValueError(f"page_num is 1-indexed; got {page_num}")
+
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        if page_num > len(pdf.pages):
+            raise IndexError(
+                f"page_num {page_num} out of range (PDF has {len(pdf.pages)} pages)"
+            )
+        page = pdf.pages[page_num - 1]
+        w, h = page.width, page.height
+        x0, y0, x1, y1 = _ANTSPAUDAS_BBOX
+        crop = page.within_bbox((w * x0, h * y0, w * x1, h * y1))
+        text = crop.extract_text() or ""
+
+    match = _DOC_CODE_RE.search(text)
+    if not match:
+        return None
+    code = match.group(1)
+    return "ŠVOK" if code == "SVOK" else code
 
 
 def classify_page(image_b64: str, client: anthropic.Anthropic | None = None) -> PageClassification:
