@@ -1,5 +1,65 @@
 # Changelog
 
+## 2026-05-14 — Stogai V1 Accuracy Wedge complete
+
+End-to-end Vision → typed merger → strategy pipeline run against both
+ground-truth projects. Acceptance gate (WAPE ≤ 2% + no unflagged
+high-impact errors) **passed on A LAIDA, failed on 0039**:
+- A LAIDA (keturslaitis, SA dalis): **WAPE 1.06% — PASS**
+- 0039 (dvislaitis, SK only, raster): **WAPE 33.20% — FAIL**
+  (3 HITLFlags raised, but WAPE gate not met)
+
+Honest failure mode on 0039 (NOT gamed):
+- Vision read SECTION (p49) ridge=8.45m, eaves=7.70m, slope=30°, but
+  returned `wall_thickness_m: None`.
+- Vision read STOGO PLANAS (p48) slope=35° (conflicts with section's
+  30°).
+- Vision did NOT return `eaves_to_ground_m` on any page (the typed
+  merger has no field for it under FLOOR_PLAN/STOGO_PLANAS authority,
+  and the section extractor returns ridge/eaves heights but the merger
+  defaults `eaves_to_ground_m=0.0`).
+- Result: dvislaitis sienos formula multiplies by `eaves_to_ground_m=0`
+  → sienos kiekis = 0.0 (vs roofer's actual 135 m²). One missing input
+  zeroes 33% of euros.
+
+Three HITLFlags WERE raised on 0039, as designed:
+- `wall_thickness` NO_AUTHORITATIVE_SOURCE (defaulted 0.25; gt is 0.30)
+- `slope` CONFLICTING_AUTHORITATIVE_SOURCES (plan 35° vs section 30°,
+  pjūvis preferred per Semantic Routing Hierarchy)
+- `eaves_overhang_from_axis_m` NO_AUTHORITATIVE_SOURCE (defaulted 0.0)
+
+Missing flag (next-iteration fix): the merger does NOT yet wire
+`eaves_height_m` from SECTION extraction into `eaves_to_ground_m` on
+RoofInput, nor does it raise a HITLFlag when this is missing. Phase 0
+math validated this manually on 0039; the Vision wedge regression is
+that the field never reaches the strategy.
+
+Architecture (from `docs/superpowers/plans/2026-05-14-stogai-v1-accuracy-wedge.md`):
+- Semantic Routing Hierarchy in `build_roof_input` drops non-authoritative
+  axis writes from structural detail pages (T1 page_authority.py + T3
+  typed merger). Floor plans own global axes; sections own slopes; stogo
+  planas owns topology + eaves + counts.
+- Constraint Verification Graph (T4) catches sub-dim sum mismatches as
+  HITLFlag entries.
+- v2 ground-truth schema (T5) records per-page-per-field values for both
+  projects (T6/T7).
+- Interactive harness `scripts/build_roof_ground_truth.py` (T8) opens the
+  door for N=8-10 ground truth growth without manual YAML editing.
+- `scripts/eval_roof_e2e.py` (T9) replaces ±2%-per-line vanity metric with
+  WAPE + "no unflagged high-impact line error" (per consultcouncil R3).
+
+Both councils 2026-05-14 (5-advisor LLM Council + 3-round
+Claude/ChatGPT/Gemini consultcouncil) converged on this architecture.
+The architecture is sound; the V1 gap is one missing field plumbing
+between SECTION extraction and the strategy.
+
+Backend suite: **594 PASS** (no regressions).
+
+Next: V1.1 — wire `eaves_height_m` (section) → `eaves_to_ground_m`
+(RoofInput) in typed merger and add HITLFlag when missing.
+V1.5 — HITL dimension ledger UI (separate plan); ground truth growth
+to N=8-10 (per R2 of consultcouncil).
+
 ## 2026-05-13 — Stogai V1 Phase 0 complete
 
 - Geometric engine reproduces both in-hand stogininko sąmatas within tolerance:
