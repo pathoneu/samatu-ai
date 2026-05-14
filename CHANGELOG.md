@@ -1,5 +1,48 @@
 # Changelog
 
+## 2026-05-14 — Stogai V1: --use-gt-inputs separates merger from Vision drift
+
+Added `--use-gt-inputs` mode to `scripts/eval_roof_e2e.py`. The flag
+bypasses Vision entirely and feeds the GT YAML's `pages[].fields`
+straight to the typed merger. This isolates "is merger+strategy
+correct?" from "is Vision returning consistent values today?". Opus
+4.7 is stochastic enough that re-runs drift by several percent on the
+same PDF — without this flag, the accuracy number conflates two very
+different sources of error.
+
+WAPE in BOTH modes for BOTH projects:
+
+| Project   | Merger+strategy (--use-gt-inputs) | Full pipeline (live Vision) |
+|-----------|-----------------------------------|-----------------------------|
+| A LAIDA   | **0.52%** — PASS                  | **1.06%** — PASS            |
+| 0039      | **3.19%** — FAIL (≤2% gate)       | **17.84%** — FAIL           |
+
+Interpretation:
+- **A LAIDA**: GT-inputs gives 0.52%. Live Vision adds ~0.5pp drift.
+  Within ±2% gate either way. Wedge is solid here.
+- **0039**: GT-inputs gives 3.19%, just over the gate, with sienos
+  (gable wall) under-reading by -9.2%. This is the **honest
+  merger+strategy ceiling** on 0039 — the formula or merger is missing
+  something even with perfect inputs (likely the dvislaitis sienos
+  formula not accounting for slope-driven gable triangle area, or
+  soflitas_depth defaulting to 0.5m vs the project's actual value).
+- **0039 Vision delta**: live Vision adds **+14.65pp** of error on top
+  of the deterministic floor — that gap is the Vision-prompt-iteration
+  backlog (V1.5 work). Today Vision over-reads axis_to_axis_width on
+  p48 (returns 9.47m vs GT 7.12m → stogas kiekis +27% over roofer),
+  and reads slope 35° on STOGO_PLANAS which conflicts with the
+  authoritative section's 30°.
+
+Backend suite: **596 PASS**. No regressions from the flag plumbing.
+
+Next priorities, in order:
+1. **V1.5 Vision-prompt work** — tighten stogo_planas axis extraction
+   on raster-flattened PDFs (the +27% width over-read drives most of
+   the 0039 Vision drift). Use isolated cropped views per dimension.
+2. **0039 merger ceiling** — investigate why GT-inputs gives -9.2% on
+   sienos. Likely `soflitas_depth_m` needs a per-project override or
+   the dvislaitis gable-triangle formula misses a slope-driven term.
+
 ## 2026-05-14 — Stogai V1.1: eaves_to_ground_m plumbing fix
 
 Fixed missed field-plumbing in the T3 typed merger refactor: vision

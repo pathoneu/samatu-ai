@@ -69,27 +69,53 @@ def render_b64(pdf_path: Path, page_num: int, dpi: int = 200) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def evaluate(gt_path: Path) -> tuple[float, float, list[dict], bool]:
+def gt_pages_data(gt: dict) -> list[dict]:
+    """Build pages_data from GT YAML directly, bypassing Vision.
+
+    Each page dict gets _page_num + _page_class plus the spread of
+    page_spec["fields"] (and sub_dimensions_m if present). All keys in
+    `fields` match the merger's evidence-collection keys (see
+    `build_roof_input`).
+    """
+    out: list[dict] = []
+    for spec in gt["pages"]:
+        d: dict = {
+            "_page_num": spec["page_num"],
+            "_page_class": PageType(spec["page_class"]),
+        }
+        d.update(spec.get("fields", {}) or {})
+        sub = (spec.get("fields") or {}).get("sub_dimensions_m") or \
+              spec.get("sub_dimensions_m") or {}
+        if sub:
+            d.setdefault("sub_dimensions_m", sub)
+        out.append(d)
+    return out
+
+
+def evaluate(gt_path: Path, use_gt_inputs: bool = False) -> tuple[float, float, list[dict], bool]:
     """Returns (wape, total_eur_actual, line_deltas, all_high_impact_flagged_or_safe)."""
     gt = yaml.safe_load(gt_path.read_text())
     pdf_path = ROOT / gt["source_pdf"]
 
-    pages_data: list[dict] = []
-    for page_spec in gt["pages"]:
-        page_num = page_spec["page_num"]
-        page_class = PageType(page_spec["page_class"])
-        b64 = render_b64(pdf_path, page_num)
-        try:
-            if page_class == PageType.SECTION:
-                data = extract_pjuvis_dims(b64, model=OPUS_MODEL)
-            else:
-                data = extract_stogo_planas_dims(b64, model=OPUS_MODEL)
-        except Exception as e:
-            print(f"  vision failed on p{page_num}: {e}")
-            data = {}
-        data["_page_num"] = page_num
-        data["_page_class"] = page_class
-        pages_data.append(data)
+    if use_gt_inputs:
+        pages_data = gt_pages_data(gt)
+    else:
+        pages_data = []
+        for page_spec in gt["pages"]:
+            page_num = page_spec["page_num"]
+            page_class = PageType(page_spec["page_class"])
+            b64 = render_b64(pdf_path, page_num)
+            try:
+                if page_class == PageType.SECTION:
+                    data = extract_pjuvis_dims(b64, model=OPUS_MODEL)
+                else:
+                    data = extract_stogo_planas_dims(b64, model=OPUS_MODEL)
+            except Exception as e:
+                print(f"  vision failed on p{page_num}: {e}")
+                data = {}
+            data["_page_num"] = page_num
+            data["_page_class"] = page_class
+            pages_data.append(data)
 
     inp, evidence, flags = build_roof_input(pages_data)
 
@@ -164,6 +190,8 @@ def main():
     p.add_argument("--gt", help="Ground truth v2 YAML path")
     p.add_argument("--all", action="store_true",
                    help="Run all *_roof_v2.yaml in ground_truth/")
+    p.add_argument("--use-gt-inputs", action="store_true",
+                   help="Skip Vision; feed GT page.fields straight to merger.")
     args = p.parse_args()
     load_dotenv(ROOT / "backend" / ".env")
 
@@ -175,9 +203,13 @@ def main():
         sys.exit("specify --gt or --all")
 
     overall_pass = True
+    mode_label = "GT-inputs (no Vision)" if args.use_gt_inputs else "live Vision"
+    print(f"Mode: {mode_label}")
     for gt_path in targets:
         print(f"\n=== {gt_path.name} ===")
-        wape, total, deltas, no_unflagged_high_impact = evaluate(gt_path)
+        wape, total, deltas, no_unflagged_high_impact = evaluate(
+            gt_path, use_gt_inputs=args.use_gt_inputs,
+        )
         print(f"WAPE: {wape:.2f}%   (roofer total €{total:.0f})")
         for d in deltas:
             if d["delta_pct"] is None:
