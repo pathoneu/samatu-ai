@@ -102,6 +102,48 @@ def calculate_room_tile_area(payload: ElevationPayload) -> dict[str, RoomTileRes
     return dict(rooms)
 
 
+WET_ROOM_PASKIRTYS = {"vonia", "wc", "san", "skalbykla", "katiline"}
+HIGH_TILE_RATIO_WARNING = 0.80
+
+
+def diagnose_tile_coverage(
+    parsed: dict[str, Any],
+    elevation_results: dict[str, RoomTileResult],
+) -> list[dict[str, Any]]:
+    """Soft sanity check — never mutates totals; surfaces a list of warnings
+    when a non-wet room comes back with ≥80% tile coverage on walls. Real LT
+    bathrooms tile floor-to-ceiling (95%+), so we explicitly do NOT clamp
+    wet rooms. The warning surfaces likely Vision over-counts on living-area
+    rooms (kitchens with full-height tile splashes are rare; if Vision says
+    a svetainė is 90% tiled, the elevation read is probably wrong).
+    """
+    warnings: list[dict[str, Any]] = []
+    rooms_by_nr = {str(r.get("nr")): r for r in parsed.get("patalpos") or []}
+    for nr, result in elevation_results.items():
+        room = rooms_by_nr.get(nr)
+        if not room:
+            continue
+        wall_gross = float(room.get("perimetras_m") or 0) * float(room.get("lubu_aukstis_m") or 0)
+        if wall_gross <= 0:
+            continue
+        ratio = result.tile_area_m2 / wall_gross
+        paskirtis = (room.get("paskirtis") or "").lower()
+        if ratio >= HIGH_TILE_RATIO_WARNING and paskirtis not in WET_ROOM_PASKIRTYS:
+            warnings.append({
+                "room_nr": nr,
+                "room_name": room.get("pavadinimas"),
+                "paskirtis": paskirtis,
+                "tile_ratio": round(ratio, 3),
+                "tile_area_m2": round(result.tile_area_m2, 2),
+                "wall_gross_m2": round(wall_gross, 2),
+                "message": (
+                    f"non-wet room with {ratio:.0%} tile coverage — verify "
+                    f"elevation read (truth-friendly diagnostic, no clamp applied)"
+                ),
+            })
+    return warnings
+
+
 def apply_tile_overrides_to_rooms(
     parsed: dict[str, Any],
     elevation_results: dict[str, RoomTileResult],

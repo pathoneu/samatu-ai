@@ -35,11 +35,38 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def infer_room_exteriors(room: dict) -> tuple[int, list[str]]:
+def is_envelope_room(room: dict, *, partition_count: int | None = None) -> bool:
+    """Best-effort exterior-room signal.
+
+    A room lives on the envelope when at least one of its walls is NOT shared
+    with another room. When ``n_partition_walls`` is available (via
+    ``geometry_solver.detect_shared_walls``), we infer: n_walls_estimate -
+    n_partition_walls > 0 → has exterior wall.
+
+    Fall-back signals when adjacency data isn't present:
+      - paskirtis is tamburas / garazas / koridorius (often at envelope)
+      - room already has any opening flagged exterior (Vision noticed)
+      - room name suggests perimeter (svetainė, miegamasis with large windows)
+    """
+    n_walls = int(room.get("n_walls_estimate") or 4)
+    if partition_count is not None:
+        return (n_walls - partition_count) > 0
+
+    # Adjacency unavailable — fall back to explicit signals.
+    if any(bool(el.get("_exterior")) for el in (room.get("elementai") or [])):
+        return True
+    paskirtis = (room.get("paskirtis") or "").lower()
+    if paskirtis in ("tamburas", "tambūras", "garazas", "garažas"):
+        return True
+    return False
+
+
+def infer_room_exteriors(room: dict, *, partition_count: int | None = None) -> tuple[int, list[str]]:
     """Mutate room['elementai'] in place; return (count_changed, change_log)."""
     paskirtis = (room.get("paskirtis") or "").lower()
     name = (room.get("pavadinimas") or "").lower()
     is_garage = paskirtis in ("garazas", "garažas") or "garaž" in name
+    on_envelope = is_envelope_room(room, partition_count=partition_count)
 
     changes: list[str] = []
     count = 0
@@ -48,6 +75,7 @@ def infer_room_exteriors(room: dict) -> tuple[int, list[str]]:
         if el.get("_exterior"):
             continue
         plotis_mm = el.get("plotis_mm") or 0
+        aukstis_mm = el.get("aukstis_mm") or 0
         rule = None
 
         if tipas in ("duris", "pasleptos_duris"):
@@ -55,9 +83,19 @@ def infer_room_exteriors(room: dict) -> tuple[int, list[str]]:
                 rule = "garage door"
             elif plotis_mm >= 1500:
                 rule = f"terrace/wide door ({plotis_mm}mm)"
+            # 2026-05-31: catch standard 900x2100 exterior doors when the
+            # room is on the envelope. Adjacency-driven when available;
+            # otherwise relies on the explicit-signal fallback in
+            # is_envelope_room (paskirtis or pre-existing _exterior flag).
+            elif on_envelope and plotis_mm >= 900 and aukstis_mm >= 2100:
+                rule = f"envelope-room standard door ({plotis_mm}x{aukstis_mm}mm)"
         elif tipas in ("langas", "stoglangis"):
             if plotis_mm >= 2000:
                 rule = f"panoramic window ({plotis_mm}mm)"
+            elif on_envelope and plotis_mm >= 600:
+                # Any window in an envelope room over the minimum-bath
+                # ventilation size is overwhelmingly exterior.
+                rule = f"envelope-room window ({plotis_mm}mm)"
 
         if rule:
             el["_exterior"] = True

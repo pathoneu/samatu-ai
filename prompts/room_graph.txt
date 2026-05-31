@@ -68,11 +68,22 @@ RULES — graph
 1. vertices — every wall corner. id = v1,v2,… Coordinates are 0..1 fractions
    of image width/height. Snap nearly-coincident corners (within ~5px) to the
    same vertex.
-2. walls — every interior or exterior straight wall segment. dimension_id
-   MUST reference one entry from the input dimension list whose value_mm
-   matches this wall's length. If a wall has no direct dimension line drawn
-   over it, set dimension_id to null — plan_assembler will infer it from
-   polygon closure.
+2. walls — every interior or exterior wall segment. dimension_id MUST
+   reference one entry from the input dimension list whose value_mm matches
+   this wall's length. If a wall has no direct dimension line drawn over it,
+   set dimension_id to null — plan_assembler will infer it from polygon
+   closure.
+
+   Additional fields:
+     wall_type: "load_bearing" | "partition" | "exterior_envelope"
+                 ("load_bearing" — thick wall, often hatched / poché-filled
+                  in plan; "partition" — thin un-filled drywall/GKP;
+                  "exterior_envelope" — outer envelope wall including
+                  facade insulation; pick the closest match)
+     curved:    true | false — set true ONLY for genuinely curved walls
+                (arc segments). For curved walls, polygon_assembler will
+                approximate the segment length from the dimension_id;
+                set angle_deg to the tangent at the midpoint.
 3. angle_deg — 0=east, 90=north (standard math convention with image Y down,
    so 90° points UP on the page). For axis-aligned walls use exactly 0, 90,
    180, 270 from the set below; for a rectangular room walked CCW from the

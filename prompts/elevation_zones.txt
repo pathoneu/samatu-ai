@@ -50,6 +50,25 @@ OUTPUT — return exactly one JSON object, no prose, no fences:
   ]
 }
 
+LITHUANIAN DRAWING CONVENTIONS — read these before identifying materials
+The vast majority of LT residential interior elevations use these fills.
+When you see them, prefer the COLOUR signal over hatch pattern (hatches
+inside a coloured zone are usually decorative for the tile format, not
+material indicators):
+  • Cyan / light-blue solid fill  → tile (ceramic / porcelain)
+  • Grey or beige solid fill      → wood_panel (plokštė: medienos /
+                                    laminato / MDF dekoras)
+  • White / no fill                → paint
+  • Diagonal grey crosshatch       → concrete (rare on interior elev.,
+                                    common on technical elevations only)
+  • Vertical thin lines on a fill  → wallpaper (tapetai) — keep the
+                                    underlying fill colour as the
+                                    material when it matches one above
+  • Solid black / mirrored ratio    → mirror (veidrodis)
+  • Stone-like irregular hatch     → stone
+A panel that has BOTH a fill colour and a labelled format ("120x60",
+"120x120", "didžiaformatės") is overwhelmingly tile.
+
 RULES
 1. material — one of: "tile" | "paint" | "wood_panel" | "wallpaper" | "mirror"
    | "stone" | "other".

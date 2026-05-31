@@ -66,6 +66,56 @@ def _load_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
+def _decode_response_json(text: str) -> dict[str, Any]:
+    """Robust JSON decode for model output.
+
+    Tolerates: code-fenced output (```json…```), leading/trailing prose,
+    UTF-8 BOMs. Falls back to extracting the first top-level JSON object
+    via brace-matching when straight ``json.loads`` fails.
+    """
+    if not text:
+        raise ValueError("empty model response")
+    s = text.strip().lstrip("﻿")
+    # Strip code fences
+    if s.startswith("```"):
+        # ```json or ``` + newline at start, ``` at end
+        s = s.split("\n", 1)[-1] if "\n" in s else s
+        if s.endswith("```"):
+            s = s[: -3]
+        s = s.strip()
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+    # Brace-balance fallback — find the first '{' then walk to the matching '}'
+    start = s.find("{")
+    if start == -1:
+        raise ValueError("no JSON object in response")
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(s)):
+        ch = s[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = s[start: i + 1]
+                return json.loads(candidate)
+    raise ValueError("unbalanced JSON object in response")
+
+
 def _detect_image_media_type(img_bytes: bytes) -> str:
     """Sniff a base64-decoded image's media type from the first few bytes.
     Anthropic accepts image/png, image/jpeg, image/webp, image/gif."""
@@ -81,7 +131,14 @@ def _detect_image_media_type(img_bytes: bytes) -> str:
 
 
 def parse_dimension_payload(raw_json: dict[str, Any]) -> DimensionList:
-    """Convert Vision JSON → typed DimensionList, raising on malformed input."""
+    """Convert Vision JSON → typed DimensionList, raising on malformed input.
+
+    Filters out implausible entries that slipped through despite the prompt:
+      - value_mm <= 0 (room numbers parsed as length, or genuine zero-lengths)
+      - x_pct / y_pct outside [0, 1] (mis-positioned text)
+      - duplicate IDs (model retry with same numbering — first wins)
+    Filtered entries are recorded in _meta.filtered so they're auditable.
+    """
     if not isinstance(raw_json, dict):
         raise ValueError("expected dict at top level")
     items = raw_json.get("dimensions")
@@ -93,12 +150,33 @@ def parse_dimension_payload(raw_json: dict[str, Any]) -> DimensionList:
             raise ValueError("missing 'dimensions' array")
     out = DimensionList()
     seen_ids: set[str] = set()
+    filtered: list[dict[str, Any]] = []
     for raw in items:
         d = Dimension.from_dict(raw)
         if d.id in seen_ids:
-            raise ValueError(f"duplicate dimension id {d.id!r}")
+            filtered.append({"id": d.id, "reason": "duplicate_id"})
+            continue
+        # Drop value_mm that's a level marker (orientation="level") OR zero/negative
+        # length on a horizontal/vertical/diagonal dimension.
+        if d.orientation in ("horizontal", "vertical", "diagonal"):
+            if d.value_mm is None or d.value_mm <= 0:
+                filtered.append({"id": d.id, "reason": "non_positive_value_mm"})
+                continue
+            # Sanity: a real LT dimension is between 50 mm (door jamb) and
+            # 100 000 mm (a 100 m building edge). Outside that → almost
+            # certainly a room number or area label.
+            if not (50 <= d.value_mm <= 100_000):
+                filtered.append({"id": d.id, "reason": f"value_mm_out_of_range({d.value_mm})"})
+                continue
+        # Coordinate sanity. Allow a small overhang (model occasionally clamps
+        # at 1.01) but reject hard out-of-page coords.
+        if not (-0.05 <= d.x_pct <= 1.05 and -0.05 <= d.y_pct <= 1.05):
+            filtered.append({"id": d.id, "reason": "coords_out_of_range"})
+            continue
         seen_ids.add(d.id)
         out.dimensions.append(d)
+    if filtered:
+        out._meta = {**out._meta, "filtered": filtered}
     return out
 
 
@@ -178,7 +256,7 @@ def extract_dimensions(
     text = "".join(
         b.text for b in resp.content if getattr(b, "type", None) == "text"
     )
-    payload = json.loads(text)
+    payload = _decode_response_json(text)
     cache.put(key, payload)
     out = parse_dimension_payload(payload)
     out._meta = {

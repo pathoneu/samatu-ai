@@ -182,6 +182,44 @@ def test_apply_tile_overrides_full_coverage_sets_room_overrides():
     assert r["_elevation_full"]["plyteles_sienos_m2"] == 28.8
 
 
+def test_diagnose_tile_coverage_warns_on_non_wet_room():
+    from extractor.tile_calculator import diagnose_tile_coverage
+    parsed = {
+        "patalpos": [
+            {"nr": "102", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+             "perimetras_m": 30.0, "lubu_aukstis_m": 3.0},  # walls_gross 90
+        ],
+    }
+    # 80 m² of tile reported in a living room (90 m² walls) → 88% ratio
+    results = {"102": RoomTileResult(
+        room_nr="102", panel_ids=["a"], tile_area_m2=80.0, paint_area_m2=10.0,
+        panel_area_m2=90.0,
+    )}
+    warnings = diagnose_tile_coverage(parsed, results)
+    assert len(warnings) == 1
+    assert warnings[0]["room_nr"] == "102"
+    assert warnings[0]["tile_ratio"] > 0.80
+
+
+def test_diagnose_tile_coverage_silent_on_wet_room_full_tile():
+    """Beržų-style bathroom: 95% tile coverage in a 'vonia'/'san' room is the
+    correct reading and must NOT raise a warning (or the diagnostic noise
+    would drown out real signals)."""
+    from extractor.tile_calculator import diagnose_tile_coverage
+    parsed = {"patalpos": [
+        {"nr": "111", "pavadinimas": "Tėvų vonia", "paskirtis": "vonia",
+         "perimetras_m": 12.0, "lubu_aukstis_m": 2.8},
+    ]}
+    results = {"111": RoomTileResult(
+        room_nr="111", panel_ids=["a"],
+        tile_area_m2=32.0,         # 95% of 33.6 walls
+        paint_area_m2=1.6,
+        panel_area_m2=33.6,
+    )}
+    warnings = diagnose_tile_coverage(parsed, results)
+    assert warnings == []
+
+
 def test_apply_tile_overrides_partial_coverage_keeps_legacy_path():
     parsed = {
         "patalpos": [

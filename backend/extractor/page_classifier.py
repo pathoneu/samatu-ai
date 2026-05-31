@@ -137,6 +137,28 @@ Hints — page_type:
 - "Patalpų eksplikacija" / room schedule table → eksplikacija
 - Symbol legend with key-value rows → legend
 
+Discriminators (use these when the visual cues are weak):
+- A FLOOR PLAN contains walls (paired parallel lines often hatched),
+  doors/windows cut into the walls, AND dimension lines (numeric annotations
+  between extension ticks). If you see ≥10 numeric dimensions distributed
+  around the drawing, it's almost certainly a floor_plan.
+- A FURNITURE-LAYOUT page (interjero išplanavimas, baldų planas) overlays
+  furniture pictograms — beds, sofas, tables, chairs, cabinets — on top of
+  the wall outlines but typically has FEW or ZERO dimension lines and the
+  bulk of the page is filled with named objects. Furniture layouts should
+  classify as "floor_plan" ONLY if dimensions are present too; otherwise
+  return "unknown" (the eksplikacija can still be read from a separate page).
+- A CEILING PLAN often shares wall geometry with the floor plan but adds
+  height markers like "+2,800" / "+3,400" and light-fixture pictograms.
+- An EKSPLIKACIJA is a TABLE — rows with room number, name, area in m². No
+  geometry. If the page is dominated by tabular text rather than line work,
+  it's eksplikacija, not floor_plan.
+- A SCALE-BAR page (just title + scale legend + page number) is "unknown".
+
+When you're unsure between floor_plan and a less-architecturally-rich page,
+PREFER the more specific tag (eksplikacija / legend / unknown). The downstream
+pipeline is more robust to a missing tag than to a wrong one.
+
 Hints — dalis (LT building-section code from the antspaudas title block):
 - BD = Bendroji dalis     SP = Sklypo planas     SA = Statybinė architektūra
 - SK = Statybinės konstrukcijos    VVN = Vandentiekio/ nuotekynių

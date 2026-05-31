@@ -54,11 +54,22 @@ RULES
    - column grids
    - opening dimensions written near doors/windows
    - thickness annotations (e.g. 150 between two parallel wall lines)
-9. Exclude:
+9. Exclude EVERYTHING that is NOT a length on a dimension line. In particular:
    - dimension TICK marks without numbers
    - axis labels (A, B, C, 1, 2, 3)
    - room name labels
-   - area annotations like "11.01 m²"
+   - room numbers in the eksplikacija column ("101", "102", … sit BESIDE
+     room names, NOT between two extension lines — they are NOT dimensions)
+   - floor area labels (e.g. "11,01 m²", "165,61 m²")
+   - elevation / level markers ("+0,000", "+2,800")
+   - scale-bar numbers (the legend "M 1:50" or numbers under a scale bar)
+   - schedule-table cell contents (sizes printed in a table of doors / windows
+     are extracted by the schedule extractor, NOT this pass)
+   - drawing titles, North arrows, page numbers
+   The rule of thumb: a real dimension number sits BETWEEN two extension lines
+   (short ticks above and below the number) and refers to the length of a
+   specific segment. If you cannot point at the two extension ticks, do NOT
+   emit the number.
 10. If a dimension is repeated by chain dimensioning (e.g. 3150+2500+3150 in
     one chain), list each segment as its own entry.
 

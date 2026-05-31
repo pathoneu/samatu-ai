@@ -38,6 +38,11 @@ class Wall:
     thickness_mm: float | None = None
     is_exterior: bool = False
     room_ids: list[str] = field(default_factory=list)
+    # 2026-05-31: wall classification — used by adjacency detection
+    # (load-bearing walls are usually shared between rooms; partition walls
+    # often aren't) and by kampai categorisation.
+    wall_type: str = "partition"   # load_bearing | partition | exterior_envelope
+    curved: bool = False
 
 
 @dataclass
@@ -101,16 +106,32 @@ def parse_room_graph_payload(raw_json: dict[str, Any]) -> RoomGraph:
             x_pct=float(v["x_pct"]),
             y_pct=float(v["y_pct"]),
         ))
+    def _safe_float(v: Any) -> float | None:
+        """Coerce model output to a float. Vision occasionally emits a
+        reference id ('d32') where a number was expected — return None
+        rather than crash the entire parse."""
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
     for w in raw_json.get("walls", []):
+        wall_type = str(w.get("wall_type") or "partition").lower()
+        if wall_type not in ("load_bearing", "partition", "exterior_envelope"):
+            wall_type = "partition"
         rg.walls.append(Wall(
             id=str(w["id"]),
             start_vertex=str(w["start_vertex"]),
             end_vertex=str(w["end_vertex"]),
             dimension_id=(str(w["dimension_id"]) if w.get("dimension_id") else None),
-            angle_deg=(float(w["angle_deg"]) if w.get("angle_deg") is not None else None),
-            thickness_mm=(float(w["thickness_mm"]) if w.get("thickness_mm") is not None else None),
+            angle_deg=_safe_float(w.get("angle_deg")),
+            thickness_mm=_safe_float(w.get("thickness_mm")),
             is_exterior=bool(w.get("is_exterior", False)),
             room_ids=[str(x) for x in (w.get("room_ids") or [])],
+            wall_type=wall_type,
+            curved=bool(w.get("curved", False)),
         ))
     for r in raw_json.get("rooms", []):
         rg.rooms.append(Room(
@@ -139,7 +160,61 @@ def parse_room_graph_payload(raw_json: dict[str, Any]) -> RoomGraph:
         ))
 
     _validate_referential_integrity(rg)
+    degenerate = _filter_degenerate_rooms(rg)
+    if degenerate:
+        rg._meta = {**(rg._meta or {}),
+                    "degenerate_rooms_dropped": degenerate}
     return rg
+
+
+def _filter_degenerate_rooms(rg: RoomGraph) -> list[str]:
+    """Drop rooms whose polygons are degenerate.
+
+    A polygon is degenerate when:
+      - it has fewer than 3 walls (cannot close), OR
+      - any interior angle is > 175° (the polygon is essentially a line with
+        a tiny tip — almost certainly a Vision read error)
+
+    Returns the list of dropped room ids for the warnings buffer.
+    """
+    import math
+
+    wmap = {w.id: w for w in rg.walls}
+    kept: list[Room] = []
+    dropped: list[str] = []
+    for r in rg.rooms:
+        wids = r.polygon_walls
+        if len(wids) < 3:
+            dropped.append(f"{r.id} ({r.nr}): only {len(wids)} walls")
+            continue
+        # Build the sequence of (angle_deg) for each wall in order
+        angles: list[float | None] = []
+        for wid in wids:
+            w = wmap.get(wid)
+            angles.append(w.angle_deg if w else None)
+        if any(a is None for a in angles):
+            # Can't verify angles → leave the room in, the geometry_solver
+            # will infer or fail gracefully.
+            kept.append(r)
+            continue
+        # Interior angle at vertex k = 180° − exterior_turn(k), where the
+        # exterior turn is the change in direction from wall k to wall k+1.
+        bad = False
+        n = len(angles)
+        for k in range(n):
+            a1 = float(angles[k])
+            a2 = float(angles[(k + 1) % n])
+            turn = ((a2 - a1) + 180) % 360 - 180          # signed [-180, 180)
+            interior = 180.0 - abs(turn)
+            if interior > 175.0:
+                bad = True
+                break
+        if bad:
+            dropped.append(f"{r.id} ({r.nr}): degenerate interior angle")
+            continue
+        kept.append(r)
+    rg.rooms = kept
+    return dropped
 
 
 def _validate_referential_integrity(rg: RoomGraph) -> None:
