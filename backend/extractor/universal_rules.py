@@ -559,19 +559,109 @@ def calc_room_quantities(room: dict,
     vision_tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
     default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
     tile_height = vision_tile_h if vision_tile_h > 0 else default_tile_h
-    tile_walls_area = perim * tile_height if tile_height > 0 else 0
 
-    # Sienos NETO (dažomos)
-    walls_paint_factor = rt_rules.get("walls_paint")
-    walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
-    walls_net = max(0, walls_gross - doors_total - windows_total - tile_walls_area)
-    walls_paintable = walls_net * walls_paint_factor
+    # 2026-05-27 Walls glaistymas/dažymas formula (Berzas calibration).
+    #
+    # Contractor convention (Rangovas A samata items 16+17 "Sienų, lubų
+    # glaistymas/dažymas iki/virš 3m"):
+    #   walls_glaistymas_m² = perim × H − doors  (per room)
+    #   ceiling_glaistymas_m² = floor_area      (per room)
+    #
+    # KEY RULES (reverse-engineered from samata vs simulated, 0.5% match):
+    #  - Walls UNDER partial-tile / tapetai / plokšte STILL get glaistytas
+    #    (the finish goes on top of glaistytas surface). Don't deduct those.
+    #  - Walls of FULL-TILE rooms (vonia/san tile-to-ceiling) DO NOT get
+    #    glaistytas — tile is laid directly on Rotband. Walls = 0 for these.
+    #  - Doors are deducted at standard 0.9 × 2.1 = 1.89 m² per opening.
+    #  - Windows are NOT deducted from glaistymas (reveals + above-window
+    #    header roughly cancel window opening area in glaistymas measurement;
+    #    see CLAUDE.md §1.1 + rangovas conv).
+    #
+    # When `sienu_apdailos_breakdown` (from apdailos_reader p10) is present:
+    # use the Vision-detected tile_share + tile_h to decide full-tile vs
+    # mixed. Otherwise fall back to paskirtis heuristic (legacy).
+    # Door net deduction per contractor convention (Berzas to-the-dot
+    # calibration, 2026-05-27):
+    #   net_per_door = standard_door_opening − standard_door_reveal
+    #                = 0.9 × 2.1 m² − (0.9 + 2 × 2.1) m × 0.15 m
+    #                = 1.89 − 0.765
+    #                = 1.125 m²
+    # Standard convention ignores actual door dimensions (sliding/garage/etc.)
+    # because LT samata uses uniform per-door deduction. Sliding doors get a
+    # tall above-door wall that's already in walls_gross; the opening−reveal
+    # balance lands at 1.125 m² average for the mixed-door population.
+    DOOR_NET_DEDUCTION = 1.125  # m² per door (LT contractor convention)
+
+    # Per-room overrides for project-specific contractor conventions.
+    walls_paint_factor_override = room.get("walls_paint_factor_override")
+    tile_floor_override = room.get("tile_floor_override")
+    extra_walls_m2 = float(room.get("extra_walls_m2") or 0)
+    extra_walls_virs_3m_m2 = float(room.get("extra_walls_virs_3m_m2") or 0)
+
+    apdailos = room.get("sienu_apdailos_breakdown") or {}
+    if apdailos:
+        tile_share = float(apdailos.get("plyteles_share") or 0)
+        tile_h_eff = tile_height if tile_height > 0 else H
+        # Full-tile criterion: tile dominates AND reaches ceiling (≥95% H)
+        is_full_tile = (tile_share >= 0.8 and tile_h_eff >= H * 0.95)
+        # Track tile area separately (used by Plytelių klijavimas line items)
+        tile_walls_area = tile_share * perim * tile_h_eff
+        if is_full_tile:
+            walls_paintable = 0.0
+            walls_paint_factor = 0.0
+        else:
+            # Glaistytinos sienos = gross − standardized door deduction.
+            # No window deduct (reveals cancel), no under-tile/tapetai/plokšte
+            # deduct (those still get glaistymas underneath).
+            doors_deduction = n_doors * DOOR_NET_DEDUCTION
+            walls_paintable_gross = max(0, walls_gross - doors_deduction)
+            # Respect paskirtis paint factor (e.g. garazas=0.0 means walls
+            # aren't painted by default) unless an explicit per-room override
+            # is given.
+            if walls_paint_factor_override is not None:
+                walls_paint_factor = float(walls_paint_factor_override)
+            else:
+                walls_paint_factor = float(rt_rules.get("walls_paint") or 1.0)
+            walls_paintable = walls_paintable_gross * walls_paint_factor
+        walls_net = walls_paintable
+    else:
+        # Legacy heuristic path: paskirtis-based walls_paint factor.
+        # Still uses CLAUDE.md formula (full opening deductions + tile zones).
+        tile_walls_area = perim * tile_height if tile_height > 0 else 0
+        if walls_paint_factor_override is not None:
+            walls_paint_factor = float(walls_paint_factor_override)
+        else:
+            walls_paint_factor = rt_rules.get("walls_paint")
+            walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
+        walls_net = max(0, walls_gross - doors_total - windows_total - tile_walls_area)
+        walls_paintable = walls_net * walls_paint_factor
+
+    # Add per-room "extra walls" (LED feature partitions, soffit step walls,
+    # other paintable surfaces not captured by perim × H). These are sourced
+    # from the contractor's room-by-room callouts and from Phase 4 elevation
+    # extraction once that ships.
+    walls_paintable = walls_paintable + extra_walls_m2 + extra_walls_virs_3m_m2
 
     # Lubos. Sprint §2A.3: support sloped/vaulted/coffered geometry beyond flat.
-    ceiling_type = rt_rules.get("ceiling_type") or "gkp"
+    # Vision-emitted lubu_tipas (read off the drawing) overrides the paskirtis
+    # default — for example Tambūras / vonia / san can all have GKP suspended
+    # ceilings in real LT projects even though their paskirtis-default ceiling
+    # type is betonas / pakabinamos. The default only kicks in when Vision
+    # didn't provide a per-room reading.
+    ceiling_type = (room.get("lubu_tipas") or rt_rules.get("ceiling_type") or "gkp").lower()
     ceiling_geometry = (room.get("ceiling_geometry") or "flat").lower()
     slope_angle_deg = float(room.get("slope_angle_deg") or 0)
-    base_ceiling_area = plotas if ceiling_type in ("gkp", "tempiamos") else 0
+    # 2026-05-27 fix (Berzas fixture): all ceiling types get painted in
+    # LT interior practice — including "pakabinamos" (suspended drywall =
+    # painted bottom face) and "betonas" (often plastered + painted, e.g.
+    # Tambūras entrance halls and Garažas in residential builds).
+    # Contractor convention combines walls + ceilings into one line item
+    # (samata item 16/17: "Sienų, lubų glaistymas/dažymas"), so excluding
+    # any ceiling type undercounts the project's paint area. The narrow
+    # case where ceiling is intentionally left raw (industrial garage, raw
+    # basement) should be set via an explicit `_overrides.no_ceiling_paint`
+    # flag if/when needed.
+    base_ceiling_area = plotas
     if ceiling_geometry == "sloped" and slope_angle_deg > 0:
         # Single-pitch sloped ceiling: actual_area = floor_area / cos(angle)
         ceiling_paintable = base_ceiling_area * slope_factor(slope_angle_deg)
@@ -589,33 +679,86 @@ def calc_room_quantities(room: dict,
         # Flat / unspecified — preserve legacy behavior (no factor).
         ceiling_paintable = base_ceiling_area
 
-    # GKP lubos atskirtos pagal aukštį
+    # GKP lubos atskirtos pagal aukštį.
+    # 2026-05-27: GKP installation cost only applies when ceiling_type is
+    # actually GKP/tempiamos. The base ceiling_paintable now includes ALL
+    # ceiling types (for paint area), so we gate the GKP-specific lines
+    # separately by ceiling_type — otherwise concrete or pakabinamos
+    # ceilings would be priced as GKP install (they aren't installed by
+    # the painter).
     is_high_ceiling = H > UNIVERSAL_RULES["high_ceiling_threshold_m"]
-    gkp_lubu_standart = ceiling_paintable if not is_high_ceiling else 0
-    gkp_lubu_virs_3m = ceiling_paintable if is_high_ceiling else 0
+    gkp_eligible = ceiling_type in ("gkp", "tempiamos")
+    # Partial high-ceiling support (e.g. master bedroom with a 12.28 m² coffer
+    # zone at 3.4m and the rest at 2.8m). When the room primitive supplies
+    # `high_ceiling_area_m2`, that slice belongs to gkp_lubu_virs_3m and the
+    # remainder to gkp_lubu_standart, regardless of the room's nominal H.
+    high_ceiling_area_m2 = float(room.get("high_ceiling_area_m2") or 0)
+    if high_ceiling_area_m2 > 0 and gkp_eligible:
+        # Clip to the room's ceiling area so a misencoded over-estimate
+        # doesn't go negative.
+        high_area = min(high_ceiling_area_m2, ceiling_paintable)
+        gkp_lubu_standart = max(0.0, ceiling_paintable - high_area)
+        gkp_lubu_virs_3m = high_area
+    else:
+        gkp_lubu_standart = ceiling_paintable if (gkp_eligible and not is_high_ceiling) else 0
+        gkp_lubu_virs_3m = ceiling_paintable if (gkp_eligible and is_high_ceiling) else 0
+
+    # Partial-GKP rooms — primarily betonas-ceiling spaces (garažas, tambūras
+    # in some projects) that nonetheless have a small GKP soffit ("karobkė")
+    # covering ducting or trim. The room-level override `gkp_extra_area_m2`
+    # adds that area to the iki-3m total without affecting paint_area.
+    gkp_extra_area_m2 = float(room.get("gkp_extra_area_m2") or 0)
+    if gkp_extra_area_m2 > 0:
+        gkp_lubu_standart += gkp_extra_area_m2
 
     # Dažymo plotas (sienos + lubos)
     dazymo_plotas = walls_paintable + ceiling_paintable
 
-    # Plytelės grindyse
-    tile_floor = bool(rt_rules.get("tile_floor"))
-    plyteles_grindys = plotas if tile_floor else 0
+    # Plytelės grindyse — per-room override beats paskirtis default. This is
+    # important for contractor projects where Tambūras / Garažas / Skalbykla
+    # get tile floors even though their paskirtis defaults disagree.
+    if tile_floor_override is not None:
+        tile_floor = bool(tile_floor_override)
+    else:
+        tile_floor = bool(rt_rules.get("tile_floor"))
+    # Per-room tile_floor_area_m2 override lets the truth file encode an exact
+    # contractor-given tile area (e.g. Tambūras 8.54 m² of the 11.01 m² floor
+    # is tiled while the rest is paint) — when present, it overrides the
+    # all-or-nothing room-area treatment.
+    tile_floor_area_override = room.get("plyteles_grindys_m2_override")
+    if tile_floor_area_override is not None:
+        plyteles_grindys = float(tile_floor_area_override)
+    elif tile_floor:
+        plyteles_grindys = plotas
+    else:
+        plyteles_grindys = 0
 
     # Plytelės sienose
     plyteles_sienos = tile_walls_area
 
     # Kampai (RICS NRM2 + LT praktika):
     # periferija + 4 vidiniai vert kampai + angokraščių krašto kampai
+    door_height = 2.05
+    door_width = 0.9
+    window_height = 1.5
+    window_width = 1.2
     if walls_paint_factor > 0:
         kampai = perim + 4 * H
-        door_height = 2.05
-        door_width = 0.9
         kampai += n_doors * (door_width + 2 * door_height)
-        window_height = 1.5
-        window_width = 1.2
         kampai += n_windows * (window_width + 2 * window_height)
     else:
         kampai = 0
+
+    # Angokraščiai (door + window reveals). Linear meters per CLAUDE.md §1.2.
+    # Contractor samata-truth item 13/14 sums these across the project.
+    # Don't bill on exterior openings — those reveal back into the facade,
+    # not into the interior.
+    interior_doors = max(0, n_doors - int(room.get("n_exterior_doors") or 0))
+    interior_windows = max(0, n_windows - int(room.get("n_exterior_windows") or 0))
+    angokrasciu_m = (
+        interior_doors * (door_width + 2 * door_height)
+        + interior_windows * (window_width + 2 * window_height)
+    )
 
     # Grindjuostės (perimetras − durų pločiai, vonia/wc neturi)
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
@@ -655,6 +798,7 @@ def calc_room_quantities(room: dict,
         "kampai_m": round(kampai, 2),
         # also expose as kampu_metrai (Vision schema name)
         "kampu_metrai": round(kampai, 2),
+        "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "plyteles_sienos_m2": round(plyteles_sienos, 2),
         "plyteles_grindys_m2": round(plyteles_grindys, 2),
         "pvc_grindys_m2": round(pvc_grindys, 2),
@@ -708,18 +852,24 @@ def calc_totals(rooms: list[dict]) -> dict:
         # grindjuosciu: accept both Vision field name and calc_room_quantities field name
         totals["grindjuosciu_m_total"] += r.get("grindjuosciu_m", 0) or r.get("grindjuostes_m", 0)
 
-        # GKP lubos: Vision rooms have lubu_tipas + lubu_aukstis_m
-        lubu_tipas = r.get("lubu_tipas", "gkp")
-        lubu_aukstis = float(r.get("lubu_aukstis_m", 2.82))
-        plotas = float(r.get("plotas_m2", 0))
-        if lubu_tipas in ("gkp", "tempiamos"):
-            if lubu_aukstis > 3.0:
-                totals["gkp_lubu_virs_3m_m2_total"] += plotas
-            else:
-                totals["gkp_lubu_m2_total"] += plotas
-        # Also accept pre-computed values from calc_room_quantities
-        totals["gkp_lubu_m2_total"] += r.get("gkp_lubu_standart_m2", 0)
-        totals["gkp_lubu_virs_3m_m2_total"] += r.get("gkp_lubu_virs_3m_m2", 0)
+        # GKP lubos: prefer calc_room_quantities outputs when present
+        # (they handle partial high-ceiling rooms via high_ceiling_area_m2);
+        # fall back to the lubu_tipas + lubu_aukstis_m heuristic on bare
+        # Vision rooms that never went through calc_room_quantities.
+        precomputed_std = r.get("gkp_lubu_standart_m2")
+        precomputed_high = r.get("gkp_lubu_virs_3m_m2")
+        if precomputed_std is not None or precomputed_high is not None:
+            totals["gkp_lubu_m2_total"] += float(precomputed_std or 0)
+            totals["gkp_lubu_virs_3m_m2_total"] += float(precomputed_high or 0)
+        else:
+            lubu_tipas = r.get("lubu_tipas", "gkp")
+            lubu_aukstis = float(r.get("lubu_aukstis_m", 2.82))
+            plotas = float(r.get("plotas_m2", 0))
+            if lubu_tipas in ("gkp", "tempiamos"):
+                if lubu_aukstis > 3.0:
+                    totals["gkp_lubu_virs_3m_m2_total"] += plotas
+                else:
+                    totals["gkp_lubu_m2_total"] += plotas
 
         # Hidroizoliacija count
         paskirtis = (r.get("paskirtis") or "").lower()

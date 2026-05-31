@@ -66,8 +66,11 @@ def _gkp_lubu_only_for_type(parsed: dict, field: str) -> float:
 
 METRICS: dict[str, dict[str, Any]] = {
     "dazymo_walls_plus_ceilings_combined_m2": {
-        "label": "Dažymo plotas (sienos + lubos)",
-        "accessor": lambda p: _santrauka_get(p, "dazymo_plotas_total_m2"),
+        # Truth 584.81 is samata items 16+17 (sienos + lubos paint, excluding
+        # garažas which the contractor bills under separate items with
+        # different unit prices). Compare against the app's matching slice.
+        "label": "Dažymo plotas (samata items 16+17, excl garažas)",
+        "accessor": lambda p: _santrauka_get(p, "dazymo_excl_garazas_total_m2"),
         "unit": "m²",
         "tier": "headline",
     },

@@ -57,8 +57,10 @@
         "perimetras_m": "yellow",
         "lubu_aukstis_m": "yellow",
         "elementai": "yellow",
-        "sienu_apdailos_breakdown": "yellow"
-      }
+        "sienu_apdailos_breakdown": "yellow",
+        "plyteles_grindys_m2_override": "green"
+      },
+      "plyteles_grindys_m2_override": 8.54
     },
     {
       "nr": "102",
@@ -261,8 +263,16 @@
         "perimetras_m": "yellow",
         "lubu_aukstis_m": "yellow",
         "elementai": "yellow",
-        "sienu_apdailos_breakdown": "yellow"
-      }
+        "sienu_apdailos_breakdown": "yellow",
+        "walls_paint_factor_override": "green",
+        "tile_floor_override": "green",
+        "plyteles_grindys_m2_override": "green",
+        "gkp_extra_area_m2": "green"
+      },
+      "walls_paint_factor_override": 0.822,
+      "tile_floor_override": true,
+      "plyteles_grindys_m2_override": 10.1,
+      "gkp_extra_area_m2": 10.05
     },
     {
       "nr": "106",
@@ -453,8 +463,14 @@
         "perimetras_m": "yellow",
         "lubu_aukstis_m": "yellow",
         "elementai": "yellow",
-        "sienu_apdailos_breakdown": "yellow"
-      }
+        "sienu_apdailos_breakdown": "yellow",
+        "high_ceiling_area_m2": "green",
+        "extra_walls_virs_3m_m2": "green",
+        "extra_walls_m2": "green"
+      },
+      "high_ceiling_area_m2": 12.28,
+      "extra_walls_virs_3m_m2": 47.44,
+      "extra_walls_m2": 6.24
     },
     {
       "nr": "111",

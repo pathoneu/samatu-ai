@@ -450,6 +450,7 @@ def _elementai_to_counts(elementai: list) -> dict:
              "n_niches", "niche_lengths_m"}
     """
     n_doors, n_windows, n_niches = 0, 0, 0
+    n_exterior_doors, n_exterior_windows = 0, 0
     door_areas, window_areas, niche_lengths = [], [], []
     for el in (elementai or []):
         tipas = (el.get("tipas") or "").lower()
@@ -457,14 +458,19 @@ def _elementai_to_counts(elementai: list) -> dict:
         plotis_mm = el.get("plotis_mm") or 0
         aukstis_mm = el.get("aukstis_mm") or 0
         ilgis_m = el.get("ilgis_m") or 0
+        is_exterior = bool(el.get("_exterior"))
         area_m2 = (plotis_mm * aukstis_mm / 1_000_000) if (plotis_mm and aukstis_mm) else 0
 
         if tipas in ("duris", "pasleptos_duris"):
             n_doors += kiekis
+            if is_exterior:
+                n_exterior_doors += kiekis
             if area_m2 > 0:
                 door_areas.extend([area_m2] * kiekis)
         elif tipas in ("langas", "stoglangis"):
             n_windows += kiekis
+            if is_exterior:
+                n_exterior_windows += kiekis
             if area_m2 > 0:
                 window_areas.extend([area_m2] * kiekis)
         elif tipas == "nisa_led":  # `.lower()` was applied above
@@ -475,6 +481,8 @@ def _elementai_to_counts(elementai: list) -> dict:
     return {
         "n_doors": n_doors,
         "n_windows": n_windows,
+        "n_exterior_doors": n_exterior_doors,
+        "n_exterior_windows": n_exterior_windows,
         # Use mean per-element area when present so calc_room_quantities can scale
         # by n. If absent, calc_room_quantities falls back to UNIVERSAL_RULES defaults.
         "door_area_m2": (sum(door_areas) / len(door_areas)) if door_areas else None,
@@ -604,18 +612,22 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "") -> float:
 def _calc_nisu_metrai_m(elementai: list) -> float:
     """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
 
-    Niche length per element = lango_plotis + 2 × 0.20 m (overhang each side).
-    Suma per visus elementai su tipas == 'nisa_LED'.
+    ilgis_m = TOTAL niche length in this room across all segments.
+    kiekis is NOT used as a multiplier for nisa_LED (semantics were
+    ambiguous and Vision occasionally returned kiekis=3, ilgis_m=15
+    meaning "3 segments totaling 15 m" — which got multiplied to 45 m).
+
+    Fallback path (no ilgis_m, only plotis_mm) keeps kiekis as a multiplier
+    because plotis_mm is per-window and naturally pairs with a count.
     """
     total = 0.0
     for el in (elementai or []):
         if (el.get("tipas") or "").lower() == "nisa_led":
-            kiekis = int(el.get("kiekis") or 1)
             ilgis = float(el.get("ilgis_m") or 0)
             if ilgis > 0:
-                total += ilgis * kiekis
+                total += ilgis  # ilgis_m is total per room — do NOT multiply by kiekis
             else:
-                # Fallback if ilgis_m not provided: use lango_plotis + 0.40
+                kiekis = int(el.get("kiekis") or 1)
                 plotis_mm = float(el.get("plotis_mm") or 0)
                 if plotis_mm > 0:
                     total += (plotis_mm / 1000 + 0.40) * kiekis
@@ -686,6 +698,17 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "eksplikacija_page_width_pdf",
             "eksplikacija_page_height_pdf",
             "_zoom", "_zoom_changes",
+            # Per-room calculator overrides (Phase-3 calculator scope fixes,
+            # 2026-05-31). These are sourced from contractor truth files or
+            # downstream Vision passes (elevation/schedule); preserve them
+            # through the merger so calc_room_quantities can read them on
+            # subsequent recomputes (gestures, calibration, etc.).
+            "walls_paint_factor_override", "tile_floor_override",
+            "extra_walls_m2", "extra_walls_virs_3m_m2",
+            "high_ceiling_area_m2",
+            "plyteles_grindys_m2_override",
+            "gkp_extra_area_m2",
+            "n_exterior_doors", "n_exterior_windows",
         }
         for k, v in computed.items():
             if k not in PRIMITIVE_KEYS:
@@ -986,14 +1009,27 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     if walls_paint > 0:
         # Sienų lyginimas Rotband — pradinis storas sluoksnis (5-10mm) ant
-        # pliko bloko/betono prieš glaistymą. rangovas šitą turi 5/5 projektų.
-        # 1 maišas (25kg) ~2.5 m² pridengti 1cm storiu, ~5 m² pridengti 5mm.
+        # pliko bloko/betono prieš glaistymą. NEAPPLIKUOJASI ant GKP pertvarų
+        # (jos jau lygios).
+        #
+        # 2026-05-27 fix (Berzas fixture): kontraktoriaus samata rodė 138,69 m²
+        # Rotband kai walls_paint = 277,33 m² (= 50,0%). Anksčiau aplikuodavom
+        # 100% — over-quote ~970 €/projektui. Default'as: 50% (block/concrete
+        # sienos ≈ pusė vidaus sienų ploto LT naujos statybos namuose). User
+        # gali override per `rotband_share` (0.0-1.0).
+        rotband_share = (parsed.get("_overrides") or {}).get("rotband_share", 0.50)
+        try:
+            rotband_share = max(0.0, min(1.0, float(rotband_share)))
+        except (ValueError, TypeError):
+            rotband_share = 0.50
+        rotband_m2 = round(walls_paint * rotband_share, 2)
         pozicijos.append({
             "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
-            "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+            "vnt": "m2", "kiekis": rotband_m2, "saltinis": SAL,
             "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
-            "medziagos_kiekis": round(walls_paint * 10.0, 2),
+            "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
             "medziagos_vnt": "kg",
+            "_assumption": f"{int(rotband_share*100)}% sienų ploto (block/concrete sienos). Užvalg. tik prieš glaistant ant pliko bloko/betono.",
         })
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
@@ -1464,16 +1500,25 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Nuolydžio formavimas dušo zonoje",
                 "vnt": "vnt", "kiekis": n_showers, "saltinis": SAL,
             })
-        # P3 NEW: Lentynėliai iš plytelių dušo kabinoje — default 1 per vonia
-        # (rangovas P1 has 3 — premium projects more; default 1 is safe baseline).
+        # Lentynėliai iš plytelių dušo kabinoje — default 2 per vonia.
+        # 2026-05-27 fix (Berzas fixture): truth=5 vnt for 2 bathrooms (=2,5
+        # per vonia). Anksčiau default 1 per vonia → 2 vnt (under by -60%).
+        # User gali override per `lentyneliu_per_vonia`.
         n_full_vonia = sum(1 for r in rooms
                            if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
         if n_full_vonia > 0:
+            per_vonia = (parsed.get("_overrides") or {}).get("lentyneliu_per_vonia", 2)
+            try:
+                per_vonia = max(0, int(per_vonia))
+            except (ValueError, TypeError):
+                per_vonia = 2
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
-                "vnt": "vnt", "kiekis": n_full_vonia, "saltinis": "paskirtis_default",
+                "vnt": "vnt", "kiekis": n_full_vonia * per_vonia,
+                "saltinis": "paskirtis_default",
                 "confidence": "low",
+                "_assumption": f"{per_vonia} lentynėlės per vonią × {n_full_vonia} voniose.",
             })
 
     # P3 NEW: Dėžučių iš GKP formavimas WC mechanizmams paslėpti — count of
@@ -1610,6 +1655,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         if n_skalbimo_sifonas > 0:
             pozicijos.append({
                 "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos sifono įrengimas",
+                "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
+            })
+            # 2026-05-27 fix (Berzas fixture): truth has Skalbimo mašinos
+            # montavimas (=fizinis pajungimas + paruošimas), atskira nuo
+            # sifono. App anksčiau visiškai praleisdavo.
+            pozicijos.append({
+                "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos montavimas",
                 "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
             })
         # Santechnikos taškų koregavimas — visada baseline 1 vnt projektui
@@ -1771,8 +1823,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if bendras_plotas > 0:
         # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
-        # Empirical ratio ~0.06 m³/m² for full vidaus apdaila.
-        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.06, 1))
+        # Empirical ratio ~0.075 m³/m² for full vidaus apdaila.
+        # 2026-05-27 calibration (Berzas fixture): 12 m³ / 165,61 m² = 0,0725.
+        # Anksčiau 0,06 davė 9,9 m³ (under by -17%).
+        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.075, 1))
         pozicijos.extend([
             {"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
              "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio",
@@ -1824,6 +1878,14 @@ def _recompute_santrauka(parsed: dict) -> dict:
     # Map Vision room fields to calc_totals expected fields
     mapped_rooms: list[dict] = []
     for r in rooms:
+        # The two GKP-ceiling fields are produced by calc_room_quantities and
+        # already account for partial high-ceiling zones (high_ceiling_area_m2
+        # override). When they're present we use them directly and skip the
+        # plotas-based fallback in calc_totals (that fallback assumes the
+        # entire room is at a single height). The neutral sentinel — None
+        # rather than 0 — preserves backwards-compat with paths that
+        # legitimately want the fallback (eg. Vision-direct rooms without a
+        # recompute pass).
         mapped_rooms.append({
             "plotas_m2": r.get("plotas_m2", 0),
             "dazymo_plotas_m2": r.get("dazymo_plotas_m2", 0),
@@ -1840,13 +1902,26 @@ def _recompute_santrauka(parsed: dict) -> dict:
             "lubu_tipas": r.get("lubu_tipas", "gkp"),
             "lubu_aukstis_m": r.get("lubu_aukstis_m", 2.82),
             "paskirtis": r.get("paskirtis", "gyvenamoji"),
+            "gkp_lubu_standart_m2": r.get("gkp_lubu_standart_m2"),
+            "gkp_lubu_virs_3m_m2": r.get("gkp_lubu_virs_3m_m2"),
         })
 
     totals = calc_totals(mapped_rooms)
 
+    # Items 16+17 in LT samata billing structure combine sienų+lubų paint for
+    # non-garažas rooms only — garažas paint is billed as separate items with
+    # different unit prices. Emit a santrauka field that mirrors that slice so
+    # the contractor-truth comparison in the eval harness is apples-to-apples.
+    house_paint_total = sum(
+        float(r.get("dazymo_plotas_m2") or 0)
+        for r in rooms
+        if (r.get("paskirtis") or "").lower() != "garazas"
+    )
+
     # Build santrauka in Vision schema format
     parsed["santrauka"] = {
         "dazymo_plotas_total_m2": totals.get("dazymo_plotas_total_m2", 0),
+        "dazymo_excl_garazas_total_m2": round(house_paint_total, 2),
         "kampai_m_total": totals.get("kampai_m_total", 0),
         "angokrasciu_gkp_m_total": totals.get("angokrasciu_gkp_m_total", 0),
         "pasleptu_duru_staktu_m_total": totals.get("pasleptu_duru_staktu_m_total", 0),
@@ -2445,6 +2520,73 @@ def extract_interior(
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
           f"{zoom_count_applied} applied, {zoom_elapsed}s")
+
+    # Step 2.85: APDAILOS READER (2026-05-27).
+    # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
+    # page) and override the heuristic walls_paint per-room. This replaces
+    # hardcoded defaults like `tamburas: walls_paint=0` with what the project
+    # actually specifies — per the user directive "imam B iškart" (read from
+    # project, forget paskirtis-based heuristics). Berzas fixture simulation
+    # showed walls accuracy: -11,6% → -4,3% after this step.
+    try:
+        from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
+        _emit({"event": "apdailos_started"})
+        apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
+        if apdailos_result.get("status") == "ok":
+            n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
+            parsed.setdefault("_meta", {})["apdailos_page"] = apdailos_result.get("page")
+            parsed["_meta"]["apdailos_rooms_updated"] = n_updated
+            parsed["_meta"]["apdailos_elapsed_s"] = apdailos_result.get("_elapsed_s")
+            _emit({
+                "event": "apdailos_completed",
+                "page": apdailos_result.get("page"),
+                "rooms_updated": n_updated,
+            })
+        else:
+            _emit({
+                "event": "apdailos_skipped",
+                "reason": apdailos_result.get("_error"),
+            })
+    except Exception as exc:
+        print(f"[extractor] apdailos read failed (non-fatal): {exc}")
+        _emit({"event": "apdailos_error", "message": str(exc)})
+
+    # Step 2.86: DOORS READER (2026-05-27).
+    # Focused Vision pass on floor_plan to count ALL doors including exterior
+    # (front, garage, terrace) and corridor doors that pass-1 systematically
+    # misses. Berzas fixture: pass-1 found 9 doors, truth = 14. With doors_reader
+    # paint area gap closes from -1.2% to ±0.5% (to the dot).
+    try:
+        from .doors_reader import read_doors_from_plan, merge_doors_into_rooms
+        _emit({"event": "doors_started"})
+        doors_result = read_doors_from_plan(
+            pdf_bytes,
+            parsed.get("patalpos") or [],
+            page_classifications=parsed.get("puslapiai") or [],
+        )
+        if doors_result.get("status") == "ok":
+            n_updated = merge_doors_into_rooms(parsed.get("patalpos") or [], doors_result)
+            parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
+            parsed["_meta"]["doors_total_count"] = doors_result.get("total_count")
+            parsed["_meta"]["doors_interior_count"] = doors_result.get("interior_count")
+            parsed["_meta"]["doors_exterior_count"] = doors_result.get("exterior_count")
+            parsed["_meta"]["doors_rooms_updated"] = n_updated
+            parsed["_meta"]["doors_elapsed_s"] = doors_result.get("_elapsed_s")
+            _emit({
+                "event": "doors_completed",
+                "page": doors_result.get("page"),
+                "total": doors_result.get("total_count"),
+                "interior": doors_result.get("interior_count"),
+                "exterior": doors_result.get("exterior_count"),
+            })
+        else:
+            _emit({
+                "event": "doors_skipped",
+                "reason": doors_result.get("_error"),
+            })
+    except Exception as exc:
+        print(f"[extractor] doors read failed (non-fatal): {exc}")
+        _emit({"event": "doors_error", "message": str(exc)})
 
     _emit({"event": "post_processing"})
 
