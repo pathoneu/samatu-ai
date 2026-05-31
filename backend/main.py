@@ -198,6 +198,10 @@ from api.cv_tools import router as cv_tools_router
 # PDF Annotator persistence (Phase 7 prep). File-backed for now; swaps to a
 # real DB when the frontend ships.
 from api.annotations import router as annotations_router
+# Room-graph endpoint — feeds the Annotator's magic-wand polygon overlay.
+from api.room_graph import router as room_graph_router
+# Symbol detection — Vision pass returning point-symbols for the Annotator.
+from api.symbols import router as symbols_router
 
 load_dotenv()
 
@@ -325,6 +329,8 @@ app.include_router(billing_v2_router)
 app.include_router(revalidate_router)
 app.include_router(cv_tools_router)
 app.include_router(annotations_router)
+app.include_router(room_graph_router)
+app.include_router(symbols_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

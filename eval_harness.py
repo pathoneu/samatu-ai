@@ -170,12 +170,43 @@ METRICS: dict[str, dict[str, Any]] = {
 
 
 # ── Pipeline drivers ───────────────────────────────────────────────────────────
-def run_pipeline_use_gt_inputs(truth: dict) -> dict:
+def _apply_exterior_heuristic_in_place(rooms: list[dict]) -> int:
+    """Mirror of scripts/infer_exterior_openings rules. Applied to a list of
+    room dicts on the fly so the eval can A/B the heuristic without mutating
+    truth.json on disk. Returns count of openings flagged."""
+    count = 0
+    for room in rooms:
+        paskirtis = (room.get("paskirtis") or "").lower()
+        is_garage = paskirtis in ("garazas", "garažas")
+        for el in room.get("elementai") or []:
+            tipas = (el.get("tipas") or "").lower()
+            if el.get("_exterior"):
+                continue
+            w = el.get("plotis_mm") or 0
+            if tipas in ("duris", "pasleptos_duris"):
+                if is_garage or w >= 1500:
+                    el["_exterior"] = True
+                    count += 1
+            elif tipas in ("langas", "stoglangis"):
+                if w >= 2000:
+                    el["_exterior"] = True
+                    count += 1
+    return count
+
+
+def run_pipeline_use_gt_inputs(truth: dict, *, estimate_exterior: bool = False) -> dict:
     """Bypass Vision: feed GT primitives straight into the deterministic engine.
 
     Strips the `_dim_confidence` annotation from each room (calculator-side fields
     only) before invoking the engine; the rest of the GT room dict is exactly
     the primitive schema the calculator already consumes in production.
+
+    Parameters
+    ----------
+    estimate_exterior : bool
+        When True, apply the principled exterior-opening heuristic (garage
+        doors, ≥1500mm doors, ≥2000mm windows) to gt_dimensions in memory
+        before invoking the calculator. truth.json on disk is NOT modified.
     """
     vc = importlib.import_module("extractor.vision_call")
     _recompute_per_room = vc._recompute_per_room_via_python
@@ -184,7 +215,14 @@ def run_pipeline_use_gt_inputs(truth: dict) -> dict:
     rooms_in: list[dict] = []
     for r in truth["gt_dimensions"]:
         room = {k: v for k, v in r.items() if not k.startswith("_dim")}
+        # Deep copy elementai to avoid mutating the loaded truth dict
+        if room.get("elementai"):
+            room["elementai"] = [dict(e) for e in room["elementai"]]
         rooms_in.append(room)
+
+    flagged = 0
+    if estimate_exterior:
+        flagged = _apply_exterior_heuristic_in_place(rooms_in)
 
     parsed = {
         "patalpos": rooms_in,
@@ -193,6 +231,8 @@ def run_pipeline_use_gt_inputs(truth: dict) -> dict:
         "_meta": {
             "mode": "use_gt_inputs",
             "harness": "eval_harness.py",
+            "estimate_exterior": estimate_exterior,
+            "openings_flagged_by_heuristic": flagged,
         },
     }
     parsed = _recompute_per_room(parsed, None)
@@ -506,12 +546,12 @@ def _load_truth(project_id: str) -> dict:
         return json.load(f)
 
 
-def run_one(project_id: str, mode: str) -> int:
+def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
     if mode == "use_gt_inputs":
-        parsed = run_pipeline_use_gt_inputs(truth)
+        parsed = run_pipeline_use_gt_inputs(truth, estimate_exterior=estimate_exterior)
     elif mode == "replay":
         parsed = run_pipeline_replay(REPO_ROOT / entry["replay_path"])
     elif mode == "vision":
@@ -553,6 +593,10 @@ def main() -> int:
                      help="reuse cached extractor output (registry.replay_path)")
     grp.add_argument("--vision", action="store_true",
                      help="run the full Vision pipeline (costs API $$)")
+    ap.add_argument("--estimate-exterior", action="store_true",
+                    help="apply the principled exterior-opening heuristic to "
+                         "gt_dimensions in memory before invoking the calculator "
+                         "(truth.json not modified)")
     args = ap.parse_args()
 
     if args.use_gt_inputs:
@@ -563,7 +607,7 @@ def main() -> int:
         mode = "vision"
     else:
         mode = "use_gt_inputs"  # default: cheapest, safest
-    return run_one(args.project, mode)
+    return run_one(args.project, mode, estimate_exterior=args.estimate_exterior)
 
 
 if __name__ == "__main__":
