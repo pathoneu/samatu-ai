@@ -736,18 +736,67 @@ def calc_room_quantities(room: dict,
     # Plytelės sienose
     plyteles_sienos = tile_walls_area
 
-    # Kampai (RICS NRM2 + LT praktika):
-    # periferija + 4 vidiniai vert kampai + angokraščių krašto kampai
+    # Kampai (LT samata convention — refined 2026-05-31).
+    #
+    # Beržų contractor truth (Rangovas A item 19, 493.35 m total) breaks down
+    # into four sub-categories per contractor-notes-verbatim.md:
+    #   • pusiniai kampai (semi-corners between rooms) — 110.28 m
+    #   • durų angos (door reveal vertical edges) — 14 × 2.8 = 39.2 m
+    #   • angų kampai (opening-edge corners) — 24 × 2.8 = 67.2 m
+    #   • statūs kampai (straight outer corners) — 6 × 2.8 + 5 × 3.41 = 33.85 m
+    #   • subtotal documented: 250.53 m; remaining ~243 m is line-items the
+    #     contractor accumulates from neighbouring categories.
+    #
+    # The legacy formula emitted ``perim + 4H + per-opening reveal contour``.
+    # The refined formula keeps that as ``inner_corners_m`` (it's the right
+    # interior-room result) and adds two new per-room totals so the project
+    # sum approaches the contractor structure:
+    #
+    #   inner_corners_m         — vertical interior corner runs (4 × H per
+    #                              rectangle, scaled by walls/4 for L-shapes)
+    #   opening_reveals_m       — vertical reveals around openings (was the
+    #                              door+window contribution to legacy kampai)
+    #   pusiniai_m              — wall-to-wall partition junction corners
+    #                              between two finished rooms; counted once
+    #                              per partition wall × ceiling height.
+    #
+    # Total kampu_metrai = inner + opening + pusiniai. Each is also exposed
+    # individually so the eval can compare contractor categories.
     door_height = 2.05
     door_width = 0.9
     window_height = 1.5
     window_width = 1.2
+
+    n_walls_estimate = int(room.get("n_walls_estimate") or 4)  # default rectangle
+    # Number of partition (shared) walls — set by the caller when room
+    # adjacency is known. Each partition contributes one vertical
+    # "pusinis" corner of full ceiling height (counted once for this room;
+    # the neighbouring room's calc adds the other half later via dedup).
+    n_partition_walls = int(room.get("n_partition_walls") or 0)
+
     if walls_paint_factor > 0:
-        kampai = perim + 4 * H
-        kampai += n_doors * (door_width + 2 * door_height)
-        kampai += n_windows * (window_width + 2 * window_height)
+        # Interior corners: one per polygon vertex × ceiling height.
+        # Default to 4 for a rectangle; L-shape rooms set n_walls_estimate=6,
+        # T-shape 8, etc.
+        inner_corners_m = n_walls_estimate * H
+        # Door/window reveal edges (vertical perimeters around openings).
+        opening_reveals_m = (
+            n_doors * (door_width + 2 * door_height)
+            + n_windows * (window_width + 2 * window_height)
+        )
+        # Pusiniai — shared partition junctions, vertical corner at the floor
+        # plate of each partition wall × ceiling height.
+        pusiniai_m = n_partition_walls * H
+        kampai = inner_corners_m + opening_reveals_m + pusiniai_m
+        # Add the perimeter contribution from the LEGACY formula (perim term)
+        # so we don't regress projects where n_partition_walls isn't yet
+        # populated; once room-adjacency wiring lands this can be removed.
+        kampai += perim
     else:
-        kampai = 0
+        inner_corners_m = 0.0
+        opening_reveals_m = 0.0
+        pusiniai_m = 0.0
+        kampai = 0.0
 
     # Angokraščiai (door + window reveals). Linear meters per CLAUDE.md §1.2.
     # Contractor samata-truth item 13/14 sums these across the project.
@@ -798,6 +847,11 @@ def calc_room_quantities(room: dict,
         "kampai_m": round(kampai, 2),
         # also expose as kampu_metrai (Vision schema name)
         "kampu_metrai": round(kampai, 2),
+        # 2026-05-31: contractor-aligned sub-categories — expose so the eval
+        # can map them against samata item 19's pusiniai/statūs/etc.
+        "kampai_inner_m": round(inner_corners_m, 2),
+        "kampai_opening_reveals_m": round(opening_reveals_m, 2),
+        "kampai_pusiniai_m": round(pusiniai_m, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "plyteles_sienos_m2": round(plyteles_sienos, 2),
         "plyteles_grindys_m2": round(plyteles_grindys, 2),

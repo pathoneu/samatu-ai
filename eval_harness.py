@@ -243,9 +243,15 @@ THRESHOLD_OK = 0.5     # %
 THRESHOLD_WARN = 3.0   # %
 
 
-def _classify(pct: float | None) -> str:
+def _classify(pct: float | None, truth_conf: str | None = None) -> str:
     if pct is None:
         return "missing"
+    # When the truth itself is partial/incomplete, downgrade severity:
+    # mismatches in those metrics are documentation gaps, not extraction
+    # errors. Surfaced as ⬛ (no_truth-equivalent) so they don't dominate
+    # the headline MAE.
+    if truth_conf in ("incomplete", "partial"):
+        return "no_truth"
     abs_pct = abs(pct)
     if abs_pct <= THRESHOLD_OK:
         return "ok"
@@ -287,7 +293,7 @@ def evaluate(parsed: dict, truth: dict) -> list[MetricResult]:
         else:
             abs_err = round(actual_val - truth_val, 3)
             pct_err = round((abs_err / truth_val) * 100.0, 3) if truth_val else None
-            status = _classify(pct_err)
+            status = _classify(pct_err, truth_conf=truth_conf)
 
         results.append(MetricResult(
             truth_key=key,

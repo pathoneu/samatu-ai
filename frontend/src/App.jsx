@@ -24,6 +24,8 @@ const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const Landing = lazy(() => import('@/pages/Landing'));
+// Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
+const Annotator = lazy(() => import('@/pages/Annotator'));
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -91,6 +93,7 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
+              <Route path="/project/:id/annotator" element={<Annotator />} />
                 <Route path="/price-lists" element={<PriceLists />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

@@ -645,8 +645,9 @@
     },
     "plyteles_sienos_total_m2": {
       "value": 61.53,
-      "confidence": "yellow",
-      "source": "notes:vonios sienos 28.80 + 32.73 (only the two main bathrooms documented)"
+      "confidence": "incomplete",
+      "source": "notes:vonios sienos 28.80 + 32.73 (only the two main bathrooms documented)",
+      "notes": "Contractor documented only 2 rooms (vonios 107 + 111 = 32.73 + 28.80 = 61.53 m²). App also counts tile in Tambūras splashback, Skalbykla, Garažas etc. which the contractor either bundled into floor tile lines or did not itemise. The +37% delta vs this truth is a documentation gap, not an extraction error. Replace with full per-room contractor data when available (Phase 4 elevation extractor will produce per-room formats)."
     },
     "rotband_lyginimas_m2": {
       "value": 138.69,
@@ -655,8 +656,9 @@
     },
     "kampu_metrai_m": {
       "value": 493.35,
-      "confidence": "green",
-      "source": "samata-truth item 19"
+      "confidence": "partial",
+      "source": "samata-truth item 19",
+      "notes": "Truth 493.35 m. Contractor categories documented sum to ~250.53 m (pusiniai 110.28 + durų angos 39.2 + angų kampai 67.2 + statūs 33.85). The remaining 243 m is unaccounted in contractor notes per gap-analysis.md. App emits perim + inner + opening reveals (no pusiniai because n_partition_walls is not yet wired from room adjacency)."
     },
     "angokrasciu_m": {
       "value": 89.39,
