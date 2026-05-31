@@ -62,15 +62,33 @@ def is_envelope_room(room: dict, *, partition_count: int | None = None) -> bool:
 
 
 def infer_room_exteriors(room: dict, *, partition_count: int | None = None) -> tuple[int, list[str]]:
-    """Mutate room['elementai'] in place; return (count_changed, change_log)."""
+    """Mutate room['elementai'] in place; return (count_changed, change_log).
+
+    Safeguard (2026-05-31): the envelope-room 900×2100 door / 600+ mm window
+    rules only fire when the room has NO already-flagged exterior opening
+    of the same kind. This stops the heuristic from over-flagging interior
+    doors in multi-door envelope rooms (e.g. Tambūras has 1 entrance + 2
+    interior doors all at 900×2100 — without this guard, all 3 would be
+    flagged exterior and angokraščiai would drop for the wrong reason).
+    """
     paskirtis = (room.get("paskirtis") or "").lower()
     name = (room.get("pavadinimas") or "").lower()
     is_garage = paskirtis in ("garazas", "garažas") or "garaž" in name
     on_envelope = is_envelope_room(room, partition_count=partition_count)
 
+    elementai = room.get("elementai") or []
+    has_flagged_exterior_door = any(
+        bool(e.get("_exterior")) and (e.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
+        for e in elementai
+    )
+    has_flagged_exterior_window = any(
+        bool(e.get("_exterior")) and (e.get("tipas") or "").lower() in ("langas", "stoglangis")
+        for e in elementai
+    )
+
     changes: list[str] = []
     count = 0
-    for el in room.get("elementai") or []:
+    for el in elementai:
         tipas = (el.get("tipas") or "").lower()
         if el.get("_exterior"):
             continue
@@ -83,19 +101,17 @@ def infer_room_exteriors(room: dict, *, partition_count: int | None = None) -> t
                 rule = "garage door"
             elif plotis_mm >= 1500:
                 rule = f"terrace/wide door ({plotis_mm}mm)"
-            # 2026-05-31: catch standard 900x2100 exterior doors when the
-            # room is on the envelope. Adjacency-driven when available;
-            # otherwise relies on the explicit-signal fallback in
-            # is_envelope_room (paskirtis or pre-existing _exterior flag).
-            elif on_envelope and plotis_mm >= 900 and aukstis_mm >= 2100:
-                rule = f"envelope-room standard door ({plotis_mm}x{aukstis_mm}mm)"
+            elif (on_envelope and plotis_mm >= 900 and aukstis_mm >= 2100
+                  and not has_flagged_exterior_door):
+                # Conservative: only fill in a missing entrance signal,
+                # never override Vision's existing per-room exterior reads.
+                rule = f"envelope-room sole-entrance door ({plotis_mm}x{aukstis_mm}mm)"
         elif tipas in ("langas", "stoglangis"):
             if plotis_mm >= 2000:
                 rule = f"panoramic window ({plotis_mm}mm)"
-            elif on_envelope and plotis_mm >= 600:
-                # Any window in an envelope room over the minimum-bath
-                # ventilation size is overwhelmingly exterior.
-                rule = f"envelope-room window ({plotis_mm}mm)"
+            elif (on_envelope and plotis_mm >= 600
+                  and not has_flagged_exterior_window):
+                rule = f"envelope-room sole window ({plotis_mm}mm)"
 
         if rule:
             el["_exterior"] = True

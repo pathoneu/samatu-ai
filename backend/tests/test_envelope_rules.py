@@ -91,3 +91,40 @@ def test_adjacency_count_can_override_fallback():
     }
     n, _ = infer_room_exteriors(room, partition_count=0)
     assert n == 1
+
+
+def test_envelope_rule_does_not_override_existing_exterior_door():
+    """Beržų Tambūras has 1 exterior + 2 interior doors all at 900×2100.
+    The envelope rule MUST NOT over-flag the 2 interior ones — that would
+    shrink angokraščiai by hiding interior reveals (eval fitting). The
+    safeguard: rule only fires when room has NO already-flagged exterior
+    door of the same kind."""
+    room = {
+        "nr": "101",
+        "pavadinimas": "Tambūras",
+        "paskirtis": "tamburas",
+        "elementai": [
+            {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100, "_exterior": True},
+            {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100},   # interior #1
+            {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100},   # interior #2
+        ],
+    }
+    n, _ = infer_room_exteriors(room)
+    # 0 new flags — the existing exterior door blocks the envelope rule.
+    assert n == 0
+    flagged = [e for e in room["elementai"] if e.get("_exterior")]
+    assert len(flagged) == 1
+
+
+def test_envelope_rule_fires_for_sole_entrance_door():
+    """The case the rule WAS designed for — a studio entrance / mažas
+    tambūras with ONE 900×2100 door, none yet flagged."""
+    room = {
+        "paskirtis": "tamburas",
+        "elementai": [
+            {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100},
+        ],
+    }
+    n, _ = infer_room_exteriors(room)
+    assert n == 1
+    assert room["elementai"][0]["_exterior"] is True
