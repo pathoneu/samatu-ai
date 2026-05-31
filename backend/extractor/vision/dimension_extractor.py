@@ -66,6 +66,20 @@ def _load_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
+def _detect_image_media_type(img_bytes: bytes) -> str:
+    """Sniff a base64-decoded image's media type from the first few bytes.
+    Anthropic accepts image/png, image/jpeg, image/webp, image/gif."""
+    if img_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if img_bytes[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if img_bytes[:4] == b"RIFF" and img_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    if img_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    return "image/png"  # default
+
+
 def parse_dimension_payload(raw_json: dict[str, Any]) -> DimensionList:
     """Convert Vision JSON → typed DimensionList, raising on malformed input."""
     if not isinstance(raw_json, dict):
@@ -137,7 +151,10 @@ def extract_dimensions(
         import anthropic  # local import: tests don't need anthropic installed
         client = anthropic.Anthropic()
 
-    resp = client.messages.create(
+    # pdf_to_b64_images emits JPEG; auto-detect to stay flexible.
+    media_type = _detect_image_media_type(img_bytes)
+    # Anthropic SDK requires streaming when max_tokens may take >10min.
+    with client.messages.stream(
         model=model,
         max_tokens=max_tokens,
         system=prompt,
@@ -148,14 +165,15 @@ def extract_dimensions(
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": media_type,
                         "data": image_b64,
                     },
                 },
                 {"type": "text", "text": "Return the dimension list as JSON."},
             ],
         }],
-    )
+    ) as stream:
+        resp = stream.get_final_message()
 
     text = "".join(
         b.text for b in resp.content if getattr(b, "type", None) == "text"

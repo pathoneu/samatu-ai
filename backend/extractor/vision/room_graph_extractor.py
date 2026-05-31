@@ -198,7 +198,9 @@ def extract_room_graph(
         import anthropic
         client = anthropic.Anthropic()
 
-    resp = client.messages.create(
+    from .dimension_extractor import _detect_image_media_type
+    media_type = _detect_image_media_type(img_bytes)
+    with client.messages.stream(
         model=model,
         max_tokens=max_tokens,
         system=prompt,
@@ -209,7 +211,7 @@ def extract_room_graph(
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": media_type,
                         "data": image_b64,
                     },
                 },
@@ -222,7 +224,8 @@ def extract_room_graph(
                 },
             ],
         }],
-    )
+    ) as stream:
+        resp = stream.get_final_message()
     text = "".join(
         b.text for b in resp.content if getattr(b, "type", None) == "text"
     )

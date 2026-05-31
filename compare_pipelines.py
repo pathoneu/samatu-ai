@@ -230,6 +230,147 @@ def _pct(new: float, old: float) -> float | None:
     return round((new - old) / old * 100.0, 3)
 
 
+def _load_dotenv(path: Path) -> None:
+    """Lightweight .env loader (avoid a python-dotenv dep)."""
+    if not path.exists():
+        return
+    import os
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        os.environ.setdefault(key, val)
+
+
+def run_live_compare(pdf_path: str, threshold_pct: float, floor_plan_page: int) -> int:
+    """Run the new dim→graph→assembler pipeline live on one floor-plan page,
+    then diff against the saved old-pipeline extract.
+
+    Cost control:
+      - rasterises ONLY the requested page (not all 17 pages)
+      - both Vision calls hit the on-disk cache; second invocation is free
+      - prints token usage from the actual response
+
+    The comparison target is the saved app-output-to-the-dot.json next to the
+    PDF — that's the OLD pipeline's known output on the same project.
+    """
+    import os
+
+    REPO_ROOT = Path(__file__).resolve().parent
+    _load_dotenv(REPO_ROOT / "backend" / ".env")
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ERR: ANTHROPIC_API_KEY not found in env or backend/.env")
+        return 2
+
+    pdf_p = Path(pdf_path).resolve()
+    if not pdf_p.exists():
+        print(f"ERR: PDF not found: {pdf_p}")
+        return 2
+
+    # Locate the saved old-pipeline extract next to the PDF.
+    old_extract_path = pdf_p.parent / "app-output-to-the-dot.json"
+    if not old_extract_path.exists():
+        print(f"WARN: no old extract at {old_extract_path}; will not produce comparison.")
+        old: dict[str, Any] = {"patalpos": []}
+    else:
+        with old_extract_path.open() as f:
+            old = json.load(f)
+
+    # Rasterise the requested page only. Use existing pdf_to_b64_images for the
+    # right DPI / sizing pipeline (200 DPI, capped at 2000px per Opus 4.7 input
+    # limits).
+    from extractor.vision_call import pdf_to_b64_images
+    print(f"Rasterising page {floor_plan_page} of {pdf_p.name}…")
+    pages = pdf_to_b64_images(pdf_p.read_bytes(), max_pages=floor_plan_page)
+    if len(pages) < floor_plan_page:
+        print(f"ERR: PDF has only {len(pages)} pages; cannot extract page {floor_plan_page}")
+        return 2
+    page = pages[floor_plan_page - 1]
+    image_b64 = page if isinstance(page, str) else page.get("image_b64") or page.get("b64")
+    if not image_b64:
+        # pdf_to_b64_images may return dicts with 'image_b64' or strings
+        print(f"ERR: unexpected page object shape: {type(page).__name__}")
+        return 2
+
+    # Pass 1: dimensions
+    from extractor.vision.dimension_extractor import extract_dimensions
+    from extractor.vision.room_graph_extractor import extract_room_graph
+    print("Calling dimension_extractor (cached on hit)…")
+    dl = extract_dimensions(image_b64=image_b64, model="claude-opus-4-7")
+    print(f"  ← {len(dl.dimensions)} dimensions  cache={dl._meta.get('cache')}  "
+          f"in_tok={dl._meta.get('input_tokens')}  out_tok={dl._meta.get('output_tokens')}")
+
+    # Pass 2: room graph
+    print("Calling room_graph_extractor (cached on hit)…")
+    rg = extract_room_graph(
+        image_b64=image_b64,
+        dimensions_payload=dl.to_dict(),
+        model="claude-opus-4-7",
+    )
+    print(f"  ← {len(rg.rooms)} rooms / {len(rg.walls)} walls / {len(rg.openings)} openings  "
+          f"cache={rg._meta.get('cache')}  in_tok={rg._meta.get('input_tokens')}  "
+          f"out_tok={rg._meta.get('output_tokens')}")
+
+    # Assemble + solve + bridge into formula engine
+    plan = assemble_plan(dl, rg)
+    plan_dict = solve_plan(plan.to_dict())
+
+    from extractor.plan_assembler import (
+        AssembledRoom as AR, AssembledOpening as AO, Plan as P, _polygon_area_m2,
+    )
+    from extractor.geometry_solver import walk_polygon
+    solved_plan = P(
+        schedule_doors=plan.schedule_doors,
+        schedule_windows=plan.schedule_windows,
+        _meta=plan._meta,
+    )
+    for r in plan_dict["rooms"]:
+        new_perim = sum(r["wall_lengths_mm"].values())
+        pts = walk_polygon(
+            r["polygon_walls"], r["wall_lengths_mm"], r["wall_angles_deg"],
+            tuple(r.get("start_vertex_xy_mm") or (0.0, 0.0)),
+        )
+        new_area = _polygon_area_m2(pts[:-1])
+        openings = [AO(**o) for o in r["openings"]]
+        solved_plan.rooms.append(AR(
+            id=r["id"], nr=r["nr"], name=r["name"], paskirtis=r["paskirtis"],
+            polygon_walls=list(r["polygon_walls"]),
+            wall_lengths_mm=dict(r["wall_lengths_mm"]),
+            wall_angles_deg=dict(r["wall_angles_deg"]),
+            perimeter_mm=new_perim,
+            area_m2=round(new_area, 4),
+            openings=openings,
+            lubu_aukstis_m=r["lubu_aukstis_m"],
+            lubu_aukstis_source=r["lubu_aukstis_source"],
+            lubu_tipas=r["lubu_tipas"],
+            plyteles_sienos_aukstis_m=float(r.get("plyteles_sienos_aukstis_m") or 0.0),
+            sienu_apdailos_breakdown=dict(r.get("sienu_apdailos_breakdown") or {}),
+            confidence_score=r.get("confidence_score", 0.0),
+            confidence_color=r.get("confidence_color", "yellow"),
+            missing_dimension_walls=list(r.get("missing_dimension_walls") or []),
+            start_vertex_xy_mm=tuple(r.get("start_vertex_xy_mm") or (0.0, 0.0)),
+        ))
+
+    parsed_new = plan_to_parsed(solved_plan)
+    parsed_new = _recompute_per_room_via_python(parsed_new, None)
+    parsed_new = _recompute_santrauka(parsed_new)
+
+    per_room = diff_per_room(old, parsed_new) if old.get("patalpos") else []
+    sant = diff_santrauka(old, parsed_new) if old.get("santrauka") else []
+    print()
+    if per_room or sant:
+        failing = print_diff(per_room, sant, threshold_pct)
+        print(f"\n  Failing categories (>3%): {failing}")
+        return 1 if failing else 0
+    else:
+        print("  No old-pipeline reference available; new pipeline output only:")
+        print(json.dumps(parsed_new.get("santrauka") or {}, indent=2, ensure_ascii=False))
+        return 0
+
+
 def diff_per_room(old: dict, new: dict) -> list[dict]:
     new_by_nr = {str(r.get("nr")): r for r in (new.get("patalpos") or [])}
     rows: list[dict] = []
@@ -321,15 +462,14 @@ def main() -> int:
     ap.add_argument("--from-extract", metavar="PATH",
                     help="path to old extractor JSON output to round-trip")
     ap.add_argument("--live", metavar="PDF", help="path to PDF for live Vision compare ($$$)")
+    ap.add_argument("--floor-plan-page", type=int, default=2,
+                    help="page number (1-indexed) of the floor plan to extract (default 2)")
     ap.add_argument("--threshold-pct", type=float, default=0.5,
                     help="per-metric pass threshold (default 0.5%%)")
     args = ap.parse_args()
 
     if args.live:
-        print("ERR: --live mode requires ANTHROPIC_API_KEY and burns "
-              "Vision credits ($1-3 per Beržų run).")
-        print("     Implement explicit confirmation + re-run if you really mean it.")
-        return 2
+        return run_live_compare(args.live, args.threshold_pct, args.floor_plan_page)
 
     if not args.from_extract:
         print("USAGE: compare_pipelines.py --from-extract <old_extract.json>")
