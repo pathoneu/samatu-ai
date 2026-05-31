@@ -56,9 +56,61 @@ export default function Annotator() {
   const [measurements, setMeasurements] = useState([]); // {x1,y1,x2,y2,length_mm}
   const [calibrationPoints, setCalibrationPoints] = useState([]);
   const [loadError, setLoadError] = useState(null);
+  // Persistence state
+  const [saveStatus, setSaveStatus] = useState(null);  // "saving" | "saved" | "error"
+  const [lastSavedAt, setLastSavedAt] = useState(null);
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+
+  // ── Persistence ──────────────────────────────────────────────────────────
+  const annotationsUrl = `/api/projects/${projectId}/annotations`;
+
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      const body = {
+        measurements,
+        calibration_scale_mm_per_px: scale,
+        page: pageNum,
+      };
+      const r = await fetch(annotationsUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(`HTTP ${r.status}: ${t.slice(0, 200)}`);
+      }
+      const j = await r.json();
+      setSaveStatus('saved');
+      setLastSavedAt(j.updated_at || Math.floor(Date.now() / 1000));
+    } catch (err) {
+      console.error('annotation save failed', err);
+      setSaveStatus('error');
+    }
+  };
+
+  const handleLoad = async () => {
+    setSaveStatus('saving');
+    try {
+      const r = await fetch(annotationsUrl, { credentials: 'include' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      if (Array.isArray(j.measurements)) setMeasurements(j.measurements);
+      if (typeof j.calibration_scale_mm_per_px === 'number') {
+        setScale(j.calibration_scale_mm_per_px);
+      }
+      if (j.page && Number.isFinite(j.page)) setPageNum(j.page);
+      setSaveStatus('saved');
+      setLastSavedAt(j.updated_at || null);
+    } catch (err) {
+      console.error('annotation load failed', err);
+      setSaveStatus('error');
+    }
+  };
 
   // Redraw all overlay objects whenever they change.
   useEffect(() => {
@@ -249,6 +301,29 @@ export default function Annotator() {
       >
         Išvalyti
       </button>
+      <button
+        type="button"
+        className="rounded border border-emerald-500 bg-emerald-50 px-3 py-1 text-emerald-700"
+        onClick={handleSave}
+        disabled={saveStatus === 'saving'}
+        title="Įrašyti matavimus į backend"
+      >
+        Įrašyti
+      </button>
+      <button
+        type="button"
+        className="rounded border border-neutral-300 px-3 py-1"
+        onClick={handleLoad}
+        disabled={saveStatus === 'saving'}
+        title="Atkurti paskutinius įrašytus matavimus"
+      >
+        Atkurti
+      </button>
+      <span className="ml-2 text-xs text-neutral-500">
+        {saveStatus === 'saving' && '⏳ siunčiama…'}
+        {saveStatus === 'saved' && lastSavedAt && `✓ įrašyta ${new Date(lastSavedAt * 1000).toLocaleTimeString('lt-LT')}`}
+        {saveStatus === 'error' && '⚠ klaida'}
+      </span>
       <span className="ml-auto text-neutral-600">
         Mastelis: <strong>{scale ? `${(scale).toFixed(3)} mm/px` : 'nekalibruota'}</strong>
         {' · '}

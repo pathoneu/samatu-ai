@@ -287,7 +287,15 @@
       "lubu_aukstis_m": 2.8,
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.8,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.6,
+          "_source": "niche_locator_2026_05_31",
+          "_confidence": "medium"
+        }
+      ],
       "sienu_apdailos_breakdown": {
         "dazymas_share": 0.3,
         "plyteles_share": 0.7,

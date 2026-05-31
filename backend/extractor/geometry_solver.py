@@ -311,3 +311,123 @@ def solve_plan(plan: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
     """Apply ``solve_room`` to every room in the plan."""
     new_rooms = [solve_room(r, **kwargs) for r in (plan.get("rooms") or [])]
     return {**plan, "rooms": new_rooms}
+
+
+# ── Adjacency detection ──────────────────────────────────────────────────────
+def _segment_endpoints(
+    poly_walls: list[str],
+    wall_lengths_mm: dict[str, float],
+    wall_angles_deg: dict[str, float],
+    start_xy_mm: tuple[float, float],
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Walk the polygon and return {wall_id: (start_xy, end_xy)} in mm."""
+    pts = walk_polygon(poly_walls, wall_lengths_mm, wall_angles_deg, start_xy_mm)
+    out: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+    for i, wid in enumerate(poly_walls):
+        out[wid] = (pts[i], pts[i + 1])
+    return out
+
+
+def _segments_overlap_collinear(
+    a: tuple[tuple[float, float], tuple[float, float]],
+    b: tuple[tuple[float, float], tuple[float, float]],
+    tol_mm: float = 200.0,
+) -> bool:
+    """True iff segments a and b lie on the same axis-aligned line within
+    ``tol_mm`` AND share a non-zero overlap along that line.
+
+    Beržų's walls are all axis-aligned (snapped by the solver). We require
+    one of:
+        - both horizontal (Δy < tol) and overlapping in x
+        - both vertical   (Δx < tol) and overlapping in y
+    """
+    (ax1, ay1), (ax2, ay2) = a
+    (bx1, by1), (bx2, by2) = b
+    a_horiz = abs(ay1 - ay2) <= tol_mm
+    b_horiz = abs(by1 - by2) <= tol_mm
+    a_vert = abs(ax1 - ax2) <= tol_mm
+    b_vert = abs(bx1 - bx2) <= tol_mm
+
+    if a_horiz and b_horiz:
+        # Same horizontal line?
+        if abs(((ay1 + ay2) * 0.5) - ((by1 + by2) * 0.5)) > tol_mm:
+            return False
+        a_lo, a_hi = sorted((ax1, ax2))
+        b_lo, b_hi = sorted((bx1, bx2))
+        overlap = min(a_hi, b_hi) - max(a_lo, b_lo)
+        return overlap > tol_mm
+
+    if a_vert and b_vert:
+        if abs(((ax1 + ax2) * 0.5) - ((bx1 + bx2) * 0.5)) > tol_mm:
+            return False
+        a_lo, a_hi = sorted((ay1, ay2))
+        b_lo, b_hi = sorted((by1, by2))
+        overlap = min(a_hi, b_hi) - max(a_lo, b_lo)
+        return overlap > tol_mm
+
+    return False
+
+
+def detect_shared_walls(
+    rooms: list[dict[str, Any]],
+    tol_mm: float = 200.0,
+) -> dict[str, int]:
+    """For each room id, count how many of its walls are shared with another room.
+
+    Inputs are the same shape as ``solve_room``'s input:
+      ``{id, polygon_walls, wall_lengths_mm, wall_angles_deg, start_vertex_xy_mm}``
+
+    Returns ``{room_id: n_partition_walls}``.
+
+    Each room's polygon is walked from its ``start_vertex_xy_mm``; the
+    resulting absolute segment endpoints are compared between rooms. Two
+    rooms share a wall when one of their wall segments is collinear AND
+    overlapping with one of the other's, within ``tol_mm``. The shared
+    count for each room is the number of *its own* walls touching some
+    other room (so a wall shared between A and B counts as 1 for A and 1
+    for B).
+
+    When room polygons aren't yet aligned in a common coordinate frame
+    (each polygon walks from (0,0)), this function returns 0 across the
+    board — caller should pre-translate each room to a shared origin
+    before calling. We don't infer that translation here; callers should
+    supply ``start_vertex_xy_mm`` per room from the room-graph extractor's
+    absolute coordinates.
+    """
+    # Build absolute segments per room
+    room_segments: dict[str, dict[str, tuple[tuple[float, float], tuple[float, float]]]] = {}
+    for r in rooms:
+        rid = str(r.get("id") or r.get("nr") or "")
+        if not rid:
+            continue
+        room_segments[rid] = _segment_endpoints(
+            list(r.get("polygon_walls") or []),
+            dict(r.get("wall_lengths_mm") or {}),
+            dict(r.get("wall_angles_deg") or {}),
+            tuple(r.get("start_vertex_xy_mm") or (0.0, 0.0)),
+        )
+
+    counts: dict[str, int] = {rid: 0 for rid in room_segments}
+    ids = list(room_segments.keys())
+    for i, a_id in enumerate(ids):
+        for b_id in ids[i + 1:]:
+            for _wa, seg_a in room_segments[a_id].items():
+                for _wb, seg_b in room_segments[b_id].items():
+                    if _segments_overlap_collinear(seg_a, seg_b, tol_mm):
+                        counts[a_id] += 1
+                        counts[b_id] += 1
+                        break  # one shared wall per room-pair per other-wall
+    return counts
+
+
+def attach_partition_counts(
+    rooms: list[dict[str, Any]],
+    counts: dict[str, int],
+) -> list[dict[str, Any]]:
+    """Mutate each room dict to carry ``n_partition_walls`` so
+    ``calc_room_quantities`` picks it up on the next recompute."""
+    for r in rooms:
+        rid = str(r.get("id") or r.get("nr") or "")
+        if rid in counts:
+            r["n_partition_walls"] = counts[rid]
+    return rooms
