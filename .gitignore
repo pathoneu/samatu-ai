@@ -74,3 +74,9 @@ data/human_gt/
 reports/baseline/
 # Local PDF symlinks for stogai bake-off — point at user-local files
 backend/tests/fixtures/stogai/*.pdf
+
+# Eval harness run artifacts (one dir per run; reports + parsed.json snapshots)
+eval_runs/
+
+# Vision call cache (sha256-keyed JSON responses)
+.vision_cache/
