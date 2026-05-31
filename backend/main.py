@@ -202,6 +202,9 @@ from api.annotations import router as annotations_router
 from api.room_graph import router as room_graph_router
 # Symbol detection — Vision pass returning point-symbols for the Annotator.
 from api.symbols import router as symbols_router
+# Project calibration — contractor enters known totals, system stores
+# per-project adjustment factors (never modifies the global formula).
+from api.calibrate import router as calibrate_router
 
 load_dotenv()
 
@@ -331,6 +334,7 @@ app.include_router(cv_tools_router)
 app.include_router(annotations_router)
 app.include_router(room_graph_router)
 app.include_router(symbols_router)
+app.include_router(calibrate_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

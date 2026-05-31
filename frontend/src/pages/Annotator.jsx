@@ -478,6 +478,64 @@ export default function Annotator() {
     }
   };
 
+  // ── Calibration (contractor enters known totals) ─────────────────────────
+  const [calibrationModalOpen, setCalibrationModalOpen] = useState(false);
+  const [calibrationFactors, setCalibrationFactors] = useState({});
+  const [calibrationOverrides, setCalibrationOverrides] = useState({});
+  const [calibrationFetching, setCalibrationFetching] = useState(false);
+
+  // KŽ totals derived from rooms (the magic-wand sidebar already exposes
+  // per-room values; here we aggregate for the calibration dialog).
+  const kzTotals = useMemo(() => {
+    const sum = (field) =>
+      rooms.reduce((acc, r) => acc + (Number(r[field]) || 0), 0);
+    return {
+      dazymo_plotas_m2: Number(sum("dazymo_plotas_m2").toFixed(2)),
+      walls_paintable_m2: Number(sum("walls_paintable_m2").toFixed(2)),
+      ceiling_paintable_m2: Number(sum("ceiling_paintable_m2").toFixed(2)),
+      floor_total_m2: Number(sum("area_m2").toFixed(2)),
+    };
+  }, [rooms]);
+
+  // Fetch any stored calibration on mount
+  useEffect(() => {
+    const url = `/api/projects/${projectId}/calibrate`;
+    fetch(url, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((j) => {
+        if (j && j.factors) {
+          setCalibrationFactors(j.factors);
+          setCalibrationOverrides(j.overrides || {});
+        }
+      })
+      .catch(() => undefined);
+  }, [projectId]);
+
+  const submitCalibration = async (overrides) => {
+    setCalibrationFetching(true);
+    try {
+      const url = fixture
+        ? `/api/projects/${projectId}/calibrate?fixture=${fixture}`
+        : `/api/projects/${projectId}/calibrate`;
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ overrides }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setCalibrationFactors(j.factors || {});
+      setCalibrationOverrides(overrides);
+      setCalibrationModalOpen(false);
+    } catch (err) {
+      console.error("calibration failed", err);
+      alert("Kalibravimas nepavyko");
+    } finally {
+      setCalibrationFetching(false);
+    }
+  };
+
   // ── Symbol auto-detection ────────────────────────────────────────────────
   const [detecting, setDetecting] = useState(false);
   const handleDetectSymbols = async () => {
@@ -547,6 +605,12 @@ export default function Annotator() {
           <span>💡</span><span>{detecting ? 'Aptinkama…' : 'Aptikti simbolius'}</span>
         </button>
         <span className="mx-2 text-neutral-300">|</span>
+        <button
+          type="button"
+          onClick={() => setCalibrationModalOpen(true)}
+          className="rounded border border-amber-500 bg-amber-50 px-3 py-1.5 text-amber-700"
+          title="Kalibruoti AI sumas pagal jūsų žinomus skaičius"
+        >⚖ Kalibruoti</button>
         <button
           type="button"
           onClick={handleSave}
@@ -654,8 +718,76 @@ export default function Annotator() {
           </div>
         </main>
 
+        {/* Calibration modal */}
+        {calibrationModalOpen && (
+          <CalibrationModal
+            initialAi={kzTotals}
+            initialOverrides={calibrationOverrides}
+            onCancel={() => setCalibrationModalOpen(false)}
+            onSubmit={submitCalibration}
+            busy={calibrationFetching}
+          />
+        )}
+
         {/* Sidebar */}
         <aside className="flex w-[36%] min-w-[320px] flex-col border-l border-neutral-200 bg-neutral-50">
+          {/* KŽ summary — AI vs Calibrated (when contractor overrides exist) */}
+          <section className="border-b border-neutral-200 bg-white px-4 py-3">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-xs font-medium uppercase text-neutral-500">
+                KŽ santrauka
+              </div>
+              {Object.keys(calibrationFactors).length > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                  ⚖ Kalibruota
+                </span>
+              )}
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-neutral-500">
+                  <th className="text-left">Kategorija</th>
+                  <th className="text-right">AI</th>
+                  <th className="text-right">Jūsų</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["dazymo_plotas_m2", "Dažymo plotas", kzTotals.dazymo_plotas_m2, "m²"],
+                  ["walls_paintable_m2", "Sienos", kzTotals.walls_paintable_m2, "m²"],
+                  ["ceiling_paintable_m2", "Lubos", kzTotals.ceiling_paintable_m2, "m²"],
+                  ["floor_total_m2", "Plotas", kzTotals.floor_total_m2, "m²"],
+                ].map(([key, label, ai, unit]) => {
+                  const override = calibrationOverrides[key];
+                  const factor = calibrationFactors[key]?.factor;
+                  const calibrated = (override !== undefined)
+                    ? override
+                    : (factor ? ai * factor : null);
+                  return (
+                    <tr key={key} className="border-t border-neutral-100">
+                      <td className="py-1 text-neutral-700">{label}</td>
+                      <td className="py-1 text-right font-mono text-neutral-600">
+                        {ai.toFixed(2)} {unit}
+                      </td>
+                      <td className="py-1 text-right font-mono font-semibold text-amber-700">
+                        {calibrated !== null && calibrated !== undefined
+                          ? `${calibrated.toFixed(2)} ${unit}`
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() => setCalibrationModalOpen(true)}
+              className="mt-2 w-full rounded border border-amber-300 bg-amber-50 py-1.5 text-sm text-amber-700 hover:bg-amber-100"
+            >
+              ⚖ Kalibruoti pagal mano sumas
+            </button>
+          </section>
+
           {/* Selected room card */}
           {selectedRoom && (
             <section className="border-b border-neutral-200 bg-blue-50/40 px-4 py-3">
@@ -738,6 +870,97 @@ export default function Annotator() {
         {' · '}Patalpos su poligonais: <strong>{rooms.filter((r) => r.polygon_pct).length}/{rooms.length}</strong>
         {pageScaleMmPerPct && <> {' · '}Aptiktas mastelis: {pageScaleMmPerPct.toFixed(0)} mm/pct</>}
       </footer>
+    </div>
+  );
+}
+
+
+// ─── Calibration modal ─────────────────────────────────────────────────────
+const CALIBRATION_FIELDS = [
+  { key: "dazymo_plotas_m2",     label: "Dažymo plotas",       unit: "m²" },
+  { key: "plyteles_sienose_m2",  label: "Plytelės sienose",    unit: "m²" },
+  { key: "plyteles_grindyse_m2", label: "Plytelės grindyse",   unit: "m²" },
+  { key: "angokrasciai_m",       label: "Angokraščiai",        unit: "m"  },
+  { key: "kampu_metrai_m",       label: "Dažymo kampai",       unit: "m"  },
+  { key: "led_nisos_m",          label: "LED nišų ilgis",      unit: "m"  },
+  { key: "gkp_lubu_iki_3m_m2",   label: "GKP lubos iki 3m",    unit: "m²" },
+];
+
+function CalibrationModal({ initialAi, initialOverrides, onCancel, onSubmit, busy }) {
+  const [values, setValues] = React.useState(() => {
+    const out = {};
+    for (const f of CALIBRATION_FIELDS) {
+      out[f.key] = initialOverrides[f.key] ?? "";
+    }
+    return out;
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const overrides = {};
+    for (const [k, v] of Object.entries(values)) {
+      const n = parseFloat(v);
+      if (Number.isFinite(n) && n > 0) overrides[k] = n;
+    }
+    if (Object.keys(overrides).length === 0) {
+      alert("Įveskite bent vieną kategoriją.");
+      return;
+    }
+    onSubmit(overrides);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onCancel}
+    >
+      <div
+        className="w-[520px] max-w-[90vw] rounded-lg bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="mb-1 text-lg font-semibold text-neutral-800">
+          Kalibruoti pagal jūsų sumas
+        </h2>
+        <p className="mb-4 text-sm text-neutral-500">
+          Įveskite jums žinomas sumas kategorijoms, kurias norite pakoreguoti.
+          Sistema saugos koregavimo koeficientus tik šiam projektui — bendra
+          AI formulė lieka nepakitusi.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-2">
+          {CALIBRATION_FIELDS.map((f) => (
+            <div key={f.key} className="flex items-center gap-3">
+              <label className="flex-1 text-sm text-neutral-700">
+                {f.label}
+                <span className="ml-2 text-xs text-neutral-400">
+                  {f.key in initialAi && `AI: ${initialAi[f.key].toFixed(2)} ${f.unit}`}
+                </span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={values[f.key]}
+                onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                placeholder={`mano ${f.unit}`}
+                className="w-28 rounded border border-neutral-300 px-2 py-1 text-right font-mono text-sm"
+              />
+              <span className="w-8 text-xs text-neutral-400">{f.unit}</span>
+            </div>
+          ))}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded border border-neutral-300 px-4 py-1.5 text-sm"
+            >Atšaukti</button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded border border-amber-500 bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            >{busy ? "Saugoma…" : "Kalibruoti"}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
