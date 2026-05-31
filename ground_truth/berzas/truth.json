@@ -77,13 +77,15 @@
           "tipas": "langas",
           "kiekis": 2,
           "plotis_mm": 2750,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 3300,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "nisa_LED",
@@ -209,7 +211,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2780,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "nisa_LED",
@@ -347,7 +350,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2165,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "nisa_LED",
@@ -385,7 +389,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2165,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "nisa_LED",
@@ -423,7 +428,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2200,
-          "aukstis_mm": 2200
+          "aukstis_mm": 2200,
+          "_exterior": true
         },
         {
           "tipas": "langas",
