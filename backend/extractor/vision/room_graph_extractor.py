@@ -143,29 +143,47 @@ def parse_room_graph_payload(raw_json: dict[str, Any]) -> RoomGraph:
 
 
 def _validate_referential_integrity(rg: RoomGraph) -> None:
+    """Drop unresolvable rooms/walls/openings rather than crash the whole pipeline.
+
+    The downstream assembler is robust to missing rooms (just emits fewer
+    patalpos); crashing on a partially-bad Vision response throws away the
+    salvageable subset. Anomalies are pushed into rg._meta['warnings'] so
+    callers can surface them.
+    """
     vids = {v.id for v in rg.vertices}
     wids = {w.id for w in rg.walls}
     rids = {r.id for r in rg.rooms}
+    warnings: list[str] = []
 
-    for w in rg.walls:
-        if w.start_vertex not in vids:
-            raise ValueError(f"wall {w.id} references unknown start_vertex {w.start_vertex}")
-        if w.end_vertex not in vids:
-            raise ValueError(f"wall {w.id} references unknown end_vertex {w.end_vertex}")
-        for rid in w.room_ids:
-            if rid not in rids:
-                raise ValueError(f"wall {w.id} references unknown room {rid}")
+    # Walls with unknown endpoints → drop
+    rg.walls = [
+        w for w in rg.walls
+        if (w.start_vertex in vids and w.end_vertex in vids)
+        or (warnings.append(f"wall {w.id} references unknown vertices; dropped") or False)
+    ]
+    wids = {w.id for w in rg.walls}
 
+    # Rooms with empty polygon or unknown walls → drop
+    kept_rooms: list[Room] = []
     for r in rg.rooms:
         if not r.polygon_walls:
-            raise ValueError(f"room {r.id} has empty polygon_walls")
-        for wid in r.polygon_walls:
-            if wid not in wids:
-                raise ValueError(f"room {r.id} references unknown wall {wid}")
+            warnings.append(f"room {r.id} ({r.nr}) has empty polygon_walls; dropped")
+            continue
+        if any(wid not in wids for wid in r.polygon_walls):
+            warnings.append(f"room {r.id} ({r.nr}) references unknown walls; dropped")
+            continue
+        kept_rooms.append(r)
+    rg.rooms = kept_rooms
 
-    for o in rg.openings:
-        if o.wall_id not in wids:
-            raise ValueError(f"opening {o.id} references unknown wall {o.wall_id}")
+    # Openings with unknown wall → drop
+    rg.openings = [
+        o for o in rg.openings
+        if o.wall_id in wids
+        or (warnings.append(f"opening {o.id} references unknown wall; dropped") or False)
+    ]
+
+    if warnings:
+        rg._meta = {**(rg._meta or {}), "warnings": warnings}
 
 
 def extract_room_graph(

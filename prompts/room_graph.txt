@@ -73,9 +73,10 @@ RULES — graph
    matches this wall's length. If a wall has no direct dimension line drawn
    over it, set dimension_id to null — plan_assembler will infer it from
    polygon closure.
-3. angle_deg — 0=east, 90=north (standard math convention). For axis-aligned
-   walls use exactly 0, 90, 180, 270. Estimate to ±5°; geometry_solver
-   snaps within tolerance.
+3. angle_deg — 0=east, 90=north (standard math convention with image Y down,
+   so 90° points UP on the page). For axis-aligned walls use exactly 0, 90,
+   180, 270 from the set below; for a rectangular room walked CCW from the
+   bottom-left corner the four walls have angles [0, 90, 180, 270] in order.
 4. thickness_mm — read from drawing if a thickness dimension is given; else
    null (assembler picks a default).
 5. is_exterior — true if the wall is part of the outer envelope.
