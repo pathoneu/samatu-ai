@@ -729,6 +729,31 @@ def run_totals_only_multi(registry_path: Path) -> int:
 
     for entry in projects:
         slug = entry["slug"]
+        # Per-registry exclusions: scope_mismatch, blocked_for_vision_extraction,
+        # blocked_partial_input projects are visible but NOT included in MAE.
+        if entry.get("scope_mismatch"):
+            per_project_summary.append({
+                "slug": slug, "status": "excluded_scope_mismatch",
+                "reason": (entry.get("scope_mismatch_reason") or
+                           "scope mismatch documented in registry"),
+                "metrics": [], "excluded_from_mae": True,
+            })
+            continue
+        if entry.get("blocked_for_vision_extraction"):
+            per_project_summary.append({
+                "slug": slug, "status": "excluded_blocked",
+                "reason": entry.get("blocked_reason") or "missing input PDF",
+                "metrics": [], "excluded_from_mae": True,
+            })
+            continue
+        if entry.get("blocked_partial_input"):
+            per_project_summary.append({
+                "slug": slug, "status": "excluded_partial_input",
+                "reason": (entry.get("blocked_reason") or
+                           "input PDF lacks required pages"),
+                "metrics": [], "excluded_from_mae": True,
+            })
+            continue
         truth_path = REPO_ROOT / entry["truth_path"]
         if not truth_path.exists():
             per_project_summary.append({

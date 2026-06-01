@@ -78,4 +78,12 @@ projects:
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
+    blocked_partial_input: true
+    blocked_reason: |
+      The project_pdf is Apmatavimai-Layout4.pdf — a measurements-only page.
+      The architectural floor plan lives in OTHER Layout4 PDFs not bundled
+      into a single project_pdf. AI extraction produces ~50% of rooms by
+      design (it can only see what's labelled on the measurements page).
+      Excluded from MAE per docs/known_issues.md until the missing PDFs
+      are bundled.
     notes: "APARTMENT (butas), smallest scope. Project drawings split across 10 single-page Layout4 PDFs — needs bundling before extractor accepts it."

@@ -34,7 +34,9 @@ def _load_all() -> list[dict]:
     out = []
     for entry in reg.get("projects") or []:
         slug = entry["slug"]
-        if entry.get("scope_mismatch") or entry.get("blocked_for_vision_extraction"):
+        if (entry.get("scope_mismatch")
+                or entry.get("blocked_for_vision_extraction")
+                or entry.get("blocked_partial_input")):
             # Exclude from systematic error analysis — keep visible in summary.
             out.append({
                 "slug": slug, "name": entry.get("name", slug),
