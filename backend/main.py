@@ -205,6 +205,11 @@ from api.symbols import router as symbols_router
 # Project calibration — contractor enters known totals, system stores
 # per-project adjustment factors (never modifies the global formula).
 from api.calibrate import router as calibrate_router
+# Per-room recalc — fast pure-math endpoint feeding the Annotator's
+# per-wall edit and verify-all-rooms walkthrough.
+from api.room_recalc import router as room_recalc_router
+# Excel export — Two-sheet KŽ (AI + Patikslinta) via openpyxl.
+from api.export_excel import router as export_excel_router
 
 load_dotenv()
 
@@ -335,6 +340,8 @@ app.include_router(annotations_router)
 app.include_router(room_graph_router)
 app.include_router(symbols_router)
 app.include_router(calibrate_router)
+app.include_router(room_recalc_router)
+app.include_router(export_excel_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

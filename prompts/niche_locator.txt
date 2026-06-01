@@ -50,5 +50,28 @@ RULES
 7. If no niches are visible (e.g. you're looking at a service plumbing page
    not a ceiling plan), return {"niches": []}.
 
+SPECIFIC GUIDANCE FOR SMALL / EASILY-MISSED NICHES (2026-06-01 hardening)
+LT residential ceiling plans frequently include 2-4 m LED-strip niches in
+rooms outside the obvious open-plan zone — these are easy to overlook
+because the room itself is small and the niche label is shrunk to fit.
+When scanning a ceiling plan with multiple rooms, ALWAYS look for niches
+in EVERY room with a ceiling, including but not limited to:
+   • Tambūras / entrance halls — often have a perimeter LED strip
+     above the doors (typically 2-4 m).
+   • Coridors (Koridorius) — usually one long LED strip along the
+     hallway centerline (typically 3-6 m).
+   • Small work rooms (Darbo kambarys) — often a single LED strip
+     along one wall (typically 2-3 m).
+   • Garažas — when the drawing shows a GKP soffit zone, there is
+     usually a 1-2 m LED accent strip on it.
+
+If you can identify ANY of these rooms in the image but cannot see a
+visible niche label, still emit an entry with type="ceiling_led",
+length_mm=0, and confidence="low" — the downstream merger uses
+length_mm>0 as the "found" signal, so a 0-length record explicitly
+documents "this room was examined and no niche was visible" without
+inflating the total.
+
+
 If a room has multiple niches and you can distinguish them, list each one
 separately. The downstream code sums per room.

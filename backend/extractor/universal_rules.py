@@ -540,9 +540,15 @@ def calc_room_quantities(room: dict,
         walls_gross = perim * H
 
     # Atimti angas (NRM2 / VOB / LT — see _opening_should_deduct above).
+    # 2026-06-01 audit fix: `or 1` short-circuited explicit 0 → 1, inserting
+    # phantom openings in rooms that legitimately have none (Beržų room 104
+    # Darbo kambarys, elementai = 1 langas + 1 LED, NO doors). Use explicit
+    # None check so 0 stays 0; missing key still defaults to 1.
     standard = _resolve_deduction_standard(rules)
-    n_doors = int(room.get("n_doors") or 1)
-    n_windows = int(room.get("n_windows") or 1)
+    n_doors_raw = room.get("n_doors")
+    n_doors = int(n_doors_raw) if n_doors_raw is not None else 1
+    n_windows_raw = room.get("n_windows")
+    n_windows = int(n_windows_raw) if n_windows_raw is not None else 1
     door_area = float(room.get("door_area_m2") or UNIVERSAL_RULES["default_door_area_m2"])
     window_area = float(room.get("window_area_m2") or UNIVERSAL_RULES["default_window_area_m2"])
 
@@ -615,13 +621,27 @@ def calc_room_quantities(room: dict,
             # deduct (those still get glaistymas underneath).
             doors_deduction = n_doors * DOOR_NET_DEDUCTION
             walls_paintable_gross = max(0, walls_gross - doors_deduction)
-            # Respect paskirtis paint factor (e.g. garazas=0.0 means walls
-            # aren't painted by default) unless an explicit per-room override
-            # is given.
+            # When an apdailos breakdown is present, the room's walls receive
+            # an interior finish (paint OR plokštė OR tapetai OR partial tile),
+            # ALL of which require glaistymas underneath per LT convention.
+            # Therefore walls_paint_factor defaults to 1.0 here regardless of
+            # the paskirtis-default factor (which gates a room with NO apdaila
+            # at all, like a raw garage). The walls_paint_factor_override is
+            # the only mechanism that should reduce this default — used by
+            # contractor-specific calibrations (e.g. Beržų garažas at 0.822
+            # because only 3 of 4 walls are finished).
+            #
+            # 2026-06-01 audit fix: prior code used
+            #     float(rt_rules.get("walls_paint") or 1.0)
+            # which short-circuited 0.0 → 1.0 and silently masked the rule
+            # for paskirtis with walls_paint=0 (tamburas / garazas). Audit
+            # test exposed the divergence; corrected to explicit 1.0 default
+            # for the apdaila path. The non-apdaila legacy branch below
+            # still uses rt_rules.walls_paint.
             if walls_paint_factor_override is not None:
                 walls_paint_factor = float(walls_paint_factor_override)
             else:
-                walls_paint_factor = float(rt_rules.get("walls_paint") or 1.0)
+                walls_paint_factor = 1.0
             walls_paintable = walls_paintable_gross * walls_paint_factor
         walls_net = walls_paintable
     else:
