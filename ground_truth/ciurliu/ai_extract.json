@@ -3279,5 +3279,83 @@
       "skipped_implausible": []
     },
     "cost_usd": 0.0
+  },
+  "_height_fusion": {
+    "ts": "2026-06-01T21:45:03",
+    "pages_searched": [
+      3,
+      1
+    ],
+    "result": {
+      "signals": [
+        {
+          "source": "explicit",
+          "value_m": null,
+          "confidence": "low",
+          "evidence": "no annotation found"
+        },
+        {
+          "source": "door_lintel",
+          "value_m": null,
+          "confidence": "low",
+          "evidence": "door mode=2100.0mm (standard) — no signal beyond default"
+        }
+      ],
+      "primary_m": null,
+      "chosen_source": "none",
+      "confidence": "low"
+    },
+    "rooms_summary": {
+      "n_updated": 0,
+      "from_to": [],
+      "preserved": []
+    },
+    "cost_usd": 0.0
+  },
+  "_consistency_checks": {
+    "checks": [
+      {
+        "name": "room_count",
+        "status": "PASS",
+        "value": 7,
+        "expected": null,
+        "message": "7 rooms found; eksplikacija empty (no expected count)"
+      },
+      {
+        "name": "wall_floor_ratio",
+        "status": "PASS",
+        "value": 2.88,
+        "expected": [
+          2.0,
+          5.0
+        ],
+        "message": "walls/floor = 2.88 (typical: 2.0-5.0)",
+        "walls_m2": 274.95,
+        "floor_m2": 95.5
+      },
+      {
+        "name": "height_plausibility",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all heights in plausible range"
+      },
+      {
+        "name": "perim_geometry",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all perimeters geometrically plausible"
+      },
+      {
+        "name": "height_uniformity",
+        "status": "WARN",
+        "value": 2.82,
+        "message": "all rooms at 2.82m — likely Vision default; check title block or section for actual height"
+      }
+    ],
+    "n_fail": 0,
+    "n_warn": 1,
+    "overall_status": "REVIEW_NEEDED"
   }
 }

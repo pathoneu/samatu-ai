@@ -689,9 +689,9 @@
       "dazymo_plotas_m2": 6.59,
       "gkp_lubu_standart_m2": 6.59,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 0.0,
-      "kampu_metrai": 0.0,
-      "plyteles_sienos_m2": 27.72,
+      "kampai_m": 30.6,
+      "kampu_metrai": 30.6,
+      "plyteles_sienos_m2": 46.32,
       "plyteles_grindys_m2": 6.59,
       "pvc_grindys_m2": 0,
       "isliginamasis_m2": 6.59,
@@ -713,10 +713,13 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "high",
-      "kampai_inner_m": 0.0,
+      "kampai_inner_m": 11.2,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 0.0
+      "kampai_pusiniai_m": 8.4,
+      "angokrasciu_gkp_m": 0.0,
+      "_plyteles_sienos_m2_source": "wall_elevation_mm",
+      "_tile_area_from_elevation_m2": 46.32,
+      "_plyteles_sienos_m2_prior": 27.72
     },
     {
       "nr": "108",
@@ -2101,7 +2104,7 @@
   "santrauka": {
     "dazymo_plotas_total_m2": 584.75,
     "dazymo_excl_garazas_total_m2": 534.7,
-    "kampai_m_total": 470.7,
+    "kampai_m_total": 501.3,
     "angokrasciu_gkp_m_total": 78.05,
     "pasleptu_duru_staktu_m_total": 0.0,
     "nisu_metrai_total": 40.0,
@@ -2109,7 +2112,7 @@
     "gkp_lubu_virs_3m_m2_total": 50.54,
     "pvc_grindys_m2_total": 123.08,
     "plyteles_grindys_m2_total": 31.89,
-    "plyteles_sienos_m2_total": 105.17,
+    "plyteles_sienos_m2_total": 123.77,
     "isliginamasis_m2_total": 154.97,
     "grindjuosciu_m_total": 111.87,
     "hidroizoliacijos_vnt": 3
@@ -2119,6 +2122,18 @@
       "level": "WARN",
       "patalpa_nr": "102",
       "message": "Svetainė/virtuvė (nr=102): plotas 50.5 m² per didelis 'valgomasis' patalpai (STR norma 8–30 m²). Galimai atvira erdvė arba paskirtis blogai."
+    },
+    {
+      "level": "WARN",
+      "field": "plyteles_sienos_m2",
+      "patalpa_nr": "108",
+      "message": "Patalpa „Berniuko kambarys (Nr. 108) — wall_elevation duomenys praleisti, nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų `nr` lauką wall_elevation entry'jėje."
+    },
+    {
+      "level": "WARN",
+      "field": "plyteles_sienos_m2",
+      "patalpa_nr": "109",
+      "message": "Patalpa „Berniuko kambarys (Nr. 109) — wall_elevation duomenys praleisti, nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų `nr` lauką wall_elevation entry'jėje."
     },
     {
       "level": "WARN",
@@ -4999,6 +5014,88 @@
       "furniture_zones": [],
       "confidence": "medium",
       "page": 16
+    },
+    {
+      "wall_id": "d1",
+      "wall_total_width_mm": 1755,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "wall_segment_label": "Kronoceramiche Vena lux 2800x1200 (full wall tiling)",
+          "confidence": "high"
+        },
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 800,
+          "wall_segment_label": "Plytelės Living ceramics gubi light (floor-level band, niche surround)",
+          "confidence": "high"
+        }
+      ],
+      "nr": "107",
+      "room_name": "Vaikų san.mazgas",
+      "_source_pass": "second_pass_tile_focus"
+    },
+    {
+      "wall_id": "d2",
+      "wall_total_width_mm": 4870,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "wall_segment_label": "Kronoceramiche plytelės lux venna 280x120cm (full wall)",
+          "confidence": "high"
+        },
+        {
+          "from_floor_mm": 1050,
+          "to_floor_mm": 1750,
+          "wall_segment_label": "Plytelės Atlas Concorde White vein 278x120 (accent above counter)",
+          "confidence": "high"
+        }
+      ],
+      "nr": "107",
+      "room_name": "Vaikų san.mazgas",
+      "_source_pass": "second_pass_tile_focus"
+    },
+    {
+      "wall_id": "d3",
+      "wall_total_width_mm": 1540,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "wall_segment_label": "Kronoceramiche Vena lux 2800x1200 (full wall - shower)",
+          "confidence": "high"
+        }
+      ],
+      "nr": "107",
+      "room_name": "Vaikų san.mazgas",
+      "_source_pass": "second_pass_tile_focus"
+    },
+    {
+      "wall_id": "d4",
+      "wall_total_width_mm": 5180,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "wall_segment_label": "Kronoceramiche Vena lux 2800x1200 (full wall)",
+          "confidence": "high"
+        },
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 800,
+          "wall_segment_label": "Cronoceramiche lux falda 1200x1200 (floor-level accent)",
+          "confidence": "medium"
+        }
+      ],
+      "nr": "107",
+      "room_name": "Vaikų san.mazgas",
+      "_source_pass": "second_pass_tile_focus"
     }
   ],
   "_elevation_pass": {
@@ -5039,5 +5136,107 @@
       "skipped_implausible": []
     },
     "cost_usd": 0.0693
+  },
+  "_height_fusion": {
+    "ts": "2026-06-01T21:44:57",
+    "pages_searched": [
+      6,
+      1,
+      2
+    ],
+    "result": {
+      "signals": [
+        {
+          "source": "explicit",
+          "value_m": 2.8,
+          "confidence": "high",
+          "evidence": "+2800, +3000, +3400; Lubų apačios altitudė, aukštis nuo grindų, mm"
+        },
+        {
+          "source": "door_lintel",
+          "value_m": null,
+          "confidence": "low",
+          "evidence": "door mode=2100.0mm (standard) — no signal beyond default"
+        }
+      ],
+      "primary_m": 2.8,
+      "chosen_source": "explicit",
+      "confidence": "high"
+    },
+    "rooms_summary": {
+      "n_updated": 0,
+      "from_to": [],
+      "preserved": [
+        {
+          "nr": "102",
+          "value_m": 3.4
+        },
+        {
+          "nr": "105",
+          "value_m": 3.0
+        }
+      ]
+    },
+    "cost_usd": 0.0
+  },
+  "_elevation_second_pass": {
+    "ts": "2026-06-01T21:47:00",
+    "rooms_attempted": [
+      "107"
+    ],
+    "rooms_repaired": 1,
+    "elevations_added": 4,
+    "rooms_recomputed": 5,
+    "cost_usd": 0.1379
+  },
+  "_consistency_checks": {
+    "checks": [
+      {
+        "name": "room_count",
+        "status": "PASS",
+        "value": 11,
+        "expected": 11,
+        "message": "floor plan + eksplikacija agree on 11 rooms"
+      },
+      {
+        "name": "wall_floor_ratio",
+        "status": "PASS",
+        "value": 3.01,
+        "expected": [
+          2.0,
+          5.0
+        ],
+        "message": "walls/floor = 3.01 (typical: 2.0-5.0)",
+        "walls_m2": 499.26,
+        "floor_m2": 165.64
+      },
+      {
+        "name": "height_plausibility",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all heights in plausible range"
+      },
+      {
+        "name": "perim_geometry",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all perimeters geometrically plausible"
+      },
+      {
+        "name": "height_uniformity",
+        "status": "PASS",
+        "value": [
+          3.0,
+          2.8,
+          3.4
+        ],
+        "message": "per-room heights vary: [2.8, 3.0, 3.4]"
+      }
+    ],
+    "n_fail": 0,
+    "n_warn": 0,
+    "overall_status": "OK"
   }
 }

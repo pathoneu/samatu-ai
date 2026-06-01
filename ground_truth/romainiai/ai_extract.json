@@ -6605,5 +6605,165 @@
       "skipped_implausible": []
     },
     "cost_usd": 0.0693
+  },
+  "_height_fusion": {
+    "ts": "2026-06-01T21:45:08",
+    "pages_searched": [
+      35,
+      36,
+      5
+    ],
+    "result": {
+      "signals": [
+        {
+          "source": "explicit",
+          "value_m": 3.0,
+          "confidence": "high",
+          "evidence": "ŠVARUS LUBŲ AUKŠTIS: 300cm"
+        },
+        {
+          "source": "door_lintel",
+          "value_m": null,
+          "confidence": "low",
+          "evidence": "door mode=2100.0mm (standard) — no signal beyond default"
+        }
+      ],
+      "primary_m": 3.0,
+      "chosen_source": "explicit",
+      "confidence": "high"
+    },
+    "rooms_summary": {
+      "n_updated": 0,
+      "from_to": [],
+      "preserved": [
+        {
+          "nr": "1",
+          "value_m": 3.71
+        },
+        {
+          "nr": "2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "3",
+          "value_m": 3.71
+        },
+        {
+          "nr": "4",
+          "value_m": 3.71
+        },
+        {
+          "nr": "5",
+          "value_m": 3.71
+        },
+        {
+          "nr": "6",
+          "value_m": 3.71
+        },
+        {
+          "nr": "7",
+          "value_m": 3.71
+        },
+        {
+          "nr": "8",
+          "value_m": 3.71
+        },
+        {
+          "nr": "9",
+          "value_m": 3.71
+        },
+        {
+          "nr": "10",
+          "value_m": 3.71
+        },
+        {
+          "nr": "11",
+          "value_m": 3.71
+        },
+        {
+          "nr": "1.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "2.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "3.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "4.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "5.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "6.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "7.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "8.2",
+          "value_m": 3.71
+        },
+        {
+          "nr": "9.2",
+          "value_m": 3.71
+        }
+      ]
+    },
+    "cost_usd": 0.0
+  },
+  "_consistency_checks": {
+    "checks": [
+      {
+        "name": "room_count",
+        "status": "WARN",
+        "value": 20,
+        "expected": 11,
+        "message": "floor plan returned 20 rooms but eksplikacija lists 11 — extra rooms (subset project?)"
+      },
+      {
+        "name": "wall_floor_ratio",
+        "status": "PASS",
+        "value": 4.06,
+        "expected": [
+          2.0,
+          5.0
+        ],
+        "message": "walls/floor = 4.06 (typical: 2.0-5.0)",
+        "walls_m2": 1087.71,
+        "floor_m2": 267.71
+      },
+      {
+        "name": "height_plausibility",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all heights in plausible range"
+      },
+      {
+        "name": "perim_geometry",
+        "status": "PASS",
+        "value": 0,
+        "expected": 0,
+        "message": "all perimeters geometrically plausible"
+      },
+      {
+        "name": "height_uniformity",
+        "status": "PASS",
+        "value": 3.706,
+        "message": "all rooms at 3.706m"
+      }
+    ],
+    "n_fail": 0,
+    "n_warn": 1,
+    "overall_status": "REVIEW_NEEDED"
   }
 }

@@ -2739,6 +2739,28 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] sanity_checks failed (non-fatal): {exc}")
 
+    # Step 4.067 (2026-06-01): permanent consistency checker.
+    # Pure-Python audit (room count vs eksplikacija, wall/floor ratio,
+    # height plausibility + uniformity, perim-geometry). Emits a report
+    # under parsed["_consistency_checks"] + warnings on failed checks.
+    try:
+        from .consistency_checker import run_all_checks as _ck_run
+        ck_report = _ck_run(parsed)
+        parsed["_consistency_checks"] = ck_report
+        if ck_report["n_warn"] > 0 or ck_report["n_fail"] > 0:
+            existing = parsed.get("warnings") or []
+            for c in ck_report["checks"]:
+                if c["status"] in ("WARN", "FAIL"):
+                    existing.append({
+                        "level": c["status"], "source": "consistency_checker",
+                        "message": f"{c['name']}: {c['message']}",
+                    })
+            parsed["warnings"] = existing
+            print(f"[extractor] consistency_checker: "
+                  f"{ck_report['n_warn']} warn + {ck_report['n_fail']} fail")
+    except Exception as exc:
+        print(f"[extractor] consistency_checker failed (non-fatal): {exc}")
+
     # Step 4.066 (2026-06-01): permanent geometric perimeter validation.
     # Pure-Python check that each room's perimetras_m is consistent with
     # its plotas_m2 via the isoperimetric bound. Emits structured warnings
