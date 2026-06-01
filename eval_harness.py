@@ -456,18 +456,57 @@ def _summarize(results: list[MetricResult]) -> dict:
     }
 
 
+def _load_calibration_for_html(project_id: str) -> dict[str, float]:
+    """Return {santrauka_key: calibrated_value} for the eval report.
+
+    The calibrator stores per-metric ``factor = user_value / ai_value``.
+    For each saved override, the eval HTML can render a "Calibrated"
+    column showing what the user's target was.
+    """
+    calib_path = REPO_ROOT / "backend" / "data" / "calibrations" / f"{project_id}.json"
+    if not calib_path.exists():
+        return {}
+    try:
+        record = json.loads(calib_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    # Map calibrator metric keys → truth_key in the eval METRICS table
+    KEY_MAP = {
+        "angokrasciai_m":           "angokrasciai_m",
+        "dazymo_plotas_m2":         "dazymo_walls_plus_ceilings_combined_m2",
+        "dazymo_excl_garazas_m2":   "dazymo_walls_plus_ceilings_combined_m2",
+        "plyteles_sienose_m2":      "plyteles_sienos_total_m2",
+        "plyteles_grindyse_m2":     "plyteles_grindys_total_m2",
+        "kampu_metrai_m":           "kampu_metrai_m",
+        "gkp_lubu_iki_3m_m2":       "gkp_lubu_iki_3m_m2",
+        "led_nisos_m":              "led_nisos_m",
+    }
+    out: dict[str, float] = {}
+    for k, v in (record.get("overrides") or {}).items():
+        if isinstance(v, (int, float)) and k in KEY_MAP:
+            out[KEY_MAP[k]] = float(v)
+    return out
+
+
 def write_html_report(out_path: Path, project_id: str, mode: str,
                       results: list[MetricResult], per_room: list[dict],
                       summary: dict) -> None:
+    calibrated_overrides = _load_calibration_for_html(project_id)
     rows_html = []
     for r in results:
         if r.status == "no_truth":
             continue
+        calibrated = calibrated_overrides.get(r.truth_key)
+        calibrated_cell = (
+            f"<span class='calibrated'>{_fmt_num(calibrated)} {r.unit}</span>"
+            if calibrated is not None else "<span class='muted'>—</span>"
+        )
         rows_html.append(
             f"<tr class='row-{r.status}'>"
             f"<td>{r.label}</td>"
             f"<td class='num'>{_fmt_num(r.truth_value)} {r.unit}</td>"
             f"<td class='num'>{_fmt_num(r.actual_value)} {r.unit}</td>"
+            f"<td class='num'>{calibrated_cell}</td>"
             f"<td class='num'>{_fmt_num(r.abs_error)}</td>"
             f"<td class='num'>{_fmt_pct(r.pct_error)}</td>"
             f"<td>{r.truth_confidence}</td>"
@@ -515,6 +554,8 @@ def write_html_report(out_path: Path, project_id: str, mode: str,
   tr.row-warn  {{ background: rgba(237, 137, 54, 0.07); }}
   tr.row-fail  {{ background: rgba(229, 62, 62, 0.10); }}
   tr.row-missing {{ color: #999; }}
+  .calibrated {{ color: #92400e; font-weight: 600; }}
+  .muted {{ color: #cbd5e1; }}
 </style>
 </head><body>
 <h1>Eval report — {project_id}</h1>
@@ -527,7 +568,7 @@ def write_html_report(out_path: Path, project_id: str, mode: str,
 </div>
 <h3>Headline + category metrics</h3>
 <table>
-  <thead><tr><th>metric</th><th>truth</th><th>actual</th><th>Δ</th><th>pct</th><th>conf</th><th>status</th></tr></thead>
+  <thead><tr><th>metric</th><th>truth</th><th>AI</th><th>Calibrated</th><th>Δ (AI−truth)</th><th>pct</th><th>conf</th><th>status</th></tr></thead>
   <tbody>{''.join(rows_html)}</tbody>
 </table>
 {per_room_html}

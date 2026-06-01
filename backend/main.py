@@ -210,6 +210,8 @@ from api.calibrate import router as calibrate_router
 from api.room_recalc import router as room_recalc_router
 # Excel export — Two-sheet KŽ (AI + Patikslinta) via openpyxl.
 from api.export_excel import router as export_excel_router
+# Project stats — dashboard payload (counts, confidence, verification progress).
+from api.project_stats import router as project_stats_router
 
 load_dotenv()
 
@@ -342,6 +344,7 @@ app.include_router(symbols_router)
 app.include_router(calibrate_router)
 app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
+app.include_router(project_stats_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

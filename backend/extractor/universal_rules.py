@@ -818,16 +818,45 @@ def calc_room_quantities(room: dict,
         pusiniai_m = 0.0
         kampai = 0.0
 
-    # Angokraščiai (door + window reveals). Linear meters per CLAUDE.md §1.2.
-    # Contractor samata-truth item 13/14 sums these across the project.
-    # Don't bill on exterior openings — those reveal back into the facade,
-    # not into the interior.
-    interior_doors = max(0, n_doors - int(room.get("n_exterior_doors") or 0))
-    interior_windows = max(0, n_windows - int(room.get("n_exterior_windows") or 0))
-    angokrasciu_m = (
-        interior_doors * (door_width + 2 * door_height)
-        + interior_windows * (window_width + 2 * window_height)
-    )
+    # Angokraščiai (atkosai = reveal length around openings). Per CLAUDE.md
+    # §1.2 + Beržų contractor verdict (2026-06-01 rule-explorer Rule #1):
+    #
+    #   ALL doors (interior + exterior)   → W + 2H reveal contour
+    #     The door frame always sits INSIDE the room, with three sides
+    #     of reveal-finishing material (one above, two on the jambs)
+    #     regardless of which side of the door opens to outside.
+    #
+    #   Interior windows (between rooms)  → W + 2H
+    #     Same logic: frame sits in the room, three sides need reveal.
+    #
+    #   Exterior windows (facade)         → 0 m
+    #     The reveal is on the facade side and is paid for under fasado
+    #     darbai (samata separate items), NOT under interior atkosai.
+    #
+    # This iterates elementai directly with each opening's actual W and H
+    # (not fixed door_width/height defaults) so wide doors (e.g. Svetainė
+    # terrace 2750mm) and panoramic windows (2200-3300mm) contribute the
+    # right reveal length.
+    #
+    # Result on Beržų (rule-explorer #1): 89.51 m vs truth 89.39 m → +0.13%.
+    angokrasciu_m = 0.0
+    for el in room.get("elementai") or []:
+        tipas = (el.get("tipas") or "").lower()
+        kiekis = int(el.get("kiekis") or 1)
+        w_mm = float(el.get("plotis_mm") or 0)
+        h_mm = float(el.get("aukstis_mm") or 0)
+        if w_mm <= 0 or h_mm <= 0:
+            continue
+        w_m = w_mm / 1000.0
+        h_m = h_mm / 1000.0
+        is_exterior = bool(el.get("_exterior"))
+        if tipas in ("duris", "pasleptos_duris"):
+            # All doors: W + 2H (frame inside the room regardless of exterior flag)
+            angokrasciu_m += kiekis * (w_m + 2 * h_m)
+        elif tipas in ("langas", "stoglangis"):
+            if not is_exterior:
+                angokrasciu_m += kiekis * (w_m + 2 * h_m)
+            # else: 0 (counted under fasado darbai, not interior)
 
     # Grindjuostės (perimetras − durų pločiai, vonia/wc neturi)
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
