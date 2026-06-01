@@ -15,6 +15,31 @@
   "rejected_corrections": [
     {
       "considered_at": "2026-06-01",
+      "proposed_change": "Apply BALDŲ PLANAS built-in furniture detector output (40.83 m² of exclusions) to gt_dimensions to close the +4.15 m² walls gap",
+      "reason_for_rejection": "Council R3 hypothesis (Gemini) was that built-in wardrobes / kitchen cabinets / shower cubicles excluded from paint scope explain the +4.15 m² overshoot. The detector pass on BALDŲ PLANAS (in_tok=4911, out_tok=1506, ~$0.20) CONFIRMS built-ins exist in this project: 11 fixtures, 9 rooms, 40.83 m² wall area (kitchen cabinet runs in 101+102, wardrobes in 108+109+110, shower cubicles in 107+111, vanities in 107+111, bathtub apron in 111, fixed shelving in 106). But 40.83 m² is ~10× the +4.15 m² target. Applying all exclusions pushes walls from +0.90% (over) to ~−7.9% (under). Any SUBSET selected to land closer to the target IS eval-fitting on N=1 truth — there is no principled rule recoverable from the lump-sum contractor totals telling us which built-ins the contractor's specific scope excludes. Honest engineering: detector + integration mechanism (apply_built_in_exclusions) ship as feature; ZERO exclusions auto-applied. Activation routes through the per-project Kalibruoti UI (contractor toggles which built-ins their scope excludes) OR waits for N≥3 truth where systematic patterns become learnable. Detector raw output is logged below for reference.",
+      "detector_output": {
+        "fixtures": [
+          {"id": "f1", "type": "kitchen_cabinet_run", "room_nr": "102", "wall_label": "north", "width_mm": 3300, "height_mm": 2400, "excluded_m2": 7.92, "confidence": "high"},
+          {"id": "f2", "type": "kitchen_cabinet_run", "room_nr": "101", "wall_label": "east",  "width_mm": 2000, "height_mm": 2400, "excluded_m2": 4.80, "confidence": "high"},
+          {"id": "f3", "type": "fixed_shelving",      "room_nr": "106", "wall_label": "north", "width_mm": 2780, "height_mm": 2400, "excluded_m2": 6.67, "confidence": "medium"},
+          {"id": "f4", "type": "bathroom_vanity",     "room_nr": "107", "wall_label": "north", "width_mm": 1050, "height_mm": 2100, "excluded_m2": 2.21, "confidence": "high"},
+          {"id": "f5", "type": "shower_cubicle",      "room_nr": "107", "wall_label": "east",  "width_mm":  900, "height_mm": 2400, "excluded_m2": 2.16, "confidence": "high"},
+          {"id": "f6", "type": "wardrobe",            "room_nr": "108", "wall_label": "north", "width_mm": 1200, "height_mm": 2400, "excluded_m2": 2.88, "confidence": "high"},
+          {"id": "f7", "type": "wardrobe",            "room_nr": "109", "wall_label": "north", "width_mm": 1200, "height_mm": 2400, "excluded_m2": 2.88, "confidence": "high"},
+          {"id": "f8", "type": "wardrobe",            "room_nr": "110", "wall_label": "west",  "width_mm": 2200, "height_mm": 2400, "excluded_m2": 5.28, "confidence": "high"},
+          {"id": "f9", "type": "bathtub_apron",       "room_nr": "111", "wall_label": "west",  "width_mm": 2000, "height_mm":  600, "excluded_m2": 1.20, "confidence": "medium"},
+          {"id": "f10","type": "shower_cubicle",      "room_nr": "111", "wall_label": "south", "width_mm": 1000, "height_mm": 2400, "excluded_m2": 2.40, "confidence": "high"},
+          {"id": "f11","type": "bathroom_vanity",     "room_nr": "111", "wall_label": "south", "width_mm": 1160, "height_mm": 2100, "excluded_m2": 2.44, "confidence": "high"}
+        ],
+        "per_room_excluded_m2": {"101": 4.80, "102": 7.92, "106": 6.67, "107": 4.37, "108": 2.88, "109": 2.88, "110": 5.28, "111": 6.04},
+        "total_excluded_m2": 40.83,
+        "target_gap_m2": 4.15,
+        "ratio_to_target": 9.84,
+        "note": "Rooms 107 & 111 are full-tile bathrooms (walls_paint_factor=0); excluding built-ins there is mathematically a no-op on paint. After zeroing those: 30.42 m² across 6 rooms — still 7× target."
+      }
+    },
+    {
+      "considered_at": "2026-06-01",
       "proposed_change": "Add a 'duris 900×2100' opening to rooms 104, 106, 108, 109, 110, 111 (rooms reporting n_doors=0)",
       "reason_for_rejection": "Total doors across gt_dimensions = 14 = exact contractor truth (14 × 2.8m = 39.2m item-18 'Durų angų paruošimas'). The '0-door rooms' aren't a Vision miss — Vision attributed the connecting doors to Koridorius (one side per door) rather than splitting them between adjoining rooms. This is topologically correct: a single door belongs to one room of the pair from a deduction perspective. Adding phantom doors would double-deduct."
     },

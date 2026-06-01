@@ -623,8 +623,41 @@ def _load_truth(project_id: str) -> dict:
         return json.load(f)
 
 
+def _append_drift_row(project_id: str, mode: str, summary: dict,
+                       results: list[MetricResult]) -> None:
+    """Append-only per-run snapshot for cross-commit drift detection.
+
+    Format: one JSON object per line in eval_runs/drift.jsonl. Each row
+    carries (timestamp, git_sha, project, mode, MAE, per-metric pct).
+    Append-only — never edit or compact this file. To inspect drift,
+    diff the last N rows or feed them to a notebook.
+    """
+    import subprocess
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=REPO_ROOT, text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        sha = "unknown"
+    row = {
+        "ts": _dt.datetime.now().isoformat(timespec="seconds"),
+        "git_sha": sha,
+        "project_id": project_id,
+        "mode": mode,
+        "mae_pct": summary.get("mae_pct"),
+        "metrics": {r.label: r.pct_error for r in results
+                    if r.tier == "headline" and r.pct_error is not None},
+    }
+    drift_path = EVAL_RUNS_ROOT / "drift.jsonl"
+    drift_path.parent.mkdir(parents=True, exist_ok=True)
+    with drift_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"  Drift logged → {drift_path}")
+
+
 def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
-            apply_calibration: bool = False) -> int:
+            apply_calibration: bool = False, track_drift: bool = False) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
@@ -662,6 +695,9 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     write_html_report(run_dir / "report.html", project_id, mode, results, per_room, summary)
     print(f"\n  Report → {run_dir / 'report.html'}")
 
+    if track_drift:
+        _append_drift_row(project_id, mode, summary, results)
+
     # Exit code: 1 if any headline metric is "fail", 0 otherwise.
     failing = [r for r in results if r.tier == "headline" and r.status == "fail"]
     return 1 if failing else 0
@@ -686,6 +722,9 @@ def main() -> int:
                          "backend/data/calibrations/{project_id}.json before "
                          "invoking the calculator (currently honours "
                          "perimeter_correction_factor)")
+    ap.add_argument("--track-drift", action="store_true",
+                    help="append a per-run snapshot to eval_runs/drift.jsonl "
+                         "so accuracy regressions across commits become visible")
     args = ap.parse_args()
 
     if args.use_gt_inputs:
@@ -698,7 +737,8 @@ def main() -> int:
         mode = "use_gt_inputs"  # default: cheapest, safest
     return run_one(args.project, mode,
                    estimate_exterior=args.estimate_exterior,
-                   apply_calibration=args.apply_calibration)
+                   apply_calibration=args.apply_calibration,
+                   track_drift=args.track_drift)
 
 
 if __name__ == "__main__":
