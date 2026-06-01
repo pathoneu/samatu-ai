@@ -194,7 +194,35 @@ def _apply_exterior_heuristic_in_place(rooms: list[dict]) -> int:
     return count
 
 
-def run_pipeline_use_gt_inputs(truth: dict, *, estimate_exterior: bool = False) -> dict:
+def _apply_perimeter_correction(rooms: list[dict], factor: float) -> int:
+    """Scale every room's perimetras_m by the per-project correction factor.
+    Returns count of rooms modified."""
+    n = 0
+    for room in rooms:
+        if "perimetras_m" not in room:
+            continue
+        old = float(room["perimetras_m"])
+        room["perimetras_m"] = round(old * factor, 4)
+        n += 1
+    return n
+
+
+def _load_project_calibration(project_id: str) -> dict[str, Any]:
+    """Read backend/data/calibrations/{project_id}.json if present."""
+    p = REPO_ROOT / "backend" / "data" / "calibrations" / f"{project_id}.json"
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def run_pipeline_use_gt_inputs(
+    truth: dict, *,
+    estimate_exterior: bool = False,
+    apply_calibration: dict | None = None,
+) -> dict:
     """Bypass Vision: feed GT primitives straight into the deterministic engine.
 
     Strips the `_dim_confidence` annotation from each room (calculator-side fields
@@ -224,6 +252,13 @@ def run_pipeline_use_gt_inputs(truth: dict, *, estimate_exterior: bool = False) 
     if estimate_exterior:
         flagged = _apply_exterior_heuristic_in_place(rooms_in)
 
+    perim_correction_applied = None
+    if apply_calibration:
+        factor = apply_calibration.get("perimeter_correction_factor")
+        if isinstance(factor, (int, float)) and factor and abs(factor - 1.0) > 1e-6:
+            n = _apply_perimeter_correction(rooms_in, float(factor))
+            perim_correction_applied = {"factor": float(factor), "rooms_affected": n}
+
     parsed = {
         "patalpos": rooms_in,
         "archetipas": "dideli_namu_premium",
@@ -233,6 +268,7 @@ def run_pipeline_use_gt_inputs(truth: dict, *, estimate_exterior: bool = False) 
             "harness": "eval_harness.py",
             "estimate_exterior": estimate_exterior,
             "openings_flagged_by_heuristic": flagged,
+            "perimeter_correction_applied": perim_correction_applied,
         },
     }
     parsed = _recompute_per_room(parsed, None)
@@ -587,12 +623,19 @@ def _load_truth(project_id: str) -> dict:
         return json.load(f)
 
 
-def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False) -> int:
+def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
+            apply_calibration: bool = False) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
+    calibration = _load_project_calibration(project_id) if apply_calibration else None
+
     if mode == "use_gt_inputs":
-        parsed = run_pipeline_use_gt_inputs(truth, estimate_exterior=estimate_exterior)
+        parsed = run_pipeline_use_gt_inputs(
+            truth,
+            estimate_exterior=estimate_exterior,
+            apply_calibration=calibration,
+        )
     elif mode == "replay":
         parsed = run_pipeline_replay(REPO_ROOT / entry["replay_path"])
     elif mode == "vision":
@@ -638,6 +681,11 @@ def main() -> int:
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
                          "(truth.json not modified)")
+    ap.add_argument("--apply-calibration", action="store_true",
+                    help="apply the per-project calibration from "
+                         "backend/data/calibrations/{project_id}.json before "
+                         "invoking the calculator (currently honours "
+                         "perimeter_correction_factor)")
     args = ap.parse_args()
 
     if args.use_gt_inputs:
@@ -648,7 +696,9 @@ def main() -> int:
         mode = "vision"
     else:
         mode = "use_gt_inputs"  # default: cheapest, safest
-    return run_one(args.project, mode, estimate_exterior=args.estimate_exterior)
+    return run_one(args.project, mode,
+                   estimate_exterior=args.estimate_exterior,
+                   apply_calibration=args.apply_calibration)
 
 
 if __name__ == "__main__":

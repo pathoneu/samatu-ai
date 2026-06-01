@@ -793,6 +793,12 @@ def calc_room_quantities(room: dict,
     # "pusinis" corner of full ceiling height (counted once for this room;
     # the neighbouring room's calc adds the other half later via dedup).
     n_partition_walls = int(room.get("n_partition_walls") or 0)
+    # 2026-06-01 STR alignment: per the user's STR 2.01.01:1999 research,
+    # partition (interior-drywall) corners do NOT count toward "dažymo
+    # kampai" because they take paper joint tape, not metal corner bead.
+    # Opt-in via room["count_partition_corners"]=True for contractors who
+    # itemise them. Default False matches the standard.
+    count_partition_corners = bool(room.get("count_partition_corners", False))
 
     if walls_paint_factor > 0:
         # Interior corners: one per polygon vertex × ceiling height.
@@ -804,13 +810,16 @@ def calc_room_quantities(room: dict,
             n_doors * (door_width + 2 * door_height)
             + n_windows * (window_width + 2 * window_height)
         )
-        # Pusiniai — shared partition junctions, vertical corner at the floor
-        # plate of each partition wall × ceiling height.
+        # Pusiniai (partition junctions) — emitted as a separate sub-total
+        # but NOT added to kampai unless the project explicitly opts in.
         pusiniai_m = n_partition_walls * H
-        kampai = inner_corners_m + opening_reveals_m + pusiniai_m
+        kampai = inner_corners_m + opening_reveals_m
+        if count_partition_corners:
+            kampai += pusiniai_m
         # Add the perimeter contribution from the LEGACY formula (perim term)
-        # so we don't regress projects where n_partition_walls isn't yet
-        # populated; once room-adjacency wiring lands this can be removed.
+        # so we don't regress projects where n_walls_estimate is still
+        # defaulted to 4. Once room-adjacency wiring lands across the board
+        # this can be removed.
         kampai += perim
     else:
         inner_corners_m = 0.0

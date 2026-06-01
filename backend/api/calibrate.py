@@ -180,6 +180,25 @@ async def calibrate_project(
     except (TypeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=f"overrides values must be numeric: {e}")
 
+    # Optional opt-in global correction. The caller MAY supply
+    # perimeter_correction_factor (≈0.99–1.01); when present, the eval
+    # harness with --apply-calibration multiplies every room's perim by
+    # this factor before invoking the calculator. Used for project-
+    # specific Vision drift compensation; never inherited globally.
+    perim_factor_raw = body.get("perimeter_correction_factor")
+    perimeter_correction_factor: float | None = None
+    if perim_factor_raw is not None:
+        try:
+            perimeter_correction_factor = float(perim_factor_raw)
+        except (TypeError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"perimeter_correction_factor must be numeric: {e}")
+        if not (0.90 <= perimeter_correction_factor <= 1.10):
+            raise HTTPException(
+                status_code=400,
+                detail="perimeter_correction_factor must be in [0.90, 1.10] (a ±10% bound; "
+                       "values outside this range are almost certainly not Vision drift)",
+            )
+
     parsed = _load_project_for_calibration(request, project_id, fixture)
     factors = compute_factors(parsed, overrides)
 
@@ -188,8 +207,9 @@ async def calibrate_project(
         "fixture": fixture,
         "overrides": overrides,
         "factors": factors,
+        "perimeter_correction_factor": perimeter_correction_factor,
         "updated_at": int(time.time()),
-        "schema_version": 1,
+        "schema_version": 2,
     }
     # Atomic write
     p = _calib_path(project_id)

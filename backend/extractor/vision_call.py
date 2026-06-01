@@ -709,6 +709,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "plyteles_grindys_m2_override",
             "gkp_extra_area_m2",
             "n_exterior_doors", "n_exterior_windows",
+            "count_partition_corners",
         }
         for k, v in computed.items():
             if k not in PRIMITIVE_KEYS:
