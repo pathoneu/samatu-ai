@@ -1,0 +1,390 @@
+{
+  "rooms": [
+    {
+      "room_name": "Tambūras",
+      "room_nr": "101",
+      "adjacent_rooms": [
+        {
+          "to_room": "Svetainė/virtuvė",
+          "to_room_nr": "102",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Darbo kambarys",
+          "to_room_nr": "104",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Entry vestibule with exterior entrance door on the north; borders living room on west, corridor on south, and study on east",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Svetainė/virtuvė",
+      "room_nr": "102",
+      "adjacent_rooms": [
+        {
+          "to_room": "Tambūras",
+          "to_room_nr": "101",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 3,
+      "confidence": "high",
+      "evidence": "Large living/kitchen room in western part of plan; north, west and south walls face outside",
+      "n_partition_walls": 2
+    },
+    {
+      "room_name": "Koridorius",
+      "room_nr": "103",
+      "adjacent_rooms": [
+        {
+          "to_room": "Tambūras",
+          "to_room_nr": "101",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė/virtuvė",
+          "to_room_nr": "102",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Darbo kambarys",
+          "to_room_nr": "104",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Skalbykla",
+          "to_room_nr": "106",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vaikų san.mazgas",
+          "to_room_nr": "107",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "108",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "109",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "110",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tėvų vonia",
+          "to_room_nr": "111",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "high",
+      "evidence": "Central distribution corridor running north-south; connects all rooms along east side and southern parents' suite",
+      "n_partition_walls": 9
+    },
+    {
+      "room_name": "Darbo kambarys",
+      "room_nr": "104",
+      "adjacent_rooms": [
+        {
+          "to_room": "Tambūras",
+          "to_room_nr": "101",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Skalbykla",
+          "to_room_nr": "106",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Study in north area; north wall exterior, west borders tambūras, south borders corridor, east borders laundry; also has exterior wall adjacent to garage (unheated)",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Garažas",
+      "room_nr": "105",
+      "adjacent_rooms": [],
+      "exterior_wall_count": 4,
+      "confidence": "medium",
+      "evidence": "Garage is treated as unheated space; though it shares walls with rooms 104/106, those are considered exterior walls per rules",
+      "n_partition_walls": 0
+    },
+    {
+      "room_name": "Skalbykla",
+      "room_nr": "106",
+      "adjacent_rooms": [
+        {
+          "to_room": "Darbo kambarys",
+          "to_room_nr": "104",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vaikų san.mazgas",
+          "to_room_nr": "107",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "high",
+      "evidence": "Laundry room next to garage (treated as exterior); borders study north, corridor west, kids' WC south",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Vaikų san.mazgas",
+      "room_nr": "107",
+      "adjacent_rooms": [
+        {
+          "to_room": "Skalbykla",
+          "to_room_nr": "106",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "108",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "high",
+      "evidence": "Kids' bathroom between laundry and boy's room, east wall is exterior",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Berniuko kambarys",
+      "room_nr": "108",
+      "adjacent_rooms": [
+        {
+          "to_room": "Vaikų san.mazgas",
+          "to_room_nr": "107",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "109",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Boy's bedroom; north borders kids' WC, west corridor, south second boy's room; east and part of south face outside",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Berniuko kambarys",
+      "room_nr": "109",
+      "adjacent_rooms": [
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "108",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "110",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Second boy's bedroom; north borders 108, west corridor, south borders parents' bedroom; east and partial south face outside",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Miegamasis",
+      "room_nr": "110",
+      "adjacent_rooms": [
+        {
+          "to_room": "Berniuko kambarys",
+          "to_room_nr": "109",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tėvų vonia",
+          "to_room_nr": "111",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Parents' bedroom at southern end; north borders boy's room, west borders corridor and parents' bathroom; east and south face outside",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Tėvų vonia",
+      "room_nr": "111",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "103",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "110",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Parents' bathroom in southwest annex; north and west walls exterior, east borders bedroom, north borders corridor end",
+      "n_partition_walls": 2
+    }
+  ],
+  "_meta": {
+    "cache": "hit",
+    "key": "1e5b4d428c458f52a1be5efa46f3b52ebffc240de3916317669ebc03015aedd4",
+    "model": "claude-opus-4-7"
+  }
+}

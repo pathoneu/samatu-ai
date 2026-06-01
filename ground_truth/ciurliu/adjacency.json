@@ -1,0 +1,213 @@
+{
+  "rooms": [
+    {
+      "room_name": "Miegamasis",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Vonia prie miegamojo",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė-virtuvė",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Bedroom with LOVA 180x200 in NW corner; west and north walls exterior; east borders bathroom, south borders living area",
+      "n_partition_walls": 2
+    },
+    {
+      "room_name": "Vonia prie miegamojo",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys (šiaurės rytų)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė-virtuvė",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Bathroom adjacent to bedroom labeled 'Atskiras brėžinys vonia prie miegamojo'; north wall exterior; separates bedroom from NE room",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambarys (šiaurės rytų)",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Vonia prie miegamojo",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys (pietryčių)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė-virtuvė",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Room with SOFA 210x800 in NE corner; north and east walls exterior; west borders bathroom and living area, south borders another room",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambarys (pietryčių)",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys (šiaurės rytų)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vonia prie lauko durų",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė-virtuvė",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "high",
+      "evidence": "Room with SOFA 200x800 on east side; east wall exterior; north borders NE room, south borders bathroom, west borders living area",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Vonia prie lauko durų",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys (pietryčių)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė-virtuvė",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Bathroom labeled 'Atskiras brėžinys vonia prie lauko durų' in SE corner; east and south walls exterior",
+      "n_partition_walls": 2
+    },
+    {
+      "room_name": "Svetainė-virtuvė",
+      "room_nr": null,
+      "adjacent_rooms": [
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vonia prie miegamojo",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys (šiaurės rytų)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys (pietryčių)",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vonia prie lauko durų",
+          "to_room_nr": null,
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Central open-plan living/dining/kitchen space with sofa, table, and kitchen units; west and south walls exterior; connects to all other rooms",
+      "n_partition_walls": 5
+    }
+  ],
+  "_meta": {
+    "cache": "hit",
+    "key": "72fcac0ecc7ba1247b8f53d78c794358d03b0aa3c916495e91e256e800f041ce",
+    "model": "claude-opus-4-7"
+  }
+}

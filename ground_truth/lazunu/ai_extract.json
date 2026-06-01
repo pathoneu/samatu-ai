@@ -1613,5 +1613,24 @@
     "error": null
   },
   "_elapsed_s": 94.7,
-  "status": "ok"
+  "status": "ok",
+  "_adjacency_applied": {
+    "page_used": 1,
+    "summary": {
+      "n_rooms_matched": 0,
+      "n_partition_walls_total": 0,
+      "n_windows_flagged_exterior": 0,
+      "n_unmatched_rooms": 3,
+      "n_rooms_with_exterior_walls": 0,
+      "unmatched_names": [
+        "01:Miegamasis",
+        "02:Svetainė",
+        "03:Sandėliukas/Drabužinė"
+      ]
+    },
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0,
+    "ts": "2026-06-01T20:26:35"
+  }
 }

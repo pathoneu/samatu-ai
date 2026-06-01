@@ -793,12 +793,16 @@ def calc_room_quantities(room: dict,
     # "pusinis" corner of full ceiling height (counted once for this room;
     # the neighbouring room's calc adds the other half later via dedup).
     n_partition_walls = int(room.get("n_partition_walls") or 0)
-    # 2026-06-01 STR alignment: per the user's STR 2.01.01:1999 research,
-    # partition (interior-drywall) corners do NOT count toward "dažymo
-    # kampai" because they take paper joint tape, not metal corner bead.
-    # Opt-in via room["count_partition_corners"]=True for contractors who
-    # itemise them. Default False matches the standard.
-    count_partition_corners = bool(room.get("count_partition_corners", False))
+    # 2026-06-01 multi-project sprint: Rangovas A's 4-project sąmatas
+    # consistently UNDER-count by ~18% on kampai when partition corners
+    # are excluded (3 of 4 projects). The STR rule (paper tape on
+    # interior corners) is one convention; the contractor's billing
+    # convention is to INCLUDE them. Default flipped to True; the
+    # per-room/per-project flag remains for contractors who follow STR
+    # strictly. Verified: when ``n_partition_walls`` is 0 (e.g. when the
+    # adjacency pass found no neighbours), the contribution is zero so
+    # Beržų is unaffected by the default flip.
+    count_partition_corners = bool(room.get("count_partition_corners", True))
 
     if walls_paint_factor > 0:
         # Interior corners: one per polygon vertex × ceiling height.

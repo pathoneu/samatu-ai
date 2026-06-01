@@ -503,7 +503,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 800,
-          "aukstis_mm": 2400
+          "aukstis_mm": 2400,
+          "_exterior": true
         },
         {
           "tipas": "duris",
@@ -518,6 +519,13 @@
           "plotis_mm": 900,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 0.0,
+          "_source": "niche_locator",
+          "_confidence": "low"
         }
       ],
       "confidence": "high",
@@ -543,7 +551,7 @@
       "kampai_inner_m": 0.0,
       "kampai_opening_reveals_m": 0.0,
       "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 15.8,
+      "angokrasciu_gkp_m": 10.2,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 7.36,
       "pvc_grindys_m2": 0,
@@ -562,7 +570,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(11.40) × H(2.82) = 32.15 m² − 1 lang./2 dur. atimimai → dažymas 7.36 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 2,
+      "_exterior_wall_count": 2,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "02",
@@ -607,26 +618,24 @@
           "kiekis": 3,
           "plotis_mm": 2240,
           "aukstis_mm": 2800,
-          "panoraminis": true
+          "panoraminis": true,
+          "_exterior": true
         },
         {
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 3000,
           "aukstis_mm": 2800,
-          "panoraminis": true
+          "panoraminis": true,
+          "_exterior": true
         },
         {
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2460,
           "aukstis_mm": 2800,
-          "panoraminis": true
-        },
-        {
-          "tipas": "nisa_LED",
-          "kiekis": 1,
-          "ilgis_m": 12.0
+          "panoraminis": true,
+          "_exterior": true
         },
         {
           "tipas": "pasleptos_duris",
@@ -641,6 +650,20 @@
           "plotis_mm": 3000,
           "aukstis_mm": 2200,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 6.91,
+          "_source": "niche_locator",
+          "_confidence": "high"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 2,
+          "ilgis_m": 2.9,
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -663,12 +686,12 @@
       "dazymo_plotas_m2": 114.51,
       "gkp_lubu_standart_m2": 62.42,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 75.78,
-      "kampu_metrai": 75.78,
+      "kampai_m": 87.06,
+      "kampu_metrai": 87.06,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 31.0,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 52.58,
+      "kampai_pusiniai_m": 11.28,
+      "angokrasciu_gkp_m": 12.4,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
       "pvc_grindys_m2": 62.42,
@@ -683,11 +706,14 @@
       "_paint_class": 2,
       "gruntas_l": 16.36,
       "lubu_karnizo_m": 35.18,
-      "nisu_metrai": 12.0,
+      "nisu_metrai": 9.81,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(33.50) × H(2.82) = 94.47 m² − 5 lang./2 dur. atimimai → dažymas 114.51 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 4,
+      "_exterior_wall_count": 2,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "03",
@@ -775,6 +801,13 @@
           "plotis_mm": 900,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.0,
+          "_source": "niche_locator",
+          "_confidence": "medium"
         }
       ],
       "confidence": "high",
@@ -797,11 +830,11 @@
       "dazymo_plotas_m2": 64.69,
       "gkp_lubu_standart_m2": 15.25,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 68.28,
-      "kampu_metrai": 68.28,
+      "kampai_m": 96.48,
+      "kampu_metrai": 96.48,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 35.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 28.2,
       "angokrasciu_gkp_m": 35.4,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
@@ -817,11 +850,14 @@
       "_paint_class": 2,
       "gruntas_l": 9.24,
       "lubu_karnizo_m": 23.1,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.0,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(22.00) × H(2.82) = 62.04 m² − 0 lang./7 dur. atimimai → dažymas 64.69 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 10,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "04",
@@ -865,7 +901,8 @@
           "tipas": "langas",
           "kiekis": 2,
           "plotis_mm": 1000,
-          "aukstis_mm": 1800
+          "aukstis_mm": 1800,
+          "_exterior": true
         },
         {
           "tipas": "pasleptos_duris",
@@ -893,12 +930,12 @@
       "dazymo_plotas_m2": 46.34,
       "gkp_lubu_standart_m2": 12.14,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 38.68,
-      "kampu_metrai": 38.68,
+      "kampai_m": 47.14,
+      "kampu_metrai": 47.14,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 13.4,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 14.2,
+      "kampai_pusiniai_m": 8.46,
+      "angokrasciu_gkp_m": 5.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
       "pvc_grindys_m2": 12.14,
@@ -917,7 +954,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(14.00) × H(2.82) = 39.48 m² − 2 lang./1 dur. atimimai → dažymas 46.34 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 2,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "05",
@@ -977,11 +1017,11 @@
       "dazymo_plotas_m2": 25.75,
       "gkp_lubu_standart_m2": 3.75,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 19.08,
-      "kampu_metrai": 19.08,
+      "kampai_m": 27.54,
+      "kampu_metrai": 27.54,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 8.46,
       "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
@@ -1001,7 +1041,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(7.80) × H(2.82) = 22.00 m² − 0 lang./0 dur. atimimai → dažymas 25.75 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "06",
@@ -1045,7 +1088,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 2380,
-          "aukstis_mm": 2100
+          "aukstis_mm": 2100,
+          "_exterior": true
         },
         {
           "tipas": "pasleptos_duris",
@@ -1053,6 +1097,13 @@
           "plotis_mm": 800,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.485,
+          "_source": "niche_locator",
+          "_confidence": "medium"
         }
       ],
       "confidence": "high",
@@ -1075,12 +1126,12 @@
       "dazymo_plotas_m2": 51.38,
       "gkp_lubu_standart_m2": 14.63,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 35.88,
-      "kampu_metrai": 35.88,
+      "kampai_m": 44.34,
+      "kampu_metrai": 44.34,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 9.2,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 11.58,
+      "kampai_pusiniai_m": 8.46,
+      "angokrasciu_gkp_m": 5.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
       "pvc_grindys_m2": 14.63,
@@ -1095,11 +1146,14 @@
       "_paint_class": 2,
       "gruntas_l": 7.34,
       "lubu_karnizo_m": 16.17,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 1.49,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(15.40) × H(2.82) = 43.43 m² − 1 lang./1 dur. atimimai → dažymas 51.38 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 2,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "07",
@@ -1159,11 +1213,11 @@
       "dazymo_plotas_m2": 26.1,
       "gkp_lubu_standart_m2": 3.82,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 19.18,
-      "kampu_metrai": 19.18,
+      "kampai_m": 27.64,
+      "kampu_metrai": 27.64,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 8.46,
       "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
@@ -1183,7 +1237,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(7.90) × H(2.82) = 22.28 m² − 0 lang./0 dur. atimimai → dažymas 26.10 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 1,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "08",
@@ -1227,7 +1284,15 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 600,
-          "aukstis_mm": 2100
+          "aukstis_mm": 2100,
+          "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.16,
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -1250,12 +1315,12 @@
       "dazymo_plotas_m2": 6.83,
       "gkp_lubu_standart_m2": 6.83,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 26.68,
-      "kampu_metrai": 26.68,
+      "kampai_m": 35.14,
+      "kampu_metrai": 35.14,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 4.2,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 4.8,
+      "kampai_pusiniai_m": 8.46,
+      "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 31.36,
       "plyteles_grindys_m2": 6.83,
       "pvc_grindys_m2": 0,
@@ -1270,11 +1335,14 @@
       "_paint_class": 2,
       "gruntas_l": 0.98,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.16,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(11.20) × H(2.82) = 31.58 m² − 1 lang./0 dur. atimimai → dažymas 6.83 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 1,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "09",
@@ -1318,7 +1386,8 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 3370,
-          "aukstis_mm": 2100
+          "aukstis_mm": 2100,
+          "_exterior": true
         },
         {
           "tipas": "pasleptos_duris",
@@ -1333,6 +1402,20 @@
           "plotis_mm": 800,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.5,
+          "_source": "niche_locator",
+          "_confidence": "high"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 2,
+          "ilgis_m": 1.415,
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -1355,12 +1438,12 @@
       "dazymo_plotas_m2": 48.13,
       "gkp_lubu_standart_m2": 14.58,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 41.08,
-      "kampu_metrai": 41.08,
+      "kampai_m": 55.18,
+      "kampu_metrai": 55.18,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 14.2,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 17.57,
+      "kampai_pusiniai_m": 14.1,
+      "angokrasciu_gkp_m": 10.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
       "pvc_grindys_m2": 14.58,
@@ -1375,11 +1458,14 @@
       "_paint_class": 2,
       "gruntas_l": 6.88,
       "lubu_karnizo_m": 16.38,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.92,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(15.60) × H(2.82) = 43.99 m² − 1 lang./2 dur. atimimai → dažymas 48.13 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 5,
+      "_exterior_wall_count": 1,
+      "_adjacency_confidence": "medium"
     },
     {
       "nr": "10",
@@ -1423,7 +1509,15 @@
           "tipas": "langas",
           "kiekis": 1,
           "plotis_mm": 1500,
-          "aukstis_mm": 2100
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.5,
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -1446,11 +1540,11 @@
       "dazymo_plotas_m2": 14.04,
       "gkp_lubu_standart_m2": 14.04,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 31.68,
-      "kampu_metrai": 31.68,
+      "kampai_m": 45.78,
+      "kampu_metrai": 45.78,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 4.2,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 14.1,
       "angokrasciu_gkp_m": 5.7,
       "plyteles_sienos_m2": 45.36,
       "plyteles_grindys_m2": 14.04,
@@ -1466,11 +1560,14 @@
       "_paint_class": 2,
       "gruntas_l": 2.01,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 1.5,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(16.20) × H(2.82) = 45.68 m² − 1 lang./0 dur. atimimai → dažymas 14.04 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 5,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "low"
     },
     {
       "nr": "11",
@@ -1530,11 +1627,11 @@
       "dazymo_plotas_m2": 33.37,
       "gkp_lubu_standart_m2": 5.73,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 21.08,
-      "kampu_metrai": 21.08,
+      "kampai_m": 29.54,
+      "kampu_metrai": 29.54,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 8.46,
       "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
@@ -1554,7 +1651,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(9.80) × H(2.82) = 27.64 m² − 0 lang./0 dur. atimimai → dažymas 33.37 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "low"
     },
     {
       "nr": "12",
@@ -1593,7 +1693,15 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.8,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 0.0,
+          "_source": "niche_locator",
+          "_confidence": "low"
+        }
+      ],
       "confidence": "high",
       "pastabos": "",
       "eksplikacija_row_bbox": [
@@ -1614,11 +1722,11 @@
       "dazymo_plotas_m2": 3.03,
       "gkp_lubu_standart_m2": 2.89,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 18.28,
-      "kampu_metrai": 18.28,
+      "kampai_m": 29.56,
+      "kampu_metrai": 29.56,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 11.28,
       "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 19.6,
       "plyteles_grindys_m2": 2.89,
@@ -1638,7 +1746,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(7.00) × H(2.82) = 19.74 m² − 0 lang./0 dur. atimimai → dažymas 3.03 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 4,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "low"
     },
     {
       "nr": "13",
@@ -1684,6 +1795,13 @@
           "plotis_mm": 900,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 0.0,
+          "_source": "niche_locator",
+          "_confidence": "low"
         }
       ],
       "confidence": "high",
@@ -1706,11 +1824,11 @@
       "dazymo_plotas_m2": 9.49,
       "gkp_lubu_standart_m2": 9.49,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 28.68,
-      "kampu_metrai": 28.68,
+      "kampai_m": 42.78,
+      "kampu_metrai": 42.78,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 5.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 14.1,
       "angokrasciu_gkp_m": 5.1,
       "plyteles_sienos_m2": 34.72,
       "plyteles_grindys_m2": 0,
@@ -1730,7 +1848,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(12.40) × H(2.82) = 34.97 m² − 0 lang./1 dur. atimimai → dažymas 9.49 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 5,
+      "_exterior_wall_count": 1,
+      "_adjacency_confidence": "low"
     },
     {
       "nr": "14",
@@ -1790,11 +1911,11 @@
       "dazymo_plotas_m2": 38.09,
       "gkp_lubu_standart_m2": 7.07,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 22.28,
-      "kampu_metrai": 22.28,
+      "kampai_m": 30.74,
+      "kampu_metrai": 30.74,
       "kampai_inner_m": 11.28,
       "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
+      "kampai_pusiniai_m": 8.46,
       "angokrasciu_gkp_m": 0.0,
       "plyteles_sienos_m2": 0,
       "plyteles_grindys_m2": 0,
@@ -1814,7 +1935,10 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(11.00) × H(2.82) = 31.02 m² − 0 lang./0 dur. atimimai → dažymas 38.09 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 0,
+      "_adjacency_confidence": "low"
     },
     {
       "nr": "15",
@@ -1860,6 +1984,13 @@
           "plotis_mm": 2500,
           "aukstis_mm": 2200,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 5.0,
+          "_source": "niche_locator",
+          "_confidence": "medium"
         }
       ],
       "confidence": "high",
@@ -1902,11 +2033,14 @@
       "_paint_class": 2,
       "gruntas_l": 6.29,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 5.0,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(27.00) × H(2.82) = 76.14 m² − 0 lang./1 dur. atimimai → dažymas 44.00 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "eksplikacija"
+      "plotas_source": "eksplikacija",
+      "n_partition_walls": 3,
+      "_exterior_wall_count": 3,
+      "_adjacency_confidence": "medium"
     }
   ],
   "durys_total": [
@@ -3071,10 +3205,10 @@
   "santrauka": {
     "dazymo_plotas_total_m2": 533.11,
     "dazymo_excl_garazas_total_m2": 489.11,
-    "kampai_m_total": 446.64,
-    "angokrasciu_gkp_m_total": 169.63,
+    "kampai_m_total": 598.92,
+    "angokrasciu_gkp_m_total": 95.7,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 12.0,
+    "nisu_metrai_total": 24.88,
     "gkp_lubu_m2_total": 180.0,
     "gkp_lubu_virs_3m_m2_total": 0.0,
     "pvc_grindys_m2_total": 148.88,
@@ -5855,5 +5989,30 @@
     "error": null
   },
   "_elapsed_s": 468.3,
-  "status": "ok"
+  "status": "ok",
+  "_adjacency_applied": {
+    "page_used": 1,
+    "summary": {
+      "n_rooms_matched": 15,
+      "n_partition_walls_total": 59,
+      "n_windows_flagged_exterior": 0,
+      "n_unmatched_rooms": 0,
+      "n_rooms_with_exterior_walls": 9,
+      "unmatched_names": []
+    },
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0,
+    "ts": "2026-06-01T20:26:29"
+  },
+  "_ceiling_pass": {
+    "pages_scanned": [
+      5
+    ],
+    "n_niches_added": 12,
+    "input_tokens": 5025,
+    "output_tokens": 1391,
+    "cost_usd": 0.1797,
+    "ts": "2026-06-01T20:30:19"
+  }
 }
