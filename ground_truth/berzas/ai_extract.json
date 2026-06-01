@@ -326,7 +326,9 @@
       "kampai_inner_m": 13.6,
       "kampai_opening_reveals_m": 22.6,
       "kampai_pusiniai_m": 6.8,
-      "angokrasciu_gkp_m": 12.05
+      "angokrasciu_gkp_m": 12.05,
+      "_plyteles_sienos_m2_source": "wall_elevation_mm",
+      "_tile_area_from_elevation_m2": 0.0
     },
     {
       "nr": "103",
@@ -643,7 +645,10 @@
       "kampai_inner_m": 11.2,
       "kampai_opening_reveals_m": 0.0,
       "kampai_pusiniai_m": 8.4,
-      "angokrasciu_gkp_m": 0.0
+      "angokrasciu_gkp_m": 0.0,
+      "_plyteles_sienos_m2_source": "wall_elevation_mm",
+      "_tile_area_from_elevation_m2": 0.0,
+      "_plyteles_sienos_m2_prior": 20.58
     },
     {
       "nr": "107",
@@ -957,7 +962,9 @@
       "kampai_inner_m": 11.2,
       "kampai_opening_reveals_m": 18.4,
       "kampai_pusiniai_m": 8.4,
-      "angokrasciu_gkp_m": 11.4
+      "angokrasciu_gkp_m": 11.4,
+      "_plyteles_sienos_m2_source": "wall_elevation_mm",
+      "_tile_area_from_elevation_m2": 0.0
     },
     {
       "nr": "111",
@@ -1005,9 +1012,9 @@
       "dazymo_plotas_m2": 7.45,
       "gkp_lubu_standart_m2": 7.45,
       "gkp_lubu_virs_3m_m2": 0,
-      "kampai_m": 0.0,
-      "kampu_metrai": 0.0,
-      "plyteles_sienos_m2": 31.92,
+      "kampai_m": 33.0,
+      "kampu_metrai": 33.0,
+      "plyteles_sienos_m2": 52.37,
       "plyteles_grindys_m2": 7.45,
       "pvc_grindys_m2": 0,
       "isliginamasis_m2": 7.45,
@@ -1029,10 +1036,13 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "high",
-      "kampai_inner_m": 0.0,
-      "kampai_opening_reveals_m": 0.0,
-      "kampai_pusiniai_m": 0.0,
-      "angokrasciu_gkp_m": 0.0
+      "kampai_inner_m": 11.2,
+      "kampai_opening_reveals_m": 4.2,
+      "kampai_pusiniai_m": 5.6,
+      "angokrasciu_gkp_m": 0.0,
+      "_plyteles_sienos_m2_source": "wall_elevation_mm",
+      "_tile_area_from_elevation_m2": 52.37,
+      "_plyteles_sienos_m2_prior": 31.92
     }
   ],
   "durys_total": [
@@ -1233,9 +1243,9 @@
     "wall_elevation_meta": {
       "pages_processed": 6,
       "pages_failed": 0,
-      "elapsed_s": 100.47,
-      "input_tokens_total": 36858,
-      "output_tokens_total": 4871,
+      "elapsed_s": 65.82,
+      "input_tokens_total": 42504,
+      "output_tokens_total": 4097,
       "cache_read_tokens_total": 0
     }
   },
@@ -2091,7 +2101,7 @@
   "santrauka": {
     "dazymo_plotas_total_m2": 584.75,
     "dazymo_excl_garazas_total_m2": 534.7,
-    "kampai_m_total": 437.7,
+    "kampai_m_total": 470.7,
     "angokrasciu_gkp_m_total": 78.05,
     "pasleptu_duru_staktu_m_total": 0.0,
     "nisu_metrai_total": 40.0,
@@ -2099,7 +2109,7 @@
     "gkp_lubu_virs_3m_m2_total": 50.54,
     "pvc_grindys_m2_total": 123.08,
     "plyteles_grindys_m2_total": 31.89,
-    "plyteles_sienos_m2_total": 84.72,
+    "plyteles_sienos_m2_total": 105.17,
     "isliginamasis_m2_total": 154.97,
     "grindjuosciu_m_total": 111.87,
     "hidroizoliacijos_vnt": 3
@@ -2109,6 +2119,18 @@
       "level": "WARN",
       "patalpa_nr": "102",
       "message": "Svetainė/virtuvė (nr=102): plotas 50.5 m² per didelis 'valgomasis' patalpai (STR norma 8–30 m²). Galimai atvira erdvė arba paskirtis blogai."
+    },
+    {
+      "level": "WARN",
+      "field": "plyteles_sienos_m2",
+      "patalpa_nr": "108",
+      "message": "Patalpa „Berniuko kambarys (Nr. 108) — wall_elevation duomenys praleisti, nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų `nr` lauką wall_elevation entry'jėje."
+    },
+    {
+      "level": "WARN",
+      "field": "plyteles_sienos_m2",
+      "patalpa_nr": "109",
+      "message": "Patalpa „Berniuko kambarys (Nr. 109) — wall_elevation duomenys praleisti, nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų `nr` lauką wall_elevation entry'jėje."
     },
     {
       "level": "WARN",
@@ -4481,39 +4503,53 @@
   },
   "_wall_elevations": [
     {
-      "room_name": null,
-      "wall_id": "a1-a6 (top)",
+      "nr": "102",
+      "room_name": "Svetainė/virtuvė",
+      "wall_id": "a6-a1",
       "wall_total_width_mm": null,
       "wall_total_height_mm": 3400,
       "tile_zones": [
         {
-          "from_floor_mm": 900,
-          "to_floor_mm": 2500,
-          "wall_segment_label": "Kronoceramiche plytelės venna 280x120"
+          "from_floor_mm": 800,
+          "to_floor_mm": 2300,
+          "wall_segment_label": "backsplash a5"
         }
       ],
-      "paint_zones": [],
-      "niches": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 3400
+        }
+      ],
+      "niches": [
+        {
+          "width_mm": 1180,
+          "height_mm": 2500,
+          "depth_mm": null,
+          "purpose": "lentynos/plytelės dekoras"
+        }
+      ],
       "furniture_zones": [
         {
-          "from_floor_mm": 100,
+          "from_floor_mm": 0,
           "to_floor_mm": 900,
-          "width_mm": 4380,
-          "label": "Virtuvės apatiniai stalčiai/spintelės"
+          "width_mm": 3215,
+          "label": "Virtuvės apatiniai stalčiai"
         },
         {
-          "from_floor_mm": 2500,
-          "to_floor_mm": 3400,
-          "width_mm": null,
-          "label": "Viršutinės spintelės (baltos plokštės)"
+          "from_floor_mm": 1500,
+          "to_floor_mm": 2800,
+          "width_mm": 2050,
+          "label": "Kabykla/lentynos"
         }
       ],
       "confidence": "low",
       "page": 11
     },
     {
-      "room_name": null,
-      "wall_id": "a6-a9 (bottom)",
+      "nr": "102",
+      "room_name": "Svetainė/virtuvė",
+      "wall_id": "a9-a6",
       "wall_total_width_mm": null,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
@@ -4528,91 +4564,31 @@
           "width_mm": 2700,
           "height_mm": 1350,
           "depth_mm": null,
-          "purpose": "TV niša / rėmai"
+          "purpose": "TV niša"
         }
       ],
       "furniture_zones": [
         {
           "from_floor_mm": 0,
-          "to_floor_mm": 300,
-          "width_mm": 2150,
-          "label": "TV baldas"
+          "to_floor_mm": 500,
+          "width_mm": 3390,
+          "label": "TV spintelė"
+        },
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "width_mm": 1000,
+          "label": "Mikrobangė/orkaitė kolona"
         }
       ],
       "confidence": "low",
       "page": 11
     },
     {
+      "nr": null,
       "room_name": null,
-      "wall_id": "b3",
-      "wall_total_width_mm": null,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "low",
-      "page": 12
-    },
-    {
-      "room_name": null,
-      "wall_id": "b2",
-      "wall_total_width_mm": null,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "low",
-      "page": 12
-    },
-    {
-      "room_name": null,
-      "wall_id": "b1",
-      "wall_total_width_mm": null,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "low",
-      "page": 12
-    },
-    {
-      "room_name": null,
-      "wall_id": "c1",
-      "wall_total_width_mm": null,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2700,
-          "width_mm": 2380,
-          "label": "Skalbimo/džiovinimo mašinos su lentynomis"
-        }
-      ],
-      "confidence": "low",
-      "page": 12
-    },
-    {
-      "room_name": null,
-      "wall_id": "c2",
-      "wall_total_width_mm": null,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "low",
-      "page": 12
-    },
-    {
-      "room_name": null,
-      "wall_id": "c3",
-      "wall_total_width_mm": null,
+      "wall_id": "b",
+      "wall_total_width_mm": 5290,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
       "paint_zones": [],
@@ -4621,35 +4597,56 @@
         {
           "from_floor_mm": 0,
           "to_floor_mm": 2800,
-          "width_mm": 1595,
-          "label": "Visa namų įranga"
+          "width_mm": 2390,
+          "label": "Spintelės/lentynos b3"
+        },
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "width_mm": 2245,
+          "label": "Spintelės b2"
         }
       ],
       "confidence": "low",
       "page": 12
     },
     {
-      "room_name": null,
-      "wall_id": "c4",
-      "wall_total_width_mm": null,
+      "nr": "106",
+      "room_name": "Skalbykla",
+      "wall_id": "c",
+      "wall_total_width_mm": 8775,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
       "paint_zones": [],
       "niches": [],
-      "furniture_zones": [],
+      "furniture_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "width_mm": 3080,
+          "label": "Skalbimo/džiovinimo zona c1"
+        },
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800,
+          "width_mm": 1595,
+          "label": "Spintelės c2-c3"
+        }
+      ],
       "confidence": "low",
       "page": 12
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "d1-d2",
-      "wall_total_width_mm": 5005,
+      "nr": "111",
+      "room_name": "Tėvų vonia",
+      "wall_id": "d1",
+      "wall_total_width_mm": 9485,
       "wall_total_height_mm": 2800,
       "tile_zones": [
         {
           "from_floor_mm": 0,
           "to_floor_mm": 2800,
-          "wall_segment_label": null
+          "wall_segment_label": "visa siena"
         }
       ],
       "paint_zones": [],
@@ -4657,79 +4654,32 @@
         {
           "width_mm": 1500,
           "height_mm": 700,
-          "depth_mm": 200,
-          "purpose": "dekoratyvinė niša"
+          "depth_mm": 150,
+          "purpose": "niša virš praustuvo"
+        },
+        {
+          "width_mm": 500,
+          "height_mm": 800,
+          "depth_mm": null,
+          "purpose": "niša"
         }
       ],
       "furniture_zones": [
         {
-          "from_floor_mm": 800,
-          "to_floor_mm": 1850,
+          "from_floor_mm": 0,
+          "to_floor_mm": 800,
           "width_mm": 1050,
-          "label": "Spintelė su kriaukle"
+          "label": "Spintelė/praustuvas"
         }
       ],
       "confidence": "medium",
       "page": 13
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "d2-d3",
-      "wall_total_width_mm": 1540,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800,
-          "wall_segment_label": null
-        }
-      ],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "medium",
-      "page": 13
-    },
-    {
-      "room_name": "Vonia",
-      "wall_id": "d3-d4",
-      "wall_total_width_mm": 4280,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800,
-          "wall_segment_label": null
-        }
-      ],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "medium",
-      "page": 13
-    },
-    {
-      "room_name": "Vonia",
-      "wall_id": "d4-d1",
-      "wall_total_width_mm": 1540,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800,
-          "wall_segment_label": null
-        }
-      ],
-      "paint_zones": [],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "low",
-      "page": 13
-    },
-    {
+      "nr": null,
       "room_name": null,
-      "wall_id": "e4-e3",
-      "wall_total_width_mm": 4280,
+      "wall_id": "e1",
+      "wall_total_width_mm": 1505,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
       "paint_zones": [
@@ -4739,13 +4689,46 @@
         }
       ],
       "niches": [],
-      "furniture_zones": [],
+      "furniture_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 1850,
+          "width_mm": 1505,
+          "label": "Lentynos/spintelės"
+        }
+      ],
       "confidence": "medium",
       "page": 14
     },
     {
+      "nr": null,
       "room_name": null,
-      "wall_id": "e3-e2",
+      "wall_id": "e2",
+      "wall_total_width_mm": 2770,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800
+        }
+      ],
+      "niches": [],
+      "furniture_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2380,
+          "width_mm": 2400,
+          "label": "Kabykla/lentynos/stalčiai"
+        }
+      ],
+      "confidence": "medium",
+      "page": 14
+    },
+    {
+      "nr": null,
+      "room_name": null,
+      "wall_id": "e3",
       "wall_total_width_mm": 900,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
@@ -4761,85 +4744,9 @@
       "page": 14
     },
     {
+      "nr": null,
       "room_name": null,
-      "wall_id": "e2-e1",
-      "wall_total_width_mm": 3870,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800
-        }
-      ],
-      "niches": [],
-      "furniture_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2380,
-          "width_mm": 2400,
-          "label": "Spintelės/lentynos (pilkos plokštės RAL 7044 + mėlynos RAL 5024)"
-        },
-        {
-          "from_floor_mm": 750,
-          "to_floor_mm": 2600,
-          "width_mm": 1505,
-          "label": "Pakabinama spintelė (mėlyna RAL 5024)"
-        }
-      ],
-      "confidence": "medium",
-      "page": 14
-    },
-    {
-      "room_name": null,
-      "wall_id": "f1-f2",
-      "wall_total_width_mm": 3870,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800
-        }
-      ],
-      "niches": [],
-      "furniture_zones": [
-        {
-          "from_floor_mm": 750,
-          "to_floor_mm": 2600,
-          "width_mm": 1505,
-          "label": "Pakabinama spintelė (mėlyna RAL 5024)"
-        },
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2380,
-          "width_mm": 2400,
-          "label": "Spintelės/lentynos (mėlyna RAL 5024 + pilka RAL 7044)"
-        }
-      ],
-      "confidence": "medium",
-      "page": 14
-    },
-    {
-      "room_name": null,
-      "wall_id": "f2-f3",
-      "wall_total_width_mm": 900,
-      "wall_total_height_mm": 2800,
-      "tile_zones": [],
-      "paint_zones": [
-        {
-          "from_floor_mm": 0,
-          "to_floor_mm": 2800
-        }
-      ],
-      "niches": [],
-      "furniture_zones": [],
-      "confidence": "medium",
-      "page": 14
-    },
-    {
-      "room_name": null,
-      "wall_id": "f3-f4",
+      "wall_id": "e4",
       "wall_total_width_mm": 4280,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
@@ -4855,9 +4762,96 @@
       "page": 14
     },
     {
+      "nr": null,
       "room_name": null,
+      "wall_id": "f1",
+      "wall_total_width_mm": 1505,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800
+        }
+      ],
+      "niches": [],
+      "furniture_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 1850,
+          "width_mm": 1505,
+          "label": "Lentynos/spintelės"
+        }
+      ],
+      "confidence": "medium",
+      "page": 14
+    },
+    {
+      "nr": null,
+      "room_name": null,
+      "wall_id": "f2",
+      "wall_total_width_mm": 2770,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800
+        }
+      ],
+      "niches": [],
+      "furniture_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2380,
+          "width_mm": 2400,
+          "label": "Kabykla/lentynos/stalčiai"
+        }
+      ],
+      "confidence": "medium",
+      "page": 14
+    },
+    {
+      "nr": null,
+      "room_name": null,
+      "wall_id": "f3",
+      "wall_total_width_mm": 900,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800
+        }
+      ],
+      "niches": [],
+      "furniture_zones": [],
+      "confidence": "medium",
+      "page": 14
+    },
+    {
+      "nr": null,
+      "room_name": null,
+      "wall_id": "f4",
+      "wall_total_width_mm": 4280,
+      "wall_total_height_mm": 2800,
+      "tile_zones": [],
+      "paint_zones": [
+        {
+          "from_floor_mm": 0,
+          "to_floor_mm": 2800
+        }
+      ],
+      "niches": [],
+      "furniture_zones": [],
+      "confidence": "medium",
+      "page": 14
+    },
+    {
+      "nr": "110",
+      "room_name": "Miegamasis",
       "wall_id": "g1-g4",
-      "wall_total_width_mm": null,
+      "wall_total_width_mm": 11180,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
       "paint_zones": [
@@ -4879,9 +4873,10 @@
       "page": 15
     },
     {
-      "room_name": null,
+      "nr": "110",
+      "room_name": "Miegamasis",
       "wall_id": "g4-g7",
-      "wall_total_width_mm": null,
+      "wall_total_width_mm": 7720,
       "wall_total_height_mm": 2800,
       "tile_zones": [],
       "paint_zones": [
@@ -4896,8 +4891,9 @@
       "page": 15
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "h1-h2",
+      "nr": "111",
+      "room_name": "Tėvų vonia",
+      "wall_id": "h1",
       "wall_total_width_mm": 2720,
       "wall_total_height_mm": 2800,
       "tile_zones": [
@@ -4911,13 +4907,13 @@
       "niches": [
         {
           "width_mm": 150,
-          "height_mm": 900,
+          "height_mm": 2800,
           "depth_mm": null,
           "purpose": "kairys šonas nišos"
         },
         {
           "width_mm": 150,
-          "height_mm": 900,
+          "height_mm": 2800,
           "depth_mm": null,
           "purpose": "dešinys šonas nišos"
         }
@@ -4926,17 +4922,18 @@
         {
           "from_floor_mm": 0,
           "to_floor_mm": 2800,
-          "width_mm": 1080,
-          "label": "WC / dušo pertvara"
+          "width_mm": 1640,
+          "label": "WC / dušo stiklas"
         }
       ],
       "confidence": "medium",
       "page": 16
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "h2-h3",
-      "wall_total_width_mm": 2000,
+      "nr": "111",
+      "room_name": "Tėvų vonia",
+      "wall_id": "h2",
+      "wall_total_width_mm": 1800,
       "wall_total_height_mm": 2800,
       "tile_zones": [
         {
@@ -4952,8 +4949,9 @@
       "page": 16
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "h3-h4",
+      "nr": "111",
+      "room_name": "Tėvų vonia",
+      "wall_id": "h3",
       "wall_total_width_mm": 2700,
       "wall_total_height_mm": 2800,
       "tile_zones": [
@@ -4969,13 +4967,13 @@
           "width_mm": 2620,
           "height_mm": 700,
           "depth_mm": null,
-          "purpose": "veidrodis / kriauklės zona"
+          "purpose": "Kronosceramiche plytelės Vena lux 280x120 (virš kriauklės)"
         }
       ],
       "furniture_zones": [
         {
           "from_floor_mm": 0,
-          "to_floor_mm": 1200,
+          "to_floor_mm": 1050,
           "width_mm": 1000,
           "label": "kriauklės spintelė"
         }
@@ -4984,8 +4982,9 @@
       "page": 16
     },
     {
-      "room_name": "Vonia",
-      "wall_id": "h4-h1",
+      "nr": "111",
+      "room_name": "Tėvų vonia",
+      "wall_id": "h4",
       "wall_total_width_mm": 2000,
       "wall_total_height_mm": 2800,
       "tile_zones": [
@@ -4998,12 +4997,12 @@
       "paint_zones": [],
       "niches": [],
       "furniture_zones": [],
-      "confidence": "low",
+      "confidence": "medium",
       "page": 16
     }
   ],
   "_elevation_pass": {
-    "ts": "2026-06-01T20:59:07",
+    "ts": "2026-06-01T21:20:18",
     "pages": [
       11,
       12,
@@ -5012,9 +5011,33 @@
       15,
       16
     ],
-    "rooms_updated": 0,
+    "rooms_updated": 4,
     "input_tokens": 0,
     "output_tokens": 0,
     "cost_usd": 0.0
+  },
+  "_height_extractor": {
+    "ts": "2026-06-01T21:23:41",
+    "page": 2,
+    "payload": {
+      "ceiling_heights_m": [],
+      "primary_value_m": null,
+      "source_quote": "",
+      "confidence": "low",
+      "per_room": {},
+      "_meta": {
+        "cache": "miss",
+        "key": "9c1989f62cfe8d0a4b4f02a349bc73226ee9cad8ed9b1ddb644d3083849861fb",
+        "model": "claude-opus-4-7",
+        "input_tokens": 4357,
+        "output_tokens": 52
+      }
+    },
+    "summary": {
+      "n_rooms_updated": 0,
+      "from_to": [],
+      "skipped_implausible": []
+    },
+    "cost_usd": 0.0693
   }
 }

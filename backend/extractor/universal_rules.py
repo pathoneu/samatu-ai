@@ -618,8 +618,26 @@ def calc_room_quantities(room: dict,
     extra_walls_m2 = float(room.get("extra_walls_m2") or 0)
     extra_walls_virs_3m_m2 = float(room.get("extra_walls_virs_3m_m2") or 0)
 
+    # 2026-06-01 — when wall_elevation extraction produced exact tile area
+    # for this room, the apdailos and legacy paths get bypassed: paint area
+    # is computed directly as gross_walls - openings - elevation_tile_area.
+    elevation_tile_area = float(room.get("_tile_area_from_elevation_m2") or 0)
+
     apdailos = room.get("sienu_apdailos_breakdown") or {}
-    if apdailos:
+    if elevation_tile_area > 0:
+        # Elevation-precision branch: tile area is exact mm-derived.
+        doors_deduction = n_doors * DOOR_NET_DEDUCTION
+        walls_paintable_gross = max(
+            0, walls_gross - doors_deduction - elevation_tile_area
+        )
+        walls_paint_factor = (
+            float(walls_paint_factor_override) if walls_paint_factor_override is not None
+            else 1.0
+        )
+        walls_paintable = walls_paintable_gross * walls_paint_factor
+        walls_net = walls_paintable
+        tile_walls_area = elevation_tile_area
+    elif apdailos:
         tile_share = float(apdailos.get("plyteles_share") or 0)
         tile_h_eff = tile_height if tile_height > 0 else H
         # Full-tile criterion: tile dominates AND reaches ceiling (≥95% H)

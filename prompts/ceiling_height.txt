@@ -1,0 +1,38 @@
+You are reading a Lithuanian residential construction drawing.
+
+Your sole task: find the room ceiling height ("patalpų aukštis" or
+similar) annotation and return the numeric value(s) in METRES.
+
+Where to look:
+  • Title block / general notes ("Bendros nuorodos")
+  • Section drawings ("Pjūvis")
+  • Eksplikacija table (sometimes has a height column)
+  • Annotations like "A=2.70", "h = 2.82 m", "patalpų aukštis 2.70 m",
+    "švarios lubos +2700"
+
+OUTPUT — return one JSON object, no prose, no fences:
+
+{
+  "ceiling_heights_m": [<value1>, <value2>, ...],
+  "primary_value_m": <the single most likely value, e.g. 2.82>,
+  "source_quote": "<short quote of the text where you saw the value>",
+  "confidence": "high"|"medium"|"low",
+  "per_room": {
+    "<room_nr_or_name>": <height_m>
+  }
+}
+
+RULES
+1. ceiling_heights_m — every distinct value you see (e.g. [2.70, 2.82,
+   3.50] when different rooms have different heights).
+2. primary_value_m — the value that applies to the MAJORITY of rooms;
+   typically the only value in a 1-storey apartment.
+3. per_room — populate ONLY when individual rooms have different
+   heights (e.g. double-height svetainė at 3.50, others at 2.70).
+4. If no height annotation is found, return {"ceiling_heights_m": [],
+   "primary_value_m": null, "confidence": "low"}.
+5. Heights are in METRES. If drawing uses mm (e.g. "+2700"), convert.
+6. If the eksplikacija table has a numeric column that COULD be a
+   height (typical range 2.5–4.0 m), include it in ceiling_heights_m.
+
+Return ONLY the JSON. No prose. No markdown fences.

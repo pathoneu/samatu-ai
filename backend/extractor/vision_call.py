@@ -368,6 +368,11 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
         prior = r.get("plyteles_sienos_m2")
         r["plyteles_sienos_m2"] = round(total_tile_m2, 2)
         r["_plyteles_sienos_m2_source"] = "wall_elevation_mm"
+        # 2026-06-01: also expose as `_tile_area_from_elevation_m2` so
+        # universal_rules.py can compute walls_paintable = walls_gross
+        # - openings - tile_area without going through walls_paint_factor.
+        # This is the bridge that lets paint-above-tile work per-room.
+        r["_tile_area_from_elevation_m2"] = round(total_tile_m2, 2)
         if prior is not None and prior != r["plyteles_sienos_m2"]:
             r["_plyteles_sienos_m2_prior"] = round(prior, 2)
         updated += 1
@@ -712,6 +717,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "count_partition_corners",
             # 2026-06-01 paint-above-tile systemic fix
             "_bathroom_paint_above_tile_m",
+            "_tile_area_from_elevation_m2",
+            "_plyteles_sienos_m2_source",
         }
         for k, v in computed.items():
             if k not in PRIMITIVE_KEYS:

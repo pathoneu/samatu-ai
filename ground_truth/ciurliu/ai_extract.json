@@ -3257,5 +3257,27 @@
       "3:Vonia prie miegamojo",
       "7:Vonia prie lauko durų"
     ]
+  },
+  "_height_extractor": {
+    "ts": "2026-06-01T21:23:50",
+    "page": 1,
+    "payload": {
+      "ceiling_heights_m": [],
+      "primary_value_m": null,
+      "source_quote": "",
+      "confidence": "low",
+      "per_room": {},
+      "_meta": {
+        "cache": "hit",
+        "key": "2e7125ba5a20aaa5cc546a701b81a8fcaf97f1503caf9b5b2847fab92c66a6d9",
+        "model": "claude-opus-4-7"
+      }
+    },
+    "summary": {
+      "n_rooms_updated": 0,
+      "from_to": [],
+      "skipped_implausible": []
+    },
+    "cost_usd": 0.0
   }
 }

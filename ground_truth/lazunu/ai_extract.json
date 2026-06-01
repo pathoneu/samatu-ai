@@ -1674,5 +1674,31 @@
         "reason": "within isoperimetric bounds"
       }
     ]
+  },
+  "_height_extractor": {
+    "ts": "2026-06-01T21:24:02",
+    "page": 1,
+    "payload": {
+      "ceiling_heights_m": [
+        2.82
+      ],
+      "primary_value_m": 2.82,
+      "source_quote": "H - 2820",
+      "confidence": "high",
+      "per_room": {},
+      "_meta": {
+        "cache": "miss",
+        "key": "bb2bfbf6b93ae881bce0af5e29778b7815f6d1a752c3a67baa52834389ddc669",
+        "model": "claude-opus-4-7",
+        "input_tokens": 4357,
+        "output_tokens": 60
+      }
+    },
+    "summary": {
+      "n_rooms_updated": 0,
+      "from_to": [],
+      "skipped_implausible": []
+    },
+    "cost_usd": 0.0699
   }
 }

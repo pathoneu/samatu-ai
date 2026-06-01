@@ -73,8 +73,15 @@ def process_project(slug: str, dry_run: bool = False) -> dict:
     from extractor.vision_call import _apply_wall_elevation_tile_override
 
     client = anthropic.Anthropic()
+    # Pass canonical room list so the prompt can match elevations to rooms
+    room_list = [
+        {"nr": r.get("nr"), "pavadinimas": r.get("pavadinimas"),
+         "paskirtis": r.get("paskirtis")}
+        for r in (ai.get("patalpos") or [])
+    ]
     t0 = time.time()
-    we_result = extract_wall_elevations(pdf_bytes, client, we_pages)
+    we_result = extract_wall_elevations(pdf_bytes, client, we_pages,
+                                         room_list=room_list)
     dt = time.time() - t0
 
     meta = we_result.get("_meta") or {}

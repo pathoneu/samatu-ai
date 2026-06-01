@@ -15,7 +15,7 @@ from extractor.wall_elevation import (
 def test_module_exports_callable_with_correct_signature():
     sig = inspect.signature(extract_wall_elevations)
     params = list(sig.parameters.keys())
-    assert params == ["pdf_bytes", "client", "wall_elevation_pages"]
+    assert params == ["pdf_bytes", "client", "wall_elevation_pages", "room_list"]
 
 
 def test_schema_requires_zones_arrays():
