@@ -44,6 +44,11 @@
       "source": "pasiūlymas item 15"
     },
     "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 493.03,
+      "confidence": "green",
+      "source": "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Beržų convention"
+    },
+    "dazymo_iki_3m_m2": {
       "value": 424.75,
       "confidence": "green",
       "source": "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"

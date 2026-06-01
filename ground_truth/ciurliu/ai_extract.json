@@ -1,0 +1,3111 @@
+{
+  "archetipas": "standart",
+  "bendras_plotas_m2": 95.5,
+  "scale_source_page": 1,
+  "eksplikacija_source_page": null,
+  "puslapiai": [
+    {
+      "nr": 1,
+      "tipas": "floor_plan",
+      "pavadinimas": "P042_1 Baldų planas",
+      "confidence": "high",
+      "pastabos": "Baldų išdėstymo planas M 1:50, be eksplikacijos lentelės"
+    },
+    {
+      "nr": 2,
+      "tipas": "electrical",
+      "pavadinimas": "P042_2 Elektros planas",
+      "confidence": "high",
+      "pastabos": "Elektros taškų išdėstymo schema"
+    },
+    {
+      "nr": 3,
+      "tipas": "ceiling_plan",
+      "pavadinimas": "P042_3 Apšvietimo planas",
+      "confidence": "high",
+      "pastabos": "Apšvietimo ir jungiklių taškų išdėstymo schema, LED juostos žymimos raudonai"
+    }
+  ],
+  "patalpos": [
+    {
+      "nr": "1",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.22,
+        "w": 0.3,
+        "h": 0.25
+      },
+      "polygon_pct": [
+        [
+          0.18,
+          0.22
+        ],
+        [
+          0.48,
+          0.22
+        ],
+        [
+          0.48,
+          0.47
+        ],
+        [
+          0.18,
+          0.47
+        ]
+      ],
+      "plotas_m2": 16.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 16.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1800,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.0
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "Karnizo/nišos zona 20cm gylio prie lango sienos; LOVA 180x200",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 45.12,
+      "walls_paintable_m2": 39.06,
+      "ceiling_paintable_m2": 16.0,
+      "dazymo_plotas_m2": 55.06,
+      "gkp_lubu_standart_m2": 16.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 41.48,
+      "kampu_metrai": 41.48,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 14.2,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 14.8,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 16.0,
+      "isliginamasis_m2": 16.0,
+      "grindjuostes_m": 15.73,
+      "grindjuosciu_m": 15.73,
+      "doors_deducted_m2": 3.36,
+      "windows_deducted_m2": 2.7,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.83,
+      "dazai_l": 11.01,
+      "_paint_class": 2,
+      "gruntas_l": 7.87,
+      "lubu_karnizo_m": 16.8,
+      "nisu_metrai": 2.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(16.00) × H(2.82) = 45.12 m² − 1 lang./2 dur. atimimai → dažymas 55.06 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "2",
+      "pavadinimas": "Drabužinė / spinta zona prie miegamojo",
+      "paskirtis": "drabuzine",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.43,
+        "y": 0.25,
+        "w": 0.1,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.43,
+          0.25
+        ],
+        [
+          0.53,
+          0.25
+        ],
+        [
+          0.53,
+          0.45
+        ],
+        [
+          0.43,
+          0.45
+        ]
+      ],
+      "plotas_m2": 3.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 7.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "low",
+      "pastabos": "Spintos zona 1650x600 + 600x1980 - drabužinė prie miegamojo",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 19.74,
+      "walls_paintable_m2": 18.06,
+      "ceiling_paintable_m2": 3.0,
+      "dazymo_plotas_m2": 21.06,
+      "gkp_lubu_standart_m2": 3.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 23.28,
+      "kampu_metrai": 23.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 3.0,
+      "isliginamasis_m2": 3.0,
+      "grindjuostes_m": 6.77,
+      "grindjuosciu_m": 6.77,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 26.32,
+      "dazai_l": 4.21,
+      "_paint_class": 2,
+      "gruntas_l": 3.01,
+      "lubu_karnizo_m": 7.35,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(7.00) × H(2.82) = 19.74 m² − 0 lang./1 dur. atimimai → dažymas 21.06 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "3",
+      "pavadinimas": "Vonia prie miegamojo",
+      "paskirtis": "san",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.27,
+        "w": 0.1,
+        "h": 0.13
+      },
+      "polygon_pct": [
+        [
+          0.5,
+          0.27
+        ],
+        [
+          0.6,
+          0.27
+        ],
+        [
+          0.6,
+          0.4
+        ],
+        [
+          0.5,
+          0.4
+        ]
+      ],
+      "plotas_m2": 4.5,
+      "plotas_saltinis": "default_fallback",
+      "perimetras_m": 8.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.5,
+      "elementai": [],
+      "confidence": "low",
+      "pastabos": "Pažymėta 'Atskiras brėžinys vonia prie miegamojo' - detalūs matmenys nepateikti šiame plane",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 23.97,
+      "walls_paintable_m2": 2.72,
+      "ceiling_paintable_m2": 4.5,
+      "dazymo_plotas_m2": 7.22,
+      "gkp_lubu_standart_m2": 4.5,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 19.78,
+      "kampu_metrai": 19.78,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 0.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "plyteles_sienos_m2": 21.25,
+      "plyteles_grindys_m2": 4.5,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.5,
+      "grindjuostes_m": 0.0,
+      "grindjuosciu_m": 0.0,
+      "doors_deducted_m2": 0.0,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 16.07,
+      "glaistas_kg": 9.03,
+      "dazai_l": 1.44,
+      "_paint_class": 2,
+      "gruntas_l": 1.03,
+      "lubu_karnizo_m": 0.0,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(8.50) × H(2.82) = 23.97 m² − 0 lang./0 dur. atimimai → dažymas 7.22 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "4",
+      "pavadinimas": "Kambarys 1 (vaikų / svečių, prie sofos 210x80)",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.22,
+        "w": 0.28,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.22
+        ],
+        [
+          0.9,
+          0.22
+        ],
+        [
+          0.9,
+          0.42000000000000004
+        ],
+        [
+          0.62,
+          0.42000000000000004
+        ]
+      ],
+      "plotas_m2": 14.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "SOFA 210x80, STALAS 140x70; karnizas/niša 20cm gylio prie sienos",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 40.62,
+      "ceiling_paintable_m2": 14.0,
+      "dazymo_plotas_m2": 54.62,
+      "gkp_lubu_standart_m2": 14.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 31.28,
+      "kampu_metrai": 31.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 14.0,
+      "isliginamasis_m2": 14.0,
+      "grindjuostes_m": 15.57,
+      "grindjuosciu_m": 15.57,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.27,
+      "dazai_l": 10.92,
+      "_paint_class": 2,
+      "gruntas_l": 7.8,
+      "lubu_karnizo_m": 15.75,
+      "nisu_metrai": 2.5,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(15.00) × H(2.82) = 42.30 m² − 0 lang./1 dur. atimimai → dažymas 54.62 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "5",
+      "pavadinimas": "Kambarys 2 (prie sofos 200x80)",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.45,
+        "w": 0.28,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.45
+        ],
+        [
+          0.9,
+          0.45
+        ],
+        [
+          0.9,
+          0.65
+        ],
+        [
+          0.62,
+          0.65
+        ]
+      ],
+      "plotas_m2": 14.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "SOFA 200x80, STALAS 140x70; karnizas/niša 20cm gylio prie išorinės sienos",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 2.813,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 40.62,
+      "ceiling_paintable_m2": 14.0,
+      "dazymo_plotas_m2": 54.62,
+      "gkp_lubu_standart_m2": 14.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 31.28,
+      "kampu_metrai": 31.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 14.0,
+      "isliginamasis_m2": 14.0,
+      "grindjuostes_m": 15.57,
+      "grindjuosciu_m": 15.57,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.27,
+      "dazai_l": 10.92,
+      "_paint_class": 2,
+      "gruntas_l": 7.8,
+      "lubu_karnizo_m": 15.75,
+      "nisu_metrai": 2.5,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(15.00) × H(2.82) = 42.30 m² − 0 lang./1 dur. atimimai → dažymas 54.62 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "6",
+      "pavadinimas": "Svetainė / valgomasis / virtuvė",
+      "paskirtis": "gyvenamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.48,
+        "w": 0.45,
+        "h": 0.32
+      },
+      "polygon_pct": [
+        [
+          0.18,
+          0.48
+        ],
+        [
+          0.63,
+          0.48
+        ],
+        [
+          0.63,
+          0.8
+        ],
+        [
+          0.18,
+          0.8
+        ]
+      ],
+      "plotas_m2": 40.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 28.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 2,
+          "plotis_mm": 1800,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 5.0
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": true
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "Atvira erdvė: svetainė (SOFA 380x180, TV), valgomasis (STALAS D160 išskleidžiamas), virtuvė (Indaplovė 60cm, plautuvė, kargo, kaitlentė, šaldytuvas, orkaitė, gartraukis). Karnizai/nišos 20cm gylio prie dviejų išorinių sienų.",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 0.156,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 78.96,
+      "walls_paintable_m2": 71.67,
+      "ceiling_paintable_m2": 40.0,
+      "dazymo_plotas_m2": 111.67,
+      "gkp_lubu_standart_m2": 40.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 52.68,
+      "kampu_metrai": 52.68,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 13.4,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 14.7,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 40.0,
+      "isliginamasis_m2": 40.0,
+      "grindjuostes_m": 29.87,
+      "grindjuosciu_m": 29.87,
+      "doors_deducted_m2": 1.89,
+      "windows_deducted_m2": 5.4,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 139.59,
+      "dazai_l": 22.33,
+      "_paint_class": 2,
+      "gruntas_l": 15.95,
+      "lubu_karnizo_m": 29.4,
+      "nisu_metrai": 5.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(28.00) × H(2.82) = 78.96 m² − 2 lang./1 dur. atimimai → dažymas 111.67 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "7",
+      "pavadinimas": "Vonia prie lauko durų",
+      "paskirtis": "san",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.65,
+        "w": 0.18,
+        "h": 0.15
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.65
+        ],
+        [
+          0.8,
+          0.65
+        ],
+        [
+          0.8,
+          0.8
+        ],
+        [
+          0.62,
+          0.8
+        ]
+      ],
+      "plotas_m2": 4.0,
+      "plotas_saltinis": "default_fallback",
+      "perimetras_m": 8.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.5,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "low",
+      "pastabos": "Pažymėta 'Atskiras brėžinys vonia prie lauko durų' - detalūs matmenys atskirame brėžinyje",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 2.969,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 22.56,
+      "walls_paintable_m2": 0.88,
+      "ceiling_paintable_m2": 4.0,
+      "dazymo_plotas_m2": 4.88,
+      "gkp_lubu_standart_m2": 4.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 24.28,
+      "kampu_metrai": 24.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 20.0,
+      "plyteles_grindys_m2": 4.0,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.0,
+      "grindjuostes_m": 0.0,
+      "grindjuosciu_m": 0.0,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 15.42,
+      "glaistas_kg": 6.1,
+      "dazai_l": 0.98,
+      "_paint_class": 2,
+      "gruntas_l": 0.7,
+      "lubu_karnizo_m": 0.0,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(8.00) × H(2.82) = 22.56 m² − 0 lang./1 dur. atimimai → dažymas 4.88 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    }
+  ],
+  "durys_total": [
+    {
+      "plotis_mm": 900,
+      "aukstis_mm": 2100,
+      "tipas": "standart",
+      "kiekis": 1
+    },
+    {
+      "plotis_mm": 800,
+      "aukstis_mm": 2100,
+      "tipas": "standart",
+      "kiekis": 3
+    },
+    {
+      "plotis_mm": 700,
+      "aukstis_mm": 2100,
+      "tipas": "standart",
+      "kiekis": 3
+    }
+  ],
+  "langai_total": [
+    {
+      "plotis_mm": 1800,
+      "aukstis_mm": 1500,
+      "kiekis": 3
+    },
+    {
+      "plotis_mm": 1500,
+      "aukstis_mm": 1500,
+      "kiekis": 2
+    }
+  ],
+  "detected_symbols_summary": {
+    "rozetes": 38,
+    "jungikliai": 14,
+    "sviestuvai": 32,
+    "pakabinami_sviestuvai": 4,
+    "led_juostos": 18.0,
+    "difuzoriai": 0,
+    "klozetai": 0,
+    "praustuves": 0,
+    "vonios": 0,
+    "trapai": 0,
+    "wc_remai": 0,
+    "kondicionieriai": 2,
+    "radiatoriai": 0,
+    "gyvatukai": 0,
+    "sieniniai_sviestuvai": 2,
+    "termostatai": 1,
+    "interneto_lizdai": 4
+  },
+  "pastabos": "Vieno aukšto buto baldų / elektros / apšvietimo planai (P042_2025). Eksplikacijos lentelės nėra - patalpų plotai apytiksliai pagal sienų matmenis brėžinyje. Dvi vonios pateiktos atskiruose brėžiniuose (nepateikti šiame komplekte). Visi matmenys mm, altitudės metrais nuo grindų. LED juostos žymimos raudona spalva apšvietimo plane - bendras ilgis ~18m (svetainėje, miegamuosiuose, virtuvėje, drabužinėse). Karnizo/nišos zonos 20cm gylio prie keturių išorinių sienų.",
+  "warnings": [
+    {
+      "level": "WARN",
+      "message": "Eksplikacijos lentelės nėra - patalpų plotai įvertinti iš dimension chains (wall_dim_calc) arba default fallback."
+    },
+    {
+      "level": "WARN",
+      "message": "Dvi vonios (prie miegamojo ir prie lauko durų) pateiktos atskiruose brėžiniuose, kurie šiame komplekte nepateikti - santechnikos kiekiai (klozetai, praustuvės, vonios, trapai) negali būti suskaičiuoti.",
+      "patalpa_nr": "3"
+    },
+    {
+      "level": "WARN",
+      "message": "Lubų aukštis nematomas pjūvyje - naudojamas default 2.82m gyvenamosioms ir 2.50m vonioms."
+    },
+    {
+      "level": "INFO",
+      "message": "LED juostų bendras ilgis ~18m apima karnizo/nišos zonas (4 sienos × ~3m kiekvienoje) plus virtuvės pašvietimą H1.5m."
+    },
+    {
+      "code": "grindjuosciu_cap_fired",
+      "severity": "low",
+      "message": "Grindjuostės apriboti per empirinį 0.65 m/m² limitą: 83.5m → 62.1m. Reiškia, kad polygon_pct/bbox_pct duomenų trūko ir wall_adjacency negalėjo apskaičiuoti bendrų sienų.",
+      "hint": "Re-extract'ink projektą — naujas Vision prompt'as turėtų grąžinti polygon_pct visoms patalpoms.",
+      "expected": "≤0.65 m/m² (po wall_adjacency korekcijos ~0.55)",
+      "actual": "0.874 m/m² (pre-cap)"
+    },
+    {
+      "code": "paintable_floor_ratio",
+      "message": "Sienų plotas 2.24× grindų ploto",
+      "hint": "Turi būti 2.5-4×. Patikrink ar langai/durys teisingai atimti, lubų aukštis tinkamas.",
+      "severity": "med",
+      "expected": "2.5-4.0",
+      "actual": "2.24"
+    },
+    {
+      "level": "INFO",
+      "message": "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų (±10–20% kambarių skaičiui, daugiau plytelių zonoms). Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
+    }
+  ],
+  "_meta": {
+    "input_tokens": 11308,
+    "output_tokens": 4417,
+    "cache_read_tokens": 13785,
+    "cache_write_tokens": 0,
+    "stop_reason": "end_turn",
+    "attempt": 1,
+    "pages_sent": 3,
+    "model": "claude-opus-4-7",
+    "eksplikacija_merged_rooms": 0,
+    "eksplikacija_total_rows": 0,
+    "schedule_anchored_elements": 0,
+    "schedule_count_check": {
+      "langai_room_total": 3,
+      "langai_schedule_total": 0,
+      "durys_room_total": 7,
+      "durys_schedule_total": 0
+    },
+    "zoom_attempted": 7,
+    "zoom_skipped_via_eksplikacija": 0,
+    "zoom_applied": 2,
+    "zoom_elapsed_s": 85.1,
+    "doors_page": 1,
+    "doors_total_count": 7,
+    "doors_interior_count": 6,
+    "doors_exterior_count": 1,
+    "doors_rooms_updated": 7,
+    "doors_elapsed_s": 20.7,
+    "grindjuosciu_pre_cap_m": 83.51,
+    "grindjuosciu_post_cap_m": 62.08,
+    "grindjuosciu_cap_ratio_m_per_m2": 0.65,
+    "elapsed_s": 186.4
+  },
+  "paint_class": 2,
+  "paint_class_source": "user_default",
+  "_eksplikacija": {
+    "eksplikacija_source_page": null,
+    "patalpos": [],
+    "schedule_tables": {
+      "durys": [],
+      "langai": []
+    },
+    "_meta": {
+      "input_tokens": 7374,
+      "output_tokens": 50,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 6893,
+      "elapsed_s": 7.34,
+      "attempts": 1,
+      "pages_sent": 3,
+      "model": "claude-opus-4-7"
+    }
+  },
+  "_overrides": {
+    "paint_class": 2
+  },
+  "pozicijos": [
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų lyginimas Knauf Rotband",
+      "vnt": "m2",
+      "kiekis": 106.81,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
+      "medziagos_kiekis": 1068.1,
+      "medziagos_vnt": "kg",
+      "_assumption": "50% sienų ploto (block/concrete sienos). Užvalg. tik prieš glaistant ant pliko bloko/betono."
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų pirminis glaistymas Q1",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pradinis glaistas",
+      "medziagos_kiekis": 133.52,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų antrinis glaistymas Q2",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Baigiamasis glaistas",
+      "medziagos_kiekis": 133.52,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų šlifavimas",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų gruntavimas (1 sluoksnis)",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Gruntas",
+      "medziagos_kiekis": 30.52,
+      "medziagos_vnt": "l"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų dažymas (1 sluoksnis)",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Sienų dažymas (2 sluoksnis)",
+      "vnt": "m2",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+      "medziagos_kiekis": 42.71,
+      "medziagos_vnt": "l"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų pirminis glaistymas Q1",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pradinis glaistas",
+      "medziagos_kiekis": 59.69,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų antrinis glaistymas Q2",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Baigiamasis glaistas",
+      "medziagos_kiekis": 59.69,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų šlifavimas",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų gruntavimas (1 sluoksnis)",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Gruntas",
+      "medziagos_kiekis": 13.64,
+      "medziagos_vnt": "l"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų dažymas (2 sluoksniai)",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+      "medziagos_kiekis": 19.1,
+      "medziagos_vnt": "l"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Glaistymo kampai vidiniai",
+      "vnt": "m",
+      "kiekis": 156.84,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Glaistymo kampai išoriniai",
+      "vnt": "m",
+      "kiekis": 67.22,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "PVC kampuotės",
+      "medziagos_kiekis": 67.22,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Dažymo kampų montavimas",
+      "vnt": "m",
+      "kiekis": 224.06,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Angokraščių glaistymas-dažymas",
+      "vnt": "m",
+      "kiekis": 49.5,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Grindjuosčių sumontavimas",
+      "vnt": "m",
+      "kiekis": 62.08,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
+      "medziagos_kiekis": 68.29,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Grindjuosčių dažymas",
+      "vnt": "m",
+      "kiekis": 62.08,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų karnizo sumontavimas",
+      "vnt": "m",
+      "kiekis": 85.05,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Karnizas (m + 5% atliekų)",
+      "medziagos_kiekis": 89.3,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "Lubų karnizo dažymas",
+      "vnt": "m",
+      "kiekis": 85.05,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "LED nišų glaistymas",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "aprasymas": "LED nišų dažymas",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Angokraščių apdirbimas GKP (struktūra)",
+      "vnt": "m",
+      "kiekis": 49.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP juostelės + savisriegiai",
+      "medziagos_kiekis": 49.5,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Nišų formavimas GKP konstrukcijoje",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP profiliai + savisriegiai",
+      "medziagos_kiekis": 30.0,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP lubų montavimas (standartinis aukštis)",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP lapai luboms (9.5 mm)",
+      "vnt": "vnt",
+      "kiekis": 36,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+      "medziagos_kiekis": 36,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP karkaso CD profiliai (laikantieji)",
+      "vnt": "m",
+      "kiekis": 152.8,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "CD 60×27 mm (~1.6 m/m² lubų, ~625 mm c/c)",
+      "medziagos_kiekis": 152.8,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP karkaso UW profiliai (pakraščio)",
+      "vnt": "m",
+      "kiekis": 38.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "UW 28×27 mm pakraščio kontūras",
+      "medziagos_kiekis": 38.2,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
+      "vnt": "m",
+      "kiekis": 143.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
+      "medziagos_kiekis": 143.25,
+      "medziagos_vnt": "m"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Savisriegiai GKP montavimui",
+      "vnt": "vnt",
+      "kiekis": 2865,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "~30 vnt/m² lubų",
+      "medziagos_kiekis": 2865,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Reviziniai dureliai (vamzdžių prieiga)",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Reviziniai dureliai 200×200 mm",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "GKP montavimas",
+      "aprasymas": "Dėžučių iš GKP formavimas WC mechanizmams paslėpti",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": "GKP plokštė + profiliai",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios sienų plytelių klijavimas",
+      "vnt": "m2",
+      "kiekis": 41.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+      "medziagos_kiekis": 206.25,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios sienų plytelės",
+      "vnt": "m2",
+      "kiekis": 44.55,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+      "medziagos_kiekis": 44.55,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios sienų plytelių fugavimas",
+      "vnt": "m2",
+      "kiekis": 41.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+      "medziagos_kiekis": 12.38,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios grindų plytelių klijavimas",
+      "vnt": "m2",
+      "kiekis": 8.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+      "medziagos_kiekis": 42.5,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios grindų plytelės",
+      "vnt": "m2",
+      "kiekis": 9.18,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+      "medziagos_kiekis": 9.18,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Vonios grindų plytelių fugavimas",
+      "vnt": "m2",
+      "kiekis": 8.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+      "medziagos_kiekis": 2.55,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Plytelių 45° pjovimas (vidiniai kampai)",
+      "vnt": "m",
+      "kiekis": 10.0,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
+      "vnt": "m",
+      "kiekis": 13.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Sanitarinis silikonas (~10 m/tūbelę)",
+      "medziagos_kiekis": 1,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Plytelių vidinių kampų silikonavimas",
+      "vnt": "m",
+      "kiekis": 9.9,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Spalvotas silikonas pagal fugavimo spalvą",
+      "medziagos_kiekis": 1,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Skylių gręžimas plytelėse (vamzdžiams, kaiščiams)",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "skaiciuota_is_brezinio",
+      "confidence": "low"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Nuolydžio formavimas dušo zonoje",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Plytelių klijavimas",
+      "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "paskirtis_default",
+      "confidence": "low",
+      "_assumption": "2 lentynėlės per vonią × 2 voniose."
+    },
+    {
+      "skyrius": "Hidroizoliacija",
+      "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Hidroizoliacijos medžiaga + sandarinimo juostelė (×2 sluoksniai)",
+      "medziagos_kiekis": 94.47,
+      "medziagos_vnt": "kg",
+      "_detail_m2": 31.49,
+      "_detail_juostele_m": 16.5
+    },
+    {
+      "skyrius": "Grindys",
+      "aprasymas": "Grindų išlyginamasis sluoksnis",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Savaime išsilyginantis mišinys (~2 kg/m²/mm)",
+      "medziagos_kiekis": 573.0,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "skyrius": "Grindys",
+      "aprasymas": "Grindų dangos pamušalas",
+      "vnt": "m2",
+      "kiekis": 87.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pamušalo membrana",
+      "medziagos_kiekis": 87.0,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "skyrius": "Grindys",
+      "aprasymas": "Parketo / laminato klojimas",
+      "vnt": "m2",
+      "kiekis": 87.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
+      "medziagos_kiekis": 95.7,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "skyrius": "Grindys",
+      "aprasymas": "Slenksniai (perėjimai tarp patalpų)",
+      "vnt": "vnt",
+      "kiekis": 6,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Slenksnis (alu / mediena)",
+      "medziagos_kiekis": 6,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "WC rėmo montavimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": "WC potinkinis rėmas",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Klozeto montavimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Praustuvės maišytuvo montavimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Praustuvės montavimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Dušo maišytuvo sistemos montavimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Gyvatuko montavimas, teno pajungimas",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Skalbimo mašinos sifono įrengimas",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Skalbimo mašinos montavimas",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "paskirtis_default"
+    },
+    {
+      "skyrius": "Santechnikos darbai",
+      "aprasymas": "Santechnikos taškų koregavimas",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "baseline"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Rozetės / jungiklio pajungimas",
+      "vnt": "vnt",
+      "kiekis": 52,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Lubinių priglaistomų šviestuvų montavimas",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Skylių šviestuvams gręžimas",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Pakabinamų šviestuvų montavimas",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "LED juostos pajungimas",
+      "vnt": "m",
+      "kiekis": 18.0,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Elektros instaliacijos darbai",
+      "aprasymas": "Šviestuvų apdirbimas (gipsiniai priglaistomi)",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "confidence": "medium"
+    },
+    {
+      "skyrius": "Pridėtiniai elementai",
+      "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
+      "vnt": "m3",
+      "kiekis": 7.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Konteineris + transportas",
+      "medziagos_kiekis": 7.2,
+      "medziagos_vnt": "m3"
+    },
+    {
+      "skyrius": "Pridėtiniai elementai",
+      "aprasymas": "Statybvietės sutvarkymas po darbų",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "skaiciuota_is_brezinio"
+    },
+    {
+      "skyrius": "Pridėtiniai elementai",
+      "aprasymas": "Apsauginės dangos / juostos darbų metu",
+      "vnt": "m2",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
+      "medziagos_kiekis": 95.5,
+      "medziagos_vnt": "m2"
+    }
+  ],
+  "santrauka": {
+    "dazymo_plotas_total_m2": 309.13,
+    "dazymo_excl_garazas_total_m2": 309.13,
+    "kampai_m_total": 224.06,
+    "angokrasciu_gkp_m_total": 49.5,
+    "pasleptu_duru_staktu_m_total": 0.0,
+    "nisu_metrai_total": 12.0,
+    "gkp_lubu_m2_total": 95.5,
+    "gkp_lubu_virs_3m_m2_total": 0.0,
+    "pvc_grindys_m2_total": 87.0,
+    "plyteles_grindys_m2_total": 8.5,
+    "plyteles_sienos_m2_total": 41.25,
+    "isliginamasis_m2_total": 95.5,
+    "grindjuosciu_m_total": 83.51,
+    "hidroizoliacijos_vnt": 2
+  },
+  "_lt_warnings": [],
+  "_plyteliu_specs": [],
+  "lt_sanity": {
+    "warnings": [
+      {
+        "level": "WARNING",
+        "room": "",
+        "field": "",
+        "value": null,
+        "expected": null,
+        "message": "Eksplikacijos lentelės nėra - patalpų plotai įvertinti iš dimension chains (wall_dim_calc) arba default fallback."
+      },
+      {
+        "level": "WARNING",
+        "room": "3",
+        "field": "",
+        "value": null,
+        "expected": null,
+        "message": "Dvi vonios (prie miegamojo ir prie lauko durų) pateiktos atskiruose brėžiniuose, kurie šiame komplekte nepateikti - santechnikos kiekiai (klozetai, praustuvės, vonios, trapai) negali būti suskaičiuoti."
+      },
+      {
+        "level": "WARNING",
+        "room": "",
+        "field": "",
+        "value": null,
+        "expected": null,
+        "message": "Lubų aukštis nematomas pjūvyje - naudojamas default 2.82m gyvenamosioms ir 2.50m vonioms."
+      },
+      {
+        "level": "INFO",
+        "room": "",
+        "field": "",
+        "value": null,
+        "expected": null,
+        "message": "LED juostų bendras ilgis ~18m apima karnizo/nišos zonas (4 sienos × ~3m kiekvienoje) plus virtuvės pašvietimą H1.5m."
+      },
+      {
+        "level": "INFO",
+        "room": "",
+        "field": "",
+        "value": null,
+        "expected": "≤0.65 m/m² (po wall_adjacency korekcijos ~0.55)",
+        "message": "Grindjuostės apriboti per empirinį 0.65 m/m² limitą: 83.5m → 62.1m. Reiškia, kad polygon_pct/bbox_pct duomenų trūko ir wall_adjacency negalėjo apskaičiuoti bendrų sienų."
+      },
+      {
+        "level": "INFO",
+        "room": "",
+        "field": "",
+        "value": null,
+        "expected": "2.5-4.0",
+        "message": "Sienų plotas 2.24× grindų ploto"
+      }
+    ],
+    "summary": {
+      "rooms_count": 7,
+      "total_area_m2": 95.5,
+      "warnings_count": 3,
+      "errors": 0,
+      "warnings": 3,
+      "info": 3
+    }
+  },
+  "darbu_sarasas": [
+    {
+      "eil_nr": 1,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų lyginimas Knauf Rotband",
+      "pavadinimas": "Sienų lyginimas Knauf Rotband",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 106.81,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
+      "medziagos_kiekis": 1068.1,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 2,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų pirminis glaistymas Q1",
+      "pavadinimas": "Sienų pirminis glaistymas Q1",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pradinis glaistas",
+      "medziagos_kiekis": 133.52,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 3,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų antrinis glaistymas Q2",
+      "pavadinimas": "Sienų antrinis glaistymas Q2",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Baigiamasis glaistas",
+      "medziagos_kiekis": 133.52,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 4,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų šlifavimas",
+      "pavadinimas": "Sienų šlifavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 5,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų gruntavimas (1 sluoksnis)",
+      "pavadinimas": "Sienų gruntavimas (1 sluoksnis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Gruntas",
+      "medziagos_kiekis": 30.52,
+      "medziagos_vnt": "l"
+    },
+    {
+      "eil_nr": 6,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų dažymas (1 sluoksnis)",
+      "pavadinimas": "Sienų dažymas (1 sluoksnis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 7,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Sienų dažymas (2 sluoksnis)",
+      "pavadinimas": "Sienų dažymas (2 sluoksnis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 213.63,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+      "medziagos_kiekis": 42.71,
+      "medziagos_vnt": "l"
+    },
+    {
+      "eil_nr": 8,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų pirminis glaistymas Q1",
+      "pavadinimas": "Lubų pirminis glaistymas Q1",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pradinis glaistas",
+      "medziagos_kiekis": 59.69,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 9,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų antrinis glaistymas Q2",
+      "pavadinimas": "Lubų antrinis glaistymas Q2",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Baigiamasis glaistas",
+      "medziagos_kiekis": 59.69,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 10,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų šlifavimas",
+      "pavadinimas": "Lubų šlifavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 11,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų gruntavimas (1 sluoksnis)",
+      "pavadinimas": "Lubų gruntavimas (1 sluoksnis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Gruntas",
+      "medziagos_kiekis": 13.64,
+      "medziagos_vnt": "l"
+    },
+    {
+      "eil_nr": 12,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų dažymas (2 sluoksniai)",
+      "pavadinimas": "Lubų dažymas (2 sluoksniai)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+      "medziagos_kiekis": 19.1,
+      "medziagos_vnt": "l"
+    },
+    {
+      "eil_nr": 13,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Glaistymo kampai vidiniai",
+      "pavadinimas": "Glaistymo kampai vidiniai",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 156.84,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 14,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Glaistymo kampai išoriniai",
+      "pavadinimas": "Glaistymo kampai išoriniai",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 67.22,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "PVC kampuotės",
+      "medziagos_kiekis": 67.22,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 15,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Dažymo kampų montavimas",
+      "pavadinimas": "Dažymo kampų montavimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 224.06,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 16,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Angokraščių glaistymas-dažymas",
+      "pavadinimas": "Angokraščių glaistymas-dažymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 49.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 17,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Grindjuosčių sumontavimas",
+      "pavadinimas": "Grindjuosčių sumontavimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 62.08,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
+      "medziagos_kiekis": 68.29,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 18,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Grindjuosčių dažymas",
+      "pavadinimas": "Grindjuosčių dažymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 62.08,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 19,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų karnizo sumontavimas",
+      "pavadinimas": "Lubų karnizo sumontavimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 85.05,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Karnizas (m + 5% atliekų)",
+      "medziagos_kiekis": 89.3,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 20,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "Lubų karnizo dažymas",
+      "pavadinimas": "Lubų karnizo dažymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 85.05,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 21,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "LED nišų glaistymas",
+      "pavadinimas": "LED nišų glaistymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 22,
+      "skyrius": "Sienų lubų glaistymas dažymas",
+      "skyrius_label": "Sienų lubų glaistymas dažymas",
+      "skyrius_enum": "paint",
+      "aprasymas": "LED nišų dažymas",
+      "pavadinimas": "LED nišų dažymas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 23,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Angokraščių apdirbimas GKP (struktūra)",
+      "pavadinimas": "Angokraščių apdirbimas GKP (struktūra)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 49.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP juostelės + savisriegiai",
+      "medziagos_kiekis": 49.5,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 24,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Nišų formavimas GKP konstrukcijoje",
+      "pavadinimas": "Nišų formavimas GKP konstrukcijoje",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 12.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP profiliai + savisriegiai",
+      "medziagos_kiekis": 30.0,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 25,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP lubų montavimas (standartinis aukštis)",
+      "pavadinimas": "GKP lubų montavimas (standartinis aukštis)",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 26,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP lapai luboms (9.5 mm)",
+      "pavadinimas": "GKP lapai luboms (9.5 mm)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 36,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+      "medziagos_kiekis": 36,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 27,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP karkaso CD profiliai (laikantieji)",
+      "pavadinimas": "GKP karkaso CD profiliai (laikantieji)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 152.8,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "CD 60×27 mm (~1.6 m/m² lubų, ~625 mm c/c)",
+      "medziagos_kiekis": 152.8,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 28,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP karkaso UW profiliai (pakraščio)",
+      "pavadinimas": "GKP karkaso UW profiliai (pakraščio)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 38.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "UW 28×27 mm pakraščio kontūras",
+      "medziagos_kiekis": 38.2,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 29,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
+      "pavadinimas": "GKP siūlių glaistymas + armavimo juostelė",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 143.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
+      "medziagos_kiekis": 143.25,
+      "medziagos_vnt": "m"
+    },
+    {
+      "eil_nr": 30,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Savisriegiai GKP montavimui",
+      "pavadinimas": "Savisriegiai GKP montavimui",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2865,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "~30 vnt/m² lubų",
+      "medziagos_kiekis": 2865,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 31,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Reviziniai dureliai (vamzdžių prieiga)",
+      "pavadinimas": "Reviziniai dureliai (vamzdžių prieiga)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Reviziniai dureliai 200×200 mm",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 32,
+      "skyrius": "GKP montavimas",
+      "skyrius_label": "GKP montavimas",
+      "skyrius_enum": "gkp",
+      "aprasymas": "Dėžučių iš GKP formavimas WC mechanizmams paslėpti",
+      "pavadinimas": "Dėžučių iš GKP formavimas WC mechanizmams paslėpti",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": "GKP plokštė + profiliai",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 33,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios sienų plytelių klijavimas",
+      "pavadinimas": "Vonios sienų plytelių klijavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 41.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+      "medziagos_kiekis": 206.25,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 34,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios sienų plytelės",
+      "pavadinimas": "Vonios sienų plytelės",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 44.55,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+      "medziagos_kiekis": 44.55,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "eil_nr": 35,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios sienų plytelių fugavimas",
+      "pavadinimas": "Vonios sienų plytelių fugavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 41.25,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+      "medziagos_kiekis": 12.38,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 36,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios grindų plytelių klijavimas",
+      "pavadinimas": "Vonios grindų plytelių klijavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 8.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+      "medziagos_kiekis": 42.5,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 37,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios grindų plytelės",
+      "pavadinimas": "Vonios grindų plytelės",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 9.18,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+      "medziagos_kiekis": 9.18,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "eil_nr": 38,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Vonios grindų plytelių fugavimas",
+      "pavadinimas": "Vonios grindų plytelių fugavimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 8.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+      "medziagos_kiekis": 2.55,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 39,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių 45° pjovimas (vidiniai kampai)",
+      "pavadinimas": "Plytelių 45° pjovimas (vidiniai kampai)",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 10.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 40,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
+      "pavadinimas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 13.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Sanitarinis silikonas (~10 m/tūbelę)",
+      "medziagos_kiekis": 1,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 41,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Plytelių vidinių kampų silikonavimas",
+      "pavadinimas": "Plytelių vidinių kampų silikonavimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 9.9,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Spalvotas silikonas pagal fugavimo spalvą",
+      "medziagos_kiekis": 1,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 42,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Skylių gręžimas plytelėse (vamzdžiams, kaiščiams)",
+      "pavadinimas": "Skylių gręžimas plytelėse (vamzdžiams, kaiščiams)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 43,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Nuolydžio formavimas dušo zonoje",
+      "pavadinimas": "Nuolydžio formavimas dušo zonoje",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 44,
+      "skyrius": "Plytelių klijavimas",
+      "skyrius_label": "Plytelių klijavimas",
+      "skyrius_enum": "tile",
+      "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
+      "pavadinimas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 45,
+      "skyrius": "Hidroizoliacija",
+      "skyrius_label": "Hidroizoliacija",
+      "skyrius_enum": "waterproof",
+      "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
+      "pavadinimas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Hidroizoliacijos medžiaga + sandarinimo juostelė (×2 sluoksniai)",
+      "medziagos_kiekis": 94.47,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 46,
+      "skyrius": "Grindys",
+      "skyrius_label": "Grindys",
+      "skyrius_enum": "floor",
+      "aprasymas": "Grindų išlyginamasis sluoksnis",
+      "pavadinimas": "Grindų išlyginamasis sluoksnis",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Savaime išsilyginantis mišinys (~2 kg/m²/mm)",
+      "medziagos_kiekis": 573.0,
+      "medziagos_vnt": "kg"
+    },
+    {
+      "eil_nr": 47,
+      "skyrius": "Grindys",
+      "skyrius_label": "Grindys",
+      "skyrius_enum": "floor",
+      "aprasymas": "Grindų dangos pamušalas",
+      "pavadinimas": "Grindų dangos pamušalas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 87.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Pamušalo membrana",
+      "medziagos_kiekis": 87.0,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "eil_nr": 48,
+      "skyrius": "Grindys",
+      "skyrius_label": "Grindys",
+      "skyrius_enum": "floor",
+      "aprasymas": "Parketo / laminato klojimas",
+      "pavadinimas": "Parketo / laminato klojimas",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 87.0,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
+      "medziagos_kiekis": 95.7,
+      "medziagos_vnt": "m2"
+    },
+    {
+      "eil_nr": 49,
+      "skyrius": "Grindys",
+      "skyrius_label": "Grindys",
+      "skyrius_enum": "floor",
+      "aprasymas": "Slenksniai (perėjimai tarp patalpų)",
+      "pavadinimas": "Slenksniai (perėjimai tarp patalpų)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 6,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Slenksnis (alu / mediena)",
+      "medziagos_kiekis": 6,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 50,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "WC rėmo montavimas",
+      "pavadinimas": "WC rėmo montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": "WC potinkinis rėmas",
+      "medziagos_kiekis": 2,
+      "medziagos_vnt": "vnt"
+    },
+    {
+      "eil_nr": 51,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Klozeto montavimas",
+      "pavadinimas": "Klozeto montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 52,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Praustuvės maišytuvo montavimas",
+      "pavadinimas": "Praustuvės maišytuvo montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 53,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Praustuvės montavimas",
+      "pavadinimas": "Praustuvės montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 54,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Dušo maišytuvo sistemos montavimas",
+      "pavadinimas": "Dušo maišytuvo sistemos montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 55,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Gyvatuko montavimas, teno pajungimas",
+      "pavadinimas": "Gyvatuko montavimas, teno pajungimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 56,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
+      "pavadinimas": "Linijinio latako montavimas (dušo zonoje)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 2,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 57,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Skalbimo mašinos sifono įrengimas",
+      "pavadinimas": "Skalbimo mašinos sifono įrengimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 58,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Skalbimo mašinos montavimas",
+      "pavadinimas": "Skalbimo mašinos montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 1,
+      "saltinis": "paskirtis_default",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 59,
+      "skyrius": "Santechnikos darbai",
+      "skyrius_label": "Santechnikos darbai",
+      "skyrius_enum": "plumbing",
+      "aprasymas": "Santechnikos taškų koregavimas",
+      "pavadinimas": "Santechnikos taškų koregavimas",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "baseline",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 60,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "Rozetės / jungiklio pajungimas",
+      "pavadinimas": "Rozetės / jungiklio pajungimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 52,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 61,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "Lubinių priglaistomų šviestuvų montavimas",
+      "pavadinimas": "Lubinių priglaistomų šviestuvų montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 62,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "Skylių šviestuvams gręžimas",
+      "pavadinimas": "Skylių šviestuvams gręžimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 63,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "Pakabinamų šviestuvų montavimas",
+      "pavadinimas": "Pakabinamų šviestuvų montavimas",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 4,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 64,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "LED juostos pajungimas",
+      "pavadinimas": "LED juostos pajungimas",
+      "mato_vnt": "m",
+      "vnt": "m",
+      "kiekis": 18.0,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 65,
+      "skyrius": "Elektros instaliacijos darbai",
+      "skyrius_label": "Elektros instaliacijos darbai",
+      "skyrius_enum": "electrical",
+      "aprasymas": "Šviestuvų apdirbimas (gipsiniai priglaistomi)",
+      "pavadinimas": "Šviestuvų apdirbimas (gipsiniai priglaistomi)",
+      "mato_vnt": "vnt",
+      "vnt": "vnt",
+      "kiekis": 32,
+      "saltinis": "simboliai_brezinyje",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 66,
+      "skyrius": "Pridėtiniai elementai",
+      "skyrius_label": "Pridėtiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
+      "pavadinimas": "Šiukšlių išvežimas (statybinės atliekos)",
+      "mato_vnt": "m3",
+      "vnt": "m3",
+      "kiekis": 7.2,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "Konteineris + transportas",
+      "medziagos_kiekis": 7.2,
+      "medziagos_vnt": "m3"
+    },
+    {
+      "eil_nr": 67,
+      "skyrius": "Pridėtiniai elementai",
+      "skyrius_label": "Pridėtiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Statybvietės sutvarkymas po darbų",
+      "pavadinimas": "Statybvietės sutvarkymas po darbų",
+      "mato_vnt": "kompl",
+      "vnt": "kompl",
+      "kiekis": 1,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": null,
+      "medziagos_kiekis": null,
+      "medziagos_vnt": null
+    },
+    {
+      "eil_nr": 68,
+      "skyrius": "Pridėtiniai elementai",
+      "skyrius_label": "Pridėtiniai elementai",
+      "skyrius_enum": "extras",
+      "aprasymas": "Apsauginės dangos / juostos darbų metu",
+      "pavadinimas": "Apsauginės dangos / juostos darbų metu",
+      "mato_vnt": "m²",
+      "vnt": "m²",
+      "kiekis": 95.5,
+      "saltinis": "skaiciuota_is_brezinio",
+      "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
+      "medziagos_kiekis": 95.5,
+      "medziagos_vnt": "m2"
+    }
+  ],
+  "v8_totals": {
+    "bendras_plotas_m2": 95.5,
+    "dazymo_plotas_m2": 309.13,
+    "kampai_m": 224.06,
+    "angokrasciu_gkp_m": 49.5,
+    "pasleptu_duru_staktu_m": 0.0,
+    "nisu_metrai": 12.0,
+    "gkp_lubu_standart_m2": 95.5,
+    "gkp_lubu_virs_3m_m2": 0.0,
+    "pvc_grindys_m2": 87.0,
+    "plyteles_grindys_m2": 8.5,
+    "plyteles_sienos_m2": 41.25,
+    "isliginamasis_m2": 95.5,
+    "grindjuosciu_m": 83.51,
+    "hidroizoliacijos_vnt": 2
+  },
+  "v8_rooms": [
+    {
+      "nr": "1",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.22,
+        "w": 0.3,
+        "h": 0.25
+      },
+      "polygon_pct": [
+        [
+          0.18,
+          0.22
+        ],
+        [
+          0.48,
+          0.22
+        ],
+        [
+          0.48,
+          0.47
+        ],
+        [
+          0.18,
+          0.47
+        ]
+      ],
+      "plotas_m2": 16.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 16.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1800,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.0
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "Karnizo/nišos zona 20cm gylio prie lango sienos; LOVA 180x200",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 45.12,
+      "walls_paintable_m2": 39.06,
+      "ceiling_paintable_m2": 16.0,
+      "dazymo_plotas_m2": 55.06,
+      "gkp_lubu_standart_m2": 16.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 41.48,
+      "kampu_metrai": 41.48,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 14.2,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 14.8,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 16.0,
+      "isliginamasis_m2": 16.0,
+      "grindjuostes_m": 15.73,
+      "grindjuosciu_m": 15.73,
+      "doors_deducted_m2": 3.36,
+      "windows_deducted_m2": 2.7,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.83,
+      "dazai_l": 11.01,
+      "_paint_class": 2,
+      "gruntas_l": 7.87,
+      "lubu_karnizo_m": 16.8,
+      "nisu_metrai": 2.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(16.00) × H(2.82) = 45.12 m² − 1 lang./2 dur. atimimai → dažymas 55.06 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "2",
+      "pavadinimas": "Drabužinė / spinta zona prie miegamojo",
+      "paskirtis": "drabuzine",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.43,
+        "y": 0.25,
+        "w": 0.1,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.43,
+          0.25
+        ],
+        [
+          0.53,
+          0.25
+        ],
+        [
+          0.53,
+          0.45
+        ],
+        [
+          0.43,
+          0.45
+        ]
+      ],
+      "plotas_m2": 3.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 7.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "low",
+      "pastabos": "Spintos zona 1650x600 + 600x1980 - drabužinė prie miegamojo",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 19.74,
+      "walls_paintable_m2": 18.06,
+      "ceiling_paintable_m2": 3.0,
+      "dazymo_plotas_m2": 21.06,
+      "gkp_lubu_standart_m2": 3.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 23.28,
+      "kampu_metrai": 23.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 3.0,
+      "isliginamasis_m2": 3.0,
+      "grindjuostes_m": 6.77,
+      "grindjuosciu_m": 6.77,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 26.32,
+      "dazai_l": 4.21,
+      "_paint_class": 2,
+      "gruntas_l": 3.01,
+      "lubu_karnizo_m": 7.35,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(7.00) × H(2.82) = 19.74 m² − 0 lang./1 dur. atimimai → dažymas 21.06 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "3",
+      "pavadinimas": "Vonia prie miegamojo",
+      "paskirtis": "san",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.5,
+        "y": 0.27,
+        "w": 0.1,
+        "h": 0.13
+      },
+      "polygon_pct": [
+        [
+          0.5,
+          0.27
+        ],
+        [
+          0.6,
+          0.27
+        ],
+        [
+          0.6,
+          0.4
+        ],
+        [
+          0.5,
+          0.4
+        ]
+      ],
+      "plotas_m2": 4.5,
+      "plotas_saltinis": "default_fallback",
+      "perimetras_m": 8.5,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.5,
+      "elementai": [],
+      "confidence": "low",
+      "pastabos": "Pažymėta 'Atskiras brėžinys vonia prie miegamojo' - detalūs matmenys nepateikti šiame plane",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 23.97,
+      "walls_paintable_m2": 2.72,
+      "ceiling_paintable_m2": 4.5,
+      "dazymo_plotas_m2": 7.22,
+      "gkp_lubu_standart_m2": 4.5,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 19.78,
+      "kampu_metrai": 19.78,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 0.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 0.0,
+      "plyteles_sienos_m2": 21.25,
+      "plyteles_grindys_m2": 4.5,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.5,
+      "grindjuostes_m": 0.0,
+      "grindjuosciu_m": 0.0,
+      "doors_deducted_m2": 0.0,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 16.07,
+      "glaistas_kg": 9.03,
+      "dazai_l": 1.44,
+      "_paint_class": 2,
+      "gruntas_l": 1.03,
+      "lubu_karnizo_m": 0.0,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(8.50) × H(2.82) = 23.97 m² − 0 lang./0 dur. atimimai → dažymas 7.22 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "4",
+      "pavadinimas": "Kambarys 1 (vaikų / svečių, prie sofos 210x80)",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.22,
+        "w": 0.28,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.22
+        ],
+        [
+          0.9,
+          0.22
+        ],
+        [
+          0.9,
+          0.42000000000000004
+        ],
+        [
+          0.62,
+          0.42000000000000004
+        ]
+      ],
+      "plotas_m2": 14.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "SOFA 210x80, STALAS 140x70; karnizas/niša 20cm gylio prie sienos",
+      "polygon_source": "synthesized_from_bbox",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 40.62,
+      "ceiling_paintable_m2": 14.0,
+      "dazymo_plotas_m2": 54.62,
+      "gkp_lubu_standart_m2": 14.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 31.28,
+      "kampu_metrai": 31.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 14.0,
+      "isliginamasis_m2": 14.0,
+      "grindjuostes_m": 15.57,
+      "grindjuosciu_m": 15.57,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.27,
+      "dazai_l": 10.92,
+      "_paint_class": 2,
+      "gruntas_l": 7.8,
+      "lubu_karnizo_m": 15.75,
+      "nisu_metrai": 2.5,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(15.00) × H(2.82) = 42.30 m² − 0 lang./1 dur. atimimai → dažymas 54.62 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "5",
+      "pavadinimas": "Kambarys 2 (prie sofos 200x80)",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.45,
+        "w": 0.28,
+        "h": 0.2
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.45
+        ],
+        [
+          0.9,
+          0.45
+        ],
+        [
+          0.9,
+          0.65
+        ],
+        [
+          0.62,
+          0.65
+        ]
+      ],
+      "plotas_m2": 14.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "SOFA 200x80, STALAS 140x70; karnizas/niša 20cm gylio prie išorinės sienos",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 2.813,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 42.3,
+      "walls_paintable_m2": 40.62,
+      "ceiling_paintable_m2": 14.0,
+      "dazymo_plotas_m2": 54.62,
+      "gkp_lubu_standart_m2": 14.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 31.28,
+      "kampu_metrai": 31.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 14.0,
+      "isliginamasis_m2": 14.0,
+      "grindjuostes_m": 15.57,
+      "grindjuosciu_m": 15.57,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 68.27,
+      "dazai_l": 10.92,
+      "_paint_class": 2,
+      "gruntas_l": 7.8,
+      "lubu_karnizo_m": 15.75,
+      "nisu_metrai": 2.5,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(15.00) × H(2.82) = 42.30 m² − 0 lang./1 dur. atimimai → dažymas 54.62 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "6",
+      "pavadinimas": "Svetainė / valgomasis / virtuvė",
+      "paskirtis": "gyvenamoji",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.18,
+        "y": 0.48,
+        "w": 0.45,
+        "h": 0.32
+      },
+      "polygon_pct": [
+        [
+          0.18,
+          0.48
+        ],
+        [
+          0.63,
+          0.48
+        ],
+        [
+          0.63,
+          0.8
+        ],
+        [
+          0.18,
+          0.8
+        ]
+      ],
+      "plotas_m2": 40.0,
+      "plotas_saltinis": "wall_dim_calc",
+      "perimetras_m": 28.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 2,
+          "plotis_mm": 1800,
+          "aukstis_mm": 1500
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 5.0
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": true
+        }
+      ],
+      "confidence": "medium",
+      "pastabos": "Atvira erdvė: svetainė (SOFA 380x180, TV), valgomasis (STALAS D160 išskleidžiamas), virtuvė (Indaplovė 60cm, plautuvė, kargo, kaitlentė, šaldytuvas, orkaitė, gartraukis). Karnizai/nišos 20cm gylio prie dviejų išorinių sienų.",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 0.156,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 78.96,
+      "walls_paintable_m2": 71.67,
+      "ceiling_paintable_m2": 40.0,
+      "dazymo_plotas_m2": 111.67,
+      "gkp_lubu_standart_m2": 40.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 52.68,
+      "kampu_metrai": 52.68,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 13.4,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 14.7,
+      "plyteles_sienos_m2": 0,
+      "plyteles_grindys_m2": 0,
+      "pvc_grindys_m2": 40.0,
+      "isliginamasis_m2": 40.0,
+      "grindjuostes_m": 29.87,
+      "grindjuosciu_m": 29.87,
+      "doors_deducted_m2": 1.89,
+      "windows_deducted_m2": 5.4,
+      "hidroizoliacija_m2": 0.0,
+      "glaistas_kg": 139.59,
+      "dazai_l": 22.33,
+      "_paint_class": 2,
+      "gruntas_l": 15.95,
+      "lubu_karnizo_m": 29.4,
+      "nisu_metrai": 5.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(28.00) × H(2.82) = 78.96 m² − 2 lang./1 dur. atimimai → dažymas 111.67 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    },
+    {
+      "nr": "7",
+      "pavadinimas": "Vonia prie lauko durų",
+      "paskirtis": "san",
+      "puslapio_nr": 1,
+      "bbox_pct": {
+        "x": 0.62,
+        "y": 0.65,
+        "w": 0.18,
+        "h": 0.15
+      },
+      "polygon_pct": [
+        [
+          0.62,
+          0.65
+        ],
+        [
+          0.8,
+          0.65
+        ],
+        [
+          0.8,
+          0.8
+        ],
+        [
+          0.62,
+          0.8
+        ]
+      ],
+      "plotas_m2": 4.0,
+      "plotas_saltinis": "default_fallback",
+      "perimetras_m": 8.0,
+      "lubu_aukstis_m": 2.82,
+      "lubu_aukstis_saltinis": "section_average",
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.5,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "confidence": "low",
+      "pastabos": "Pažymėta 'Atskiras brėžinys vonia prie lauko durų' - detalūs matmenys atskirame brėžinyje",
+      "polygon_source": "synthesized_from_bbox",
+      "shared_with_neighbors_m": 2.969,
+      "shared_edges_provenance": "polygon_adjacency_audit",
+      "ceiling_type": "gkp",
+      "walls_gross_m2": 22.56,
+      "walls_paintable_m2": 0.88,
+      "ceiling_paintable_m2": 4.0,
+      "dazymo_plotas_m2": 4.88,
+      "gkp_lubu_standart_m2": 4.0,
+      "gkp_lubu_virs_3m_m2": 0,
+      "kampai_m": 24.28,
+      "kampu_metrai": 24.28,
+      "kampai_inner_m": 11.28,
+      "kampai_opening_reveals_m": 5.0,
+      "kampai_pusiniai_m": 0.0,
+      "angokrasciu_gkp_m": 5.0,
+      "plyteles_sienos_m2": 20.0,
+      "plyteles_grindys_m2": 4.0,
+      "pvc_grindys_m2": 0,
+      "isliginamasis_m2": 4.0,
+      "grindjuostes_m": 0.0,
+      "grindjuosciu_m": 0.0,
+      "doors_deducted_m2": 1.68,
+      "windows_deducted_m2": 0.0,
+      "hidroizoliacija_m2": 15.42,
+      "glaistas_kg": 6.1,
+      "dazai_l": 0.98,
+      "_paint_class": 2,
+      "gruntas_l": 0.7,
+      "lubu_karnizo_m": 0.0,
+      "nisu_metrai": 0.0,
+      "_computed_by": "python_deterministic",
+      "calculation_trace": "perim(8.00) × H(2.82) = 22.56 m² − 0 lang./1 dur. atimimai → dažymas 4.88 m². Skaičiavo Python (deterministinis).",
+      "_grindjuosciu_capped": true,
+      "plotas_source": "vision"
+    }
+  ],
+  "_verify_pass": {
+    "corrections": [],
+    "error": null
+  },
+  "_elapsed_s": 186.4,
+  "status": "ok"
+}

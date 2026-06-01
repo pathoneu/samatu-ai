@@ -60,7 +60,9 @@ BACEVICIAUS = {
         "led_nisos_m": _val(54.98, "pasiūlymas item 4 'Nišų formavimas iš GKP'"),
         "angokrasciu_m": _val(94.02, "pasiūlymas item 14 'Angokraščių apdirbimas GKP'"),
         "rotband_lyginimas_m2": _val(138.69, "pasiūlymas item 15"),
-        "dazymo_walls_plus_ceilings_combined_m2": _val(424.75, "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"),
+        "dazymo_walls_plus_ceilings_combined_m2": _val(
+            493.03, "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Beržų convention"),
+        "dazymo_iki_3m_m2": _val(424.75, "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"),
         "dazymo_lubu_virs_3m_m2": _val(68.28, "pasiūlymas item 17"),
         "sienu_molio_tinkas_m2": _val(160.0, "pasiūlymas item 18 'Sienų dekoravimas molio tinku'",
                                        confidence="green",
@@ -134,8 +136,15 @@ ROMAINIAI = {
     "gt_per_room": {},
     "gt_totals": {
         "rotband_lyginimas_m2": _val(95.0, "pasiūlymas item 1"),
+        "dazymo_walls_plus_ceilings_combined_m2": _val(
+            420.08, "pasiūlymas items 2+3+5 sum (139.79 + 250.95 + 29.34) — all three are paint",
+            confidence="incomplete",
+            notes=("Even with all paint items summed, project_pdf is the FULL 45-page "
+                   "interior design but pasiūlymas prices only the 4.1-5.1 punktas subset. "
+                   "AI will over-extract vs this number — flagged scope_mismatch in registry.")),
         "dazymo_lubu_only_m2": _val(139.79, "pasiūlymas item 2 'Lubų glaistymas/dažymas (Benjamin Moore)'"),
-        "dazymo_walls_plus_ceilings_combined_m2": _val(250.95, "pasiūlymas item 3 'Sienų/ lubų glaistymas/dažymas (Benjamin Moore)'"),
+        "dazymo_walls_plus_ceilings_combined_subset_m2": _val(
+            250.95, "pasiūlymas item 3 'Sienų/ lubų glaistymas/dažymas (Benjamin Moore)' — subset only"),
         "stiklo_audinys_lubose_m2": _val(134.79, "pasiūlymas item 4 'Stiklo audinio klijavimas'",
                                           confidence="green",
                                           notes="Fiberglass on cooled ceilings — separate from paint line"),

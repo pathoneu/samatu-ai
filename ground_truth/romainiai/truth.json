@@ -18,15 +18,21 @@
       "confidence": "green",
       "source": "pasiūlymas item 1"
     },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 420.08,
+      "confidence": "incomplete",
+      "source": "pasiūlymas items 2+3+5 sum (139.79 + 250.95 + 29.34) — all three are paint",
+      "notes": "Even with all paint items summed, project_pdf is the FULL 45-page interior design but pasiūlymas prices only the 4.1-5.1 punktas subset. AI will over-extract vs this number — flagged scope_mismatch in registry."
+    },
     "dazymo_lubu_only_m2": {
       "value": 139.79,
       "confidence": "green",
       "source": "pasiūlymas item 2 'Lubų glaistymas/dažymas (Benjamin Moore)'"
     },
-    "dazymo_walls_plus_ceilings_combined_m2": {
+    "dazymo_walls_plus_ceilings_combined_subset_m2": {
       "value": 250.95,
       "confidence": "green",
-      "source": "pasiūlymas item 3 'Sienų/ lubų glaistymas/dažymas (Benjamin Moore)'"
+      "source": "pasiūlymas item 3 'Sienų/ lubų glaistymas/dažymas (Benjamin Moore)' — subset only"
     },
     "stiklo_audinys_lubose_m2": {
       "value": 134.79,

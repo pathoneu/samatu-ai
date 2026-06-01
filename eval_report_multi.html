@@ -20,7 +20,7 @@
 </head>
 <body>
 <h1>Multi-project totals-only baseline</h1>
-<p><strong>Timestamp:</strong> 2026-06-01_18-39-27<br>
+<p><strong>Timestamp:</strong> 2026-06-01_19-46-23<br>
    <strong>Registry:</strong> <code>ground_truth/registry.yaml</code></p>
 
 <div class='banner'>
@@ -28,27 +28,27 @@
   This is a single-contractor cross-project benchmark, NOT cross-contractor.
 </div>
 
-<h2>Overall: MAE = 3.872%  (4 metric observations)</h2>
+<h2>Overall: MAE = 29.857%  (10 metric observations)</h2>
 
 <h2>Per-project summary</h2>
 <table>
   <thead><tr>
     <th>Project (AI mode)</th><th>Metrics scored</th><th>MAE</th><th>Worst</th><th>Not emitted by production</th>
   </tr></thead>
-  <tbody><tr><td>berzas <span class='muted'>(replay)</span></td><td>4</td><td>3.872%</td><td class='fail'>10.008%</td><td class='muted'>Dažymo plotas (samata items 16+17, excl garažas)</td></tr><tr><td>bacveviciaus</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr><tr><td>ciurliu</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr><tr><td>romainiai</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr><tr><td>sernu</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr><tr><td>lazunu</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr></tbody>
+  <tbody><tr><td>berzas <span class='muted'>(replay)</span></td><td>4</td><td>3.872%</td><td class='fail'>10.008%</td><td class='muted'>Dažymo plotas (samata items 16+17, excl garažas)</td></tr><tr><td>bacveviciaus <span class='muted'>(ai_extract)</span></td><td>2</td><td>39.485%</td><td class='fail'>78.174%</td><td class='muted'></td></tr><tr><td>ciurliu <span class='muted'>(ai_extract)</span></td><td>2</td><td>24.535%</td><td class='fail'>28.741%</td><td class='muted'></td></tr><tr><td>romainiai <span class='muted'>(ai_extract)</span></td><td>1</td><td>132.944%</td><td class='fail'>132.944%</td><td class='muted'>LED nišų ilgis</td></tr><tr><td>sernu</td><td colspan='4' class='muted'>no_ai_side — no cached extract AND no gt_dimensions — Vision spend required before this project can score</td></tr><tr><td>lazunu <span class='muted'>(ai_extract)</span></td><td>1</td><td>22.103%</td><td class='fail'>22.103%</td><td class='muted'>LED nišų ilgis</td></tr></tbody>
 </table>
 
 <h2>Per-metric detail</h2>
 <table>
   <thead><tr><th>Project</th><th>Metric</th><th>Truth</th><th>AI</th><th>Δ%</th></tr></thead>
-  <tbody><tr class='fail'><td>berzas</td><td>Sienų dažomas plotas</td><td>460.71</td><td>414.60</td><td>-10.008%</td></tr><tr class='ok'><td>berzas</td><td>Lubų dažomas plotas</td><td>165.60</td><td>165.64</td><td>+0.024%</td></tr><tr class='fail'><td>berzas</td><td>LED nišų ilgis</td><td>42.30</td><td>40.00</td><td>-5.437%</td></tr><tr class='ok'><td>berzas</td><td>Bendras plotas</td><td>165.61</td><td>165.64</td><td>+0.018%</td></tr></tbody>
+  <tbody><tr class='fail'><td>berzas</td><td>Sienų dažomas plotas</td><td>460.71</td><td>414.60</td><td>-10.008%</td></tr><tr class='ok'><td>berzas</td><td>Lubų dažomas plotas</td><td>165.60</td><td>165.64</td><td>+0.024%</td></tr><tr class='fail'><td>berzas</td><td>LED nišų ilgis</td><td>42.30</td><td>40.00</td><td>-5.437%</td></tr><tr class='ok'><td>berzas</td><td>Bendras plotas</td><td>165.61</td><td>165.64</td><td>+0.018%</td></tr><tr class='warn'><td>bacveviciaus</td><td>Dažymo plotas (samata items 16+17, excl garažas)</td><td>493.03</td><td>489.11</td><td>-0.795%</td></tr><tr class='fail'><td>bacveviciaus</td><td>LED nišų ilgis</td><td>54.98</td><td>12.00</td><td>-78.174%</td></tr><tr class='fail'><td>ciurliu</td><td>Dažymo plotas (samata items 16+17, excl garažas)</td><td>388.01</td><td>309.13</td><td>-20.329%</td></tr><tr class='fail'><td>ciurliu</td><td>LED nišų ilgis</td><td>16.84</td><td>12.00</td><td>-28.741%</td></tr><tr class='no_truth'><td>romainiai</td><td>Dažymo plotas (samata items 16+17, excl garažas)</td><td>420.08</td><td>978.55</td><td>+132.944%</td></tr><tr class='fail'><td>lazunu</td><td>Dažymo plotas (samata items 16+17, excl garažas)</td><td>150.57</td><td>117.29</td><td>-22.103%</td></tr></tbody>
 </table>
 
 <h2>Honest disclosure</h2>
 <ul>
   <li>The <code>--use-gt-inputs</code> mode (math correctness only) shows Beržų MAE 0.68%.</li>
   <li>The <code>--totals-only</code> mode (production pipeline incl Vision drift)
-      shows Beržų MAE 3.87%. <strong>This is the user-facing accuracy.</strong></li>
+      shows Beržų MAE 29.86%. <strong>This is the user-facing accuracy.</strong></li>
   <li>5 of 6 projects show <em>no_ai_side</em>: no cached extract and no
       <code>gt_dimensions</code> populated. To bring them into this baseline,
       either run Vision extraction (~$2–10/project for the larger TPs) or

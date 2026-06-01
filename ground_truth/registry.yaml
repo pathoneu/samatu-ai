@@ -51,6 +51,12 @@ projects:
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
+    scope_mismatch: true
+    scope_mismatch_reason: |
+      Contractor's pasiūlymas prices the 4.1-5.1 punktas subset of the project; the
+      project_pdf is the full 45-page interior design. AI extracts the whole document,
+      truth covers a subset → totals not directly comparable (AI 978.55 m² combined
+      paint vs truth 250.95 m² = +290%). Exclude from systematic error analysis.
     notes: "Interior-only scope (no plytelės). Project PDF is 4.1-5.1 punktas subset; totals scoped accordingly."
 
   - slug: sernu

@@ -738,10 +738,18 @@ def run_totals_only_multi(registry_path: Path) -> int:
             continue
         truth = json.loads(truth_path.read_text(encoding="utf-8"))
 
-        # Pick the cheapest available AI side.
+        # Pick the cheapest available AI side. Order of preference:
+        #   1. ground_truth/<slug>/ai_extract.json — fresh production-pipeline
+        #      output from scripts/run_vision_on_truth_set.py
+        #   2. REGISTRY[slug].replay_path — legacy cached extract
+        #   3. gt_dimensions feed through --use-gt-inputs
         parsed = None
         ai_mode = None
-        if slug in REGISTRY and "replay_path" in REGISTRY[slug]:
+        fresh_extract = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
+        if fresh_extract.exists():
+            parsed = run_pipeline_replay(fresh_extract)
+            ai_mode = "ai_extract"
+        elif slug in REGISTRY and "replay_path" in REGISTRY[slug]:
             replay_path = REPO_ROOT / REGISTRY[slug]["replay_path"]
             if replay_path.exists():
                 parsed = run_pipeline_replay(replay_path)
@@ -761,17 +769,19 @@ def run_totals_only_multi(registry_path: Path) -> int:
             continue
 
         results = evaluate(parsed, truth)
-        # Honest filter: when ai_mode == "replay" the production-pipeline
-        # santrauka may not emit every metric the truth tracks. An accessor
-        # returning 0.0 against a >0 truth = "production field absent",
-        # NOT "AI says zero". Exclude those from MAE; surface them as
-        # not_emitted so the gap is visible without inflating the score.
+        # Honest filter: when ai_mode == "replay"/"ai_extract" the production
+        # pipeline's santrauka may not emit every metric the truth tracks.
+        # An accessor returning 0.0 against a >0 truth = "production field
+        # absent", NOT "AI says zero". Exclude those from MAE; surface them
+        # as not_emitted so the gap is visible without inflating the score.
         scored = []
         not_emitted: list[str] = []
         for r in results:
             if r.tier != "headline" or r.pct_error is None:
                 continue
-            if ai_mode == "replay" and r.actual_value == 0.0 and r.truth_value and r.truth_value > 0.5:
+            if (ai_mode in ("replay", "ai_extract")
+                    and r.actual_value == 0.0
+                    and r.truth_value and r.truth_value > 0.5):
                 not_emitted.append(r.label)
                 continue
             scored.append(r)
@@ -843,6 +853,8 @@ def main() -> int:
                      help="multi-project mode: iterate ground_truth/registry.yaml, "
                           "diff AI totals (cached or use-gt-inputs) against each "
                           "project's gt_totals; emit baseline_multi.json")
+    ap.add_argument("--all", action="store_true",
+                    help="alias for --totals-only (spec compatibility)")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -857,7 +869,7 @@ def main() -> int:
                          "so accuracy regressions across commits become visible")
     args = ap.parse_args()
 
-    if args.totals_only:
+    if args.totals_only or args.all:
         return run_totals_only_multi(GROUND_TRUTH_ROOT / "registry.yaml")
 
     if args.use_gt_inputs:
