@@ -3161,5 +3161,91 @@
     "output_tokens": 624,
     "cost_usd": 0.1222,
     "ts": "2026-06-01T20:30:29"
+  },
+  "_perimeter_validation": {
+    "n_total": 7,
+    "n_pass": 7,
+    "n_needs_reextraction": 0,
+    "n_no_data": 0,
+    "flagged_rooms": [],
+    "rooms": [
+      {
+        "room_nr": "1",
+        "room_name": "Miegamasis",
+        "area_m2": 16.0,
+        "perim_m": 16.0,
+        "lower_bound_m": 15.2,
+        "upper_bound_m": 26.0,
+        "discrepancy_pct": 0.0,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "2",
+        "room_name": "Drabužinė / spinta zona prie miegamojo",
+        "area_m2": 3.0,
+        "perim_m": 7.0,
+        "lower_bound_m": 6.58,
+        "upper_bound_m": 11.26,
+        "discrepancy_pct": 1.04,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "3",
+        "room_name": "Vonia prie miegamojo",
+        "area_m2": 4.5,
+        "perim_m": 8.5,
+        "lower_bound_m": 8.06,
+        "upper_bound_m": 13.79,
+        "discrepancy_pct": 0.17,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "4",
+        "room_name": "Kambarys 1 (vaikų / svečių, prie sofos 210x80)",
+        "area_m2": 14.0,
+        "perim_m": 15.0,
+        "lower_bound_m": 14.22,
+        "upper_bound_m": 24.32,
+        "discrepancy_pct": 0.22,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "5",
+        "room_name": "Kambarys 2 (prie sofos 200x80)",
+        "area_m2": 14.0,
+        "perim_m": 15.0,
+        "lower_bound_m": 14.22,
+        "upper_bound_m": 24.32,
+        "discrepancy_pct": 0.22,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "6",
+        "room_name": "Svetainė / valgomasis / virtuvė",
+        "area_m2": 40.0,
+        "perim_m": 28.0,
+        "lower_bound_m": 24.03,
+        "upper_bound_m": 41.11,
+        "discrepancy_pct": 10.68,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "7",
+        "room_name": "Vonia prie lauko durų",
+        "area_m2": 4.0,
+        "perim_m": 8.0,
+        "lower_bound_m": 7.6,
+        "upper_bound_m": 13.0,
+        "discrepancy_pct": 0.0,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      }
+    ]
   }
 }

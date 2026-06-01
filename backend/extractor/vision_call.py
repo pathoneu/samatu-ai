@@ -2730,6 +2730,37 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] sanity_checks failed (non-fatal): {exc}")
 
+    # Step 4.066 (2026-06-01): permanent geometric perimeter validation.
+    # Pure-Python check that each room's perimetras_m is consistent with
+    # its plotas_m2 via the isoperimetric bound. Emits structured warnings
+    # for any room with impossible perimeter; downstream code MAY trigger
+    # re-extraction. Today: just surface the report on parsed for audit;
+    # no automated re-extraction (would require the rich dimension_extractor
+    # to be wired into production — separate work item).
+    try:
+        from .vision.perimeter_validator import validate_extract
+        perim_report = validate_extract(parsed)
+        parsed["_perimeter_validation"] = perim_report
+        if perim_report["n_needs_reextraction"] > 0:
+            existing = parsed.get("warnings") or []
+            for fr in perim_report["flagged_rooms"]:
+                existing.append({
+                    "level": "WARN",
+                    "message": (f"Room {fr['room_nr']} ({fr['room_name']}): "
+                                f"perimeter {fr['perim_m']:.1f}m outside geometric "
+                                f"bounds [{fr['lower_bound_m']:.1f}, {fr['upper_bound_m']:.1f}]"
+                                f" for area {fr['area_m2']:.1f}m²"),
+                    "source": "perimeter_validator",
+                })
+            parsed["warnings"] = existing
+            print(f"[extractor] perimeter_validator flagged "
+                  f"{perim_report['n_needs_reextraction']}/{perim_report['n_total']} rooms")
+        else:
+            print(f"[extractor] perimeter_validator: all "
+                  f"{perim_report['n_total']} rooms within bounds")
+    except Exception as exc:
+        print(f"[extractor] perimeter_validator failed (non-fatal): {exc}")
+
     # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
     # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
     # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].

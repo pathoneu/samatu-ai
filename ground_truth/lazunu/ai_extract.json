@@ -1632,5 +1632,47 @@
     "output_tokens": 0,
     "cost_usd": 0.0,
     "ts": "2026-06-01T20:26:35"
+  },
+  "_perimeter_validation": {
+    "n_total": 3,
+    "n_pass": 3,
+    "n_needs_reextraction": 0,
+    "n_no_data": 0,
+    "flagged_rooms": [],
+    "rooms": [
+      {
+        "room_nr": "01",
+        "room_name": "Miegamasis",
+        "area_m2": 9.89,
+        "perim_m": 12.76,
+        "lower_bound_m": 11.95,
+        "upper_bound_m": 20.44,
+        "discrepancy_pct": 1.44,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "02",
+        "room_name": "Svetainė",
+        "area_m2": 16.51,
+        "perim_m": 17.4,
+        "lower_bound_m": 15.44,
+        "upper_bound_m": 26.41,
+        "discrepancy_pct": 7.06,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "03",
+        "room_name": "Sandėliukas/Drabužinė",
+        "area_m2": 4.28,
+        "perim_m": 8.74,
+        "lower_bound_m": 7.86,
+        "upper_bound_m": 13.45,
+        "discrepancy_pct": 5.62,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      }
+    ]
   }
 }

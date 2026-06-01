@@ -6352,5 +6352,234 @@
     "output_tokens": 0,
     "cost_usd": 0.0,
     "ts": "2026-06-01T20:26:35"
+  },
+  "_perimeter_validation": {
+    "n_total": 20,
+    "n_pass": 20,
+    "n_needs_reextraction": 0,
+    "n_no_data": 0,
+    "flagged_rooms": [],
+    "rooms": [
+      {
+        "room_nr": "1",
+        "room_name": "Holas",
+        "area_m2": 11.55,
+        "perim_m": 14.0,
+        "lower_bound_m": 12.91,
+        "upper_bound_m": 22.09,
+        "discrepancy_pct": 2.99,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "2",
+        "room_name": "Katilinė",
+        "area_m2": 5.9,
+        "perim_m": 10.0,
+        "lower_bound_m": 9.23,
+        "upper_bound_m": 15.79,
+        "discrepancy_pct": 2.92,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "3",
+        "room_name": "Koridorius",
+        "area_m2": 12.05,
+        "perim_m": 16.0,
+        "lower_bound_m": 13.19,
+        "upper_bound_m": 22.56,
+        "discrepancy_pct": 15.23,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "4",
+        "room_name": "San. mazgas",
+        "area_m2": 4.1,
+        "perim_m": 8.4,
+        "lower_bound_m": 7.69,
+        "upper_bound_m": 13.16,
+        "discrepancy_pct": 3.71,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "5",
+        "room_name": "Kambarys (miegamasis)",
+        "area_m2": 15.4,
+        "perim_m": 16.0,
+        "lower_bound_m": 14.91,
+        "upper_bound_m": 25.51,
+        "discrepancy_pct": 1.93,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "6",
+        "room_name": "Sandėliukas",
+        "area_m2": 5.76,
+        "perim_m": 9.8,
+        "lower_bound_m": 9.12,
+        "upper_bound_m": 15.6,
+        "discrepancy_pct": 2.08,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "7",
+        "room_name": "Kambarys",
+        "area_m2": 12.32,
+        "perim_m": 14.4,
+        "lower_bound_m": 13.34,
+        "upper_bound_m": 22.81,
+        "discrepancy_pct": 2.56,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "8",
+        "room_name": "Virtuvė",
+        "area_m2": 24.03,
+        "perim_m": 20.0,
+        "lower_bound_m": 18.63,
+        "upper_bound_m": 31.86,
+        "discrepancy_pct": 2.0,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "9",
+        "room_name": "Valgomasis",
+        "area_m2": 11.18,
+        "perim_m": 13.5,
+        "lower_bound_m": 12.71,
+        "upper_bound_m": 21.73,
+        "discrepancy_pct": 0.94,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "10",
+        "room_name": "Svetainė",
+        "area_m2": 32.44,
+        "perim_m": 23.5,
+        "lower_bound_m": 21.64,
+        "upper_bound_m": 37.02,
+        "discrepancy_pct": 3.15,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "11",
+        "room_name": "Garažas",
+        "area_m2": 35.94,
+        "perim_m": 24.0,
+        "lower_bound_m": 22.78,
+        "upper_bound_m": 38.97,
+        "discrepancy_pct": 0.08,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "1.2",
+        "room_name": "Holas (2 aukštas)",
+        "area_m2": 14.76,
+        "perim_m": 22.0,
+        "lower_bound_m": 14.6,
+        "upper_bound_m": 24.97,
+        "discrepancy_pct": 43.16,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "2.2",
+        "room_name": "Skalbykla",
+        "area_m2": 7.7,
+        "perim_m": 11.5,
+        "lower_bound_m": 10.54,
+        "upper_bound_m": 18.04,
+        "discrepancy_pct": 3.61,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "3.2",
+        "room_name": "Kambarys (vaikų miegamasis)",
+        "area_m2": 12.9,
+        "perim_m": 14.5,
+        "lower_bound_m": 13.65,
+        "upper_bound_m": 23.35,
+        "discrepancy_pct": 0.93,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "4.2",
+        "room_name": "Kambarys (vaikų miegamasis)",
+        "area_m2": 12.85,
+        "perim_m": 14.4,
+        "lower_bound_m": 13.62,
+        "upper_bound_m": 23.3,
+        "discrepancy_pct": 0.43,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "5.2",
+        "room_name": "Kambarys (vaikų miegamasis)",
+        "area_m2": 12.9,
+        "perim_m": 14.5,
+        "lower_bound_m": 13.65,
+        "upper_bound_m": 23.35,
+        "discrepancy_pct": 0.93,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "6.2",
+        "room_name": "San. mazgas (vaikų)",
+        "area_m2": 4.63,
+        "perim_m": 9.0,
+        "lower_bound_m": 8.18,
+        "upper_bound_m": 13.99,
+        "discrepancy_pct": 4.57,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "7.2",
+        "room_name": "San. mazgas (tėvų)",
+        "area_m2": 4.57,
+        "perim_m": 9.0,
+        "lower_bound_m": 8.12,
+        "upper_bound_m": 13.9,
+        "discrepancy_pct": 5.25,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "8.2",
+        "room_name": "Miegamasis (tėvų)",
+        "area_m2": 20.72,
+        "perim_m": 18.5,
+        "lower_bound_m": 17.3,
+        "upper_bound_m": 29.59,
+        "discrepancy_pct": 1.61,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      },
+      {
+        "room_nr": "9.2",
+        "room_name": "Drabužinė",
+        "area_m2": 6.01,
+        "perim_m": 10.5,
+        "lower_bound_m": 9.32,
+        "upper_bound_m": 15.93,
+        "discrepancy_pct": 7.08,
+        "status": "PASS",
+        "reason": "within isoperimetric bounds"
+      }
+    ]
   }
 }
