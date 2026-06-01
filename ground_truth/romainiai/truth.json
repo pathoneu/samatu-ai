@@ -1,0 +1,83 @@
+{
+  "$schema_version": 1,
+  "project_id": "romainiai",
+  "name": "Romainiai (Deividas Norkaitis)",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Deividas Norakitis INTERJERAS 4.1-5.1 punktas.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2026-01-15"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty. Interior-only scope — NO plytelės, NO GKP montavimas. Paint-heavy project. Two separate paint products billed (Benjamin Moore + Supreme Ultimate). Interior PDF is 4.1-5.1 punktas subset of full project — totals reflect subset only.",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "rotband_lyginimas_m2": {
+      "value": 95.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 1"
+    },
+    "dazymo_lubu_only_m2": {
+      "value": 139.79,
+      "confidence": "green",
+      "source": "pasiūlymas item 2 'Lubų glaistymas/dažymas (Benjamin Moore)'"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 250.95,
+      "confidence": "green",
+      "source": "pasiūlymas item 3 'Sienų/ lubų glaistymas/dažymas (Benjamin Moore)'"
+    },
+    "stiklo_audinys_lubose_m2": {
+      "value": 134.79,
+      "confidence": "green",
+      "source": "pasiūlymas item 4 'Stiklo audinio klijavimas'",
+      "notes": "Fiberglass on cooled ceilings — separate from paint line"
+    },
+    "dazymo_supreme_zone_m2": {
+      "value": 29.34,
+      "confidence": "green",
+      "source": "pasiūlymas item 5 'Supreme Ultimate dažais'"
+    },
+    "doors_atkosai_m": {
+      "value": 23.92,
+      "confidence": "green",
+      "source": "pasiūlymas item 6 'Durų angų paruošimas beapvadinėms durims'"
+    },
+    "pasleptu_duru_staktos_m": {
+      "value": 5.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 7"
+    },
+    "duru_varcios_dazymas_vnt": {
+      "value": 1.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 8"
+    },
+    "angokrasciu_m": {
+      "value": 23.8,
+      "confidence": "green",
+      "source": "pasiūlymas item 9 'Angokraščių glaistymas/dažymas'"
+    },
+    "moldingu_dazymas_m": {
+      "value": 27.1,
+      "confidence": "green",
+      "source": "pasiūlymas item 10"
+    },
+    "kampu_metrai_m": {
+      "value": 329.77,
+      "confidence": "green",
+      "source": "pasiūlymas item 11"
+    },
+    "led_profiliai_apdirbimas_m": {
+      "value": 5.5,
+      "confidence": "green",
+      "source": "pasiūlymas item 12"
+    },
+    "led_nisos_m": {
+      "value": 34.54,
+      "confidence": "green",
+      "source": "pasiūlymas item 14 'Nišų iš GKP'"
+    }
+  }
+}

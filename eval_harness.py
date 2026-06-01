@@ -703,6 +703,132 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     return 1 if failing else 0
 
 
+def run_totals_only_multi(registry_path: Path) -> int:
+    """Iterate every project in ground_truth/registry.yaml and run the
+    AI-vs-truth diff on its gt_totals block (no per-room work).
+
+    A project contributes to the aggregate MAE only when an AI extract
+    is available — either via REGISTRY[project_id].replay_path (cached)
+    or by feeding gt_dimensions through the calculator. Projects with
+    neither are reported as 'no_ai_side' so the gap is explicit.
+    """
+    import yaml
+
+    reg = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    projects = reg.get("projects") or []
+    if not projects:
+        print(f"  registry has no projects: {registry_path}")
+        return 2
+
+    per_project_summary: list[dict] = []
+    all_pct_errors: list[float] = []
+
+    ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    for entry in projects:
+        slug = entry["slug"]
+        truth_path = REPO_ROOT / entry["truth_path"]
+        if not truth_path.exists():
+            per_project_summary.append({
+                "slug": slug, "status": "missing_truth", "reason": str(truth_path),
+                "metrics": [],
+            })
+            continue
+        truth = json.loads(truth_path.read_text(encoding="utf-8"))
+
+        # Pick the cheapest available AI side.
+        parsed = None
+        ai_mode = None
+        if slug in REGISTRY and "replay_path" in REGISTRY[slug]:
+            replay_path = REPO_ROOT / REGISTRY[slug]["replay_path"]
+            if replay_path.exists():
+                parsed = run_pipeline_replay(replay_path)
+                ai_mode = "replay"
+        if parsed is None and truth.get("gt_dimensions"):
+            parsed = run_pipeline_use_gt_inputs(truth)
+            ai_mode = "use_gt_inputs"
+
+        if parsed is None:
+            per_project_summary.append({
+                "slug": slug,
+                "status": "no_ai_side",
+                "reason": ("no cached extract AND no gt_dimensions — "
+                           "Vision spend required before this project can score"),
+                "metrics": [],
+            })
+            continue
+
+        results = evaluate(parsed, truth)
+        # Honest filter: when ai_mode == "replay" the production-pipeline
+        # santrauka may not emit every metric the truth tracks. An accessor
+        # returning 0.0 against a >0 truth = "production field absent",
+        # NOT "AI says zero". Exclude those from MAE; surface them as
+        # not_emitted so the gap is visible without inflating the score.
+        scored = []
+        not_emitted: list[str] = []
+        for r in results:
+            if r.tier != "headline" or r.pct_error is None:
+                continue
+            if ai_mode == "replay" and r.actual_value == 0.0 and r.truth_value and r.truth_value > 0.5:
+                not_emitted.append(r.label)
+                continue
+            scored.append(r)
+        mae = (sum(abs(r.pct_error) for r in scored) / len(scored)
+               if scored else None)
+        worst = max((abs(r.pct_error) for r in scored), default=None)
+        per_project_summary.append({
+            "slug": slug,
+            "name": entry.get("name", slug),
+            "status": "ok",
+            "ai_mode": ai_mode,
+            "metrics_scored": len(scored),
+            "metrics_not_emitted": not_emitted,
+            "mae_pct": round(mae, 3) if mae is not None else None,
+            "worst_pct": round(worst, 3) if worst is not None else None,
+            "metrics": [
+                {"label": r.label, "truth": r.truth_value,
+                 "actual": r.actual_value, "pct_error": r.pct_error,
+                 "status": r.status}
+                for r in scored
+            ],
+        })
+        for r in scored:
+            all_pct_errors.append(abs(r.pct_error))
+
+    overall_mae = (sum(all_pct_errors) / len(all_pct_errors)
+                   if all_pct_errors else None)
+    baseline = {
+        "ts": ts,
+        "registry": str(registry_path.relative_to(REPO_ROOT)),
+        "overall_mae_pct": round(overall_mae, 3) if overall_mae is not None else None,
+        "n_metric_observations": len(all_pct_errors),
+        "projects": per_project_summary,
+    }
+    out_json = run_dir / "baseline_multi.json"
+    out_json.write_text(json.dumps(baseline, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+
+    print(f"\n  Cross-project totals-only baseline — {len(projects)} project(s)")
+    print(f"  {'slug':<14} {'AI side':<14} {'scored':>7} {'MAE %':>9} {'worst %':>10}")
+    print("  " + "─" * 60)
+    for s in per_project_summary:
+        if s["status"] != "ok":
+            print(f"  {s['slug']:<14} {s['status']:<14} {'—':>7} {'—':>9} {'—':>10}")
+            continue
+        print(f"  {s['slug']:<14} {s['ai_mode']:<14} {s['metrics_scored']:>7} "
+              f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
+    print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
+          f"(n={len(all_pct_errors)} metric observations)")
+    print(f"  Saved → {out_json}")
+
+    # Exit 1 only if at least one OK project broke the 2.0% per-project cap.
+    breached = [s for s in per_project_summary
+                if s["status"] == "ok" and (s.get("worst_pct") or 0) > 2.0]
+    return 1 if breached else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sąmatų AI evaluation harness")
     ap.add_argument("--project", default="berzas", help="project id in REGISTRY")
@@ -713,6 +839,10 @@ def main() -> int:
                      help="reuse cached extractor output (registry.replay_path)")
     grp.add_argument("--vision", action="store_true",
                      help="run the full Vision pipeline (costs API $$)")
+    grp.add_argument("--totals-only", action="store_true",
+                     help="multi-project mode: iterate ground_truth/registry.yaml, "
+                          "diff AI totals (cached or use-gt-inputs) against each "
+                          "project's gt_totals; emit baseline_multi.json")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -726,6 +856,9 @@ def main() -> int:
                     help="append a per-run snapshot to eval_runs/drift.jsonl "
                          "so accuracy regressions across commits become visible")
     args = ap.parse_args()
+
+    if args.totals_only:
+        return run_totals_only_multi(GROUND_TRUTH_ROOT / "registry.yaml")
 
     if args.use_gt_inputs:
         mode = "use_gt_inputs"

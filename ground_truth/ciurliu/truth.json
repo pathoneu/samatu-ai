@@ -1,0 +1,67 @@
+{
+  "$schema_version": 1,
+  "project_id": "ciurliu",
+  "name": "Čiurlių g. 10, Bajorai",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2026-02-12"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty. Smallest of the 5 batch projects (3-page A3 planai). Single-tier ceiling (no virš 3m split).",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "gkp_lubu_iki_3m_m2": {
+      "value": 111.84,
+      "confidence": "green",
+      "source": "pasiūlymas item 1 'GKP ant lubų'"
+    },
+    "led_nisos_m": {
+      "value": 16.84,
+      "confidence": "green",
+      "source": "pasiūlymas item 2 'Nišų formavimas iš GKP'"
+    },
+    "angokrasciu_m": {
+      "value": 34.53,
+      "confidence": "green",
+      "source": "pasiūlymas item 4 'Angokraščių apdirbimas GKP'"
+    },
+    "rotband_lyginimas_m2": {
+      "value": 37.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 6"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 388.01,
+      "confidence": "green",
+      "source": "pasiūlymas item 7 'Sienų, lubų glaistymas/dažymas'"
+    },
+    "kampu_metrai_m": {
+      "value": 201.86,
+      "confidence": "green",
+      "source": "pasiūlymas item 8 'Dažymo kampų montavimas'"
+    },
+    "plyteles_sienos_grindys_combined_m2": {
+      "value": 55.27,
+      "confidence": "green",
+      "source": "pasiūlymas item 12 'Plytelių klijavimas ant sienų ir grindų'"
+    },
+    "plyteles_epoksidinis_glaistas_m2": {
+      "value": 37.11,
+      "confidence": "green",
+      "source": "pasiūlymas (unindexed) 'Plytelių glaistymas epoksidiniu'"
+    },
+    "pvc_grindys_m2": {
+      "value": 98.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 8 (grindų skyrius) 'Pvc grindų įrengimas'"
+    },
+    "palanges_m": {
+      "value": 4.94,
+      "confidence": "green",
+      "source": "pasiūlymas item 7 (grindų skyrius)"
+    }
+  }
+}

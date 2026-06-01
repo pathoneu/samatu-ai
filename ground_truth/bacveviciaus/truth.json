@@ -1,0 +1,108 @@
+{
+  "$schema_version": 1,
+  "project_id": "bacveviciaus",
+  "name": "Bacevičiaus g. (Gytis ir Simona)",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Gytis ir Simona_2025naujausias.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2026-04-13"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty — per-room data not extracted yet. Totals derived from pasiūlymas 2026-04-13. Largest of the 5 batch projects (65-page TP).",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "gkp_lubu_iki_3m_m2": {
+      "value": 74.91,
+      "confidence": "green",
+      "source": "pasiūlymas item 1 'GKP ant lubų'"
+    },
+    "gkp_lubu_virs_3m_m2": {
+      "value": 68.28,
+      "confidence": "green",
+      "source": "pasiūlymas item 2 'GKP ant lubų virš 3m'"
+    },
+    "gkp_laidu_apsiuvimas_garaze_m2": {
+      "value": 26.57,
+      "confidence": "green",
+      "source": "pasiūlymas item 3"
+    },
+    "led_nisos_m": {
+      "value": 54.98,
+      "confidence": "green",
+      "source": "pasiūlymas item 4 'Nišų formavimas iš GKP'"
+    },
+    "angokrasciu_m": {
+      "value": 94.02,
+      "confidence": "green",
+      "source": "pasiūlymas item 14 'Angokraščių apdirbimas GKP'"
+    },
+    "rotband_lyginimas_m2": {
+      "value": 138.69,
+      "confidence": "green",
+      "source": "pasiūlymas item 15"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 424.75,
+      "confidence": "green",
+      "source": "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"
+    },
+    "dazymo_lubu_virs_3m_m2": {
+      "value": 68.28,
+      "confidence": "green",
+      "source": "pasiūlymas item 17"
+    },
+    "sienu_molio_tinkas_m2": {
+      "value": 160.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 18 'Sienų dekoravimas molio tinku'",
+      "notes": "Clay plaster — not in default formula scope but contractor-billed"
+    },
+    "doors_atkosai_m": {
+      "value": 55.52,
+      "confidence": "green",
+      "source": "pasiūlymas item 19 'Durų angų paruošimas beapvasdinėms durims'"
+    },
+    "kampu_metrai_m": {
+      "value": 580.54,
+      "confidence": "green",
+      "source": "pasiūlymas item 20 'Dažymo kampų montavimas'"
+    },
+    "plyteles_sienos_grindys_1200x1200_m2": {
+      "value": 157.34,
+      "confidence": "green",
+      "source": "pasiūlymas item 28"
+    },
+    "plyteles_sienos_grindys_1200x600_m2": {
+      "value": 52.59,
+      "confidence": "green",
+      "source": "pasiūlymas item 30"
+    },
+    "plyteles_didzformaciai_m2": {
+      "value": 7.52,
+      "confidence": "green",
+      "source": "pasiūlymas item 31"
+    },
+    "parketas_45_eglute_m2": {
+      "value": 108.08,
+      "confidence": "green",
+      "source": "pasiūlymas item 101"
+    },
+    "ilyginamasis_grindys_m2": {
+      "value": 143.19,
+      "confidence": "green",
+      "source": "pasiūlymas item 102"
+    },
+    "grindjuostes_isleistos_m": {
+      "value": 63.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 103"
+    },
+    "grindjuostes_paprastos_m": {
+      "value": 30.8,
+      "confidence": "green",
+      "source": "pasiūlymas item 104"
+    }
+  }
+}

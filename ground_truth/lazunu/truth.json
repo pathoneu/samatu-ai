@@ -1,0 +1,87 @@
+{
+  "$schema_version": 1,
+  "project_id": "lazunu",
+  "name": "Lazūnų g. 6 (Butas)",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2024-06-26"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty. APARTMENT (butas) not house — smallest scope. Project drawings split across 10 separate single-page AutoCAD Layout4 PDFs. Vision-extraction path needs PDF bundling logic before it can run.",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "gkp_lubu_iki_3m_m2": {
+      "value": 41.28,
+      "confidence": "green",
+      "source": "sąmata item 1"
+    },
+    "gkp_pertvaros_4_sluoksniai_m2": {
+      "value": 11.14,
+      "confidence": "green",
+      "source": "sąmata item 2"
+    },
+    "gkp_dezuciu_montavimas_m": {
+      "value": 9.94,
+      "confidence": "green",
+      "source": "sąmata item 3"
+    },
+    "led_nisos_m": {
+      "value": 10.58,
+      "confidence": "green",
+      "source": "sąmata item 4 'Nišų formavimas'"
+    },
+    "pasleptu_duru_staktos_m": {
+      "value": 10.22,
+      "confidence": "green",
+      "source": "sąmata item 6"
+    },
+    "angokrasciu_m": {
+      "value": 31.8,
+      "confidence": "green",
+      "source": "sąmata item 10 'Angokraščių apdirbimas GKP'"
+    },
+    "rotband_lyginimas_m2": {
+      "value": 32.41,
+      "confidence": "green",
+      "source": "sąmata item 12"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 150.57,
+      "confidence": "green",
+      "source": "sąmata item 13 'Sienų, lubų glaistymas/dažymas'"
+    },
+    "kampu_metrai_m": {
+      "value": 123.59,
+      "confidence": "green",
+      "source": "sąmata item 14"
+    },
+    "doors_atkosai_m": {
+      "value": 10.22,
+      "confidence": "green",
+      "source": "sąmata item 18 'Durų angų paruošimas'"
+    },
+    "led_nisos_glaistymas_m": {
+      "value": 10.68,
+      "confidence": "green",
+      "source": "sąmata item 19"
+    },
+    "plyteles_sienos_grindys_combined_m2": {
+      "value": 32.97,
+      "confidence": "green",
+      "source": "sąmata item 20 'Plytelių klijavimas (iki 120x60)'"
+    },
+    "pvc_grindys_m2": {
+      "value": 36.99,
+      "confidence": "green",
+      "source": "sąmata item 44"
+    },
+    "grindjuostes_paprastos_m": {
+      "value": 23.07,
+      "confidence": "green",
+      "source": "sąmata item 45"
+    }
+  }
+}

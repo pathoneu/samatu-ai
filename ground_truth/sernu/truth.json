@@ -1,0 +1,64 @@
+{
+  "$schema_version": 1,
+  "project_id": "sernu",
+  "name": "Šernų g. 18B, Kaunas",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2025-07-16"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty. ⚠ No general floor plan PDF in the supplied bundle — only electrical + tile specialty drawings. The 'pdf_path' field points at the tile drawing, which is NOT the architectural source for paint/wall extraction. Marked blocked_for_vision_extraction until missing PDFs are supplied.",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "rotband_lyginimas_m2": {
+      "value": 132.36,
+      "confidence": "green",
+      "source": "sąmata item 1"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 461.31,
+      "confidence": "green",
+      "source": "sąmata item 2 'Sienų, lubų glaistymas/dažymas'"
+    },
+    "papildomas_sienu_glaistymas_m2": {
+      "value": 395.19,
+      "confidence": "green",
+      "source": "sąmata item 3"
+    },
+    "doors_atkosai_m": {
+      "value": 33.97,
+      "confidence": "green",
+      "source": "sąmata item 4 'Durų angų paruošimas'"
+    },
+    "kampu_metrai_m": {
+      "value": 303.25,
+      "confidence": "green",
+      "source": "sąmata item 5"
+    },
+    "angokrasciu_m": {
+      "value": 85.45,
+      "confidence": "green",
+      "source": "sąmata item 9 'Angokraščių apdirbimas gipso kartonu'"
+    },
+    "stoglangiai_vnt": {
+      "value": 6.0,
+      "confidence": "green",
+      "source": "sąmata item 10"
+    },
+    "plyteles_sienos_grindys_combined_m2": {
+      "value": 101.57,
+      "confidence": "green",
+      "source": "sąmata item 16"
+    },
+    "plyteles_angokrasciai_m": {
+      "value": 25.74,
+      "confidence": "green",
+      "source": "sąmata item 17 'Angokraščių ir nišų'"
+    }
+  },
+  "blocked_for_vision_extraction": true,
+  "blocked_reason": "Missing architectural floor plan PDF in bundle — only specialty (elektra, plytelės) drawings present."
+}
