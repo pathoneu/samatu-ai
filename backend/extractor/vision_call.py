@@ -710,6 +710,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "gkp_extra_area_m2",
             "n_exterior_doors", "n_exterior_windows",
             "count_partition_corners",
+            # 2026-06-01 paint-above-tile systemic fix
+            "_bathroom_paint_above_tile_m",
         }
         for k, v in computed.items():
             if k not in PRIMITIVE_KEYS:

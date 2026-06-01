@@ -288,7 +288,8 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "_bathroom_paint_above_tile_m": 1.2
     },
     {
       "nr": "4",
@@ -656,7 +657,8 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "_bathroom_paint_above_tile_m": 1.2
     }
   ],
   "durys_total": [
@@ -3246,6 +3248,14 @@
         "status": "PASS",
         "reason": "within isoperimetric bounds"
       }
+    ]
+  },
+  "_paint_above_tile_pass": {
+    "ts": "2026-06-01T21:01:37",
+    "tile_band_m": 1.2,
+    "rooms_flagged": [
+      "3:Vonia prie miegamojo",
+      "7:Vonia prie lauko durų"
     ]
   }
 }

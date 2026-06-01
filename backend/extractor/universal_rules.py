@@ -566,6 +566,20 @@ def calc_room_quantities(room: dict,
     default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
     tile_height = vision_tile_h if vision_tile_h > 0 else default_tile_h
 
+    # 2026-06-01 systemic fix — paint-above-tile default for projects without
+    # wall_elevation pages. Set per-room by the pipeline (post-eksplikacija)
+    # only when:
+    #   • paskirtis ∈ bathroom-family AND
+    #   • project has 0 wall_elevation pages (so we can't read exact tile zones)
+    #   • room has no Vision-detected tile height
+    # Effect: tile_height is forced to the default (typically 1.2m) AND the
+    # walls_paint_factor is forced to 1.0 so the area above the tile band
+    # is counted as paint. Projects WITH elevation pages skip this default —
+    # the calculator falls through to the existing apdailos / paskirtis path.
+    bathroom_default_h = float(room.get("_bathroom_paint_above_tile_m") or 0)
+    if bathroom_default_h > 0 and vision_tile_h == 0:
+        tile_height = bathroom_default_h
+
     # 2026-05-27 Walls glaistymas/dažymas formula (Berzas calibration).
     #
     # Contractor convention (Rangovas A samata items 16+17 "Sienų, lubų
@@ -650,6 +664,11 @@ def calc_room_quantities(room: dict,
         tile_walls_area = perim * tile_height if tile_height > 0 else 0
         if walls_paint_factor_override is not None:
             walls_paint_factor = float(walls_paint_factor_override)
+        elif bathroom_default_h > 0:
+            # Paint-above-tile default active for this room (set by the
+            # pipeline because the project has no elevation pages). Force
+            # walls_paint_factor=1.0 so the area above the tile band counts.
+            walls_paint_factor = 1.0
         else:
             walls_paint_factor = rt_rules.get("walls_paint")
             walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
