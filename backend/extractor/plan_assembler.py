@@ -6,6 +6,23 @@ opening → schedule_ref); this module resolves them and produces numbers.
 
 Outputs feed into ``geometry_solver.solve_plan`` for orthogonality / closure
 constraints, then into ``plan_to_parsed`` for the existing formula engine.
+
+# EXPERIMENTAL — NOT IN PRODUCTION PATH (as of 2026-06-01)
+#
+# This module is part of the "deterministic Phase 2" pipeline that never
+# beat the production ``extract_interior()`` flow in real Vision tests.
+# Imports: only by tests + ``backend/extractor/geometry_solver.py``.
+# Verified 2026-06-01 by `grep "from .plan_assembler"`: zero production
+# call sites in vision_call.py.
+#
+# Kept because:
+#   1. detect_shared_walls + attach_partition_counts from geometry_solver
+#      are reused conceptually by the lightweight adjacency_extractor
+#      Vision pass (production)
+#   2. Future room-graph work can build on this scaffolding
+#
+# Do NOT add new dependencies on this module from production code without
+# first reviving the Phase 2 deterministic pipeline end-to-end.
 """
 
 from __future__ import annotations

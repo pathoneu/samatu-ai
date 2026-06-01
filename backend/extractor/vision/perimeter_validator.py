@@ -1,5 +1,30 @@
 """Geometric perimeter validator — pure Python, no Vision spend.
 
+# STATUS (2026-06-01): GUARD, not gap-closer.
+#
+# Empirical finding on N=5 projects (56 rooms total):
+#
+#   project        rooms  flagged
+#   ─────────────────────────────
+#   berzas         11     0
+#   bacveviciaus   15     0
+#   ciurliu         7     0
+#   romainiai      20     0
+#   lazunu          3     0
+#   ─────────────────────────────
+#   TOTAL          56     0
+#
+# Zero perimeters across all real-world projects fail the isoperimetric
+# bound 3.8√A ≤ P ≤ 6.5√A. This validator is therefore a REGRESSION
+# GUARD that protects against future Vision drift, not a fix for the
+# current combined-paint gap. The gap comes from height / openings /
+# tile-scope, not perimeter geometry.
+#
+# Keep wired into the production pipeline as Step 4.066 to catch any
+# future regression. Cost: zero. Value: alerts on impossible geometry.
+
+
+
 The full perimeter-vs-scale-factor validator the user originally
 proposed requires per-wall pixel coordinates that the production
 pipeline doesn't currently produce (the rich dimension_extractor isn't

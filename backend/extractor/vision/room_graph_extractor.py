@@ -5,6 +5,14 @@ from pass 1, and must emit a graph of {vertices, walls, rooms, openings}
 where every numeric length is a *reference* to a dimension id (never a new
 number). The deterministic plan_assembler then uses the IDs to assemble
 perimeters/areas, and the geometry_solver enforces closure/orthogonality.
+
+# EXPERIMENTAL — NOT IN PRODUCTION PATH (as of 2026-06-01)
+#
+# This is the Phase 2 deterministic room-graph extractor. Production
+# `extract_interior()` does NOT call this module; the lightweight
+# `adjacency_extractor` Vision pass (2026-06-01) covers the room-
+# adjacency need with far less infrastructure. Imports outside this
+# file are limited to tests + plan_assembler (also EXPERIMENTAL).
 """
 
 from __future__ import annotations

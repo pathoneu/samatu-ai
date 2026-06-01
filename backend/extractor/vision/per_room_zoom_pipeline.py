@@ -1,5 +1,13 @@
 """Per-room zoom Vision pipeline.
 
+# EXPERIMENTAL — NOT IN PRODUCTION PATH (as of 2026-06-01)
+# Part of the Phase 2 deterministic pipeline (paired with plan_assembler
+# and room_graph_extractor). Never wired into production extract_interior.
+# Bbox-locator + zoom failures on small rooms documented in
+# `docs/superpowers/research/`. Per-room re-extraction would re-replace
+# good dimensions with noisier ones for small rooms. Kept for future
+# iteration.
+
 The whole-page dim→graph approach fails on complex LT floor plans because
 Opus 4.7 can't track 11 rooms' axis-alignment in a single shot (the previous
 live run emitted mostly 0°/270° walls, never 90°/180°). The fix: crop the
