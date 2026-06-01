@@ -627,6 +627,30 @@ def calc_room_quantities(room: dict,
     if elevation_tile_area > 0:
         # Elevation-precision branch: tile area is exact mm-derived.
         doors_deduction = n_doors * DOOR_NET_DEDUCTION
+        # CLAMP — when the Vision elevation extractor over-counts tile zones
+        # (sum > walls_gross), scale down proportionally instead of letting
+        # the max(0, ...) clip drop walls_paintable to 0. This recovers
+        # proportional paint-above-tile area for rooms where the elevation
+        # Vision was over-aggressive (e.g. berzas room 107). Documented in
+        # the audit trail.
+        wall_area_available = max(0, walls_gross - doors_deduction)
+        if elevation_tile_area > wall_area_available * 1.02 and wall_area_available > 0:
+            # Proportional clamp per Module 4 spec: scale BOTH width and
+            # height of every tile zone by (walls/tile), so the SUM of
+            # zone areas scales by (walls/tile)². Result: clamped tile =
+            # walls² / tile_original, leaving paint = walls × (1 − walls/tile).
+            # This recovers a positive paint-above-tile estimate from
+            # over-counted Vision extractions instead of clipping to 0.
+            raw_tile = elevation_tile_area
+            clamped_tile = (wall_area_available * wall_area_available) / raw_tile
+            scale_factor = wall_area_available / raw_tile  # linear scale
+            elevation_tile_area = clamped_tile
+            room["_tile_clamp_applied"] = round(scale_factor, 4)
+            room["_tile_clamp_reason"] = (
+                f"raw elevation tile {raw_tile:.2f}m² > wall_available "
+                f"{wall_area_available:.2f}m² → clamped to {clamped_tile:.2f}m² "
+                f"(linear scale {scale_factor:.3f})"
+            )
         walls_paintable_gross = max(
             0, walls_gross - doors_deduction - elevation_tile_area
         )
