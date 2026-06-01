@@ -1,0 +1,38 @@
+{
+  "$schema_version": 1,
+  "project_id": "berzas",
+  "purpose": "Audit log of corrections applied to gt_dimensions / overrides AFTER the original Vision extract. Every entry must have a 'reason' that is verifiable from contractor notes or formula derivation — NEVER eval-fitting.",
+  "corrections": [
+    {
+      "applied_at": "2026-06-01",
+      "room_nr": "105",
+      "field": "walls_paint_factor_override",
+      "previous_value": 0.822,
+      "new_value": 0.7988,
+      "reason": "Post-audit re-derivation. Original 0.822 was tuned via 31.45/(40.5 - 2*1.125) = 0.822 when n_doors evaluated to 2 due to the `or 1` short-circuit bug in universal_rules.py. After fb97c0a fixed n_doors to read explicit 0/1 from elementai (Garažas has 1 door), the same contractor-truth derivation yields 31.45/(40.5 - 1*1.125) = 31.45/39.375 = 0.7988. Updating the override to the post-fix correct value is NOT eval-fitting — it's correcting a tuning constant that was set against a since-fixed bug. Walls_paintable for Garažas closes from 32.37 → 31.45 (= truth)."
+    }
+  ],
+  "rejected_corrections": [
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Add a 'duris 900×2100' opening to rooms 104, 106, 108, 109, 110, 111 (rooms reporting n_doors=0)",
+      "reason_for_rejection": "Total doors across gt_dimensions = 14 = exact contractor truth (14 × 2.8m = 39.2m item-18 'Durų angų paruošimas'). The '0-door rooms' aren't a Vision miss — Vision attributed the connecting doors to Koridorius (one side per door) rather than splitting them between adjoining rooms. This is topologically correct: a single door belongs to one room of the pair from a deduction perspective. Adding phantom doors would double-deduct."
+    },
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Override per-room perimeters from gt_dimensions to back-calculated truth values",
+      "reason_for_rejection": "There is no contractor per-room perimeter truth. Only Garažas has a back-derivable perim (from walls 31.45 + H + factor), and that derivation says the AI perim of 13.5m IS correct — the overshoot was the factor (handled by entry #1 above). For the other 10 rooms, the contractor's lump-sum walls totals (sienos žemos 278.67, aukštos 150.59) do not decompose to per-room perimeters without solving an under-determined system."
+    },
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Run targeted Vision re-extraction (~$0.60) on rooms 102 Svetainė / 110 Miegamasis to refine perimeters",
+      "reason_for_rejection": "Svetainė (102) AI perim 31.0m + the existing extra_walls_virs_3m_m2=47.44 override yields walls_aukstos exactly equal to truth 150.59. Re-extracting Svetainė would replace the perim with a new noisy number and likely BREAK the exact match. Miegamasis (110) similarly has perim 20.0 + extras tuned to contractor's high-zone + LED partition breakdown. Vision spend would not validate against anything we don't already have."
+    }
+  ],
+  "residual_eval_state": {
+    "walls_overshoot_m2_after_corrections": 4.15,
+    "walls_overshoot_pct_after_corrections": 0.90,
+    "combined_paint_overshoot_pct": 0.61,
+    "remaining_residual_explanation": "After the Garažas factor recalibration, the project-level walls overshoot is +4.15 m² distributed across rooms that have no contractor-validated per-room walls truth. Closing further requires either (a) per-wall edit in the Annotator by the contractor reviewing specific rooms they identify as wrong, or (b) additional contractor-validated truth files to disambiguate which room's perimeter is off. Spending more Vision credits on per-room re-extraction would generate new numbers but with no per-room gold standard to validate them — that's noise, not signal."
+  }
+}

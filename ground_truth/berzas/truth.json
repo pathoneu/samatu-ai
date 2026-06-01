@@ -272,7 +272,7 @@
         "plyteles_grindys_m2_override": "green",
         "gkp_extra_area_m2": "green"
       },
-      "walls_paint_factor_override": 0.822,
+      "walls_paint_factor_override": 0.7988,
       "tile_floor_override": true,
       "plyteles_grindys_m2_override": 10.1,
       "gkp_extra_area_m2": 10.05
