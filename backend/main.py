@@ -220,9 +220,39 @@ _PDF_CACHE: dict[str, dict] = {}
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
-app = FastAPI()
+app = FastAPI(
+    title="Sąmatų AI Backend",
+    description=(
+        "Lithuanian construction takeoff API. Endpoints accept BOTH the "
+        "unprefixed `/api/...` path (legacy, supported indefinitely for "
+        "backward compatibility) AND the versioned `/api/v1/...` path "
+        "(canonical, used by the viewer rebuild). Both route to the same "
+        "handler — the v1 prefix is a path-rewrite, not a deployment split."
+    ),
+    version="1.0.0",
+)
 
 from starlette.middleware.sessions import SessionMiddleware
+
+
+# Task 4 (2026-06-01): canonical API versioning via path-rewrite middleware.
+# Every request to /api/v1/<rest> is internally rewritten to /api/<rest>,
+# so existing handlers serve both URLs without per-route changes. This
+# keeps the diff small while giving the viewer rebuild a stable v1
+# contract documented in docs/api_spec.json.
+@app.middleware("http")
+async def _api_v1_rewrite(request, call_next):
+    scope = request.scope
+    path = scope.get("path", "")
+    if path.startswith("/api/v1/"):
+        # Strip the /v1 segment so the unprefixed /api/<rest> handler matches.
+        new_path = "/api/" + path[len("/api/v1/"):]
+        scope["path"] = new_path
+        # Preserve raw_path so middleware downstream sees the rewrite consistently
+        raw = scope.get("raw_path")
+        if raw is not None:
+            scope["raw_path"] = new_path.encode("latin-1")
+    return await call_next(request)
 import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
 
