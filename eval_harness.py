@@ -862,7 +862,42 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     return 1 if failing else 0
 
 
-def run_totals_only_multi(registry_path: Path) -> int:
+def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
+    """Compact 5-line table — the default for multi-project mode.
+
+    Columns: Project | Combined Paint | Walls | Ceilings | MAE
+    Where Combined Paint / Walls / Ceilings are signed % error vs truth
+    and MAE is the mean absolute % error across the project's scored
+    metrics. Skipped/blocked projects show '—' in every numeric column.
+    """
+    def _metric(s: dict, label_starts_with: str):
+        for m in s.get("metrics", []):
+            if (m.get("label") or "").startswith(label_starts_with):
+                return m.get("pct_error")
+        return None
+
+    def _fmt(v):
+        return "—" if v is None else f"{v:+.2f}%"
+
+    print(f"\n  {'Project':<14} {'Combined Paint':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}")
+    print("  " + "─" * 60)
+    for s in per_project_summary:
+        if s.get("status") != "ok":
+            print(f"  {s['slug']:<14} {'—':>15} {'—':>9} {'—':>10} {'—':>8}")
+            continue
+        combined = _metric(s, "Dažymo plotas")
+        walls    = _metric(s, "Sienų dažomas plotas")
+        ceiling  = _metric(s, "Lubų dažomas plotas")
+        mae      = s.get("mae_pct")
+        print(f"  {s['slug']:<14} {_fmt(combined):>15} {_fmt(walls):>9} "
+              f"{_fmt(ceiling):>10} "
+              f"{('—' if mae is None else f'{mae:.2f}%'):>8}")
+    print("  " + "─" * 60)
+    avg_line = "—" if overall_mae is None else f"{overall_mae:.2f}%"
+    print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}")
+
+
+def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int:
     """Iterate every project in ground_truth/registry.yaml and run the
     AI-vs-truth diff on its gt_totals block (no per-room work).
 
@@ -870,6 +905,10 @@ def run_totals_only_multi(registry_path: Path) -> int:
     is available — either via REGISTRY[project_id].replay_path (cached)
     or by feeding gt_dimensions through the calculator. Projects with
     neither are reported as 'no_ai_side' so the gap is explicit.
+
+    Output: a compact 5-line table by default (one row per project with
+    combined paint / walls / ceilings / MAE percentages). Pass
+    ``detailed=True`` to print the legacy 5-column per-project table.
     """
     import yaml
 
@@ -1004,18 +1043,22 @@ def run_totals_only_multi(registry_path: Path) -> int:
     out_json.write_text(json.dumps(baseline, ensure_ascii=False, indent=2),
                         encoding="utf-8")
 
-    print(f"\n  Cross-project totals-only baseline — {len(projects)} project(s)")
-    print(f"  {'slug':<14} {'AI side':<14} {'scored':>7} {'MAE %':>9} {'worst %':>10}")
-    print("  " + "─" * 60)
-    for s in per_project_summary:
-        if s["status"] != "ok":
-            print(f"  {s['slug']:<14} {s['status']:<14} {'—':>7} {'—':>9} {'—':>10}")
-            continue
-        print(f"  {s['slug']:<14} {s['ai_mode']:<14} {s['metrics_scored']:>7} "
-              f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
-    print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
-          f"(n={len(all_pct_errors)} metric observations)")
-    print(f"  Saved → {out_json}")
+    if detailed:
+        print(f"\n  Cross-project totals-only baseline — {len(projects)} project(s)")
+        print(f"  {'slug':<14} {'AI side':<14} {'scored':>7} {'MAE %':>9} {'worst %':>10}")
+        print("  " + "─" * 60)
+        for s in per_project_summary:
+            if s["status"] != "ok":
+                print(f"  {s['slug']:<14} {s['status']:<14} {'—':>7} {'—':>9} {'—':>10}")
+                continue
+            print(f"  {s['slug']:<14} {s['ai_mode']:<14} {s['metrics_scored']:>7} "
+                  f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
+        print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
+              f"(n={len(all_pct_errors)} metric observations)")
+        print(f"  Saved → {out_json}")
+    else:
+        _print_summary_table(per_project_summary, overall_mae)
+        print(f"  Saved → {out_json}")
 
     # Exit 1 only if at least one OK project broke the 2.0% per-project cap.
     breached = [s for s in per_project_summary
@@ -1054,6 +1097,13 @@ def main() -> int:
     ap.add_argument("--verbose", action="store_true",
                     help="print a timeline of every extraction step "
                          "with duration, status, and any cost incurred")
+    ap.add_argument("--detailed", action="store_true",
+                    help="multi-project: emit the full per-project per-metric "
+                         "diff table (default is the compact 5-line summary)")
+    # --summary-only is the default for multi-project mode; flag exposed for
+    # CI / script clarity. No-op alongside --detailed (detailed wins).
+    ap.add_argument("--summary-only", action="store_true",
+                    help="multi-project: compact 5-line table (default)")
     ap.add_argument("--debug-project", default=None, metavar="SLUG",
                     help="run only the named project and dump every "
                          "intermediate data structure to "
@@ -1064,7 +1114,10 @@ def main() -> int:
         return run_debug_project(args.debug_project)
 
     if args.totals_only or args.all:
-        return run_totals_only_multi(GROUND_TRUTH_ROOT / "registry.yaml")
+        return run_totals_only_multi(
+            GROUND_TRUTH_ROOT / "registry.yaml",
+            detailed=args.detailed,
+        )
 
     if args.use_gt_inputs:
         mode = "use_gt_inputs"
