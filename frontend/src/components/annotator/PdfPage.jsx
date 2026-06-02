@@ -20,6 +20,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 export default function PdfPage({
   file,
   pageNumber,
+  zoom = 1,
   onNumPages,
   onPageDims,
   onLoadError,
@@ -33,10 +34,17 @@ export default function PdfPage({
     >
       <Page
         pageNumber={pageNumber}
+        scale={zoom}
         renderTextLayer={false}
         renderAnnotationLayer={false}
         onRenderSuccess={(page) =>
-          onPageDims && onPageDims({ width: page.width, height: page.height })
+          // Report intrinsic (zoom=1) dimensions so annotation pct→px
+          // conversions stay stable across zoom levels. The DOM canvas
+          // is sized by AnnotationCanvas via {width*zoom, height*zoom}.
+          onPageDims && onPageDims({
+            width: page.width / zoom,
+            height: page.height / zoom,
+          })
         }
       />
     </Document>

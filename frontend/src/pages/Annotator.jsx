@@ -16,6 +16,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 
 import PdfPage from '@/components/annotator/PdfPage';
 import AnnotationCanvas, { SYMBOL_ICONS, TOOLS } from '@/components/annotator/AnnotationCanvas';
+import useCommandStack from '@/hooks/useCommandStack';
 
 
 export default function Annotator() {
@@ -44,6 +45,14 @@ export default function Annotator() {
   // ── Drawing data ────────────────────────────────────────────────────────
   const [measurements, setMeasurements] = useState([]);
   const [symbols, setSymbols] = useState([]);
+
+  // ── Zoom (synced PDF + canvas viewport) ─────────────────────────────────
+  const [zoom, setZoom] = useState(1.0);
+  const ZOOM_MIN = 0.25;
+  const ZOOM_MAX = 4.0;
+
+  // ── Undo/redo for measurements + symbols ─────────────────────────────────
+  const cmdStack = useCommandStack({ bindKeys: true });
 
   // ── Rooms (from /room-graph) + selection ────────────────────────────────
   const [rooms, setRooms] = useState([]);
@@ -363,6 +372,42 @@ export default function Annotator() {
           className="rounded border border-green-600 bg-green-50 px-3 py-1.5 text-green-700"
           title="Eksportuoti KŽ į Excel"
         >📊 Eksportuoti</button>
+        <span className="mx-2 text-neutral-300">|</span>
+        <button
+          type="button"
+          onClick={cmdStack.undo}
+          disabled={!cmdStack.canUndo}
+          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 disabled:opacity-30"
+          title="Atšaukti (Ctrl+Z)"
+        >↶ Atšaukti</button>
+        <button
+          type="button"
+          onClick={cmdStack.redo}
+          disabled={!cmdStack.canRedo}
+          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 disabled:opacity-30"
+          title="Pakartoti (Ctrl+Y)"
+        >↷ Pakartoti</button>
+        <span className="mx-2 text-neutral-300">|</span>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z / 1.25))}
+          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-neutral-700"
+          title="Mažinti (Ctrl + −)"
+        >−</button>
+        <span className="text-xs font-mono text-neutral-600">{Math.round(zoom * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z * 1.25))}
+          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-neutral-700"
+          title="Didinti (Ctrl + +)"
+        >+</button>
+        <button
+          type="button"
+          onClick={() => setZoom(1)}
+          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-600"
+          title="100%"
+        >1:1</button>
+        <span className="mx-2 text-neutral-300">|</span>
         <button
           type="button"
           onClick={handleSave}
@@ -432,6 +477,7 @@ export default function Annotator() {
             <PdfPage
               file={pdfUrl}
               pageNumber={pageNum}
+              zoom={zoom}
               onNumPages={setNumPages}
               onPageDims={setPageDims}
               onLoadError={(err) => setLoadError(err?.message || String(err))}
@@ -448,19 +494,46 @@ export default function Annotator() {
               selectedRoomNr={selectedRoomNr}
               hoveredRoomNr={hoveredRoomNr}
               editingWall={editingWall}
+              zoom={zoom}
+              onWheel={(e) => {
+                // Ctrl/Cmd + wheel zooms; bare wheel scrolls (default).
+                if (!(e.ctrlKey || e.metaKey)) return;
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+                setZoom((z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * delta)));
+              }}
               onCalibrationComplete={setScale}
-              onMeasurementComplete={(m) =>
-                setMeasurements((prev) => [...prev, {
-                  id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  ...m,
-                }])}
-              onSymbolPlaced={(s) =>
-                setSymbols((prev) => [...prev, {
-                  id: `sym-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  ...s,
-                }])}
-              onSymbolDeleted={(id) =>
-                setSymbols((prev) => prev.filter((s) => s.id !== id))}
+              onMeasurementComplete={(m) => {
+                const id = `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                const next = { id, ...m };
+                setMeasurements((prev) => [...prev, next]);
+                cmdStack.push({
+                  label: `Pridėtas matavimas ${next.length_mm.toFixed(0)} mm`,
+                  do:   () => setMeasurements((prev) => [...prev, next]),
+                  undo: () => setMeasurements((prev) => prev.filter((x) => x.id !== id)),
+                });
+              }}
+              onSymbolPlaced={(s) => {
+                const id = `sym-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                const next = { id, ...s };
+                setSymbols((prev) => [...prev, next]);
+                cmdStack.push({
+                  label: `Pridėtas simbolis ${s.type}`,
+                  do:   () => setSymbols((prev) => [...prev, next]),
+                  undo: () => setSymbols((prev) => prev.filter((x) => x.id !== id)),
+                });
+              }}
+              onSymbolDeleted={(id) => {
+                const removed = symbols.find((s) => s.id === id);
+                setSymbols((prev) => prev.filter((s) => s.id !== id));
+                if (removed) {
+                  cmdStack.push({
+                    label: `Ištrintas simbolis`,
+                    do:   () => setSymbols((prev) => prev.filter((s) => s.id !== id)),
+                    undo: () => setSymbols((prev) => [...prev, removed]),
+                  });
+                }
+              }}
               onSymbolMoved={(id, pos_pct) =>
                 setSymbols((prev) => prev.map((s) => s.id === id ? { ...s, pos_pct } : s))}
               onRoomClick={(nr) => {

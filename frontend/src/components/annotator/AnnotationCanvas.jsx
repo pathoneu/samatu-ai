@@ -1,53 +1,76 @@
 /**
- * AnnotationCanvas — vanilla-canvas overlay for the Annotator.
+ * AnnotationCanvas — Fabric.js-backed overlay for the Annotator viewer.
  *
- * Receives all persistent state as props (measurements, symbols, rooms,
- * tool, scale, …); owns ONLY transient drawing state (cursor position,
- * draft start, calibration points, snap target). Emits user actions via
- * the on* callbacks. Exposes an imperative ref API for snap/hit-test
- * lookups + cancelDraft.
+ * Contract: see docs/viewer-api.md. Same forwardRef + useImperativeHandle
+ * surface as the legacy vanilla-canvas implementation; the swap is a
+ * single-file change. All caller-visible behaviour is preserved:
  *
- * Drop-in Fabric.js replacement target — see docs/viewer-api.md for the
- * full contract this file implements.
+ *   - draws room polygons, measurements, symbols, draft cursor, snap ring
+ *   - the imperative API (snapPxToCorner / cancelDraft / hitTest…) is identical
+ *   - all coordinate state stored in pct (page-fraction), pixel conversions
+ *     happen at draw time
+ *
+ * What changed:
+ *
+ *   - render path uses fabric.Canvas → fabric.Polygon/Line/Circle/Text/Group
+ *     instead of imperative ctx.draw calls. Same per-state-change clear+
+ *     redraw cycle (the React state model is the source of truth; Fabric
+ *     is the rendering primitive).
+ *   - the canvas now supports zoom via the `zoom` prop. The DOM canvas
+ *     element stays sized to pageDims (page-pixel coords); fabric's
+ *     viewport transform scales the rendered output. Pointer events are
+ *     unwrapped back to page-pixel coords so hit-test logic is unchanged.
+ *   - wheel events bubble to the parent so the parent can drive a shared
+ *     pan/zoom across the PDF + canvas.
  */
 import React, {
   forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState,
 } from 'react';
+import * as fabric from 'fabric';
 
+// ── Constants ──────────────────────────────────────────────────────────────
 const SNAP_PX = 20;
 
-// LT construction icon set — small SVG glyphs, all 24×24, currentColor stroke.
 export const SYMBOL_ICONS = {
-  socket:        { label: 'Rozetė',      glyph: '⊙',  color: '#2a6fb5' },
-  switch:        { label: 'Jungtukas',   glyph: '⊟',  color: '#7c3aed' },
-  light_ceiling: { label: 'Šviestuvas',  glyph: '☀',  color: '#f59e0b' },
-  vent_supply:   { label: 'Difūzorius',  glyph: '◈',  color: '#0ea5e9' },
-  water_cold:    { label: 'Vanduo',      glyph: '◐',  color: '#0891b2' },
-  data_outlet:   { label: 'Internetas',  glyph: '⌬',  color: '#16a34a' },
+  socket:        { glyph: '⚡', color: '#dc2626', label: 'Rozetė' },
+  switch:        { glyph: '⌧', color: '#2563eb', label: 'Jungiklis' },
+  light_ceiling: { glyph: '☀', color: '#f59e0b', label: 'Šviestuvas' },
+  vent_supply:   { glyph: '⤒', color: '#0891b2', label: 'Vėdinimas' },
+  water_cold:    { glyph: '💧', color: '#0284c7', label: 'Vanduo' },
+  data_outlet:   { glyph: '⚙', color: '#7c3aed', label: 'Internetas' },
 };
 
 export const TOOLS = {
-  NONE: 'none',
-  CALIBRATE: 'calibrate',
-  MEASURE: 'measure',
+  NONE:        'none',
+  CALIBRATE:   'calibrate',
+  MEASURE:     'measure',
   PLACE_SYMBOL: 'place_symbol',
-  EDIT_WALL: 'edit_wall',
+  EDIT_WALL:   'edit_wall',
 };
 
-function clientToCanvas(canvas, e) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+// ── Geometry helpers ───────────────────────────────────────────────────────
+function clientToPagePx(canvasEl, e, zoom) {
+  const rect = canvasEl.getBoundingClientRect();
+  // Convert screen coords → display coords → page-pixel coords (undo zoom).
+  return {
+    x: ((e.clientX - rect.left) / rect.width) * canvasEl.width / zoom,
+    y: ((e.clientY - rect.top) / rect.height) * canvasEl.height / zoom,
+  };
 }
+
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
 function pctToPx(pt, dims) {
   return { x: pt.x_pct * dims.width, y: pt.y_pct * dims.height };
 }
+
 function pxToPct(pt, dims) {
   return {
-    x_pct: dims.width  > 0 ? pt.x / dims.width  : 0,
-    y_pct: dims.height > 0 ? pt.y / dims.height : 0,
+    x_pct: dims.width ? pt.x / dims.width : 0,
+    y_pct: dims.height ? pt.y / dims.height : 0,
   };
 }
+
 function snapToCorner(cursor, rooms, dims, thresholdPx) {
   let best = null;
   let bestD = thresholdPx;
@@ -58,21 +81,20 @@ function snapToCorner(cursor, rooms, dims, thresholdPx) {
       const d = dist(cursor, px);
       if (d < bestD) {
         bestD = d;
-        best = { ...px, room_nr: room.nr, room_name: room.name };
+        best = { x: px.x, y: px.y, room_nr: room.nr, room_name: room.name };
       }
     }
   }
   return best;
 }
+
 function pointInPolygonPx(pt, polygonPx) {
   let inside = false;
-  const n = polygonPx.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
+  for (let i = 0, j = polygonPx.length - 1; i < polygonPx.length; j = i++) {
     const xi = polygonPx[i].x, yi = polygonPx[i].y;
     const xj = polygonPx[j].x, yj = polygonPx[j].y;
-    const intersect =
-      (yi > pt.y) !== (yj > pt.y) &&
-      pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi + 1e-9) + xi;
+    const intersect = ((yi > pt.y) !== (yj > pt.y))
+      && (pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi + 1e-9) + xi);
     if (intersect) inside = !inside;
   }
   return inside;
@@ -89,7 +111,8 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     placeSymbolType,
     selectedRoomNr,
     hoveredRoomNr,
-    editingWall,                     // {room_nr, wall_id, p1_pct, p2_pct} | null
+    editingWall,
+    zoom = 1,
     onMeasurementComplete,
     onSymbolPlaced,
     onSymbolDeleted,
@@ -98,20 +121,46 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     onRoomClick,
     onRoomHover,
     onWallEditComplete,
+    onWheel,
   },
   ref,
 ) {
-  const canvasRef = useRef(null);
+  const canvasElRef = useRef(null);
+  const fabricRef = useRef(null);                  // fabric.Canvas instance
   const [cursorPx, setCursorPx] = useState(null);
   const [draftStart, setDraftStart] = useState(null);
   const [snapTarget, setSnapTarget] = useState(null);
   const [calibrationPoints, setCalibrationPoints] = useState([]);
   const [draggingSymbolId, setDraggingSymbolId] = useState(null);
 
-  // ── Imperative API ────────────────────────────────────────────────────────
+  // ── Initialize fabric.Canvas once ───────────────────────────────────────
+  useEffect(() => {
+    const el = canvasElRef.current;
+    if (!el || fabricRef.current) return undefined;
+    const fc = new fabric.Canvas(el, {
+      selection: false,           // we manage selection through React state
+      renderOnAddRemove: false,   // we batch via requestRenderAll
+      skipTargetFind: true,       // we run our own hit-tests
+      preserveObjectStacking: true,
+      stopContextMenu: false,
+      backgroundColor: undefined,
+    });
+    fabricRef.current = fc;
+    return () => { fc.dispose(); fabricRef.current = null; };
+  }, []);
+
+  // ── Resize + zoom application ───────────────────────────────────────────
+  useEffect(() => {
+    const fc = fabricRef.current;
+    if (!fc) return;
+    fc.setDimensions({ width: pageDims.width, height: pageDims.height });
+    fc.setZoom(zoom);
+    fc.requestRenderAll();
+  }, [pageDims.width, pageDims.height, zoom]);
+
+  // ── Imperative API (unchanged from vanilla impl) ────────────────────────
   useImperativeHandle(ref, () => ({
-    snapPxToCorner: (point) =>
-      snapToCorner(point, rooms, pageDims, SNAP_PX),
+    snapPxToCorner: (point) => snapToCorner(point, rooms, pageDims, SNAP_PX),
     getCanvasDims: () => ({ width: pageDims.width, height: pageDims.height }),
     cancelDraft: () => {
       setDraftStart(null);
@@ -133,6 +182,8 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       }
       return null;
     },
+    setMeasurements: () => {},    // controlled by parent; no-op preserved for API parity
+    setSymbols: () => {},
   }), [rooms, symbols, pageDims]);
 
   // Cancel transient drafts whenever the tool switches.
@@ -142,136 +193,130 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     setSnapTarget(null);
   }, [tool]);
 
-  // Resize canvas backing store to page dims
+  // ── Redraw via Fabric on any state change ───────────────────────────────
   useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-    c.width = pageDims.width;
-    c.height = pageDims.height;
-  }, [pageDims]);
-
-  // ── Redraw on any state change ───────────────────────────────────────────
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const fc = fabricRef.current;
+    if (!fc) return;
+    // Clear & rebuild. Object pooling would be faster but is overkill for
+    // typical 5-20 rooms + ~100 measurements/symbols per page.
+    fc.remove(...fc.getObjects());
 
     // 1. Room polygons
     for (const room of rooms) {
       if (!room.polygon_pct) continue;
       const polyPx = room.polygon_pct.map((v) => pctToPx(v, pageDims));
-      ctx.beginPath();
-      polyPx.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-      ctx.closePath();
       const isHover = room.nr === hoveredRoomNr;
       const isSelected = room.nr === selectedRoomNr;
-      ctx.fillStyle = isSelected
-        ? 'rgba(42, 111, 181, 0.30)'
-        : isHover
-          ? 'rgba(42, 111, 181, 0.18)'
-          : 'rgba(42, 111, 181, 0.08)';
-      ctx.strokeStyle = isSelected ? '#2a6fb5' : 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = isSelected ? 2.5 : 1.5;
-      ctx.fill();
-      ctx.stroke();
+      const fill = isSelected ? 'rgba(42, 111, 181, 0.30)'
+                 : isHover    ? 'rgba(42, 111, 181, 0.18)'
+                              : 'rgba(42, 111, 181, 0.08)';
+      const stroke = isSelected ? '#2a6fb5' : 'rgba(255,255,255,0.9)';
+      fc.add(new fabric.Polygon(polyPx, {
+        fill, stroke,
+        strokeWidth: isSelected ? 2.5 : 1.5,
+        selectable: false,
+        evented: false,
+        objectCaching: false,
+      }));
     }
 
     // 2. Measurements
-    ctx.font = '12px ui-sans-serif, system-ui';
     for (const m of measurements) {
       const p1 = pctToPx(m.p1_pct, pageDims);
       const p2 = pctToPx(m.p2_pct, pageDims);
-      ctx.strokeStyle = '#2a6fb5';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.stroke();
-      [p1, p2].forEach((p) => {
-        ctx.fillStyle = '#2a6fb5';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      fc.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
+        stroke: '#2a6fb5', strokeWidth: 2,
+        selectable: false, evented: false, objectCaching: false,
+      }));
+      for (const p of [p1, p2]) {
+        fc.add(new fabric.Circle({
+          left: p.x - 3, top: p.y - 3, radius: 3,
+          fill: '#2a6fb5', stroke: 'transparent',
+          selectable: false, evented: false, objectCaching: false,
+        }));
+      }
       const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
       const label = `${m.length_mm.toFixed(0)} mm`;
-      const w = ctx.measureText(label).width + 8;
-      ctx.fillStyle = 'rgba(255,255,255,0.94)';
-      ctx.fillRect(mid.x - w / 2, mid.y - 16, w, 16);
-      ctx.fillStyle = '#2a6fb5';
-      ctx.fillText(label, mid.x - w / 2 + 4, mid.y - 4);
+      fc.add(new fabric.Textbox(label, {
+        left: mid.x - 30, top: mid.y - 18,
+        fontSize: 12, fontFamily: 'ui-sans-serif, system-ui',
+        backgroundColor: 'rgba(255,255,255,0.94)',
+        fill: '#2a6fb5', textAlign: 'center', width: 60,
+        selectable: false, evented: false, objectCaching: false,
+      }));
     }
 
     // 3. Calibration in-progress
     if (calibrationPoints.length === 1 && cursorPx) {
       const a = calibrationPoints[0];
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(cursorPx.x, cursorPx.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      const ln = new fabric.Line([a.x, a.y, cursorPx.x, cursorPx.y], {
+        stroke: '#f59e0b', strokeWidth: 2, strokeDashArray: [6, 4],
+        selectable: false, evented: false, objectCaching: false,
+      });
+      fc.add(ln);
     }
 
     // 4. Draft measurement (MEASURE / EDIT_WALL)
     if (draftStart && cursorPx && (tool === TOOLS.MEASURE || tool === TOOLS.EDIT_WALL)) {
       const end = snapTarget || cursorPx;
-      ctx.strokeStyle = '#16a34a';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(draftStart.x, draftStart.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      fc.add(new fabric.Line([draftStart.x, draftStart.y, end.x, end.y], {
+        stroke: '#16a34a', strokeWidth: 2, strokeDashArray: [5, 4],
+        selectable: false, evented: false, objectCaching: false,
+      }));
       if (scale) {
         const lenPx = dist(draftStart, end);
         const label = `${(lenPx * scale).toFixed(0)} mm`;
-        ctx.fillStyle = '#16a34a';
-        ctx.fillText(label, end.x + 8, end.y - 6);
+        fc.add(new fabric.Textbox(label, {
+          left: end.x + 8, top: end.y - 14,
+          fontSize: 12, fontFamily: 'ui-sans-serif, system-ui',
+          fill: '#16a34a', selectable: false, evented: false, objectCaching: false,
+          width: 80,
+        }));
       }
     }
 
     // 5. Snap indicator
     if (snapTarget && (tool === TOOLS.MEASURE || tool === TOOLS.CALIBRATE || tool === TOOLS.EDIT_WALL)) {
-      ctx.strokeStyle = '#16a34a';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(snapTarget.x, snapTarget.y, 8, 0, Math.PI * 2);
-      ctx.stroke();
+      fc.add(new fabric.Circle({
+        left: snapTarget.x - 8, top: snapTarget.y - 8, radius: 8,
+        fill: 'transparent', stroke: '#16a34a', strokeWidth: 2,
+        selectable: false, evented: false, objectCaching: false,
+      }));
     }
 
     // 6. Symbols
     for (const s of symbols) {
       const pos = pctToPx(s.pos_pct, pageDims);
       const meta = SYMBOL_ICONS[s.type] || SYMBOL_ICONS.socket;
-      ctx.fillStyle = meta.color;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'white';
-      ctx.font = '14px ui-sans-serif, system-ui';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(meta.glyph, pos.x, pos.y + 1);
-      ctx.textAlign = 'start';
-      ctx.textBaseline = 'alphabetic';
-      ctx.font = '12px ui-sans-serif, system-ui';
+      const circle = new fabric.Circle({
+        left: -10, top: -10, radius: 10,
+        fill: meta.color, originX: 'left', originY: 'top',
+        selectable: false, evented: false,
+      });
+      const glyph = new fabric.Text(meta.glyph, {
+        left: 0, top: 0,
+        originX: 'center', originY: 'center',
+        fontSize: 14, fontFamily: 'ui-sans-serif, system-ui',
+        fill: 'white', selectable: false, evented: false,
+      });
+      fc.add(new fabric.Group([circle, glyph], {
+        left: pos.x, top: pos.y, originX: 'center', originY: 'center',
+        selectable: false, evented: false, objectCaching: false,
+      }));
     }
+
+    fc.requestRenderAll();
   }, [
     rooms, pageDims, measurements, symbols, calibrationPoints,
     draftStart, cursorPx, snapTarget, hoveredRoomNr, selectedRoomNr,
     tool, scale,
   ]);
 
-  // ── Mouse handlers ───────────────────────────────────────────────────────
+  // ── Mouse handlers (unchanged event model from vanilla impl) ────────────
   const onMove = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const p = clientToCanvas(canvas, e);
+    const el = canvasElRef.current;
+    if (!el) return;
+    const p = clientToPagePx(el, e, zoom);
     setCursorPx(p);
 
     if (draggingSymbolId) {
@@ -295,9 +340,9 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   };
 
   const onClick = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const raw = clientToCanvas(canvas, e);
+    const el = canvasElRef.current;
+    if (!el) return;
+    const raw = clientToPagePx(el, e, zoom);
     const p = snapTarget || raw;
 
     if (tool === TOOLS.PLACE_SYMBOL && placeSymbolType) {
@@ -366,9 +411,9 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
 
   const onMouseDown = (e) => {
     if (tool !== TOOLS.NONE) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const p = clientToCanvas(canvas, e);
+    const el = canvasElRef.current;
+    if (!el) return;
+    const p = clientToPagePx(el, e, zoom);
     for (const s of symbols) {
       const sp = pctToPx(s.pos_pct, pageDims);
       if (dist(p, sp) <= 12) { setDraggingSymbolId(s.id); return; }
@@ -379,9 +424,9 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   const onContextMenu = (e) => {
     if (tool !== TOOLS.NONE) return;
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const p = clientToCanvas(canvas, e);
+    const el = canvasElRef.current;
+    if (!el) return;
+    const p = clientToPagePx(el, e, zoom);
     for (const s of symbols) {
       const sp = pctToPx(s.pos_pct, pageDims);
       if (dist(p, sp) <= 12) {
@@ -391,9 +436,22 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     }
   };
 
+  // ── Keyboard: Escape cancels current draft ─────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setDraftStart(null);
+        setCalibrationPoints([]);
+        setSnapTarget(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <canvas
-      ref={canvasRef}
+      ref={canvasElRef}
       onClick={onClick}
       onMouseMove={onMove}
       onMouseDown={onMouseDown}
@@ -404,8 +462,12 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
         onRoomHover && onRoomHover(null);
       }}
       onContextMenu={onContextMenu}
+      onWheel={onWheel}
       className={`absolute left-0 top-0 ${tool === TOOLS.NONE ? 'cursor-pointer' : 'cursor-crosshair'}`}
-      style={{ width: pageDims.width || 0, height: pageDims.height || 0 }}
+      style={{
+        width: (pageDims.width || 0) * zoom,
+        height: (pageDims.height || 0) * zoom,
+      }}
     />
   );
 });

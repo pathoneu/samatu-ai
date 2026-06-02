@@ -1,9 +1,9 @@
 # Annotation viewer API
 
-Public contract for the Annotator's display layer. Today the
-implementation is vanilla canvas (`AnnotationCanvas.jsx`); the
-future Fabric.js implementation must honour the same imperative
-methods + prop callbacks so the swap is a single-file replacement.
+Public contract for the Annotator's display layer. As of 2026-06-02
+the implementation is **Fabric.js 7.4** (`AnnotationCanvas.jsx`); the
+imperative methods + prop callbacks are unchanged from the legacy
+vanilla-canvas version per the migration plan.
 
 ## File layout
 
@@ -11,7 +11,9 @@ methods + prop callbacks so the swap is a single-file replacement.
 | --- | --- |
 | `pages/Annotator.jsx`               | Top-level page. Owns app state (rooms, tools, scale, calibration, walkthrough). |
 | `components/annotator/PdfPage.jsx`  | Loads + renders one PDF page via `react-pdf`. Reports rendered dimensions. |
-| `components/annotator/AnnotationCanvas.jsx` | Vanilla `<canvas>` overlay. Owns all drawing state (measurements, symbols, room polygons, draft cursor, snap target). Exposes an imperative ref API. |
+| `components/annotator/AnnotationCanvas.jsx` | `fabric.Canvas`-backed overlay (Fabric.js 7.4). Owns all drawing state (measurements, symbols, room polygons, draft cursor, snap target). Exposes an imperative ref API. Renders via `fabric.Polygon` / `fabric.Line` / `fabric.Circle` / `fabric.Group`. |
+| `components/annotator/ViewerToolbar.jsx` | Standalone professional toolbar component: tool group, undo/redo, save/export/verify, status. Currently optional — Annotator.jsx still uses its inline toolbar with undo/redo + zoom added. |
+| `hooks/useCommandStack.js` | Generic undo/redo command stack with Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z bindings. Each push records `{do, undo, label?}`. |
 | `components/annotator/CalibrationModal.jsx` | Modal for the contractor-override flow. |
 | `components/annotator/WalkthroughOverlay.jsx` | The "Tikrinti kambarius" floating card. |
 
@@ -31,8 +33,10 @@ methods + prop callbacks so the swap is a single-file replacement.
 | `selectedRoomNr`  | `string \| null`  | Highlighted room (controlled). |
 | `hoveredRoomNr`   | `string \| null`  | Hover-highlighted room (controlled). |
 | `editingWall`     | `{room_nr, wall_id, p1_pct, p2_pct} \| null` | When set, click sequence finishes a wall measurement. |
+| `zoom`            | `number`          | Viewport zoom factor (1.0 = 100%). The canvas DOM element scales by `zoom`; mouse coords are unwrapped back to page-pixel space before hit-tests. |
 | `measurements`    | `Measurement[]`   | Externally-controlled measurements list. |
 | `symbols`         | `Symbol[]`        | Externally-controlled symbols list. |
+| `onWheel`         | `(e) => void`     | Wheel event handler. Caller decides zoom behaviour (typically Ctrl+wheel = zoom). |
 | `onMeasurementComplete` | `(m: Measurement) => void` | Called when the user finishes a 2-click measurement. Caller updates the canonical list. |
 | `onSymbolPlaced`        | `(s: Symbol) => void` | Called when the user drops a new symbol. |
 | `onSymbolDeleted`       | `(id: string) => void` | Right-click on a symbol. |
@@ -117,16 +121,40 @@ type SnapTarget = {x:number, y:number, room_nr:string, room_name:string};
 | `place_symbol` | Drop new symbol at click. | — | `onSymbolPlaced(s)` |
 | `edit_wall` | Set point A on the room's wall start vertex (auto-locked). | Set point B; compute new wall length. | `onWallEditComplete(roomNr, wallId, mm)` |
 
-## Migration path to Fabric.js
+## Fabric.js implementation notes (2026-06-02)
 
-A Fabric replacement keeps the same `AnnotationCanvas` file path and
-re-implements with `fabric.Canvas` internally. The imperative methods
-and prop callbacks stay identical; only the rendering primitives change
-(canvas paths → `fabric.Line` / `fabric.Polygon` / `fabric.Group` etc).
+The component initialises `fabric.Canvas` once in a mount-effect on the
+same `<canvas>` ref the React tree owns. Every state change in the
+redraw `useEffect` runs `fc.remove(...fc.getObjects())` followed by
+`fc.add(...)` of fresh Fabric objects. Object pooling would be faster
+but isn't needed for typical residential plans (5-20 rooms, ~100
+measurements/symbols).
 
-Drop-in checklist for the Fabric implementation:
-- [ ] Mount `fabric.Canvas` on the same `<canvas>` element.
-- [ ] Re-implement each draw block as Fabric object creation/update.
-- [ ] Wire snap + hit-test using `fabric.Canvas.findTarget()`.
-- [ ] Preserve pct coordinate convention at all serialisation boundaries.
-- [ ] Run the existing `vite build` — no other code path should change.
+Render-pass settings:
+  - `selection: false` — Fabric's built-in object selection is disabled;
+    React state owns selection.
+  - `renderOnAddRemove: false` — we batch adds and call `requestRenderAll`
+    once per state change.
+  - `skipTargetFind: true` — we run our own pct-based hit-tests, not
+    Fabric's `findTarget`, because all coordinates are pct.
+  - Every object created with `selectable: false`, `evented: false`,
+    `objectCaching: false`.
+
+Zoom support:
+  - `setZoom(zoom)` applied to the fabric.Canvas viewport transform.
+  - `clientToPagePx` divides by `zoom` so mouse coords land in the
+    canonical page-pixel space the rest of the code assumes.
+  - The DOM `<canvas>` element is sized to `pageDims × zoom` via style;
+    the backing store stays at `pageDims` so the React state model is
+    zoom-invariant.
+
+Why we kept the React event model (not Fabric's):
+  - All hit-tests, snap logic, and tool state machines are React state.
+  - Fabric.findTarget is fine for clean canvas apps; our flow needs
+    custom snap-to-corner across multiple polygons with thresholds.
+  - Mouse handlers stay where the state lives.
+
+Coordinate convention is unchanged:
+  - State stored in pct (page-fraction).
+  - pct → px conversion at draw time.
+  - Serialisation to `/api/projects/{id}/annotations` passes pct.
