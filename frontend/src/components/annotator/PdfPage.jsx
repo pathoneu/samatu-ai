@@ -37,15 +37,28 @@ export default function PdfPage({
         scale={zoom}
         renderTextLayer={false}
         renderAnnotationLayer={false}
-        onRenderSuccess={(page) =>
-          // Report intrinsic (zoom=1) dimensions so annotation pct→px
-          // conversions stay stable across zoom levels. The DOM canvas
-          // is sized by AnnotationCanvas via {width*zoom, height*zoom}.
+        onRenderSuccess={(page) => {
+          // react-pdf's `page.width/height` report the UNROTATED PDF page
+          // dimensions, which are transposed for landscape pages whose
+          // rotation = 90. Read the actual rendered canvas dims instead;
+          // those reflect what the user sees and what our overlay must
+          // match pixel-for-pixel.
+          const canvas = document.querySelector('.react-pdf__Page__canvas');
+          let renderedW, renderedH;
+          if (canvas) {
+            const r = canvas.getBoundingClientRect();
+            renderedW = r.width;
+            renderedH = r.height;
+          } else {
+            // Fallback to page-reported (might be transposed on rotated pages)
+            renderedW = page.width;
+            renderedH = page.height;
+          }
           onPageDims && onPageDims({
-            width: page.width / zoom,
-            height: page.height / zoom,
-          })
-        }
+            width: renderedW / zoom,
+            height: renderedH / zoom,
+          });
+        }}
       />
     </Document>
   );

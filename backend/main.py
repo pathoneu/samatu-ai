@@ -200,6 +200,7 @@ from api.cv_tools import router as cv_tools_router
 from api.annotations import router as annotations_router
 # Room-graph endpoint — feeds the Annotator's magic-wand polygon overlay.
 from api.room_graph import router as room_graph_router
+from api.project_pdf import router as project_pdf_router
 # Symbol detection — Vision pass returning point-symbols for the Annotator.
 from api.symbols import router as symbols_router
 # Project calibration — contractor enters known totals, system stores
@@ -370,6 +371,7 @@ app.include_router(revalidate_router)
 app.include_router(cv_tools_router)
 app.include_router(annotations_router)
 app.include_router(room_graph_router)
+app.include_router(project_pdf_router)
 app.include_router(symbols_router)
 app.include_router(calibrate_router)
 app.include_router(room_recalc_router)

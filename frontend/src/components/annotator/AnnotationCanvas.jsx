@@ -50,11 +50,16 @@ export const TOOLS = {
 
 // ── Geometry helpers ───────────────────────────────────────────────────────
 function clientToPagePx(canvasEl, e, zoom) {
+  // Convert client-space click → page-pixel space.
+  // Canvas CSS is sized to pageDims × zoom, so dividing the in-rect
+  // offset by `zoom` lands us back in pageDims coords (the same space
+  // polygon_pct × pageDims produces). DO NOT use canvasEl.width — that's
+  // the DPI-scaled intrinsic store (Fabric multiplies it for HiDPI) and
+  // would put coords in a different space than the polygon hit-test.
   const rect = canvasEl.getBoundingClientRect();
-  // Convert screen coords → display coords → page-pixel coords (undo zoom).
   return {
-    x: ((e.clientX - rect.left) / rect.width) * canvasEl.width / zoom,
-    y: ((e.clientY - rect.top) / rect.height) * canvasEl.height / zoom,
+    x: (e.clientX - rect.left) / zoom,
+    y: (e.clientY - rect.top) / zoom,
   };
 }
 
@@ -145,6 +150,26 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       stopContextMenu: false,
       backgroundColor: undefined,
     });
+    // Fabric wraps the <canvas> in a `.canvas-container` div whose CSS
+    // doesn't inherit our `absolute left-0 top-0`. Force it manually so
+    // the annotation layer overlays the PDF (without this, the wrapper
+    // div participates in normal flow and sits BELOW the PDF page).
+    const wrapper = fc.wrapperEl;
+    if (wrapper) {
+      wrapper.style.position = 'absolute';
+      wrapper.style.left = '0';
+      wrapper.style.top = '0';
+      wrapper.style.pointerEvents = 'auto';
+    }
+    // Fabric installs an `upper-canvas` SIBLING that intercepts ALL
+    // pointer events for Fabric's own selection logic. Since we set
+    // skipTargetFind+selection=false (React owns interaction), the
+    // upper-canvas is interaction-dead AND blocks React's onClick from
+    // reaching the lower-canvas (the React-controlled <canvas>). Force
+    // pointer-events:none on upper so events fall through to lower.
+    if (fc.upperCanvasEl) {
+      fc.upperCanvasEl.style.pointerEvents = 'none';
+    }
     fabricRef.current = fc;
     return () => { fc.dispose(); fabricRef.current = null; };
   }, []);
@@ -362,6 +387,8 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
         }
         return null;
       })();
+      // eslint-disable-next-line no-console
+      if (window.__DEBUG_CANVAS) console.log('[AnnotationCanvas] click', { raw, hit, n_rooms: rooms.length, pageDims });
       onRoomClick && onRoomClick(hit);
       return;
     }
@@ -394,7 +421,11 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
 
     if (tool === TOOLS.MEASURE) {
       if (!scale) {
-        alert('Pirmiausia kalibruokite mastelį.');
+        // Non-blocking inline notice instead of a modal alert. The
+        // calibration wizard (when shipped) will trigger the calibrate
+        // flow automatically on first project open.
+        // eslint-disable-next-line no-console
+        console.warn('[AnnotationCanvas] measure attempted without scale; calibrate first');
         return;
       }
       if (!draftStart) { setDraftStart(p); return; }
@@ -449,6 +480,10 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Avoid setting className on the <canvas> via React: Fabric installs
+  // its own `lower-canvas` class for hit-testing + style hooks, and any
+  // React-set className on re-render wipes Fabric's class. Style is
+  // applied via inline cursor + dimensions instead.
   return (
     <canvas
       ref={canvasElRef}
@@ -463,8 +498,11 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       }}
       onContextMenu={onContextMenu}
       onWheel={onWheel}
-      className={`absolute left-0 top-0 ${tool === TOOLS.NONE ? 'cursor-pointer' : 'cursor-crosshair'}`}
       style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        cursor: tool === TOOLS.NONE ? 'pointer' : 'crosshair',
         width: (pageDims.width || 0) * zoom,
         height: (pageDims.height || 0) * zoom,
       }}
