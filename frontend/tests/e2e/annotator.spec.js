@@ -136,6 +136,68 @@ test('KŽ santrauka shows AI numbers from room-graph', async ({ page }) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 7a. Polygons are actually PAINTED to the lower canvas.
+//
+// This is a regression guard against the bug shipped between commits
+// b8790b6 and bec69ea: every fabric.Polygon was being added to the
+// Canvas but Chrome's GPU 32767-pixel canvas-side limit was being
+// silently exceeded (canvas height × devicePixelRatio), causing every
+// draw to discard. The footer correctly counted "Patalpos su poligonais:
+// N/N" so DOM-level tests passed — but the user saw an empty overlay.
+//
+// We sample the lower canvas pixels in the floor-plan-page band and
+// assert at least one bluish pixel exists (polygon fill is
+// rgba(42, 111, 181, 0.08)). If polygons were missing, count == 0.
+// ─────────────────────────────────────────────────────────────────────────────
+test('room polygons actually paint to the lower canvas', async ({ page }) => {
+  await openBerzasFresh(page);
+  await page.getByRole('button', { name: /Praleisti/ }).click();
+
+  // Wait for all 17 pages to be in DOM
+  await expect.poll(async () =>
+    page.locator('[data-testid^="pdf-page-"]').count()
+  ).toBe(17);
+
+  // Wait for lower-canvas to have been sized (Fabric setDimensions has fired)
+  await expect.poll(async () =>
+    page.evaluate(() => {
+      const c = document.querySelector('canvas.lower-canvas');
+      return c?.height || 0;
+    }),
+  ).toBeGreaterThan(1000);
+
+  // Scroll page 2 (the floor plan that holds the Svetainė polygon) into view
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="pdf-page-2"]');
+    el && el.scrollIntoView({ block: 'start' });
+  });
+
+  // Sample lower canvas for bluish polygon-fill pixels in page-2's band
+  const bluePolygonPixels = await page.evaluate(() => {
+    const lower = document.querySelector('canvas.lower-canvas');
+    const p2 = document.querySelector('[data-testid="pdf-page-2"]')
+      ?.querySelector('.react-pdf__Page__canvas');
+    if (!lower || !p2) return 0;
+    const lr = lower.getBoundingClientRect();
+    const pr = p2.getBoundingClientRect();
+    const scaleY = lower.height / parseFloat(lower.style.height);
+    const startY = Math.round((pr.top - lr.top) * scaleY);
+    const endY   = Math.round((pr.bottom - lr.top) * scaleY);
+    const ctx = lower.getContext('2d');
+    let count = 0;
+    for (let y = startY; y < endY; y += 30) {
+      const row = ctx.getImageData(0, y, lower.width, 1).data;
+      for (let x = 0; x < lower.width; x++) {
+        const r = row[x*4], g = row[x*4+1], b = row[x*4+2], a = row[x*4+3];
+        if (a > 10 && b > r && b > g && b > 150) count++;
+      }
+    }
+    return count;
+  });
+  expect(bluePolygonPixels).toBeGreaterThan(100);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 8a. Uploaded-project route mounts the integrated AnnotatorView.
 //
 // /project/:id is the route real users land on after uploading. Until

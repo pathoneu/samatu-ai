@@ -260,6 +260,14 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       preserveObjectStacking: true,
       stopContextMenu: false,
       backgroundColor: undefined,
+      // CRITICAL: disable retina scaling on multi-page canvases. With 45+ PDF
+      // pages stacked vertically, CSS height × devicePixelRatio quickly
+      // exceeds Chrome's 32767-pixel GPU canvas limit; over that limit the
+      // canvas is created without error but every draw is silently discarded
+      // (polygons / measurements / symbols become invisible). Trading some
+      // crispness on retina displays for "polygons actually render" is the
+      // right call. See diagnosis 2026-06-02.
+      enableRetinaScaling: false,
     });
     // Fabric wraps the <canvas> in a `.canvas-container` div whose CSS
     // doesn't inherit our `absolute left-0 top-0`. Force it manually so
