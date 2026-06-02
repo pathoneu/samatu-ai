@@ -29,14 +29,22 @@ export default function ViewerToolbar({
   canUndo,
   canRedo,
   onSave,
+  onLoad,
   onExport,
+  onCalibrateModal,
+  onDetectSymbols,
+  detectingSymbols,
   onVerifyAll,
   walkthroughActive,
   saveStatus,
   scale,
+  zoom,
+  onZoom,
   pageNum,
   numPages,
   onPageChange,
+  measurementsCount,
+  symbolsCount,
 }) {
   const btn = (active, disabled = false) =>
     `flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm transition-colors
@@ -92,34 +100,58 @@ export default function ViewerToolbar({
 
       <div className="mx-3 h-6 w-px bg-neutral-200" />
 
-      {/* Save / Export / Verify */}
+      {/* Zoom controls */}
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onSave}
-          className={btn(false)}
-          title="Išsaugoti anotacijas"
-        >
+        <button type="button" onClick={() => onZoom && onZoom('out')}
+          className={btn(false)} title="Mažinti">−</button>
+        <span className="font-mono text-xs text-neutral-600 px-1">
+          {zoom ? `${Math.round(zoom * 100)}%` : '100%'}
+        </span>
+        <button type="button" onClick={() => onZoom && onZoom('in')}
+          className={btn(false)} title="Didinti">+</button>
+        <button type="button" onClick={() => onZoom && onZoom('reset')}
+          className={btn(false)} title="100%">1:1</button>
+      </div>
+
+      <div className="mx-3 h-6 w-px bg-neutral-200" />
+
+      {/* Save / Load / Export / Verify */}
+      <div className="flex items-center gap-1">
+        {onDetectSymbols && (
+          <button type="button" onClick={onDetectSymbols} disabled={detectingSymbols}
+            className={btn(false, detectingSymbols)} title="Aptikti simbolius brėžinyje">
+            <span className="text-base leading-none">💡</span>
+            <span className="hidden lg:inline">{detectingSymbols ? 'Aptinkama…' : 'Aptikti'}</span>
+          </button>
+        )}
+        {onCalibrateModal && (
+          <button type="button" onClick={onCalibrateModal}
+            className={btn(false)} title="Kalibruoti pagal mano sumas">
+            <span className="text-base leading-none">⚖</span>
+            <span className="hidden lg:inline">Kalibruoti</span>
+          </button>
+        )}
+        <button type="button" onClick={onSave}
+          className={btn(false)} title="Išsaugoti anotacijas (Ctrl+S)">
           <span className="text-base leading-none">💾</span>
           <span className="hidden sm:inline">Saugoti</span>
         </button>
+        {onLoad && (
+          <button type="button" onClick={onLoad}
+            className={btn(false)} title="Atkurti išsaugotas anotacijas">
+            <span className="text-base leading-none">↺</span>
+            <span className="hidden lg:inline">Atkurti</span>
+          </button>
+        )}
         {onExport && (
-          <button
-            type="button"
-            onClick={onExport}
-            className={btn(false)}
-            title="Eksportuoti į Excel"
-          >
-            <span className="text-base leading-none">⬇</span>
+          <button type="button" onClick={onExport}
+            className={btn(false)} title="Eksportuoti į Excel">
+            <span className="text-base leading-none">📊</span>
             <span className="hidden sm:inline">Excel</span>
           </button>
         )}
-        <button
-          type="button"
-          onClick={onVerifyAll}
-          className={btn(walkthroughActive)}
-          title="Tikrinti visus kambarius paeiliui"
-        >
+        <button type="button" onClick={onVerifyAll} className={btn(walkthroughActive)}
+          title="Tikrinti visus kambarius paeiliui">
           <span className="text-base leading-none">✓</span>
           <span className="hidden sm:inline">Tikrinti</span>
         </button>
@@ -129,10 +161,14 @@ export default function ViewerToolbar({
 
       {/* Status info */}
       <div className="flex items-center gap-3 text-xs text-neutral-500">
-        {scale && (
-          <span title="Aktyvus mastelis">
-            Mastelis: <strong className="font-mono">{scale.toFixed(2)}</strong> mm/px
-          </span>
+        <span title="Aktyvus mastelis">
+          Mastelis: <strong className="font-mono">{scale ? `${scale.toFixed(2)} mm/px` : 'nekalibruota'}</strong>
+        </span>
+        {typeof measurementsCount === 'number' && (
+          <span>Matavimai: <strong>{measurementsCount}</strong></span>
+        )}
+        {typeof symbolsCount === 'number' && (
+          <span>Simboliai: <strong>{symbolsCount}</strong></span>
         )}
         {saveStatus === 'saved' && (
           <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">✓ Išsaugota</span>
@@ -142,19 +178,13 @@ export default function ViewerToolbar({
         )}
         {numPages > 1 && onPageChange && (
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.max(1, pageNum - 1))}
+            <button type="button" onClick={() => onPageChange(Math.max(1, pageNum - 1))}
               disabled={pageNum <= 1}
-              className="rounded border border-neutral-300 px-2 py-0.5 disabled:opacity-30"
-            >‹</button>
+              className="rounded border border-neutral-300 px-2 py-0.5 disabled:opacity-30">‹</button>
             <span className="font-mono">{pageNum}/{numPages}</span>
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.min(numPages, pageNum + 1))}
+            <button type="button" onClick={() => onPageChange(Math.min(numPages, pageNum + 1))}
               disabled={pageNum >= numPages}
-              className="rounded border border-neutral-300 px-2 py-0.5 disabled:opacity-30"
-            >›</button>
+              className="rounded border border-neutral-300 px-2 py-0.5 disabled:opacity-30">›</button>
           </div>
         )}
       </div>

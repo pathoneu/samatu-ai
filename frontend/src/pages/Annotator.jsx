@@ -16,6 +16,12 @@ import { useParams, useSearchParams } from 'react-router-dom';
 
 import PdfPage from '@/components/annotator/PdfPage';
 import AnnotationCanvas, { SYMBOL_ICONS, TOOLS } from '@/components/annotator/AnnotationCanvas';
+import ViewerToolbar from '@/components/annotator/ViewerToolbar';
+import RoomDetailCard from '@/components/annotator/RoomDetailCard';
+import MeasurementsList from '@/components/annotator/MeasurementsList';
+import SymbolPalette from '@/components/annotator/SymbolPalette';
+import VerifyWalkthrough from '@/components/annotator/VerifyWalkthrough';
+import ScaleCalibrationWizard from '@/components/annotator/ScaleCalibrationWizard';
 import useCommandStack from '@/hooks/useCommandStack';
 
 
@@ -53,6 +59,27 @@ export default function Annotator() {
 
   // ── Undo/redo for measurements + symbols ─────────────────────────────────
   const cmdStack = useCommandStack({ bindKeys: true });
+
+  // ── Bidirectional linking: selected measurement ──────────────────────────
+  // When the user clicks a measurement row in the sidebar, this is set;
+  // the canvas pulses the matching line. When the user clicks a
+  // measurement directly on the canvas, the same state highlights the
+  // sidebar row and scrolls it into view.
+  const [selectedMeasurementId, setSelectedMeasurementId] = useState(null);
+
+  // ── First-time scale calibration wizard ──────────────────────────────────
+  // Shown on first project open with no saved scale. Once dismissed
+  // (accept / draw / skip), never reopens until the user manually
+  // clicks the toolbar Calibrate tool. localStorage gates re-opens
+  // across reloads so the wizard isn't repetitive.
+  const [scaleWizardOpen, setScaleWizardOpen] = useState(false);
+  useEffect(() => {
+    const key = `scale-wizard-dismissed:${projectId}`;
+    const dismissed = localStorage.getItem(key);
+    if (!dismissed && scale === null && pageDims.width > 0) {
+      setScaleWizardOpen(true);
+    }
+  }, [projectId, scale, pageDims.width]);
 
   // ── Rooms (from /room-graph) + selection ────────────────────────────────
   const [rooms, setRooms] = useState([]);
@@ -320,148 +347,80 @@ export default function Annotator() {
     </button>
   );
 
+  // Excel export handler
+  const handleExport = async () => {
+    const url = fixture
+      ? `/api/projects/${projectId}/export-excel?fixture=${fixture}`
+      : `/api/projects/${projectId}/export-excel`;
+    const r = await fetch(url, { method: 'POST', credentials: 'include' });
+    if (!r.ok) {
+      setSaveStatus('error');
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `samata-${projectId}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // Tool change wrapper (cancels in-progress draft)
+  const setToolSafe = (id) => {
+    setTool(id);
+    if (id !== TOOLS.PLACE_SYMBOL) setPlaceSymbolType(null);
+    if (canvasRef.current) canvasRef.current.cancelDraft();
+  };
+
+  const startVerifyAll = () => {
+    setWalkthroughActive(true);
+    setWalkthroughIdx(0);
+    if (roomsWithPolygons[0]) setSelectedRoomNr(roomsWithPolygons[0].nr);
+  };
+
   return (
     <div className="flex h-screen flex-col bg-neutral-100">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 text-sm">
-        <strong className="mr-3 text-neutral-700">Matavimas</strong>
-        {toolBtn(TOOLS.NONE,      'Pasirinkti', '🖱')}
-        {toolBtn(TOOLS.CALIBRATE, 'Kalibruoti', '🔍')}
-        {toolBtn(TOOLS.MEASURE,   'Matuoti',    '📏')}
-        <button
-          type="button"
-          onClick={handleDetectSymbols}
-          disabled={detecting}
-          className="flex items-center gap-1.5 rounded border border-purple-300 bg-white px-3 py-1.5 text-sm text-purple-700 hover:border-purple-500"
-        >
-          <span>💡</span><span>{detecting ? 'Aptinkama…' : 'Aptikti simbolius'}</span>
-        </button>
-        <span className="mx-2 text-neutral-300">|</span>
-        <button
-          type="button"
-          onClick={() => {
-            setWalkthroughActive(true);
-            setWalkthroughIdx(0);
-            if (roomsWithPolygons[0]) setSelectedRoomNr(roomsWithPolygons[0].nr);
-          }}
-          disabled={roomsWithPolygons.length === 0}
-          className="rounded border border-sky-500 bg-sky-50 px-3 py-1.5 text-sky-700"
-          title="Praeiti per visus kambarius ir patvirtinti / pakoreguoti"
-        >🚶 Tikrinti kambarius</button>
-        <button
-          type="button"
-          onClick={() => setCalibrationModalOpen(true)}
-          className="rounded border border-amber-500 bg-amber-50 px-3 py-1.5 text-amber-700"
-          title="Kalibruoti AI sumas pagal jūsų žinomus skaičius"
-        >⚖ Kalibruoti</button>
-        <button
-          type="button"
-          onClick={async () => {
-            const url = fixture
-              ? `/api/projects/${projectId}/export-excel?fixture=${fixture}`
-              : `/api/projects/${projectId}/export-excel`;
-            const r = await fetch(url, { method: 'POST', credentials: 'include' });
-            if (!r.ok) return alert('Eksportavimas nepavyko');
-            const blob = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `samata-${projectId}.xlsx`;
-            a.click();
-            URL.revokeObjectURL(a.href);
-          }}
-          className="rounded border border-green-600 bg-green-50 px-3 py-1.5 text-green-700"
-          title="Eksportuoti KŽ į Excel"
-        >📊 Eksportuoti</button>
-        <span className="mx-2 text-neutral-300">|</span>
-        <button
-          type="button"
-          onClick={cmdStack.undo}
-          disabled={!cmdStack.canUndo}
-          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 disabled:opacity-30"
-          title="Atšaukti (Ctrl+Z)"
-        >↶ Atšaukti</button>
-        <button
-          type="button"
-          onClick={cmdStack.redo}
-          disabled={!cmdStack.canRedo}
-          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 disabled:opacity-30"
-          title="Pakartoti (Ctrl+Y)"
-        >↷ Pakartoti</button>
-        <span className="mx-2 text-neutral-300">|</span>
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z / 1.25))}
-          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-neutral-700"
-          title="Mažinti (Ctrl + −)"
-        >−</button>
-        <span className="text-xs font-mono text-neutral-600">{Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z * 1.25))}
-          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-neutral-700"
-          title="Didinti (Ctrl + +)"
-        >+</button>
-        <button
-          type="button"
-          onClick={() => setZoom(1)}
-          className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-600"
-          title="100%"
-        >1:1</button>
-        <span className="mx-2 text-neutral-300">|</span>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saveStatus === 'saving'}
-          className="rounded border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-emerald-700"
-        >💾 Įrašyti</button>
-        <button
-          type="button"
-          onClick={handleLoad}
-          disabled={saveStatus === 'saving'}
-          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700"
-        >↺ Atkurti</button>
-        <span className="text-xs text-neutral-500">
-          {saveStatus === 'saving' && '⏳'}
-          {saveStatus === 'saved' && lastSavedAt && `✓ ${new Date(lastSavedAt * 1000).toLocaleTimeString('lt-LT')}`}
-          {saveStatus === 'error' && '⚠ klaida'}
-        </span>
-        <span className="ml-auto text-neutral-600">
-          Mastelis: <strong>{scale ? `1 mm = ${(1 / scale).toFixed(2)} px` : 'nekalibruota'}</strong>
-          {' · '}
-          Matavimai: <strong>{measurements.length}</strong>
-          {' · '}
-          Simboliai: <strong>{symbols.length}</strong>
-          {' · '}
-          Puslapis {pageNum}/{numPages || '?'}
-        </span>
-      </div>
+      {/* Professional toolbar */}
+      <ViewerToolbar
+        tool={tool}
+        setTool={setToolSafe}
+        onUndo={cmdStack.undo}
+        onRedo={cmdStack.redo}
+        canUndo={cmdStack.canUndo}
+        canRedo={cmdStack.canRedo}
+        onSave={handleSave}
+        onLoad={handleLoad}
+        onExport={handleExport}
+        onCalibrateModal={() => setCalibrationModalOpen(true)}
+        onDetectSymbols={handleDetectSymbols}
+        detectingSymbols={detecting}
+        onVerifyAll={startVerifyAll}
+        walkthroughActive={walkthroughActive}
+        saveStatus={saveStatus}
+        scale={scale}
+        zoom={zoom}
+        onZoom={(action) => {
+          if (action === 'in') setZoom((z) => Math.min(ZOOM_MAX, z * 1.25));
+          else if (action === 'out') setZoom((z) => Math.max(ZOOM_MIN, z / 1.25));
+          else setZoom(1);
+        }}
+        pageNum={pageNum}
+        numPages={numPages}
+        onPageChange={setPageNum}
+        measurementsCount={measurements.length}
+        symbolsCount={symbols.length}
+      />
 
-      {/* Symbol palette — when no other tool active */}
+      {/* Symbol palette — visible during NONE and PLACE_SYMBOL tools */}
       {(tool === TOOLS.NONE || tool === TOOLS.PLACE_SYMBOL) && (
-        <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-4 py-1.5 text-xs">
-          <span className="text-neutral-500">Simboliai:</span>
-          {Object.entries(SYMBOL_ICONS).map(([type, meta]) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => {
-                setTool(TOOLS.PLACE_SYMBOL);
-                setPlaceSymbolType(type);
-              }}
-              className={`flex items-center gap-1.5 rounded border px-2 py-1 ${
-                placeSymbolType === type
-                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                  : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-              }`}
-              style={{ borderLeftWidth: 4, borderLeftColor: meta.color }}
-            >
-              <span>{meta.glyph}</span>{meta.label}
-            </button>
-          ))}
-          <span className="ml-2 text-neutral-400">
-            Dešinysis pelės klavišas = ištrinti.  Vilkti = perkelti.
-          </span>
-        </div>
+        <SymbolPalette
+          symbols={symbols}
+          activeType={placeSymbolType}
+          onSelectType={(type) => {
+            setTool(TOOLS.PLACE_SYMBOL);
+            setPlaceSymbolType(type);
+          }}
+        />
       )}
 
       {loadError && (
@@ -494,6 +453,7 @@ export default function Annotator() {
               selectedRoomNr={selectedRoomNr}
               hoveredRoomNr={hoveredRoomNr}
               editingWall={editingWall}
+              selectedMeasurementId={selectedMeasurementId}
               zoom={zoom}
               onWheel={(e) => {
                 // Ctrl/Cmd + wheel zooms; bare wheel scrolls (default).
@@ -545,76 +505,45 @@ export default function Annotator() {
               }}
               onRoomHover={setHoveredRoomNr}
               onWallEditComplete={commitWallEdit}
+              onMeasurementClick={(id) => setSelectedMeasurementId(id)}
             />
           </div>
         </main>
 
         {/* Walkthrough overlay */}
-        {walkthroughActive && roomsWithPolygons[walkthroughIdx] && (() => {
-          const current = roomsWithPolygons[walkthroughIdx];
-          const total = roomsWithPolygons.length;
-          const confirmed = Object.values(verificationState).filter((v) => v === 'confirmed').length;
-          const corrected = Object.values(verificationState).filter((v) => v === 'corrected').length;
-          const advance = () => {
-            if (walkthroughIdx + 1 >= total) {
-              setWalkthroughActive(false);
-              alert(`Patvirtinta: ${confirmed}, Pakoreguota: ${corrected}, Iš viso: ${total}`);
-              return;
-            }
-            const nextIdx = walkthroughIdx + 1;
-            setWalkthroughIdx(nextIdx);
-            setSelectedRoomNr(roomsWithPolygons[nextIdx].nr);
-          };
-          return (
-            <div className="absolute right-4 top-32 z-40 w-80 rounded-lg border border-sky-300 bg-white p-4 shadow-2xl">
-              <div className="mb-1 text-xs uppercase text-sky-600">
-                Tikrinimas {walkthroughIdx + 1} / {total}
-              </div>
-              <div className="text-base font-semibold text-neutral-800">
-                {current.nr} {current.name}
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-neutral-600">
-                <div>Plotas: <strong>{current.area_m2.toFixed(2)} m²</strong></div>
-                <div>Perim.: <strong>{(current.perimeter_mm / 1000).toFixed(2)} m</strong></div>
-                <div>H: <strong>{current.ceiling_height_m.toFixed(2)} m</strong></div>
-                <div>Dažym.: <strong>{current.dazymo_plotas_m2.toFixed(1)} m²</strong></div>
-              </div>
-              <p className="mt-3 text-sm font-medium text-neutral-700">
-                Ar AI matmenys teisingi?
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { confirmRoom(current.nr); advance(); }}
-                  className="flex-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-1.5 text-sm text-emerald-700"
-                >✓ Taip</button>
-                <button
-                  type="button"
-                  onClick={() => markCorrected(current.nr)}
-                  className="flex-1 rounded border border-amber-500 bg-amber-50 px-2 py-1.5 text-sm text-amber-700"
-                  title="Pakoreguokite sienas dešinėje, tada Toliau"
-                >✎ Koreguoti</button>
-              </div>
-              <div className="mt-2 flex gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={advance}
-                  className="flex-1 rounded border border-neutral-300 px-2 py-1 text-neutral-600"
-                >→ Toliau</button>
-                <button
-                  type="button"
-                  onClick={() => setWalkthroughActive(false)}
-                  className="rounded border border-neutral-300 px-2 py-1 text-neutral-500"
-                >Nutraukti</button>
-              </div>
-              <div className="mt-2 text-xs text-neutral-400">
-                ✓ {confirmed}  ·  ✎ {corrected}  ·  liko {total - walkthroughIdx - 1}
-              </div>
-            </div>
-          );
-        })()}
+        {walkthroughActive && (
+          <VerifyWalkthrough
+            rooms={roomsWithPolygons}
+            currentIdx={walkthroughIdx}
+            verificationState={verificationState}
+            onConfirm={(nr) => {
+              confirmRoom(nr);
+              // Advance: same logic as the inline version
+              const total = roomsWithPolygons.length;
+              if (walkthroughIdx + 1 >= total) {
+                setWalkthroughActive(false);
+                return;
+              }
+              const nextIdx = walkthroughIdx + 1;
+              setWalkthroughIdx(nextIdx);
+              setSelectedRoomNr(roomsWithPolygons[nextIdx].nr);
+            }}
+            onCorrect={(nr) => markCorrected(nr)}
+            onAdvance={() => {
+              const total = roomsWithPolygons.length;
+              if (walkthroughIdx + 1 >= total) {
+                setWalkthroughActive(false);
+                return;
+              }
+              const nextIdx = walkthroughIdx + 1;
+              setWalkthroughIdx(nextIdx);
+              setSelectedRoomNr(roomsWithPolygons[nextIdx].nr);
+            }}
+            onStop={() => setWalkthroughActive(false)}
+          />
+        )}
 
-        {/* Calibration modal */}
+        {/* Calibration modal (per-category override) */}
         {calibrationModalOpen && (
           <CalibrationModal
             initialAi={kzTotals}
@@ -622,6 +551,29 @@ export default function Annotator() {
             onCancel={() => setCalibrationModalOpen(false)}
             onSubmit={submitCalibration}
             busy={calibrationFetching}
+          />
+        )}
+
+        {/* First-time scale calibration wizard */}
+        {scaleWizardOpen && (
+          <ScaleCalibrationWizard
+            aiScale={pageScaleMmPerPct && pageDims.width
+              ? pageScaleMmPerPct / pageDims.width
+              : null}
+            onAccept={(s) => {
+              setScale(s);
+              setScaleWizardOpen(false);
+              localStorage.setItem(`scale-wizard-dismissed:${projectId}`, '1');
+            }}
+            onDrawLine={() => {
+              setTool(TOOLS.CALIBRATE);
+              setScaleWizardOpen(false);
+              localStorage.setItem(`scale-wizard-dismissed:${projectId}`, '1');
+            }}
+            onSkip={() => {
+              setScaleWizardOpen(false);
+              localStorage.setItem(`scale-wizard-dismissed:${projectId}`, '1');
+            }}
           />
         )}
 
@@ -673,74 +625,15 @@ export default function Annotator() {
           </section>
 
           {/* Selected room card + per-wall edit */}
-          {selectedRoom && (
-            <section className="border-b border-neutral-200 bg-blue-50/40 px-4 py-3">
-              <div className="mb-1 flex items-center justify-between">
-                <div className="text-xs font-medium uppercase text-neutral-500">Pasirinkta patalpa</div>
-                {verificationState[selectedRoom.nr] === 'confirmed' && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">✓ Patvirtinta</span>
-                )}
-                {verificationState[selectedRoom.nr] === 'corrected' && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">✎ Pakoreguota</span>
-                )}
-              </div>
-              <div className="text-base font-semibold text-neutral-800">
-                {selectedRoom.nr} {selectedRoom.name}
-              </div>
-              <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
-                <div><span className="text-neutral-500">Plotas: </span><strong>{selectedRoom.area_m2.toFixed(2)} m²</strong></div>
-                <div><span className="text-neutral-500">Perimetras: </span><strong>{(selectedRoom.perimeter_mm / 1000).toFixed(2)} m</strong></div>
-                <div><span className="text-neutral-500">H: </span><strong>{selectedRoom.ceiling_height_m.toFixed(2)} m</strong></div>
-                <div><span className="text-neutral-500">Sienos dažomos: </span><strong>{selectedRoom.walls_paintable_m2.toFixed(1)} m²</strong></div>
-                <div><span className="text-neutral-500">Lubos: </span><strong>{selectedRoom.ceiling_paintable_m2.toFixed(1)} m²</strong></div>
-                <div><span className="text-neutral-500">Σ dažymas: </span><strong>{selectedRoom.dazymo_plotas_m2.toFixed(1)} m²</strong></div>
-              </div>
-              {selectedRoom.polygon_pct && (
-                <div className="mt-3">
-                  <div className="mb-1 text-xs font-medium text-neutral-500">Sienos</div>
-                  <ul className="space-y-1">
-                    {selectedRoom.polygon_pct.map((_, idx) => {
-                      const wallId = `w${idx + 1}`;
-                      const override = roomOverrides[selectedRoom.nr]?.walls?.[wallId];
-                      const aiLen = (selectedRoom.perimeter_mm / selectedRoom.polygon_pct.length / 1000).toFixed(2);
-                      return (
-                        <li key={wallId} className="flex items-center gap-2 text-xs">
-                          <span className="w-8 font-mono text-neutral-500">{wallId}</span>
-                          <span className="flex-1">
-                            AI: {aiLen} m
-                            {override !== undefined && (
-                              <span className="ml-2 font-mono font-semibold text-amber-700">
-                                → {(override / 1000).toFixed(2)} m
-                              </span>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => startWallEdit(selectedRoom.nr, wallId)}
-                            disabled={!scale}
-                            title={scale ? 'Pertaškyti sieną' : 'Pirmiausia kalibruokite'}
-                            className="rounded border border-blue-300 bg-white px-2 py-0.5 text-blue-700 hover:border-blue-500"
-                          >✎ Pertaškyti</button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => confirmRoom(selectedRoom.nr)}
-                  className="flex-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
-                >✓ Patvirtinti</button>
-                <button
-                  type="button"
-                  onClick={() => markCorrected(selectedRoom.nr)}
-                  className="flex-1 rounded border border-amber-500 bg-amber-50 px-2 py-1 text-xs text-amber-700"
-                >✎ Pakoregavau</button>
-              </div>
-            </section>
-          )}
+          <RoomDetailCard
+            room={selectedRoom}
+            verificationState={verificationState}
+            roomOverrides={roomOverrides}
+            scale={scale}
+            onConfirm={confirmRoom}
+            onMarkCorrected={markCorrected}
+            onStartWallEdit={startWallEdit}
+          />
 
           {/* Rooms list */}
           <section className="border-b border-neutral-200">
@@ -770,30 +663,20 @@ export default function Annotator() {
             </ul>
           </section>
 
-          {/* Measurements */}
-          <section className="flex-1 overflow-auto">
-            <header className="flex items-center justify-between px-4 py-2 text-xs font-medium uppercase text-neutral-500">
-              <span>Matavimai ({measurements.length})</span>
-              {measurements.length > 0 && (
-                <button
-                  onClick={() => setMeasurements([])}
-                  className="rounded border border-neutral-300 px-2 py-0.5 text-xs"
-                >Išvalyti</button>
-              )}
-            </header>
-            <ul className="text-sm">
-              {measurements.map((m, i) => (
-                <li key={m.id} className="flex items-center justify-between gap-2 border-b border-neutral-100 px-4 py-1.5">
-                  <span className="text-neutral-500">#{i + 1}</span>
-                  <span className="font-mono text-blue-700">{m.length_mm.toFixed(1)} mm</span>
-                  <button
-                    onClick={() => setMeasurements((prev) => prev.filter((x) => x.id !== m.id))}
-                    className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600"
-                  >Trinti</button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* Measurements list (with bidirectional canvas linking) */}
+          <MeasurementsList
+            measurements={measurements}
+            selectedId={selectedMeasurementId}
+            onSelect={setSelectedMeasurementId}
+            onDelete={(id) => {
+              setMeasurements((prev) => prev.filter((x) => x.id !== id));
+              if (selectedMeasurementId === id) setSelectedMeasurementId(null);
+            }}
+            onClearAll={() => {
+              setMeasurements([]);
+              setSelectedMeasurementId(null);
+            }}
+          />
         </aside>
       </div>
 

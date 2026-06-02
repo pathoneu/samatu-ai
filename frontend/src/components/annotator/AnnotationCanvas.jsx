@@ -117,6 +117,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     selectedRoomNr,
     hoveredRoomNr,
     editingWall,
+    selectedMeasurementId = null,
     zoom = 1,
     onMeasurementComplete,
     onSymbolPlaced,
@@ -126,6 +127,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     onRoomClick,
     onRoomHover,
     onWallEditComplete,
+    onMeasurementClick,
     onWheel,
   },
   ref,
@@ -207,9 +209,29 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       }
       return null;
     },
+    // Hit-test a measurement line — used for canvas → list highlight.
+    // Returns the closest measurement id whose line passes within
+    // `thresholdPx` of the click point.
+    hitTestMeasurementAtPx: (point, thresholdPx = 6) => {
+      const distPointToSeg = (p, a, b) => {
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const t = dx === 0 && dy === 0 ? 0
+          : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx*dx + dy*dy)));
+        const px = a.x + t * dx, py = a.y + t * dy;
+        return Math.hypot(p.x - px, p.y - py);
+      };
+      let best = null, bestD = thresholdPx;
+      for (const m of measurements) {
+        const a = pctToPx(m.p1_pct, pageDims);
+        const b = pctToPx(m.p2_pct, pageDims);
+        const d = distPointToSeg(point, a, b);
+        if (d < bestD) { bestD = d; best = m.id; }
+      }
+      return best;
+    },
     setMeasurements: () => {},    // controlled by parent; no-op preserved for API parity
     setSymbols: () => {},
-  }), [rooms, symbols, pageDims]);
+  }), [rooms, symbols, pageDims, measurements]);
 
   // Cancel transient drafts whenever the tool switches.
   useEffect(() => {
@@ -249,8 +271,18 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     for (const m of measurements) {
       const p1 = pctToPx(m.p1_pct, pageDims);
       const p2 = pctToPx(m.p2_pct, pageDims);
+      const isSelected = m.id && m.id === selectedMeasurementId;
+      // Selected measurement gets a yellow halo (thicker, brighter)
+      // so the bidirectional canvas↔list highlight is visible.
+      if (isSelected) {
+        fc.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
+          stroke: '#facc15', strokeWidth: 8, opacity: 0.6,
+          selectable: false, evented: false, objectCaching: false,
+        }));
+      }
       fc.add(new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
-        stroke: '#2a6fb5', strokeWidth: 2,
+        stroke: isSelected ? '#1d4ed8' : '#2a6fb5',
+        strokeWidth: isSelected ? 3 : 2,
         selectable: false, evented: false, objectCaching: false,
       }));
       for (const p of [p1, p2]) {
@@ -334,7 +366,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   }, [
     rooms, pageDims, measurements, symbols, calibrationPoints,
     draftStart, cursorPx, snapTarget, hoveredRoomNr, selectedRoomNr,
-    tool, scale,
+    selectedMeasurementId, tool, scale,
   ]);
 
   // ── Mouse handlers (unchanged event model from vanilla impl) ────────────
@@ -379,6 +411,30 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     }
 
     if (tool === TOOLS.NONE) {
+      // 1. Prefer measurement-line click (canvas → list highlight)
+      const measHit = (() => {
+        // Inline the hit-test (the imperative API method is for outside callers)
+        const distPointToSeg = (p, a, b) => {
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const t = dx === 0 && dy === 0 ? 0
+            : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx*dx + dy*dy)));
+          const px = a.x + t * dx, py = a.y + t * dy;
+          return Math.hypot(p.x - px, p.y - py);
+        };
+        let best = null, bestD = 8;
+        for (const m of measurements) {
+          const a = pctToPx(m.p1_pct, pageDims);
+          const b = pctToPx(m.p2_pct, pageDims);
+          const d = distPointToSeg(raw, a, b);
+          if (d < bestD) { bestD = d; best = m.id; }
+        }
+        return best;
+      })();
+      if (measHit && onMeasurementClick) {
+        onMeasurementClick(measHit);
+        return;
+      }
+      // 2. Otherwise: room polygon click → select room
       const hit = (() => {
         for (const room of rooms) {
           if (!room.polygon_pct) continue;
