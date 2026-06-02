@@ -49,17 +49,42 @@ export const TOOLS = {
 };
 
 // ── Geometry helpers ───────────────────────────────────────────────────────
-function clientToPagePx(canvasEl, e, zoom) {
-  // Convert client-space click → page-pixel space.
-  // Canvas CSS is sized to pageDims × zoom, so dividing the in-rect
-  // offset by `zoom` lands us back in pageDims coords (the same space
-  // polygon_pct × pageDims produces). DO NOT use canvasEl.width — that's
-  // the DPI-scaled intrinsic store (Fabric multiplies it for HiDPI) and
-  // would put coords in a different space than the polygon hit-test.
+function clientToCanvasPx(canvasEl, e, zoom) {
+  // Convert client-space click → canvas-pixel space (full multi-page
+  // height). Canvas CSS is sized to layout.totalSize × zoom; dividing
+  // the in-rect offset by `zoom` lands us back in layout coords.
   const rect = canvasEl.getBoundingClientRect();
   return {
     x: (e.clientX - rect.left) / zoom,
     y: (e.clientY - rect.top) / zoom,
+  };
+}
+
+function pageOfY(layoutPages, canvasY) {
+  // Which page contains this canvas-y? Returns the page entry or null.
+  for (const p of layoutPages || []) {
+    if (canvasY >= p.offsetY && canvasY < p.offsetY + p.height) return p;
+  }
+  return null;
+}
+
+function canvasPxToPagePct(canvasPt, layoutPages) {
+  // Returns {pageNum, x_pct, y_pct} or null if outside any page.
+  const p = pageOfY(layoutPages, canvasPt.y);
+  if (!p) return null;
+  return {
+    pageNum: p.pageNum,
+    x_pct: p.width > 0 ? canvasPt.x / p.width : 0,
+    y_pct: p.height > 0 ? (canvasPt.y - p.offsetY) / p.height : 0,
+  };
+}
+
+function pagePctToCanvasPx(pageNum, pt_pct, layoutPages) {
+  const p = (layoutPages || []).find((q) => q.pageNum === pageNum);
+  if (!p) return null;
+  return {
+    x: pt_pct.x_pct * p.width,
+    y: p.offsetY + pt_pct.y_pct * p.height,
   };
 }
 
@@ -76,13 +101,22 @@ function pxToPct(pt, dims) {
   };
 }
 
-function snapToCorner(cursor, rooms, dims, thresholdPx) {
+function snapToCorner(cursor, rooms, layoutPages, thresholdPx) {
+  // Multi-page: each room's polygon is in pct of its own page; convert to
+  // canvas-y coords by offsetting with the room's page.
   let best = null;
   let bestD = thresholdPx;
   for (const room of rooms) {
     if (!room.polygon_pct) continue;
+    const pageNum = parseInt(room.puslapio_nr ?? 1, 10);
+    const page = (layoutPages || []).find((p) => p.pageNum === pageNum)
+      || (layoutPages || [])[0];
+    if (!page) continue;
     for (const v of room.polygon_pct) {
-      const px = pctToPx(v, dims);
+      const px = {
+        x: v.x_pct * page.width,
+        y: page.offsetY + v.y_pct * page.height,
+      };
       const d = dist(cursor, px);
       if (d < bestD) {
         bestD = d;
@@ -91,6 +125,68 @@ function snapToCorner(cursor, rooms, dims, thresholdPx) {
     }
   }
   return best;
+}
+
+function snapToWallLine(cursor, rooms, layoutPages, thresholdPx) {
+  // Perpendicular snap: for every wall segment in every room's polygon,
+  // find the foot of perpendicular from cursor. If within threshold,
+  // snap there. Returns {x, y, line: [{x,y},{x,y}]} or null.
+  let best = null;
+  let bestD = thresholdPx;
+  for (const room of rooms) {
+    if (!room.polygon_pct || room.polygon_pct.length < 2) continue;
+    const pageNum = parseInt(room.puslapio_nr ?? 1, 10);
+    const page = (layoutPages || []).find((p) => p.pageNum === pageNum)
+      || (layoutPages || [])[0];
+    if (!page) continue;
+    const poly = room.polygon_pct.map((v) => ({
+      x: v.x_pct * page.width,
+      y: page.offsetY + v.y_pct * page.height,
+    }));
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 < 1) continue;
+      const t = ((cursor.x - a.x) * dx + (cursor.y - a.y) * dy) / len2;
+      if (t < 0 || t > 1) continue;  // foot outside segment — corner snap handles
+      const fx = a.x + t * dx, fy = a.y + t * dy;
+      const d = Math.hypot(cursor.x - fx, cursor.y - fy);
+      if (d < bestD) {
+        bestD = d;
+        best = { x: fx, y: fy, line: [a, b] };
+      }
+    }
+  }
+  return best;
+}
+
+function snapToOrthogonal(cursor, anchor, thresholdDeg = 15) {
+  // When drawing from anchor → cursor, snap to 0/90/180/270 when the
+  // current angle is within thresholdDeg of one. Returns possibly
+  // adjusted endpoint, plus a flag for whether a snap happened.
+  const dx = cursor.x - anchor.x, dy = cursor.y - anchor.y;
+  const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+  const candidates = [0, 90, 180, 270];
+  let chosen = null;
+  for (const c of candidates) {
+    const diff = Math.min(
+      Math.abs(angle - c),
+      Math.abs(angle - c - 360),
+      Math.abs(angle - c + 360),
+    );
+    if (diff < thresholdDeg) { chosen = c; break; }
+  }
+  if (chosen === null) return { x: cursor.x, y: cursor.y, snapped: false };
+  const r = Math.hypot(dx, dy);
+  const rad = chosen * Math.PI / 180;
+  return {
+    x: anchor.x + r * Math.cos(rad),
+    y: anchor.y + r * Math.sin(rad),
+    snapped: true,
+    angle: chosen,
+  };
 }
 
 function pointInPolygonPx(pt, polygonPx) {
@@ -107,7 +203,11 @@ function pointInPolygonPx(pt, polygonPx) {
 
 const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   {
+    // Single-page legacy: pageDims = {width, height}
+    // Multi-page: pagesLayout = {pages:[{pageNum,width,height,offsetY}],
+    //                            totalWidth, totalHeight}
     pageDims,
+    pagesLayout,
     tool,
     scale,
     rooms,
@@ -132,6 +232,15 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   },
   ref,
 ) {
+  // Normalize: caller may supply either pagesLayout (multi-page) or
+  // pageDims (legacy single-page). Internally we always use layoutPages
+  // as the source-of-truth list of {pageNum,width,height,offsetY}.
+  const layoutPages = pagesLayout?.pages || (pageDims && pageDims.width > 0
+    ? [{ pageNum: 1, width: pageDims.width, height: pageDims.height, offsetY: 0 }]
+    : []);
+  const canvasSize = pagesLayout
+    ? { width: pagesLayout.totalWidth || 0, height: pagesLayout.totalHeight || 0 }
+    : { width: pageDims?.width || 0, height: pageDims?.height || 0 };
   const canvasElRef = useRef(null);
   const fabricRef = useRef(null);                  // fabric.Canvas instance
   const [cursorPx, setCursorPx] = useState(null);
@@ -180,38 +289,51 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   useEffect(() => {
     const fc = fabricRef.current;
     if (!fc) return;
-    fc.setDimensions({ width: pageDims.width, height: pageDims.height });
+    fc.setDimensions({ width: canvasSize.width, height: canvasSize.height });
     fc.setZoom(zoom);
     fc.requestRenderAll();
-  }, [pageDims.width, pageDims.height, zoom]);
+  }, [canvasSize.width, canvasSize.height, zoom]);
+
+  // Helper: convert a stored point (with optional pageNum) to canvas px
+  const storedPointToCanvasPx = (pt) => {
+    const pageNum = pt.pageNum != null ? pt.pageNum : 1;
+    const r = pagePctToCanvasPx(pageNum, pt, layoutPages);
+    return r || { x: 0, y: 0 };
+  };
 
   // ── Imperative API (unchanged from vanilla impl) ────────────────────────
   useImperativeHandle(ref, () => ({
-    snapPxToCorner: (point) => snapToCorner(point, rooms, pageDims, SNAP_PX),
-    getCanvasDims: () => ({ width: pageDims.width, height: pageDims.height }),
+    snapPxToCorner: (point) => snapToCorner(point, rooms, layoutPages, SNAP_PX),
+    snapPxToWallLine: (point) => snapToWallLine(point, rooms, layoutPages, SNAP_PX),
+    getCanvasDims: () => canvasSize,
     cancelDraft: () => {
       setDraftStart(null);
       setCalibrationPoints([]);
       setSnapTarget(null);
     },
     hitTestRoomAtPx: (point) => {
+      // Click in canvas coords → find which page → check that page's polygons
+      const pageEntry = pageOfY(layoutPages, point.y);
+      if (!pageEntry) return null;
       for (const room of rooms) {
+        const roomPageNum = parseInt(room.puslapio_nr ?? 1, 10);
+        if (roomPageNum !== pageEntry.pageNum) continue;
         if (!room.polygon_pct) continue;
-        const polyPx = room.polygon_pct.map((v) => pctToPx(v, pageDims));
+        const polyPx = room.polygon_pct.map((v) => ({
+          x: v.x_pct * pageEntry.width,
+          y: pageEntry.offsetY + v.y_pct * pageEntry.height,
+        }));
         if (pointInPolygonPx(point, polyPx)) return room.nr;
       }
       return null;
     },
     hitTestSymbolAtPx: (point) => {
       for (const s of symbols) {
-        const sp = pctToPx(s.pos_pct, pageDims);
+        const sp = storedPointToCanvasPx(s.pos_pct);
         if (dist(point, sp) <= 12) return s.id;
       }
       return null;
     },
-    // Hit-test a measurement line — used for canvas → list highlight.
-    // Returns the closest measurement id whose line passes within
-    // `thresholdPx` of the click point.
     hitTestMeasurementAtPx: (point, thresholdPx = 6) => {
       const distPointToSeg = (p, a, b) => {
         const dx = b.x - a.x, dy = b.y - a.y;
@@ -222,8 +344,8 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       };
       let best = null, bestD = thresholdPx;
       for (const m of measurements) {
-        const a = pctToPx(m.p1_pct, pageDims);
-        const b = pctToPx(m.p2_pct, pageDims);
+        const a = storedPointToCanvasPx(m.p1_pct);
+        const b = storedPointToCanvasPx(m.p2_pct);
         const d = distPointToSeg(point, a, b);
         if (d < bestD) { bestD = d; best = m.id; }
       }
@@ -231,7 +353,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     },
     setMeasurements: () => {},    // controlled by parent; no-op preserved for API parity
     setSymbols: () => {},
-  }), [rooms, symbols, pageDims, measurements]);
+  }), [rooms, symbols, layoutPages, canvasSize, measurements]);
 
   // Cancel transient drafts whenever the tool switches.
   useEffect(() => {
@@ -248,10 +370,16 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     // typical 5-20 rooms + ~100 measurements/symbols per page.
     fc.remove(...fc.getObjects());
 
-    // 1. Room polygons
+    // 1. Room polygons (per-page offset)
     for (const room of rooms) {
       if (!room.polygon_pct) continue;
-      const polyPx = room.polygon_pct.map((v) => pctToPx(v, pageDims));
+      const pageNum = parseInt(room.puslapio_nr ?? 1, 10);
+      const page = layoutPages.find((p) => p.pageNum === pageNum) || layoutPages[0];
+      if (!page) continue;
+      const polyPx = room.polygon_pct.map((v) => ({
+        x: v.x_pct * page.width,
+        y: page.offsetY + v.y_pct * page.height,
+      }));
       const isHover = room.nr === hoveredRoomNr;
       const isSelected = room.nr === selectedRoomNr;
       const fill = isSelected ? 'rgba(42, 111, 181, 0.30)'
@@ -263,14 +391,14 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
         strokeWidth: isSelected ? 2.5 : 1.5,
         selectable: false,
         evented: false,
-        objectCaching: false,
+        objectCaching: true,
       }));
     }
 
     // 2. Measurements
     for (const m of measurements) {
-      const p1 = pctToPx(m.p1_pct, pageDims);
-      const p2 = pctToPx(m.p2_pct, pageDims);
+      const p1 = storedPointToCanvasPx(m.p1_pct);
+      const p2 = storedPointToCanvasPx(m.p2_pct);
       const isSelected = m.id && m.id === selectedMeasurementId;
       // Selected measurement gets a yellow halo (thicker, brighter)
       // so the bidirectional canvas↔list highlight is visible.
@@ -341,9 +469,9 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       }));
     }
 
-    // 6. Symbols
+    // 6. Symbols (with optional rotation)
     for (const s of symbols) {
-      const pos = pctToPx(s.pos_pct, pageDims);
+      const pos = storedPointToCanvasPx(s.pos_pct);
       const meta = SYMBOL_ICONS[s.type] || SYMBOL_ICONS.socket;
       const circle = new fabric.Circle({
         left: -10, top: -10, radius: 10,
@@ -358,93 +486,125 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       });
       fc.add(new fabric.Group([circle, glyph], {
         left: pos.x, top: pos.y, originX: 'center', originY: 'center',
+        angle: s.rotation_deg || 0,
         selectable: false, evented: false, objectCaching: false,
       }));
+      // Rotation handle when this symbol is selected
+      if (s.id && s.id === window.__selectedSymbolId) {
+        fc.add(new fabric.Circle({
+          left: pos.x, top: pos.y - 26,
+          radius: 6, fill: '#fff', stroke: meta.color, strokeWidth: 2,
+          originX: 'center', originY: 'center',
+          selectable: false, evented: false, objectCaching: false,
+        }));
+      }
     }
 
     fc.requestRenderAll();
   }, [
-    rooms, pageDims, measurements, symbols, calibrationPoints,
+    rooms, layoutPages, measurements, symbols, calibrationPoints,
     draftStart, cursorPx, snapTarget, hoveredRoomNr, selectedRoomNr,
     selectedMeasurementId, tool, scale,
   ]);
 
-  // ── Mouse handlers (unchanged event model from vanilla impl) ────────────
+  // ── Mouse handlers (multi-page aware) ───────────────────────────────────
   const onMove = (e) => {
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToPagePx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom);
     setCursorPx(p);
 
     if (draggingSymbolId) {
-      onSymbolMoved && onSymbolMoved(draggingSymbolId, pxToPct(p, pageDims));
+      const pageMeta = canvasPxToPagePct(p, layoutPages);
+      if (pageMeta) onSymbolMoved && onSymbolMoved(draggingSymbolId, pageMeta);
       return;
     }
     if (tool === TOOLS.NONE) {
+      // Multi-page hit-test by page-of-y
+      const pageEntry = pageOfY(layoutPages, p.y);
       let hit = null;
-      for (const room of rooms) {
-        if (!room.polygon_pct) continue;
-        const polyPx = room.polygon_pct.map((v) => pctToPx(v, pageDims));
-        if (pointInPolygonPx(p, polyPx)) { hit = room.nr; break; }
+      if (pageEntry) {
+        for (const room of rooms) {
+          const rPage = parseInt(room.puslapio_nr ?? 1, 10);
+          if (rPage !== pageEntry.pageNum) continue;
+          if (!room.polygon_pct) continue;
+          const polyPx = room.polygon_pct.map((v) => ({
+            x: v.x_pct * pageEntry.width,
+            y: pageEntry.offsetY + v.y_pct * pageEntry.height,
+          }));
+          if (pointInPolygonPx(p, polyPx)) { hit = room.nr; break; }
+        }
       }
       onRoomHover && onRoomHover(hit);
       setSnapTarget(null);
       return;
     }
     if (tool === TOOLS.MEASURE || tool === TOOLS.CALIBRATE || tool === TOOLS.EDIT_WALL) {
-      setSnapTarget(snapToCorner(p, rooms, pageDims, SNAP_PX));
+      // Snap priority: corner > wall-line > orthogonal-from-draft
+      let snap = snapToCorner(p, rooms, layoutPages, SNAP_PX);
+      if (!snap) snap = snapToWallLine(p, rooms, layoutPages, 15);
+      if (!snap && draftStart && tool === TOOLS.MEASURE) {
+        const ortho = snapToOrthogonal(p, draftStart, 8);
+        if (ortho.snapped) snap = { x: ortho.x, y: ortho.y, ortho: true };
+      }
+      setSnapTarget(snap);
     }
   };
 
   const onClick = (e) => {
     const el = canvasElRef.current;
     if (!el) return;
-    const raw = clientToPagePx(el, e, zoom);
+    const raw = clientToCanvasPx(el, e, zoom);
     const p = snapTarget || raw;
 
     if (tool === TOOLS.PLACE_SYMBOL && placeSymbolType) {
-      onSymbolPlaced && onSymbolPlaced({
-        type: placeSymbolType,
-        pos_pct: pxToPct(raw, pageDims),
-      });
+      const pageMeta = canvasPxToPagePct(raw, layoutPages);
+      if (pageMeta) {
+        onSymbolPlaced && onSymbolPlaced({
+          type: placeSymbolType,
+          pos_pct: pageMeta,
+        });
+      }
       return;
     }
 
     if (tool === TOOLS.NONE) {
       // 1. Prefer measurement-line click (canvas → list highlight)
-      const measHit = (() => {
-        // Inline the hit-test (the imperative API method is for outside callers)
-        const distPointToSeg = (p, a, b) => {
-          const dx = b.x - a.x, dy = b.y - a.y;
-          const t = dx === 0 && dy === 0 ? 0
-            : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx*dx + dy*dy)));
-          const px = a.x + t * dx, py = a.y + t * dy;
-          return Math.hypot(p.x - px, p.y - py);
-        };
-        let best = null, bestD = 8;
-        for (const m of measurements) {
-          const a = pctToPx(m.p1_pct, pageDims);
-          const b = pctToPx(m.p2_pct, pageDims);
-          const d = distPointToSeg(raw, a, b);
-          if (d < bestD) { bestD = d; best = m.id; }
-        }
-        return best;
-      })();
+      const distPointToSeg = (q, a, b) => {
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const t = dx === 0 && dy === 0 ? 0
+          : Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / (dx*dx + dy*dy)));
+        const px = a.x + t * dx, py = a.y + t * dy;
+        return Math.hypot(q.x - px, q.y - py);
+      };
+      let measHit = null, bestD = 8;
+      for (const m of measurements) {
+        const a = storedPointToCanvasPx(m.p1_pct);
+        const b = storedPointToCanvasPx(m.p2_pct);
+        const d = distPointToSeg(raw, a, b);
+        if (d < bestD) { bestD = d; measHit = m.id; }
+      }
       if (measHit && onMeasurementClick) {
         onMeasurementClick(measHit);
         return;
       }
-      // 2. Otherwise: room polygon click → select room
-      const hit = (() => {
+      // 2. Otherwise: room polygon click → select room (multi-page hit-test)
+      const pageEntry = pageOfY(layoutPages, raw.y);
+      let hit = null;
+      if (pageEntry) {
         for (const room of rooms) {
+          const rPage = parseInt(room.puslapio_nr ?? 1, 10);
+          if (rPage !== pageEntry.pageNum) continue;
           if (!room.polygon_pct) continue;
-          const polyPx = room.polygon_pct.map((v) => pctToPx(v, pageDims));
-          if (pointInPolygonPx(raw, polyPx)) return room.nr;
+          const polyPx = room.polygon_pct.map((v) => ({
+            x: v.x_pct * pageEntry.width,
+            y: pageEntry.offsetY + v.y_pct * pageEntry.height,
+          }));
+          if (pointInPolygonPx(raw, polyPx)) { hit = room.nr; break; }
         }
-        return null;
-      })();
+      }
       // eslint-disable-next-line no-console
-      if (window.__DEBUG_CANVAS) console.log('[AnnotationCanvas] click', { raw, hit, n_rooms: rooms.length, pageDims });
+      if (window.__DEBUG_CANVAS) console.log('[AnnotationCanvas] click', { raw, hit, page: pageEntry?.pageNum });
       onRoomClick && onRoomClick(hit);
       return;
     }
@@ -477,9 +637,6 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
 
     if (tool === TOOLS.MEASURE) {
       if (!scale) {
-        // Non-blocking inline notice instead of a modal alert. The
-        // calibration wizard (when shipped) will trigger the calibrate
-        // flow automatically on first project open.
         // eslint-disable-next-line no-console
         console.warn('[AnnotationCanvas] measure attempted without scale; calibrate first');
         return;
@@ -487,12 +644,16 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       if (!draftStart) { setDraftStart(p); return; }
       const lenPx = dist(draftStart, p);
       const lenMm = lenPx * scale;
+      const p1Stored = canvasPxToPagePct(draftStart, layoutPages);
+      const p2Stored = canvasPxToPagePct(p, layoutPages);
       setDraftStart(null);
-      onMeasurementComplete && onMeasurementComplete({
-        p1_pct: pxToPct(draftStart, pageDims),
-        p2_pct: pxToPct(p, pageDims),
-        length_mm: lenMm,
-      });
+      if (p1Stored && p2Stored) {
+        onMeasurementComplete && onMeasurementComplete({
+          p1_pct: p1Stored,
+          p2_pct: p2Stored,
+          length_mm: lenMm,
+        });
+      }
     }
   };
 
@@ -500,10 +661,21 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     if (tool !== TOOLS.NONE) return;
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToPagePx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom);
     for (const s of symbols) {
-      const sp = pctToPx(s.pos_pct, pageDims);
-      if (dist(p, sp) <= 12) { setDraggingSymbolId(s.id); return; }
+      const sp = storedPointToCanvasPx(s.pos_pct);
+      if (dist(p, sp) <= 12) {
+        setDraggingSymbolId(s.id);
+        // Alt-drag = duplicate
+        if (e.altKey && onSymbolPlaced) {
+          onSymbolPlaced({
+            type: s.type,
+            pos_pct: { ...s.pos_pct },
+            rotation_deg: s.rotation_deg || 0,
+          });
+        }
+        return;
+      }
     }
   };
   const onMouseUp = () => setDraggingSymbolId(null);
@@ -513,9 +685,9 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     e.preventDefault();
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToPagePx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom);
     for (const s of symbols) {
-      const sp = pctToPx(s.pos_pct, pageDims);
+      const sp = storedPointToCanvasPx(s.pos_pct);
       if (dist(p, sp) <= 12) {
         onSymbolDeleted && onSymbolDeleted(s.id);
         return;
@@ -559,8 +731,8 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
         left: 0,
         top: 0,
         cursor: tool === TOOLS.NONE ? 'pointer' : 'crosshair',
-        width: (pageDims.width || 0) * zoom,
-        height: (pageDims.height || 0) * zoom,
+        width: canvasSize.width * zoom,
+        height: canvasSize.height * zoom,
       }}
     />
   );

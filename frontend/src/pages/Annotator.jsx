@@ -14,7 +14,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
-import PdfPage from '@/components/annotator/PdfPage';
+import PdfMultiPage from '@/components/annotator/PdfMultiPage';
 import AnnotationCanvas, { SYMBOL_ICONS, TOOLS } from '@/components/annotator/AnnotationCanvas';
 import ViewerToolbar from '@/components/annotator/ViewerToolbar';
 import RoomDetailCard from '@/components/annotator/RoomDetailCard';
@@ -37,9 +37,16 @@ export default function Annotator() {
 
   // ── PDF render state ─────────────────────────────────────────────────────
   const [numPages, setNumPages] = useState(0);
-  const [pageNum, setPageNum] = useState(initialPage);
-  const [pageDims, setPageDims] = useState({ width: 0, height: 0 });
+  const [pageNum, setPageNum] = useState(initialPage);   // legacy, used for scroll-to-page nav
+  // Multi-page layout reported by PdfMultiPage:
+  //   {pages: [{pageNum,width,height,offsetY}], totalWidth, totalHeight}
+  const [pagesLayout, setPagesLayout] = useState({ pages: [], totalWidth: 0, totalHeight: 0 });
   const [loadError, setLoadError] = useState(null);
+  // Backward-compat alias: a synthetic single-page dims for the wizard's
+  // page-rendered gate. Use the first page's dims when available.
+  const pageDims = pagesLayout.pages[0]
+    ? { width: pagesLayout.pages[0].width, height: pagesLayout.pages[0].height }
+    : { width: 0, height: 0 };
 
   // ── Tool + interaction ──────────────────────────────────────────────────
   const [tool, setTool] = useState(TOOLS.NONE);
@@ -406,7 +413,12 @@ export default function Annotator() {
         }}
         pageNum={pageNum}
         numPages={numPages}
-        onPageChange={setPageNum}
+        onPageChange={(n) => {
+          setPageNum(n);
+          // Scroll the corresponding page into the viewport
+          const el = document.querySelector(`[data-testid="pdf-page-${n}"]`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
         measurementsCount={measurements.length}
         symbolsCount={symbols.length}
       />
@@ -429,21 +441,23 @@ export default function Annotator() {
         </div>
       )}
 
-      {/* Body */}
+      {/* Body — main is the scrollable infinite-canvas viewport */}
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex flex-1 items-start justify-center overflow-auto p-4">
-          <div className="relative inline-block bg-white shadow">
-            <PdfPage
+        <main
+          data-testid="viewer-scroll-container"
+          className="flex flex-1 items-start justify-center overflow-auto p-4"
+        >
+          <div className="relative inline-block">
+            <PdfMultiPage
               file={pdfUrl}
-              pageNumber={pageNum}
               zoom={zoom}
               onNumPages={setNumPages}
-              onPageDims={setPageDims}
+              onPagesLayout={setPagesLayout}
               onLoadError={(err) => setLoadError(err?.message || String(err))}
             />
             <AnnotationCanvas
               ref={canvasRef}
-              pageDims={pageDims}
+              pagesLayout={pagesLayout}
               tool={tool}
               scale={scale}
               rooms={rooms}
