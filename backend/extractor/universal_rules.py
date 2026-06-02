@@ -970,11 +970,12 @@ def calc_room_quantities(room: dict,
         "kampai_m": round(kampai, 2),
         # also expose as kampu_metrai (Vision schema name)
         "kampu_metrai": round(kampai, 2),
-        # 2026-05-31: contractor-aligned sub-categories — expose so the eval
-        # can map them against samata item 19's pusiniai/statūs/etc.
-        "kampai_inner_m": round(inner_corners_m, 2),
-        "kampai_opening_reveals_m": round(opening_reveals_m, 2),
-        "kampai_pusiniai_m": round(pusiniai_m, 2),
+        # 2026-06-02: removed kampai_inner_m / kampai_opening_reveals_m /
+        # kampai_pusiniai_m sub-fields. They were added 2026-05-31 to feed
+        # samata item 19's pusiniai breakdown into the eval, but the eval
+        # only reads the parent kampu_metrai total and contractors don't
+        # see the breakdown either. Dead output — collapsed to a single
+        # total to match the simplified KŽ summary.
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "plyteles_sienos_m2": round(plyteles_sienos, 2),
         "plyteles_grindys_m2": round(plyteles_grindys, 2),
