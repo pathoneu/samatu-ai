@@ -23,52 +23,20 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Layers, Upload } from 'lucide-react';
-import PlanViewer from './PlanViewer';
+// PlanViewer is the legacy single-page PDF viewer; replaced by AnnotatorView
+// (multi-page Fabric canvas) for the Brėžinys tab as of 2026-06-02. Kept
+// importable for now in case a feature flag wants to A/B back.
+import AnnotatorView from '@/components/annotator/AnnotatorView';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
 
-const SYMBOL_LABELS = {
-  rozetes: 'Rozetės / jungiklio pajungimas',
-  jungikliai: 'Rozetės / jungiklio pajungimas',
-  sviestuvai: 'Lubinių priglaistomų šviestuvų apdirbimas',
-  pakabinami_sviestuvai: 'Pakabinamų šviestuvų montavimas',
-  difuzoriai: 'Difūzorių apdirbimas (ventiliacijos taškai)',
-  klozetai: 'Klozeto montavimas',
-  praustuvai: 'Praustuvų montavimas',
-  vonios: 'Vonios montavimas',
-  trapai: 'Linijinio latako montavimas (vonios drenažas)',
-  maisytuvai: 'Maišytuvų montavimas',
-  gyvatukai: 'Gyvatuko (rankšluosčių džiovintuvo) montavimas',
-  durys: 'Durys (vidaus)',
-  langai: 'Langai',
-  template_symbol: 'Sutartinis ženklas (paspaudimu)',
-  led_juostos: 'LED juostos / nišos',
-  skalbimo_masinos: 'Skalbimo mašinos prijungimas',
-  radiatoriai: 'Radiatoriai',
-};
-
-const SYMBOL_CATEGORIES = {
-  rozetes: 'Elektra',
-  jungikliai: 'Elektra',
-  sviestuvai: 'Apšvietimas',
-  pakabinami_sviestuvai: 'Apšvietimas',
-  difuzoriai: 'Ventiliacija',
-  klozetai: 'Santechnika',
-  praustuvai: 'Santechnika',
-  vonios: 'Santechnika',
-  trapai: 'Santechnika',
-  maisytuvai: 'Santechnika',
-  gyvatukai: 'Santechnika',
-  durys: 'GKP',
-  langai: 'GKP',
-  template_symbol: 'Sutartiniai ženklai',
-  led_juostos: 'Apšvietimas',
-  skalbimo_masinos: 'Santechnika',
-  radiatoriai: 'Šildymas',
-};
+// SYMBOL_LABELS / SYMBOL_CATEGORIES tables were used by the old PlanViewer's
+// click-to-count flow that pushed counted symbols into project.darbu_sarasas.
+// AnnotatorView's symbol palette + persistence handles this differently now;
+// the tables are removed with the old wiring.
 
 export default function InteriorWorkspace({
   project,
@@ -135,155 +103,63 @@ export default function InteriorWorkspace({
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  // 2026-06-02: Brėžinys tab is now the multi-page Fabric viewer (AnnotatorView)
+  // with its OWN built-in sidebar (KŽ santrauka + room list + measurements).
+  // The legacy 70/30 split with PlanViewer + WorkspacePanel was removed — the
+  // contractor's editing UI lives in the Kiekiai tab (ProjectMainView). This
+  // tab is now purely for visual takeoff work.
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
-      {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
+    <div className="h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
       <OnboardingTooltips />
-      {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (Togal-style) */}
-      <div
-        className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
-        style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
-      >
-        {pdfUrl ? (
-          <PlanViewer
-            fileUrl={pdfUrl}
-            pageMeta={pageMetaDict}
-            missingTypes={missingTypes}
-            focusedPage={effectiveFocusedPage}
-            focusedRoom={effectiveFocusedRoom}
-            eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
-            pdfFile={pdfBlob}
-            onSymbolCountResult={(symbolType, result) => {
-              // Pridedam į projekto darbų sąrašą kaip naują eilutę.
-              // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
-              const aprasymas = SYMBOL_LABELS[symbolType] || `Simbolių skaičius (${symbolType})`;
-              const skyrius = SYMBOL_CATEGORIES[symbolType] || 'Kiti darbai';
-              const kiekis = result?.count || (result?.matches?.length ?? 0);
-              if (!kiekis) return;
-              const darbai = [...(project.darbu_sarasas || [])];
-              const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
-              // Tikrinam ar tokia eilutė jau egzistuoja — jei taip, atnaujiname kiekį
-              const existingIdx = darbai.findIndex(d =>
-                (d.aprasymas || '').toLowerCase() === aprasymas.toLowerCase());
-              if (existingIdx >= 0) {
-                darbai[existingIdx] = {
-                  ...darbai[existingIdx],
-                  kiekis,
-                  detected: true,
-                  source: 'Pažymėjus brėžinyje',
-                  confidence: 'medium',
-                };
-              } else {
-                darbai.push({
-                  eil_nr: maxNr + 1,
-                  skyrius,
-                  aprasymas,
-                  mato_vnt: 'vnt',
-                  kiekis,
-                  kaina: 0,
-                  suma: 0,
-                  detected: true,
-                  source: 'Pažymėjus brėžinyje',
-                  confidence: 'medium',
-                });
-              }
-              updateProject(project.id, { ...project, darbu_sarasas: darbai });
-            }}
-          />
-        ) : pdfMissing ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-foreground font-medium mb-1">Brėžinys nepasiekiamas</p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Šis projektas sukurtas anksčiau ir PDF nebuvo išsaugotas. Sukurkite
-              naują projektą, kad galėtumėte naudoti brėžinio matavimo įrankius.
-            </p>
-            <label
-              className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              {attachingPdf ? 'Prisegama…' : 'Prisegti PDF prie projekto'}
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                disabled={attachingPdf}
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  setAttachingPdf(true);
-                  try {
-                    await savePdf(project.id, file);
-                    const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
-                    setPdfUrl(u);
-                    setPdfBlob(b);
-                    setPdfMissing(!u);
-                    onProjectChange?.({ ...project, pdf_name: file.name, has_pdf: true });
-                  } finally {
-                    setAttachingPdf(false);
-                    event.target.value = '';
-                  }
-                }}
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            Krauname brėžinį…
-          </div>
-        )}
-      </div>
-
-      {/* Resizer — only on desktop. Mobile uses fixed 60/40 vertical split. */}
-      {!isMobile && (
-        <div
-          className="w-1 hover:bg-foreground/20 cursor-col-resize transition-colors shrink-0"
-          onMouseDown={(e) => {
-            const startX = e.clientX;
-            const startRatio = splitRatio;
-            const containerWidth = e.currentTarget.parentElement.offsetWidth;
-            const onMove = (ev) => {
-              const delta = ((ev.clientX - startX) / containerWidth) * 100;
-              setSplitRatio(Math.max(40, Math.min(75, startRatio + delta)));
-            };
-            const onUp = () => {
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
-            };
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-          }}
+      {pdfUrl ? (
+        <AnnotatorView
+          projectId={project.id}
+          pdfUrl={pdfUrl}
+          embedded
+          initialPage={effectiveFocusedPage || 2}
         />
+      ) : pdfMissing ? (
+        <div className="h-full flex flex-col items-center justify-center p-8 text-center">
+          <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
+          <p className="text-sm text-foreground font-medium mb-1">Brėžinys nepasiekiamas</p>
+          <p className="text-xs text-muted-foreground max-w-sm">
+            Šis projektas sukurtas anksčiau ir PDF nebuvo išsaugotas. Sukurkite
+            naują projektą, kad galėtumėte naudoti brėžinio matavimo įrankius.
+          </p>
+          <label
+            className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            {attachingPdf ? 'Prisegama…' : 'Prisegti PDF prie projekto'}
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              disabled={attachingPdf}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setAttachingPdf(true);
+                try {
+                  await savePdf(project.id, file);
+                  const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
+                  setPdfUrl(u);
+                  setPdfBlob(b);
+                  setPdfMissing(!u);
+                  onProjectChange?.({ ...project, pdf_name: file.name, has_pdf: true });
+                } finally {
+                  setAttachingPdf(false);
+                  event.target.value = '';
+                }
+              }}
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+          Krauname brėžinį…
+        </div>
       )}
-
-      {/* RIGHT (md+) / BOTTOM (mobile): Kompaktinė sąmatos panelė */}
-      <div
-        style={{ width: isMobile ? '100%' : `${100 - splitRatio}%`, height: isMobile ? '40%' : 'auto' }}
-        className="overflow-hidden"
-      >
-        <WorkspacePanel
-          project={project}
-          onJumpToPage={(pageNr, room) => {
-            setLocalFocusedPage(pageNr);
-            setLocalFocusedRoom(room || null);
-            onJumpToPage?.(pageNr, room);
-          }}
-          onJumpToProvenance={(room) => {
-            // Eksplikacija chips open an in-place data popover (handled inside
-            // WorkspacePanel). Other sources (manual_polygon, vision, dimension)
-            // jump to the room's page so the user can find it visually.
-            const src = room.plotas_source;
-            if (src === 'manual_polygon') {
-              const targetPage = room.page_nr ?? room.puslapio_nr;
-              if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
-            } else if (src && src !== 'eksplikacija') {
-              const targetPage = room.puslapio_nr ?? room.page_nr;
-              if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
-            }
-          }}
-          onProjectChange={onProjectChange}
-        />
-      </div>
     </div>
   );
 }
