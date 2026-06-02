@@ -656,8 +656,164 @@ def _append_drift_row(project_id: str, mode: str, summary: dict,
     print(f"  Drift logged → {drift_path}")
 
 
+def _print_extraction_timeline(parsed: dict) -> None:
+    """Print a per-step timeline derived from intermediate artefacts the
+    extractor leaves on ``parsed``. Used by --verbose."""
+    print("\n  ─── Extraction step timeline ───")
+    meta = parsed.get("_meta") or {}
+    steps: list[tuple[str, str, str]] = []  # (label, status, detail)
+    # Vision pass 1
+    if meta.get("page_count"):
+        steps.append(("pdf→images", "OK",
+                      f"{meta.get('page_count')} pages, "
+                      f"{meta.get('vendor_pages_skipped', 0)} vendor-skipped"))
+    if parsed.get("_eksplikacija"):
+        eks = parsed["_eksplikacija"]
+        src = eks.get("eksplikacija_source_page")
+        n_rooms = len(eks.get("patalpos") or [])
+        status = "OK" if n_rooms > 0 else "EMPTY"
+        steps.append(("eksplikacija_reader", status,
+                      f"src_page={src}, {n_rooms} rooms"))
+    if parsed.get("_adjacency_applied"):
+        adj = parsed["_adjacency_applied"]
+        steps.append(("adjacency_extractor", "OK",
+                      f"page={adj.get('page_used')}, "
+                      f"matched={adj.get('summary', {}).get('n_rooms_matched')}, "
+                      f"${adj.get('cost_usd', 0):.3f}"))
+    if parsed.get("_height_fusion"):
+        hf = parsed["_height_fusion"]
+        steps.append(("height_fusion", "OK",
+                      f"source={hf['result']['chosen_source']}, "
+                      f"value={hf['result']['primary_m']}m, "
+                      f"updated={hf.get('rooms_summary', {}).get('n_updated', 0)}"))
+    if parsed.get("_elevation_pass"):
+        ep = parsed["_elevation_pass"]
+        steps.append(("wall_elevation", "OK",
+                      f"pages={ep.get('pages')}, "
+                      f"rooms_updated={ep.get('rooms_updated')}, "
+                      f"${ep.get('cost_usd', 0):.3f}"))
+    if parsed.get("_elevation_second_pass"):
+        e2 = parsed["_elevation_second_pass"]
+        steps.append(("elevation_second_pass", "OK",
+                      f"repaired={e2.get('rooms_repaired')}, "
+                      f"${e2.get('cost_usd', 0):.3f}"))
+    if parsed.get("_ceiling_pass"):
+        cp = parsed["_ceiling_pass"]
+        steps.append(("ceiling_plan_niches", "OK",
+                      f"pages={cp.get('pages_scanned')}, "
+                      f"niches_added={cp.get('n_niches_added')}, "
+                      f"${cp.get('cost_usd', 0):.3f}"))
+    if parsed.get("_paint_above_tile_pass"):
+        pat = parsed["_paint_above_tile_pass"]
+        steps.append(("paint_above_tile", "OK",
+                      f"flagged={len(pat.get('rooms_flagged') or [])} rooms"))
+    if parsed.get("_perimeter_validation"):
+        pv = parsed["_perimeter_validation"]
+        steps.append(("perimeter_validator",
+                      "OK" if pv.get("n_needs_reextraction", 0) == 0 else "FLAG",
+                      f"{pv.get('n_pass')}/{pv.get('n_total')} pass, "
+                      f"{pv.get('n_needs_reextraction')} need_reextraction"))
+    if parsed.get("_consistency_checks"):
+        cc = parsed["_consistency_checks"]
+        steps.append(("consistency_checker",
+                      "OK" if (cc.get("n_warn", 0) + cc.get("n_fail", 0)) == 0 else "WARN",
+                      f"warn={cc.get('n_warn')}, fail={cc.get('n_fail')}"))
+    warnings = parsed.get("warnings") or []
+    if warnings:
+        steps.append(("warnings", "INFO", f"{len(warnings)} warning(s) emitted"))
+    if not steps:
+        print("  (no intermediate step artefacts on parsed — extract_interior")
+        print("   may not have populated _meta/_eksplikacija/etc.)")
+        return
+    name_w = max(len(s[0]) for s in steps)
+    status_w = max(len(s[1]) for s in steps)
+    for name, status, detail in steps:
+        print(f"  · {name:<{name_w}}  [{status:<{status_w}}]  {detail}")
+    print()
+
+
+def run_debug_project(slug: str) -> int:
+    """Run the AI extract pipeline on a single project and dump every
+    intermediate data structure to a timestamped folder for inspection.
+
+    Use this when debugging a project's accuracy — gives you all the
+    intermediates (ai_extract, adjacency, height_fusion, consistency,
+    eksplikacija, wall_elevations) without re-running Vision.
+    """
+    import shutil
+    ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    out_dir = EVAL_RUNS_ROOT / f"debug_{slug}_{ts}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
+    if not ai_path.exists():
+        print(f"  No ai_extract.json for slug={slug!r} — nothing to debug")
+        return 2
+    ai = json.loads(ai_path.read_text(encoding="utf-8"))
+
+    # Dump top-level
+    shutil.copy(ai_path, out_dir / "ai_extract.json")
+    truth_path = REPO_ROOT / "ground_truth" / slug / "truth.json"
+    if truth_path.exists():
+        shutil.copy(truth_path, out_dir / "truth.json")
+
+    # Pull each intermediate that's embedded in the extract
+    intermediates = {
+        "santrauka.json": ai.get("santrauka"),
+        "patalpos.json": ai.get("patalpos"),
+        "puslapiai.json": ai.get("puslapiai"),
+        "_eksplikacija.json": ai.get("_eksplikacija"),
+        "_wall_elevations.json": ai.get("_wall_elevations"),
+        "_adjacency_applied.json": ai.get("_adjacency_applied"),
+        "_height_fusion.json": ai.get("_height_fusion"),
+        "_consistency_checks.json": ai.get("_consistency_checks"),
+        "_perimeter_validation.json": ai.get("_perimeter_validation"),
+        "_elevation_pass.json": ai.get("_elevation_pass"),
+        "_elevation_second_pass.json": ai.get("_elevation_second_pass"),
+        "_ceiling_pass.json": ai.get("_ceiling_pass"),
+        "_paint_above_tile_pass.json": ai.get("_paint_above_tile_pass"),
+        "_meta.json": ai.get("_meta"),
+        "warnings.json": ai.get("warnings"),
+    }
+    for fname, data in intermediates.items():
+        if data is None:
+            continue
+        (out_dir / fname).write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    # Adjacency raw output (separate file)
+    adj_path = REPO_ROOT / "ground_truth" / slug / "adjacency.json"
+    if adj_path.exists():
+        shutil.copy(adj_path, out_dir / "adjacency.json")
+
+    # Run the analyzer on this single project for human-readable diff
+    diff_lines = []
+    diff_lines.append(f"DEBUG REPORT — {slug} @ {ts}\n")
+    diff_lines.append(f"\nIntermediate files dumped:")
+    written = sorted(p.name for p in out_dir.iterdir() if p.is_file())
+    for name in written:
+        size = (out_dir / name).stat().st_size
+        diff_lines.append(f"  {size:>8} B  {name}")
+    diff_lines.append(f"\nai_extract top-level keys: {sorted(ai.keys())[:30]}")
+    diff_lines.append(f"\nnumber of rooms: {len(ai.get('patalpos') or [])}")
+    diff_lines.append(f"number of warnings: {len(ai.get('warnings') or [])}")
+    diff_lines.append(f"number of pages: {len(ai.get('puslapiai') or [])}")
+    if ai.get("_consistency_checks"):
+        cc = ai["_consistency_checks"]
+        diff_lines.append(f"\nconsistency: ok={cc.get('n_ok',0)} warn={cc.get('n_warn')} fail={cc.get('n_fail')}")
+        for chk in cc.get("checks") or []:
+            if chk.get("status") != "PASS":
+                diff_lines.append(f"  [{chk['status']}] {chk['name']}: {chk['message']}")
+    (out_dir / "DEBUG_REPORT.txt").write_text("\n".join(diff_lines), encoding="utf-8")
+    print(f"  Debug dump → {out_dir.relative_to(REPO_ROOT)}")
+    print(f"  {len(written)} files written; see DEBUG_REPORT.txt for index")
+    return 0
+
+
 def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
-            apply_calibration: bool = False, track_drift: bool = False) -> int:
+            apply_calibration: bool = False, track_drift: bool = False,
+            verbose: bool = False) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
@@ -675,6 +831,9 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
         parsed = run_pipeline_vision(REPO_ROOT / entry["pdf_path"])
     else:
         raise SystemExit(f"Unknown mode {mode!r}")
+
+    if verbose:
+        _print_extraction_timeline(parsed)
 
     results = evaluate(parsed, truth)
     per_room = evaluate_per_room(parsed, truth)
@@ -892,7 +1051,17 @@ def main() -> int:
     ap.add_argument("--track-drift", action="store_true",
                     help="append a per-run snapshot to eval_runs/drift.jsonl "
                          "so accuracy regressions across commits become visible")
+    ap.add_argument("--verbose", action="store_true",
+                    help="print a timeline of every extraction step "
+                         "with duration, status, and any cost incurred")
+    ap.add_argument("--debug-project", default=None, metavar="SLUG",
+                    help="run only the named project and dump every "
+                         "intermediate data structure to "
+                         "eval_runs/debug_<slug>_<ts>/ for manual inspection")
     args = ap.parse_args()
+
+    if args.debug_project:
+        return run_debug_project(args.debug_project)
 
     if args.totals_only or args.all:
         return run_totals_only_multi(GROUND_TRUTH_ROOT / "registry.yaml")
@@ -908,7 +1077,8 @@ def main() -> int:
     return run_one(args.project, mode,
                    estimate_exterior=args.estimate_exterior,
                    apply_calibration=args.apply_calibration,
-                   track_drift=args.track_drift)
+                   track_drift=args.track_drift,
+                   verbose=args.verbose)
 
 
 if __name__ == "__main__":
