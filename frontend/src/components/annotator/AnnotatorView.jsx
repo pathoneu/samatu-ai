@@ -93,6 +93,54 @@ export default function AnnotatorView({
   const [calibrationFetching, setCalibrationFetching] = useState(false);
 
   const canvasRef = useRef(null);
+  // Scroll container — AnnotationCanvas observes it to size to the viewport
+  // and to follow scroll via viewportTransform (2026-06-02 virtual viewport
+  // refactor; previously the canvas was sized to the entire page stack).
+  const scrollContainerRef = useRef(null);
+  // Canvas overlay sizing — tracks <main>.getBoundingClientRect() so the
+  // overlay div always matches the scroller's exact rect, even when the
+  // sidebar hits its min-width clamp (2026-06-03; previously hardcoded 64%).
+  const [overlayRect, setOverlayRect] = useState(null);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      const parent = el.parentElement?.getBoundingClientRect();
+      if (!parent) return;
+      setOverlayRect({
+        left: r.left - parent.left,
+        top:  r.top  - parent.top,
+        width: r.width,
+        height: r.height,
+      });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  // Focal point for zoom-to-cursor — captured in the wheel handler before
+  // zoom changes, then consumed by an effect that adjusts scroll after
+  // pagesLayout has updated to the new zoom.
+  const zoomFocalRef = useRef(null);
+  useEffect(() => {
+    const focal = zoomFocalRef.current;
+    if (!focal) return;
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+    // After zoom update: world (wx,wy) should remain under cursor (cx,cy)
+    //   visible canvas-x = wx*zoom - sl == cx  →  sl = wx*zoom - cx
+    const newSL = focal.wx * zoom - focal.cx;
+    const newST = focal.wy * zoom - focal.cy;
+    scrollEl.scrollLeft = Math.max(0, newSL);
+    scrollEl.scrollTop  = Math.max(0, newST);
+    zoomFocalRef.current = null;
+  }, [zoom, pagesLayout]);
 
   const kzTotals = useMemo(() => {
     const sum = (field) => rooms.reduce((acc, r) => acc + (Number(r[field]) || 0), 0);
@@ -391,12 +439,19 @@ export default function AnnotatorView({
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+        {/*
+          The scroller and the Fabric overlay are SIBLINGS so the canvas
+          stays glued to the viewport while the PDF pages scroll inside
+          the scroller. The canvas (returned by AnnotationCanvas) is
+          position:absolute inset:0 inside this relative wrapper.
+        */}
         <main
+          ref={scrollContainerRef}
           data-testid="viewer-scroll-container"
-          className="flex flex-1 items-start justify-center overflow-auto p-4"
+          className="flex flex-1 items-start overflow-auto p-4"
         >
-          <div className="relative inline-block">
+          <div className="relative">
             {pdfUrl && (
               <PdfMultiPage
                 file={pdfUrl}
@@ -409,8 +464,29 @@ export default function AnnotatorView({
             {!pdfUrl && (
               <div className="p-12 text-sm text-neutral-500">PDF nepasiekiamas.</div>
             )}
-            <AnnotationCanvas
-              ref={canvasRef}
+          </div>
+        </main>
+        {/*
+          Canvas overlay: ResizeObserver-driven width/height match
+          <main>'s exact clientRect so the overlay always aligns with the
+          scroller — even when the sidebar hits its min-width clamp on
+          narrow viewports. Wrapper is pointer-events:none so it doesn't
+          eat scrollbar / sidebar clicks; the canvas itself sets
+          pointer-events:auto. Hidden until first ResizeObserver tick
+          so we don't render a wrong-sized canvas.
+        */}
+        <div
+          className="pointer-events-none absolute"
+          style={overlayRect ? {
+            left: overlayRect.left,
+            top: overlayRect.top,
+            width: overlayRect.width,
+            height: overlayRect.height,
+          } : { display: 'none' }}
+        >
+          <AnnotationCanvas
+            ref={canvasRef}
+            scrollContainer={scrollContainerRef}
               pagesLayout={pagesLayout}
               tool={tool}
               scale={scale}
@@ -424,8 +500,27 @@ export default function AnnotatorView({
               selectedMeasurementId={selectedMeasurementId}
               zoom={zoom}
               onWheel={(e) => {
-                if (!(e.ctrlKey || e.metaKey)) return;
+                const scrollEl = scrollContainerRef.current;
+                if (!(e.ctrlKey || e.metaKey)) {
+                  // Forward bare wheel to the scroller below the overlay
+                  if (scrollEl) {
+                    e.preventDefault();
+                    scrollEl.scrollBy({ left: e.deltaX, top: e.deltaY });
+                  }
+                  return;
+                }
                 e.preventDefault();
+                // Zoom-to-cursor: capture world point under cursor before
+                // zoom changes; an effect adjusts scroll after pagesLayout
+                // reports the new zoomed dims (see zoomFocalRef effect).
+                if (scrollEl) {
+                  const rect = scrollEl.getBoundingClientRect();
+                  const cx = e.clientX - rect.left;
+                  const cy = e.clientY - rect.top;
+                  const wx = (cx + scrollEl.scrollLeft) / zoom;
+                  const wy = (cy + scrollEl.scrollTop)  / zoom;
+                  zoomFocalRef.current = { wx, wy, cx, cy };
+                }
                 const delta = e.deltaY < 0 ? 1.1 : 1 / 1.1;
                 setZoom((z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * delta)));
               }}
@@ -474,8 +569,7 @@ export default function AnnotatorView({
               onWallEditComplete={commitWallEdit}
               onMeasurementClick={(id) => setSelectedMeasurementId(id)}
             />
-          </div>
-        </main>
+        </div>
 
         {walkthroughActive && (
           <VerifyWalkthrough

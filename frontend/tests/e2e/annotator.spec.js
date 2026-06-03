@@ -158,34 +158,40 @@ test('room polygons actually paint to the lower canvas', async ({ page }) => {
     page.locator('[data-testid^="pdf-page-"]').count()
   ).toBe(17);
 
-  // Wait for lower-canvas to have been sized (Fabric setDimensions has fired)
+  // With the virtual-viewport refactor (2026-06-03) the canvas is sized
+  // to the scroller's clientRect (NOT the page stack). Wait for the
+  // ResizeObserver tick that sets non-trivial canvas dims.
   await expect.poll(async () =>
     page.evaluate(() => {
       const c = document.querySelector('canvas.lower-canvas');
-      return c?.height || 0;
+      return (c?.width || 0) * (c?.height || 0);
     }),
-  ).toBeGreaterThan(1000);
+  ).toBeGreaterThan(10000);
 
-  // Scroll page 2 (the floor plan that holds the Svetainė polygon) into view
+  // Scroll page 2 (Svetainė's floor plan) into the scroller's viewport.
+  // After scrollIntoView, the Svetainė polygon should be in the visible
+  // canvas band — Fabric's viewportTransform translates the world
+  // coords (page 2 starts at world-y ≈ 1207) into canvas-y near 0.
   await page.evaluate(() => {
     const el = document.querySelector('[data-testid="pdf-page-2"]');
     el && el.scrollIntoView({ block: 'start' });
   });
+  // Two animation frames for the rAF-throttled viewportTransform + a
+  // fabric requestRenderAll to land.
+  await page.evaluate(() =>
+    new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r))));
 
-  // Sample lower canvas for bluish polygon-fill pixels in page-2's band
+  // Sample the lower canvas across the full visible canvas — polygons
+  // can land anywhere in viewport-space depending on scroll. Looking
+  // for bluish polygon fill pixels (rgba(42, 111, 181, 0.08)).
   const bluePolygonPixels = await page.evaluate(() => {
     const lower = document.querySelector('canvas.lower-canvas');
-    const p2 = document.querySelector('[data-testid="pdf-page-2"]')
-      ?.querySelector('.react-pdf__Page__canvas');
-    if (!lower || !p2) return 0;
-    const lr = lower.getBoundingClientRect();
-    const pr = p2.getBoundingClientRect();
-    const scaleY = lower.height / parseFloat(lower.style.height);
-    const startY = Math.round((pr.top - lr.top) * scaleY);
-    const endY   = Math.round((pr.bottom - lr.top) * scaleY);
+    if (!lower) return 0;
     const ctx = lower.getContext('2d');
     let count = 0;
-    for (let y = startY; y < endY; y += 30) {
+    const step = Math.max(1, Math.floor(lower.height / 80));
+    for (let y = 0; y < lower.height; y += step) {
       const row = ctx.getImageData(0, y, lower.width, 1).data;
       for (let x = 0; x < lower.width; x++) {
         const r = row[x*4], g = row[x*4+1], b = row[x*4+2], a = row[x*4+3];

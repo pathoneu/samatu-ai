@@ -86,7 +86,10 @@ export default function PdfMultiPage({
       onLoadError={(err) => onLoadError && onLoadError(err)}
       loading={<div className="p-12 text-neutral-500">Kraunama PDF…</div>}
     >
-      <div className="flex flex-col items-center">
+      {/* items-start (not items-center) so narrower pages stay at x=0 in the
+          stacked layout. Otherwise the canvas overlay would have to know each
+          page's horizontal centering offset to align polygons correctly. */}
+      <div className="flex flex-col items-start">
         {Array.from({ length: numPages }, (_, i) => {
           const pageNum = i + 1;
           return (

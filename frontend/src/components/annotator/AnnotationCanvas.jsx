@@ -49,14 +49,26 @@ export const TOOLS = {
 };
 
 // ── Geometry helpers ───────────────────────────────────────────────────────
-function clientToCanvasPx(canvasEl, e, zoom) {
-  // Convert client-space click → canvas-pixel space (full multi-page
-  // height). Canvas CSS is sized to layout.totalSize × zoom; dividing
-  // the in-rect offset by `zoom` lands us back in layout coords.
+function clientToCanvasPx(canvasEl, e, zoom, scrollEl) {
+  // Convert a client-space mouse event to WORLD-pixel coords (the
+  // unzoomed multi-page coordinate space polygons / measurements live in).
+  //
+  // Coordinate framework (viewport mode, introduced 2026-06-02):
+  //   - PDF pages are RENDERED at zoom×, so 1 world px == zoom CSS px.
+  //   - scrollEl.scrollLeft / scrollTop are reported by the DOM in CSS px.
+  //   - The Fabric canvas is sized to the scroller's clientRect (CSS px)
+  //     and uses viewportTransform = [zoom,0,0,zoom, -sl, -st] so a world
+  //     point (wx,wy) renders at canvas pixel (wx*zoom - sl, wy*zoom - st).
+  //   - Inverse: world_x = (canvas_x + sl) / zoom
+  //
+  // Legacy mode (no scrollContainer): scrollEl is undefined; canvas IS
+  // the world. world = canvas / zoom.
   const rect = canvasEl.getBoundingClientRect();
+  const sl = scrollEl?.scrollLeft || 0;
+  const st = scrollEl?.scrollTop  || 0;
   return {
-    x: (e.clientX - rect.left) / zoom,
-    y: (e.clientY - rect.top) / zoom,
+    x: (e.clientX - rect.left + sl) / zoom,
+    y: (e.clientY - rect.top  + st) / zoom,
   };
 }
 
@@ -229,6 +241,14 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     onWallEditComplete,
     onMeasurementClick,
     onWheel,
+    // NEW (2026-06-02): scrollContainer is a ref to the scroller (the
+    // <main> element that scrolls the PDF pages). When provided, the
+    // canvas runs in VIEWPORT mode: sized to the scroller's clientRect
+    // and using viewportTransform to follow scroll/zoom. When absent,
+    // legacy whole-stack mode (canvas == totalHeight) is used —
+    // suitable for single-page tests but DOES hit Chrome's 32767px
+    // canvas-side limit on tall PDFs.
+    scrollContainer = null,
   },
   ref,
 ) {
@@ -260,14 +280,13 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       preserveObjectStacking: true,
       stopContextMenu: false,
       backgroundColor: undefined,
-      // CRITICAL: disable retina scaling on multi-page canvases. With 45+ PDF
-      // pages stacked vertically, CSS height × devicePixelRatio quickly
-      // exceeds Chrome's 32767-pixel GPU canvas limit; over that limit the
-      // canvas is created without error but every draw is silently discarded
-      // (polygons / measurements / symbols become invisible). Trading some
-      // crispness on retina displays for "polygons actually render" is the
-      // right call. See diagnosis 2026-06-02.
-      enableRetinaScaling: false,
+      // In VIEWPORT mode the canvas is sized to the scroll container's
+      // visible rect (typically <2000 px in either dimension) — well
+      // under Chrome's 32767px GPU canvas-side limit. Retina scaling
+      // is safe and improves polygon edge sharpness. In legacy mode
+      // (no scrollContainer) we keep retina scaling OFF because the
+      // canvas can be up to ~30000 css px tall and 2× would clip.
+      enableRetinaScaling: !!scrollContainer,
     });
     // Fabric wraps the <canvas> in a `.canvas-container` div whose CSS
     // doesn't inherit our `absolute left-0 top-0`. Force it manually so
@@ -293,14 +312,86 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     return () => { fc.dispose(); fabricRef.current = null; };
   }, []);
 
-  // ── Resize + zoom application ───────────────────────────────────────────
+  // ── Canvas sizing ───────────────────────────────────────────────────────
+  //
+  // VIEWPORT mode: track scrollContainer's clientRect via ResizeObserver.
+  // The Fabric canvas matches the scroller's visible size; world coords
+  // are projected into that small canvas through viewportTransform.
+  //
+  // LEGACY mode: size the canvas to the entire page-stack (totalWidth ×
+  // totalHeight × zoom). Only used by single-page callers and Playwright
+  // specs running before the viewport refactor.
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    if (!scrollContainer?.current) return undefined;
+    const el = scrollContainer.current;
+    const update = () =>
+      setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [scrollContainer]);
+
   useEffect(() => {
     const fc = fabricRef.current;
     if (!fc) return;
-    fc.setDimensions({ width: canvasSize.width, height: canvasSize.height });
-    fc.setZoom(zoom);
+    if (scrollContainer?.current) {
+      if (viewportSize.width === 0 || viewportSize.height === 0) return;
+      fc.setDimensions({ width: viewportSize.width, height: viewportSize.height });
+    } else {
+      // Legacy stack-sized mode
+      fc.setDimensions({ width: canvasSize.width, height: canvasSize.height });
+      fc.setZoom(zoom);
+    }
     fc.requestRenderAll();
-  }, [canvasSize.width, canvasSize.height, zoom]);
+  }, [
+    scrollContainer,
+    viewportSize.width,
+    viewportSize.height,
+    canvasSize.width,
+    canvasSize.height,
+    zoom,
+  ]);
+
+  // ── Viewport transform: scroll + zoom → fabric.viewportTransform ────────
+  //
+  // World coord (wx, wy) lands at canvas (wx*zoom - scrollLeft*zoom,
+  // wy*zoom - scrollTop*zoom). Each scroll or zoom change schedules an
+  // rAF tick; this batches scroll events that fire many times per
+  // animation frame.
+  useEffect(() => {
+    if (!scrollContainer?.current) return undefined;
+    const scrollEl = scrollContainer.current;
+    const fc = fabricRef.current;
+    if (!fc) return undefined;
+    let rafId = null;
+    const apply = () => {
+      rafId = null;
+      // scrollLeft/Top are CSS px in the ZOOM-rendered content. A world
+      // point (wx, wy) sits at content (wx*zoom, wy*zoom) CSS; visible
+      // canvas pos = wx*zoom - sl. So viewportTransform[4] = -sl
+      // (not -sl*zoom — that was the math bug fixed 2026-06-03).
+      const sl = scrollEl.scrollLeft;
+      const st = scrollEl.scrollTop;
+      fc.setViewportTransform([zoom, 0, 0, zoom, -sl, -st]);
+      fc.requestRenderAll();
+    };
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(apply);
+    };
+    apply();   // initial sync
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      scrollEl.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [scrollContainer, zoom, viewportSize.width, viewportSize.height]);
 
   // Helper: convert a stored point (with optional pageNum) to canvas px
   const storedPointToCanvasPx = (pt) => {
@@ -519,7 +610,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   const onMove = (e) => {
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToCanvasPx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom, scrollContainer?.current);
     setCursorPx(p);
 
     if (draggingSymbolId) {
@@ -562,7 +653,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
   const onClick = (e) => {
     const el = canvasElRef.current;
     if (!el) return;
-    const raw = clientToCanvasPx(el, e, zoom);
+    const raw = clientToCanvasPx(el, e, zoom, scrollContainer?.current);
     const p = snapTarget || raw;
 
     if (tool === TOOLS.PLACE_SYMBOL && placeSymbolType) {
@@ -669,7 +760,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     if (tool !== TOOLS.NONE) return;
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToCanvasPx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom, scrollContainer?.current);
     for (const s of symbols) {
       const sp = storedPointToCanvasPx(s.pos_pct);
       if (dist(p, sp) <= 12) {
@@ -693,7 +784,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
     e.preventDefault();
     const el = canvasElRef.current;
     if (!el) return;
-    const p = clientToCanvasPx(el, e, zoom);
+    const p = clientToCanvasPx(el, e, zoom, scrollContainer?.current);
     for (const s of symbols) {
       const sp = storedPointToCanvasPx(s.pos_pct);
       if (dist(p, sp) <= 12) {
@@ -734,14 +825,25 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
       }}
       onContextMenu={onContextMenu}
       onWheel={onWheel}
-      style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        cursor: tool === TOOLS.NONE ? 'pointer' : 'crosshair',
-        width: canvasSize.width * zoom,
-        height: canvasSize.height * zoom,
-      }}
+      style={
+        scrollContainer
+          ? {
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              cursor: tool === TOOLS.NONE ? 'pointer' : 'crosshair',
+              pointerEvents: 'auto',
+            }
+          : {
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              cursor: tool === TOOLS.NONE ? 'pointer' : 'crosshair',
+              width: canvasSize.width * zoom,
+              height: canvasSize.height * zoom,
+            }
+      }
     />
   );
 });
