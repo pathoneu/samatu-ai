@@ -32,23 +32,46 @@ RULES
 1. room_nr — read from the eksplikacija (room number list) when visible;
    else use the room name and let the downstream code match by name.
 2. type — one of:
-     - "ceiling_led"  → LED strip embedded in the ceiling/coffer
+     - "ceiling_led"  → LED strip embedded in the ceiling/coffer. ONLY
+                        if you see an explicit "LED", "LD-1/LD-2/LD-3"
+                        label, a red/colored highlight, OR a hatched
+                        strip clearly drawn as a light fixture. A
+                        rectangular ceiling recess WITHOUT one of these
+                        markings is decorative GKP, NOT ceiling_led.
      - "wall_led"     → LED strip embedded in a partition wall (e.g.
-                        bedroom headboard wall)
-     - "partition_niche" → recessed niche in a partition wall (no LED),
-                           treated separately downstream
+                        bedroom headboard wall). Same evidence rule.
+     - "partition_niche" → recessed niche in a partition wall (no LED).
+                        Use this for nišos pertvarose, curtain niches
+                        (užuolaidų niša), and decorative wall recesses.
+                        Contractor bills these as a SEPARATE line item
+                        from LED, so getting the type right matters.
+     - "shelf_niche"  → recessed shelving niche, typically in bathrooms
+                        (above bathtub, in shower). Contractor bills
+                        per-room, not as LED.
+     - "shower_niche" → wet-area niche specifically inside a shower
+                        zone. Bathroom-specific billing.
 3. length_mm — for linear niches, the visible length. If two parallel
    strips form one niche envelope, sum them. If the niche is rectangular
    (a panel rather than a strip), use the longer side.
 4. count — for repeated identical niches in the same room (e.g. matched
    pair around a TV), use count > 1 and length_mm = the single length.
-5. confidence — "high" when the niche is clearly drawn and dimensioned,
-   "medium" when present but length is interpolated, "low" when you're
-   guessing from a vague graphic.
+5. confidence — "high" when the niche has an explicit LED/LD-X label
+   or hatching, "medium" when shape is clear but type is inferred,
+   "low" when type is ambiguous between LED and decorative.
 6. evidence — a short verbatim quote of the drawing label or a description
-   of the geometric cue (≤120 chars).
+   of the geometric cue (≤120 chars). For type="ceiling_led" you MUST
+   cite a specific marking (label, color, hatch). If you cannot cite a
+   specific LED marking, set type="partition_niche" or "shelf_niche"
+   and set confidence="medium".
 7. If no niches are visible (e.g. you're looking at a service plumbing page
    not a ceiling plan), return {"niches": []}.
+
+CONSERVATIVE RULE FOR AMBIGUOUS NICHES
+   When in doubt, mark a niche as "partition_niche" with confidence="low"
+   rather than "ceiling_led". The downstream LED-metric calculation
+   filters by tipas; mis-labelling as ceiling_led inflates contractor
+   billing. Mis-labelling as partition is a smaller error (it stays
+   visible in the room list but doesn't add to LED meterage).
 
 SPECIFIC GUIDANCE FOR SMALL / EASILY-MISSED NICHES (2026-06-01 hardening)
 LT residential ceiling plans frequently include 2-4 m LED-strip niches in

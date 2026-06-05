@@ -2598,6 +2598,55 @@ def extract_interior(
         print(f"[extractor] doors read failed (non-fatal): {exc}")
         _emit({"event": "doors_error", "message": str(exc)})
 
+    # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05).
+    # Targeted Vision pass on the ceiling_plan page to recover LED niches
+    # that the main pass under-counts. Verified Beržų LED accuracy went
+    # from -5.44% (main pass alone) to -0.99% (main + niche_locator)
+    # with the stricter prompt that distinguishes LED from decorative /
+    # partition niches. fold_niches_into_rooms preserves non-LED elementai.
+    try:
+        from .vision.niche_locator import extract_niches, fold_niches_into_rooms
+        page_classifications = parsed.get("puslapiai") or []
+        ceiling_pages = [
+            int(p.get("nr"))
+            for p in page_classifications
+            if (p.get("tipas") or "").lower() == "ceiling_plan"
+        ]
+        if ceiling_pages:
+            _emit({"event": "niche_locator_started", "pages": ceiling_pages})
+            # Render the first ceiling_plan page only (most projects have one).
+            # convert_from_bytes supports first_page/last_page; the
+            # pdf_to_b64_images helper iterates all pages so we inline here.
+            page_nr = ceiling_pages[0]
+            imgs = convert_from_bytes(
+                pdf_bytes, dpi=200, fmt="jpeg",
+                first_page=page_nr, last_page=page_nr,
+            )
+            if imgs:
+                buf = io.BytesIO()
+                imgs[0].save(buf, format="JPEG", quality=85)
+                image_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                nl = extract_niches(image_b64=image_b64)
+                fold_niches_into_rooms(parsed.get("patalpos") or [], nl)
+                parsed.setdefault("_meta", {})["niche_locator_page"] = page_nr
+                parsed["_meta"]["niche_locator_count"] = len(nl.niches)
+                parsed["_meta"]["niche_locator_cache"] = (nl._meta or {}).get("cache")
+                _emit({
+                    "event": "niche_locator_completed",
+                    "page": page_nr,
+                    "niches_found": len(nl.niches),
+                    "cache": (nl._meta or {}).get("cache"),
+                })
+            else:
+                _emit({"event": "niche_locator_skipped",
+                       "reason": f"failed to render page {page_nr}"})
+        else:
+            _emit({"event": "niche_locator_skipped",
+                   "reason": "no ceiling_plan page in puslapiai"})
+    except Exception as exc:
+        print(f"[extractor] niche_locator failed (non-fatal): {exc}")
+        _emit({"event": "niche_locator_error", "message": str(exc)})
+
     _emit({"event": "post_processing"})
 
     # Step 2.9: PYTHON DETERMINISTIC MATH (2026-04-28 deterministic refactor).
