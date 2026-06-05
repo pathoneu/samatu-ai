@@ -216,7 +216,9 @@
       "kampai_opening_reveals_m": 15.0,
       "kampai_pusiniai_m": 8.4,
       "angokrasciu_gkp_m": 15.3,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 13.5
     },
     {
       "nr": "102",
@@ -349,7 +351,9 @@
       "angokrasciu_gkp_m": 12.05,
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 0.0,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 31.0
     },
     {
       "nr": "103",
@@ -463,7 +467,9 @@
       "kampai_opening_reveals_m": 30.0,
       "kampai_pusiniai_m": 25.2,
       "angokrasciu_gkp_m": 32.4,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 15.0
     },
     {
       "nr": "104",
@@ -542,7 +548,9 @@
       "kampai_opening_reveals_m": 4.2,
       "kampai_pusiniai_m": 8.4,
       "angokrasciu_gkp_m": 0.0,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 15.0
     },
     {
       "nr": "105",
@@ -621,7 +629,9 @@
       "kampai_opening_reveals_m": 5.0,
       "kampai_pusiniai_m": 0.0,
       "angokrasciu_gkp_m": 6.9,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 13.5
     },
     {
       "nr": "106",
@@ -696,7 +706,9 @@
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 0.0,
       "_plyteles_sienos_m2_prior": 20.58,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 10.5
     },
     {
       "nr": "107",
@@ -771,7 +783,9 @@
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 46.32,
       "_plyteles_sienos_m2_prior": 27.72,
-      "silikonavimas_m": 25.3
+      "silikonavimas_m": 25.3,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 11.0
     },
     {
       "nr": "108",
@@ -850,7 +864,9 @@
       "kampai_opening_reveals_m": 4.2,
       "kampai_pusiniai_m": 8.4,
       "angokrasciu_gkp_m": 0.0,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.6
     },
     {
       "nr": "109",
@@ -929,7 +945,9 @@
       "kampai_opening_reveals_m": 4.2,
       "kampai_pusiniai_m": 8.4,
       "angokrasciu_gkp_m": 0.0,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.6
     },
     {
       "nr": "110",
@@ -1031,7 +1049,9 @@
       "angokrasciu_gkp_m": 11.4,
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 0.0,
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 20.0
     },
     {
       "nr": "111",
@@ -1113,7 +1133,9 @@
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 52.37,
       "_plyteles_sienos_m2_prior": 31.92,
-      "silikonavimas_m": 27.6
+      "silikonavimas_m": 27.6,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 12.0
     }
   ],
   "durys_total": [

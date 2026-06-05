@@ -500,6 +500,35 @@ def _resolve_deduction_standard(rules: dict | None) -> str:
 # SKAIČIAVIMAI per patalpą (simplified — no V8-only trace/detection deps)
 # ═════════════════════════════════════════════════════════════════════════
 
+# 2026-06-05: perimeter floor for SYNTHETIC (non-eksplikacija) room geometry.
+# When a plan has no eksplikacija table, Vision can't trace real wall runs and
+# emits a minimum-SQUARE perimeter (perim ≈ 4·√area). Real rooms are rectangular/
+# L-shaped, so wall length — and wall paint — is systematically under-read. For
+# rooms whose AREA source is NOT a trusted table we floor the perimeter that
+# feeds walls_gross toward an elongated rectangle. The coefficient is calibrated
+# on the two no-eksplikacija benchmark projects (ciurliu, lazunu); both stay
+# UNDER contractor truth at this value, so there is no overshoot. Scoped to the
+# wall-paint path ONLY — kampai / grindjuostės / silikonavimas keep the MEASURED
+# perimeter because their multipliers (e.g. silikonavimas ×2.3) are calibrated
+# against it. Extending the floor to those is a separate, eval-gated follow-up.
+#
+# We floor ONLY when the area source is EXPLICITLY synthetic. eksplikacija /
+# inline_label (trusted) and null/unknown (unclassifiable) are both left alone —
+# acting only on a positive synthetic signal bounds false positives (a missed
+# correction is safe; inflating a real-perimeter room is not).
+_SYNTHETIC_PERIM_RECT_COEFF = 4.69
+_SYNTHETIC_AREA_SOURCES = ("wall_dim_calc", "default_fallback")
+
+
+def _perimeter_floor_enabled() -> bool:
+    """Feature-flag gate for the synthetic-perimeter wall floor (default ON)."""
+    try:
+        from .feature_flags import get_flags
+        return bool(get_flags().get("perimeter_floor_synthetic", True))
+    except Exception:
+        return True
+
+
 def calc_room_quantities(room: dict,
                           ceiling_height_m: float = 2.82,
                           rules: dict | None = None) -> dict:
@@ -528,6 +557,20 @@ def calc_room_quantities(room: dict,
     if perim <= 0 and plotas > 0:
         perim = 4.18 * math.sqrt(plotas)
 
+    # Perimeter floor for synthetic (non-eksplikacija) geometry — WALL-PAINT path
+    # only. See _SYNTHETIC_PERIM_RECT_COEFF above. `perim` itself (and everything
+    # downstream that reads it — kampai, grindjuostės, silikonavimas, return value)
+    # stays the MEASURED Vision value; only walls_gross uses the floored length.
+    perim_walls = perim
+    perimetras_floor_applied = False
+    if _perimeter_floor_enabled() and plotas > 0:
+        area_src = (room.get("plotas_saltinis") or "").strip().lower()
+        if area_src in _SYNTHETIC_AREA_SOURCES:
+            floored = _SYNTHETIC_PERIM_RECT_COEFF * math.sqrt(plotas)
+            if floored > perim_walls:
+                perim_walls = floored
+                perimetras_floor_applied = True
+
     # Sienos bruto plotas. Sprint §2A.3: stairwell uses
     # max_height − Σ(stair triangles), not flat perim × H.
     if (room.get("room_type") or "").lower() == "stairwell" or paskirtis == "laiptine":
@@ -537,7 +580,7 @@ def calc_room_quantities(room: dict,
         rise = float(room.get("stair_rise_m") or 0)
         walls_gross = stairwell_wall_area_m2(perim, max_h, n_steps, run, rise)
     else:
-        walls_gross = perim * H
+        walls_gross = perim_walls * H
 
     # Atimti angas (NRM2 / VOB / LT — see _opening_should_deduct above).
     # 2026-06-01 audit fix: `or 1` short-circuited explicit 0 → 1, inserting
@@ -959,6 +1002,11 @@ def calc_room_quantities(room: dict,
         "puslapio_nr": room.get("puslapio_nr"),
         "plotas_m2": round(plotas, 2),
         "perimetras_m": round(perim, 2),
+        # Wall geometry MODELED (not measured) when the floor fired — disclosed,
+        # not hidden, per CLAUDE.md. _walls_perimetras_m is the length actually
+        # used for walls_gross; perimetras_m above stays the measured value.
+        "_perimetras_floor_applied": perimetras_floor_applied,
+        "_walls_perimetras_m": round(perim_walls, 2),
         "lubu_aukstis_m": round(H, 2),
         "ceiling_type": ceiling_type,
         "walls_gross_m2": round(walls_gross, 2),

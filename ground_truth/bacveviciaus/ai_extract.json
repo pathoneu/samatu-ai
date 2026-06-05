@@ -583,7 +583,9 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 11.4
     },
     {
       "nr": "02",
@@ -750,7 +752,9 @@
       "n_partition_walls": 4,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 33.5
     },
     {
       "nr": "03",
@@ -897,7 +901,9 @@
       "n_partition_walls": 10,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 22.0
     },
     {
       "nr": "04",
@@ -1006,7 +1012,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.0
     },
     {
       "nr": "05",
@@ -1094,7 +1102,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 7.8
     },
     {
       "nr": "06",
@@ -1205,7 +1215,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 15.4
     },
     {
       "nr": "07",
@@ -1293,7 +1305,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 7.9
     },
     {
       "nr": "08",
@@ -1429,7 +1443,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 25.76
+      "silikonavimas_m": 25.76,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 11.2
     },
     {
       "nr": "09",
@@ -1547,7 +1563,9 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 15.6
     },
     {
       "nr": "10",
@@ -1708,7 +1726,9 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 37.26
+      "silikonavimas_m": 37.26,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 16.2
     },
     {
       "nr": "11",
@@ -1796,7 +1816,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 9.8
     },
     {
       "nr": "12",
@@ -1910,7 +1932,9 @@
       "n_partition_walls": 4,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 16.1
+      "silikonavimas_m": 16.1,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 7.0
     },
     {
       "nr": "13",
@@ -2013,7 +2037,9 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 12.4
     },
     {
       "nr": "14",
@@ -2101,7 +2127,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 11.0
     },
     {
       "nr": "15",
@@ -2205,7 +2233,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 3,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 27.0
     }
   ],
   "durys_total": [

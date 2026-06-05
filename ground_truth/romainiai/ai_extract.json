@@ -317,7 +317,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.0
     },
     {
       "nr": "2",
@@ -420,7 +422,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 10.0
     },
     {
       "nr": "3",
@@ -546,7 +550,9 @@
       "n_partition_walls": 7,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 16.0
     },
     {
       "nr": "4",
@@ -642,7 +648,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 19.32
+      "silikonavimas_m": 19.32,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 8.4
     },
     {
       "nr": "5",
@@ -738,7 +746,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 16.0
     },
     {
       "nr": "6",
@@ -826,7 +836,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 9.8
     },
     {
       "nr": "7",
@@ -938,7 +950,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.4
     },
     {
       "nr": "8",
@@ -1034,7 +1048,9 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 20.0
     },
     {
       "nr": "9",
@@ -1139,7 +1155,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 13.5
     },
     {
       "nr": "10",
@@ -1252,7 +1270,9 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 3,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 23.5
     },
     {
       "nr": "11",
@@ -1345,7 +1365,9 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 3,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 24.0
     },
     {
       "nr": "1.2",
@@ -1432,7 +1454,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 22.0
     },
     {
       "nr": "2.2",
@@ -1518,7 +1542,9 @@
       "calculation_trace": "perim(11.50) × H(3.71) = 42.62 m² − 0 lang./0 dur. atimimai → dažymas 18.81 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "eksplikacija",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 11.5
     },
     {
       "nr": "3.2",
@@ -1614,7 +1640,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.5
     },
     {
       "nr": "4.2",
@@ -1710,7 +1738,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.4
     },
     {
       "nr": "5.2",
@@ -1806,7 +1836,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 14.5
     },
     {
       "nr": "6.2",
@@ -1895,7 +1927,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 20.7
+      "silikonavimas_m": 20.7,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 9.0
     },
     {
       "nr": "7.2",
@@ -1984,7 +2018,9 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 20.7
+      "silikonavimas_m": 20.7,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 9.0
     },
     {
       "nr": "8.2",
@@ -2076,7 +2112,9 @@
       "calculation_trace": "perim(18.50) × H(3.71) = 68.56 m² − 1 lang./0 dur. atimimai → dažymas 86.73 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "eksplikacija",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 18.5
     },
     {
       "nr": "9.2",
@@ -2150,7 +2188,9 @@
       "calculation_trace": "perim(10.50) × H(3.71) = 38.91 m² − 0 lang./0 dur. atimimai → dažymas 44.92 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "eksplikacija",
-      "silikonavimas_m": 0
+      "silikonavimas_m": 0,
+      "_perimetras_floor_applied": false,
+      "_walls_perimetras_m": 10.5
     }
   ],
   "durys_total": [
