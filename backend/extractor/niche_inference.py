@@ -27,16 +27,22 @@ The fallback only fires when:
 Estimates are marked _source='statistical_inference', _confidence='low'
 so downstream consumers can distinguish them from extractor output.
 
-Validated impact (test commit):
-  berzas       no change (all 0-LED rooms have ratio=0)
-  bacveviciaus 26.61m → ~45m (truth 55m; -52% → -18%)
-  ciurliu      14.50m → ~22m (truth 17m; -14% → +30% — caveat below)
+Validated impact (benchmark eval, verified 2026-06-05):
+  berzas       no change (all 0-LED rooms have ratio=0; LED -0.99%)
+  bacveviciaus 26.61m → 44.97m (truth 54.98; -52% → -18.2%)
+  ciurliu      14.50m → 18.95m (truth 16.84; -13.9% → +12.5% — over-bills)
 
 The ciurliu case shows the risk: when a 0-LED room ACTUALLY has 0
-LED (not just "the Vision missed it"), this fallback over-bills.
-That's why the ratios skew conservative and the threshold is 0.15.
-For projects where this over-bills, the contractor-side calibration
-UI is the right correction.
+LED (not just "Vision missed it"), this fallback over-bills. Here it
+fires on exactly 2 'san' wet rooms (perim × 0.27 = +4.45m) the
+contractor never billed, flipping -13.9% UNDER → +12.5% OVER. The
+ratios cannot simply be lowered to fix it: the same san=0.27 HELPS
+bacveviciaus (+6.26m), and dropping san/vonia/wc regresses
+bacveviciaus to -29.6% (verified). The clean asymmetric fix is to
+gate inference on per-room locator coverage (suppress only when the
+locator demonstrably imaged the room's ceiling plan and found 0),
+which needs a coverage map not yet persisted in the extract. Until
+then, route over-bills through the contractor /calibrate UI.
 """
 from __future__ import annotations
 

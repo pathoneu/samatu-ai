@@ -102,6 +102,44 @@ This is a CLASSIFICATION ambiguity (not measurement) — even high-res zoom on t
 
 ---
 
+## Benchmark accuracy ceiling — paint & LED residuals (2026-06-06)
+
+After the square-perimeter-synthesis fix (commit `771fb7e`: avg benchmark MAE
+**6.87% → 5.78%**, zero regression on eksplikacija projects), two residuals remain.
+A multi-round investigation (perimeter priors, niche-prompt tuning, coverage gating,
+area priors, scale calibration, ceiling overage, **two live Vision spikes**) established
+that BOTH are Vision **measurement ceilings**, not code bugs — do not re-litigate:
+
+- **Čiurlių paint −10.5%** — the bundled `project_pdf` (planning + lighting sheets)
+  has **no wall-dimension chains, only furniture dimensions**, so Vision sizes rooms
+  from furniture + assumed 1:50 scale → uniform ~10% under-read. Empirical proof
+  (live `claude-opus-4-7` calls, 2026-06-06):
+    - lighting plan (pg 3): ceiling area → **78 m²** @ conf 0.35 (truth 111.84)
+    - floor plan (pg 1): footprint → **87.7 m²** @ conf 0.35, **0/7 rooms from written
+      dims**; model's own note: *"Brėžinyje nėra eksplikacijos… pateikti tik baldų
+      matmenys, o ne sienų ilgių grandinės."*
+  Nuance: truth ceiling-GKP (111.84) exceeds real floor/PVC (98.0) by ~14% — the
+  contractor's ceiling includes soffit/boxing surface a flat-ceiling model can't
+  derive. AI floor (95.5) is only **−2.6%** vs the real floor (98.0); the headline
+  −10.5% is mostly the unmodellable ceiling-soffit gap.
+- **Bacevičiaus LED −18%** — Vision *recall* gap (niche prompt already recall-hardened;
+  multi-page locator already runs pgs 5/6/7). The inference fallback over-bills Čiurlių
+  (+12.5%) while under-recovering Bacevičiaus; **no global ratio change is safe**
+  (verified: dropping san/vonia/wc → Bacevičiaus −29.6%).
+
+**Root cause is DATA/input-completeness, same pattern as lazunu** — the dimensioned
+architectural plan lives on a separate sheet not in the bundle.
+
+**Answers (no further extraction cleverness warranted):**
+1. **`/calibrate`** — contractor enters the exact floor/ceiling/LED value per project
+   ($0, exact, never mutates the global calculator; `led_nisos_m` + `dazymo_plotas_m2`
+   already registered as calibration metrics).
+2. Bundle the **dimensioned architectural plan** into Čiurlių's `project_pdf`.
+3. Expand the **no-eksplikacija ground-truth set** (currently N=1–2) before any further
+   "global" no-schedule fix — that's the only thing that unblocks this regime.
+
+---
+
 ## 🚫 Untested scenarios (cannot resolve without sample data)
 
 We have only 5 training projects, all private residential new-builds. The pipeline has NEVER been validated on:
