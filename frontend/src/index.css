@@ -211,6 +211,21 @@
   background: hsl(var(--primary) / 0.05);
 }
 
+/* Annotator viewer animations (2026-06-05): used by loading skeletons
+   and the toast notification stack in src/components/annotator/. */
+@keyframes samatu-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+@keyframes samatu-fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes samatu-slidein-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Landing page — drafting-anchored aesthetic (2026-05-12).
    Highlighted noun pill, ghost numerals, floor plan reveal animation.

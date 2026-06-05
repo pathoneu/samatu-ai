@@ -17,6 +17,7 @@
  *   onClearAll()          — user clicked the section's Išvalyti button
  */
 import React, { useEffect, useRef } from 'react';
+import { Ruler, Trash2 } from 'lucide-react';
 
 export default function MeasurementsList({
   measurements,
@@ -50,9 +51,12 @@ export default function MeasurementsList({
         )}
       </header>
       {measurements.length === 0 ? (
-        <p className="px-4 py-3 text-xs italic text-neutral-400">
-          Pasirinkite įrankį 📏 Matuoti ir spustelėkite du taškus ant brėžinio.
-        </p>
+        <div className="px-4 py-6 text-center text-xs text-neutral-500">
+          <Ruler size={28} strokeWidth={1.5} aria-hidden="true"
+            className="mx-auto mb-2 text-neutral-300" />
+          <div className="font-medium text-neutral-600 mb-0.5">Nėra matavimų</div>
+          <div>Spustelėkite <span className="font-medium">Matuoti</span> ir brėžkite du taškus ant brėžinio</div>
+        </div>
       ) : (
         <ul className="text-sm">
           {measurements.map((m, i) => {
@@ -81,8 +85,12 @@ export default function MeasurementsList({
                     e.stopPropagation();
                     onDelete && onDelete(m.id);
                   }}
-                  className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600"
-                >Trinti</button>
+                  className="rounded border border-neutral-300 px-1.5 py-1 text-neutral-600 hover:border-red-400 hover:text-red-600 transition-colors"
+                  title="Ištrinti matavimą"
+                  aria-label="Ištrinti matavimą"
+                >
+                  <Trash2 size={12} strokeWidth={1.75} aria-hidden="true" />
+                </button>
               </li>
             );
           })}

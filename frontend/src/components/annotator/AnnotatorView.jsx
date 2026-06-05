@@ -382,6 +382,33 @@ export default function AnnotatorView({
     if (roomsWithPolygons[0]) setSelectedRoomNr(roomsWithPolygons[0].nr);
   };
 
+  // Global keyboard shortcuts (2026-06-05).
+  // V / M / C / Y / E switch the active tool. Esc cancels and returns
+  // to Select. Ctrl+S saves. Ctrl+Z / Y / Shift+Z already bound by
+  // useCommandStack({bindKeys:true}). Suppressed inside form inputs so
+  // the wizard's input field still accepts typed digits.
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if      (key === 'v')      setToolSafe(TOOLS.NONE);
+      else if (key === 'm')      setToolSafe(TOOLS.MEASURE);
+      else if (key === 'c')      setToolSafe(TOOLS.CALIBRATE);
+      else if (key === 'y')      setToolSafe(TOOLS.PLACE_SYMBOL);
+      else if (key === 'e')      setToolSafe(TOOLS.EDIT_WALL);
+      else if (key === 'escape') setToolSafe(TOOLS.NONE);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleSave]);
+
   const wrapperClass = embedded
     ? 'flex h-full w-full flex-col bg-neutral-100'
     : 'flex h-screen flex-col bg-neutral-100';

@@ -2,11 +2,14 @@
  * SymbolPalette — togal.ai-style symbol placement palette.
  *
  * Each symbol type shows the live count placed on the canvas as a
- * badge ("Socket × 14"). Clicking a symbol type activates the
+ * badge ("Rozetė × 14"). Clicking a symbol type activates the
  * place-symbol tool with that type.
  *
- * Symbols grouped by category (Electrical, Plumbing, HVAC). The
- * existing 6-symbol set is mapped to categories below.
+ * 2026-06-05: emoji glyphs in the palette replaced with Lucide React
+ * icons. The on-canvas rendering still uses unicode glyphs (see
+ * SYMBOL_ICONS in AnnotationCanvas) because Fabric.js Text objects
+ * can't render React/SVG icons in place — but the palette UI now
+ * looks like a real construction tool.
  *
  * Props:
  *   symbols[]    — current symbols (used for count badges)
@@ -16,7 +19,19 @@
  *                            highlight all instances on canvas
  */
 import React from 'react';
+import {
+  Power, ToggleLeft, Lightbulb, Wifi, Droplets, Wind,
+} from 'lucide-react';
 import { SYMBOL_ICONS } from './AnnotationCanvas';
+
+const PALETTE_ICONS = {
+  socket:        Power,
+  switch:        ToggleLeft,
+  light_ceiling: Lightbulb,
+  data_outlet:   Wifi,
+  water_cold:    Droplets,
+  vent_supply:   Wind,
+};
 
 // Group the 6 symbol types into 3 categories
 const CATEGORIES = [
@@ -53,6 +68,7 @@ export default function SymbolPalette({
           {cat.types.map((type) => {
             const meta = SYMBOL_ICONS[type];
             if (!meta) return null;
+            const Icon = PALETTE_ICONS[type] || Power;
             const count = counts[type] || 0;
             const active = activeType === type;
             return (
@@ -60,15 +76,17 @@ export default function SymbolPalette({
                 key={type}
                 type="button"
                 onClick={() => onSelectType && onSelectType(type)}
-                className={`flex items-center gap-1.5 rounded border px-2 py-1 ${
+                className={`flex items-center gap-1.5 rounded border px-2 py-1 transition-colors ${
                   active
                     ? 'border-purple-500 bg-purple-50 text-purple-700'
-                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50'
                 }`}
                 style={{ borderLeftWidth: 4, borderLeftColor: meta.color }}
                 title={meta.label}
+                aria-label={meta.label}
+                aria-pressed={active}
               >
-                <span>{meta.glyph}</span>
+                <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
                 <span>{meta.label}</span>
                 {count > 0 && (
                   <span
@@ -86,7 +104,7 @@ export default function SymbolPalette({
         </React.Fragment>
       ))}
       <span className="ml-2 text-neutral-400">
-        Dešinysis pelės klavišas = ištrinti.  Vilkti = perkelti.
+        Dešinysis pelės klavišas = ištrinti. Vilkti = perkelti.
       </span>
     </div>
   );
