@@ -78,9 +78,20 @@ class NicheList:
     _meta: dict[str, Any] = field(default_factory=dict)
 
     def per_room(self) -> dict[str, list[NicheRecord]]:
+        """Group niches by room_nr (primary key). Niches that have no
+        room_nr but DO have a room_name land under the special key
+        "__name__:<name>" so the fold can match by name when the
+        ceiling plan doesn't show room numbers (e.g., Ciurliu's
+        Apšvietimo planas only shows room labels, not nrs).
+        """
         out: dict[str, list[NicheRecord]] = {}
         for n in self.niches:
-            out.setdefault(str(n.room_nr), []).append(n)
+            nr = str(n.room_nr or "").strip()
+            if nr:
+                out.setdefault(nr, []).append(n)
+            elif (n.room_name or "").strip():
+                out.setdefault(f"__name__:{n.room_name.strip()}", []).append(n)
+            # niches with neither nr nor name are unassignable — dropped
         return out
 
     def to_dict(self) -> dict[str, Any]:
@@ -209,7 +220,10 @@ def fold_niches_into_rooms(
     by_room = niches.per_room()
     for room in rooms:
         nr = str(room.get("nr") or "")
-        room_niches = by_room.get(nr)
+        name = str(room.get("pavadinimas") or "").strip()
+        # Try nr first, then by-name fallback (helps when ceiling plan
+        # doesn't show room numbers and the locator can only provide names).
+        room_niches = by_room.get(nr) or by_room.get(f"__name__:{name}")
         if not room_niches:
             continue
         # Strip existing nisa_LED entries (preserve other tipai incl.

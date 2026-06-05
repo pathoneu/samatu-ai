@@ -670,6 +670,14 @@
           "_confidence": "low"
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 3.25,
+          "_niche_type": "partition_niche",
+          "_source": "niche_locator",
+          "_confidence": "low"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 2,
           "ilgis_m": 2.9,
@@ -1348,6 +1356,14 @@
           "_confidence": "medium"
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 1,
           "ilgis_m": 0.0,
@@ -1420,7 +1436,7 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 28.0
+      "silikonavimas_m": 25.76
     },
     {
       "nr": "09",
@@ -1594,6 +1610,30 @@
           "_confidence": "medium"
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.55,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.8,
+          "_niche_type": "shelf_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 1,
           "ilgis_m": 0.0,
@@ -1674,7 +1714,7 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 40.5
+      "silikonavimas_m": 37.26
     },
     {
       "nr": "11",
@@ -1809,6 +1849,14 @@
           "_niche_type": "shower_niche",
           "_source": "niche_locator",
           "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
         }
       ],
       "confidence": "high",
@@ -1859,7 +1907,7 @@
       "n_partition_walls": 4,
       "_exterior_wall_count": 0,
       "_adjacency_confidence": "low",
-      "silikonavimas_m": 17.5
+      "silikonavimas_m": 16.1
     },
     {
       "nr": "13",
@@ -3330,7 +3378,7 @@
     "plyteles_sienos_m2_total": 131.04,
     "isliginamasis_m2_total": 180.0,
     "grindjuosciu_m_total": 151.27,
-    "silikonavimas_m_total": 86.0,
+    "silikonavimas_m_total": 79.12,
     "hidroizoliacijos_vnt": 3
   },
   "_lt_warnings": [],

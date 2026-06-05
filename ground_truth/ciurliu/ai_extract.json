@@ -72,23 +72,26 @@
           "_exterior": true
         },
         {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 1,
-          "ilgis_m": 2.0
-        },
-        {
-          "tipas": "duris",
-          "kiekis": 1,
-          "plotis_mm": 800,
-          "aukstis_mm": 2100,
-          "_exterior": false
-        },
-        {
-          "tipas": "duris",
-          "kiekis": 1,
-          "plotis_mm": 800,
-          "aukstis_mm": 2100,
-          "_exterior": false
+          "ilgis_m": 4.5,
+          "_niche_type": "ceiling_led",
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "medium",
@@ -121,7 +124,7 @@
       "_paint_class": 2,
       "gruntas_l": 7.87,
       "lubu_karnizo_m": 16.8,
-      "nisu_metrai": 2.0,
+      "nisu_metrai": 4.5,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(16.00) × H(2.82) = 45.12 m² − 1 lang./2 dur. atimimai → dažymas 55.06 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -292,7 +295,7 @@
       "_adjacency_confidence": "medium",
       "count_partition_corners": false,
       "_bathroom_paint_above_tile_m": 1.2,
-      "silikonavimas_m": 21.25
+      "silikonavimas_m": 19.55
     },
     {
       "nr": "4",
@@ -665,7 +668,7 @@
       "_adjacency_confidence": "medium",
       "count_partition_corners": false,
       "_bathroom_paint_above_tile_m": 1.2,
-      "silikonavimas_m": 20.0
+      "silikonavimas_m": 18.4
     }
   ],
   "durys_total": [
@@ -1422,7 +1425,7 @@
     "kampai_m_total": 224.06,
     "angokrasciu_gkp_m_total": 35.1,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 12.0,
+    "nisu_metrai_total": 14.5,
     "gkp_lubu_m2_total": 95.5,
     "gkp_lubu_virs_3m_m2_total": 0.0,
     "pvc_grindys_m2_total": 87.0,
@@ -1430,7 +1433,7 @@
     "plyteles_sienos_m2_total": 41.25,
     "isliginamasis_m2_total": 95.5,
     "grindjuosciu_m_total": 83.51,
-    "silikonavimas_m_total": 41.25,
+    "silikonavimas_m_total": 37.95,
     "hidroizoliacijos_vnt": 2
   },
   "_lt_warnings": [],

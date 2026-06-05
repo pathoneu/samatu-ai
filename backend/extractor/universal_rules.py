@@ -985,16 +985,17 @@ def calc_room_quantities(room: dict,
         # also expose as grindjuosciu_m (Vision schema name)
         "grindjuosciu_m": round(grindjuostes, 2),
         # 2026-06-05: silikonavimas_m — Kampų silikonavimas (corner sealant).
-        # Wet rooms (vonia/wc/san) only. Formula: perim × 2.5 covers
-        # floor-wall joint (1×perim) + vertical wall-wall corners
-        # (~4 corners × tile_height_m=2.0 ≈ 8m extra per typical 10m
-        # perim bath ≈ 0.8×perim) + fixture seams (sink/bath/shower
-        # edges ≈ 0.7×perim). Cross-checked vs Beržų contractor truth:
-        #   Vaikų san.mazgas perim=10.5m → 26.25m (truth 23.64m, +11%)
-        #   Tėvų vonia       perim=12.0m → 30.00m (truth 31.74m, -5%)
-        # Both within 15%; close enough for headline without per-room
-        # contractor calibration. Dry rooms get 0.
-        "silikonavimas_m": round(perim * 2.5 if paskirtis in ("vonia", "wc", "san") else 0, 2),
+        # Wet rooms (vonia/wc/san) only. Multiplier 2.3 is the data-derived
+        # median across projects where the AI extract caught the wet rooms:
+        #   berzas       truth 50.14 / wet_perim 23.00 = 2.18
+        #   ciurliu      truth 38.15 / wet_perim 16.50 = 2.31
+        #   bacveviciaus truth 128.97 / wet_perim 34.40 = 3.75 (outlier;
+        #     likely more fixture seams than typical, calibrator-territory)
+        # At 2.3: berzas +5.5%, ciurliu -0.1%, bacveviciaus -38%, lazunu -100%
+        #   (lazunu extract found no wet rooms — root cause separate).
+        # Per-project tuning beyond ±15% is calibrator territory (use the
+        # /calibrate endpoint), not a single-multiplier fix.
+        "silikonavimas_m": round(perim * 2.3 if paskirtis in ("vonia", "wc", "san") else 0, 2),
         "doors_deducted_m2": round(doors_total, 2),
         "windows_deducted_m2": round(windows_total, 2),
     }

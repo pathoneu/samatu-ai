@@ -771,7 +771,7 @@
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 46.32,
       "_plyteles_sienos_m2_prior": 27.72,
-      "silikonavimas_m": 27.5
+      "silikonavimas_m": 25.3
     },
     {
       "nr": "108",
@@ -1113,7 +1113,7 @@
       "_plyteles_sienos_m2_source": "wall_elevation_mm",
       "_tile_area_from_elevation_m2": 52.37,
       "_plyteles_sienos_m2_prior": 31.92,
-      "silikonavimas_m": 30.0
+      "silikonavimas_m": 27.6
     }
   ],
   "durys_total": [
@@ -2183,7 +2183,7 @@
     "plyteles_sienos_m2_total": 67.12,
     "isliginamasis_m2_total": 154.97,
     "grindjuosciu_m_total": 111.87,
-    "silikonavimas_m_total": 57.5,
+    "silikonavimas_m_total": 52.9,
     "hidroizoliacijos_vnt": 3
   },
   "_lt_warnings": [

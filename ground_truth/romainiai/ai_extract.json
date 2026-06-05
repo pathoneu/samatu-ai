@@ -623,7 +623,7 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 21.0
+      "silikonavimas_m": 19.32
     },
     {
       "nr": "5",
@@ -1793,7 +1793,7 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 22.5
+      "silikonavimas_m": 20.7
     },
     {
       "nr": "7.2",
@@ -1872,7 +1872,7 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
-      "silikonavimas_m": 22.5
+      "silikonavimas_m": 20.7
     },
     {
       "nr": "8.2",
@@ -3193,7 +3193,7 @@
     "plyteles_sienos_m2_total": 262.03,
     "isliginamasis_m2_total": 231.77,
     "grindjuosciu_m_total": 213.35,
-    "silikonavimas_m_total": 66.0,
+    "silikonavimas_m_total": 60.72,
     "hidroizoliacijos_vnt": 5
   },
   "_lt_warnings": [],

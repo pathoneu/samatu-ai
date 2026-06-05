@@ -74,11 +74,11 @@
     "cost_est_usd": 0.0,
     "n_niches_found": 19,
     "truth": 54.98,
-    "before": 25.61,
+    "before": 26.61,
     "after": 26.61,
-    "before_pct": -53.42,
+    "before_pct": -51.6,
     "after_pct": -51.6,
-    "improvement_pp": 1.82,
+    "improvement_pp": 0.0,
     "rerolled_to": "ground_truth/bacveviciaus/ai_extract_with_niches.json"
   },
   {
@@ -100,10 +100,10 @@
     "n_niches_found": 5,
     "truth": 16.84,
     "before": 12.0,
-    "after": 12.0,
+    "after": 14.5,
     "before_pct": -28.74,
-    "after_pct": -28.74,
-    "improvement_pp": 0.0,
+    "after_pct": -13.9,
+    "improvement_pp": 14.85,
     "rerolled_to": "ground_truth/ciurliu/ai_extract_with_niches.json"
   }
 ]
