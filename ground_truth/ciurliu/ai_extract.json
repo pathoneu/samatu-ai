@@ -254,7 +254,17 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.5,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.29,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
+        }
+      ],
       "confidence": "low",
       "pastabos": "Pažymėta 'Atskiras brėžinys vonia prie miegamojo' - detalūs matmenys nepateikti šiame plane",
       "polygon_source": "synthesized_from_bbox",
@@ -285,7 +295,7 @@
       "_paint_class": 2,
       "gruntas_l": 1.03,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.29,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(8.50) × H(2.82) = 23.97 m² − 0 lang./0 dur. atimimai → dažymas 7.22 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -624,6 +634,15 @@
           "plotis_mm": 800,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.16,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
         }
       ],
       "confidence": "low",
@@ -658,7 +677,7 @@
       "_paint_class": 2,
       "gruntas_l": 0.7,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.16,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(8.00) × H(2.82) = 22.56 m² − 0 lang./1 dur. atimimai → dažymas 4.88 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1425,7 +1444,7 @@
     "kampai_m_total": 224.06,
     "angokrasciu_gkp_m_total": 35.1,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 14.5,
+    "nisu_metrai_total": 18.95,
     "gkp_lubu_m2_total": 95.5,
     "gkp_lubu_virs_3m_m2_total": 0.0,
     "pvc_grindys_m2_total": 87.0,

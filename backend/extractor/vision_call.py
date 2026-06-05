@@ -2688,6 +2688,23 @@ def extract_interior(
         print(f"[extractor] niche_locator failed (non-fatal): {exc}")
         _emit({"event": "niche_locator_error", "message": str(exc)})
 
+    # Step 2.88: STATISTICAL NICHE INFERENCE (2026-06-05).
+    # For rooms where the niche_locator returned nothing but the room
+    # paskirtis empirically has LED (corridor 0.55, wet rooms 0.27,
+    # etc.), inject a fallback estimate based on perim × ratio.
+    # See backend/extractor/niche_inference.py for the per-paskirtis
+    # table and the validated impact on bacveviciaus (-52% → -18%).
+    try:
+        from .niche_inference import infer_missing_niches
+        n_inferred = infer_missing_niches(parsed.get("patalpos") or [])
+        if n_inferred:
+            parsed.setdefault("_meta", {})["niche_inference_rooms"] = n_inferred
+            _emit({"event": "niche_inference_completed",
+                   "rooms_inferred": n_inferred})
+    except Exception as exc:
+        print(f"[extractor] niche inference failed (non-fatal): {exc}")
+        _emit({"event": "niche_inference_error", "message": str(exc)})
+
     _emit({"event": "post_processing"})
 
     # Step 2.9: PYTHON DETERMINISTIC MATH (2026-04-28 deterministic refactor).

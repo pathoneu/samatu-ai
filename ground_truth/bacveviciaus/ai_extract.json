@@ -842,18 +842,11 @@
         {
           "tipas": "nisa_LED",
           "kiekis": 1,
-          "ilgis_m": 0.0,
+          "ilgis_m": 12.1,
           "_niche_type": "ceiling_led",
-          "_source": "niche_locator",
-          "_confidence": "low"
-        },
-        {
-          "tipas": "nisa_LED",
-          "kiekis": 1,
-          "ilgis_m": 0.0,
-          "_niche_type": "ceiling_led",
-          "_source": "niche_locator",
-          "_confidence": "low"
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.55
         }
       ],
       "confidence": "high",
@@ -896,7 +889,7 @@
       "_paint_class": 2,
       "gruntas_l": 9.24,
       "lubu_karnizo_m": 23.1,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 12.1,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(22.00) × H(2.82) = 62.04 m² − 0 lang./7 dur. atimimai → dažymas 64.69 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1634,14 +1627,6 @@
           "_confidence": "medium"
         },
         {
-          "tipas": "nisa_LED",
-          "kiekis": 1,
-          "ilgis_m": 0.0,
-          "_niche_type": "ceiling_led",
-          "_source": "niche_locator",
-          "_confidence": "low"
-        },
-        {
           "tipas": "nisa_partition",
           "kiekis": 1,
           "ilgis_m": 0.55,
@@ -1664,6 +1649,15 @@
           "_niche_type": "shelf_niche",
           "_source": "niche_locator",
           "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 4.37,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
         }
       ],
       "confidence": "high",
@@ -1706,7 +1700,7 @@
       "_paint_class": 2,
       "gruntas_l": 2.01,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 4.37,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(16.20) × H(2.82) = 45.68 m² − 1 lang./0 dur. atimimai → dažymas 14.04 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1857,6 +1851,15 @@
           "_niche_type": "shower_niche",
           "_source": "niche_locator",
           "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.89,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
         }
       ],
       "confidence": "high",
@@ -1899,7 +1902,7 @@
       "_paint_class": 2,
       "gruntas_l": 0.43,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 1.89,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(7.00) × H(2.82) = 19.74 m² − 0 lang./0 dur. atimimai → dažymas 3.03 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -3370,7 +3373,7 @@
     "kampai_m_total": 598.92,
     "angokrasciu_gkp_m_total": 95.7,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 26.61,
+    "nisu_metrai_total": 44.97,
     "gkp_lubu_m2_total": 180.0,
     "gkp_lubu_virs_3m_m2_total": 0.0,
     "pvc_grindys_m2_total": 148.88,

@@ -486,6 +486,15 @@
           "plotis_mm": 900,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 8.8,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.55
         }
       ],
       "confidence": "high",
@@ -529,7 +538,7 @@
       "_paint_class": 2,
       "gruntas_l": 9.23,
       "lubu_karnizo_m": 16.8,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 8.8,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(16.00) × H(3.71) = 59.30 m² − 0 lang./4 dur. atimimai → dažymas 64.63 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -575,7 +584,17 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 3.0,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.27,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
+        }
+      ],
       "confidence": "high",
       "pastabos": "Plytelės nuo grindų iki lubų (Materia Pesca Trama Rett 60x120)",
       "eksplikacija_row_idx": 400,
@@ -615,7 +634,7 @@
       "_paint_class": 2,
       "gruntas_l": 1.43,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.27,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(8.40) × H(3.71) = 31.13 m² − 0 lang./0 dur. atimimai → dažymas 10.03 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -668,6 +687,15 @@
           "plotis_mm": 1700,
           "aukstis_mm": 1500,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.72,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "medium",
@@ -702,7 +730,7 @@
       "_paint_class": 2,
       "gruntas_l": 10.31,
       "lubu_karnizo_m": 16.8,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.72,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(16.00) × H(3.71) = 59.30 m² − 1 lang./0 dur. atimimai → dažymas 72.15 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -850,6 +878,15 @@
           "plotis_mm": 700,
           "aukstis_mm": 2100,
           "_exterior": false
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.45,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "medium",
@@ -893,7 +930,7 @@
       "_paint_class": 2,
       "gruntas_l": 8.81,
       "lubu_karnizo_m": 15.12,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.45,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(14.40) × H(3.71) = 53.37 m² − 1 lang./1 dur. atimimai → dažymas 61.67 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1042,6 +1079,15 @@
           "plotis_mm": 2000,
           "aukstis_mm": 2100,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 5.27,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.39
         }
       ],
       "confidence": "medium",
@@ -1085,7 +1131,7 @@
       "_paint_class": 2,
       "gruntas_l": 8.14,
       "lubu_karnizo_m": 14.18,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 5.27,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(13.50) × H(3.71) = 50.03 m² − 0 lang./1 dur. atimimai → dažymas 57.01 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1146,6 +1192,15 @@
           "plotis_mm": 2000,
           "aukstis_mm": 2100,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 9.4,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.4
         }
       ],
       "confidence": "high",
@@ -1189,7 +1244,7 @@
       "_paint_class": 2,
       "gruntas_l": 14.62,
       "lubu_karnizo_m": 24.68,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 9.4,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(23.50) × H(3.71) = 87.09 m² − 1 lang./1 dur. atimimai → dažymas 102.37 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1415,7 +1470,17 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.74,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 4.71,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.41
+        }
+      ],
       "confidence": "high",
       "pastabos": "Florim Sensi White Lithos plytelės sienose ir grindyse",
       "polygon_source": "synthesized_from_bbox",
@@ -1448,7 +1513,7 @@
       "_paint_class": 2,
       "gruntas_l": 2.69,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 4.71,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(11.50) × H(3.71) = 42.62 m² − 0 lang./0 dur. atimimai → dažymas 18.81 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1498,6 +1563,15 @@
           "plotis_mm": 2700,
           "aukstis_mm": 1500,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.47,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "high",
@@ -1532,7 +1606,7 @@
       "_paint_class": 2,
       "gruntas_l": 8.94,
       "lubu_karnizo_m": 15.23,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.47,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(14.50) × H(3.71) = 53.74 m² − 1 lang./0 dur. atimimai → dažymas 62.59 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1585,6 +1659,15 @@
           "plotis_mm": 2700,
           "aukstis_mm": 1500,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.45,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "high",
@@ -1619,7 +1702,7 @@
       "_paint_class": 2,
       "gruntas_l": 8.88,
       "lubu_karnizo_m": 15.12,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.45,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(14.40) × H(3.71) = 53.37 m² − 1 lang./0 dur. atimimai → dažymas 62.17 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1672,6 +1755,15 @@
           "plotis_mm": 2700,
           "aukstis_mm": 1500,
           "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.47,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "high",
@@ -1706,7 +1798,7 @@
       "_paint_class": 2,
       "gruntas_l": 8.94,
       "lubu_karnizo_m": 15.23,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.47,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(14.50) × H(3.71) = 53.74 m² − 1 lang./0 dur. atimimai → dažymas 62.59 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1752,7 +1844,17 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.74,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.43,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
+        }
+      ],
       "confidence": "high",
       "pastabos": "Limo Cedit Compatta sienos, Mutina Foldet grindys/sienos",
       "polygon_source": "synthesized_from_bbox",
@@ -1785,7 +1887,7 @@
       "_paint_class": 2,
       "gruntas_l": 1.9,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.43,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(9.00) × H(3.71) = 33.35 m² − 0 lang./0 dur. atimimai → dažymas 13.32 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1831,7 +1933,17 @@
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
       "plyteles_sienos_aukstis_m": 2.74,
-      "elementai": [],
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.43,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.27
+        }
+      ],
       "confidence": "high",
       "pastabos": "Limo Cedit Compatta plytelės",
       "polygon_source": "synthesized_from_bbox",
@@ -1864,7 +1976,7 @@
       "_paint_class": 2,
       "gruntas_l": 1.89,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.43,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(9.00) × H(3.71) = 33.35 m² − 0 lang./0 dur. atimimai → dažymas 13.26 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -1916,6 +2028,15 @@
           "kiekis": 1,
           "plotis_mm": 1700,
           "aukstis_mm": 1500
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.15,
+          "_niche_type": "ceiling_led",
+          "_source": "statistical_inference",
+          "_confidence": "low",
+          "_paskirtis_ratio": 0.17
         }
       ],
       "confidence": "high",
@@ -1950,7 +2071,7 @@
       "_paint_class": 2,
       "gruntas_l": 12.39,
       "lubu_karnizo_m": 19.43,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 3.15,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(18.50) × H(3.71) = 68.56 m² − 1 lang./0 dur. atimimai → dažymas 86.73 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
@@ -3185,7 +3306,7 @@
     "kampai_m_total": 852.14,
     "angokrasciu_gkp_m_total": 64.0,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 0.0,
+    "nisu_metrai_total": 51.02,
     "gkp_lubu_m2_total": 0.0,
     "gkp_lubu_virs_3m_m2_total": 231.77,
     "pvc_grindys_m2_total": 180.84,
