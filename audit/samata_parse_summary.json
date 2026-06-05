@@ -1,0 +1,38 @@
+[
+  {
+    "slug": "berzas",
+    "n_items": 58,
+    "n_sections": 5,
+    "with_qty": 53
+  },
+  {
+    "slug": "bacveviciaus",
+    "n_items": 121,
+    "n_sections": 8,
+    "with_qty": 111
+  },
+  {
+    "slug": "ciurliu",
+    "n_items": 44,
+    "n_sections": 7,
+    "with_qty": 36
+  },
+  {
+    "slug": "romainiai",
+    "n_items": 16,
+    "n_sections": 1,
+    "with_qty": 15
+  },
+  {
+    "slug": "sernu",
+    "n_items": 32,
+    "n_sections": 3,
+    "with_qty": 28
+  },
+  {
+    "slug": "lazunu",
+    "n_items": 58,
+    "n_sections": 8,
+    "with_qty": 50
+  }
+]

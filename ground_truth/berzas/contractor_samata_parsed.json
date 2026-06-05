@@ -1,8 +1,7 @@
 {
+  "slug": "berzas",
   "source": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf",
-  "project": "Beržų g. 24",
-  "contractor": "Rangovas A (Rangovas A)",
-  "n_line_items": 59,
+  "n_line_items": 58,
   "sections": [
     "Gipso kartono montavimas",
     "Sienų lubų glaistymas dažymas",
@@ -139,7 +138,7 @@
     },
     {
       "page": 1,
-      "nr": "",
+      "nr": null,
       "section": "Gipso kartono montavimas",
       "name": "Viso už skyrių",
       "unit": null,
@@ -229,7 +228,7 @@
     },
     {
       "page": 1,
-      "nr": "",
+      "nr": null,
       "section": "Sienų lubų glaistymas dažymas",
       "name": "Viso už skyrių",
       "unit": null,
@@ -355,7 +354,7 @@
     },
     {
       "page": 2,
-      "nr": "",
+      "nr": null,
       "section": "Plytelių klijavimas",
       "name": "Viso už skyrių",
       "unit": null,
@@ -508,7 +507,7 @@
     },
     {
       "page": 2,
-      "nr": "",
+      "nr": null,
       "section": "Santechnikos darbai",
       "name": "Viso už skyrių",
       "unit": null,
@@ -526,19 +525,10 @@
     },
     {
       "page": 2,
-      "nr": "",
+      "nr": null,
       "section": "Statybvietės išlaidos",
       "name": "Viso už skyrių",
       "unit": null,
-      "quantity": null,
-      "raw_qty": null
-    },
-    {
-      "page": 2,
-      "nr": "",
-      "section": "Statybvietės išlaidos",
-      "name": "",
-      "unit": "Iš viso:",
       "quantity": null,
       "raw_qty": null
     }
