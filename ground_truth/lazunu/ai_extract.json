@@ -90,7 +90,8 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(12.76) × H(2.82) = 35.98 m² − 1 lang./0 dur. atimimai → dažymas 42.73 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "silikonavimas_m": 0
     },
     {
       "nr": "02",
@@ -212,7 +213,8 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(17.40) × H(2.82) = 49.07 m² − 2 lang./4 dur. atimimai → dažymas 45.63 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "silikonavimas_m": 0
     },
     {
       "nr": "03",
@@ -284,7 +286,8 @@
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(8.74) × H(2.82) = 24.65 m² − 0 lang./0 dur. atimimai → dažymas 28.93 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "silikonavimas_m": 0
     }
   ],
   "durys_total": [
@@ -741,6 +744,7 @@
     "plyteles_sienos_m2_total": 0.0,
     "isliginamasis_m2_total": 30.68,
     "grindjuosciu_m_total": 39.05,
+    "silikonavimas_m_total": 0.0,
     "hidroizoliacijos_vnt": 0
   },
   "_lt_warnings": [],

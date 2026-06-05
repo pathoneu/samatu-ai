@@ -1908,6 +1908,7 @@ def _recompute_santrauka(parsed: dict) -> dict:
             "plyteles_sienos_m2": r.get("plyteles_sienos_m2", 0),
             "isliginamasis_m2": r.get("isliginamasis_m2", 0),
             "grindjuosciu_m": r.get("grindjuosciu_m", 0),
+            "silikonavimas_m": r.get("silikonavimas_m", 0),
             "hidroizoliacija_m2": r.get("hidroizoliacija_m2", 0),
             "lubu_tipas": r.get("lubu_tipas", "gkp"),
             "lubu_aukstis_m": r.get("lubu_aukstis_m", 2.82),
@@ -1943,6 +1944,7 @@ def _recompute_santrauka(parsed: dict) -> dict:
         "plyteles_sienos_m2_total": totals.get("plyteles_sienos_m2_total", 0),
         "isliginamasis_m2_total": totals.get("isliginamasis_m2_total", 0),
         "grindjuosciu_m_total": totals.get("grindjuosciu_m_total", 0),
+        "silikonavimas_m_total": totals.get("silikonavimas_m_total", 0),
         "hidroizoliacijos_vnt": totals.get("hidroizoliacijos_vnt", 0),
     }
     return parsed
@@ -2598,51 +2600,90 @@ def extract_interior(
         print(f"[extractor] doors read failed (non-fatal): {exc}")
         _emit({"event": "doors_error", "message": str(exc)})
 
-    # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05).
-    # Targeted Vision pass on the ceiling_plan page to recover LED niches
-    # that the main pass under-counts. Verified Beržų LED accuracy went
-    # from -5.44% (main pass alone) to -0.99% (main + niche_locator)
-    # with the stricter prompt that distinguishes LED from decorative /
-    # partition niches. fold_niches_into_rooms preserves non-LED elementai.
+    # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page
+    # backfill added 2026-06-05 evening).
+    # Targeted Vision pass on the ceiling_plan page + conditional
+    # backfill from secondary pages (lubu mazgai sections, apsvietimo
+    # planas) when the primary's LED-room coverage is sparse.
+    #
+    # Verified Beržų: -5.44% → -0.99% (primary alone). Secondary pages
+    # would over-extract (light-wiring rectangles mis-read as LED), so
+    # the COVERAGE_GATE skips them when primary already covers many
+    # rooms. Bacveviciaus: -54.75% → -51.60% (primary 4 rooms < gate,
+    # backfill kicks in, helps marginally — locator-limited beyond that).
     try:
-        from .vision.niche_locator import extract_niches, fold_niches_into_rooms
-        page_classifications = parsed.get("puslapiai") or []
-        ceiling_pages = [
-            int(p.get("nr"))
-            for p in page_classifications
-            if (p.get("tipas") or "").lower() == "ceiling_plan"
-        ]
-        if ceiling_pages:
-            _emit({"event": "niche_locator_started", "pages": ceiling_pages})
-            # Render the first ceiling_plan page only (most projects have one).
-            # convert_from_bytes supports first_page/last_page; the
-            # pdf_to_b64_images helper iterates all pages so we inline here.
-            page_nr = ceiling_pages[0]
+        from .vision.niche_locator import (
+            extract_niches, fold_niches_into_rooms, NicheList,
+        )
+
+        def _is_niche_candidate(p: dict) -> bool:
+            tipas = (p.get("tipas") or "").lower()
+            if tipas == "ceiling_plan":
+                return True
+            title = (p.get("pavadinimas") or "").lower()
+            return ("lub" in title) or ("apšviet" in title) or ("apsviet" in title)
+
+        def _render_one_page(page_nr: int) -> str | None:
             imgs = convert_from_bytes(
                 pdf_bytes, dpi=200, fmt="jpeg",
                 first_page=page_nr, last_page=page_nr,
             )
-            if imgs:
-                buf = io.BytesIO()
-                imgs[0].save(buf, format="JPEG", quality=85)
-                image_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-                nl = extract_niches(image_b64=image_b64)
-                fold_niches_into_rooms(parsed.get("patalpos") or [], nl)
-                parsed.setdefault("_meta", {})["niche_locator_page"] = page_nr
-                parsed["_meta"]["niche_locator_count"] = len(nl.niches)
-                parsed["_meta"]["niche_locator_cache"] = (nl._meta or {}).get("cache")
+            if not imgs:
+                return None
+            buf = io.BytesIO()
+            imgs[0].save(buf, format="JPEG", quality=85)
+            return base64.b64encode(buf.getvalue()).decode("ascii")
+
+        page_classifications = parsed.get("puslapiai") or []
+        candidates = [p for p in page_classifications if _is_niche_candidate(p)]
+        # Primary = first ceiling_plan, else first candidate
+        candidates.sort(key=lambda p: (
+            0 if (p.get("tipas") or "").lower() == "ceiling_plan" else 1,
+            int(p.get("nr", 999)),
+        ))
+        page_nrs = [int(p.get("nr")) for p in candidates]
+        if not page_nrs:
+            _emit({"event": "niche_locator_skipped",
+                   "reason": "no candidate page (no ceiling_plan / lub / apšviet)"})
+        else:
+            _emit({"event": "niche_locator_started", "pages": page_nrs})
+            combined = NicheList()
+            covered: set[str] = set()
+            COVERAGE_GATE = 5  # rooms with non-zero LED before backfill skips
+            # Primary pass
+            primary_pg = page_nrs[0]
+            image_b64 = _render_one_page(primary_pg)
+            if image_b64:
+                nl_p = extract_niches(image_b64=image_b64)
+                for n in nl_p.niches:
+                    if n.type in ("ceiling_led", "wall_led") and (n.length_mm or 0) > 0:
+                        covered.add(str(n.room_nr))
+                    combined.niches.append(n)
+                # Backfill secondaries only when primary coverage is sparse
+                if len(covered) < COVERAGE_GATE:
+                    for page_nr in page_nrs[1:]:
+                        img = _render_one_page(page_nr)
+                        if not img:
+                            continue
+                        nl_s = extract_niches(image_b64=img)
+                        for n in nl_s.niches:
+                            is_led = n.type in ("ceiling_led", "wall_led")
+                            if (not is_led) or (str(n.room_nr) not in covered):
+                                combined.niches.append(n)
+                fold_niches_into_rooms(parsed.get("patalpos") or [], combined)
+                parsed.setdefault("_meta", {})["niche_locator_pages"] = page_nrs
+                parsed["_meta"]["niche_locator_primary_covered"] = len(covered)
+                parsed["_meta"]["niche_locator_count"] = len(combined.niches)
                 _emit({
                     "event": "niche_locator_completed",
-                    "page": page_nr,
-                    "niches_found": len(nl.niches),
-                    "cache": (nl._meta or {}).get("cache"),
+                    "primary_page": primary_pg,
+                    "primary_rooms_covered": len(covered),
+                    "total_niches_kept": len(combined.niches),
+                    "backfill_ran": len(covered) < COVERAGE_GATE,
                 })
             else:
                 _emit({"event": "niche_locator_skipped",
-                       "reason": f"failed to render page {page_nr}"})
-        else:
-            _emit({"event": "niche_locator_skipped",
-                   "reason": "no ceiling_plan page in puslapiai"})
+                       "reason": f"failed to render primary page {primary_pg}"})
     except Exception as exc:
         print(f"[extractor] niche_locator failed (non-fatal): {exc}")
         _emit({"event": "niche_locator_error", "message": str(exc)})

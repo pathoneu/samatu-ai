@@ -984,6 +984,17 @@ def calc_room_quantities(room: dict,
         "grindjuostes_m": round(grindjuostes, 2),
         # also expose as grindjuosciu_m (Vision schema name)
         "grindjuosciu_m": round(grindjuostes, 2),
+        # 2026-06-05: silikonavimas_m — Kampų silikonavimas (corner sealant).
+        # Wet rooms (vonia/wc/san) only. Formula: perim × 2.5 covers
+        # floor-wall joint (1×perim) + vertical wall-wall corners
+        # (~4 corners × tile_height_m=2.0 ≈ 8m extra per typical 10m
+        # perim bath ≈ 0.8×perim) + fixture seams (sink/bath/shower
+        # edges ≈ 0.7×perim). Cross-checked vs Beržų contractor truth:
+        #   Vaikų san.mazgas perim=10.5m → 26.25m (truth 23.64m, +11%)
+        #   Tėvų vonia       perim=12.0m → 30.00m (truth 31.74m, -5%)
+        # Both within 15%; close enough for headline without per-room
+        # contractor calibration. Dry rooms get 0.
+        "silikonavimas_m": round(perim * 2.5 if paskirtis in ("vonia", "wc", "san") else 0, 2),
         "doors_deducted_m2": round(doors_total, 2),
         "windows_deducted_m2": round(windows_total, 2),
     }
@@ -1013,6 +1024,7 @@ def calc_totals(rooms: list[dict]) -> dict:
         "plyteles_sienos_m2_total": 0.0,
         "isliginamasis_m2_total": 0.0,
         "grindjuosciu_m_total": 0.0,
+        "silikonavimas_m_total": 0.0,
         "hidroizoliacijos_vnt": 0,
     }
 
@@ -1029,6 +1041,7 @@ def calc_totals(rooms: list[dict]) -> dict:
         totals["isliginamasis_m2_total"] += r.get("isliginamasis_m2", 0)
         # grindjuosciu: accept both Vision field name and calc_room_quantities field name
         totals["grindjuosciu_m_total"] += r.get("grindjuosciu_m", 0) or r.get("grindjuostes_m", 0)
+        totals["silikonavimas_m_total"] += r.get("silikonavimas_m", 0)
 
         # GKP lubos: prefer calc_room_quantities outputs when present
         # (they handle partial high-ceiling rooms via high_ceiling_area_m2);

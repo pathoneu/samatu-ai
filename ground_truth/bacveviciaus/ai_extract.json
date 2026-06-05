@@ -527,6 +527,14 @@
           "_niche_type": "ceiling_led",
           "_source": "niche_locator",
           "_confidence": "low"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 0.0,
+          "_niche_type": "ceiling_led",
+          "_source": "niche_locator",
+          "_confidence": "low"
         }
       ],
       "confidence": "high",
@@ -574,7 +582,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 2,
       "_exterior_wall_count": 2,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "02",
@@ -653,6 +662,14 @@
           "_exterior": true
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 3.25,
+          "_niche_type": "partition_niche",
+          "_source": "niche_locator",
+          "_confidence": "low"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 2,
           "ilgis_m": 2.9,
@@ -724,7 +741,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 4,
       "_exterior_wall_count": 2,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "03",
@@ -820,6 +838,14 @@
           "_niche_type": "ceiling_led",
           "_source": "niche_locator",
           "_confidence": "low"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 0.0,
+          "_niche_type": "ceiling_led",
+          "_source": "niche_locator",
+          "_confidence": "low"
         }
       ],
       "confidence": "high",
@@ -869,7 +895,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 10,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "04",
@@ -977,7 +1004,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "05",
@@ -1064,7 +1092,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "06",
@@ -1174,7 +1203,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 2,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "07",
@@ -1261,7 +1291,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "08",
@@ -1309,6 +1340,14 @@
           "_exterior": true
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 1,
           "ilgis_m": 0.0,
@@ -1323,6 +1362,14 @@
           "_niche_type": "shower_niche",
           "_source": "niche_locator",
           "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 2,
+          "ilgis_m": 2.0,
+          "_niche_type": "ceiling_led",
+          "_source": "niche_locator",
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -1365,14 +1412,15 @@
       "_paint_class": 2,
       "gruntas_l": 0.98,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 0.0,
+      "nisu_metrai": 2.0,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(11.20) × H(2.82) = 31.58 m² − 1 lang./0 dur. atimimai → dažymas 6.83 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 28.0
     },
     {
       "nr": "09",
@@ -1489,7 +1537,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 5,
       "_exterior_wall_count": 1,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     },
     {
       "nr": "10",
@@ -1537,6 +1586,14 @@
           "_exterior": false
         },
         {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.55,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
           "tipas": "nisa_LED",
           "kiekis": 1,
           "ilgis_m": 0.0,
@@ -1549,6 +1606,22 @@
           "kiekis": 1,
           "ilgis_m": 0.55,
           "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
+          "_source": "niche_locator",
+          "_confidence": "medium"
+        },
+        {
+          "tipas": "nisa_partition",
+          "kiekis": 1,
+          "ilgis_m": 0.8,
+          "_niche_type": "shelf_niche",
           "_source": "niche_locator",
           "_confidence": "medium"
         }
@@ -1600,7 +1673,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 5,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "low"
+      "_adjacency_confidence": "low",
+      "silikonavimas_m": 40.5
     },
     {
       "nr": "11",
@@ -1687,7 +1761,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "low"
+      "_adjacency_confidence": "low",
+      "silikonavimas_m": 0
     },
     {
       "nr": "12",
@@ -1728,11 +1803,12 @@
       "plyteles_sienos_aukstis_m": 2.8,
       "elementai": [
         {
-          "tipas": "nisa_LED",
+          "tipas": "nisa_partition",
           "kiekis": 1,
-          "ilgis_m": 0.0,
+          "ilgis_m": 0.6,
+          "_niche_type": "shower_niche",
           "_source": "niche_locator",
-          "_confidence": "low"
+          "_confidence": "medium"
         }
       ],
       "confidence": "high",
@@ -1782,7 +1858,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 4,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "low"
+      "_adjacency_confidence": "low",
+      "silikonavimas_m": 17.5
     },
     {
       "nr": "13",
@@ -1884,7 +1961,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 5,
       "_exterior_wall_count": 1,
-      "_adjacency_confidence": "low"
+      "_adjacency_confidence": "low",
+      "silikonavimas_m": 0
     },
     {
       "nr": "14",
@@ -1971,7 +2049,8 @@
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 0,
-      "_adjacency_confidence": "low"
+      "_adjacency_confidence": "low",
+      "silikonavimas_m": 0
     },
     {
       "nr": "15",
@@ -2020,10 +2099,11 @@
         },
         {
           "tipas": "nisa_LED",
-          "kiekis": 1,
-          "ilgis_m": 5.0,
+          "kiekis": 3,
+          "ilgis_m": 4.0,
+          "_niche_type": "ceiling_led",
           "_source": "niche_locator",
-          "_confidence": "medium"
+          "_confidence": "high"
         }
       ],
       "confidence": "high",
@@ -2066,14 +2146,15 @@
       "_paint_class": 2,
       "gruntas_l": 6.29,
       "lubu_karnizo_m": 0.0,
-      "nisu_metrai": 5.0,
+      "nisu_metrai": 4.0,
       "_computed_by": "python_deterministic",
       "calculation_trace": "perim(27.00) × H(2.82) = 76.14 m² − 0 lang./1 dur. atimimai → dažymas 44.00 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "eksplikacija",
       "n_partition_walls": 3,
       "_exterior_wall_count": 3,
-      "_adjacency_confidence": "medium"
+      "_adjacency_confidence": "medium",
+      "silikonavimas_m": 0
     }
   ],
   "durys_total": [
@@ -3241,7 +3322,7 @@
     "kampai_m_total": 598.92,
     "angokrasciu_gkp_m_total": 95.7,
     "pasleptu_duru_staktu_m_total": 0.0,
-    "nisu_metrai_total": 25.61,
+    "nisu_metrai_total": 26.61,
     "gkp_lubu_m2_total": 180.0,
     "gkp_lubu_virs_3m_m2_total": 0.0,
     "pvc_grindys_m2_total": 148.88,
@@ -3249,6 +3330,7 @@
     "plyteles_sienos_m2_total": 131.04,
     "isliginamasis_m2_total": 180.0,
     "grindjuosciu_m_total": 151.27,
+    "silikonavimas_m_total": 86.0,
     "hidroizoliacijos_vnt": 3
   },
   "_lt_warnings": [],

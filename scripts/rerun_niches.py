@@ -23,9 +23,24 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "backend"))
 
 from extractor.vision.niche_locator import (  # noqa: E402
-    extract_niches, fold_niches_into_rooms,
+    extract_niches, fold_niches_into_rooms, NicheList,
 )
 from extractor.vision_call import _recompute_per_room_via_python, _recompute_santrauka  # noqa: E402
+
+
+def _is_niche_candidate(page: dict) -> bool:
+    """Pages worth scanning for LED/niche annotations:
+       1. classifier marked as ceiling_plan
+       2. title contains 'lub' (Lubų planas, lubų mazgai) or 'apšviet'
+          (Apšvietimo planas — often shows LED strip routing)
+    Catches detail-section pages and lighting plans the page
+    classifier doesn't tag as ceiling_plan but which carry niche data.
+    """
+    tipas = (page.get("tipas") or "").lower()
+    if tipas == "ceiling_plan":
+        return True
+    title = (page.get("pavadinimas") or "").lower()
+    return ("lub" in title) or ("apšviet" in title) or ("apsviet" in title)
 
 
 def get_truth_led(truth: dict) -> float | None:
@@ -71,32 +86,84 @@ def process(slug: str, entry: dict) -> dict:
     led_truth = get_truth_led(truth)
     extract = json.loads(extract_path.read_text(encoding="utf-8"))
 
-    # Find ceiling_plan page
-    ceiling = [
+    # Find ALL niche-candidate pages. Primary = first ceiling_plan;
+    # secondary = other candidates (lighting plans, section pages).
+    candidate_pages = [
         p for p in (extract.get("puslapiai") or [])
-        if (p.get("tipas") or "").lower() == "ceiling_plan"
+        if _is_niche_candidate(p)
     ]
-    if not ceiling:
+    if not candidate_pages:
         return {
-            "slug": slug, "status": "no_ceiling_plan_page",
+            "slug": slug, "status": "no_niche_candidate_page",
             "truth": led_truth, "before": sum_led_m(extract.get("patalpos") or []),
         }
-    page_nr = ceiling[0]["nr"]
+    # Sort: ceiling_plan first, then by page number
+    candidate_pages.sort(key=lambda p: (
+        0 if (p.get("tipas") or "").lower() == "ceiling_plan" else 1,
+        int(p.get("nr", 999)),
+    ))
+    page_nrs = [int(p["nr"]) for p in candidate_pages]
 
-    # Render that page
     pdf_bytes = pdf_path.read_bytes()
-    image_b64 = render_page(pdf_bytes, page_nr)
-
-    # Run niche_locator (signature is keyword-only)
-    nl = extract_niches(image_b64=image_b64)
-    cache_state = (nl._meta or {}).get("cache")
-    cost = 0.0 if cache_state == "hit" else 0.40   # rough estimate
-
     rooms = extract.get("patalpos") or []
     before_led = float((extract.get("santrauka") or {}).get("nisu_metrai_total") or 0)
 
-    # Fold + recompute per-room + recompute santrauka totals
-    fold_niches_into_rooms(rooms, nl)
+    # CONDITIONAL BACKFILL (2026-06-05): primary page is canonical.
+    # Run secondary pages ONLY if primary's LED coverage is sparse
+    # (< COVERAGE_GATE rooms with non-zero LED). On projects where
+    # the ceiling_plan already covers most rooms (berzas pg6: 10
+    # rooms), additional pages just re-detect the same LEDs as new
+    # niches → false positives.
+    COVERAGE_GATE = 5
+    combined = NicheList()
+    rooms_covered_by_primary: set[str] = set()
+    page_results: list[dict] = []
+    cost = 0.0
+
+    # First pass: primary page only
+    primary_pg = page_nrs[0]
+    image_b64 = render_page(pdf_bytes, primary_pg)
+    nl = extract_niches(image_b64=image_b64)
+    c = (nl._meta or {}).get("cache")
+    if c != "hit":
+        cost += 0.40
+    for n in nl.niches:
+        is_led_billable = n.type in ("ceiling_led", "wall_led")
+        if is_led_billable and (n.length_mm or 0) > 0:
+            rooms_covered_by_primary.add(str(n.room_nr))
+        combined.niches.append(n)
+    page_results.append({
+        "page": primary_pg, "n": len(nl.niches),
+        "kept": len(nl.niches), "cache": c, "role": "primary",
+    })
+
+    # Conditional backfill: only run secondaries if coverage is sparse
+    if len(rooms_covered_by_primary) < COVERAGE_GATE:
+        for page_nr in page_nrs[1:]:
+            image_b64 = render_page(pdf_bytes, page_nr)
+            nl = extract_niches(image_b64=image_b64)
+            c = (nl._meta or {}).get("cache")
+            if c != "hit":
+                cost += 0.40
+            kept = 0
+            for n in nl.niches:
+                is_led_billable = n.type in ("ceiling_led", "wall_led")
+                if (not is_led_billable
+                    or str(n.room_nr) not in rooms_covered_by_primary):
+                    combined.niches.append(n)
+                    kept += 1
+            page_results.append({
+                "page": page_nr, "n": len(nl.niches),
+                "kept": kept, "cache": c, "role": "backfill",
+            })
+    else:
+        for page_nr in page_nrs[1:]:
+            page_results.append({
+                "page": page_nr, "n": None, "kept": 0,
+                "cache": "skipped", "role": "skipped_coverage_ok",
+            })
+
+    fold_niches_into_rooms(rooms, combined)
     extract["patalpos"] = rooms
     extract = _recompute_per_room_via_python(extract, None)
     extract = _recompute_santrauka(extract)
@@ -110,10 +177,10 @@ def process(slug: str, entry: dict) -> dict:
     return {
         "slug": slug,
         "status": "ok",
-        "page": page_nr,
-        "cache": cache_state,
+        "pages_scanned": page_nrs,
+        "per_page": page_results,
         "cost_est_usd": cost,
-        "n_niches_found": len(nl.niches),
+        "n_niches_found": len(combined.niches),
         "truth": led_truth,
         "before": round(before_led, 2),
         "after":  round(after_led, 2),

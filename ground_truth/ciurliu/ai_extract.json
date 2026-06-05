@@ -129,7 +129,8 @@
       "n_partition_walls": 2,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "high",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "silikonavimas_m": 0
     },
     {
       "nr": "2",
@@ -211,7 +212,8 @@
       "calculation_trace": "perim(7.00) × H(2.82) = 19.74 m² − 0 lang./1 dur. atimimai → dažymas 21.06 m². Skaičiavo Python (deterministinis).",
       "_grindjuosciu_capped": true,
       "plotas_source": "vision",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "silikonavimas_m": 0
     },
     {
       "nr": "3",
@@ -289,7 +291,8 @@
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "medium",
       "count_partition_corners": false,
-      "_bathroom_paint_above_tile_m": 1.2
+      "_bathroom_paint_above_tile_m": 1.2,
+      "silikonavimas_m": 21.25
     },
     {
       "nr": "4",
@@ -379,7 +382,8 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "high",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "silikonavimas_m": 0
     },
     {
       "nr": "5",
@@ -471,7 +475,8 @@
       "n_partition_walls": 3,
       "_exterior_wall_count": 1,
       "_adjacency_confidence": "high",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "silikonavimas_m": 0
     },
     {
       "nr": "6",
@@ -570,7 +575,8 @@
       "n_partition_walls": 5,
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "high",
-      "count_partition_corners": false
+      "count_partition_corners": false,
+      "silikonavimas_m": 0
     },
     {
       "nr": "7",
@@ -658,7 +664,8 @@
       "_exterior_wall_count": 2,
       "_adjacency_confidence": "medium",
       "count_partition_corners": false,
-      "_bathroom_paint_above_tile_m": 1.2
+      "_bathroom_paint_above_tile_m": 1.2,
+      "silikonavimas_m": 20.0
     }
   ],
   "durys_total": [
@@ -1423,6 +1430,7 @@
     "plyteles_sienos_m2_total": 41.25,
     "isliginamasis_m2_total": 95.5,
     "grindjuosciu_m_total": 83.51,
+    "silikonavimas_m_total": 41.25,
     "hidroizoliacijos_vnt": 2
   },
   "_lt_warnings": [],
