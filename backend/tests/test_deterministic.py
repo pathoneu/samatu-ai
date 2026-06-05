@@ -439,7 +439,13 @@ def test_pozicijos_no_paslepta_stakta_when_no_hidden_doors():
 
 
 def test_pozicijos_p3_lentyneliu_in_vonia():
-    """Lentynėlių iš plytelių dušo kabinoje — 1 per vonia/san by default."""
+    """Lentynėlių iš plytelių dušo kabinoje — 2 per vonia/san by default.
+
+    Default changed 1→2 on 2026-05-31 (commit c91dd3b, vision_call.py:1513-1520):
+    the Beržų contractor truth = 5 vnt for 2 bathrooms (≈2.5/vonia), so the prior
+    default of 1 under-counted by ~60%. The "1 by default" assertion (written
+    2026-04-29) is stale. User can override via _overrides.lentyneliu_per_vonia.
+    """
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
@@ -452,8 +458,15 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
     out = _run_full_pipeline(parsed)
     line = [p for p in out["pozicijos"] if "lentynė" in p["aprasymas"].lower()]
     assert len(line) == 1
-    assert line[0]["kiekis"] == 1
+    assert line[0]["kiekis"] == 2  # 2 per vonia (Beržų calibration, c91dd3b)
     assert line[0]["vnt"] == "vnt"
+
+    # Override still honored: an explicit per-vonia count wins over the default.
+    parsed["_overrides"] = {"lentyneliu_per_vonia": 1}
+    out2 = _run_full_pipeline(parsed)
+    line2 = [p for p in out2["pozicijos"] if "lentynė" in p["aprasymas"].lower()]
+    assert len(line2) == 1
+    assert line2[0]["kiekis"] == 1
 
 
 def test_pozicijos_p3_dezuciu_gkp_per_wet_room():

@@ -40,7 +40,27 @@ def test_empty_rooms_calc_totals():
 
 # ── Edge: single garazas (no painting, no plytelės) ────────────────────
 
-def test_single_garazas_no_painting():
+def test_single_garazas_walls_unpainted_ceiling_painted():
+    """Garažas (betonas lubos, no apdailos): WALLS stay unpainted, CEILING is painted.
+
+    Spec changed 2026-05-31 (commit c91dd3b, "close calculator coverage gaps —
+    Beržų MAE 3.25%→1.15%"). calc_room_quantities now sets
+    base_ceiling_area = plotas for ALL ceiling types (universal_rules.py:778-788):
+    betonas garažas/tambūras ceilings are plastered + painted in LT residential
+    builds. The contractor-validated Beržų ground truth confirms it — garažas
+    room 105 (lubu_tipas=betonas) carries ceiling_paintable_m2=10.67 and IS
+    included in the primary dazymo_plotas_total_m2 (607.11; the excl-garažas
+    figure 557.06 is only a secondary total). So a betonas garažas ceiling is
+    painted; the pre-calibration "no painting at all" assertion (written
+    2026-04-29) is stale and reverting it would regress the Beržų benchmark.
+
+    Walls stay unpainted HERE only because this room has no
+    sienu_apdailos_breakdown → it falls through the legacy paskirtis path where
+    garazas walls_paint=0. (Beržų's garažas walls ARE painted, but solely
+    because its truth file supplies dazymas_share=1.0, routing it through the
+    apdailos path.) This test still guards that: a bare garažas paints the
+    ceiling but never the walls.
+    """
     rooms = [{
         "nr": "1", "pavadinimas": "Garažas", "paskirtis": "garazas",
         "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.7,
@@ -53,10 +73,14 @@ def test_single_garazas_no_painting():
         r.update(calc_room_quantities(r))
     out = _build_pozicijos_from_rooms(parsed)
     pozicijos = out.get("pozicijos", [])
-    # Garazas: walls_paint=0, ceiling_type=betonas, floor=concrete → no painting/plytelės/grindys
     paint_lines = [p for p in pozicijos if "dažymas" in p.get("aprasymas", "").lower()
                    or "glaistymas" in p.get("aprasymas", "").lower()]
-    assert len(paint_lines) == 0, f"Garazas should produce no painting, got {paint_lines}"
+    # The ONLY glaistymas/dažymas in a bare garažas is the ceiling — never walls.
+    assert paint_lines, "betonas garažas ceiling should be painted (Beržų calibration)"
+    assert all(p["aprasymas"].lower().startswith("lubų") for p in paint_lines), \
+        f"Only the ceiling should be painted in a bare garažas, got {paint_lines}"
+    assert all(p["kiekis"] == 30.0 for p in paint_lines), \
+        f"Ceiling paint area should equal floor area (30.0), got {paint_lines}"
 
 
 # ── Edge: single-room project ─────────────────────────────────────────
