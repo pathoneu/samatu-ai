@@ -40,12 +40,33 @@ class NicheRecord:
     def length_m(self) -> float:
         return self.length_mm / 1000.0
 
+    # Map Vision-detected niche types → elementai.tipas. Only ceiling_led
+    # and wall_led are billed as LED (`_calc_nisu_metrai_m` filters by
+    # tipas == 'nisa_LED'). partition_niche and similar wall recesses are
+    # tracked as nisa_partition so they're visible downstream but excluded
+    # from the LED metric. This was the source of Beržų's +10m over-count
+    # before the 2026-06-05 audit — every niche the locator returned was
+    # being billed as LED regardless of type. See audit/niche_locator_rerun.json.
+    _TYPE_TO_TIPAS = {
+        "ceiling_led":     "nisa_LED",
+        "wall_led":        "nisa_LED",
+        "partition_niche": "nisa_partition",
+        "shelf_niche":     "nisa_partition",
+        "curtain_niche":   "nisa_partition",
+    }
+
     def to_elementai_row(self) -> dict[str, Any]:
-        """Format compatible with vision_call._elementai_to_counts."""
+        """Format compatible with vision_call._elementai_to_counts.
+
+        Conservative fallback: unknown niche types map to nisa_partition
+        (NOT billed as LED). Only explicit ceiling_led / wall_led count.
+        """
+        tipas = self._TYPE_TO_TIPAS.get(self.type, "nisa_partition")
         return {
-            "tipas": "nisa_LED",
+            "tipas": tipas,
             "kiekis": self.count,
             "ilgis_m": round(self.length_m, 3),
+            "_niche_type": self.type,
             "_source": "niche_locator",
             "_confidence": self.confidence,
         }
@@ -174,6 +195,16 @@ def fold_niches_into_rooms(
 
     Rooms not mentioned in the niche pass are left untouched (the main
     extractor's record stands).
+
+    2026-06-05 audit note: a confidence-weighted variant was tried but
+    didn't help because the locator's current prompt over-extracts on
+    Beržų (52m vs 42m truth) and under-extracts on Bacveviciaus (23m
+    vs 55m truth). The locator finds real niches the main pass misses
+    but also catches curtain/non-LED niches the contractor doesn't
+    bill. The root fix is at the prompt level (precision/recall tuning)
+    not at the fold level. Keeping the original REPLACE policy here
+    so the fold's behavior is well-understood; do NOT wire into prod
+    until the locator prompt is improved. See audit/niche_locator_rerun.json.
     """
     by_room = niches.per_room()
     for room in rooms:
@@ -181,12 +212,12 @@ def fold_niches_into_rooms(
         room_niches = by_room.get(nr)
         if not room_niches:
             continue
-        # Strip existing nisa_LED entries
+        # Strip existing nisa_LED entries (preserve other tipai incl.
+        # nisa_partition from a previous fold)
         elementai = [
             e for e in (room.get("elementai") or [])
             if (e.get("tipas") or "").lower() != "nisa_led"
         ]
-        # Inject the niche-pass entries
         for n in room_niches:
             elementai.append(n.to_elementai_row())
         room["elementai"] = elementai

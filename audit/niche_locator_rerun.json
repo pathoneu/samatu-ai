@@ -23,10 +23,10 @@
     "n_niches_found": 10,
     "truth": 54.98,
     "before": 24.88,
-    "after": 23.8,
+    "after": 22.47,
     "before_pct": -54.75,
-    "after_pct": -56.71,
-    "improvement_pp": -1.96,
+    "after_pct": -59.13,
+    "improvement_pp": -4.38,
     "rerolled_to": "ground_truth/bacveviciaus/ai_extract_with_niches.json"
   },
   {
