@@ -1,0 +1,47 @@
+[
+  {
+    "slug": "berzas",
+    "status": "ok",
+    "page": 6,
+    "cache": "hit",
+    "cost_est_usd": 0.0,
+    "n_niches_found": 11,
+    "truth": 42.3,
+    "before": 40.0,
+    "after": 52.05,
+    "before_pct": -5.44,
+    "after_pct": 23.05,
+    "improvement_pp": -17.61,
+    "rerolled_to": "ground_truth/berzas/ai_extract_with_niches.json"
+  },
+  {
+    "slug": "bacveviciaus",
+    "status": "ok",
+    "page": 5,
+    "cache": "hit",
+    "cost_est_usd": 0.0,
+    "n_niches_found": 10,
+    "truth": 54.98,
+    "before": 24.88,
+    "after": 23.8,
+    "before_pct": -54.75,
+    "after_pct": -56.71,
+    "improvement_pp": -1.96,
+    "rerolled_to": "ground_truth/bacveviciaus/ai_extract_with_niches.json"
+  },
+  {
+    "slug": "ciurliu",
+    "status": "ok",
+    "page": 3,
+    "cache": "hit",
+    "cost_est_usd": 0.0,
+    "n_niches_found": 5,
+    "truth": 16.84,
+    "before": 12.0,
+    "after": 12.0,
+    "before_pct": -28.74,
+    "after_pct": -28.74,
+    "improvement_pp": 0.0,
+    "rerolled_to": "ground_truth/ciurliu/ai_extract_with_niches.json"
+  }
+]
