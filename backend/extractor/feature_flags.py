@@ -39,10 +39,14 @@ _FLAG_DEFINITIONS = {
     # median-vote into one consensus extraction. Stabilises kampai (the
     # pusiniai term survives a single adjacency-bail run) and wires the
     # adjacency pass into production so n_partition_walls is populated on
-    # real uploads (not just the offline benchmark). Default OFF until the
-    # live verification (plan Task 7) proves stability + accuracy on $.
-    # Enable: ENABLE_EXTRACTION_VOTING=1 ; rounds: VOTING_N (default 3, 2-5).
-    "extraction_voting": ("ENABLE_EXTRACTION_VOTING", False),
+    # real uploads (not just the offline benchmark).
+    # → DEFAULT ON after the live A/B on berzas (2026-06-09): voted vs single-pass
+    #   moved combined paint −5.4%→+2.3%, kampai −32%→−10.6%, recovered per-room
+    #   ceiling heights [2.8,3.0,3.4] and n_partition_walls 0→34, at only +13%
+    #   wall-clock (once-only downstream passes dominate; consensus already carried
+    #   heights so zoom skipped). Disable: ENABLE_EXTRACTION_VOTING=0.
+    #   Rounds: VOTING_N (default 3, 2-5).
+    "extraction_voting": ("ENABLE_EXTRACTION_VOTING", True),
 }
 
 

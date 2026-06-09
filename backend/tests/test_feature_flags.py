@@ -81,8 +81,16 @@ def test_flags_whitespace_stripped(monkeypatch):
     assert flags["paint_class_inference"] is True
 
 
-def test_extraction_voting_defaults_off():
-    """extraction_voting must default OFF (opt-in until live-verified)."""
+def test_extraction_voting_defaults_on():
+    """extraction_voting is DEFAULT ON since the 2026-06-09 live A/B proved it
+    (paint −5.4%→+2.3%, kampai −32%→−10.6%, ceiling heights + n_partition_walls
+    recovered, +13% wall-clock). Opt out with ENABLE_EXTRACTION_VOTING=0."""
+    from extractor.feature_flags import get_flags
+    assert get_flags()["extraction_voting"] is True
+
+
+def test_extraction_voting_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("ENABLE_EXTRACTION_VOTING", "0")
     from extractor.feature_flags import get_flags
     assert get_flags()["extraction_voting"] is False
 
