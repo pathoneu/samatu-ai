@@ -73,17 +73,9 @@ projects:
   - slug: lazunu
     name: "Lazūnų g. 6 (Butas)"
     truth_path: ground_truth/lazunu/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf"
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/lazunu_TP_bundled.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf"
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
-    blocked_partial_input: true
-    blocked_reason: |
-      The project_pdf is Apmatavimai-Layout4.pdf — a measurements-only page.
-      The architectural floor plan lives in OTHER Layout4 PDFs not bundled
-      into a single project_pdf. AI extraction produces ~50% of rooms by
-      design (it can only see what's labelled on the measurements page).
-      Excluded from MAE per docs/known_issues.md until the missing PDFs
-      are bundled.
-    notes: "APARTMENT (butas), smallest scope. Project drawings split across 10 single-page Layout4 PDFs — needs bundling before extractor accepts it."
+    notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into lazunu_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."

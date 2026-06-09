@@ -1,14 +1,14 @@
 {
   "slug": "lazunu",
-  "pdf_path": "/Users/ignasgaldikas/samatu-ai/docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
-  "pdf_size_bytes": 105942,
+  "pdf_path": "/Users/ignasgaldikas/samatu-ai/docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/lazunu_TP_bundled.pdf",
+  "pdf_size_bytes": 705912,
   "status": "pending",
   "error": null,
-  "input_tokens": 3938,
-  "output_tokens": 2517,
-  "cost_usd": 0.2478,
-  "seconds": 94.88722610473633,
-  "n_rooms": 3,
+  "input_tokens": 14993,
+  "output_tokens": 3602,
+  "cost_usd": 0.495,
+  "seconds": 79.1301691532135,
+  "n_rooms": 4,
   "n_pages": null,
   "metas": [
     {
@@ -16,7 +16,7 @@
     },
     {
       "event": "started",
-      "page_count": 1,
+      "page_count": 4,
       "vendor_pages_skipped": []
     },
     {
@@ -24,54 +24,62 @@
     },
     {
       "event": "eksplikacija_completed",
-      "rooms_in_table": 0,
-      "doors_in_table": 0,
+      "rooms_in_table": 4,
+      "doors_in_table": 2,
       "windows_in_table": 0
     },
     {
       "event": "pass1_started",
-      "page_count": 1
+      "page_count": 4
     },
     {
       "event": "pass1_completed",
-      "rooms_count": 3,
+      "rooms_count": 4,
       "patalpos": [
         {
           "nr": "01",
-          "pavadinimas": "Miegamasis",
-          "paskirtis": "miegamoji",
-          "plotas_m2": 9.89,
-          "puslapio_nr": 1,
-          "confidence": "medium"
+          "pavadinimas": "Įėjimo koridorius",
+          "paskirtis": "koridorius",
+          "plotas_m2": 4.05,
+          "puslapio_nr": 2,
+          "confidence": "high"
         },
         {
           "nr": "02",
-          "pavadinimas": "Svetainė",
-          "paskirtis": "gyvenamoji",
-          "plotas_m2": 16.51,
-          "puslapio_nr": 1,
-          "confidence": "medium"
+          "pavadinimas": "San. mazgas",
+          "paskirtis": "san",
+          "plotas_m2": 4.0,
+          "puslapio_nr": 2,
+          "confidence": "high"
         },
         {
           "nr": "03",
-          "pavadinimas": "Sandėliukas/Drabužinė",
-          "paskirtis": "drabuzine",
-          "plotas_m2": 4.28,
-          "puslapio_nr": 1,
-          "confidence": "medium"
+          "pavadinimas": "Miegamasis",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 10.21,
+          "puslapio_nr": 2,
+          "confidence": "high"
+        },
+        {
+          "nr": "04",
+          "pavadinimas": "Virtuvė/svetainė",
+          "paskirtis": "virtuve",
+          "plotas_m2": 23.02,
+          "puslapio_nr": 2,
+          "confidence": "high"
         }
       ]
     },
     {
       "event": "eksplikacija_merged",
-      "merged_rooms": 0,
-      "total_rows": 0
+      "merged_rooms": 4,
+      "total_rows": 4
     },
     {
       "event": "schedule_anchored",
-      "anchored_elements": 0,
+      "anchored_elements": 4,
       "langai_match": "3/0",
-      "durys_match": "2/0"
+      "durys_match": "4/2"
     },
     {
       "event": "polygon_prepass_applied",
@@ -80,94 +88,65 @@
     {
       "event": "no_height_markers",
       "reason": "text_layer_empty_or_flattened_or_no_markers",
-      "scan_pages_count": 1
+      "scan_pages_count": 4
+    },
+    {
+      "event": "lubu_auksciai_salvaged_from_warnings",
+      "salvaged_count": 2,
+      "rooms": [
+        "Virtuvė/svetainė",
+        "Įėjimo koridorius"
+      ]
     },
     {
       "event": "per_room_ceiling_applied",
-      "rooms_with_per_room": 0,
+      "rooms_with_per_room": 2,
       "source_count_by_nr": 0,
-      "source_count_by_name": 0
+      "source_count_by_name": 2
     },
     {
       "event": "zoom_started",
-      "total": 3,
-      "skipped_via_eksplikacija": 0
-    },
-    {
-      "event": "zoom_room_started",
-      "idx": 1,
-      "total": 3,
-      "room_nr": "01",
-      "pavadinimas": "Miegamasis"
-    },
-    {
-      "event": "zoom_room_completed",
-      "idx": 1,
-      "total": 3,
-      "room_nr": "01",
-      "applied": true,
-      "plotas_m2": 9.89
-    },
-    {
-      "event": "zoom_room_started",
-      "idx": 2,
-      "total": 3,
-      "room_nr": "02",
-      "pavadinimas": "Svetainė"
-    },
-    {
-      "event": "zoom_room_completed",
-      "idx": 2,
-      "total": 3,
-      "room_nr": "02",
-      "applied": false,
-      "plotas_m2": 16.51
-    },
-    {
-      "event": "zoom_room_started",
-      "idx": 3,
-      "total": 3,
-      "room_nr": "03",
-      "pavadinimas": "Sandėliukas/Drabužinė"
-    },
-    {
-      "event": "zoom_room_completed",
-      "idx": 3,
-      "total": 3,
-      "room_nr": "03",
-      "applied": false,
-      "plotas_m2": 4.28
+      "total": 0,
+      "skipped_via_eksplikacija": 4
     },
     {
       "event": "zoom_completed",
-      "attempted": 3,
-      "applied": 1,
-      "skipped_via_eksplikacija": 0,
-      "elapsed_s": 35.0
+      "attempted": 0,
+      "applied": 0,
+      "skipped_via_eksplikacija": 4,
+      "elapsed_s": 0.0
     },
     {
-      "event": "apdailos_started"
+      "event": "apdailos_error",
+      "message": "No module named 'extractor.apdailos_reader'"
     },
     {
-      "event": "apdailos_skipped",
-      "reason": "no IŠKLOTINIŲ/APDAILŲ page found in PDF"
+      "event": "doors_error",
+      "message": "No module named 'extractor.doors_reader'"
     },
     {
-      "event": "doors_started"
+      "event": "niche_locator_started",
+      "pages": [
+        3
+      ]
     },
     {
-      "event": "doors_completed",
-      "page": 1,
-      "total": 4,
-      "interior": 2,
-      "exterior": 2
+      "event": "niche_locator_completed",
+      "primary_page": 3,
+      "primary_rooms_covered": 1,
+      "total_niches_kept": 4,
+      "backfill_ran": true
+    },
+    {
+      "event": "niche_inference_completed",
+      "rooms_inferred": 1
     },
     {
       "event": "post_processing"
     },
     {
       "event": "python_math_completed",
-      "rooms_computed": 3
+      "rooms_computed": 4
     }
   ]
 }

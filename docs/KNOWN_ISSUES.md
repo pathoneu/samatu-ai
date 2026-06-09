@@ -138,6 +138,20 @@ architectural plan lives on a separate sheet not in the bundle.
 3. Expand the **no-eksplikacija ground-truth set** (currently N=1–2) before any further
    "global" no-schedule fix — that's the only thing that unblocks this regime.
 
+**Update 2026-06-06 — lazunu unblocked (benchmark 3 → 4 scored projects):**
+Bundled lazunu's split single-page Layout4 sheets (Apmatavimai + Naujai-pertvaru floor
+plan + Pakabinamu-lubu ceiling + Sviestuvu lighting → `lazunu_TP_bundled.pdf`) and
+re-extracted ($0.49 Vision). Areas now read correctly from the **eksplikacija** (4 rooms,
+`plotas_saltinis=eksplikacija`; perimeter floor correctly did NOT fire). Overall MAE
+**5.78% (3 proj) → 6.66% (4 proj)** — *added coverage*, not a regression
+(berzas/bacveviciaus/ciurliu byte-identical). lazunu paint is still **−14.2%**, but for a
+**distinct** reason from ciurliu: **multi-level suspended ceilings with bulkhead faces
+(kaktos at 2.39/2.51/2.66/2.26 m)**. Vision detects the heights (prose warning) but NOT the
+bulkhead boundary lengths, and `calc_room_quantities` has no bulkhead-face-paint term → not
+cleanly code-fixable from the current extract. **The no-schedule regime is hard for ≥2
+distinct reasons** (no readable dimensions; multi-level ceilings). sernu remains blocked
+(architectural plan absent from the fixtures; must be requested from Rangovas A).
+
 ---
 
 ## 🚫 Untested scenarios (cannot resolve without sample data)
