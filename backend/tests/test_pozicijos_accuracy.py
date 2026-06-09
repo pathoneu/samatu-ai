@@ -53,6 +53,22 @@ def test_basin_count_uses_praustuves_symbol():
     assert len(basin) == 1 and basin[0]["kiekis"] == 3, basin  # not 2 (n_wet_with_klozetas)
 
 
+# ── RC4 ────────────────────────────────────────────────────────────────
+def test_rotband_share_calibrated_to_contractor_30pct():
+    # Rotband (gypsum leveling) is applied ONLY to bare block/concrete walls,
+    # not GKP partitions. The Beržų contractor samata: 138.69 m² Rotband on
+    # 460.71 m² total wall area = 30.1% (NOT 50%). The old 0.50 default was
+    # calibrated against a since-corrected buggy walls_paint (277.33). Assert
+    # the share is ~0.30 of walls_paintable, behaviourally.
+    rooms = [_room([], plotas_m2=40.0, perimetras_m=26.0, lubu_aukstis_m=2.7)]
+    out = _build_pozicijos_from_rooms(_parsed(rooms))
+    walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    rotband = [p for p in out["pozicijos"] if "rotband" in p["aprasymas"].lower()]
+    assert len(rotband) == 1, rotband
+    share = rotband[0]["kiekis"] / walls_paint
+    assert abs(share - 0.30) < 0.005, f"rotband share {share:.3f}, expected 0.30"
+
+
 # ── RC8 ────────────────────────────────────────────────────────────────
 def test_kampai_emitted_as_single_line():
     rooms = [_room([], perimetras_m=20.0)]

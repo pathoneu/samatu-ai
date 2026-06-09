@@ -1137,16 +1137,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # pliko bloko/betono prieš glaistymą. NEAPPLIKUOJASI ant GKP pertvarų
         # (jos jau lygios).
         #
-        # 2026-05-27 fix (Berzas fixture): kontraktoriaus samata rodė 138,69 m²
-        # Rotband kai walls_paint = 277,33 m² (= 50,0%). Anksčiau aplikuodavom
-        # 100% — over-quote ~970 €/projektui. Default'as: 50% (block/concrete
-        # sienos ≈ pusė vidaus sienų ploto LT naujos statybos namuose). User
-        # gali override per `rotband_share` (0.0-1.0).
-        rotband_share = (parsed.get("_overrides") or {}).get("rotband_share", 0.50)
+        # 2026-06-09 re-calibration (Berzas fixture, contractor-verified):
+        # kontraktoriaus samata = 138,69 m² Rotband ant 460,71 m² visų sienų
+        # ploto = 30,1%. Ankstesnis 50% default'as buvo kalibruotas prieš KLAIDINGĄ
+        # walls_paint=277,33 (nuo to laiko ištaisyta į ~448 m² — GT walls_paint
+        # 460,71, −2,8%). Rotband užvalg. TIK ant pliko bloko/betono (ne ant GKP
+        # pertvarų), o tai ~30% vidaus sienų ploto LT naujos statybos name.
+        # User gali override per `rotband_share` (0.0-1.0).
+        rotband_share = (parsed.get("_overrides") or {}).get("rotband_share", 0.30)
         try:
             rotband_share = max(0.0, min(1.0, float(rotband_share)))
         except (ValueError, TypeError):
-            rotband_share = 0.50
+            rotband_share = 0.30
         rotband_m2 = round(walls_paint * rotband_share, 2)
         pozicijos.append({
             "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
@@ -1154,7 +1156,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
             "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
             "medziagos_vnt": "kg",
-            "_assumption": f"{int(rotband_share*100)}% sienų ploto (block/concrete sienos). Užvalg. tik prieš glaistant ant pliko bloko/betono.",
+            "_assumption": f"{int(rotband_share*100)}% sienų ploto (mūro/betono sienos, ne GKP pertvaros). Užvalg. tik prieš glaistant ant pliko bloko/betono.",
         })
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
