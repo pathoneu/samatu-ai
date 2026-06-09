@@ -2,7 +2,43 @@
 
 **Created 2026-06-06.** Every-line compare of the app's 62 pozicijos vs the contractor's 53-line samata, reading the actual calc code. Living document.
 
-> ⚠️ VALUES below are from the **cached** berzas extract. A **fresh** extraction differs (kampai 325 vs 501) because the pipeline is unstable run-to-run — but the *calc methods / code bugs* are identical, so the root causes hold. Per-line fresh-vs-cached deltas TBD.
+---
+
+## ⛔ 2026-06-09 VERIFIED CORRECTION — READ THIS FIRST (supersedes the verdict below)
+
+**The original audit (everything under "## Verdict" onward) was run with a `_build_pozicijos_from_rooms` call that did NOT pass `detected_symbols_summary`.** That made every symbol-driven line hit its fallback or vanish. Re-running the **true live pipeline (WITH symbols)** overturns several headline findings:
+
+| Original audit claim | Verified live (with symbols) | Status |
+|---|---|---|
+| difūzorių montavimas — MISSING (symbol==0) | emitted, 6 vnt (symbol=6) | ❌ artifact — line IS present |
+| lubinių šviestuvų montavimas — MISSING | emitted, 35 vnt (symbol=35) | ❌ artifact — line IS present |
+| skylių gręžimas — 4 vs 56 (−93%, "symbol path silently fails") | live = 40 vs 56 (−29%) | ❌ artifact; path fires. Real gap = recall |
+| angokraščiai GKP — 138.42 (+54.8%) | 78.05 (RC3 fix shipped 5ca45ff) | ✅ fixed; now −12.7% (mild under) |
+| Rotband — 220.74 (+59%), "share 0.50 stale" | share 0.50→**0.30** (commit, 2026-06-09) | ✅ fixed; now 132.44 (−4.5%) |
+| basin mixers 2 vs 5 | RC1 → 3 (max of klozetas/praustuves symbol) | ✅ partial; symbol recall caps at 3 |
+
+**Verified deterministic accuracy (against GT `gt_totals`, contractor-confirmed green):**
+- walls_paint 447.73 vs GT 460.71 → **−2.8%** ✅
+- ceiling_paint 165.64 vs GT 165.6 → **+0.0%** ✅
+- combined paint 613.37 vs GT 584.81 → **+4.9%** ✅
+- kampai 501.3 vs 493.35 → **+1.6%** ✅
+- Rotband (after fix) 132.44 vs 138.69 → **−4.5%** ✅
+
+**The deterministic math is SOUND.** The two remaining "deterministic-looking" gaps are actually **Vision**, not code:
+- **iki/virš-3m split skew** (iki +22%, virš −28%, *combined accurate*): the split method is whole-room, identical to the contractor's. The skew is 100% from Vision room-dims — the app marks only Svetainė (3.40m) as >3m; the contractor's high zone is bigger (Vision got Svetainė smaller than reality and/or missed a 2nd tall room). NOT a split bug.
+- **durų angų / beapvadinės durys −56%** (17.1 vs 39.2): Vision tagged 3 doors `pasleptos_duris` but the contractor prepped ~7. Vision under-classifies frameless doors. NOT deterministic — forcing "all interior doors frameless" would overfit berzas.
+
+**True remaining gaps are ALL Vision recall/stability** (the "double down on vision" bucket):
+1. Room dims / ceiling heights → iki/virš split + combined paint −10…−14% on bacveviciaus/ciurliu/lazunu
+2. Frameless-door classification (3 vs ~7)
+3. Symbol undercounts: praustuves 3<5, difuzoriai 6<15, sviestuvai 35<38, skylių 40<56
+4. Run-to-run instability (kampai fresh 325 vs cached 501 — wall_adjacency bails silently)
+
+**Lesson:** verify each audit finding against the *full live pipeline* (with symbols) before treating it as a code bug. Isolated calc calls miss the symbol layer entirely.
+
+---
+
+> ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the table above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 correction.** Per-line fresh-vs-cached deltas TBD.
 
 
 ## Verdict
