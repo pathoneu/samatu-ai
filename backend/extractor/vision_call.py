@@ -2624,6 +2624,13 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] per-room ceiling height apply failed: {exc}")
 
+    # Re-bind `rooms` to the persisted list so the Pass-2 zoom loop below mutates
+    # the SAME room dicts that live in parsed["patalpos"]. _apply_per_room_heights
+    # reassigns parsed["patalpos"] to a new list; without this rebind the zoom
+    # loop wrote per-room ceiling heights onto a stale earlier binding and the
+    # recovery was silently lost (every room fell back to the section average).
+    rooms = parsed.get("patalpos") or rooms
+
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
     # crop the page region at 300 DPI / 2576px max, send to Vision with room
@@ -2651,6 +2658,14 @@ def extract_interior(
             return False
         # Confidence guard: only skip if Vision considered this room "high"
         if (r.get("confidence") or "") == "low":
+            return False
+        # Ceiling height is NOT an eksplikacija primitive — the table carries only
+        # plotas/perimetras. If this room's height wasn't individually resolved
+        # (saltinis != "per_room"), the zoom pass is the ONLY recovery path; don't
+        # skip it, else the room keeps the section-average height and the
+        # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
+        # zoom-once regression where 10/11 berzas rooms got a uniform 2.82 m.)
+        if (r.get("lubu_aukstis_saltinis") or "section_average") != "per_room":
             return False
         return True
 
@@ -2741,6 +2756,13 @@ def extract_interior(
                 "event": "apdailos_skipped",
                 "reason": apdailos_result.get("_error"),
             })
+    except ImportError as exc:
+        # A missing reader module is a REGRESSION, not a benign runtime miss —
+        # it silently drops per-room wall-finish recovery (walls_paint collapses
+        # to the legacy paskirtis heuristic). Make it LOUD. (2026-06-09: both
+        # reader modules were lost from git and failed silently for weeks.)
+        print(f"[extractor] ⚠️ APDAILOS READER MODULE MISSING — paint recovery DISABLED: {exc}")
+        _emit({"event": "apdailos_error", "message": f"module_missing: {exc}", "severity": "regression"})
     except Exception as exc:
         print(f"[extractor] apdailos read failed (non-fatal): {exc}")
         _emit({"event": "apdailos_error", "message": str(exc)})
@@ -2778,6 +2800,9 @@ def extract_interior(
                 "event": "doors_skipped",
                 "reason": doors_result.get("_error"),
             })
+    except ImportError as exc:
+        print(f"[extractor] ⚠️ DOORS READER MODULE MISSING — door recount DISABLED: {exc}")
+        _emit({"event": "doors_error", "message": f"module_missing: {exc}", "severity": "regression"})
     except Exception as exc:
         print(f"[extractor] doors read failed (non-fatal): {exc}")
         _emit({"event": "doors_error", "message": str(exc)})
