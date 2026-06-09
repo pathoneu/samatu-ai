@@ -35,6 +35,14 @@ _FLAG_DEFINITIONS = {
     # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: ciurliu
     # -20.3%→-13.5%, lazunu -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
     "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", True),
+    # 2026-06-09: run the high-variance Pass-1 (+ adjacency) N times and
+    # median-vote into one consensus extraction. Stabilises kampai (the
+    # pusiniai term survives a single adjacency-bail run) and wires the
+    # adjacency pass into production so n_partition_walls is populated on
+    # real uploads (not just the offline benchmark). Default OFF until the
+    # live verification (plan Task 7) proves stability + accuracy on $.
+    # Enable: ENABLE_EXTRACTION_VOTING=1 ; rounds: VOTING_N (default 3, 2-5).
+    "extraction_voting": ("ENABLE_EXTRACTION_VOTING", False),
 }
 
 
@@ -63,3 +71,16 @@ def get_flags() -> dict[str, bool]:
 
 # Back-compat alias for any old code reading _FLAG_ENV_NAMES
 _FLAG_ENV_NAMES = {name: env for name, (env, _default) in _FLAG_DEFINITIONS.items()}
+
+
+def voting_n(default: int = 3) -> int:
+    """Number of Pass-1 rounds to run when extraction_voting is on.
+
+    Read from VOTING_N; clamped to [2, 5] (1 defeats the purpose, >5 burns
+    budget with diminishing returns). Invalid/unset → default (3).
+    """
+    try:
+        n = int(os.environ.get("VOTING_N", "").strip() or default)
+    except (ValueError, TypeError):
+        n = default
+    return max(2, min(5, n))
