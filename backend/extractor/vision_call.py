@@ -2105,29 +2105,45 @@ def _run_pass1_once(client, system, pages) -> dict:
     return {"status": "error", "_error": str(last_err or "Unknown error")}
 
 
+def _resolve_floor_b64(pages, runs):
+    """Pick the floor-plan page image for the adjacency pass.
+
+    The rooms live on a specific page (Vision reports it as scale_source_page,
+    or the rooms' modal puslapio_nr). pages[0] is often a title/site sheet, so
+    blindly using it makes the adjacency pass read a page with no rooms → 0
+    matches → n_partition_walls never set. Resolve the real floor page.
+    """
+    idx = None
+    for r in runs:
+        if r.get("scale_source_page"):
+            idx = int(r["scale_source_page"])
+            break
+    if idx is None:  # modal puslapio_nr across rooms
+        from collections import Counter
+        c = Counter(int(rm["puslapio_nr"]) for r in runs
+                    for rm in (r.get("patalpos") or []) if rm.get("puslapio_nr"))
+        if c:
+            idx = c.most_common(1)[0][0]
+    if idx is not None:
+        for p in pages:
+            if int(p.get("page_index") or -1) == idx:
+                return p["image_b64"], idx
+    return (pages[0]["image_b64"], pages[0].get("page_index")) if pages else (None, None)
+
+
 def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
     """Run Pass-1 ``n`` times (+ one shared adjacency pass) and median-vote into
     a single consensus parsed dict.
 
-    The adjacency pass wires ``n_partition_walls`` into production (it was only
-    ever computed by the offline benchmark script before), and median voting
-    means a single adjacency-bail or perimeter-jitter run can't tank the
-    consensus. Degrades gracefully: 0 good runs → error; 1 good run → that run.
+    The adjacency pass wires ``n_partition_walls`` (and the _exterior window
+    flags) into production — these were only ever computed by the offline
+    benchmark script before. Median voting means a single adjacency-bail or
+    perimeter-jitter run can't tank the consensus. Degrades gracefully: 0 good
+    runs → error; 1 good run → that run (adjacency still applied).
     """
     from .vision.extraction_voter import vote_extraction
 
-    # Adjacency: one shared pass on the floor-plan page (cached by image hash),
-    # applied to every run's rooms. Best-effort — failure leaves n_partition_walls
-    # unset (→ 0), exactly the pre-voting production behaviour.
-    adj = None
-    try:
-        from .vision.adjacency_extractor import extract_adjacency
-        floor_b64 = pages[0]["image_b64"] if pages else None
-        if floor_b64:
-            adj = extract_adjacency(image_b64=floor_b64, client=client)
-    except Exception as exc:
-        print(f"[voting] adjacency extract failed (n_partition_walls→0): {exc}")
-
+    # Run all Pass-1 rounds FIRST so we know which page the rooms are on.
     runs: list[dict] = []
     for i in range(n):
         _emit({"event": "voting_round_started", "round": i + 1, "of": n})
@@ -2136,18 +2152,31 @@ def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
             continue
-        if adj is not None:
-            try:
-                from .vision.adjacency_extractor import apply_adjacency_to_rooms
-                apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
-            except Exception as exc:
-                print(f"[voting] apply_adjacency failed round {i + 1}: {exc}")
         runs.append(p)
         _emit({"event": "voting_round_completed", "round": i + 1,
                "rooms": len(p.get("patalpos") or [])})
 
     if not runs:
         return {"status": "error", "_error": "all_voting_runs_failed"}
+
+    # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
+    # hash), applied to every run's rooms. Best-effort — failure leaves
+    # n_partition_walls unset, exactly the pre-voting production behaviour.
+    floor_b64, floor_idx = _resolve_floor_b64(pages, runs)
+    adj = None
+    if floor_b64:
+        try:
+            from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
+            adj = extract_adjacency(image_b64=floor_b64, client=client)
+            n_set = 0
+            for p in runs:
+                summary = apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
+                n_set += (summary or {}).get("n_rooms_matched", 0)
+            print(f"[voting] adjacency on page {floor_idx}: matched rooms across runs={n_set}")
+            _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
+        except Exception as exc:
+            print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
+
     if len(runs) == 1:
         runs[0]["_voting"] = {"n_runs": 1, "degraded": True,
                               "note": "only 1 of N runs succeeded — unvoted"}

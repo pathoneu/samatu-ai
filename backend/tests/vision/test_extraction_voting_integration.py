@@ -71,3 +71,22 @@ def test_run_pass1_voted_all_fail(monkeypatch):
                               pages=[{"image_b64": "x"}], n=3, _emit=lambda e: None)
     assert out["status"] == "error"
     assert out["_error"] == "all_voting_runs_failed"
+
+
+def test_resolve_floor_b64_picks_room_page_not_page0():
+    # The kampai-killer bug: adjacency ran on pages[0] (a title sheet) instead of
+    # the floor page (page 2 on berzas), so n_partition_walls never got set.
+    from extractor.vision_call import _resolve_floor_b64
+    pages = [{"page_index": 1, "image_b64": "TITLE"},
+             {"page_index": 2, "image_b64": "FLOOR"}]
+    # scale_source_page wins
+    b64, idx = _resolve_floor_b64(pages, [{"scale_source_page": 2,
+                                           "patalpos": [{"puslapio_nr": 2}]}])
+    assert b64 == "FLOOR" and idx == 2
+    # modal puslapio_nr fallback
+    b64, idx = _resolve_floor_b64(pages, [{"patalpos": [{"puslapio_nr": 2},
+                                                        {"puslapio_nr": 2}]}])
+    assert b64 == "FLOOR" and idx == 2
+    # no signal → pages[0]
+    b64, idx = _resolve_floor_b64(pages, [{"patalpos": [{}]}])
+    assert b64 == "TITLE"
