@@ -144,12 +144,50 @@ def vote_symbols(runs: list[dict]) -> dict:
     return {k: int(round(median(vs))) for k, vs in vals.items() if vs}
 
 
+# Disagreement tolerances — beyond these, runs are flagged low-confidence so the
+# UI can show the user exactly which Vision-derived values to double-check
+# (CLAUDE.md §7 — surface failures, don't hide them).
+_PERIM_COV_TOL = 0.05      # coefficient of variation on perimeter
+_CEIL_RANGE_TOL = 0.20     # metres spread on ceiling height
+
+
+def _cov(vals: list[float]) -> float:
+    nums = [float(v) for v in vals if v is not None]
+    if len(nums) < 2:
+        return 0.0
+    mean = sum(nums) / len(nums)
+    if mean <= 0:
+        return 0.0
+    var = sum((v - mean) ** 2 for v in nums) / len(nums)
+    return (var ** 0.5) / mean
+
+
+def _low_confidence_fields(voted_rooms: list[dict]) -> list[dict]:
+    """Scan voted rooms for fields where the runs disagreed beyond tolerance."""
+    flags: list[dict] = []
+    for room in voted_rooms:
+        vote = room.get("_vote") or {}
+        label = room.get("pavadinimas") or room.get("nr")
+        pm = vote.get("perimetras_m")
+        if pm and _cov(pm.get("values") or []) > _PERIM_COV_TOL:
+            flags.append({"room": label, "field": "perimetras_m",
+                          "values": pm["values"], "reason": "perimeter_cov_high"})
+        ch = vote.get("lubu_aukstis_m")
+        if ch:
+            vals = [float(v) for v in (ch.get("values") or []) if v is not None]
+            if vals and (max(vals) - min(vals)) > _CEIL_RANGE_TOL:
+                flags.append({"room": label, "field": "lubu_aukstis_m",
+                              "values": ch["values"], "reason": "ceiling_height_spread"})
+    return flags
+
+
 def vote_extraction(runs: list[dict], *, min_votes: int = 2) -> dict:
     """Vote N parsed-shape dicts into one consensus dict.
 
     Carries through the first run's non-voted top-level keys (puslapiai,
     scale, etc.), overrides patalpos + detected_symbols_summary with voted
-    values, and adds a `_voting` provenance block.
+    values, and adds a `_voting` provenance block (incl. low-confidence fields
+    where runs disagreed beyond tolerance, so the UI can flag them).
     """
     base = dict(runs[0]) if runs else {}
     room_runs = [r.get("patalpos") or [] for r in runs]
@@ -162,5 +200,6 @@ def vote_extraction(runs: list[dict], *, min_votes: int = 2) -> dict:
         "min_votes": min_votes,
         "n_rooms_consensus": len(voted_rooms),
         "n_rooms_per_run": [len(r) for r in room_runs],
+        "low_confidence_fields": _low_confidence_fields(voted_rooms),
     }
     return base

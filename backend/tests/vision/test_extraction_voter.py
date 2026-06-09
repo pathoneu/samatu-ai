@@ -77,3 +77,26 @@ def test_vote_extraction_end_to_end():
     assert room["n_partition_walls"] == 3
     assert out["detected_symbols_summary"]["praustuves"] == 5
     assert out["_voting"]["n_runs"] == 3
+
+
+# ── Task 6: confidence surfacing ─────────────────────────────────────────
+def test_voting_flags_high_disagreement():
+    def run(perim, ceil):
+        return {"patalpos": [{"nr": 1, "pavadinimas": "Svetainė", "plotas_m2": 50.0,
+                              "perimetras_m": perim, "lubu_aukstis_m": ceil}],
+                "detected_symbols_summary": {}}
+    # perimeter 20/30/40 → high CoV; ceiling 2.8/3.4/2.8 → >0.2m spread
+    out = vote_extraction([run(20.0, 2.8), run(30.0, 3.4), run(40.0, 2.8)], min_votes=2)
+    flags = out["_voting"]["low_confidence_fields"]
+    fields = {f["field"] for f in flags}
+    assert "perimetras_m" in fields
+    assert "lubu_aukstis_m" in fields
+
+
+def test_voting_no_flags_when_runs_agree():
+    def run():
+        return {"patalpos": [{"nr": 1, "pavadinimas": "X", "plotas_m2": 50.0,
+                              "perimetras_m": 30.0, "lubu_aukstis_m": 2.8}],
+                "detected_symbols_summary": {}}
+    out = vote_extraction([run(), run(), run()], min_votes=2)
+    assert out["_voting"]["low_confidence_fields"] == []
