@@ -956,6 +956,121 @@ def _validate_room_bboxes(vision_result: dict) -> dict:
     return {**vision_result, "warnings": warnings_list}
 
 
+# 2026-06-06: glaistymas/dažymas pozicijų konsolidacija. The generator emits a
+# per-coat split (Q1/Q2/šlifavimas/gruntavimas/dažymas-sluoksniai, walls+ceilings)
+# but contractors bill ONE m² rate for "Sienų, lubų glaistymas/dažymas" split only
+# by height zone (Rangovas A samata items 16/17). This collapses those member
+# lines into the combined line(s). Rotband / kampai / angokraščiai stay separate.
+# Combined paintable area is unchanged — display-only.
+_PAINT_SPLIT_PREFIXES = (
+    "Sienų pirminis glaistymas", "Sienų antrinis glaistymas", "Sienų šlifavimas",
+    "Sienų gruntavimas", "Sienų dažymas",
+    "Lubų pirminis glaistymas", "Lubų antrinis glaistymas", "Lubų šlifavimas",
+    "Lubų gruntavimas", "Lubų dažymas",
+    "Lubų glaistymas/dažymas (virš",
+)
+
+
+def _consolidate_paint_enabled() -> bool:
+    """Feature-flag gate for paint-line consolidation (default ON)."""
+    try:
+        from .feature_flags import get_flags
+        return bool(get_flags().get("consolidate_paint_lines", True))
+    except Exception:
+        return True
+
+
+def _consolidate_paint_pozicijos(parsed: dict) -> None:
+    """Collapse the per-coat glaistymas/dažymas split into the contractor's
+    combined line(s). Mutates parsed['pozicijos'] in place; preserves order and
+    keeps Rotband/kampai/angokraščiai. Materials kept in `_medziagos`, the
+    original split labels in `_detalus`. Combined area unchanged."""
+    if not _consolidate_paint_enabled():
+        return
+    pozicijos = parsed.get("pozicijos") or []
+    rooms = parsed.get("patalpos") or []
+    SK_GD = "Sienų lubų glaistymas dažymas"
+    SAL = "skaiciuota_is_brezinio"
+
+    def _is_split(p: dict) -> bool:
+        if (p.get("skyrius") or "") != SK_GD:
+            return False
+        a = p.get("aprasymas") or ""
+        return any(a.startswith(pre) for pre in _PAINT_SPLIT_PREFIXES)
+
+    members = [p for p in pozicijos if _is_split(p)]
+    if not members:
+        return
+
+    walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
+    dazymo_total = round(walls_paint + lubos_paint, 2)
+    if dazymo_total <= 0:
+        parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
+        return
+
+    virs_3m = round(sum(
+        (float(r.get("walls_paintable_m2") or 0) + float(r.get("ceiling_paintable_m2") or 0))
+        for r in rooms if float(r.get("lubu_aukstis_m") or 0) > 3.0
+    ), 2)
+    virs_3m = min(max(virs_3m, 0.0), dazymo_total)
+    iki_3m = round(dazymo_total - virs_3m, 2)
+
+    medziagos = [
+        {"aprasymas": "Glaistas (pradinis + baigiamasis)",
+         "kiekis": round(sum(float(r.get("glaistas_kg") or 0) for r in rooms), 2), "vnt": "kg"},
+        {"aprasymas": "Gruntas",
+         "kiekis": round(sum(float(r.get("gruntas_l") or 0) for r in rooms), 2), "vnt": "l"},
+        {"aprasymas": "Dažai (2 sluoksniai)",
+         "kiekis": round(sum(float(r.get("dazai_l") or 0) for r in rooms), 2), "vnt": "l"},
+    ]
+    detalus = [p.get("aprasymas") for p in members]
+    is_q4 = any((p.get("_q_lygis") == "Q4") for p in members)
+
+    # Surface label reflects which surfaces actually carry paint (e.g. a bare
+    # garažas paints only the ceiling → "Lubų glaistymas/dažymas").
+    if walls_paint > 0 and lubos_paint > 0:
+        surf = "Sienų, lubų"
+    elif walls_paint > 0:
+        surf = "Sienų"
+    else:
+        surf = "Lubų"
+
+    new_lines: list[dict] = []
+    base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
+            "_medziagos": medziagos, "_detalus": detalus}
+    if virs_3m <= 0.01:
+        # no high-ceiling rooms — single line, no height suffix
+        new_lines.append({**base, "kiekis": dazymo_total,
+                          "aprasymas": f"{surf} glaistymas/dažymas"})
+    elif iki_3m <= 0.01:
+        # every painted room is >3m — single virš-3m line
+        new_lines.append({**base, "kiekis": virs_3m, "_height_zone": ">3m",
+                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+    else:
+        new_lines.append({**base, "kiekis": iki_3m,
+                          "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"})
+        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": virs_3m,
+                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)",
+                          "_height_zone": ">3m", "confidence": "medium"})
+    if is_q4:
+        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": dazymo_total,
+                          "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
+                          "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"})
+
+    # Rebuild preserving order: replace the first member-run with the new lines.
+    rebuilt: list[dict] = []
+    inserted = False
+    for p in pozicijos:
+        if _is_split(p):
+            if not inserted:
+                rebuilt.extend(new_lines)
+                inserted = True
+        else:
+            rebuilt.append(p)
+    parsed["pozicijos"] = rebuilt
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -1118,57 +1233,32 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Approx: ~70% vidiniai, ~30% išoriniai (LT typical)
     kampai_total = _sum("kampu_metrai")
     if kampai_total > 0:
-        kampai_vidiniai = round(kampai_total * 0.7, 2)
-        kampai_isoriniai = round(kampai_total * 0.3, 2)
-        pozicijos.extend([
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai",
-             "vnt": "m", "kiekis": kampai_vidiniai, "saltinis": SAL},
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai",
-             "vnt": "m", "kiekis": kampai_isoriniai, "saltinis": SAL,
-             "medziagos_aprasymas": "PVC kampuotės",
-             "medziagos_kiekis": kampai_isoriniai, "medziagos_vnt": "m"},
-            # rangovas audit 2026-04-29: separate labor line for corner installation.
-            # 5/5 his projects itemize this (~308 m avg). Materials above already
-            # include kampuotės; this line covers mounting/glaistymas labor only.
-            {"skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
-             "vnt": "m", "kiekis": kampai_total, "saltinis": SAL},
-        ])
+        # 2026-06-06 (RC8): ONE corner line (= contractor item 19 "Dažymo kampų
+        # montavimas"). Previously the same metrai were ALSO emitted as
+        # vidiniai+išoriniai → the corner length billed ~2×. Outer-corner
+        # kampuotės (~30%) carried as the material sub-field.
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m", "kiekis": kampai_total, "saltinis": SAL,
+            "medziagos_aprasymas": "PVC kampuotės (išoriniai kampai)",
+            "medziagos_kiekis": round(kampai_total * 0.3, 2), "medziagos_vnt": "m",
+        })
 
-    # Angokraščių apdailos (per anga: 2H+W metrai) + paslėptų durų stakta.
-    # Sprint §2A.1: gate reveals by deduction standard (NRM2: only > 3 m², LT: always).
-    from extractor.universal_rules import _opening_adds_reveal, _resolve_deduction_standard
-    # Read user prefs from parsed["_overrides"] (set by caller). Fallback to LT default.
-    deduction_standard = _resolve_deduction_standard(parsed.get("_overrides"))
-    angokrasciai_m = 0
-    pasleptu_duru_staktu_m = 0
+    # Angokraščių apdailos (reveal length around openings) + paslėptų durų stakta.
+    # 2026-06-06 (RC3): use the calibrated per-room `angokrasciu_gkp_m` field from
+    # calc_room_quantities (doors=W+2H, interior windows=W+2H, EXTERIOR windows=0
+    # via is_exterior) instead of recomputing Σ(2H+W) inline. The inline version had
+    # NO is_exterior check and over-quoted +54.8% on BOTH the SK_GD glaistymas and
+    # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Beržų; contractor 89.39).
+    angokrasciai_m = _sum("angokrasciu_gkp_m")
+    pasleptu_duru_staktu_m = 0.0
     for r in rooms:
-        elementai = r.get("elementai") or []
-        for el in elementai:
-            tipas = (el.get("tipas") or "").lower()
-            kiekis = int(el.get("kiekis") or 1)
-            W = (el.get("plotis_mm") or 0) / 1000
-            H = (el.get("aukstis_mm") or 0) / 1000
-            opening_area = W * H if (W > 0 and H > 0) else 0
-            if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
-                if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
-                    # 3-sided for ALL openings: top + 2 šonai → 2H + W.
-                    # Doors don't have a bottom reveal (slenkstis = the
-                    # threshold/floor). Windows DO have a bottom but in LT
-                    # samatininkų convention it's priced separately as
-                    # palangė (window sill line item) — so the bundle
-                    # angokraščiai_glaistymas-dažymas line stays 3-sided.
-                    # Reverted from 2026-05-06's 4-sided window formula
-                    # after benchmark P1+P2 showed +115% / +60% over-count
-                    # against samatininkų pasiūlymai (€4.4k aggregate
-                    # corpus EUR impact). See reports/benchmark/findings_
-                    # 2026-05-10.md issue #2.
-                    angokrasciai_m += (2 * H + W) * kiekis
-            if tipas == "pasleptos_duris" and W > 0 and H > 0:
-                # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
-                # paruošimo nepriklausomai nuo size threshold (LT-specific
-                # premium hardware item, ne klasikinis NRM2 reveal).
-                pasleptu_duru_staktu_m += (2 * H + W) * kiekis
-    angokrasciai_m = round(angokrasciai_m, 2)
+        for el in (r.get("elementai") or []):
+            if (el.get("tipas") or "").lower() == "pasleptos_duris":
+                W = (el.get("plotis_mm") or 0) / 1000
+                H = (el.get("aukstis_mm") or 0) / 1000
+                if W > 0 and H > 0:
+                    pasleptu_duru_staktu_m += (2 * H + W) * int(el.get("kiekis") or 1)
     pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
@@ -1626,6 +1716,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     n_wet_with_klozetas = n_vonia + n_wc + n_san
     # Vonios — turi dušą + gyvatuką + dušo maišytuvą + lataką
     n_full_bathroom = n_vonia + n_san
+    # 2026-06-06 (RC1): basins are NOT 1-per-wet-room — decouple from toilet count;
+    # use the detected praustuvė symbol count when higher (Beržų: 3 vs 2).
+    n_praustuves = max(n_wet_with_klozetas,
+                       int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
 
     if n_wet_with_klozetas > 0 or n_virtuve > 0 or n_skalbykla > 0:
         # WC rėmas + Klozetas
@@ -1638,9 +1732,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_SAN, "aprasymas": "Klozeto montavimas",
                  "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Praustuvės maišytuvo montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
             ])
         # Pilna vonia — dušas + gyvatukas + linijinis latakas
         if n_full_bathroom > 0:
@@ -1849,6 +1943,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
              "medziagos_kiekis": round(bendras_plotas, 2), "medziagos_vnt": "m2"},
         ])
+
+    # 2026-06-06: collapse the per-coat glaistymas/dažymas split into the
+    # contractor's combined line(s) (flag ENABLE_CONSOLIDATE_PAINT_LINES, default on).
+    parsed["pozicijos"] = pozicijos
+    _consolidate_paint_pozicijos(parsed)
+    pozicijos = parsed["pozicijos"]
 
     # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.
     # lines stay grouped even when generator interleaves emit order.

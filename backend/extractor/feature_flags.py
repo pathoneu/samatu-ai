@@ -23,6 +23,11 @@ _FLAG_DEFINITIONS = {
     "sonnet_pass1":          ("ENABLE_SONNET_PASS1", False),             # Sprint 4
     "grid_overlay":          ("ENABLE_GRID_OVERLAY", False),             # Sprint 3
     "proxy_gt":              ("ENABLE_PROXY_GT", False),                 # Sprint 4
+    # 2026-06-06: collapse the per-coat glaistymas/dažymas split (Q1/Q2/sluoksnis,
+    # walls+ceilings) into the contractor's combined "Sienų, lubų glaistymas/
+    # dažymas (iki/virš 3m)" line (Rangovas A samata items 16/17). Display-only;
+    # santrauka totals unchanged. Disable: ENABLE_CONSOLIDATE_PAINT_LINES=0
+    "consolidate_paint_lines": ("ENABLE_CONSOLIDATE_PAINT_LINES", True),
     # 2026-06-05: floor SYNTHETIC square perimeters (perim ≈ 4·√area) on plans
     # with NO eksplikacija table, for the wall-paint path only. Gated on
     # plotas_saltinis so eksplikacija/inline_label rooms are NEVER touched →

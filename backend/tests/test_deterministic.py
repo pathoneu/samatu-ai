@@ -679,8 +679,10 @@ def test_pipeline_handles_high_ceiling_3plus_m():
                 if "virš 3 m" in p["aprasymas"].lower()
                 and "gkp" in p["aprasymas"].lower()]
     # Lubų glaistymas/dažymas (virš 3m) — FINISH labor (Sprint §FIX-5)
+    # 2026-06-06: paint lines consolidated — "Sienų, lubų glaistymas/dažymas
+    # (virš 3m aukščio)" (was "Lubų glaistymas/dažymas (virš 3 m aukščio)").
     high_paint = [p for p in out["pozicijos"]
-                  if "virš 3 m aukščio" in p["aprasymas"].lower()
+                  if "virš 3m aukščio" in p["aprasymas"].lower()
                   and "glaistymas" in p["aprasymas"].lower()]
     pastoliai = [p for p in out["pozicijos"]
                  if "pastolių" in p["aprasymas"].lower()]

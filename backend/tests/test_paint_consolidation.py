@@ -1,0 +1,75 @@
+"""Paint pozicijos consolidation (2026-06-06).
+
+Collapses the per-coat split (Q1 / Q2 / šlifavimas / gruntavimas /
+dažymas-sluoksniai, for walls AND ceilings) into the contractor's combined
+line "Sienų, lubų glaistymas/dažymas (iki/virš 3m)" — matching Rangovas A
+samata items 16/17. Rotband stays its own line (item 15). The combined
+paintable area is unchanged (display-only change).
+"""
+import os
+
+from extractor.vision_call import _build_pozicijos_from_rooms
+from extractor.universal_rules import calc_room_quantities
+
+
+def _parsed(rooms, overrides=None):
+    p = {"patalpos": rooms, "santrauka": {}}
+    if overrides is not None:
+        p["_overrides"] = overrides
+    return p
+
+
+def _room(**kw):
+    r = {"paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
+         "lubu_aukstis_m": 2.7, "elementai": []}
+    r.update(kw)
+    r.update(calc_room_quantities(r))
+    return r
+
+
+def test_paint_consolidated_default_on():
+    rooms = [_room()]
+    out = _build_pozicijos_from_rooms(_parsed(rooms))
+    labels = [p["aprasymas"] for p in out["pozicijos"]]
+    # the split paint-coat lines are GONE (Q1/Q2/per-coat). NB: a floor line
+    # "Grindų išlyginamasis sluoksnis" legitimately contains "sluoksnis" — so
+    # match the paint-coat patterns specifically, not the bare word.
+    bad = [l for l in labels if ("glaistymas Q1" in l) or ("glaistymas Q2" in l)
+           or ("dažymas (1 sluoksnis" in l) or ("dažymas (2 sluoksni" in l)
+           or ("gruntavimas (1 sluoksnis" in l)]
+    assert not bad, f"split paint lines still present: {bad}"
+    # exactly one consolidated glaistymas/dažymas work line (no >3m rooms here)
+    gd = [p for p in out["pozicijos"]
+          if p["aprasymas"].startswith("Sienų, lubų glaistymas/dažymas")]
+    assert len(gd) == 1, labels
+    # kiekis == combined walls + ceiling paint, counted ONCE (not summed coats)
+    r = rooms[0]
+    expected = round(r["walls_paintable_m2"] + r["ceiling_paintable_m2"], 2)
+    assert abs(gd[0]["kiekis"] - expected) < 0.5, f"{gd[0]['kiekis']} vs {expected}"
+    # materials preserved (not lost to consolidation)
+    assert gd[0].get("_medziagos"), "materials not preserved on consolidated line"
+    # Rotband stays a separate line (contractor item 15)
+    assert any("Rotband" in l for l in labels), labels
+
+
+def test_paint_split_when_flag_off():
+    os.environ["ENABLE_CONSOLIDATE_PAINT_LINES"] = "0"
+    try:
+        out = _build_pozicijos_from_rooms(_parsed([_room()]))
+        labels = [p["aprasymas"] for p in out["pozicijos"]]
+        assert any("glaistymas Q1" in l for l in labels), \
+            f"flag off should keep the split: {labels}"
+    finally:
+        del os.environ["ENABLE_CONSOLIDATE_PAINT_LINES"]
+
+
+def test_high_room_gets_iki_and_virs_3m_lines():
+    # one normal room (≤3m) + one high room (>3m) → split into the two
+    # contractor lines (items 16/17). Combined area preserved.
+    rooms = [_room(plotas_m2=20.0, perimetras_m=18.0, lubu_aukstis_m=2.7),
+             _room(plotas_m2=30.0, perimetras_m=22.0, lubu_aukstis_m=3.4)]
+    out = _build_pozicijos_from_rooms(_parsed(rooms))
+    gd = [p["aprasymas"] for p in out["pozicijos"]
+          if p["aprasymas"].startswith("Sienų, lubų glaistymas/dažymas")]
+    assert any("iki 3m" in l.lower() for l in gd), f"expected an iki-3m line: {gd}"
+    assert any("virš 3m" in l.lower() for l in gd), f"expected a virš-3m line: {gd}"
