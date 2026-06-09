@@ -2052,6 +2052,112 @@ def _recompute_santrauka(parsed: dict) -> dict:
     return parsed
 
 
+def _run_pass1_once(client, system, pages) -> dict:
+    """One Pass-1 extraction (≤3 retries). Returns the parsed dict (with
+    `_meta`) on success, or an error dict `{"status":"error", ...}` on failure
+    — same error shapes the old inline loop returned."""
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            with client.messages.stream(
+                model=MODEL,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                system=system,
+                messages=[{"role": "user", "content": build_user_content(pages)}],
+                output_config={"effort": "high"},
+            ) as stream:
+                resp = stream.get_final_message()
+
+            if resp.stop_reason == "refusal":
+                return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal"}
+            if resp.stop_reason == "max_tokens":
+                return {"status": "error", "_error": "output_truncated", "_stop_reason": "max_tokens"}
+
+            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                try:
+                    parsed = json.loads(_repair_json(text))
+                    parsed["_repaired"] = True
+                except json.JSONDecodeError as je:
+                    return {"status": "error", "_error": "json_decode_failure",
+                            "_raw_text": text[:4000], "_je": str(je)}
+
+            usage = resp.usage
+            parsed["_meta"] = {
+                "input_tokens": getattr(usage, "input_tokens", None),
+                "output_tokens": getattr(usage, "output_tokens", None),
+                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
+                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
+                "stop_reason": resp.stop_reason,
+                "attempt": attempt + 1,
+                "pages_sent": len(pages),
+                "model": MODEL,
+            }
+            return parsed
+        except Exception as exc:
+            last_err = exc
+            print(f"[extractor] attempt {attempt + 1} failed: {exc}")
+            if attempt == 2:
+                return {"status": "error", "_error": f"vision_call_failed: {exc}"}
+            time.sleep(1.5 ** attempt)
+    return {"status": "error", "_error": str(last_err or "Unknown error")}
+
+
+def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
+    """Run Pass-1 ``n`` times (+ one shared adjacency pass) and median-vote into
+    a single consensus parsed dict.
+
+    The adjacency pass wires ``n_partition_walls`` into production (it was only
+    ever computed by the offline benchmark script before), and median voting
+    means a single adjacency-bail or perimeter-jitter run can't tank the
+    consensus. Degrades gracefully: 0 good runs → error; 1 good run → that run.
+    """
+    from .vision.extraction_voter import vote_extraction
+
+    # Adjacency: one shared pass on the floor-plan page (cached by image hash),
+    # applied to every run's rooms. Best-effort — failure leaves n_partition_walls
+    # unset (→ 0), exactly the pre-voting production behaviour.
+    adj = None
+    try:
+        from .vision.adjacency_extractor import extract_adjacency
+        floor_b64 = pages[0]["image_b64"] if pages else None
+        if floor_b64:
+            adj = extract_adjacency(image_b64=floor_b64, client=client)
+    except Exception as exc:
+        print(f"[voting] adjacency extract failed (n_partition_walls→0): {exc}")
+
+    runs: list[dict] = []
+    for i in range(n):
+        _emit({"event": "voting_round_started", "round": i + 1, "of": n})
+        p = _run_pass1_once(client, system, pages)
+        if p.get("status") == "error":
+            print(f"[voting] round {i + 1} failed: {p.get('_error')}")
+            _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
+            continue
+        if adj is not None:
+            try:
+                from .vision.adjacency_extractor import apply_adjacency_to_rooms
+                apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
+            except Exception as exc:
+                print(f"[voting] apply_adjacency failed round {i + 1}: {exc}")
+        runs.append(p)
+        _emit({"event": "voting_round_completed", "round": i + 1,
+               "rooms": len(p.get("patalpos") or [])})
+
+    if not runs:
+        return {"status": "error", "_error": "all_voting_runs_failed"}
+    if len(runs) == 1:
+        runs[0]["_voting"] = {"n_runs": 1, "degraded": True,
+                              "note": "only 1 of N runs succeeded — unvoted"}
+        return runs[0]
+
+    voted = vote_extraction(runs, min_votes=2)
+    voted["_meta"] = {**runs[0].get("_meta", {}), "voting_runs": len(runs)}
+    return voted
+
+
 def extract_interior(
     pdf_bytes: bytes,
     rules_override: dict | None = None,
@@ -2140,82 +2246,27 @@ def extract_interior(
         "windows_in_table": len(eks.get("schedule_tables", {}).get("langai", [])),
     })
 
-    # Step 2: Vision call with retry (max 3 attempts)
-    _emit({"event": "pass1_started", "page_count": len(pages)})
-    last_err: Exception | None = None
-    parsed: dict | None = None
+    # Step 2: Vision call — single pass, or N-pass median voting (flag-gated).
+    # Voting stabilises the high-variance Pass-1 (perimeters, ceiling heights,
+    # symbol counts) and wires the adjacency pass into production so the kampai
+    # pusiniai term is populated on real uploads, not just the benchmark.
+    from .feature_flags import get_flags as _get_flags, voting_n as _voting_n
+    _vflags = _get_flags()
+    _voting_on = bool(_vflags.get("extraction_voting"))
+    _emit({"event": "pass1_started", "page_count": len(pages), "voting": _voting_on})
 
-    for attempt in range(3):
-        try:
-            with client.messages.stream(
-                model=MODEL,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                system=system,
-                messages=[{"role": "user", "content": build_user_content(pages)}],
-                output_config={"effort": "high"},
-            ) as stream:
-                resp = stream.get_final_message()
+    if _voting_on:
+        parsed = _run_pass1_voted(client, system, pages, _voting_n(), _emit)
+    else:
+        parsed = _run_pass1_once(client, system, pages)
 
-            if resp.stop_reason == "refusal":
-                return {
-                    "status": "error",
-                    "_error": "model_refused",
-                    "_stop_reason": "refusal",
-                }
-            if resp.stop_reason == "max_tokens":
-                return {
-                    "status": "error",
-                    "_error": "output_truncated",
-                    "_stop_reason": "max_tokens",
-                }
-
-            text = "".join(
-                b.text for b in resp.content if getattr(b, "type", None) == "text"
-            )
-
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError:
-                try:
-                    parsed = json.loads(_repair_json(text))
-                    parsed["_repaired"] = True
-                except json.JSONDecodeError as je:
-                    return {
-                        "status": "error",
-                        "_error": "json_decode_failure",
-                        "_raw_text": text[:4000],
-                        "_je": str(je),
-                    }
-
-            usage = resp.usage
-            parsed["_meta"] = {
-                "input_tokens": getattr(usage, "input_tokens", None),
-                "output_tokens": getattr(usage, "output_tokens", None),
-                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
-                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
-                "stop_reason": resp.stop_reason,
-                "attempt": attempt + 1,
-                "pages_sent": len(pages),
-                "model": MODEL,
-            }
-            break  # success
-
-        except Exception as exc:
-            last_err = exc
-            print(f"[extractor] attempt {attempt + 1} failed: {exc}")
-            if attempt == 2:
-                return {
-                    "status": "error",
-                    "_error": f"vision_call_failed: {exc}",
-                }
-            time.sleep(1.5 ** attempt)
-
-    if parsed is None:
-        _emit({"event": "error", "message": str(last_err or "Unknown error")})
-        return {
-            "status": "error",
-            "_error": str(last_err or "Unknown error"),
-        }
+    if not parsed or parsed.get("status") == "error":
+        # Error shapes (model_refused, output_truncated, json_decode_failure,
+        # vision_call_failed, all_voting_runs_failed) are returned verbatim so
+        # callers see the same payloads as before.
+        err = (parsed or {}).get("_error", "Unknown error")
+        _emit({"event": "error", "message": str(err)})
+        return parsed or {"status": "error", "_error": "Unknown error"}
 
     _pass1_rooms = parsed.get("patalpos") or []
     _emit({
