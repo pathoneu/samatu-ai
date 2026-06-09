@@ -36,6 +36,24 @@
 
 **Lesson:** verify each audit finding against the *full live pipeline* (with symbols) before treating it as a code bug. Isolated calc calls miss the symbol layer entirely.
 
+### 🔴 ROOT CAUSE of the kampai 325-vs-501 instability (2026-06-09, verified)
+
+The user uploads a project → app produces kampai **325** ; contractor truth **493** ; benchmark/cached **501**. Why three different numbers:
+
+- Cached kampai 494.7 decomposes into: inner 126 + reveals 101 + **pusiniai 96.4** (`n_partition_walls`=34) + perim 171.
+- **`n_partition_walls` is populated ONLY by the offline script `scripts/apply_adjacency.py`**, which runs a dedicated Vision adjacency pass (`extractor/vision/adjacency_extractor.extract_adjacency`) on the floor-plan page and writes the counts into `ground_truth/<slug>/ai_extract.json`.
+- **Production `extract_interior()` NEVER runs that pass.** `grep adjacency_extractor backend/extractor/vision_call.py` → nothing. The deterministic `geometry_solver.detect_shared_walls` also can't help — it needs `polygon_walls`/`start_vertex_xy_mm` in a common frame, which only the heavier `room_graph_extractor` Vision pass produces.
+- Therefore in production every room has `n_partition_walls=0` → `pusiniai=0` → kampai loses ~96 m (≈20%). The user's 325 = 398 (no pusiniai) minus further room/element recall shrink (~73 m).
+
+**Consequences:**
+1. The whole `pusiniai` mechanism (and the validated 2026-06-01 "default `count_partition_corners=True`" decision at `universal_rules.py:900-908`) is **dead code in production** — the input it needs is never computed.
+2. **The totals benchmark overstates production kampai accuracy** by ~96 m, because `eval_harness` reads the offline-enriched `ai_extract.json` that already has `apply_adjacency` baked in. Benchmark kampai +1.6% ; real production kampai ≈ −19%.
+
+**Fix options (decision pending):**
+- **A. Wire the adjacency Vision pass into `extract_interior`** (feature-flagged, graceful fallback to n_partition_walls=0 + low-confidence flag on failure). +1 Vision call/extraction (~$0.05–0.20). Makes prod kampai match truth; closes the benchmark-vs-prod gap. *Recommended.*
+- **B. Keep prod cheap**: drop/neutralize the dead pusiniai path, flag kampai low-confidence, accept ≈ −19% (or recalibrate the legacy perim term — fragile single-project fudge).
+- **C. N-pass voting** over the whole extraction for full stability (bigger build, ~3× cost) — addresses room/element recall variance too, not just pusiniai.
+
 ---
 
 > ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the table above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 correction.** Per-line fresh-vs-cached deltas TBD.
