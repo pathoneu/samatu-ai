@@ -56,7 +56,60 @@ The user uploads a project → app produces kampai **325** ; contractor truth **
 
 ---
 
-> ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the table above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 correction.** Per-line fresh-vs-cached deltas TBD.
+---
+
+## 🚨 2026-06-09 PART 2 — THE BENCHMARK WAS MEASURING LOST CODE (live A/B + .pyc forensics)
+
+A live re-extraction of the berzas PDF (single-pass production, `/tmp/berzas_A_single_pass.json`)
+vs the cached benchmark extract exposed that **production is massively degraded vs the benchmark,
+because several pipeline passes silently broke and the benchmark reads pre-breakage cached extracts.**
+
+**Live single-pass production vs contractor truth (the numbers a real user gets):**
+- kampai **313.5 (−36.5%)** — reproduces the user's "got 325" report. n_partition_walls=0.
+- combined paint **438.6 (−25%)** ; walls_paintable 273 vs GT 460.7 (**−41%**).
+- ceiling heights: **uniform 2.82 m** on all 11 rooms (cached: 2.8/3.0/3.4).
+
+**Root causes (all adversarially verified by the recover-lost-readers workflow):**
+
+1. **`apdailos_reader.py` + `doors_reader.py` were NEVER committed and are LOST.** `git log --all`
+   returns nothing; only stale `.pyc` remained in `__pycache__`. The committed `vision_call.py` calls
+   them (Step 2.85/2.86) inside `try/except` that swallowed the `ModuleNotFoundError` as "non-fatal".
+   So for weeks: no `sienu_apdailos_breakdown` → calc falls to the legacy paskirtis path that hardcodes
+   `walls_paint=0` for tamburas/garazas and full-tile-clips wet rooms → **−41% walls paint**; and no
+   door recount → doors stuck at pass-1's 9–10 (truth 14).
+   **The commit that claimed "Beržų MAE 3.25%→1.15%" (`c91dd3b`) depended entirely on these two
+   uncommitted modules.** The benchmark still reports ~1.1–2% because `eval_harness --totals-only`
+   reads the *cached* `ai_extract.json` that was built when the modules existed locally.
+   → **FIXED 2026-06-09**: both modules reconstructed faithfully from the surviving `.pyc` (verbatim
+   SYSTEM_PROMPTs, output schemas, signatures, MODEL/MAX_TOKENS) + the universal_rules consumer
+   contract. ImportError on a reader is now a LOUD regression warning.
+
+2. **Per-room ceiling zoom ran 1/11 rooms → uniform 2.82 m.** Two compounding bugs: (A) the zoom loop
+   mutated a stale `rooms` binding while `_apply_per_room_heights` had reassigned `parsed["patalpos"]`
+   to a new list — so zoom recovery was silently discarded; (B) `_can_skip_zoom` skipped every
+   eksplikacija-matched room, but ceiling height is NOT an eksplikacija primitive.
+   → **FIXED 2026-06-09**: rebind `rooms = parsed["patalpos"]` before the zoom loop; don't skip zoom
+   when `lubu_aukstis_saltinis != "per_room"`.
+
+3. **Adjacency pass not in production** (the kampai pusiniai gap from Part 1) + my initial voting wiring
+   ran adjacency on `pages[0]` (a title sheet) instead of the floor page → 0 matches.
+   → **FIXED 2026-06-09**: voting path resolves the floor page (scale_source_page / modal puslapio_nr)
+   and applies adjacency there.
+
+**Benchmark integrity (CRITICAL, confirmed):** `eval_harness --totals-only` scores against the
+enriched cached `ai_extract.json`, NOT fresh production. Honest berzas headline MAE ≈ **14.95%**, not
+the published 1.99% — a **~7.5× understatement** on enrichment-dependent projects. The "~3× overall"
+across all 11 projects is plausible but UNVERIFIED (fresh extracts exist only for berzas). **TODO**:
+regenerate every `ground_truth/<slug>/ai_extract.json` with the restored pipeline, OR flag any extract
+lacking apdailos/adjacency markers as `stale_enriched` and exclude it from the headline MAE. Also: the
+eval "honest filter" silently drops headline metrics a fresh extract emits as exactly 0.0 — for non-berzas
+projects that would HIDE a collapsed metric; remove/flag that when scoring real production extracts.
+
+**Live re-verification of the full restoration: in progress (`/tmp/berzas_restore_verify.log`).**
+
+---
+
+> ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the tables above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 corrections.** Per-line fresh-vs-cached deltas TBD.
 
 
 ## Verdict

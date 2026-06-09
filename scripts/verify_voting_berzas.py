@@ -52,6 +52,29 @@ def _npw_total(result: dict) -> int:
     return sum(int(r.get("n_partition_walls") or 0) for r in (result.get("patalpos") or []))
 
 
+def _walls_paint_total(result: dict) -> float:
+    import sys as _s
+    _s.path.insert(0, str(REPO / "backend"))
+    from extractor.universal_rules import calc_room_quantities
+    tot = 0.0
+    for r in result.get("patalpos") or []:
+        q = calc_room_quantities(r)
+        tot += float(q.get("walls_paintable_m2") or 0)
+    return round(tot, 1)
+
+
+def _doors_total(result: dict) -> int:
+    return sum(int(e.get("kiekis") or 1)
+               for r in (result.get("patalpos") or [])
+               for e in (r.get("elementai") or [])
+               if (e.get("tipas") or "").startswith(("duris", "pasleptos")))
+
+
+def _ceiling_heights(result: dict):
+    return sorted({round(float(r.get("lubu_aukstis_m") or 0), 2)
+                   for r in (result.get("patalpos") or [])})
+
+
 def run(label: str, voting: bool, n: int = 3) -> dict:
     os.environ["ENABLE_EXTRACTION_VOTING"] = "1" if voting else "0"
     if voting:
@@ -74,6 +97,11 @@ def run(label: str, voting: bool, n: int = 3) -> dict:
         "n_rooms": len(result.get("patalpos") or []),
         "kampai": round(_kampai(result), 2),
         "combined_paint": _combined_paint(result),
+        "walls_paint_total": _walls_paint_total(result),
+        "doors_total": _doors_total(result),
+        "ceiling_heights": _ceiling_heights(result),
+        "apdailos_rooms_updated": (result.get("_meta") or {}).get("apdailos_rooms_updated"),
+        "doors_reader_total": (result.get("_meta") or {}).get("doors_total_count"),
         "n_partition_walls_total": _npw_total(result),
         "voting_meta": result.get("_voting"),
     }
@@ -84,6 +112,10 @@ def run(label: str, voting: bool, n: int = 3) -> dict:
           f"Δ {(out['kampai']-TRUTH_KAMPAI)/TRUTH_KAMPAI*100:+.1f}%)", flush=True)
     print(f"    combined paint    = {out['combined_paint']:.2f}  (truth {TRUTH_PAINT}, "
           f"Δ {(out['combined_paint']-TRUTH_PAINT)/TRUTH_PAINT*100:+.1f}%)", flush=True)
+    print(f"    walls_paint total = {out['walls_paint_total']}  (GT 460.7)", flush=True)
+    print(f"    doors total       = {out['doors_total']}  (reader said {out['doors_reader_total']}; truth 14)", flush=True)
+    print(f"    apdailos updated  = {out['apdailos_rooms_updated']} rooms", flush=True)
+    print(f"    ceiling heights   = {out['ceiling_heights']}  (cached: 2.8/3.0/3.4)", flush=True)
     print(f"    n_partition_walls = {out['n_partition_walls_total']}", flush=True)
     if out["voting_meta"]:
         lcf = out["voting_meta"].get("low_confidence_fields") or []
