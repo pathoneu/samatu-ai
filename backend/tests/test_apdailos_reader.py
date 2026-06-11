@@ -55,3 +55,24 @@ def test_build_user_text_lists_rooms_and_schema():
     assert "Tambūras" in txt
     assert "sienu_apdaila" in txt          # schema present
     assert "dazymas_share" in txt
+
+
+def test_find_apdailos_page_skips_vizualizacija(monkeypatch):
+    # Bacevičiaus regression: the reader classified finishes from RENDERS.
+    import extractor.apdailos_reader as ar
+
+    class _Page:
+        def __init__(self, text): self._t = text
+        def extract_text(self): return self._t
+
+    class _Pdf:
+        def __init__(self, pages): self.pages = pages
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    pages = [_Page("TITULINIS"),
+             _Page("INTERJERO VIZUALIZACIJA. APDAILŲ PLANAS fragmentas"),  # render — skip
+             _Page("GRINDŲ APDAILOS PLANAS"),                              # ok, prio 1
+             _Page("SIENŲ IŠKLOTINIŲ IR APDAILŲ PLANAS")]                  # best, prio 0
+    monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    assert ar._find_apdailos_page(b"x") == 4

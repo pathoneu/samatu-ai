@@ -1983,6 +1983,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
     parsed["pozicijos"] = pozicijos
+
+    # 2026-06-11: per-pozicija confidence (class calibration + apdailos
+    # self-reported confidence + voting flags). Measured false-green rate was
+    # 50-60% before this pass — see docs/superpowers/research/
+    # 2026-06-11-experiments-results.md.
+    from .confidence import apply_confidence
+    apply_confidence(parsed)
     return parsed
 
 

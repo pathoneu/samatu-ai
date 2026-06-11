@@ -534,7 +534,9 @@ def test_pozicijos_p3_skyliu_grezimas_fallback_no_symbols():
     assert len(line) == 1
     # 2 openings × 4 holes = 8
     assert line[0]["kiekis"] == 8
-    assert line[0]["confidence"] == "low"
+    # 2026-06-11: confidence post-pass normalizes legacy "low" → "raudona"
+    # (unified LT scheme: zalia/geltona/raudona).
+    assert line[0]["confidence"] == "raudona"
 
 
 def test_tomas_baseline_p1_style_residential_emits_all_key_skyriai():

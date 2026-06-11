@@ -102,15 +102,29 @@ def build_user_text(rooms: list[dict]) -> str:
 def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
     """Scan PDF text layer for 'IŠKLOTINIŲ' or 'APDAILŲ PLANAS' title.
 
-    Returns 1-based page index, or None if no such page found."""
+    Returns 1-based page index, or None if no such page found.
+
+    2026-06-11 hardening (Bacevičiaus experiment): pages titled VIZUALIZACIJA
+    (renders) are EXCLUDED — the reader was classifying finishes from renders
+    and self-reporting "low confidence" on half the rooms. Among the remaining
+    candidates, a page whose title mentions IŠKLOTIN wins over a generic
+    APDAILŲ match (išklotinės carry the per-wall finish markers)."""
+    candidates: list[tuple[int, int]] = []  # (priority, 1-based page)
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for i, page in enumerate(pdf.pages):
                 txt = (page.extract_text() or "").upper()
-                if "IŠKLOTIN" in txt or "APDAILŲ PLANAS" in txt or "APDAILU PLANAS" in txt:
-                    return i + 1
+                if "VIZUALIZACIJ" in txt:
+                    continue
+                if "IŠKLOTIN" in txt or "ISKLOTIN" in txt:
+                    candidates.append((0, i + 1))
+                elif "APDAILŲ PLANAS" in txt or "APDAILU PLANAS" in txt or "APDAILOS PLANAS" in txt:
+                    candidates.append((1, i + 1))
     except Exception as exc:  # noqa: BLE001
         print(f"[apdailos_reader] pdfplumber scan failed: {exc}")
+    if candidates:
+        candidates.sort()
+        return candidates[0][1]
     return None
 
 
