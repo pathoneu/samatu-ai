@@ -1186,6 +1186,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_vnt": "l"},
         ])
 
+    # Molio tinkas / decor-coated walls — separate finish, EXCLUDED from the
+    # glaistymas/dažymas lines above (2026-06-11 Bacevičiaus experiment: 160 m²
+    # of clay plaster was silently billed as paint, +62.8% combined error).
+    molio_total = _sum("molio_tinko_m2")
+    if molio_total > 0:
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Sienų dekoravimas molio tinku",
+            "vnt": "m2", "kiekis": molio_total, "saltinis": SAL,
+            "_assumption": "Plotas iš apdailos plano (molio/kalkinio tinko ar kitos dangos zona). Paruošimas įskaičiuotas į dekoravimo darbą — atskiros glaistymo eilutės šiam plotui nėra.",
+        })
+
     if lubos_paint > 0:
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Lubų pirminis glaistymas Q1",

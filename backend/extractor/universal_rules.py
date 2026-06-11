@@ -667,6 +667,7 @@ def calc_room_quantities(room: dict,
     elevation_tile_area = float(room.get("_tile_area_from_elevation_m2") or 0)
 
     apdailos = room.get("sienu_apdailos_breakdown") or {}
+    molio_tinko_m2 = 0.0  # set in the apdailos branch when molio/kita_danga share > 0
     if elevation_tile_area > 0:
         # Elevation-precision branch: tile area is exact mm-derived.
         doors_deduction = n_doors * DOOR_NET_DEDUCTION
@@ -742,6 +743,20 @@ def calc_room_quantities(room: dict,
             else:
                 walls_paint_factor = 1.0
             walls_paintable = walls_paintable_gross * walls_paint_factor
+        # 2026-06-11 (Bacevičiaus experiment): molio tinkas / decor-coated walls
+        # are a SEPARATE finish — the contractor bills them as their own m² line
+        # ("Sienų dekoravimas molio tinku", prep included) and EXCLUDES them from
+        # glaistymas/dažymas. Before this split, 160 m² of clay-plastered walls
+        # were silently counted as paint (+62.8% combined-paint error). kita_danga
+        # (mikrocementas etc.) is treated the same way.
+        molio_share = float(apdailos.get("molio_tinkas_share") or 0) + \
+            float(apdailos.get("kita_danga_share") or 0)
+        if molio_share > 0 and walls_paintable > 0:
+            # Shares are fractions of TOTAL wall area; walls_paintable here is
+            # gross − door deduction (tile zones included per the glaistymas-
+            # under-finish convention), so the share applies directly.
+            molio_tinko_m2 = round(walls_paintable * min(1.0, molio_share), 2)
+            walls_paintable = max(0.0, walls_paintable - molio_tinko_m2)
         walls_net = walls_paintable
     else:
         # Legacy heuristic path: paskirtis-based walls_paint factor.
@@ -1011,6 +1026,7 @@ def calc_room_quantities(room: dict,
         "ceiling_type": ceiling_type,
         "walls_gross_m2": round(walls_gross, 2),
         "walls_paintable_m2": round(walls_paintable, 2),
+        "molio_tinko_m2": round(molio_tinko_m2, 2),
         "ceiling_paintable_m2": round(ceiling_paintable, 2),
         "dazymo_plotas_m2": round(dazymo_plotas, 2),
         "gkp_lubu_standart_m2": round(gkp_lubu_standart, 2),

@@ -47,6 +47,11 @@ Apdailos tipai (skaityk iš puslapio legendos — pavadinimai ir spalvos gali sk
 - "tapetai" — tapetai (vaikiški ar dekoratyviniai)
 - "plokste" — siena dengiama plokšte (medienos panelis, akmuo, t.t.)
 - "veidrodis" — veidrodinė siena
+- "molio_tinkas" — molio / kalkinis dekoratyvinis tinkas, sienų dekoravimas tinku (NE dažymas!)
+- "kita_danga" — mikrocementas, betono efektas, kita ištisinė danga (NE dažymas, NE plytelės)
+
+SVARBU: skaityk iš APDAILOS PLANO / IŠKLOTINIŲ puslapio, NE iš vizualizacijų
+(renderių). Jei matai tik vizualizaciją — pažymėk pastabose "low confidence".
 
 Grąžink TIK JSON, jokios prozos. Ne markdown fences."""
 
@@ -63,7 +68,9 @@ Output schema (JSON):
         "plyteles_share": 0.0..1.0,
         "tapetai_share": 0.0..1.0,
         "plokste_share": 0.0..1.0,
-        "veidrodis_share": 0.0..1.0
+        "veidrodis_share": 0.0..1.0,
+        "molio_tinkas_share": 0.0..1.0,
+        "kita_danga_share": 0.0..1.0
       },
       "plyteliu_aukstis_m": null | number,
       "pastabos": "trumpai ką matei brėžinyje"
@@ -210,5 +217,13 @@ def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
             room["plyteliu_aukstis_m"] = p.get("plyteliu_aukstis_m")
         if p.get("pastabos"):
             room["_apdailos_pastabos"] = p.get("pastabos")
+            # 2026-06-11 (Bacevičiaus experiment): the reader SELF-REPORTS when
+            # it is guessing ("low confidence; spėjimas pagal paskirtį" on 8/15
+            # rooms) — and that signal was ignored while the guessed finishes
+            # flowed into 🟢 paint quantities. Propagate it so the confidence
+            # post-pass can demote finish-derived lines.
+            low = p["pastabos"].lower()
+            if "low confidence" in low or "spėjim" in low or "spejim" in low:
+                room["_apdailos_confidence"] = "low"
         n += 1
     return n
