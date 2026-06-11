@@ -109,6 +109,22 @@ def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
     and self-reporting "low confidence" on half the rooms. Among the remaining
     candidates, a page whose title mentions IŠKLOTIN wins over a generic
     APDAILŲ match (išklotinės carry the per-wall finish markers)."""
+    pages = _find_apdailos_pages(pdf_bytes)
+    return pages[0] if pages else None
+
+
+# Cap on pages sent in one finish-reading call. Bacevičiaus probe: 11 išklotinių
+# pages = ~25k input tokens, confident reads for 8/15 rooms (vs 1/15 single-page).
+MAX_APDAILOS_PAGES = 12
+
+
+def _find_apdailos_pages(pdf_bytes: bytes) -> list[int]:
+    """ALL candidate finish pages (1-based), best-priority first.
+
+    Large TPs carry per-room sienų išklotinės across MANY sheets (Bacevičiaus:
+    pages 12-22, 1-2 rooms each) — a single page structurally cannot describe
+    every room's finish, which is why the single-page read self-reported "low
+    confidence" on 14/15 rooms. Multi-page reading restored confident reads."""
     candidates: list[tuple[int, int]] = []  # (priority, 1-based page)
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -122,10 +138,8 @@ def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
                     candidates.append((1, i + 1))
     except Exception as exc:  # noqa: BLE001
         print(f"[apdailos_reader] pdfplumber scan failed: {exc}")
-    if candidates:
-        candidates.sort()
-        return candidates[0][1]
-    return None
+    candidates.sort()
+    return [pg for _prio, pg in candidates[:MAX_APDAILOS_PAGES]]
 
 
 def _render_page_b64(pdf_bytes: bytes, page_nr_1based: int, dpi: int = 200) -> Optional[str]:
@@ -154,28 +168,38 @@ def read_apdailos_finishes(
     Returns {status, page, patalpos, _error, _elapsed_s, _meta}.
     """
     t0 = time.time()
-    page = apdailos_page or _find_apdailos_page(pdf_bytes)
-    if not page:
+    pages = [apdailos_page] if apdailos_page else _find_apdailos_pages(pdf_bytes)
+    if not pages:
         return {"status": "skipped", "page": None, "patalpos": [],
                 "_error": "no apdailos page found", "_elapsed_s": round(time.time() - t0, 2),
                 "_meta": {}}
-    b64 = _render_page_b64(pdf_bytes, page)
-    if not b64:
-        return {"status": "error", "page": page, "patalpos": [],
+    content: list[dict] = []
+    rendered: list[int] = []
+    for pg in pages:
+        b64 = _render_page_b64(pdf_bytes, pg, dpi=150 if len(pages) > 3 else 200)
+        if b64:
+            content.append({"type": "text", "text": f"[Apdailos/išklotinių lapas, PDF psl. {pg}]"})
+            content.append({"type": "image", "source": {"type": "base64",
+                                                        "media_type": "image/png", "data": b64}})
+            rendered.append(pg)
+    page = rendered[0] if rendered else None
+    if not rendered:
+        return {"status": "error", "page": pages[0], "patalpos": [],
                 "_error": "page render failed", "_elapsed_s": round(time.time() - t0, 2),
                 "_meta": {}}
     user_text = build_user_text(rooms)
+    if len(rendered) > 1:
+        user_text += ("\n\nPASTABA: pateikti VISI projekto apdailos/išklotinių lapai "
+                      "(po 1-2 patalpas lape). Surask kiekvienos patalpos lapą ir "
+                      "skaityk apdailą iš jo žymėjimų/legendos.")
+    content.append({"type": "text", "text": user_text})
     try:
         client = client or anthropic.Anthropic()
         resp = client.messages.create(
             model=MODEL, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT,
                      "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": [
-                {"type": "image", "source": {"type": "base64",
-                                             "media_type": "image/png", "data": b64}},
-                {"type": "text", "text": user_text},
-            ]}],
+            messages=[{"role": "user", "content": content}],
         )
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "page": page, "patalpos": [],
@@ -197,7 +221,7 @@ def read_apdailos_finishes(
 
     usage = getattr(resp, "usage", None)
     return {
-        "status": "ok", "page": page,
+        "status": "ok", "page": page, "pages": rendered,
         "patalpos": parsed.get("patalpos") or [],
         "_error": None, "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),

@@ -76,3 +76,23 @@ def test_find_apdailos_page_skips_vizualizacija(monkeypatch):
              _Page("SIENŲ IŠKLOTINIŲ IR APDAILŲ PLANAS")]                  # best, prio 0
     monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
     assert ar._find_apdailos_page(b"x") == 4
+
+
+def test_find_apdailos_pages_returns_all_iskotines(monkeypatch):
+    # Multi-page TPs: per-room išklotinės across many sheets — return them ALL.
+    import extractor.apdailos_reader as ar
+
+    class _Page:
+        def __init__(self, text): self._t = text
+        def extract_text(self): return self._t
+
+    class _Pdf:
+        def __init__(self, pages): self.pages = pages
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    pages = [_Page("TITULINIS"), _Page("VIZUALIZACIJA IŠKLOTINĖ"),
+             _Page("SIENŲ IŠKLOTINĖS L1"), _Page("SIENŲ IŠKLOTINĖS L2"),
+             _Page("GRINDŲ APDAILOS PLANAS")]
+    monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    assert ar._find_apdailos_pages(b"x") == [3, 4, 5]  # išklotinės first, render skipped
