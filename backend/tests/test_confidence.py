@@ -34,7 +34,7 @@ def test_calibrated_class_is_geltona():
 
 def test_unlisted_class_defaults_zalia():
     out = _parsed([_room()])
-    line = _find(out, "laminato klojimas")  # no class rule, no flags → žalia
+    line = _find(out, "dangos pamušalas")  # no class rule, no flags → žalia
     assert line["confidence"] == "zalia"
 
 

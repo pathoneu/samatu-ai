@@ -28,9 +28,42 @@ def poz(extract, needle, exact=False):
     return (round(tot, 2) if found else None)
 
 
+_SEV = {"zalia": 0, "geltona": 1, "raudona": 2}
+
+
+def poz_conf(extract, needle, exact=False):
+    """Worst stamped confidence among matching pozicijos (None if no match)."""
+    worst = None
+    for p in extract.get("pozicijos") or []:
+        a = (p.get("aprasymas") or "")
+        if (a == needle) if exact else (needle.lower() in a.lower()):
+            c = p.get("confidence") or "zalia"
+            if worst is None or _SEV.get(c, 0) > _SEV.get(worst, 0):
+                worst = c
+    return worst
+
+
+def rebuild(extract: dict) -> dict:
+    """Re-derive calc fields + pozicijos + per-line confidence with CURRENT code
+    (replicates what a fresh run of the restored pipeline would now stamp)."""
+    from extractor.vision_call import _build_pozicijos_from_rooms
+    e = dict(extract)
+    for r in e.get("patalpos") or []:
+        # replicate the new merge-time derivation for extracts saved before it
+        low = (r.get("_apdailos_pastabos") or "").lower()
+        if "low confidence" in low or "spėjim" in low or "spejim" in low:
+            r["_apdailos_confidence"] = "low"
+        r.update(calc_room_quantities(r))
+    _build_pozicijos_from_rooms(e)
+    return e
+
+
 def main():
     extract_path, slug = sys.argv[1], sys.argv[2]
+    use_rebuild = "--rebuild" in sys.argv
     e = json.load(open(extract_path))
+    if use_rebuild:
+        e = rebuild(e)
     rooms = e.get("patalpos") or []
     voting = e.get("_voting") or {}
     flags = voting.get("low_confidence_fields") or []
@@ -100,7 +133,7 @@ def main():
             ("praustuvu_maisytuvai", poz(e, "Praustuvės maišytuvo"), 5, False),
             ("duso_maisytuvai", poz(e, "Dušo maišytuvo"), 2, False),
             ("parketas", poz(e, "laminato klojimas"), 108.08, False),
-            ("islyginamasis", poz(e, "išlyginamasis sluoksnis"), 143.19, False),
+            ("islyginamasis", poz(e, "išlyginamasis sluoksnis"), 182.62, False),  # 143.19 + 39.43 (2 contractor lines)
             ("grindjuostes_viso", poz(e, "Grindjuosčių sumontavimas"), 93.8, True),
             ("sviestuvu_apdirbimas", poz(e, "Šviestuvų apdirbimas"), 69, False),
             ("difuzoriu_apdirbimas", poz(e, "Difūzorių apdirbimas"), 20, False),
@@ -110,6 +143,26 @@ def main():
             single = poz(e, "lubų glaistymas/dažymas")
             Q = [(n, (single if n == "combined_paint" else v), t, s) for n, v, t, s in Q]
 
+    # rebuild mode: quantity name → pozicija needle whose STAMPED confidence rules
+    NEEDLES = {
+        "combined_paint": "glaistymas/dažymas", "paint_iki_3m": "glaistymas/dažymas",
+        "paint_virs_3m": "glaistymas/dažymas", "kampai": "Dažymo kampų montavimas",
+        "led_nisos": "Nišų formavimas GKP", "angokrasciai_gkp": "Angokraščių apdirbimas GKP",
+        "durys_beapvadines": "beapvadinėms durims", "skyliu_grezimas": "Skylių gręžimas plytelėse",
+        "silikonavimas_total": "silikonavimas", "pjovimas_45": "45° pjovimas",
+        "rotband": "Rotband", "lentyneles": "Lentynėlių", "nuolydis": "Nuolydžio formavimas",
+        "hidroizoliacija": "Hidroizoliacijos įrengimas", "wc_remai": "WC rėmo montavimas",
+        "klozetai": "Klozeto montavimas", "klozetai_bide": "Klozeto montavimas",
+        "praustuvu_maisytuvai": "Praustuvės maišytuvo", "duso_maisytuvai": "Dušo maišytuvo",
+        "parketas": "laminato klojimas", "islyginamasis": "išlyginamasis sluoksnis",
+        "grindjuostes_viso": "Grindjuosčių sumontavimas",
+        "sviestuvu_apdirbimas": "Šviestuvų apdirbimas", "difuzoriu_apdirbimas": "Difūzorių apdirbimas",
+    }
+
+    def _room_by_prefix(name):
+        nr = name.split("_")[0].lstrip("p")
+        return next((r for r in rooms if str(r.get("nr")) == nr), None)
+
     rows = []
     for name, app, truth, room_sensitive in Q:
         if app is None:
@@ -117,8 +170,19 @@ def main():
                              conf="NOT_EMITTED", wrong_10pct=True, wrong_5pct=True))
             continue
         err = (app - truth) / truth * 100
-        is_flagged = (room_sensitive and bool(flagged_rooms)) or \
-                     (name == "kampai" and npw == 0)
+        if use_rebuild and name in NEEDLES:
+            stamped = poz_conf(e, NEEDLES[name]) or "zalia"
+            is_flagged = stamped != "zalia"
+        elif use_rebuild and name.startswith("p") and name[1].isdigit():
+            r = _room_by_prefix(name)
+            is_flagged = bool(r) and (
+                (r.get("pavadinimas") in flagged_rooms)
+                or r.get("_apdailos_confidence") == "low")
+            if "plyteles_grindys" in name:
+                is_flagged = True  # floor-covering-assignment class (geltona)
+        else:
+            is_flagged = (room_sensitive and bool(flagged_rooms)) or \
+                         (name == "kampai" and npw == 0)
         rows.append(dict(name=name, app=app, truth=truth, err_pct=round(err, 1),
                          conf=("FLAGGED" if is_flagged else "GREEN"),
                          wrong_10pct=abs(err) > 10, wrong_5pct=abs(err) > 5))

@@ -38,6 +38,12 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     ("klozeto montavimas", GELTONA, "Simbolių/bide skaičiavimas: 0%/−40% (2 projektai)"),
     ("kampų montavimas", GELTONA, "Geometrinė suma: −18%/+17% (2 projektai)"),
     ("rotband", GELTONA, "Dalis nuo sienų ploto (0.30) — priklauso nuo apdailos tikslumo"),
+    ("angokraščių", GELTONA, "Nestabilu tarp projektų: −15%/+1% (2 projektai)"),
+    # Floor-covering ASSIGNMENT (kuri patalpa plytelės vs parketas vs guma) is
+    # paskirtis-heuristic-driven and missed garažas/tambūras floors on both
+    # anchor projects (−20%…−100% per-room; parketas +29%).
+    ("grindų plytel", GELTONA, "Dangos priskyrimas pagal paskirtį: −20%/−100% kai kurioms patalpoms (2 projektai)"),
+    ("laminato klojimas", GELTONA, "Dangos priskyrimas pagal paskirtį: +29% (anchor projektas)"),
 ]
 
 # Finish-derived lines: demote when apdailos self-reported guessing.
