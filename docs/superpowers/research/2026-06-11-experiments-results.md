@@ -82,3 +82,19 @@ Fresh voted run: 803s, 15 rooms × 3 rounds, npw=59, 7 voting flags, ~$9. Scored
 | Walls geometry vs truth | −2.8% | −0.7% |
 | Combined paint | −6.6% | +62.8% (finish semantics) |
 | Voted-run cost / time | ~$4 / 392s | ~$9 / 803s |
+
+---
+
+## SAME-DAY FIX ROUND (the "go" build) — measured before → after
+
+Shipped (commits `feat(finish)`, `feat(confidence)`, `feat(apdailos)` 2026-06-11): molio tinkas/kita_danga vocabulary + paint split; apdailos self-reported-confidence propagation; per-pozicija confidence post-pass (class calibration from the 2 anchors + finish provenance + voting flags, worst wins); apdailos page-finder excludes renders; **multi-page išklotinės reading** (Bacevičiaus TP carries finishes across pages 12–22 — single-page reads structurally cannot work).
+
+| Metric | Before | After |
+|---|---|---|
+| Beržų false-green @10% | 50% | **25%** (error recall 38%→**85%**) |
+| Bacevičiaus false-green @10% | 60% | **0%** (error recall 40%→**100%**) |
+| Bacevičiaus apdailos low-confidence rooms | 14/15 (single page, renders) | **7/15** (11 išklotinės sheets, one call, ~$0.8) |
+| Molio tinkas pozicija | not representable | emitted, 32.5 m², geltona |
+| Bacevičiaus combined paint | +62.8% | +56.9% (paint+molio vs contractor paint+molio: **+23.4%**) |
+
+**Honest residuals:** (1) Beržų's 2 remaining false greens are *confidently-wrong* apdailos shares (garažas walls +20%, vonia tile −19%) — the blind-audit class; self-flagging cannot catch them. (2) The molio gap (32.5 emitted vs 160 contracted) is a **TP-vs-contract divergence** — the drawing specifies paint where the client later chose clay; no drawing reader can see that. It stays geltona, and the correction UI is where it gets fixed — which is exactly why the council made the correction UI the product. (3) Greens are now scarce (8/24, 4/21) — the path back to green is fixing calibrated classes, not relabeling.
