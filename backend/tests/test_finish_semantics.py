@@ -68,3 +68,16 @@ def test_apdailos_low_confidence_propagates():
     ]})
     assert rooms[0].get("_apdailos_confidence") == "low"
     assert "_apdailos_confidence" not in rooms[1]
+
+
+# ── low-confidence apdailos must not override structural no-paint default ──
+def test_low_conf_apdailos_does_not_paint_garage():
+    base = {"nr": "1", "pavadinimas": "Garažas", "paskirtis": "garazas",
+            "plotas_m2": 44.0, "perimetras_m": 27.0, "lubu_aukstis_m": 2.82,
+            "elementai": [], "sienu_apdailos_breakdown": {"dazymas_share": 1.0}}
+    # low-confidence guess → garage stays unpainted (structural default 0)
+    low = calc_room_quantities({**base, "_apdailos_confidence": "low"})
+    assert float(low.get("walls_paintable_m2") or 0) == 0.0
+    # confident read → a genuinely-painted garage IS painted
+    high = calc_room_quantities(dict(base))  # no _apdailos_confidence == confident
+    assert float(high.get("walls_paintable_m2") or 0) > 20.0

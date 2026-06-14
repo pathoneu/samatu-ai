@@ -839,6 +839,15 @@ def calc_room_quantities(room: dict,
             # still uses rt_rules.walls_paint.
             if walls_paint_factor_override is not None:
                 walls_paint_factor = float(walls_paint_factor_override)
+            elif (str(room.get("_apdailos_confidence")) == "low"
+                  and rt_rules.get("walls_paint") == 0.0):
+                # 2026-06-11 (Bacevičiaus experiment): a LOW-CONFIDENCE apdailos
+                # guess ("garažas — dažytos sienos, spėjimas pagal paskirtį")
+                # must NOT override a structural no-paint default (garažas /
+                # tambūras). Vision guessing finishes from absence-of-data painted
+                # 76 m² of garage walls the contractor never finishes. A CONFIDENT
+                # apdailos read still overrides (a genuinely painted garage).
+                walls_paint_factor = 0.0
             else:
                 walls_paint_factor = 1.0
             walls_paintable = walls_paintable_gross * walls_paint_factor
