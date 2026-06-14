@@ -98,3 +98,13 @@ Shipped (commits `feat(finish)`, `feat(confidence)`, `feat(apdailos)` 2026-06-11
 | Bacevičiaus combined paint | +62.8% | +56.9% (paint+molio vs contractor paint+molio: **+23.4%**) |
 
 **Honest residuals:** (1) Beržų's 2 remaining false greens are *confidently-wrong* apdailos shares (garažas walls +20%, vonia tile −19%) — the blind-audit class; self-flagging cannot catch them. (2) The molio gap (32.5 emitted vs 160 contracted) is a **TP-vs-contract divergence** — the drawing specifies paint where the client later chose clay; no drawing reader can see that. It stays geltona, and the correction UI is where it gets fixed — which is exactly why the council made the correction UI the product. (3) Greens are now scarce (8/24, 4/21) — the path back to green is fixing calibrated classes, not relabeling.
+
+### Second fix round (heights + garage scope) — measured
+
+Shipped after the multi-page apdailos work (commits `feat(heights)`, `fix(finish)` garage):
+
+- **Height-plausibility gate** (`apply_height_plausibility_gate`): Vision had put the 3.5 m tall ceiling on a 6.8 m² wet room + 2.9 m² WC while the 62 m² svetainė got the 2.82 default → inverted iki/virš-3m split. Gate moves the tall height to the large living room, clamps the wet rooms. **Bacevičiaus GKP virš-3m: 9.72 → 62.42 (truth 68.28; −86% → −8.6%).** Beržų (tall room already the large svetainė): gate does not fire → zero regression.
+- **Low-confidence apdailos no longer overrides structural no-paint:** the reader GUESSED "garažas — dažytos sienos (spėjimas)" and that override painted 76 m² of garage walls the contractor never finishes. Now a low-confidence breakdown can't override garažas/tambūras = no-paint (a confident read still can). **Bacevičiaus combined paint (vs contractor paint+molio 653 m²): +62.8% → +1.6%.**
+- **Zoom-apply reframed (not a height fix):** the Pass-2 zoom is a floor-plan crop; ceiling heights live in sections (pjūviai), so floor-plan zoom structurally cannot recover them — "0 applied" for heights is expected, not a bug. The height fix is the plausibility gate above. The zoom-apply remains a *cost*-not-accuracy issue (it runs but rarely applies on single-pass; voting skips it when consensus carries heights). Deprioritized.
+
+**Cumulative finish-accuracy on the two anchors after both rounds:** false-green 50%/60% → 25%/0%; bacveviciaus combined paint +62.8% → +1.6%; GKP virš-3m −86% → −8.6%; berzas unchanged (zero regression). Geometry was never the problem — finish semantics + height attribution + scope rules were.
