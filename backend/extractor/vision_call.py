@@ -2919,6 +2919,30 @@ def extract_interior(
         print(f"[extractor] door-type read failed (non-fatal): {exc}")
         _emit({"event": "door_types_error", "message": str(exc)})
 
+    # Step 2.866: SANITARY FIXTURE READER (2026-06-14, research #3 point-list).
+    # The full-sheet pass under-counts dense sanitary symbols (Beržų praustuvės
+    # 3, truth 5). A focused point-list-then-count read raises recall (3→4 live);
+    # reconcile RAISES detected_symbols_summary to the higher count (the skylių
+    # formula consumes it), never silently lowers. Modest, honest — fixtures have
+    # no clean schedule to read (research-confirmed).
+    try:
+        from .sanitary_fixture_reader import read_fixtures, reconcile_fixture_counts
+        _emit({"event": "fixtures_started"})
+        fx = read_fixtures(pdf_bytes, parsed.get("patalpos") or [])
+        if fx.get("status") == "ok":
+            rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
+                                           fx.get("counts") or {})
+            parsed["detected_symbols_summary"] = rec["merged"]
+            parsed.setdefault("_meta", {})["fixtures_raised"] = rec["raised"]
+            parsed["_meta"]["fixtures_elapsed_s"] = fx.get("_elapsed_s")
+            _emit({"event": "fixtures_completed", "raised": rec["raised"],
+                   "counts": fx.get("counts")})
+        else:
+            _emit({"event": "fixtures_skipped", "reason": fx.get("_error")})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] fixture read failed (non-fatal): {exc}")
+        _emit({"event": "fixtures_error", "message": str(exc)})
+
     # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page
     # backfill added 2026-06-05 evening).
     # Targeted Vision pass on the ceiling_plan page + conditional
