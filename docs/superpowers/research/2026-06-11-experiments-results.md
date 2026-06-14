@@ -108,3 +108,14 @@ Shipped after the multi-page apdailos work (commits `feat(heights)`, `fix(finish
 - **Zoom-apply reframed (not a height fix):** the Pass-2 zoom is a floor-plan crop; ceiling heights live in sections (pjūviai), so floor-plan zoom structurally cannot recover them — "0 applied" for heights is expected, not a bug. The height fix is the plausibility gate above. The zoom-apply remains a *cost*-not-accuracy issue (it runs but rarely applies on single-pass; voting skips it when consensus carries heights). Deprioritized.
 
 **Cumulative finish-accuracy on the two anchors after both rounds:** false-green 50%/60% → 25%/0%; bacveviciaus combined paint +62.8% → +1.6%; GKP virš-3m −86% → −8.6%; berzas unchanged (zero regression). Geometry was never the problem — finish semantics + height attribution + scope rules were.
+
+### Recall round (the "bit more backend recalls") — disciplined against N=2 fitting
+
+The systematic under-count classes were triaged for *mechanism* fixes (generalizable) vs *coefficient fitting* (overfit to 2 anchors):
+
+- ✅ **silikonavimas — SHIPPED (mechanism):** it only sealed `paskirtis ∈ {vonia,wc,san}`, missing skalbyklos and other apdailos-tiled rooms. Extended to all tiled rooms (`plyteles_share≥0.6`), unchanged ×1.4 coefficient → berzas −39%→−10%, bacveviciaus −68%→−55%. Residual is fixture-density-driven (needs more anchors) and stays flagged geltona.
+- ❌ **silikonavimas corner-seam term — REJECTED (fitting):** adding `internal_corners × tile_h` over-shot berzas (+31%) while still under-shooting bacveviciaus (−35%); per-room sealing genuinely differs ~2× (fixture density). Can't derive stable coefficients from N=2.
+- ❌ **skylių gręžimas — LEFT AS-IS (fitting):** −11%/−21%. Adding the omitted fixture types (gyvatukai, trapai) doesn't close both gaps with stable per-fixture counts (`2g+3t=6` vs `4g+3t=23` → inconsistent). Mild + likely symbol-recall, not formula. Stays flagged.
+- ❌ **beapvadinės durys −61%/−64% — VISION RECALL, not deterministic:** the contractor treats ~all interior doors as frameless; Vision tags only the explicitly-marked ones. Forcing "all interior frameless" over-shoots projects with framed doors. Needs the doors-reader to classify better (Vision), not a formula.
+
+**Discipline note:** of 4 candidate recall classes, 1 was a clean mechanism gap (shipped) and 3 were N=2 fitting traps or Vision-recall (correctly declined). The honest move with 2 anchors is to fix mechanisms and flag the rest, not tune coefficients to hit two numbers.
