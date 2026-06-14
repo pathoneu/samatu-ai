@@ -15,7 +15,7 @@ import {
   getPlanFitScale,
   getVisiblePlanPages,
 } from '@/lib/planViewerState';
-import { getFocusedRoomRect, getPolygonPdfPoints, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
+import { getFocusedRoomRect, getPolygonPdfPoints, getPolygonPctPoints, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
 import { getAnchoredZoomScroll, nextWheelScale } from '@/lib/viewerViewport';
 import {
   getConfirmableSymbolCounts,
@@ -102,13 +102,20 @@ function PlanOverlayLayer({ room, page, eksplikacijaPage, renderedSize, pdfSize,
 
   const isEksplikacija = rect.type === 'eksplikacija';
   const isLabel = rect.type === 'label';
-  const polygonPoints = !isEksplikacija && !isLabel && Array.isArray(room?.polygon_pdf)
-    ? getPolygonPdfPoints(room.polygon_pdf, {
-      pageWidthPdf: room.page_width_pdf || room.pdf_page_width || pdfSize?.width,
-      pageHeightPdf: room.page_height_pdf || room.pdf_page_height || pdfSize?.height,
-      renderedWidth: renderedSize.width,
-      renderedHeight: renderedSize.height,
-    })
+  const polygonPoints = (!isEksplikacija && !isLabel)
+    ? (Array.isArray(room?.polygon_pct) && room.polygon_pct.length >= 3
+      ? getPolygonPctPoints(room.polygon_pct, {
+        renderedWidth: renderedSize.width,
+        renderedHeight: renderedSize.height,
+      })
+      : (Array.isArray(room?.polygon_pdf)
+        ? getPolygonPdfPoints(room.polygon_pdf, {
+          pageWidthPdf: room.page_width_pdf || room.pdf_page_width || pdfSize?.width,
+          pageHeightPdf: room.page_height_pdf || room.pdf_page_height || pdfSize?.height,
+          renderedWidth: renderedSize.width,
+          renderedHeight: renderedSize.height,
+        })
+        : null))
     : null;
   const polygonPath = polygonPoints
     ? polygonPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ') + ' Z'
@@ -369,7 +376,10 @@ export default function PlanViewer({
   const currentType = currentMeta.type || 'unknown';
   const currentLabel = currentMeta.label || pageTypeLabel(currentType);
   const currentSymbolTypes = useMemo(() => getPlanSymbolTypes(currentType), [currentType]);
-  const renderedSize = pageSize
+  // Page-identity guard: pageSize is tagged with the page it was measured on.
+  // During an async page switch the previous page's dims linger for a frame;
+  // scaling a polygon by the wrong page's dims is the navigation-drift bug.
+  const renderedSize = (pageSize && pageSize.pageNumber === pageNumber)
     ? { width: pageSize.width * scale, height: pageSize.height * scale }
     : null;
 
@@ -1005,7 +1015,15 @@ export default function PlanViewer({
                     devicePixelRatio={Math.min(3, (window.devicePixelRatio || 1) * 1.6)}
                     renderTextLayer={false}
                     renderAnnotationLayer={false}
-                    onLoadSuccess={(page) => setPageSize({ width: page.width, height: page.height })}
+                    onLoadSuccess={(page) => {
+                      // Use the ROTATION-APPLIED viewport, not page.width/height
+                      // (= unrotated MediaBox view[2]/view[3]). For a /Rotate 90|270
+                      // page the canvas renders landscape while page.width/height
+                      // report portrait — that transposes every overlay. getViewport
+                      // applies page.rotate by default; it's a no-op for unrotated pages.
+                      const vp = page.getViewport ? page.getViewport({ scale: 1 }) : { width: page.width, height: page.height };
+                      setPageSize({ width: vp.width, height: vp.height, pageNumber });
+                    }}
                     loading={<div className="w-[680px] h-[820px] bg-white flex items-center justify-center text-sm text-muted-foreground">Renderiuojamas puslapis...</div>}
                   />
                 </Document>
