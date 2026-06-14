@@ -55,18 +55,54 @@ function SourceDot({ row }) {
   return null;
 }
 
+// ── Confidence indicator (2026-06-14) ──────────────────────────────────────
+// Per-line confidence stamped by the backend (extractor/confidence.py).
+// HONEST framing for a tester: green = read directly from the drawing, amber =
+// check this (known-weak class or assumption), red = must check (fallback /
+// known-wrong). Maps both the new LT scheme (zalia/geltona/raudona) and any
+// legacy high/medium/low. The reason string explains WHY, on hover.
+const CONF_INFO = {
+  zalia:   { dot: 'bg-emerald-500', label: 'Skaityta tiesiogiai', tint: '',                    rank: 0 },
+  high:    { dot: 'bg-emerald-500', label: 'Skaityta tiesiogiai', tint: '',                    rank: 0 },
+  geltona: { dot: 'bg-amber-500',   label: 'Patikrinti',          tint: 'bg-amber-500/[0.06]', rank: 1 },
+  medium:  { dot: 'bg-amber-500',   label: 'Patikrinti',          tint: 'bg-amber-500/[0.06]', rank: 1 },
+  raudona: { dot: 'bg-red-500',     label: 'Būtina patikrinti',   tint: 'bg-red-500/[0.07]',   rank: 2 },
+  low:     { dot: 'bg-red-500',     label: 'Būtina patikrinti',   tint: 'bg-red-500/[0.07]',   rank: 2 },
+};
+function confInfo(row) {
+  return CONF_INFO[row?.confidence] || null;
+}
+function ConfidenceMark({ row }) {
+  const info = confInfo(row);
+  if (!info) return null;
+  const reason = row._confidence_reason;
+  const title = reason ? `${info.label} — ${reason}` : info.label;
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className={`w-1.5 h-1.5 rounded-full ${info.dot} shrink-0`}
+    />
+  );
+}
+
 // ── PositionRow — atskira eilutė panel'ėje ─────────────────────────────────
 function PositionRow({ row, isActive, isHovered, onClick, onHover, onChange }) {
   const [editing, setEditing] = useState(false);
   const [draftPrice, setDraftPrice] = useState(row.kaina || '');
 
   const suma = (row.kiekis || 0) * (row.kaina || 0);
+  const conf = confInfo(row);
 
   const handlePriceSave = () => {
     const newPrice = parseFloat(draftPrice) || 0;
     onChange({ ...row, kaina: newPrice, suma: (row.kiekis || 0) * newPrice });
     setEditing(false);
   };
+
+  // Flagged lines (geltona/raudona) carry a subtle tint so they're scannable in
+  // a dense list; the active/hover states still win.
+  const baseTint = !isActive && !isHovered && conf?.tint ? conf.tint : '';
 
   return (
     <div
@@ -78,11 +114,12 @@ function PositionRow({ row, isActive, isHovered, onClick, onHover, onChange }) {
           ? 'bg-foreground/10 border-l-2 border-l-foreground -ml-px'
           : isHovered
             ? 'bg-muted/40'
-            : 'hover:bg-muted/20'
+            : `hover:bg-muted/20 ${baseTint}`
       }`}
     >
       <div className="flex items-start gap-2">
         <SourceDot row={row} />
+        <ConfidenceMark row={row} />
         <div className="flex-1 min-w-0">
           <div className="text-foreground/90 leading-snug truncate">{row.aprasymas}</div>
           {row.medziagos_kiekis != null && row.medziagos_kiekis > 0 && (
@@ -166,6 +203,13 @@ export default function PositionsPanel({
     if (hideFormulas) rows = rows.filter(r => r.trace_type !== 'formula');
     return rows;
   }, [darbai, search, filterAiOnly, hideFormulas]);
+
+  // How many of the shown positions are flagged "check this" (geltona/raudona)
+  // — the triage signal: "here are the N of M to double-check".
+  const toCheckCount = useMemo(
+    () => filtered.filter(r => (confInfo(r)?.rank || 0) >= 1).length,
+    [filtered],
+  );
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
   const cats = Object.keys(grouped);
@@ -317,7 +361,16 @@ export default function PositionsPanel({
             {positionsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             <FileText className="w-3 h-3" />
             <span>Pozicijos</span>
-            <Badge variant="secondary" className="ml-auto text-[10px] py-0 h-4">
+            {toCheckCount > 0 && (
+              <span
+                title={`${toCheckCount} pozicijos pažymėtos „patikrinti" — užvesk pelę ant geltono/raudono taško, kad pamatytum priežastį`}
+                className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 px-1.5 h-4 text-[10px] font-medium normal-case tracking-normal"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {toCheckCount} tikrinti
+              </span>
+            )}
+            <Badge variant="secondary" className={`${toCheckCount > 0 ? 'ml-1.5' : 'ml-auto'} text-[10px] py-0 h-4`}>
               {filtered.length}
             </Badge>
           </button>

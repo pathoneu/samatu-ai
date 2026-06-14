@@ -72,3 +72,18 @@ def test_existing_medium_normalized_not_upgraded():
     p = {"pozicijos": [{"aprasymas": "X", "confidence": "medium"}], "patalpos": []}
     apply_confidence(p)
     assert p["pozicijos"][0]["confidence"] == "geltona"
+
+
+def test_confidence_survives_v8_compat_darbu_sarasas():
+    # The UI may render darbu_sarasas (V8-compat shape); confidence + reason must
+    # carry through, not get dropped.
+    from extractor.vision_call import _emit_v8_compat_fields
+    parsed = {"pozicijos": [
+        {"aprasymas": "Dažymo kampų montavimas", "vnt": "m", "kiekis": 100.0,
+         "skyrius": "Sienų lubų glaistymas dažymas",
+         "confidence": "raudona", "_confidence_reason": "Gretimybės analizė nerado pertvarų"},
+    ]}
+    _emit_v8_compat_fields(parsed)
+    row = parsed["darbu_sarasas"][0]
+    assert row["confidence"] == "raudona"
+    assert "pertvar" in row["_confidence_reason"]

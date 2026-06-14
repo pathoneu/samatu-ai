@@ -418,6 +418,12 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "medziagos_aprasymas": p.get("medziagos_aprasymas"),
             "medziagos_kiekis": p.get("medziagos_kiekis"),
             "medziagos_vnt": p.get("medziagos_vnt"),
+            # 2026-06-14: carry per-line confidence (zalia/geltona/raudona) + its
+            # Lithuanian reason into the V8-compat shape so the UI can surface
+            # which quantities to double-check, regardless of whether it renders
+            # `pozicijos` or `darbu_sarasas`.
+            "confidence": p.get("confidence"),
+            "_confidence_reason": p.get("_confidence_reason"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
