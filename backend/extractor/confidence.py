@@ -36,7 +36,9 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     ("lentynėlių", GELTONA, "Skaičius iš simbolių: −20%/+33% (2 projektai)"),
     ("praustuvės", GELTONA, "Simbolių skaičiavimas: ±40% (2 projektai)"),
     ("klozeto montavimas", GELTONA, "Simbolių/bide skaičiavimas: 0%/−40% (2 projektai)"),
-    ("kampų montavimas", GELTONA, "Geometrinė suma: −18%/+17% (2 projektai)"),
+    ("kampų montavimas", GELTONA,
+     "Formulė kalibruota pagal 1 rangovo samatą (Beržų) — apima ginčytiną "
+     "pusinių kampų ir perimetro dedamąją; tikslumas nepatvirtintas (reikia daugiau etalonų)"),
     ("rotband", GELTONA, "Dalis nuo sienų ploto (0.30) — priklauso nuo apdailos tikslumo"),
     ("angokraščių", GELTONA, "Nestabilu tarp projektų: −15%/+1% (2 projektai)"),
     # Floor-covering ASSIGNMENT (kuri patalpa plytelės vs parketas vs guma) is
@@ -67,11 +69,44 @@ def _normalize_existing(p: dict) -> str | None:
             "low": RAUDONA, "raudona": RAUDONA}.get(c)
 
 
+_OPENING_TIPAI = ("duris", "pasleptos_duris", "langas", "stoglangis")
+
+
+def _rooms_with_unread_opening_dims(rooms: list[dict]) -> list[str]:
+    """Rooms where an opening (door/window) has no readable W/H. calc_room_quantities
+    SILENTLY skips these in the angokraščiai (reveal) calc — surface the gap so the
+    reveal length is disclosed as possibly incomplete rather than dropped invisibly.
+    Returns the room labels (nr or name), de-duplicated, in order."""
+    out: list[str] = []
+    for r in rooms:
+        for el in (r.get("elementai") or []):
+            if (el.get("tipas") or "").lower() in _OPENING_TIPAI:
+                w = float(el.get("plotis_mm") or 0)
+                h = float(el.get("aukstis_mm") or 0)
+                if not (w > 0 and h > 0):
+                    label = str(r.get("nr") or r.get("pavadinimas") or "?")
+                    if label not in out:
+                        out.append(label)
+                    break
+    return out
+
+
 def apply_confidence(parsed: dict) -> dict:
+    """Stamp confidence + a reason on every pozicija. Worst signal wins.
+
+    CONTRACT: call ONCE on freshly-built pozicijos. The additive signals
+    (apdailos / voting / unread-dims) append to ``_confidence_reason`` and are
+    NOT idempotent if run again on already-stamped pozicijos. In production this
+    is safe: ``_build_pozicijos_from_rooms`` rebuilds ``pozicijos = []`` from
+    scratch on every call (including the assumptions-panel recompute at
+    main.py:4840), so each pozicija reaches this pass clean. Do not call this on
+    a parsed dict whose pozicijos already carry a computed ``_confidence_reason``.
+    """
     rooms = parsed.get("patalpos") or []
     apdailos_low = any(r.get("_apdailos_confidence") == "low" for r in rooms)
     voting_flags = ((parsed.get("_voting") or {}).get("low_confidence_fields") or [])
     npw_total = sum(int(r.get("n_partition_walls") or 0) for r in rooms)
+    unread_dim_rooms = _rooms_with_unread_opening_dims(rooms)
 
     for p in parsed.get("pozicijos") or []:
         label = (p.get("aprasymas") or "").lower()
@@ -103,6 +138,14 @@ def apply_confidence(parsed: dict) -> dict:
         if "kampų montavimas" in label and npw_total == 0:
             conf = _worse(conf, RAUDONA)
             reasons.append("Gretimybės analizė nerado pertvarų — kampų suma be pusinių kampų (žinomai per maža)")
+
+        # Per-project recall gap: an opening whose dims Vision didn't read is
+        # silently skipped in the reveal calc. Surface it on the angokraščiai line.
+        if unread_dim_rooms and "angokrašči" in label:
+            conf = _worse(conf, GELTONA)
+            reasons.append(
+                f"{len(unread_dim_rooms)} angos be nuskaitytų matmenų "
+                f"(patalpos: {', '.join(unread_dim_rooms)}) — angokraščiai gali būti nepilni")
 
         p["confidence"] = conf
         if reasons:

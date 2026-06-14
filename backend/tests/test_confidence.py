@@ -68,6 +68,36 @@ def test_kampai_geltona_when_adjacency_present():
     assert kampai["confidence"] == "geltona"  # class rule (±17%), not raudona
 
 
+def test_kampai_reason_discloses_calibration():
+    # The kampai reason must honestly disclose it's calibrated to 1 contractor
+    # (the formula is fitted to Beržų 493.35 m with a +perim double-count), not
+    # imply a clean validated geometric sum.
+    out = _parsed([_room(n_partition_walls=3)])
+    kampai = _find(out, "kampų montavimas")
+    assert kampai["confidence"] == "geltona"
+    assert "kalibr" in kampai["_confidence_reason"].lower()
+
+
+def test_angokrasciai_flags_unread_opening_dims():
+    # A room whose window has no readable dims → its reveal is SILENTLY skipped
+    # in calc_room_quantities. The angokraščiai line must surface that gap.
+    room = _room(elementai=[
+        {"tipas": "pasleptos_duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2400},
+        {"tipas": "langas", "kiekis": 1, "plotis_mm": 0, "aukstis_mm": 0},
+    ])
+    out = _parsed([room])
+    ang = _find(out, "angokrašči")
+    assert ang["confidence"] in ("geltona", "raudona")
+    assert "matmen" in ang["_confidence_reason"].lower()
+
+
+def test_angokrasciai_no_unread_flag_when_dims_present():
+    # All openings have dims → no unread-dims reason on the reveal line.
+    out = _parsed([_room()])
+    ang = _find(out, "angokrašči")
+    assert "be nuskaitytų matmenų" not in (ang.get("_confidence_reason") or "")
+
+
 def test_existing_medium_normalized_not_upgraded():
     p = {"pozicijos": [{"aprasymas": "X", "confidence": "medium"}], "patalpos": []}
     apply_confidence(p)
