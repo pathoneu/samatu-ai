@@ -78,11 +78,19 @@ def apply_confidence(parsed: dict) -> dict:
         conf = _normalize_existing(p) or ZALIA
         reasons: list[str] = []
 
-        for needle, klass_conf, reason in CLASS_RULES:
-            if needle in label:
-                conf = _worse(conf, klass_conf)
-                reasons.append(reason)
-                break
+        # An upstream-specific reason (e.g. the door-type reconciliation:
+        # "rasta 7 beapvadinių durų, pradinis rado 2 — patikrink") is more current
+        # and precise than a static class-bias note. Preserve it and skip the
+        # class rule for this line — the reconciliation already addressed the bias.
+        upstream_reason = p.get("_confidence_reason")
+        if upstream_reason:
+            reasons.append(upstream_reason)
+        else:
+            for needle, klass_conf, reason in CLASS_RULES:
+                if needle in label:
+                    conf = _worse(conf, klass_conf)
+                    reasons.append(reason)
+                    break
 
         if apdailos_low and any(s in label for s in _FINISH_PATTERNS):
             conf = _worse(conf, GELTONA)

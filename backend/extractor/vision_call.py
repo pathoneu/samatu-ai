@@ -1271,14 +1271,35 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Beržų; contractor 89.39).
     angokrasciai_m = _sum("angokrasciu_gkp_m")
     pasleptu_duru_staktu_m = 0.0
+    n_pasleptu_tagged = 0
+    reveal_sum = 0.0  # sum of (2H+W) over the glyph-tagged frameless doors
     for r in rooms:
         for el in (r.get("elementai") or []):
             if (el.get("tipas") or "").lower() == "pasleptos_duris":
                 W = (el.get("plotis_mm") or 0) / 1000
                 H = (el.get("aukstis_mm") or 0) / 1000
                 if W > 0 and H > 0:
-                    pasleptu_duru_staktu_m += (2 * H + W) * int(el.get("kiekis") or 1)
+                    k = int(el.get("kiekis") or 1)
+                    pasleptu_duru_staktu_m += (2 * H + W) * k
+                    n_pasleptu_tagged += k
+                    reveal_sum += (2 * H + W) * k
     pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
+
+    # 2026-06-14: frameless-door RECONCILIATION (council 5/5 + research). The
+    # glyph pass under-tags frameless doors (Beržų 2 of ~8) because frame type
+    # is NOT in the door symbol — it's in the drawing TEXT. door_type_reader reads
+    # the tags/annotations ("skirta beapvadinėms durims"); _door_types carries the
+    # reconciled count + a confidence flag. When the text count exceeds the tagged
+    # count, scale the reveal meters up to it (avg reveal per tagged door, default
+    # 5.1 m for a 900×2400 frameless), and flag the line so the user verifies.
+    _dt = parsed.get("_door_types") or {}
+    _door_conf = None
+    _door_reason = None
+    if _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged:
+        avg_reveal = (reveal_sum / n_pasleptu_tagged) if n_pasleptu_tagged > 0 else 5.1
+        pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
+        _door_conf = _dt.get("confidence")
+        _door_reason = _dt.get("reason")
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
         pozicijos.append({
@@ -1295,10 +1316,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         })
     if pasleptu_duru_staktu_m > 0.5:
         # P5 fix: paslėptų durų staktų pozicija (4/5 freq, ~400 EUR/proj)
-        pozicijos.append({
+        _door_line = {
             "skyrius": SK_GD, "aprasymas": "Durų angų paruošimas beapvadinėms durims",
             "vnt": "m", "kiekis": pasleptu_duru_staktu_m, "saltinis": SAL,
-        })
+        }
+        if _door_conf:  # text-reconciled — carry the flag + reason
+            _door_line["confidence"] = _door_conf
+            if _door_reason:
+                _door_line["_confidence_reason"] = _door_reason
+        pozicijos.append(_door_line)
 
     # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over rangovas).
     # Per-room (perim − Σdurys) × 1.10 double-counts interior walls (each
@@ -2855,6 +2881,43 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] doors read failed (non-fatal): {exc}")
         _emit({"event": "doors_error", "message": str(exc)})
+
+    # Step 2.865: DOOR-TYPE READER (2026-06-14, council 5/5 + research).
+    # Frameless ("beapvadinės") door TYPE is structurally NOT in the door glyph —
+    # it's in the drawing TEXT (tags LD-1, annotations "skirta beapvadinėms
+    # durims"). The glyph pass under-tags frameless doors (Beržų 2 of ~8 →
+    # "Durų angų paruošimas" 10.2 m vs contractor 39.2 m). Read the text, reconcile
+    # against the tagged count, RAISE + flag — never silently overwrite.
+    try:
+        from .door_type_reader import read_door_types, reconcile_frameless
+        _emit({"event": "door_types_started"})
+        rooms_now = parsed.get("patalpos") or []
+        dt = read_door_types(pdf_bytes, rooms_now,
+                             page_classifications=parsed.get("puslapiai") or [])
+        if dt.get("status") == "ok":
+            n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
+                           for el in (r.get("elementai") or [])
+                           if (el.get("tipas") or "").lower() == "pasleptos_duris")
+            _NONINT = {"garazas", "tamburas", "tambūras"}
+            n_interior = sum(int(el.get("kiekis") or 1) for r in rooms_now
+                             for el in (r.get("elementai") or [])
+                             if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
+                             and (r.get("paskirtis") or "").lower() not in _NONINT)
+            rec = reconcile_frameless(
+                plan_frameless=n_tagged, reader_frameless=dt.get("beapvadines_count", 0),
+                bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,
+                archetipas=parsed.get("archetipas") or (parsed.get("santrauka") or {}).get("archetipas"))
+            parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
+                                     "plan_tagged": n_tagged, "pages": dt.get("pages")}
+            parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
+            _emit({"event": "door_types_completed", "frameless": rec.get("count"),
+                   "confidence": rec.get("confidence"), "reader": dt.get("beapvadines_count"),
+                   "tagged": n_tagged})
+        else:
+            _emit({"event": "door_types_skipped", "reason": dt.get("_error")})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] door-type read failed (non-fatal): {exc}")
+        _emit({"event": "door_types_error", "message": str(exc)})
 
     # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page
     # backfill added 2026-06-05 evening).
