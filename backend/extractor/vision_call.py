@@ -2649,6 +2649,18 @@ def extract_interior(
     # recovery was silently lost (every room fell back to the section average).
     rooms = parsed.get("patalpos") or rooms
 
+    # 2026-06-11: deterministic height-plausibility gate. Vision sometimes puts
+    # the tall ceiling on small wet rooms (Bacevičiaus: 3.5 m on a 6.8 m² vonia)
+    # while the large svetainė gets the default — inverting the iki/virš-3m split.
+    try:
+        from .universal_rules import apply_height_plausibility_gate
+        _hc = apply_height_plausibility_gate(rooms)
+        if _hc:
+            parsed.setdefault("_meta", {})["height_gate_corrections"] = _hc
+            _emit({"event": "height_gate_applied", "corrections": _hc})
+    except Exception as exc:
+        print(f"[extractor] height plausibility gate failed: {exc}")
+
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
     # crop the page region at 300 DPI / 2576px max, send to Vision with room

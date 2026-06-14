@@ -181,6 +181,105 @@ def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
 # PER PATALPOS TIPĄ — universal taisyklės
 # ═════════════════════════════════════════════════════════════════════════
 
+# Room types that are STRUCTURALLY never the tall open-plan zone (>3m ceilings
+# live in large living/kitchen voids, never in small wet rooms, closets, WCs,
+# garages, vestibules). Used by apply_height_plausibility_gate.
+_NEVER_TALL_PASKIRTYS = frozenset({
+    "vonia", "wc", "san", "drabuzine", "rubine", "skalbykla", "katiline",
+    "tamburas", "garazas", "sandeliukas",
+})
+# Room types that legitimately carry the tall ceiling (open-plan living).
+_TALL_CAPABLE_PASKIRTYS = frozenset({"gyvenamoji", "valgomasis", "virtuve", "holas"})
+_TALL_THRESHOLD_M = 3.0
+_SMALL_SERVICE_M2 = 14.0     # a "small" service room
+_LARGE_LIVING_M2 = 25.0      # a living room big enough to be the tall zone
+
+
+def apply_height_plausibility_gate(rooms: list) -> list:
+    """Deterministically correct mis-attributed ceiling heights, in place.
+
+    Measured failure (2026-06-11 Bacevičiaus): Vision assigned 3.5 m to a 6.8 m²
+    wet room + 2.9 m² WC while the 62 m² svetainė got the section-average default
+    — inverting the iki/virš-3m paint/GKP split. Ceiling heights above 3 m belong
+    to large open-plan living spaces, never to small wet/service rooms.
+
+    Strategy:
+      - If the ONLY >3m rooms are small service-type rooms AND a large living-type
+        room sits at non-tall height → MOVE the tall height to that living room
+        and reset the service rooms to the project's modal non-tall height.
+      - If there is no living-room recipient → just CLAMP the implausible tall
+        service rooms down to the modal height (removes the inversion).
+    Rooms whose tall height is legitimate (large living room, or a confident
+    section reading) are untouched. Returns a list of correction records.
+    """
+    corrections: list[dict] = []
+    if not rooms:
+        return corrections
+
+    def _h(r):
+        try:
+            return float(r.get("lubu_aukstis_m") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _a(r):
+        try:
+            return float(r.get("plotas_m2") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    # Modal non-tall height (what plausible rooms use) — fallback 2.82.
+    non_tall = [round(_h(r), 2) for r in rooms if 0 < _h(r) <= _TALL_THRESHOLD_M]
+    if non_tall:
+        modal_h = max(set(non_tall), key=non_tall.count)
+    else:
+        modal_h = 2.82
+
+    tall = [r for r in rooms if _h(r) > _TALL_THRESHOLD_M]
+    if not tall:
+        return corrections
+
+    implausible = [r for r in tall
+                   if (r.get("paskirtis") in _NEVER_TALL_PASKIRTYS)
+                   and _a(r) < _SMALL_SERVICE_M2]
+    plausible_tall = [r for r in tall if r not in implausible]
+
+    # Only act when EVERY tall room is an implausible small service room. If a
+    # genuine large living room is already tall, the split is trusted.
+    if not implausible or plausible_tall:
+        return corrections
+
+    moved_h = max(_h(r) for r in implausible)
+
+    # Best living-room recipient: largest tall-capable room at non-tall height.
+    candidates = [r for r in rooms
+                  if (r.get("paskirtis") in _TALL_CAPABLE_PASKIRTYS)
+                  and _a(r) >= _LARGE_LIVING_M2 and _h(r) <= _TALL_THRESHOLD_M]
+    recipient = max(candidates, key=_a) if candidates else None
+
+    if recipient is not None:
+        corrections.append({"action": "reattribute", "to": recipient.get("pavadinimas"),
+                            "height": moved_h,
+                            "from": [r.get("pavadinimas") for r in implausible]})
+        recipient["lubu_aukstis_m"] = moved_h
+        recipient["lubu_aukstis_saltinis"] = "height_gate_reattributed"
+        recipient["_height_gate"] = (
+            f"Aukštis {moved_h} m perkeltas iš mažų drėgnų patalpų (Vision "
+            f"priskyrė klaidingai) — aukštos lubos būna dideliame svetainės/"
+            f"virtuvės plote")
+
+    for r in implausible:
+        old = _h(r)
+        r["lubu_aukstis_m"] = modal_h
+        r["lubu_aukstis_saltinis"] = "height_gate_clamped"
+        r["_height_gate"] = (
+            f"Aukštis {old} m nepatikimas {r.get('paskirtis')} patalpai "
+            f"({_a(r):.1f} m²) — sumažinta iki {modal_h} m")
+        corrections.append({"action": "clamp", "room": r.get("pavadinimas"),
+                            "from": old, "to": modal_h})
+    return corrections
+
+
 ROOM_TYPE_RULES = {
     # paskirtis: (sienos_dažomos, lubų_tipas, grindys, plytelės_sienos_iki, plytelės_grindys)
     "gyvenamoji":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
