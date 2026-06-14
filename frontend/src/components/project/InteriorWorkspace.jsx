@@ -33,6 +33,20 @@ import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 
 const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_needed'];
 
+// Apply a per-room field patch (keyed by nr) to BOTH patalpos and v8_rooms so
+// the two room arrays the app reads (`v8_rooms || patalpos`) never diverge.
+function applyRoomPatch(project, patchByNr) {
+  const patch = (arr) => (arr || []).map((r) => {
+    const p = patchByNr[String(r.nr)];
+    return p ? { ...r, ...p } : r;
+  });
+  return {
+    ...project,
+    patalpos: patch(project.patalpos),
+    ...(Array.isArray(project.v8_rooms) && { v8_rooms: patch(project.v8_rooms) }),
+  };
+}
+
 const SYMBOL_LABELS = {
   rozetes: 'Rozetės / jungiklio pajungimas',
   jungikliai: 'Rozetės / jungiklio pajungimas',
@@ -98,7 +112,7 @@ export default function InteriorWorkspace({
   // auto-detect upgrades the room's polygon_pct. Always render the latest.
   const rawFocusedRoom = localFocusedRoom ?? focusedRoom;
   const effectiveFocusedRoom = rawFocusedRoom
-    ? ((project.patalpos || []).find(
+    ? ((project.v8_rooms || project.patalpos || []).find(
         (r) => String(r.nr) === String(rawFocusedRoom.nr)) || rawFocusedRoom)
     : null;
   useEffect(() => {
@@ -133,9 +147,13 @@ export default function InteriorWorkspace({
   const detectRanRef = useRef(false);
   useEffect(() => {
     if (!pdfBlob || detectRanRef.current) return;
-    const rooms = project.patalpos || [];
+    const rooms = project.v8_rooms || project.patalpos || [];
     if (rooms.length === 0) return;
-    if (rooms.some((r) => DETECTED_SOURCES.includes(r.polygon_source))) {
+    // Skip if EITHER array already carries a detected source (don't re-run and
+    // overwrite a user's manual correction).
+    const alreadyDetected = [...(project.patalpos || []), ...(project.v8_rooms || [])]
+      .some((r) => DETECTED_SOURCES.includes(r.polygon_source));
+    if (alreadyDetected) {
       detectRanRef.current = true;
       return;
     }
@@ -155,12 +173,10 @@ export default function InteriorWorkspace({
           });
           Object.assign(merged, results);
         }
-        const updatedRooms = rooms.map((r) => {
-          const res = merged[String(r.nr)];
-          if (!res) return r;
-          if (res.polygon_pct) {
-            return {
-              ...r,
+        const patchByNr = {};
+        for (const [nr, res] of Object.entries(merged)) {
+          patchByNr[nr] = res.polygon_pct
+            ? {
               polygon_pct: res.polygon_pct,
               polygon_pdf: res.polygon_pdf,
               page_width_pdf: res.page_width_pdf,
@@ -168,11 +184,10 @@ export default function InteriorWorkspace({
               polygon_source: res.polygon_source,
               polygon_confidence: res.confidence,
               area_err: res.area_err,
-            };
-          }
-          return { ...r, polygon_source: res.polygon_source };  // manual_needed (keep bbox as 🔴 fallback)
-        });
-        const updated = { ...project, patalpos: updatedRooms };
+            }
+            : { polygon_source: res.polygon_source };  // manual_needed (keep bbox as 🔴 fallback)
+        }
+        const updated = applyRoomPatch(project, patchByNr);
         updateProject(project.id, updated);
         onProjectChange?.(updated);
       } catch (e) {
@@ -190,23 +205,36 @@ export default function InteriorWorkspace({
     const pw = fill.page_width_pdf, ph = fill.page_height_pdf;
     const polygon_pct = (pw && ph)
       ? fill.polygon_pdf.map(([x, y]) => [x / pw, y / ph]) : null;
-    const updatedRooms = (project.patalpos || []).map((r) => {
-      if (String(r.nr) !== String(roomNr)) return r;
-      return {
-        ...r,
-        ...(polygon_pct && { polygon_pct }),
-        polygon_pdf: fill.polygon_pdf,
-        page_width_pdf: pw,
-        page_height_pdf: ph,
-        polygon_source: 'corrected',
-        polygon_confidence: fill.confidence || 'high',
-        polygon_corrected_at: new Date().toISOString(),
-      };
-    });
-    const updated = { ...project, patalpos: updatedRooms };
+    const patch = {
+      ...(polygon_pct && { polygon_pct }),
+      polygon_pdf: fill.polygon_pdf,
+      page_width_pdf: pw,
+      page_height_pdf: ph,
+      polygon_source: 'corrected',
+      polygon_confidence: fill.confidence || 'high',
+      polygon_corrected_at: new Date().toISOString(),
+    };
+    const updated = applyRoomPatch(project, { [String(roomNr)]: patch });
     updateProject(project.id, updated);
     onProjectChange?.(updated);
   };
+
+  // "Tikrinti pirmiausia": rooms the auto-detector couldn't solve (or that fell
+  // back to a coarse bbox) — surfaced so the user fixes them with "Taisyti zoną".
+  const manualRooms = useMemo(() => {
+    const v8 = project.v8_rooms || [];
+    const pat = project.patalpos || [];
+    // polygon_source may live in either array; merge by nr, but only count REAL
+    // detected sources — ignore the placeholder 'synthesized_from_bbox' that
+    // stale v8_rooms may still carry.
+    const srcByNr = {};
+    [...pat, ...v8].forEach((r) => {
+      const s = r.polygon_source;
+      if (s && (DETECTED_SOURCES.includes(s) || s === 'bbox_fallback')) srcByNr[String(r.nr)] = s;
+    });
+    const base = v8.length ? v8 : pat;
+    return base.filter((r) => ['manual_needed', 'bbox_fallback'].includes(srcByNr[String(r.nr)]));
+  }, [project.v8_rooms, project.patalpos]);
 
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
     [project.puslapiai, project.v8_pages]);
@@ -236,6 +264,32 @@ export default function InteriorWorkspace({
         className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
         style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
       >
+        {detecting && (
+          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-50 border-b border-blue-200 text-xs text-blue-900">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            Aptinkamos tikslios patalpų zonos…
+          </div>
+        )}
+        {!detecting && manualRooms.length > 0 && (
+          <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-900">
+            <span className="font-medium">⚠ {manualRooms.length} patalpų reikia patikslinti:</span>
+            {manualRooms.map((r) => (
+              <button
+                key={r.nr}
+                type="button"
+                onClick={() => {
+                  setLocalFocusedPage(r.puslapio_nr ?? r.page_nr ?? null);
+                  setLocalFocusedRoom(r);
+                }}
+                title={`${r.nr} ${r.pavadinimas || ''} — pasirink ir spausk „Taisyti zoną"`}
+                className="rounded border border-amber-300 bg-white px-1.5 py-0.5 font-medium tabular-nums hover:bg-amber-100"
+              >
+                {r.nr}
+              </button>
+            ))}
+            <span className="text-amber-700">— pasirink ir spausk „Taisyti zoną“</span>
+          </div>
+        )}
         {pdfUrl ? (
           <PlanViewer
             fileUrl={pdfUrl}
