@@ -1523,6 +1523,19 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if pl_total > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
                               if (r.get("paskirtis") or "").lower() in WET), 2)
+        # 2026-06-11: silikonavimas seals ALL tiled zones, not only paskirtis-wet
+        # rooms — skalbyklos, and any room the apdailos reader marks substantially
+        # tiled, are sealed too. Counting only vonia/wc/san under-counted on both
+        # anchors (berzas −39%, bacv −68%); adding tiled non-wet rooms recovers the
+        # defensible part (berzas −10%, bacv −55%) with the unchanged ×1.4
+        # coefficient. (45°-pjovimas keeps WET-only perim — it didn't under-count.)
+        def _is_tiled(r: dict) -> bool:
+            if (r.get("paskirtis") or "").lower() in WET:
+                return True
+            bd = r.get("sienu_apdailos_breakdown") or {}
+            return float(bd.get("plyteles_share") or 0) >= 0.6
+        tiled_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+                                if _is_tiled(r)), 2)
         if wet_perim > 0:
             # Plytelių 45° pjovimas — outer corners × tile_height (vonia
             # default 2 outer corners). Floor: wet_perim × 0.4.
@@ -1557,8 +1570,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # Empirical splits across his 5 projects:
             #   Sanitaryware silikonas ≈ wet_perim × 0.8 (around bath/sink/WC)
             #   Plytelių kampų silikonas ≈ wet_perim × 0.6 (inside corners)
-            silikon_san_m = round(wet_perim * 0.8, 2)
-            silikon_kampai_m = round(wet_perim * 0.6, 2)
+            silikon_san_m = round(tiled_perim * 0.8, 2)
+            silikon_kampai_m = round(tiled_perim * 0.6, 2)
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",

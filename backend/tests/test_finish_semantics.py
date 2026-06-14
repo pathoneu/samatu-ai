@@ -81,3 +81,23 @@ def test_low_conf_apdailos_does_not_paint_garage():
     # confident read → a genuinely-painted garage IS painted
     high = calc_room_quantities(dict(base))  # no _apdailos_confidence == confident
     assert float(high.get("walls_paintable_m2") or 0) > 20.0
+
+
+# ── silikonavimas covers all tiled rooms, not only paskirtis-wet ──────────
+def test_silikonavimas_includes_tiled_non_wet_rooms():
+    from extractor.vision_call import _build_pozicijos_from_rooms
+    # A skalbykla (not in WET set) marked substantially tiled by apdailos.
+    rooms = [
+        {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
+         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "elementai": []},
+        {"nr": "2", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla", "plotas_m2": 9.0,
+         "perimetras_m": 12.0, "lubu_aukstis_m": 2.7, "elementai": [],
+         "sienu_apdailos_breakdown": {"plyteles_share": 0.7, "dazymas_share": 0.3}},
+    ]
+    for r in rooms:
+        r.update(calc_room_quantities(r))
+    out = _build_pozicijos_from_rooms({"patalpos": rooms, "santrauka": {}})
+    sil = round(sum(p["kiekis"] for p in out["pozicijos"]
+                    if "silikonavimas" in p["aprasymas"].lower()), 2)
+    # both rooms' perimeters seal: (10+12) × 1.4 = 30.8, not just the wet 10 × 1.4
+    assert sil > 28.0, sil
