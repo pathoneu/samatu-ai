@@ -280,6 +280,7 @@ export default function PlanViewer({
   fileUrl,
   pdfFile = null,
   onSymbolCountResult = null,
+  onRoomPolygonFill = null,
   pageMeta = {},
   missingTypes = [],
   focusedPage = null,
@@ -745,6 +746,67 @@ export default function PlanViewer({
             <Maximize2 className="w-4 h-4 inline mr-1.5" />
             Plotis
           </button>
+          {/* Manual room-contour correction (core): visible when a room is
+              focused. Click inside the room → flood-fill → Išsaugoti persists
+              it as that room's accurate polygon. */}
+          {focusedRoom?.nr && (
+            <button
+              type="button"
+              onClick={() => {
+                setFillMode(v => !v);
+                setFillError(null);
+                setFillResult(null);
+                if (symbolPickMode) setSymbolPickMode(false);
+              }}
+              className={`h-9 px-3 rounded-md border text-sm ${
+                fillMode
+                  ? 'border-violet-500 bg-violet-50 text-violet-950'
+                  : 'border-[#d8d2c8] bg-white hover:bg-[#f1eee8]'
+              } disabled:opacity-50`}
+              disabled={fillLoading || !pdfFile}
+              title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėk patalpos viduje`}
+            >
+              <Wand2 className="w-4 h-4 inline mr-1.5" />
+              {fillMode ? `Spustelėk patalpos ${focusedRoom.nr} viduje` : 'Taisyti zoną'}
+            </button>
+          )}
+          {fillLoading && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-[#70685d]">
+              <Loader2 className="w-4 h-4 animate-spin" /> Užpildoma...
+            </span>
+          )}
+          {fillError && !fillLoading && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs text-red-950">
+              {fillError}
+            </span>
+          )}
+          {fillResult && !fillLoading && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
+              ✓ {fillResult.polygon_pdf.length} taškų · {fillResult.confidence}
+              {focusedRoom?.nr && onRoomPolygonFill && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRoomPolygonFill(focusedRoom.nr, fillResult);
+                    setFillResult(null);
+                    setFillMode(false);
+                  }}
+                  className="ml-1 inline-flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-white hover:bg-violet-700"
+                  title={`Išsaugoti kaip patalpos ${focusedRoom.nr} kontūrą`}
+                >
+                  <Check className="w-3 h-3" /> Išsaugoti
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { setFillResult(null); setFillError(null); }}
+                className="ml-1 hover:text-violet-700"
+                title="Atmesti"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </span>
+          )}
           {/* 2026-05-06: Ženklai toolbar (symbol counting + click-to-fill)
               hidden by default — accuracy isn't production-ready yet.
               Re-enable via DevTools:
@@ -804,49 +866,7 @@ export default function PlanViewer({
               <Crosshair className="w-3.5 h-3.5 inline mr-1.5" />
               AI nuskaityti puslapį
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFillMode(v => !v);
-                setFillError(null);
-                setFillResult(null);
-                if (symbolPickMode) setSymbolPickMode(false);
-              }}
-              className={`h-8 px-3 rounded-md border text-xs font-medium ${
-                fillMode
-                  ? 'border-violet-500 bg-violet-50 text-violet-950'
-                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
-              } disabled:opacity-50`}
-              disabled={fillLoading || !pdfFile}
-              title="Spustelėk patalpos viduje — sistema apves sienas automatiškai (eksperimentinis)"
-            >
-              <Wand2 className="w-3.5 h-3.5 inline mr-1.5" />
-              {fillMode ? 'Spauskite patalpos viduje' : 'Užpildyti polygoną'}
-            </button>
-            {fillLoading && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-[#70685d]">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Užpildoma...
-              </span>
-            )}
-            {fillError && !fillLoading && (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs text-red-950">
-                {fillError}
-              </span>
-            )}
-            {fillResult && !fillLoading && (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
-                ✓ {fillResult.polygon_pdf.length} taškų · pasitikėjimas: {fillResult.confidence}
-                <button
-                  type="button"
-                  onClick={() => { setFillResult(null); setFillError(null); }}
-                  className="ml-1 hover:text-violet-700"
-                  title="Atmesti"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+            {/* Fill flow moved to the main toolbar (core manual-correction feature). */}
             <div className="h-6 w-px bg-[#d8d2c8]" />
             {currentSymbolTypes.map(item => (
               <button

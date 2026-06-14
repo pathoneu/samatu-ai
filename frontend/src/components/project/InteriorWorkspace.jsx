@@ -183,6 +183,31 @@ export default function InteriorWorkspace({
     })();
   }, [pdfBlob, project.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Manual fix: persist a click-to-fill polygon as the focused room's accurate
+  // contour (polygon_source 'corrected'). Clears the manual_needed flag.
+  const handleRoomPolygonFill = (roomNr, fill) => {
+    if (!roomNr || !fill?.polygon_pdf?.length) return;
+    const pw = fill.page_width_pdf, ph = fill.page_height_pdf;
+    const polygon_pct = (pw && ph)
+      ? fill.polygon_pdf.map(([x, y]) => [x / pw, y / ph]) : null;
+    const updatedRooms = (project.patalpos || []).map((r) => {
+      if (String(r.nr) !== String(roomNr)) return r;
+      return {
+        ...r,
+        ...(polygon_pct && { polygon_pct }),
+        polygon_pdf: fill.polygon_pdf,
+        page_width_pdf: pw,
+        page_height_pdf: ph,
+        polygon_source: 'corrected',
+        polygon_confidence: fill.confidence || 'high',
+        polygon_corrected_at: new Date().toISOString(),
+      };
+    });
+    const updated = { ...project, patalpos: updatedRooms };
+    updateProject(project.id, updated);
+    onProjectChange?.(updated);
+  };
+
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
     [project.puslapiai, project.v8_pages]);
   const missingTypes = useMemo(() => missingInteriorTypes(project.puslapiai),
@@ -220,6 +245,7 @@ export default function InteriorWorkspace({
             focusedRoom={effectiveFocusedRoom}
             eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
             pdfFile={pdfBlob}
+            onRoomPolygonFill={handleRoomPolygonFill}
             onSymbolCountResult={(symbolType, result) => {
               // Pridedam į projekto darbų sąrašą kaip naują eilutę.
               // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
