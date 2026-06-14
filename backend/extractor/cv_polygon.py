@@ -30,6 +30,14 @@ class FillResult:
     fill_method: str         # 'flood_fill_v1'
 
 
+@dataclass
+class AutoFillResult:
+    polygon_px: np.ndarray   # shape (N, 2), int32, image-space pixel coords
+    confidence: str          # 'high' | 'medium' | 'low'
+    area_err: float | None   # |est_m2 - plotas_m2| / plotas_m2 if area-prior used
+    fill_method: str         # 'auto_floodfill_v1'
+
+
 def binarize_page(raster: np.ndarray) -> np.ndarray:
     """Adaptive threshold to separate walls (black) from interior (white).
 
@@ -155,6 +163,99 @@ def validate_polygon(
             f"polygon too jagged (perimeter/√area={jagged:.1f}, "
             f"max {max_jagged_ratio}; likely noise or partial fill)"
         )
+
+
+def seed_grid(cx_px: int, cy_px: int, half_w: int = 70, half_h: int = 50,
+              step: int = 14) -> list[tuple[int, int]]:
+    """Dense local grid of candidate seed points around a label centroid.
+
+    Seeding the EXACT room-number centroid lands on the glyph ink every time
+    ('click landed on a wall pixel') and small grids land in glyph-hole pockets.
+    A dense local grid escapes both — caller keeps only white-basin pixels.
+    Points are ordered nearest-first so the closest valid seed wins ties.
+    """
+    pts = []
+    for dy in range(0, half_h + 1, step):
+        for dx in range(0, half_w + 1, step):
+            for sx, sy in {(cx_px + dx, cy_px + dy), (cx_px - dx, cy_px + dy),
+                           (cx_px + dx, cy_px - dy), (cx_px - dx, cy_px - dy)}:
+                if (sx, sy) not in pts:
+                    pts.append((sx, sy))
+    return pts
+
+
+def auto_room_polygon(
+    raster: np.ndarray,
+    label_x_pct: float,
+    label_y_pct: float,
+    *,
+    room_plotas_m2: float | None = None,
+    page_scale_m2_per_pct: float | None = None,
+    sensitivities: tuple[float, ...] = (0.5, 0.6, 0.7, 0.8),
+    max_area_pct: float = 0.42,
+    area_err_max: float = 0.40,
+) -> AutoFillResult | None:
+    """Best-effort accurate room polygon from a room-label seed.
+
+    Multi-seed grid around (label_x_pct, label_y_pct) × a sensitivity sweep;
+    each candidate is validated (with a TIGHT max_area_pct to reject leaks) and,
+    when ``room_plotas_m2`` + ``page_scale_m2_per_pct`` are given, gated on an
+    AREA PRIOR (|estimated m² − known m²| / known m²). The area prior both picks
+    the right fill among several valid ones AND detects its own failures —
+    returns None (→ caller routes the room to manual) instead of shipping a
+    leaked/fragmented polygon. Returns None when no candidate survives.
+    """
+    if raster.ndim == 3:
+        raster = cv2.cvtColor(raster, cv2.COLOR_BGR2GRAY)
+    h, w = raster.shape
+    cx, cy = int(round(label_x_pct * w)), int(round(label_y_pct * h))
+    page_area = float(h * w)
+    binary = binarize_page(raster)
+
+    candidates: list[tuple[np.ndarray, float, float | None]] = []
+    for sens in sensitivities:
+        kernel, epsilon = _sensitivity_to_params(sens)
+        closed = gap_fill_doors(binary, kernel_size=kernel)
+        covered = np.zeros((h, w), dtype=np.uint8)  # dedup seeds already inside a found basin
+        for sx, sy in seed_grid(cx, cy):
+            if not (0 <= sx < w and 0 <= sy < h):
+                continue
+            if closed[sy, sx] == 0 or covered[sy, sx]:
+                continue
+            mask = flood_fill_from_click(closed, sx, sy)
+            if mask.sum() == 0:
+                continue
+            covered |= mask
+            poly = extract_polygon(mask, simplify_epsilon_pct=epsilon)
+            if len(poly) < 3:
+                continue
+            try:
+                validate_polygon(poly, page_dims=(h, w), max_area_pct=max_area_pct)
+            except PolygonValidationError:
+                continue
+            area_px = float(cv2.contourArea(poly.reshape(-1, 1, 2).astype(np.int32)))
+            area_pct = area_px / page_area
+            area_err = None
+            if page_scale_m2_per_pct and room_plotas_m2:
+                est_m2 = area_pct * page_scale_m2_per_pct
+                area_err = abs(est_m2 - room_plotas_m2) / room_plotas_m2
+            candidates.append((poly, area_pct, area_err))
+
+    if not candidates:
+        return None
+
+    have_prior = any(c[2] is not None for c in candidates)
+    if have_prior:
+        gated = [c for c in candidates if c[2] is not None and c[2] <= area_err_max]
+        if not gated:
+            return None  # every fill disagrees with the known area → manual
+        poly, _area_pct, ae = min(gated, key=lambda c: c[2])
+        conf = "high" if ae < 0.10 else ("medium" if ae < 0.25 else "low")
+        return AutoFillResult(poly, conf, ae, "auto_floodfill_v1")
+    # No area prior: pick the largest valid fill (already gated < max_area_pct,
+    # so it cannot be a leak; largest avoids glyph-hole micro-pockets).
+    poly, _area_pct, _ = max(candidates, key=lambda c: c[1])
+    return AutoFillResult(poly, "medium", None, "auto_floodfill_v1")
 
 
 def _sensitivity_to_params(sensitivity: float) -> tuple[int, float]:
