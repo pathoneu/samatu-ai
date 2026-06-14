@@ -21,7 +21,7 @@
  * mato totals atsinaujinant dešinėje real-time.
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import WorkspacePanel from './WorkspacePanel';
@@ -29,6 +29,9 @@ import OnboardingTooltips from './OnboardingTooltips';
 import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
 import { updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
+import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
+
+const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_needed'];
 
 const SYMBOL_LABELS = {
   rozetes: 'Rozetės / jungiklio pajungimas',
@@ -90,7 +93,14 @@ export default function InteriorWorkspace({
   const [localFocusedPage, setLocalFocusedPage] = useState(null);
   const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
   const effectiveFocusedPage = localFocusedPage ?? focusedPage;
-  const effectiveFocusedRoom = localFocusedRoom ?? focusedRoom;
+  // Re-derive the focused room from the LIVE patalpos by nr — the focusedRoom
+  // prop / local state is a captured object and can carry a stale polygon after
+  // auto-detect upgrades the room's polygon_pct. Always render the latest.
+  const rawFocusedRoom = localFocusedRoom ?? focusedRoom;
+  const effectiveFocusedRoom = rawFocusedRoom
+    ? ((project.patalpos || []).find(
+        (r) => String(r.nr) === String(rawFocusedRoom.nr)) || rawFocusedRoom)
+    : null;
   useEffect(() => {
     setLocalFocusedPage(null);
     setLocalFocusedRoom(null);
@@ -115,6 +125,63 @@ export default function InteriorWorkspace({
       if (url) URL.revokeObjectURL(url);
     };
   }, [project.id]);
+
+  // Accurate room polygons: once the PDF is available, replace the coarse bbox
+  // polygons with wall-following flood-fill ones (label-seeded + area-prior).
+  // Runs ONCE per project (skips if rooms already carry a detected source).
+  const [detecting, setDetecting] = useState(false);
+  const detectRanRef = useRef(false);
+  useEffect(() => {
+    if (!pdfBlob || detectRanRef.current) return;
+    const rooms = project.patalpos || [];
+    if (rooms.length === 0) return;
+    if (rooms.some((r) => DETECTED_SOURCES.includes(r.polygon_source))) {
+      detectRanRef.current = true;
+      return;
+    }
+    detectRanRef.current = true;
+    setDetecting(true);
+    (async () => {
+      try {
+        const byPage = {};
+        rooms.forEach((r) => {
+          const p = r.puslapio_nr ?? r.page_nr;
+          if (p) (byPage[p] = byPage[p] || []).push(r);
+        });
+        const merged = {};
+        for (const [pageNr, pageRooms] of Object.entries(byPage)) {
+          const { results } = await detectRoomPolygons({
+            projectId: project.id, pageNr: Number(pageNr), rooms: pageRooms, pdfBlob,
+          });
+          Object.assign(merged, results);
+        }
+        const updatedRooms = rooms.map((r) => {
+          const res = merged[String(r.nr)];
+          if (!res) return r;
+          if (res.polygon_pct) {
+            return {
+              ...r,
+              polygon_pct: res.polygon_pct,
+              polygon_pdf: res.polygon_pdf,
+              page_width_pdf: res.page_width_pdf,
+              page_height_pdf: res.page_height_pdf,
+              polygon_source: res.polygon_source,
+              polygon_confidence: res.confidence,
+              area_err: res.area_err,
+            };
+          }
+          return { ...r, polygon_source: res.polygon_source };  // manual_needed (keep bbox as 🔴 fallback)
+        });
+        const updated = { ...project, patalpos: updatedRooms };
+        updateProject(project.id, updated);
+        onProjectChange?.(updated);
+      } catch (e) {
+        console.warn('[detect-room-polygons] failed:', e?.message);
+      } finally {
+        setDetecting(false);
+      }
+    })();
+  }, [pdfBlob, project.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
     [project.puslapiai, project.v8_pages]);

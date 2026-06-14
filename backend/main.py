@@ -5391,6 +5391,104 @@ async def click_to_fill_endpoint(
     }
 
 
+@app.post("/api/projects/{project_id}/detect-room-polygons")
+async def detect_room_polygons_endpoint(
+    request: Request,
+    project_id: str,
+    page_nr: int = Form(...),
+    rooms_json: str = Form(...),
+    pdf_file: UploadFile | None = File(None),
+):
+    """Batch accurate-polygon detection for every room on a floor-plan page.
+
+    Label-seeded flood-fill + area-prior (auto_room_polygon). Returns an
+    accurate polygon for the rooms it can solve and marks the rest
+    'manual_needed' — never ships a leaked/wrong polygon. rooms_json is a JSON
+    list of {nr, plotas_m2}. PDF is taken from pdf_file (cached) or the cache.
+    """
+    _billable_user(request)
+    _check_rate_limit(
+        request.client.host if request.client else "unknown",
+        "detect-room-polygons",
+    )
+    import json as _json
+    from extractor.cv_polygon import auto_room_polygon
+    from extractor.room_seeds import locate_room_seeds, calibrate_page_scale
+    import page_raster_cache as _cache
+    import cv2 as _cv2
+    import numpy as _np
+
+    try:
+        rooms = _json.loads(rooms_json)
+        assert isinstance(rooms, list)
+    except Exception:
+        raise HTTPException(status_code=400, detail="rooms_json must be a JSON list")
+
+    pdf_bytes: bytes | None = None
+    if pdf_file is not None:
+        pdf_bytes = await pdf_file.read()
+        if pdf_bytes:
+            _cache.store_pdf(project_id, pdf_bytes)
+    if pdf_bytes is None:
+        pdf_bytes = _cache.get_pdf(project_id)
+    if pdf_bytes is None:
+        raise HTTPException(status_code=400, detail="PDF byte cache nerasta — pridėkite pdf_file")
+
+    try:
+        raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"page render failed: {e}")
+    h, w = raster.shape[:2]
+    px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
+    page_w_pt, page_h_pt = float(w) * px_to_pt, float(h) * px_to_pt
+
+    nrs = [str(r.get("nr")) for r in rooms if r.get("nr") is not None]
+    plotas = {str(r.get("nr")): float(r.get("plotas_m2") or 0) for r in rooms}
+    seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
+
+    # Two-pass: rectangularity-best fills → median page scale → area-prior pass.
+    samples = []
+    for nr, (sx, sy) in seeds.items():
+        r0 = auto_room_polygon(raster, sx, sy)
+        if r0 is not None:
+            ap = float(_cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(_np.int32))) / (h * w)
+            if plotas.get(nr):
+                samples.append((ap, plotas[nr]))
+    scale = calibrate_page_scale(samples)
+
+    results: dict[str, dict] = {}
+    n_auto = n_manual = 0
+    for nr in nrs:
+        if nr not in seeds:
+            results[nr] = {"polygon_source": "manual_needed", "confidence": "manual"}
+            n_manual += 1
+            continue
+        sx, sy = seeds[nr]
+        r = auto_room_polygon(raster, sx, sy, room_plotas_m2=plotas.get(nr) or None,
+                              page_scale_m2_per_pct=scale)
+        if r is None:
+            results[nr] = {"polygon_source": "manual_needed", "confidence": "manual",
+                           "label_pct": [sx, sy]}
+            n_manual += 1
+            continue
+        poly_pct = [[float(x) / w, float(y) / h] for x, y in r.polygon_px]
+        poly_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt] for x, y in r.polygon_px]
+        results[nr] = {
+            "polygon_pct": poly_pct,
+            "polygon_pdf": poly_pdf,
+            "page_width_pdf": page_w_pt,
+            "page_height_pdf": page_h_pt,
+            "polygon_source": "auto_floodfill",
+            "confidence": r.confidence,
+            "area_err": r.area_err,
+        }
+        n_auto += 1
+
+    return {"results": results, "page_nr": page_nr,
+            "stats": {"auto": n_auto, "manual": n_manual, "total": len(nrs),
+                      "page_scale_m2_per_pct": scale}}
+
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
