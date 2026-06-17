@@ -53,14 +53,19 @@ CLASS_RULES: list[tuple[str, str, str]] = [
 # over an upstream reason, because "is this line even in scope?" outranks any
 # extraction-confidence note. Never present app-added scope as a confident green.
 _OVERBILLING_RULES: list[tuple[str, str, str]] = [
-    ("parketo / laminato", RAUDONA,
-     "Grindų danga pridėta automatiškai — patikrinkite, ar įeina į sutarties apimtį (rangovo samatoje jos gali nebūti)"),
-    ("laminato klojimas", RAUDONA, "Grindų danga pridėta automatiškai — patikrinkite, ar įeina į sutartį"),
-    ("grindų dangos pamušalas", RAUDONA, "Grindų danga pridėta automatiškai — patikrinkite pagal sutartį"),
-    ("grindų išlyginamasis", RAUDONA, "Grindų išlyginimas pridėtas automatiškai — patikrinkite pagal sutartį"),
-    ("lubų karnizo", GELTONA, "Lubų karnizas pridėtas automatiškai — patikrinkite pagal lubų planą (rangovo samatoje gali nebūti)"),
-    ("grindjuosčių", GELTONA, "Skaičiuota pagal visą patalpų perimetrą; rangovas gali skaičiuoti tik plytelių juostą — patikrinkite"),
+    # Grindų danga: the contractor includes it on SOME projects, not all (founder
+    # 2026-06-17). Keep the line — flag it geltona to verify per-project, not red.
+    ("parketo / laminato", GELTONA,
+     "Grindų danga įtraukiama ne visada — patikrinkite, ar šiame projekte ji yra rangovo apimtyje"),
+    ("laminato klojimas", GELTONA,
+     "Grindų danga įtraukiama ne visada — patikrinkite pagal šio projekto apimtį"),
+    ("grindų dangos pamušalas", GELTONA, "Grindų dangos dalis — patikrinkite, ar įeina į šio projekto apimtį"),
+    ("grindų išlyginamasis", GELTONA, "Grindų dangos dalis — patikrinkite, ar įeina į šio projekto apimtį"),
+    # Lubų karnizas: used to mount curtains — not always present (founder doubts it).
+    ("lubų karnizo", GELTONA, "Lubų karnizas (užuolaidoms) įrengiamas ne visada — patikrinkite pagal projektą"),
     ("apsauginės dangos", GELTONA, "Automatinė prielaida (grindų apsauga statybų metu)"),
+    # NOTE: grindjuostės is NOT here — the app correctly computes full perimeter
+    # minus door gaps minus wet/tile/concrete rooms (= the contractor's convention).
 ]
 
 # Finish-derived lines: demote when apdailos self-reported guessing.
