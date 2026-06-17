@@ -183,7 +183,7 @@ def parse_dimension_payload(raw_json: dict[str, Any]) -> DimensionList:
 def extract_dimensions(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-7",
+    model: str = "claude-opus-4-8",
     max_tokens: int = 32768,
     cache: VisionCache | None = None,
     no_cache: bool = False,
@@ -197,7 +197,7 @@ def extract_dimensions(
         PNG base64 string for the floor plan page. The caller is responsible
         for rasterising the right page at a useful DPI (≥200).
     model : str
-        Anthropic model id. Defaults to claude-opus-4-7.
+        Anthropic model id. Defaults to claude-opus-4-8.
     cache, no_cache : VisionCache | bool
         File cache controls. ``no_cache=True`` forces a fresh API call (used by
         determinism tests).

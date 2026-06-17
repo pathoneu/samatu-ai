@@ -19,7 +19,7 @@ from typing import Any
 
 import anthropic
 
-OPUS_MODEL = "claude-opus-4-7"
+OPUS_MODEL = "claude-opus-4-8"
 DEFAULT_MAX_TOKENS = 12_000
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-MODEL = "claude-opus-4-7"
+MODEL = "claude-opus-4-8"
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
 MAX_PAGES = 100  # Opus 4.7 API hard max — full coverage for any realistic LT project.

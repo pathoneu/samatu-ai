@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import anthropic
 
-SONNET_MODEL = "claude-sonnet-4-6"
+SONNET_MODEL = "claude-opus-4-8"
 
 
 _LEGEND_SYSTEM = """Extract the symbol legend from this LT construction drawing.

@@ -26,7 +26,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-7"
+MODEL = "claude-opus-4-8"
 MAX_TOKENS = 4096
 MAX_IMG_PX = 1568
 _FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai")

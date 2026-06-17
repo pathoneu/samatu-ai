@@ -98,7 +98,7 @@ def run_zoom_on_room(
     pdf_bytes: bytes,
     page_number: int,
     room_primitive: dict[str, Any],
-    model: str = "claude-opus-4-7",
+    model: str = "claude-opus-4-8",
     crop_dpi: int = 300,
     crop_max_dim: int = 2576,
     crop_padding: float = 0.05,
@@ -180,7 +180,7 @@ def run_pilot(
     old_extract_path: Path,
     page_number: int = 2,
     limit: int | None = None,
-    model: str = "claude-opus-4-7",
+    model: str = "claude-opus-4-8",
 ) -> dict[str, Any]:
     """Run the zoom pipeline on every room in ``old_extract`` that has a bbox.
 

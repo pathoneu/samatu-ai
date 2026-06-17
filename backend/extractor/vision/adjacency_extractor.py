@@ -110,7 +110,7 @@ def _load_prompt() -> str:
 def extract_adjacency(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-7",
+    model: str = "claude-opus-4-8",
     max_tokens: int = 8192,
     cache: VisionCache | None = None,
     no_cache: bool = False,

@@ -32,7 +32,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-7"
+MODEL = "claude-opus-4-8"
 MAX_TOKENS = 3072
 
 SYSTEM_PROMPT = """Tu esi LT interjero brėžinio durų inventorizacijos agentas. Tau duotas vienas puslapis — aukšto planas (floor_plan).

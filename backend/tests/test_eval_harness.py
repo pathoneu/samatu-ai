@@ -85,6 +85,43 @@ def test_floor_area_matches_truth_within_one_percent(harness, berzas_truth):
     assert abs(floor.pct_error) < 1.0, f"floor area drift {floor.pct_error}%"
 
 
+def _mk_metric(harness, label, actual, truth):
+    abs_err = round(actual - truth, 3)
+    pct = round((abs_err / truth) * 100, 3) if truth else None
+    return harness.MetricResult(
+        truth_key=label, label=label, unit="m²", tier="headline",
+        truth_value=truth, truth_confidence="ok", actual_value=actual,
+        abs_error=abs_err, pct_error=pct, status="fail")
+
+
+def test_honest_filter_fresh_collapse_is_scored_and_flagged(harness):
+    """A FRESH ai_extract emitting 0.0 vs a real >0 truth must NOT be silently
+    dropped: it scores as the genuine -100% collapse AND is flagged in
+    `collapsed`. Regression guard for the 2026-06-09 benchmark-honesty fix —
+    the original silent-drop hid collapsed metrics on non-berzas projects."""
+    results = [_mk_metric(harness, "CombinedPaint", 0.0, 388.0),  # collapse
+               _mk_metric(harness, "LED", 22.45, 16.84)]          # normal
+    scored, not_emitted, collapsed = harness._partition_headline_metrics(
+        results, "ai_extract")
+    assert [r.label for r in scored] == ["CombinedPaint", "LED"]
+    assert collapsed == ["CombinedPaint"]
+    assert not_emitted == []
+    cp = next(r for r in scored if r.label == "CombinedPaint")
+    assert cp.pct_error == -100.0
+
+
+def test_honest_filter_replay_zero_is_excluded(harness):
+    """Legacy `replay` keeps the old behaviour: a 0.0 vs >0 truth means the
+    cached santrauka schema never tracked the field → excluded, not_emitted."""
+    results = [_mk_metric(harness, "CombinedPaint", 0.0, 388.0),
+               _mk_metric(harness, "LED", 22.45, 16.84)]
+    scored, not_emitted, collapsed = harness._partition_headline_metrics(
+        results, "replay")
+    assert [r.label for r in scored] == ["LED"]
+    assert not_emitted == ["CombinedPaint"]
+    assert collapsed == []
+
+
 def test_summary_shape(harness, berzas_truth):
     parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
     results = harness.evaluate(parsed, berzas_truth)

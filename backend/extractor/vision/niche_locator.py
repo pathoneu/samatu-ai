@@ -125,7 +125,7 @@ def _load_prompt() -> str:
 def extract_niches(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-7",
+    model: str = "claude-opus-4-8",
     max_tokens: int = 16384,
     cache: VisionCache | None = None,
     no_cache: bool = False,

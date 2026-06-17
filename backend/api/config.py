@@ -22,15 +22,15 @@ def get_config() -> dict:
                 ...
             },
             "models": {
-                "pass1": "claude-opus-4-7",
-                "pass2": "claude-opus-4-7",
+                "pass1": "claude-opus-4-8",
+                "pass2": "claude-opus-4-8",
             }
         }
     """
     return {
         "flags": get_flags(),
         "models": {
-            "pass1": "claude-opus-4-7",
-            "pass2": "claude-opus-4-7",
+            "pass1": "claude-opus-4-8",
+            "pass2": "claude-opus-4-8",
         },
     }

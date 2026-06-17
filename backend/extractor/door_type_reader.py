@@ -31,7 +31,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-7"
+MODEL = "claude-opus-4-8"
 MAX_TOKENS = 4096
 # Keep each rendered page's long edge under Claude's silent-downscale threshold so
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus

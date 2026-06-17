@@ -53,7 +53,7 @@ if env_file.exists():
     except ImportError:
         pass
 
-MODEL = "claude-opus-4-7"
+MODEL = "claude-opus-4-8"
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects (~20+ rooms with full pozicijos) need it
 DPI = 200
 MAX_PAGES = 20

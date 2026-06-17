@@ -21,7 +21,7 @@ from typing import Any
 import anthropic
 
 
-VISION_MODEL = "claude-opus-4-7"
+VISION_MODEL = "claude-opus-4-8"
 
 
 def _parse_vision_json(text: str) -> dict:

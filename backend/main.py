@@ -1663,8 +1663,8 @@ def _parse_eilutes(raw: str) -> list:
 
 # Model used for the Claude fallback extraction path.
 # Opus delivers the highest accuracy; override with the env var for cost/speed
-# trade-offs (e.g. EXTRACTION_MODEL=claude-haiku-4-5-20251001 for fast/cheap).
-EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "claude-opus-4-7")
+# trade-offs (e.g. EXTRACTION_MODEL=claude-haiku-4-5 for fast/cheap).
+EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "claude-opus-4-8")
 
 
 def _call_claude(prompt: str) -> str:
@@ -1842,7 +1842,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
 
 import base64
 
-VISION_MODEL = os.getenv("VISION_MODEL", "claude-opus-4-7")
+VISION_MODEL = os.getenv("VISION_MODEL", "claude-opus-4-8")
 
 _INTERIOR_MARKERS = [
     "INTERJERO PROJEKTAS", "IŠKLOTINĖ", "IŠKLOTINIŲ",
@@ -5213,7 +5213,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
 
     def _call():
         return client.messages.create(
-            model="claude-opus-4-7",
+            model="claude-opus-4-8",
             max_tokens=2000,
             system=_CHAT_SYSTEM_PROMPT,
             messages=messages,

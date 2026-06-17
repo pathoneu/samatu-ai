@@ -23,10 +23,12 @@ import pdfplumber
 # choice, but stogai V1 bake-off (2026-05-14) treats this as a
 # parameter, not a default. Promote based on empirical evaluation
 # results, not assumption.
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
-SONNET_MODEL = "claude-sonnet-4-6"
-OPUS_MODEL = "claude-opus-4-7"
-# Default: Opus 4.7 — aligned with the interior pipeline. LT brėžiniai
+# 2026-06-17: all tiers promoted to Opus 4.8 for maximum accuracy (names kept
+# for the tier-selection call sites; every tier now resolves to the same model).
+HAIKU_MODEL = "claude-opus-4-8"
+SONNET_MODEL = "claude-opus-4-8"
+OPUS_MODEL = "claude-opus-4-8"
+# Default: Opus 4.8 — aligned with the interior pipeline. LT brėžiniai
 # are stricter than generic floor plans (LT abbreviations, dense
 # annotations, hand-drawn-style scans); user policy is "use the
 # strongest model for these tasks, don't optimise cost when accuracy
