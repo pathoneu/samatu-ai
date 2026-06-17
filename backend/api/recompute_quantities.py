@@ -32,6 +32,11 @@ class RecomputeRequest(BaseModel):
     pozicijos: list[dict] = Field(default_factory=list)
     edits: list[Edit]
     current_assumptions: dict
+    # Reader/extraction context (_door_types, detected_symbols_summary,
+    # _plyteliu_specs, bendras_plotas_m2, v9_meta). Needed so an assumption edit
+    # (e.g. ceiling height) can rebuild the CANONICAL pozicijos from the
+    # recomputed rooms without losing the door/fixture/symbol lines.
+    context: dict = Field(default_factory=dict)
 
 
 # Sprint 0: assumption-class fields. Sprint 2 adds gesture fields below.
@@ -241,6 +246,53 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
     return out_rooms, pozicijos
 
 
+def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
+    """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
+    user's manual edits forward from the prior pozicijos so the rebuild doesn't
+    silently revert them. Matched by aprasymas (the stable, human-readable key).
+
+    Preserved:
+      - kaina / suma — entered prices (the rebuild never computes prices).
+      - manual count override — a corrected count (e.g. rozetės 52→50) is
+        height-independent, so the user's value always wins over the rebuilt one.
+      - gesture lock (override_pozicija) — override_locked + override_orig.
+
+    Formula/geometry lines (paint, kampai, GKP) are intentionally NOT preserved:
+    recomputing them with the new height is the whole point of the rebuild, and
+    they never carry manual_override.
+    """
+    if not prior:
+        return rebuilt
+    prior_by_label = {}
+    for p in prior:
+        lab = (p.get("aprasymas") or "").strip().lower()
+        if lab:
+            prior_by_label[lab] = p
+    for p in rebuilt:
+        prev = prior_by_label.get((p.get("aprasymas") or "").strip().lower())
+        if not prev:
+            continue
+        # Entered price (+ its derived suma) — always carried forward.
+        if prev.get("kaina") not in (None, 0):
+            p["kaina"] = prev["kaina"]
+            if prev.get("suma") is not None:
+                p["suma"] = prev["suma"]
+        # Manual count override — user's corrected count wins.
+        if prev.get("manual_override") is True or prev.get("quantity_source") == "manual_override":
+            p["kiekis"] = prev.get("kiekis")
+            p["manual_override"] = True
+            p["quantity_source"] = prev.get("quantity_source") or "manual_override"
+            if prev.get("ai_kiekis_original") is not None:
+                p["ai_kiekis_original"] = prev["ai_kiekis_original"]
+        # Gesture lock (G7 override_pozicija).
+        if prev.get("override_locked"):
+            p["kiekis"] = prev.get("kiekis")
+            p["override_locked"] = True
+            if prev.get("override_orig") is not None:
+                p["override_orig"] = prev["override_orig"]
+    return rebuilt
+
+
 @router.post("/recompute-quantities")
 def recompute(req: RecomputeRequest) -> dict:
     # 1. Validate
@@ -262,5 +314,28 @@ def recompute(req: RecomputeRequest) -> dict:
 
     # 4. Apply gesture edits (Sprint 2)
     rooms, pozicijos = _apply_gesture_edits(rooms, list(req.pozicijos), req.edits)
+
+    # 5. If an ASSUMPTION edit changed room geometry (e.g. ceiling height), the
+    # aggregated pozicijos (paint iki/virš split, kampai, GKP virš-3m, karnizas…)
+    # must be rebuilt from the recomputed rooms — otherwise the displayed/exported
+    # numbers stay stale (the Prielaidos recompute bug, 2026-06-17). Rebuild via
+    # the canonical builder, carrying the reader context so door/fixture/symbol
+    # lines survive. Gesture-only edits keep the in-place pozicijos above.
+    assumption_edited = any(e.field in _ASSUMPTION_FIELDS for e in req.edits)
+    if assumption_edited and req.context:
+        try:
+            from extractor.vision_call import _build_pozicijos_from_rooms
+            parsed = {
+                **req.context,
+                "patalpos": rooms,
+                "_overrides": {**(req.context.get("_overrides") or {}), **assumptions},
+            }
+            rebuilt = _build_pozicijos_from_rooms(parsed)
+            if rebuilt.get("pozicijos"):
+                # Carry the user's manual edits (prices, corrected counts,
+                # locks) forward so the rebuild doesn't silently revert them.
+                pozicijos = _merge_user_edits(rebuilt["pozicijos"], list(req.pozicijos))
+        except Exception as exc:  # noqa: BLE001 — never break the recompute
+            print(f"[recompute-quantities] canonical pozicijos rebuild failed: {exc}")
 
     return {"rooms": rooms, "pozicijos": pozicijos, "assumptions": assumptions}

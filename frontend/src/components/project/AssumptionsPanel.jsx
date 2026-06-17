@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { recompute } from '../../lib/recomputeApi';
 
@@ -134,6 +133,17 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
         pozicijos: pozicijos || [],
         edits: [{ field, new_value: newValue }],
         current_assumptions: assumptions || {},
+        // Reader/extraction context so a ceiling-height edit rebuilds the
+        // canonical pozicijos (paint iki/virš split, kampai…) without losing
+        // the door/fixture/symbol lines. (2026-06-17 recompute fix.)
+        context: {
+          _door_types: rawData?._door_types,
+          detected_symbols_summary: rawData?.detected_symbols_summary,
+          _plyteliu_specs: rawData?._plyteliu_specs,
+          bendras_plotas_m2: rawData?.bendras_plotas_m2,
+          v9_meta: rawData?.v9_meta,
+          _overrides: rawData?._overrides,
+        },
       });
       onRecomputed(result);
     } catch (err) {
