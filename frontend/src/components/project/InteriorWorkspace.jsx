@@ -146,6 +146,12 @@ export default function InteriorWorkspace({
   const [detecting, setDetecting] = useState(false);
   const detectRanRef = useRef(false);
   useEffect(() => {
+    // 2026-06-17 (founder): auto flood-fill polygons disabled — the viewer now
+    // shows a clean room-number marker (centred on the existing room rect), not
+    // an auto-traced boundary. Accurate polygons stay available on demand via
+    // "Taisyti zoną". This also avoids the on-load CV cost + the PDF-cache churn.
+    const AUTO_DETECT_POLYGONS = false;
+    if (!AUTO_DETECT_POLYGONS) return;
     if (!pdfBlob || detectRanRef.current) return;
     const rooms = project.v8_rooms || project.patalpos || [];
     if (rooms.length === 0) return;
@@ -270,7 +276,10 @@ export default function InteriorWorkspace({
             Aptinkamos tikslios patalpų zonos…
           </div>
         )}
-        {!detecting && manualRooms.length > 0 && (
+        {/* Polygon worklist banner hidden 2026-06-17 — we no longer auto-draw
+            room polygons, so "rooms needing refinement" is no longer the primary
+            UX. Manual zone-tracing stays available via "Taisyti zoną". */}
+        {false && manualRooms.length > 0 && (
           <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-900">
             <span className="font-medium">⚠ {manualRooms.length} patalpų reikia patikslinti:</span>
             {manualRooms.map((r) => (

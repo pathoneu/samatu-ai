@@ -15,7 +15,7 @@ import {
   getPlanFitScale,
   getVisiblePlanPages,
 } from '@/lib/planViewerState';
-import { getFocusedRoomRect, getPolygonPdfPoints, getPolygonPctPoints, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
+import { getFocusedRoomRect, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
 import { getAnchoredZoomScroll, nextWheelScale } from '@/lib/viewerViewport';
 import {
   getConfirmableSymbolCounts,
@@ -100,104 +100,31 @@ function PlanOverlayLayer({ room, page, eksplikacijaPage, renderedSize, pdfSize,
 
   if (!rect) return null;
 
-  const isEksplikacija = rect.type === 'eksplikacija';
-  const isLabel = rect.type === 'label';
-  const polygonPoints = (!isEksplikacija && !isLabel)
-    ? (Array.isArray(room?.polygon_pct) && room.polygon_pct.length >= 3
-      ? getPolygonPctPoints(room.polygon_pct, {
-        renderedWidth: renderedSize.width,
-        renderedHeight: renderedSize.height,
-      })
-      : (Array.isArray(room?.polygon_pdf)
-        ? getPolygonPdfPoints(room.polygon_pdf, {
-          pageWidthPdf: room.page_width_pdf || room.pdf_page_width || pdfSize?.width,
-          pageHeightPdf: room.page_height_pdf || room.pdf_page_height || pdfSize?.height,
-          renderedWidth: renderedSize.width,
-          renderedHeight: renderedSize.height,
-        })
-        : null))
-    : null;
-  const polygonPath = polygonPoints
-    ? polygonPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ') + ' Z'
-    : null;
+  // Room centre for the clean number marker. Reverted from the flood-fill
+  // polygon (2026-06-17, founder): the auto-traced boundary wasn't accurate
+  // enough, so we mark WHERE the room is (its number), not a wrong outline.
+  // Accurate polygons stay available on demand via "Taisyti zoną".
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 20 }}>
-      {polygonPath ? (
-        <svg
-          width={renderedSize.width}
-          height={renderedSize.height}
-          viewBox={`0 0 ${renderedSize.width} ${renderedSize.height}`}
-          className="absolute inset-0"
-          aria-hidden="true"
-        >
-          <path
-            d={polygonPath}
-            fill="rgba(37, 99, 235, 0.18)"
-            stroke="#2563eb"
-            strokeWidth="3"
-            vectorEffect="non-scaling-stroke"
-            filter="drop-shadow(0 8px 18px rgba(30, 64, 175, 0.28))"
-          />
-        </svg>
-      ) : (
-        <div
-          data-testid="plan-overlay-rect"
-          style={{
-            position: 'absolute',
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            border: isLabel ? '3px solid #ef4444' : (isEksplikacija ? '2px solid #f59e0b' : '2px solid #2563eb'),
-            background: isLabel
-              ? 'rgba(239, 68, 68, 0.12)'
-              : (isEksplikacija ? 'rgba(245, 158, 11, 0.22)' : 'rgba(37, 99, 235, 0.14)'),
-            boxShadow: isLabel
-              ? '0 0 0 7px rgba(239, 68, 68, 0.18), 0 10px 26px rgba(127, 29, 29, 0.32)'
-              : (isEksplikacija
-              ? '0 0 0 4px rgba(245, 158, 11, 0.2), 0 8px 24px rgba(120, 53, 15, 0.28)'
-              : '0 0 0 4px rgba(37, 99, 235, 0.16), 0 8px 24px rgba(30, 64, 175, 0.25)'),
-            borderRadius: isLabel ? 999 : 4,
-          }}
-        />
-      )}
       <div
-        style={{
-          position: 'absolute',
-          left: Math.max(8, rect.left),
-          top: Math.max(8, rect.top - 30),
-          maxWidth: 260,
-        }}
-        className={`rounded-md px-2.5 py-1.5 text-xs shadow border ${
-          isLabel
-            ? 'bg-red-50 border-red-300 text-red-950'
-            : isEksplikacija
-            ? 'bg-amber-50 border-amber-300 text-amber-950'
-            : 'bg-blue-50 border-blue-300 text-blue-950'
-        }`}
+        style={{ position: 'absolute', left: cx, top: cy, transform: 'translate(-50%, -50%)' }}
+        className="flex flex-col items-center"
       >
-        <span className="font-semibold">{room?.nr}</span>
-        {room?.pavadinimas ? <span className="ml-1">{room.pavadinimas}</span> : null}
-        <span className="ml-1 text-current/65">
-          {isLabel ? 'numerio žymė' : isEksplikacija ? 'eksplikacijos eilutė' : 'tiksli zona'}
-        </span>
-      </div>
-      {(isEksplikacija || isLabel) && room?.bbox_pct && !room?.polygon_pdf && (
         <div
-          style={{
-            position: 'absolute',
-            left: Math.max(8, rect.left),
-            top: rect.top + rect.height + 8,
-            maxWidth: 340,
-          }}
-          className={`rounded-md border bg-white/95 px-2.5 py-1.5 text-[11px] leading-snug shadow ${
-            isLabel ? 'border-red-300 text-red-950' : 'border-amber-300 text-amber-950'
-          }`}
+          className="flex items-center justify-center rounded-full font-semibold text-white text-sm tabular-nums ring-2 ring-white"
+          style={{ width: 36, height: 36, background: '#2a6fb5', boxShadow: '0 4px 16px rgba(42,111,181,0.45)' }}
         >
-          Tikslios patalpos zonos nėra. Rodoma patalpos numerio vieta; apytikslis AI langelis paslėptas, nes jis netikslus.
+          {room?.nr}
         </div>
-      )}
+        {room?.pavadinimas ? (
+          <div className="mt-1.5 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-medium text-[#1f2937] shadow-sm whitespace-nowrap">
+            {room.pavadinimas}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
