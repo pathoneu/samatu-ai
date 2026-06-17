@@ -24,6 +24,7 @@ import base64
 import io
 import json
 import re
+import statistics
 import time
 from typing import Optional
 
@@ -36,7 +37,7 @@ MAX_TOKENS = 4096
 # Keep each rendered page's long edge under Claude's silent-downscale threshold so
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus
 # limit; staying at/below it guarantees no provider downscale.
-MAX_IMG_PX = 1568
+from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
 MAX_DOOR_PAGES = 6
 
 _TAG_RE = re.compile(r"\b(?:LD|D)-?\d\b", re.IGNORECASE)
@@ -177,6 +178,48 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
                   "output_tokens": getattr(usage, "output_tokens", None), "model": MODEL},
     }
+
+
+def _mode_int(values, default: int = 0) -> int:
+    """Mode of integer reads, MEDIAN on a tie. NOT max — max would covertly
+    drift the count up toward the oracle (the thing the culture forbids)."""
+    vals = [int(v) for v in values if v is not None]
+    if not vals:
+        return default
+    modes = statistics.multimode(vals)
+    if len(modes) == 1:
+        return modes[0]
+    return int(round(statistics.median(vals)))
+
+
+def _aggregate_door_votes(runs: list[dict]) -> dict:
+    """Median/mode-aggregate N read_door_types runs. Keeps the representative
+    run's shape, overrides the counts with the voted value, and records the
+    spread so the caller can flag run-to-run disagreement (geltona)."""
+    ok = [r for r in runs if r.get("status") == "ok"]
+    if not ok:
+        return runs[0] if runs else {"status": "error", "beapvadines_count": 0}
+    beap_vals = [int(r.get("beapvadines_count") or 0) for r in ok]
+    beap = _mode_int(beap_vals)
+    rep = next((r for r in ok if int(r.get("beapvadines_count") or 0) == beap), ok[0])
+    out = dict(rep)
+    out["beapvadines_count"] = beap
+    out["standartines_count"] = _mode_int([int(r.get("standartines_count") or 0) for r in ok])
+    out["stumdomos_count"] = _mode_int([int(r.get("stumdomos_count") or 0) for r in ok])
+    out["_vote"] = {"n": len(ok), "beapvadines_values": beap_vals,
+                    "spread": max(beap_vals) - min(beap_vals)}
+    return out
+
+
+def read_door_types_voted(pdf_bytes: bytes, rooms: list[dict],
+                          page_classifications: Optional[list] = None,
+                          client=None, n: int = 3) -> dict:
+    """Self-consistency wrapper: run read_door_types n times, median/mode-vote the
+    counts (Opus 4.8 has no temperature knob — sampling N times is the only
+    stability lever for this recall-critical single-pass reader)."""
+    runs = [read_door_types(pdf_bytes, rooms, page_classifications, client)
+            for _ in range(max(1, n))]
+    return _aggregate_door_votes(runs)
 
 
 def reconcile_frameless(plan_frameless: int, reader_frameless: int,

@@ -132,7 +132,10 @@ def _vision_zoom_room(
             max_tokens=4096,  # zoom output is small per room
             system=system,
             messages=[{"role": "user", "content": build_zoom_user_content(cropped_b64, room)}],
-            output_config={"effort": "high"},
+            # Zoom is a dimension RE-READ (perception), not reasoning — medium is
+            # the Opus 4.8 sweet spot here and cuts the ~96s-for-1-applied cost.
+            # (Watch: if any perimeter/ceiling moves vs effort=high, revert.)
+            output_config={"effort": "medium"},
         ) as stream:
             resp = stream.get_final_message()
 
@@ -2889,11 +2892,17 @@ def extract_interior(
     # "Durų angų paruošimas" 10.2 m vs contractor 39.2 m). Read the text, reconcile
     # against the tagged count, RAISE + flag — never silently overwrite.
     try:
-        from .door_type_reader import read_door_types, reconcile_frameless
+        from .door_type_reader import (
+            read_door_types, read_door_types_voted, reconcile_frameless)
         _emit({"event": "door_types_started"})
         rooms_now = parsed.get("patalpos") or []
-        dt = read_door_types(pdf_bytes, rooms_now,
-                             page_classifications=parsed.get("puslapiai") or [])
+        # Opus 4.8 has no temperature knob — this single-pass recall-critical
+        # reader is the #1 variance source. Vote it (median/mode) when voting is on.
+        dt = (read_door_types_voted(pdf_bytes, rooms_now,
+                                    page_classifications=parsed.get("puslapiai") or [])
+              if _voting_on else
+              read_door_types(pdf_bytes, rooms_now,
+                              page_classifications=parsed.get("puslapiai") or []))
         if dt.get("status") == "ok":
             n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
                            for el in (r.get("elementai") or [])
@@ -2907,8 +2916,17 @@ def extract_interior(
                 plan_frameless=n_tagged, reader_frameless=dt.get("beapvadines_count", 0),
                 bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,
                 archetipas=parsed.get("archetipas") or (parsed.get("santrauka") or {}).get("archetipas"))
+            # If the voted reads disagreed (spread>0), surface it as geltona —
+            # the honest output is "reads varied, verify", not a silent pick.
+            _vote = dt.get("_vote") or {}
+            if _vote.get("spread", 0) > 0:
+                if rec.get("confidence") == "zalia":
+                    rec["confidence"] = "geltona"
+                rec["reason"] = (rec.get("reason") or "") + \
+                    f" (skaitymai svyravo tarp paleidimų: {_vote.get('beapvadines_values')})"
             parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
-                                     "plan_tagged": n_tagged, "pages": dt.get("pages")}
+                                     "plan_tagged": n_tagged, "pages": dt.get("pages"),
+                                     "_vote": _vote}
             parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
             _emit({"event": "door_types_completed", "frameless": rec.get("count"),
                    "confidence": rec.get("confidence"), "reader": dt.get("beapvadines_count"),
@@ -2926,9 +2944,12 @@ def extract_interior(
     # formula consumes it), never silently lowers. Modest, honest — fixtures have
     # no clean schedule to read (research-confirmed).
     try:
-        from .sanitary_fixture_reader import read_fixtures, reconcile_fixture_counts
+        from .sanitary_fixture_reader import (
+            read_fixtures, read_fixtures_voted, reconcile_fixture_counts)
         _emit({"event": "fixtures_started"})
-        fx = read_fixtures(pdf_bytes, parsed.get("patalpos") or [])
+        fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [])
+              if _voting_on else
+              read_fixtures(pdf_bytes, parsed.get("patalpos") or []))
         if fx.get("status") == "ok":
             rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
                                            fx.get("counts") or {})

@@ -315,11 +315,28 @@ class MetricResult:
         }[self.status]
 
 
-THRESHOLD_OK = 0.5     # %
-THRESHOLD_WARN = 3.0   # %
+# Per-class bands (ok%, warn%) replace the old flat 0.5%/3.0%. A 0.5% green bar
+# was threshold theater — no Vision-read perimeter is accurate to 0.5%, and it
+# manufactured over-tuning pressure (e.g. the Garažas 0.7988 four-decimal factor
+# chased a 0.9% residual that's inside the noise floor). Honest per-unit bands:
+_BANDS = {
+    "area":   (3.0, 8.0),    # m²  — areas read to ~few %
+    "linear": (8.0, 15.0),   # m   — pattern items (kampai, silikonavimas) jitter more
+    "count":  (2.0, 12.0),   # vnt — essentially exact (±1 on a count of ~50 ≈ 2%)
+}
 
 
-def _classify(pct: float | None, truth_conf: str | None = None) -> str:
+def _band_for_unit(unit: str | None) -> str:
+    u = (unit or "").lower().strip()
+    if "m²" in u or "m2" in u:
+        return "area"
+    if u == "m" or "lm" in u:
+        return "linear"
+    return "count"  # vnt, kompl, t, etc.
+
+
+def _classify(pct: float | None, truth_conf: str | None = None,
+              unit: str | None = "m²") -> str:
     if pct is None:
         return "missing"
     # When the truth itself is partial/incomplete, downgrade severity:
@@ -329,9 +346,10 @@ def _classify(pct: float | None, truth_conf: str | None = None) -> str:
     if truth_conf in ("incomplete", "partial"):
         return "no_truth"
     abs_pct = abs(pct)
-    if abs_pct <= THRESHOLD_OK:
+    ok_t, warn_t = _BANDS[_band_for_unit(unit)]
+    if abs_pct <= ok_t:
         return "ok"
-    if abs_pct <= THRESHOLD_WARN:
+    if abs_pct <= warn_t:
         return "warn"
     return "fail"
 
@@ -369,7 +387,7 @@ def evaluate(parsed: dict, truth: dict) -> list[MetricResult]:
         else:
             abs_err = round(actual_val - truth_val, 3)
             pct_err = round((abs_err / truth_val) * 100.0, 3) if truth_val else None
-            status = _classify(pct_err, truth_conf=truth_conf)
+            status = _classify(pct_err, truth_conf=truth_conf, unit=meta.get("unit"))
 
         results.append(MetricResult(
             truth_key=key,
@@ -862,6 +880,25 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     return 1 if failing else 0
 
 
+def _print_collapsed_footnote(per_project_summary: list[dict]) -> None:
+    """Loudly list any FRESH-production (ai_extract) headline metrics that
+    collapsed to 0.0 against a real >0 truth. These ARE counted in the MAE
+    (as ~-100% fails) but a single dilution-resistant average can still bury
+    a total collapse, so we name them explicitly. Without this, a non-berzas
+    project silently emitting 0 for combined paint would vanish from the
+    honest score (the old behaviour this replaces)."""
+    flagged = [(s["slug"], s.get("metrics_collapsed") or [])
+               for s in per_project_summary
+               if s.get("status") == "ok" and (s.get("metrics_collapsed"))]
+    if not flagged:
+        return
+    print(f"\n  ⚠ COLLAPSED METRICS (fresh production emitted 0.0 vs a real "
+          f">0 truth — counted as -100% fails, NOT hidden):")
+    for slug, labels in flagged:
+        for lab in labels:
+            print(f"      🔴 {slug}: {lab}")
+
+
 def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
     """Compact 5-line table — the default for multi-project mode.
 
@@ -895,6 +932,42 @@ def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
     print("  " + "─" * 60)
     avg_line = "—" if overall_mae is None else f"{overall_mae:.2f}%"
     print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}")
+
+
+def _partition_headline_metrics(results, ai_mode):
+    """Split headline MetricResults into (scored, not_emitted, collapsed).
+
+    Zero-vs-truth handling — DIFFERENT meaning per AI side (2026-06-09):
+
+      • ai_mode == "replay" (legacy cached santrauka): a 0.0 against a >0
+        truth genuinely means "this cached santrauka schema never tracked the
+        field". A documentation gap, not a wrong answer — EXCLUDE from MAE,
+        surface as not_emitted.
+
+      • ai_mode == "ai_extract" (FRESH production output from
+        scripts/regenerate_truth_extracts.py): a 0.0 against a >0 truth is a
+        REAL metric collapse — production actually produced zero where the
+        contractor measured something. SCORE it (lands as a ~-100% fail) AND
+        flag it in `collapsed` so it can never hide behind the project
+        average. Silently dropping it (the old behaviour) would let a
+        non-berzas project's collapsed headline metric vanish from the honest
+        MAE — see docs/superpowers/research/2026-06-09-benchmark-honesty-regen.md.
+
+    Any other ai_mode (e.g. use_gt_inputs) scores everything as-is.
+    """
+    scored, not_emitted, collapsed = [], [], []
+    for r in results:
+        if r.tier != "headline" or r.pct_error is None:
+            continue
+        is_zero_vs_truth = (r.actual_value == 0.0
+                            and r.truth_value and r.truth_value > 0.5)
+        if is_zero_vs_truth and ai_mode == "replay":
+            not_emitted.append(r.label)
+            continue
+        if is_zero_vs_truth and ai_mode == "ai_extract":
+            collapsed.append(r.label)   # keep in `scored` — counts as a real fail
+        scored.append(r)
+    return scored, not_emitted, collapsed
 
 
 def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int:
@@ -992,22 +1065,7 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
             continue
 
         results = evaluate(parsed, truth)
-        # Honest filter: when ai_mode == "replay"/"ai_extract" the production
-        # pipeline's santrauka may not emit every metric the truth tracks.
-        # An accessor returning 0.0 against a >0 truth = "production field
-        # absent", NOT "AI says zero". Exclude those from MAE; surface them
-        # as not_emitted so the gap is visible without inflating the score.
-        scored = []
-        not_emitted: list[str] = []
-        for r in results:
-            if r.tier != "headline" or r.pct_error is None:
-                continue
-            if (ai_mode in ("replay", "ai_extract")
-                    and r.actual_value == 0.0
-                    and r.truth_value and r.truth_value > 0.5):
-                not_emitted.append(r.label)
-                continue
-            scored.append(r)
+        scored, not_emitted, collapsed = _partition_headline_metrics(results, ai_mode)
         mae = (sum(abs(r.pct_error) for r in scored) / len(scored)
                if scored else None)
         worst = max((abs(r.pct_error) for r in scored), default=None)
@@ -1018,6 +1076,7 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
             "ai_mode": ai_mode,
             "metrics_scored": len(scored),
             "metrics_not_emitted": not_emitted,
+            "metrics_collapsed": collapsed,
             "mae_pct": round(mae, 3) if mae is not None else None,
             "worst_pct": round(worst, 3) if worst is not None else None,
             "metrics": [
@@ -1055,15 +1114,53 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
                   f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
         print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
               f"(n={len(all_pct_errors)} metric observations)")
+        _print_collapsed_footnote(per_project_summary)
         print(f"  Saved → {out_json}")
     else:
         _print_summary_table(per_project_summary, overall_mae)
+        _print_collapsed_footnote(per_project_summary)
         print(f"  Saved → {out_json}")
 
     # Exit 1 only if at least one OK project broke the 2.0% per-project cap.
     breached = [s for s in per_project_summary
                 if s["status"] == "ok" and (s.get("worst_pct") or 0) > 2.0]
     return 1 if breached else 0
+
+
+THAW_N = 3  # human-confirmed values needed before a frozen formula may re-derive
+
+
+def human_corpus_summary() -> dict:
+    """The SECOND oracle: the human-confirmed corrections accumulating via the
+    viewer correction workspace (read by build_ground_truth from the project
+    blob). One human-confirmed value beats the entire AI-parsed contractor
+    samata. Reports, per quantity_class, how many confirmed values exist and
+    whether a frozen formula (kampai/rotband/silikonavimas) may legitimately
+    thaw — N>=THAW_N confirmed values before re-deriving, so we never N=1/N=2
+    fit. Until then the flags stay; the counter tells us WHEN the freeze lifts."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "build_ground_truth", REPO_ROOT / "scripts" / "build_ground_truth.py")
+    bgt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bgt)
+    db = REPO_ROOT / "backend" / "data" / "samatu.db"
+    corpus = (bgt.build_corpus(db) if db.exists()
+              else {"quantity_truth": [], "stats": {}})
+    by_class: dict[str, int] = {}
+    for q in corpus.get("quantity_truth", []):
+        by_class[q["quantity_class"]] = by_class.get(q["quantity_class"], 0) + 1
+    classes = {k: {"confirmed": n, "thaw_eligible": n >= THAW_N}
+               for k, n in sorted(by_class.items())}
+    return {
+        "classes": classes,
+        "polygon_confirmed": corpus.get("stats", {}).get("polygon_confirmed", 0),
+        "quantity_confirmed": corpus.get("stats", {}).get("quantity_confirmed", 0),
+        "frozen_status": {
+            f: ("THAW-ELIGIBLE" if classes.get(f, {}).get("thaw_eligible") else
+                f"frozen ({classes.get(f, {}).get('confirmed', 0)}/{THAW_N})")
+            for f in ("kampai", "rotband", "silikonavimas")
+        },
+    }
 
 
 def main() -> int:
@@ -1108,7 +1205,16 @@ def main() -> int:
                     help="run only the named project and dump every "
                          "intermediate data structure to "
                          "eval_runs/debug_<slug>_<ts>/ for manual inspection")
+    ap.add_argument("--human-corpus", action="store_true",
+                    help="report the human-confirmed correction corpus (2nd "
+                         "oracle) + per-class confirmed counts + frozen-formula "
+                         "thaw status")
     args = ap.parse_args()
+
+    if args.human_corpus:
+        import json as _json
+        print(_json.dumps(human_corpus_summary(), ensure_ascii=False, indent=2))
+        return 0
 
     if args.debug_project:
         return run_debug_project(args.debug_project)

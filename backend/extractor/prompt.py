@@ -11,6 +11,11 @@ from __future__ import annotations
 MODEL = "claude-opus-4-8"
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
+# Provider's max image long-edge before it silently downscales. Opus 4.7 raised
+# this to 2576 and 4.8 inherits it (was 1568 on 4.6). The tag/glyph readers MUST
+# use this — capping at 1568 on 4.8 throws away ~2.7x the pixels on the exact
+# small-symbol reads that drive door/fixture recall variance.
+PROVIDER_MAX_IMG_PX = 2576
 MAX_PAGES = 100  # Opus 4.7 API hard max — full coverage for any realistic LT project.
                  # User decision (2026-04-27): accuracy > latency; 50k+ € projects
                  # justify multi-minute waits. Cost scales linearly (~$0.025/image).
@@ -951,6 +956,12 @@ def build_user_content(pages: list[dict]) -> list[dict]:
             "type": "image",
             "source": {"type": "base64", "media_type": "image/jpeg", "data": p["image_b64"]},
         })
+    # Cache the whole image prefix: N-pass voting (_run_pass1_voted) re-sends the
+    # byte-identical images on every round, so a single ephemeral breakpoint on
+    # the last image block lets rounds 2..N read them at ~0.1x instead of full
+    # price. Zero accuracy change; rounds must stay sequential to hit the cache.
+    if content and content[-1].get("type") == "image":
+        content[-1]["cache_control"] = {"type": "ephemeral"}
     content.append({
         "type": "text",
         "text": (

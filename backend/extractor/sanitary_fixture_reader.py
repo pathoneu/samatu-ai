@@ -19,6 +19,7 @@ import base64
 import io
 import json
 import re
+import statistics
 import time
 from typing import Optional
 
@@ -28,7 +29,7 @@ from pdf2image import convert_from_bytes
 
 MODEL = "claude-opus-4-8"
 MAX_TOKENS = 4096
-MAX_IMG_PX = 1568
+from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
 _FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai")
 
 SYSTEM_PROMPT = """Tu skaitai LT santechnikos / vandentiekio brėžinį.
@@ -144,6 +145,41 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
                   "output_tokens": getattr(usage, "output_tokens", None), "model": MODEL},
     }
+
+
+def _mode_int(values, default: int = 0) -> int:
+    """Mode of integer reads, MEDIAN on a tie (not max — no covert oracle drift)."""
+    vals = [int(v) for v in values if v is not None]
+    if not vals:
+        return default
+    modes = statistics.multimode(vals)
+    if len(modes) == 1:
+        return modes[0]
+    return int(round(statistics.median(vals)))
+
+
+def _aggregate_fixture_votes(runs: list[dict]) -> dict:
+    """Median/mode-aggregate N read_fixtures runs per fixture key + record spread."""
+    ok = [r for r in runs if r.get("status") == "ok"]
+    if not ok:
+        return runs[0] if runs else {"status": "error"}
+    out = dict(ok[0])
+    merged = {}
+    spread = {}
+    for k in _FIXTURE_KEYS:
+        vals = [int((r.get("counts") or {}).get(k) or 0) for r in ok]
+        merged[k] = _mode_int(vals)
+        spread[k] = max(vals) - min(vals)
+    out["counts"] = merged
+    out["_vote"] = {"n": len(ok), "spread": spread}
+    return out
+
+
+def read_fixtures_voted(pdf_bytes: bytes, rooms: list[dict], client=None, n: int = 3) -> dict:
+    """Self-consistency wrapper: run read_fixtures n times, median/mode-vote each
+    fixture count (the only stability lever on Opus 4.8 for this single-pass reader)."""
+    runs = [read_fixtures(pdf_bytes, rooms, client) for _ in range(max(1, n))]
+    return _aggregate_fixture_votes(runs)
 
 
 def reconcile_fixture_counts(symbols: dict, reader_counts: dict) -> dict:
