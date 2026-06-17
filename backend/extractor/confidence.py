@@ -45,7 +45,22 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     # paskirtis-heuristic-driven and missed garažas/tambūras floors on both
     # anchor projects (−20%…−100% per-room; parketas +29%).
     ("grindų plytel", GELTONA, "Dangos priskyrimas pagal paskirtį: −20%/−100% kai kurioms patalpoms (2 projektai)"),
-    ("laminato klojimas", GELTONA, "Dangos priskyrimas pagal paskirtį: +29% (anchor projektas)"),
+]
+
+# OVER-BILLING / app-added scope (reconciliation 2026-06-17 vs Rangovas A samata):
+# lines the app adds that may have NO contractor counterpart — a TRUST risk worse
+# than under-reads (the contractor disputes the sąmata). These ALWAYS apply, even
+# over an upstream reason, because "is this line even in scope?" outranks any
+# extraction-confidence note. Never present app-added scope as a confident green.
+_OVERBILLING_RULES: list[tuple[str, str, str]] = [
+    ("parketo / laminato", RAUDONA,
+     "Grindų danga pridėta automatiškai — patikrinkite, ar įeina į sutarties apimtį (rangovo samatoje jos gali nebūti)"),
+    ("laminato klojimas", RAUDONA, "Grindų danga pridėta automatiškai — patikrinkite, ar įeina į sutartį"),
+    ("grindų dangos pamušalas", RAUDONA, "Grindų danga pridėta automatiškai — patikrinkite pagal sutartį"),
+    ("grindų išlyginamasis", RAUDONA, "Grindų išlyginimas pridėtas automatiškai — patikrinkite pagal sutartį"),
+    ("lubų karnizo", GELTONA, "Lubų karnizas pridėtas automatiškai — patikrinkite pagal lubų planą (rangovo samatoje gali nebūti)"),
+    ("grindjuosčių", GELTONA, "Skaičiuota pagal visą patalpų perimetrą; rangovas gali skaičiuoti tik plytelių juostą — patikrinkite"),
+    ("apsauginės dangos", GELTONA, "Automatinė prielaida (grindų apsauga statybų metu)"),
 ]
 
 # Finish-derived lines: demote when apdailos self-reported guessing.
@@ -146,6 +161,16 @@ def apply_confidence(parsed: dict) -> dict:
             reasons.append(
                 f"{len(unread_dim_rooms)} angos be nuskaitytų matmenų "
                 f"(patalpos: {', '.join(unread_dim_rooms)}) — angokraščiai gali būti nepilni")
+
+        # OVER-BILLING flag — ALWAYS applies, even over an upstream reason.
+        # App-added scope (flooring, karnizas, full-perimeter grindjuostės) is a
+        # trust risk that must never read green; surface "verify against contract".
+        for needle, ob_conf, ob_reason in _OVERBILLING_RULES:
+            if needle in label:
+                conf = _worse(conf, ob_conf)
+                if ob_reason not in reasons:
+                    reasons.append(ob_reason)
+                break
 
         p["confidence"] = conf
         if reasons:

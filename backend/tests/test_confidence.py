@@ -33,9 +33,11 @@ def test_calibrated_class_is_geltona():
 
 
 def test_unlisted_class_defaults_zalia():
-    out = _parsed([_room()])
-    line = _find(out, "dangos pamušalas")  # no class rule, no flags → žalia
-    assert line["confidence"] == "zalia"
+    # A line that matches NO class rule and carries no flags stays žalia.
+    p = {"pozicijos": [{"aprasymas": "Sienų gruntavimas prieš dažymą", "confidence": "high"}],
+         "patalpos": []}
+    apply_confidence(p)
+    assert p["pozicijos"][0]["confidence"] == "zalia"
 
 
 def test_apdailos_low_demotes_finish_lines():
