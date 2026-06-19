@@ -5524,3 +5524,22 @@ async def detect_room_polygons_endpoint(
 @app.get("/")
 def root():
     return {"status": "veikia"}
+
+
+@app.get("/health")
+@app.get("/healthz")
+def health():
+    """Liveness + readiness probe for the load balancer / uptime monitor.
+    Returns 200 with db:ok when a trivial DB query succeeds, 503 otherwise
+    (so a wedged DB takes the instance out of rotation instead of serving
+    errors). No auth — must be hittable by infra. (2026-06-19 ops baseline.)"""
+    db_ok = False
+    try:
+        db.user_usage_since("__healthcheck__", hours=1)  # cheap indexed query
+        db_ok = True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("health check DB probe failed: %r", exc)
+    body = {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "error"}
+    if not db_ok:
+        return JSONResponse(status_code=503, content=body)
+    return body
