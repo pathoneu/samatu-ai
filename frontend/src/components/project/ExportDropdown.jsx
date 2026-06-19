@@ -106,18 +106,28 @@ function buildPayload(project, allowedSkyriai = null) {
   };
 }
 
-async function downloadFile(endpoint, project, filename, allowedSkyriai) {
+async function downloadFile(endpoint, project, filename, allowedSkyriai, extra = {}) {
   // Sprint §AUDIT (2026-04-29): credentials: 'include' required after backend
   // export endpoints became auth-gated.
-  // 2026-05-06: include company_name from project (override) or global Settings.
-  let companyName = project.company_name || '';
-  if (!companyName) {
-    try {
-      const s = JSON.parse(localStorage.getItem('samatu_settings') || '{}');
-      companyName = s.company_name || '';
-    } catch { /* ignore */ }
-  }
-  const payload = { ...buildPayload(project, allowedSkyriai), imone: companyName };
+  // 2026-06-19: send the full branding block (logo + legal details) from global
+  // Settings plus the per-export client/objektas so the deliverable reads as a
+  // real LT pasiūlymas, not a raw quantity dump.
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem('samatu_settings') || '{}'); } catch { /* ignore */ }
+  const branding = {
+    imone:        project.company_name || s.company_name || '',
+    company_logo: s.company_logo || '',
+    imones_kodas: s.imones_kodas || '',
+    pvm_kodas:    s.pvm_kodas || '',
+    adresas:      s.adresas || '',
+    telefonas:    s.telefonas || '',
+    el_pastas:    s.el_pastas || '',
+    iban:         s.iban || '',
+    uzsakovas:    extra.uzsakovas || project.uzsakovas || '',
+    objektas:     extra.objektas || project.objektas || '',
+    pasiulymo_nr: extra.pasiulymo_nr || project.pasiulymo_nr || '',
+  };
+  const payload = { ...buildPayload(project, allowedSkyriai), ...branding };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
     credentials: 'include',
@@ -154,7 +164,7 @@ export default function ExportDropdown({ project }) {
     setFilterFor(action);
   };
 
-  const handleConfirm = async ({ skyriai, format }) => {
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr }) => {
     // Guard: exporting a sąmata where every line is 0,00 € sends the client a
     // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
     const priced = project.pozicijos || project.darbu_sarasas || project.rows || [];
@@ -171,10 +181,11 @@ export default function ExportDropdown({ project }) {
     setLoading(format);
     try {
       const safeName = (project.name || 'projektas').replace(/[^\w\s-]/g, '').trim();
+      const extra = { uzsakovas, objektas, pasiulymo_nr };
       if (format === 'excel') {
-        await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai);
+        await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'pdf') {
-        await downloadFile('generate-pdf', project, `${safeName}.pdf`, skyriai);
+        await downloadFile('generate-pdf', project, `${safeName}.pdf`, skyriai, extra);
       }
       // Sprint §FIX-9 (2026-04-29): F2/F3 forms removed per user feedback.
       // Code preserved in docs/superpowers/backup-2026-04-29-f2-f3-forms.py

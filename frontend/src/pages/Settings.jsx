@@ -22,6 +22,16 @@ export default function Settings() {
   const [vatRate, setVatRate] = useState('21');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Branding / business-document details (2026-06-19) — rendered into export
+  // PDF/Excel headers so the deliverable looks like a real LT pasiūlymas.
+  const [companyLogo, setCompanyLogo] = useState('');
+  const [imonesKodas, setImonesKodas] = useState('');
+  const [pvmKodas, setPvmKodas] = useState('');
+  const [adresas, setAdresas] = useState('');
+  const [telefonas, setTelefonas] = useState('');
+  const [elPastas, setElPastas] = useState('');
+  const [iban, setIban] = useState('');
+
   // Profile fields
   const [profileName, setProfileName] = useState('');
   const [profileCompany, setProfileCompany] = useState('');
@@ -37,6 +47,13 @@ export default function Settings() {
     const s = getSettings();
     if (s.company_name) setCompanyName(s.company_name);
     if (s.vat_rate) setVatRate(String(s.vat_rate));
+    if (s.company_logo) setCompanyLogo(s.company_logo);
+    if (s.imones_kodas) setImonesKodas(s.imones_kodas);
+    if (s.pvm_kodas) setPvmKodas(s.pvm_kodas);
+    if (s.adresas) setAdresas(s.adresas);
+    if (s.telefonas) setTelefonas(s.telefonas);
+    if (s.el_pastas) setElPastas(s.el_pastas);
+    if (s.iban) setIban(s.iban);
   }, []);
 
   useEffect(() => {
@@ -46,9 +63,33 @@ export default function Settings() {
     }
   }, [user]);
 
+  const handleLogoFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { toast.error('Tinka tik paveikslėlis (PNG/JPG)'); return; }
+    if (file.size > 500 * 1024) { toast.error('Logotipas per didelis (max 500 KB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setCompanyLogo(reader.result);
+    reader.onerror = () => toast.error('Nepavyko nuskaityti failo');
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = () => {
     setIsSaving(true);
-    saveSettings({ company_name: companyName, vat_rate: parseInt(vatRate) });
+    // saveSettings REPLACES the whole object — merge with existing so we never
+    // wipe unrelated keys (e.g. price-list prefs stored under the same key).
+    saveSettings({
+      ...getSettings(),
+      company_name: companyName,
+      vat_rate: parseInt(vatRate),
+      company_logo: companyLogo,
+      imones_kodas: imonesKodas,
+      pvm_kodas: pvmKodas,
+      adresas,
+      telefonas,
+      el_pastas: elPastas,
+      iban,
+    });
     setIsSaving(false);
     toast.success('Nustatymai išsaugoti');
   };
@@ -144,6 +185,56 @@ export default function Settings() {
                   <SelectItem value="0">0%</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground">Logotipas</Label>
+              <div className="mt-1.5 flex items-center gap-3">
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Logotipas" className="h-12 w-auto max-w-[140px] object-contain rounded border border-border bg-white p-1" />
+                ) : (
+                  <div className="h-12 w-[140px] rounded border border-dashed border-border flex items-center justify-center text-[11px] text-muted-foreground">Nėra logotipo</div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <label className="inline-flex items-center px-3 py-1.5 text-xs rounded border border-border bg-background hover:bg-muted/40 cursor-pointer">
+                    Įkelti…
+                    <input type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
+                  </label>
+                  {companyLogo && (
+                    <button type="button" onClick={() => setCompanyLogo('')} className="text-[11px] text-muted-foreground hover:text-destructive text-left">
+                      Pašalinti
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">PNG/JPG, iki 500 KB. Rodomas eksportuojamų PDF/Excel antraštėje.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground">Įmonės kodas</Label>
+                <Input value={imonesKodas} onChange={e => setImonesKodas(e.target.value)} placeholder="123456789" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">PVM mokėtojo kodas</Label>
+                <Input value={pvmKodas} onChange={e => setPvmKodas(e.target.value)} placeholder="LT123456789" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-sm text-muted-foreground">Adresas</Label>
+                <Input value={adresas} onChange={e => setAdresas(e.target.value)} placeholder="Vilniaus g. 1, Kaunas" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Telefonas</Label>
+                <Input value={telefonas} onChange={e => setTelefonas(e.target.value)} placeholder="+370 600 00000" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">El. paštas</Label>
+                <Input value={elPastas} onChange={e => setElPastas(e.target.value)} placeholder="info@imone.lt" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-sm text-muted-foreground">IBAN (atsiskaitymams)</Label>
+                <Input value={iban} onChange={e => setIban(e.target.value)} placeholder="LT12 3456 7890 1234 5678" className="mt-1.5 bg-background border-border" />
+              </div>
             </div>
           </div>
         </div>

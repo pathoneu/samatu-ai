@@ -3923,6 +3923,21 @@ async def generate_excel(request: Request, data: dict):
     perspejimani = data.get("perspejimani") or []
     today_str    = _date.today().strftime("%Y-%m-%d")
 
+    # Branding + client fields (2026-06-19). Folded into the banner subtitle so
+    # the existing table layout (data starts row 3) is untouched.
+    _company_bits = [b for b in [
+        f"Įm. k.: {(data.get('imones_kodas') or '').strip()}" if (data.get('imones_kodas') or '').strip() else "",
+        f"PVM: {(data.get('pvm_kodas') or '').strip()}" if (data.get('pvm_kodas') or '').strip() else "",
+        (data.get('adresas') or '').strip(),
+        (data.get('telefonas') or '').strip(),
+        (data.get('el_pastas') or '').strip(),
+        f"IBAN: {(data.get('iban') or '').strip()}" if (data.get('iban') or '').strip() else "",
+    ] if b]
+    _client_bits = [b for b in [
+        f"Užsakovas: {(data.get('uzsakovas') or '').strip()}" if (data.get('uzsakovas') or '').strip() else "",
+        f"Objektas: {(data.get('objektas') or '').strip()}" if (data.get('objektas') or '').strip() else "",
+    ] if b]
+
     wb = openpyxl.Workbook()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -3942,9 +3957,10 @@ async def generate_excel(request: Request, data: dict):
         c.alignment = Alignment(horizontal="left", vertical="center", indent=2)
         ws.row_dimensions[1].height = 26
 
-        ws.merge_cells("A2:D2")
-        ws["A2"].value = today_str
+        ws.merge_cells("A2:F2")
+        ws["A2"].value = "  ·  ".join([today_str, *_company_bits, *_client_bits])
         ws["A2"].font  = Font(size=8, color="888888")
+        ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=2)
         ws.row_dimensions[2].height = 14
 
         # Sprint §FIX-3 (2026-04-29): Conf. stulpelis pašalintas iš header'io
@@ -4307,12 +4323,50 @@ async def generate_pdf(request: Request, data: dict):
     viso_su_pvm  = round(viso_be_pvm + pvm, 2)
     doc_title    = "VIDAUS APDAILOS KIEKIAI" if tipas_pdf == "interjeras" else "KIEKIŲ ŽINIARAŠTIS"
 
+    # Branding + business-document fields (2026-06-19). All optional — KŽ exports
+    # without branding render exactly as before (the info block is skipped).
+    company_logo = (data.get("company_logo") or "").strip()
+    imones_kodas = (data.get("imones_kodas") or "").strip()
+    pvm_kodas    = (data.get("pvm_kodas") or "").strip()
+    adresas      = (data.get("adresas") or "").strip()
+    telefonas    = (data.get("telefonas") or "").strip()
+    el_pastas    = (data.get("el_pastas") or "").strip()
+    iban         = (data.get("iban") or "").strip()
+    uzsakovas    = (data.get("uzsakovas") or "").strip()
+    objektas     = (data.get("objektas") or "").strip()
+    pasiulymo_nr = (data.get("pasiulymo_nr") or "").strip()
+    galioja_iki  = (data.get("galioja_iki") or "").strip()
+    if not galioja_iki:
+        from datetime import timedelta as _timedelta
+        galioja_iki = (_date.today() + _timedelta(days=30)).strftime("%Y-%m-%d")
+
     def _n(v):
         if not isinstance(v, (int, float)):
             return str(v)
         return f"{v:,.2f}".replace(",", "\u202f").replace(".", ",")
 
     story = []
+
+    def _logo_flowable(b64, max_w=3.5 * cm, max_h=2.0 * cm):
+        """Decode a base64 (optionally data-URL) logo into a scaled ReportLab
+        Image. Returns None on any failure so the header falls back gracefully."""
+        if not b64:
+            return None
+        try:
+            import base64 as _b64, io as _io
+            from reportlab.platypus import Image as _RLImage
+            from reportlab.lib.utils import ImageReader as _ImageReader
+            raw = b64.split(",", 1)[1] if (b64.strip().lower().startswith("data:") and "," in b64) else b64
+            data_bytes = _b64.b64decode(raw)
+            iw, ih = _ImageReader(_io.BytesIO(data_bytes)).getSize()
+            if not iw or not ih:
+                return None
+            scale = min(max_w / iw, max_h / ih)
+            img = _RLImage(_io.BytesIO(data_bytes), width=iw * scale, height=ih * scale)
+            img.hAlign = "LEFT"
+            return img
+        except Exception:
+            return None
 
     # ── Logo + header bar ─────────────────────────────────────────────────────
     logo_style = ParagraphStyle(
@@ -4328,18 +4382,27 @@ async def generate_pdf(request: Request, data: dict):
         textColor=colors.HexColor("#BBCCDD"), leading=11,
     )
 
-    # Task 8: Cover page title from doc_title
-    # Logo placeholder box
+    # Logo: real uploaded image if provided, else the company name, else blank.
+    # Never the old grey "ĮMONĖS LOGOTIPAS" stub — it reads as an unfinished template.
+    _logo_img = _logo_flowable(company_logo)
+    if _logo_img is not None:
+        logo_cell = _logo_img
+    elif imone:
+        logo_cell = Paragraph(imone, ParagraphStyle(
+            "logo_name", fontName=_FONT_BOLD, fontSize=11,
+            textColor=DARK, leading=14))
+    else:
+        logo_cell = Paragraph("", logo_style)
     logo_box = Table(
-        [[Paragraph("ĮMONĖS\nLOGOTIPAS", logo_style)]],
+        [[logo_cell]],
         colWidths=[3.5*cm], rowHeights=[2.0*cm],
     )
     logo_box.setStyle(TableStyle([
-        ("BOX",         (0,0), (-1,-1), 1, colors.HexColor("#AAAAAA")),
-        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
-        ("BACKGROUND",  (0,0), (-1,-1), colors.HexColor("#F0F0F0")),
-        ("TOPPADDING",  (0,0), (-1,-1), 4),
-        ("BOTTOMPADDING",(0,0),(-1,-1), 4),
+        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+        ("LEFTPADDING",  (0,0), (-1,-1), 0),
+        ("RIGHTPADDING", (0,0), (-1,-1), 0),
+        ("TOPPADDING",   (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 4),
     ]))
 
     # 2026-05-06: surface company name in header sub-line if provided.
@@ -4371,7 +4434,41 @@ async def generate_pdf(request: Request, data: dict):
         ("BACKGROUND",   (1,0), (1, 0),  DARK),
     ]))
     story.append(header_row)
-    story.append(Spacer(1, 0.5*cm))
+    story.append(Spacer(1, 0.45*cm))
+
+    # ── Vykdytojas / Užsakovas info block (LT pasiūlymas furniture) ───────────
+    _ival = ParagraphStyle("ival", fontName=_FONT_NORMAL, fontSize=8.5,
+                           textColor=DARK, leading=12.5)
+
+    def _info_lines(pairs):
+        flow = [Paragraph(f'<font color="#8a8a8a">{lbl}:</font> {val}', _ival)
+                for lbl, val in pairs if val]
+        return flow or [Paragraph("", _ival)]
+
+    _left_info = _info_lines([
+        ("Vykdytojas", imone), ("Įmonės kodas", imones_kodas),
+        ("PVM kodas", pvm_kodas), ("Adresas", adresas),
+        ("Tel.", telefonas), ("El. paštas", el_pastas), ("IBAN", iban),
+    ])
+    _right_info = _info_lines([
+        ("Užsakovas", uzsakovas), ("Objektas", objektas),
+        ("Pasiūlymo nr.", pasiulymo_nr), ("Data", doc_date),
+        ("Galioja iki", galioja_iki),
+    ])
+    if any([imone, imones_kodas, pvm_kodas, adresas, telefonas, el_pastas,
+            iban, uzsakovas, objektas, pasiulymo_nr]):
+        info_block = Table([[_left_info, _right_info]],
+                           colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
+        info_block.setStyle(TableStyle([
+            ("VALIGN",       (0,0), (-1,-1), "TOP"),
+            ("LEFTPADDING",  (0,0), (0,0), 0),
+            ("LEFTPADDING",  (1,0), (1,0), 10),
+            ("RIGHTPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING",   (0,0), (-1,-1), 2),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
+        ]))
+        story.append(info_block)
+        story.append(Spacer(1, 0.4*cm))
 
     # ── Project name ──────────────────────────────────────────────────────────
     story.append(Paragraph(projektas, ParagraphStyle(
