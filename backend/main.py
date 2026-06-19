@@ -150,15 +150,24 @@ from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Register Unicode-capable fonts for Lithuanian characters
-_ARIAL_PATH      = "/System/Library/Fonts/Supplemental/Arial.ttf"
-_ARIAL_BOLD_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+# Register a Unicode-capable font (Lithuanian glyphs ąčęėįšųūž) for PDF export.
+# DejaVu Sans (Bitstream Vera license — free to redistribute in closed-source) is
+# VENDORED in-repo so it works in every deployment. The previous code registered
+# fonts from hardcoded macOS paths (/System/Library/Fonts/...) that don't exist on
+# the Render Linux box, then silently fell back to glyph-less Helvetica — so every
+# production "komercinis pasiūlymas" PDF rendered ąčęėįšųūž as boxes. (2026-06-19)
+import os as _os_font
+_FONT_DIR = _os_font.path.join(_os_font.path.dirname(_os_font.path.abspath(__file__)), "assets", "fonts")
+_ARIAL_PATH      = _os_font.path.join(_FONT_DIR, "DejaVuSans.ttf")
+_ARIAL_BOLD_PATH = _os_font.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf")
 try:
     pdfmetrics.registerFont(TTFont("ArialUni",     _ARIAL_PATH))
     pdfmetrics.registerFont(TTFont("ArialUniBold", _ARIAL_BOLD_PATH))
     _FONT_NORMAL = "ArialUni"
     _FONT_BOLD   = "ArialUniBold"
-except Exception:
+except Exception as _font_exc:
+    print(f"[pdf] WARNING: could not register vendored Unicode font at {_FONT_DIR} "
+          f"({_font_exc!r}); falling back to Helvetica — Lithuanian characters will NOT render correctly")
     _FONT_NORMAL = "Helvetica"
     _FONT_BOLD   = "Helvetica-Bold"
 import json
