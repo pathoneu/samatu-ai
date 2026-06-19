@@ -299,6 +299,16 @@ export default function NewProject() {
         });
       } else if (projType === 'interior') {
         if (!json.patalpos) throw new Error('Netikėtas atsakymo formatas');
+        // Zero-room result = the most common first-run dead end (wrong PDF type:
+        // a photo, a KŽ table, a facade-only sheet). Surface a recoverable message
+        // instead of silently creating an empty project. (2026-06-19)
+        if (json.patalpos.length === 0) {
+          throw new Error(
+            'AI nerado patalpų šiame brėžinyje. Patikrinkite, ar įkėlėte interjero / aukšto ' +
+            'planą (ne nuotrauką, ne KŽ lentelę, ne fasadą). Jei tai tikrai planas — pabandykite ' +
+            'dar kartą arba pridėkite patalpas rankiniu būdu.'
+          );
+        }
         project = createProject({
           ...json,
           name:            projectName || json.projektas || 'Interjero projektas',

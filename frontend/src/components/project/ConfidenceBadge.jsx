@@ -15,19 +15,23 @@ import { computeAreaConfidence } from '@/lib/areaConfidence';
 import { markRoomVerified } from '@/lib/projectStore';
 import { Check } from 'lucide-react';
 
+// Light-paper palette (#f6f5f2). The previous dark-theme -300 shades on a /15
+// fill rendered washed-out and sub-AA on the light background; -700 text on a
+// -50 fill matches the readable WorkRow treatment and the --conf-* tokens.
+// (2026-06-19 — repairs the product's hero trust signal.)
 const STYLES = {
   high: {
-    cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: '🟢',
     label: 'tikslus',
   },
   medium: {
-    cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    cls: 'bg-amber-50 text-amber-700 border-amber-200',
     dot: '🟡',
     label: 'tikrinti',
   },
   low: {
-    cls: 'bg-red-500/15 text-red-300 border-red-500/30',
+    cls: 'bg-red-50 text-red-700 border-red-200',
     dot: '🔴',
     label: 'neaišku',
   },
