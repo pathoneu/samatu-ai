@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { recompute } from '../../lib/recomputeApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -148,7 +149,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       onRecomputed(result);
     } catch (err) {
       console.error('Recompute failed:', err);
-      alert(`Klaida perskaičiuojant: ${err.message}`);
+      toast.error(`Klaida perskaičiuojant: ${err.message}`);
     } finally {
       setRecomputing(false);
     }

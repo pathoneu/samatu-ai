@@ -21,6 +21,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
@@ -948,8 +949,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     const positions = project.pozicijos || project.darbu_sarasas || [];
     const result = applyPriceListToPositions(positions, priceList.items || [], opts);
     if (result.applied === 0) {
-      // eslint-disable-next-line no-alert
-      alert(
+      toast.error(
         `Iš kainyno „${priceList.name}" nepavyko pritaikyti nė vienos eilutės. ` +
         `Patikrinkite ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).`,
       );
@@ -960,8 +960,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     if (project.darbu_sarasas) updated.darbu_sarasas = result.items;
     updated._last_applied_pricelist = { id: priceList.id, name: priceList.name, applied_at: new Date().toISOString() };
     onProjectChange?.(updated);
-    // eslint-disable-next-line no-alert
-    alert(`Pritaikyta: ${result.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${result.skipped}.`);
+    toast.success(`Pritaikyta: ${result.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${result.skipped}.`);
   };
 
   if (priceLists.length === 0) {

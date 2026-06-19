@@ -19,6 +19,7 @@ import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
 
 function fmt(v, d = 2) {
@@ -85,6 +86,7 @@ function useTakeoff(projectId) {
 const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla']);
 
 export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange }) {
+  const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
   // Provenance dots OFF by default — too noisy when most rows are computed.
@@ -96,8 +98,12 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
   // unreliable PDF coords.
   const [popoverState, setPopoverState] = useState(null);  // {room, anchorRect} | null
 
-  const handleRemovePolygon = (id) => {
-    if (!window.confirm('Ištrinti pažymėjimą?')) return;
+  const handleRemovePolygon = async (id) => {
+    if (!(await confirm({
+      title: 'Ištrinti pažymėjimą?',
+      confirmText: 'Ištrinti',
+      destructive: true,
+    }))) return;
     setTakeoff(t => removePolygon(t, id));
   };
 

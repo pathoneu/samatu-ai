@@ -13,6 +13,7 @@
 import React, {
   forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState,
 } from 'react';
+import { toast } from 'sonner';
 
 const SNAP_PX = 20;
 
@@ -349,7 +350,7 @@ const AnnotationCanvas = forwardRef(function AnnotationCanvas(
 
     if (tool === TOOLS.MEASURE) {
       if (!scale) {
-        alert('Pirmiausia kalibruokite mastelį.');
+        toast.error('Pirmiausia kalibruokite mastelį.');
         return;
       }
       if (!draftStart) { setDraftStart(p); return; }

@@ -12,6 +12,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import PdfPage from '@/components/annotator/PdfPage';
@@ -204,7 +205,7 @@ export default function Annotator() {
       setSymbols((prev) => [...prev, ...newSyms]);
     } catch (err) {
       console.error(err);
-      alert('Simbolių aptikimas nepavyko');
+      toast.error('Simbolių aptikimas nepavyko');
     } finally {
       setDetecting(false);
     }
@@ -279,7 +280,7 @@ export default function Annotator() {
       setCalibrationModalOpen(false);
     } catch (err) {
       console.error('calibration failed', err);
-      alert('Kalibravimas nepavyko');
+      toast.error('Kalibravimas nepavyko');
     } finally {
       setCalibrationFetching(false);
     }
@@ -352,7 +353,7 @@ export default function Annotator() {
               ? `/api/projects/${projectId}/export-excel?fixture=${fixture}`
               : `/api/projects/${projectId}/export-excel`;
             const r = await fetch(url, { method: 'POST', credentials: 'include' });
-            if (!r.ok) return alert('Eksportavimas nepavyko');
+            if (!r.ok) return toast.error('Eksportavimas nepavyko');
             const blob = await r.blob();
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -485,7 +486,7 @@ export default function Annotator() {
           const advance = () => {
             if (walkthroughIdx + 1 >= total) {
               setWalkthroughActive(false);
-              alert(`Patvirtinta: ${confirmed}, Pakoreguota: ${corrected}, Iš viso: ${total}`);
+              toast(`Patvirtinta: ${confirmed}, Pakoreguota: ${corrected}, Iš viso: ${total}`);
               return;
             }
             const nextIdx = walkthroughIdx + 1;
@@ -763,7 +764,7 @@ function CalibrationModal({ initialAi, initialOverrides, onCancel, onSubmit, bus
       if (Number.isFinite(n) && n > 0) overrides[k] = n;
     }
     if (Object.keys(overrides).length === 0) {
-      alert('Įveskite bent vieną kategoriją.');
+      toast.error('Įveskite bent vieną kategoriją.');
       return;
     }
     onSubmit(overrides);

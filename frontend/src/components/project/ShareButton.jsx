@@ -8,9 +8,11 @@
 import { useState } from 'react';
 import { Share2, Check, Copy, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ShareButton({ project }) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
@@ -40,7 +42,12 @@ export default function ShareButton({ project }) {
   };
 
   const revoke = async () => {
-    if (!window.confirm('Atšaukti nuorodą? Po to ji nebeveiks.')) return;
+    if (!(await confirm({
+      title: 'Atšaukti nuorodą?',
+      description: 'Po to ji nebeveiks.',
+      confirmText: 'Atšaukti nuorodą',
+      destructive: true,
+    }))) return;
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/projects/${project.id}/share`, {

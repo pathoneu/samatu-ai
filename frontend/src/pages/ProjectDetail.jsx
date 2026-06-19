@@ -13,11 +13,13 @@ import ExportModal from '@/components/project/ExportModal';
 import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
 import { getProject, updateProject, deleteProject, pullProjectsFromBackend } from '@/lib/projectStore';
+import { useConfirm } from '@/components/ui/confirm-provider';
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [collapsedSections, setCollapsedSections] = useState({});
   const [selectedRow, setSelectedRow] = useState(null);
@@ -75,8 +77,14 @@ export default function ProjectDetail() {
     setHasUnsaved(true);
   }, []);
 
-  const handleDelete = () => {
-    if (window.confirm('Ištrinti projektą?')) {
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Ištrinti projektą?',
+      description: 'Projektas bus perkeltas į šiukšliadėžę (atkuriama 30 d.).',
+      confirmText: 'Ištrinti',
+      destructive: true,
+    });
+    if (ok) {
       deleteProject(id);
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate('/');

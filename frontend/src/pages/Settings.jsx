@@ -11,6 +11,7 @@ import {
   getArchivedProjects, restoreProject, permanentlyDeleteProject,
 } from '@/lib/projectStore';
 import { downloadErrorLog, getErrorLog, clearErrorLog } from '@/lib/errorTracker';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { ltPlural } from '@/lib/ltPlural';
 import { useAuth } from '@/lib/authContext';
 import { API_BASE } from '@/lib/apiBase';
@@ -236,6 +237,7 @@ export default function Settings() {
 }
 
 function TrashSection() {
+  const confirm = useConfirm();
   const [archived, setArchived] = useState(() => getArchivedProjects());
 
   const refresh = () => setArchived(getArchivedProjects());
@@ -246,8 +248,13 @@ function TrashSection() {
     toast.success('Projektas atstatytas');
   };
 
-  const handlePermanent = (id, name) => {
-    if (!window.confirm(`Visam laikui ištrinti „${name}"? Šio veiksmo atšaukti negalėsi.`)) return;
+  const handlePermanent = async (id, name) => {
+    if (!(await confirm({
+      title: 'Ištrinti projektą visam laikui?',
+      description: `„${name}" bus ištrintas negrįžtamai. Šio veiksmo atšaukti negalėsi.`,
+      confirmText: 'Ištrinti',
+      destructive: true,
+    }))) return;
     permanentlyDeleteProject(id);
     refresh();
     toast.success('Projektas ištrintas visam laikui');
@@ -322,6 +329,7 @@ function TrashSection() {
 }
 
 function ErrorLogSection() {
+  const confirm = useConfirm();
   const [count, setCount] = useState(getErrorLog().length);
 
   const handleExport = () => {
@@ -334,8 +342,12 @@ function ErrorLogSection() {
     toast.success(`Eksportuota ${entries.length} klaida${entries.length === 1 ? '' : entries.length < 10 ? 's' : 'ų'}`);
   };
 
-  const handleClear = () => {
-    if (!window.confirm('Ar tikrai išvalyti klaidų žurnalą?')) return;
+  const handleClear = async () => {
+    if (!(await confirm({
+      title: 'Išvalyti klaidų žurnalą?',
+      confirmText: 'Išvalyti',
+      destructive: true,
+    }))) return;
     clearErrorLog();
     setCount(0);
     toast.success('Žurnalas išvalytas');
