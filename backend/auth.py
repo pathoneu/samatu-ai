@@ -150,6 +150,26 @@ def require_user(request: Request) -> dict:
     return user
 
 
+def require_billable_user(request: Request) -> dict:
+    """FastAPI Depends — require_user PLUS the per-user Vision spend cap.
+
+    Use on every endpoint that triggers an Anthropic call. Without it, a paid
+    Vision endpoint authenticated by plain require_user bypasses the spend cap
+    entirely, so a single account can loop it and drain the API key (2026-05-07
+    audit found this on several endpoints; 2026-06-19 closed the api/* routers
+    — vision_fill / lasso_rerun / symbols). The cap helper lives in main.py;
+    it is imported lazily so this module stays free of a circular import."""
+    user = require_user(request)
+    try:
+        from main import _check_user_spend_cap
+        _check_user_spend_cap(user["id"])
+    except HTTPException:
+        raise  # the 429 spend-cap rejection must propagate
+    except Exception:
+        pass   # never block a request on a cap-machinery hiccup
+    return user
+
+
 def require_admin(request: Request) -> dict:
     """FastAPI Depends — raises 401 if not logged in, 403 if not admin."""
     if AUTH_DISABLED:

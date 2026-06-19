@@ -57,7 +57,7 @@ def call_vision_for_polygon(
 @router.post("/vision-fill")
 def vision_fill(
     req: VisionFillRequest,
-    user: dict = Depends(_auth.require_user),
+    user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     try:
         result = call_vision_for_polygon(

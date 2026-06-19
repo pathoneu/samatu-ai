@@ -60,6 +60,10 @@ async def detect_symbols_endpoint(
     page: int = Query(default=5, ge=1, description="1-indexed page number to scan"),
     fixture: str | None = Query(default=None),
 ) -> dict[str, Any]:
+    # Auth + spend cap BEFORE any Vision work. The fixture branch of
+    # _resolve_pdf_bytes skipped require_user entirely, so detect-symbols?fixture=
+    # was an unauthenticated, uncapped Vision call anyone could loop. (2026-06-19)
+    _auth.require_billable_user(request)
     pdf_bytes = _resolve_pdf_bytes(request, project_id, fixture)
     pages = pdf_to_b64_images(pdf_bytes, max_pages=page)
     if len(pages) < page:

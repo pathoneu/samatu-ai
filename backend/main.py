@@ -1730,6 +1730,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
         async with asyncio.timeout(900):  # 15 min – 65-page interior PDFs run ~9-10 min
 
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
 
             # ── Path 1: pdfplumber direct extraction ─────────────────────────
             try:
@@ -3267,6 +3268,7 @@ async def detect_type(request: Request, file: UploadFile = File(...)):
     """Quick peek — classify PDF as 'kz', 'interior', or 'unknown'."""
     _billable_user(request)
     contents = await file.read()
+    _validate_pdf_upload(contents, file.filename or "")
     proj_type = await asyncio.to_thread(_detect_project_type, contents)
     return {"type": proj_type}
 
@@ -3723,6 +3725,7 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3756,6 +3759,7 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3796,6 +3800,7 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3839,6 +3844,7 @@ async def extract_concrete(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")

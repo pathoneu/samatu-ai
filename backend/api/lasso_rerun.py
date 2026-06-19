@@ -49,7 +49,7 @@ def vision_lasso_extract(project_id: str, page_idx: int,
 @router.post("/lasso-rerun")
 def lasso_rerun(
     req: LassoRequest,
-    user: dict = Depends(_auth.require_user),
+    user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     try:
         result = vision_lasso_extract(
