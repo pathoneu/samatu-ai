@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
 import { API_BASE as API } from '@/lib/apiBase';
+import { useConfirm } from '@/components/ui/confirm-provider';
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
@@ -138,6 +139,7 @@ export default function ExportDropdown({ project }) {
   const [loading, setLoading] = useState(null);
   const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | null
   const ref = useRef(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     const onClick = (e) => {
@@ -153,6 +155,19 @@ export default function ExportDropdown({ project }) {
   };
 
   const handleConfirm = async ({ skyriai, format }) => {
+    // Guard: exporting a sąmata where every line is 0,00 € sends the client a
+    // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
+    const priced = project.pozicijos || project.darbu_sarasas || project.rows || [];
+    const anyPrice = priced.some((r) => Number(r?.kaina) > 0);
+    if (priced.length > 0 && !anyPrice) {
+      const ok = await confirm({
+        title: 'Eksportuoti be kainų?',
+        description: 'Nė viena pozicija neturi kainos — dokumente bus tik kiekiai, o suma 0,00 €. Rekomenduojama pirma pritaikyti kainyną.',
+        confirmText: 'Eksportuoti vis tiek',
+        cancelText: 'Grįžti ir įvesti kainas',
+      });
+      if (!ok) return;
+    }
     setLoading(format);
     try {
       const safeName = (project.name || 'projektas').replace(/[^\w\s-]/g, '').trim();
