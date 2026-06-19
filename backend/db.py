@@ -272,10 +272,18 @@ def upsert_project(project_id: str, payload: dict, user_id: str | None = None) -
             "SELECT created_at, user_id FROM projects WHERE id = ?", (project_id,)
         ).fetchone()
         if existing:
-            if user_id and existing["user_id"] and existing["user_id"] != user_id:
+            # Ownership barrier (2026-06-19 security hunt): when the caller is
+            # authenticated, reject a write to a project owned by anyone else —
+            # INCLUDING an owner-less (NULL) pre-auth row. The old guard had an
+            # `existing["user_id"] and` short-circuit that SKIPPED the check for
+            # NULL-owner rows, letting any logged-in user overwrite/wipe an orphan
+            # project by id. (Orphans are reassigned to the bootstrap admin by
+            # _backfill_orphan_project_owners at startup.) user_id is None only in
+            # SAMATU_AUTH_DISABLED single-tenant mode, where ownership doesn't apply.
+            if user_id and existing["user_id"] != user_id:
                 raise PermissionError(f"User {user_id} does not own project {project_id}")
             created_at = existing["created_at"]
-            owner = existing["user_id"]
+            owner = existing["user_id"] or user_id
         else:
             created_at = payload.get("created_date") or now
             owner = user_id
@@ -628,6 +636,33 @@ def get_project_by_share_token(token: str) -> dict | None:
         return d
 
 
+def _backfill_orphan_project_owners() -> int:
+    """Assign owner-less (NULL user_id) projects — left over from the pre-auth
+    single-tenant era — to the bootstrap admin (the first registered admin), so
+    no orphan rows remain for the upsert ownership barrier to have to fend off.
+    Returns the number of rows reassigned. Best-effort; never blocks startup.
+    (2026-06-19 security hunt.)"""
+    try:
+        with _conn() as c:
+            n_orphans = c.execute(
+                "SELECT COUNT(*) AS n FROM projects WHERE user_id IS NULL"
+            ).fetchone()["n"]
+            if not n_orphans:
+                return 0
+            admin = c.execute(
+                "SELECT id FROM users WHERE is_admin = 1 ORDER BY created_at ASC LIMIT 1"
+            ).fetchone()
+            if not admin:
+                return 0  # no admin yet → leave orphans inert (unreadable/unwritable)
+            c.execute(
+                "UPDATE projects SET user_id = ? WHERE user_id IS NULL", (admin["id"],)
+            )
+            return n_orphans
+    except Exception:
+        return 0
+
+
 # Initialize schema on module import
 init_schema()
 _migrate_schema()
+_backfill_orphan_project_owners()

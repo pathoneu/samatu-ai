@@ -55,11 +55,25 @@ export function AuthProvider({ children }) {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Security (2026-06-19 hunt): a login/register is a USER SWITCH. Purge the
+  // previous user's cached projects + the module-level pull guard so the new
+  // user's Dashboard actually fetches their OWN data — otherwise, on a shared
+  // browser or after a silent session expiry, the next person sees (and can
+  // export) the prior user's projects from localStorage. Mirrors logout().
+  const purgeLocalUserData = async () => {
+    try { localStorage.removeItem('samatu_projects'); } catch { /* ignore */ }
+    try {
+      const { resetPullCache } = await import('@/lib/projectStore');
+      resetPullCache();
+    } catch { /* ignore */ }
+  };
+
   const login = async (email, password) => {
     const d = await apiCall('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+    await purgeLocalUserData();
     setUser(d.user);
     return d.user;
   };
@@ -69,6 +83,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ email, password, name, company_name }),
     });
+    await purgeLocalUserData();
     setUser(d.user);
     return { user: d.user, isFirstAdmin: d.is_first_admin };
   };

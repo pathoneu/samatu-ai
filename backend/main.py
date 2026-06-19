@@ -596,6 +596,26 @@ async def api_google_oauth_status():
     return {"enabled": GOOGLE_OAUTH_ENABLED}
 
 
+def _safe_next_path(raw: str | None) -> str:
+    """Only allow a same-origin RELATIVE redirect target after OAuth, to block the
+    open-redirect via ?next=https://evil.example (2026-06-19 security hunt). Accept
+    a single-leading-slash path; reject absolute URLs, scheme-relative '//host',
+    backslash tricks, and anything carrying a scheme or netloc."""
+    if not raw or not isinstance(raw, str):
+        return "/"
+    raw = raw.strip()
+    if not raw.startswith("/") or raw.startswith("//") or raw.startswith("/\\") or raw.startswith("/%2f"):
+        return "/"
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(raw)
+        if p.scheme or p.netloc:
+            return "/"
+    except Exception:
+        return "/"
+    return raw
+
+
 @app.get("/api/auth/google")
 async def api_google_login(request: Request):
     """Start Google OAuth flow. Redirects to Google's consent screen."""
@@ -604,8 +624,9 @@ async def api_google_login(request: Request):
     import secrets
     state = secrets.token_urlsafe(24)
     request.session["google_oauth_state"] = state
-    # Capture intended redirect after success (default = "/")
-    next_url = request.query_params.get("next", "/")
+    # Capture intended redirect after success (default = "/"). Sanitize on store
+    # so only a same-origin relative path is ever persisted (open-redirect guard).
+    next_url = _safe_next_path(request.query_params.get("next", "/"))
     request.session["google_oauth_next"] = next_url
     params = {
         "client_id": GOOGLE_CLIENT_ID,
@@ -686,7 +707,8 @@ async def api_google_callback(request: Request, code: str | None = None,
             )
     request.session["user_id"] = user["id"]
     db.update_user_login(user["id"])
-    return RedirectResponse(url=next_url or "/", status_code=302)
+    # Re-sanitize on use (defense in depth) before redirecting.
+    return RedirectResponse(url=_safe_next_path(next_url), status_code=302)
 
 
 # ── Project endpoints (per-user isolation) ──────────────────────────────────
