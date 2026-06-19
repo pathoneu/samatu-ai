@@ -947,21 +947,34 @@ async def api_get_shared(token: str):
         db.increment_share_view(token)
     except Exception as exc:
         log.warning("share view counter bump failed: %s", exc)
-    data = project.get("data") or {}
-    # Strip cost / token-level metadata so viewers can't see API spend.
+    import copy as _copy
+    raw = project.get("data") or {}
+    vat_mode = raw.get("vat_mode") if isinstance(raw, dict) else None
+    # Deep-copy so we never mutate the cached project dict, then strip ALL
+    # owner-internal / debug fields. The old code only popped cost keys from
+    # _meta and returned the raw blob, leaking the owner's user_id (account UUID),
+    # _overrides, extraction internals and per-room traces to any link holder —
+    # contradicting this endpoint's own "strips owner-internal fields" docstring.
+    # (2026-06-19 deliverable hunt.)
+    data = _copy.deepcopy(raw) if isinstance(raw, dict) else {}
     if isinstance(data, dict):
-        meta = data.get("_meta")
-        if isinstance(meta, dict):
-            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
-                       "cache_write_tokens", "cost_eur", "zoom_input_tokens",
-                       "zoom_output_tokens"):
-                meta.pop(k, None)
+        for k in ("user_id", "_overrides", "_meta", "_material_specs",
+                  "_plyteliu_specs", "puslapiai", "_eksplikacija", "_door_types",
+                  "detected_symbols_summary", "v9_meta"):
+            data.pop(k, None)
+        for r in (data.get("patalpos") or []):
+            if isinstance(r, dict):
+                for k in ("calculation_trace", "_zoom", "_zoom_changes", "_vote",
+                          "polygon_pdf", "polygon_pct", "bbox_pct",
+                          "page_width_pdf", "page_height_pdf"):
+                    r.pop(k, None)
     return {
         "id": project["id"],
         "name": project.get("name"),
         "company_name": project.get("company_name"),
         "tipas": project.get("tipas"),
         "archetipas": project.get("archetipas"),
+        "vat_mode": vat_mode,
         "bendras_plotas_m2": project.get("bendras_plotas_m2"),
         "vat_rate": project.get("vat_rate"),
         "created_at": project.get("created_at"),
@@ -4159,6 +4172,15 @@ async def generate_excel(request: Request, data: dict):
     # ─────────────────────────────────────────────────────────────────────────
     # Sheet 1: Sąmata (full combined list)
     # ─────────────────────────────────────────────────────────────────────────
+    # Normalize skyrius to canonical BEFORE writing the combined sheet, so its
+    # section headers match the per-section tab names. (2026-06-19 hunt: the
+    # normalization ran AFTER the main sheet, so legacy projects showed one
+    # section under two different names across the workbook.)
+    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION as _SKYRIUS_MIG
+    for e in eilutes:
+        _sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
+        e["skyrius"] = _SKYRIUS_MIG.get(_sec_raw, _sec_raw)
+
     ws_main = wb.active
     ws_main.title = "Sąmata"
     _write_sheet_header(ws_main, "SĄMATA")

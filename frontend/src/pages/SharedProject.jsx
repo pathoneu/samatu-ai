@@ -64,7 +64,13 @@ export default function SharedProject() {
   const patalpos = data.patalpos || data.v8_rooms || [];
   const darbai = (data.darbu_sarasas || []).filter(d => (d.kiekis || 0) > 0);
   const sumNoVat = darbai.reduce((s, d) => s + (d.kiekis || 0) * (d.kaina || 0), 0);
-  const vatRate = (p.vat_rate || 21) / 100;
+  // Reverse-VAT (atvirkštinis PVM) for renovation: no output VAT — must match the
+  // Excel/PDF export, which already does this. Otherwise the share link over-states
+  // the price by 21% and prints an illegal VAT line. (2026-06-19 deliverable hunt.)
+  const reverseVat = (p.vat_mode || '').toLowerCase() === 'reverse_vat'
+    || (p.archetipas || '').toLowerCase() === 'renovacija';
+  const vatRate = reverseVat ? 0 : (p.vat_rate || 21) / 100;
+  const sumWithVat = sumNoVat * (1 + vatRate);
   const totalArea = patalpos.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
 
   // Group darbai by skyrius for clean presentation.
@@ -97,7 +103,7 @@ export default function SharedProject() {
             <Stat label="Patalpos" value={patalpos.length} />
             <Stat label="Plotas" value={`${fmtNum(totalArea)} m²`} />
             <Stat label="Pozicijos" value={darbai.length} />
-            <Stat label="Suma su PVM" value={fmtEur(sumNoVat * (1 + vatRate))} />
+            <Stat label={reverseVat ? 'Suma (be PVM)' : 'Suma su PVM'} value={fmtEur(sumWithVat)} />
           </div>
         </div>
 
@@ -185,15 +191,22 @@ export default function SharedProject() {
                 <div className="text-muted-foreground text-xs">Suma be PVM</div>
                 <div className="font-semibold tabular-nums">{fmtEur(sumNoVat)}</div>
               </div>
+              {!reverseVat && (
+                <div>
+                  <div className="text-muted-foreground text-xs">PVM ({Math.round(vatRate * 100)}%)</div>
+                  <div className="font-semibold tabular-nums">{fmtEur(sumNoVat * vatRate)}</div>
+                </div>
+              )}
               <div>
-                <div className="text-muted-foreground text-xs">PVM ({Math.round(vatRate * 100)}%)</div>
-                <div className="font-semibold tabular-nums">{fmtEur(sumNoVat * vatRate)}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-xs">Iš viso</div>
-                <div className="font-bold tabular-nums">{fmtEur(sumNoVat * (1 + vatRate))}</div>
+                <div className="text-muted-foreground text-xs">{reverseVat ? 'VISO (be PVM)' : 'Iš viso'}</div>
+                <div className="font-bold tabular-nums">{fmtEur(sumWithVat)}</div>
               </div>
             </div>
+            {reverseVat && (
+              <p className="mt-2 text-right text-xs text-muted-foreground">
+                Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas (PVMĮ 96 str.).
+              </p>
+            )}
           </Section>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">

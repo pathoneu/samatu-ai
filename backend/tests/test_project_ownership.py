@@ -61,6 +61,32 @@ def test_backfill_assigns_orphans_to_bootstrap_admin(tmp_path, monkeypatch):
     assert db._backfill_orphan_project_owners() == 0
 
 
+def test_share_endpoint_strips_owner_internals(tmp_path, monkeypatch):
+    """/api/share/{token} must NOT leak the owner's user_id or extraction internals
+    to an unauthenticated link holder. (2026-06-19 deliverable hunt.)"""
+    _isolate(tmp_path, monkeypatch)
+    from fastapi.testclient import TestClient
+    from main import app
+    client = TestClient(app)
+    owner = db.create_user("o@x.lt", "h", name="O")
+    db.upsert_project("p1", {
+        "name": "Proj", "tipas": "interjeras",
+        "user_id": owner["id"],                       # internal — must NOT leak
+        "_overrides": {"secret": 1},
+        "_meta": {"cost_eur": 9.9, "model": "x"},
+        "darbu_sarasas": [{"aprasymas": "X", "kiekis": 1, "kaina": 5}],
+        "patalpos": [{"nr": "1", "calculation_trace": "internal", "plotas_m2": 10}],
+    }, user_id=owner["id"])
+    db.set_share_token("p1", "tok123")
+    r = client.get("/api/share/tok123")
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    for leaked in ("user_id", "_overrides", "_meta"):
+        assert leaked not in data, leaked
+    assert data["patalpos"][0].get("calculation_trace") is None
+    assert data["darbu_sarasas"][0]["aprasymas"] == "X"   # public fields survive
+
+
 def test_safe_next_path_blocks_open_redirect():
     from main import _safe_next_path
     # same-origin relative paths pass through

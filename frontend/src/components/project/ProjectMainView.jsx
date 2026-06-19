@@ -343,6 +343,12 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     return { darbo, medz, viso: darbo + medz, count };
   }, [darbai]);
 
+  // Reverse-VAT (renovacija): no output VAT — match the Excel/PDF export so the
+  // in-app total doesn't show a 21% VAT line the deliverable omits. (2026-06-19.)
+  const reverseVat = (project.vat_mode || '').toLowerCase() === 'reverse_vat'
+    || (project.archetipas || '').toLowerCase() === 'renovacija';
+  const vatPct = reverseVat ? 0 : (project.vat_rate || 21);
+
   const totalArea = useMemo(() => {
     const rooms = project.v8_rooms || project.patalpos || [];
     return rooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
@@ -421,10 +427,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               </div>
               <div className="flex items-baseline gap-2 border-l border-border pl-6">
                 <span className="skyrius-header" style={{ fontSize: 10 }}>
-                  Su PVM ({project.vat_rate || 21}%)
+                  {reverseVat ? 'VISO (be PVM)' : `Su PVM (${vatPct}%)`}
                 </span>
                 <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
-                  {fmtEur(totals.viso * (1 + (project.vat_rate || 21) / 100))}
+                  {fmtEur(totals.viso * (1 + vatPct / 100))}
                 </span>
               </div>
               <div className="border-l border-border pl-6 flex items-center gap-4 text-xs text-muted-foreground">
