@@ -60,3 +60,39 @@ def test_hourly_count_is_a_reliable_backstop(tmp_path, monkeypatch):
         db.record_usage("u1", _resp(1_000, 500))
     _, n = db.user_usage_since("u1", hours=1)
     assert n == 25
+
+
+# ── Reservations (2026-06-19 bug-hunt: cap only saw extract-interior actuals) ──
+
+def test_record_reservation_counts_toward_cap(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    db.record_reservation("u1", 0.30, "reserve:/extract")
+    total, n = db.user_usage_since("u1", hours=24)
+    assert n == 1
+    assert abs(total - 0.30) < 1e-6
+
+
+def test_reservation_noop_on_anonymous_or_zero(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    assert db.record_reservation(None, 0.30) == 0.0
+    assert db.record_reservation("u1", 0.0) == 0.0
+    _, n = db.user_usage_since("u1")
+    assert n == 0
+
+
+def test_reserve_billable_skips_extract_interior_meters_others(tmp_path, monkeypatch):
+    """The reservation must fire for every billable path EXCEPT extract-interior
+    (which self-reports actuals) — otherwise the cap stays dead for the other
+    ~13 endpoints, or double-counts extract-interior."""
+    _isolate(tmp_path, monkeypatch)
+    import main
+    main._reserve_billable("u1", "/extract-interior")
+    main._reserve_billable("u1", "/extract-interior-stream")
+    _, n0 = db.user_usage_since("u1")
+    assert n0 == 0  # self-metered → no reservation
+    main._reserve_billable("u1", "/chat-project")        # 0.03
+    main._reserve_billable("u1", "/extract")             # 0.30
+    main._reserve_billable("u1", "/v9/symbols/detect")   # 0.10
+    total, n = db.user_usage_since("u1")
+    assert n == 3
+    assert abs(total - 0.43) < 1e-6

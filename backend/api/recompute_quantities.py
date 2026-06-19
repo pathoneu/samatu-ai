@@ -7,6 +7,7 @@ swap the canonical view in one re-render.
 
 Spec: §4.5, §5.4
 """
+import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
@@ -246,50 +247,103 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
     return out_rooms, pozicijos
 
 
+_TIER_SUFFIX_RE = re.compile(
+    r"\s*\((?:iki|virš)\s*3\s*m[^)]*\)"          # (iki 3m aukščio) / (virš 3 m aukščio)
+    r"|\s*\(standartinis aukštis\)"               # GKP tier label
+    r"|\s*—\s*papildomas darbas dėl aukščio"      # height-premium tail
+    r"|\s*q4\s*\([^)]*\)",                         # Q4 sanding suffix
+    re.IGNORECASE,
+)
+
+
+def _norm_label(s: str | None) -> str:
+    """Height/Q-level-independent label key: strip the tier suffixes whose text
+    flips when a ceiling crosses 3 m or the glaistymo lygis changes, so a priced
+    line can be matched to its post-rebuild sibling."""
+    return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+
+
+def _has_user_edit(p: dict) -> bool:
+    return (p.get("kaina") not in (None, 0)
+            or p.get("manual_override") is True
+            or p.get("quantity_source") == "manual_override"
+            or bool(p.get("override_locked")))
+
+
+def _carry_edit(prev: dict, p: dict) -> None:
+    # 1. Manual count override / gesture lock FIRST — these set the final kiekis,
+    #    which the price→suma calc below depends on.
+    if prev.get("manual_override") is True or prev.get("quantity_source") == "manual_override":
+        p["kiekis"] = prev.get("kiekis")
+        p["manual_override"] = True
+        p["quantity_source"] = prev.get("quantity_source") or "manual_override"
+        if prev.get("ai_kiekis_original") is not None:
+            p["ai_kiekis_original"] = prev["ai_kiekis_original"]
+    if prev.get("override_locked"):
+        p["kiekis"] = prev.get("kiekis")
+        p["override_locked"] = True
+        if prev.get("override_orig") is not None:
+            p["override_orig"] = prev["override_orig"]
+    # 2. Entered price — carry it and recompute suma from the FINAL kiekis
+    #    (rebuilt-or-overridden), not the stale prior suma.
+    if prev.get("kaina") not in (None, 0):
+        p["kaina"] = prev["kaina"]
+        kiekis = p.get("kiekis")
+        p["suma"] = (round(float(kiekis) * float(prev["kaina"]), 2)
+                     if isinstance(kiekis, (int, float)) else prev.get("suma"))
+
+
 def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
     """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
     user's manual edits forward from the prior pozicijos so the rebuild doesn't
-    silently revert them. Matched by aprasymas (the stable, human-readable key).
+    silently revert them.
 
-    Preserved:
-      - kaina / suma — entered prices (the rebuild never computes prices).
-      - manual count override — a corrected count (e.g. rozetės 52→50) is
-        height-independent, so the user's value always wins over the rebuilt one.
-      - gesture lock (override_pozicija) — override_locked + override_orig.
+    Two-pass match:
+      1. EXACT aprasymas — handles the common case and the simultaneously-present
+         iki/virš tier pair in mixed-height projects (no collision).
+      2. HEIGHT-INDEPENDENT fallback for any prior edited line left unmatched
+         (its label flipped across the 3 m / Q-level boundary, e.g. a priced
+         '… (virš 3m aukščio)' line that became '… (iki 3m aukščio)'). Applied
+         ONLY when unambiguous — exactly one unmatched edited prior line and one
+         unmatched rebuilt line share the normalized key — so it can never
+         mis-assign a price between the two co-existing tier lines.
 
-    Formula/geometry lines (paint, kampai, GKP) are intentionally NOT preserved:
-    recomputing them with the new height is the whole point of the rebuild, and
-    they never carry manual_override.
+    Preserved: kaina/suma (prices), manual count overrides, gesture locks.
+    Formula/geometry quantities are otherwise recomputed (the point of the rebuild).
     """
     if not prior:
         return rebuilt
-    prior_by_label = {}
+    prior_by_label: dict[str, dict] = {}
     for p in prior:
         lab = (p.get("aprasymas") or "").strip().lower()
         if lab:
-            prior_by_label[lab] = p
+            prior_by_label.setdefault(lab, p)
+
+    matched_prior: set[int] = set()
+    matched_rebuilt: set[int] = set()
     for p in rebuilt:
         prev = prior_by_label.get((p.get("aprasymas") or "").strip().lower())
-        if not prev:
+        if prev is not None:
+            _carry_edit(prev, p)
+            matched_prior.add(id(prev))
+            matched_rebuilt.add(id(p))
+
+    # Pass 2 — rescue user edits on prior lines whose label changed on rebuild.
+    leftover_prior_by_norm: dict[str, list[dict]] = {}
+    for p in prior:
+        if id(p) in matched_prior or not _has_user_edit(p):
             continue
-        # Entered price (+ its derived suma) — always carried forward.
-        if prev.get("kaina") not in (None, 0):
-            p["kaina"] = prev["kaina"]
-            if prev.get("suma") is not None:
-                p["suma"] = prev["suma"]
-        # Manual count override — user's corrected count wins.
-        if prev.get("manual_override") is True or prev.get("quantity_source") == "manual_override":
-            p["kiekis"] = prev.get("kiekis")
-            p["manual_override"] = True
-            p["quantity_source"] = prev.get("quantity_source") or "manual_override"
-            if prev.get("ai_kiekis_original") is not None:
-                p["ai_kiekis_original"] = prev["ai_kiekis_original"]
-        # Gesture lock (G7 override_pozicija).
-        if prev.get("override_locked"):
-            p["kiekis"] = prev.get("kiekis")
-            p["override_locked"] = True
-            if prev.get("override_orig") is not None:
-                p["override_orig"] = prev["override_orig"]
+        leftover_prior_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
+    if leftover_prior_by_norm:
+        leftover_rebuilt_by_norm: dict[str, list[dict]] = {}
+        for p in rebuilt:
+            if id(p) in matched_rebuilt:
+                continue
+            leftover_rebuilt_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
+        for norm, priors in leftover_prior_by_norm.items():
+            cands = leftover_rebuilt_by_norm.get(norm, [])
+            if len(priors) == 1 and len(cands) == 1:  # unambiguous → safe to carry
+                _carry_edit(priors[0], cands[0])
     return rebuilt
 
 
@@ -325,10 +379,16 @@ def recompute(req: RecomputeRequest) -> dict:
     if assumption_edited and req.context:
         try:
             from extractor.vision_call import _build_pozicijos_from_rooms
+            overrides = {**(req.context.get("_overrides") or {}), **assumptions}
+            # The Prielaidos field is `glaistimo_lygis`, but the canonical builder
+            # reads the Q-level under `glaistas_q_lygis` (vision_call.py). Bridge
+            # the two names so a Q4 toggle actually emits the Q4 sanding-labor line.
+            if assumptions.get("glaistimo_lygis"):
+                overrides["glaistas_q_lygis"] = assumptions["glaistimo_lygis"]
             parsed = {
                 **req.context,
                 "patalpos": rooms,
-                "_overrides": {**(req.context.get("_overrides") or {}), **assumptions},
+                "_overrides": overrides,
             }
             rebuilt = _build_pozicijos_from_rooms(parsed)
             if rebuilt.get("pozicijos"):

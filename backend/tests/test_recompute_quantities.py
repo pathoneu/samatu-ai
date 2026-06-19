@@ -118,6 +118,70 @@ def test_ceiling_change_preserves_manual_count_override_and_price():
     assert roz.get("kaina") == 12.5, roz
 
 
+def test_merge_carries_price_across_tier_boundary():
+    """2026-06-19 bug-hunt: a priced '(virš 3m)' line whose label flips to
+    '(iki 3m)' when the ceiling drops below 3 m must keep its unit price (and
+    recompute suma from the new quantity)."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)",
+              "kiekis": 100, "kaina": 5.0, "suma": 500.0}]
+    rebuilt = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 120}]
+    out = _merge_user_edits(rebuilt, prior)
+    assert out[0]["kaina"] == 5.0
+    assert out[0]["suma"] == 600.0  # 120 × 5, from the rebuilt kiekis
+
+
+def test_merge_does_not_cross_contaminate_mixed_tier_pair():
+    """Mixed-height project: both tier lines present with DIFFERENT prices →
+    exact match keeps each price on its own line (no cross-assignment)."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 80, "kaina": 3.0},
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 40, "kaina": 5.0},
+    ]
+    rebuilt = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 80},
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 40},
+    ]
+    out = {p["aprasymas"]: p for p in _merge_user_edits(rebuilt, prior)}
+    assert out["Sienų, lubų glaistymas/dažymas (iki 3m aukščio)"]["kaina"] == 3.0
+    assert out["Sienų, lubų glaistymas/dažymas (virš 3m aukščio)"]["kaina"] == 5.0
+
+
+def test_merge_ambiguous_tier_fallback_is_skipped():
+    """One priced prior line, but two rebuilt lines share the normalized base →
+    ambiguous → the fallback must NOT guess (no mis-assigned price)."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 40, "kaina": 5.0}]
+    rebuilt = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 80},
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (standartinis aukštis)", "kiekis": 30},
+    ]
+    out = _merge_user_edits(rebuilt, prior)
+    assert all(p.get("kaina") in (None, 0) for p in out)
+
+
+def test_q4_level_edit_emits_q4_sanding_line():
+    """2026-06-19 bug-hunt: a glaistimo_lygis=Q4 edit must reach the canonical
+    builder (which reads glaistas_q_lygis) so the Q4 sanding-labor line is emitted,
+    not silently dropped to the Q2 default. (Production rooms carry computed
+    geometry; a glaistimo_lygis edit doesn't re-run calc, so pre-compute here.)"""
+    from extractor.universal_rules import calc_room_quantities
+    room = _living_room(h=2.8)
+    room.update(calc_room_quantities(room))
+    payload = {
+        "rooms": [room],
+        "edits": [{"field": "glaistimo_lygis", "new_value": "Q4"}],
+        "current_assumptions": {},
+        "context": {"detected_symbols_summary": {}},
+    }
+    r = client.post("/api/recompute-quantities", json=payload)
+    assert r.status_code == 200, r.text
+    poz = r.json()["pozicijos"]
+    has_q4 = any("q4" in (p.get("aprasymas") or "").lower() for p in poz)
+    assert has_q4, [p.get("aprasymas") for p in poz]
+
+
 def test_recompute_invalid_field_returns_400():
     payload = {
         "rooms": [],

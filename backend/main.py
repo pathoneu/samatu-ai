@@ -266,6 +266,39 @@ import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
 
 
+# Conservative per-call reservations (EUR) recorded BEFORE the Claude call so
+# every billable endpoint counts toward the spend cap and concurrent requests
+# can't outrun it (TOCTOU). extract-interior self-reports ACTUAL usage after the
+# call (db.record_usage), so it is excluded here to avoid double-counting.
+# 2026-06-19 bug-hunt: the cap previously only ever saw extract-interior actuals,
+# so it could never fire for /extract, /chat-project, /v9/symbols/*, facade/roof,
+# vision_fill/lasso/symbols — i.e. it was still dead for ~13 of 15 endpoints.
+_SELF_METERED_PATHS = ("/extract-interior",)
+_RESERVE_EUR = (
+    ("/chat-project", 0.03),
+    ("/detect-type", 0.10),
+    ("/v9/symbols", 0.10),
+    ("/vision", 0.10),
+    ("/lasso", 0.10),
+    ("/extract", 0.30),   # /extract + facade/roof/earthworks/concrete
+)
+_RESERVE_DEFAULT_EUR = 0.15
+
+
+def _reserve_billable(user_id: str | None, path: str | None) -> None:
+    """Best-effort: record a conservative pre-charge for a billable call so the
+    spend cap covers this endpoint. No-op for anonymous or self-metered paths."""
+    if not user_id or not path:
+        return
+    if any(s in path for s in _SELF_METERED_PATHS):
+        return
+    est = next((eur for prefix, eur in _RESERVE_EUR if prefix in path), _RESERVE_DEFAULT_EUR)
+    try:
+        db.record_reservation(user_id, est, kind=f"reserve:{path}")
+    except Exception:
+        pass
+
+
 def _billable_user(request: Request) -> dict:
     """Auth + spend cap in one call. Use for any endpoint that hits Anthropic.
 
@@ -277,6 +310,7 @@ def _billable_user(request: Request) -> dict:
     """
     user = _auth.require_user(request)
     _check_user_spend_cap(user["id"])
+    _reserve_billable(user["id"], request.url.path)
     return user
 
 

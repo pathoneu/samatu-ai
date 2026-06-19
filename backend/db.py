@@ -416,6 +416,24 @@ def record_usage(user_id: str | None, response: dict | None,
     return cost_eur
 
 
+def record_reservation(user_id: str | None, cost_eur: float, kind: str = "reserve") -> float:
+    """Record a conservative pre-charge (no token data) in usage_events BEFORE a
+    Claude call, so the per-user spend cap counts EVERY billable endpoint — not
+    just extract-interior — and concurrent requests can't outrun it (the original
+    TOCTOU race). Best-effort; callers wrap in try/except. (2026-06-19 bug-hunt.)"""
+    if not user_id or cost_eur <= 0:
+        return 0.0
+    import uuid as _uuid
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO usage_events
+                (id, user_id, kind, input_tokens, output_tokens,
+                 cache_read_tokens, cost_eur, created_at)
+            VALUES (?, ?, ?, 0, 0, 0, ?, ?)
+        """, (_uuid.uuid4().hex, user_id, kind, round(float(cost_eur), 4), _now_iso()))
+    return cost_eur
+
+
 def user_usage_since(user_id: str, hours: int = 24) -> tuple[float, int]:
     """Sum cost_eur + count of usage_events for a user within the last N hours.
     Returns (total_eur, event_count). Source of truth for the per-user spend cap

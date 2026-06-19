@@ -167,7 +167,11 @@ export default function ExportDropdown({ project }) {
   const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr }) => {
     // Guard: exporting a sąmata where every line is 0,00 € sends the client a
     // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
-    const priced = project.pozicijos || project.darbu_sarasas || project.rows || [];
+    // Check ALL candidate lists, not just pozicijos: interior prices live in
+    // darbu_sarasas, and a Prielaidos recompute leaves project.pozicijos unpriced
+    // — so reading pozicijos alone false-warns on a fully-priced export.
+    const priced = [project.darbu_sarasas, project.rows, project.pozicijos]
+      .filter(Array.isArray).flat();
     const anyPrice = priced.some((r) => Number(r?.kaina) > 0);
     if (priced.length > 0 && !anyPrice) {
       const ok = await confirm({
