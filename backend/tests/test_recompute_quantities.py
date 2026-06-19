@@ -182,6 +182,30 @@ def test_q4_level_edit_emits_q4_sanding_line():
     assert has_q4, [p.get("aprasymas") for p in poz]
 
 
+def test_recompute_emits_darbu_sarasas_in_sync_with_pozicijos():
+    """2026-06-19 workspace hunt: the Kiekiai table, totals and export read
+    darbu_sarasas (a v8 reshape of pozicijos), NOT pozicijos. The recompute must
+    emit darbu_sarasas so a Prielaidos edit actually reaches the customer doc."""
+    from extractor.universal_rules import calc_room_quantities
+    room = _living_room(h=2.8)
+    room.update(calc_room_quantities(room))
+    payload = {
+        "rooms": [room],
+        "edits": [{"field": "lubu_auksciai", "new_value": {"1": 3.4}}],
+        "current_assumptions": {},
+        "context": {"detected_symbols_summary": {}},
+    }
+    r = client.post("/api/recompute-quantities", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    poz, ds = body["pozicijos"], body["darbu_sarasas"]
+    assert ds, "darbu_sarasas must be emitted"
+    assert len(ds) == len(poz)
+    poz_by = {p["aprasymas"]: p["kiekis"] for p in poz}
+    for row in ds:  # same quantity per matching line
+        assert row["kiekis"] == poz_by.get(row["aprasymas"])
+
+
 def test_recompute_invalid_field_returns_400():
     payload = {
         "rooms": [],

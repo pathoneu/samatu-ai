@@ -4374,7 +4374,11 @@ async def generate_pdf(request: Request, data: dict):
     prielaidos   = data.get("prielaidos") or {}
     perspejimani = data.get("perspejimani") or []
     tipas_pdf    = data.get("tipas", "kz")
-    viso_be_pvm  = sum(e.get("suma", 0) for e in eilutes)
+    # Sum the per-line sumas ROUNDED to the cent (each line prints rounded), so
+    # the document total always equals the sum of the printed line amounts — a
+    # contractor adding the rows by hand gets the same number. (2026-06-19 hunt:
+    # summing the raw floats could drift a cent from the visible lines.)
+    viso_be_pvm  = round(sum(round(e.get("suma", 0) or 0, 2) for e in eilutes), 2)
     pvm          = round(viso_be_pvm * 0.21, 2)
     viso_su_pvm  = round(viso_be_pvm + pvm, 2)
     doc_title    = "VIDAUS APDAILOS KIEKIAI" if tipas_pdf == "interjeras" else "KIEKIŲ ŽINIARAŠTIS"

@@ -398,4 +398,23 @@ def recompute(req: RecomputeRequest) -> dict:
         except Exception as exc:  # noqa: BLE001 — never break the recompute
             print(f"[recompute-quantities] canonical pozicijos rebuild failed: {exc}")
 
-    return {"rooms": rooms, "pozicijos": pozicijos, "assumptions": assumptions}
+    # Also emit the V8-compat darbu_sarasas from the final pozicijos. The Kiekiai
+    # table, the top-bar totals AND the Excel/PDF export all read darbu_sarasas —
+    # NOT pozicijos — so without this a Prielaidos recompute updated pozicijos but
+    # the visible/exported quantities stayed stale (2026-06-19 workspace hunt).
+    # The frontend re-applies the user's entered prices by matching aprasymas.
+    darbu_sarasas: list[dict] = []
+    try:
+        from extractor.vision_call import _emit_v8_compat_fields
+        darbu_sarasas = _emit_v8_compat_fields(
+            {"pozicijos": pozicijos, "santrauka": {}}
+        ).get("darbu_sarasas", [])
+    except Exception as exc:  # noqa: BLE001 — never break the recompute on compat emit
+        print(f"[recompute-quantities] v8-compat emit failed: {exc}")
+
+    return {
+        "rooms": rooms,
+        "pozicijos": pozicijos,
+        "darbu_sarasas": darbu_sarasas,
+        "assumptions": assumptions,
+    }

@@ -946,21 +946,29 @@ function ApplyPriceListButton({ project, onProjectChange }) {
 
   const handleApply = (priceList, opts = {}) => {
     setOpen(false);
-    const positions = project.pozicijos || project.darbu_sarasas || [];
-    const result = applyPriceListToPositions(positions, priceList.items || [], opts);
-    if (result.applied === 0) {
+    // Price each list from its OWN rows and write back ONLY that list. The old
+    // code priced `pozicijos || darbu_sarasas` and wrote the SAME result into
+    // BOTH — clobbering darbu_sarasas (the Kiekiai/export source of truth) with
+    // the pozicijos-derived rows and destroying user edits. (2026-06-19 hunt.)
+    const updated = { ...project };
+    let primary = null;  // counts reported to the user — from darbu_sarasas (visible list) when present
+    for (const key of ['darbu_sarasas', 'pozicijos']) {
+      const src = project[key];
+      if (!Array.isArray(src) || src.length === 0) continue;
+      const result = applyPriceListToPositions(src, priceList.items || [], opts);
+      updated[key] = result.items;
+      if (!primary) primary = result;
+    }
+    if (!primary || primary.applied === 0) {
       toast.error(
         `Iš kainyno „${priceList.name}" nepavyko pritaikyti nė vienos eilutės. ` +
         `Patikrinkite ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).`,
       );
       return;
     }
-    const updated = { ...project };
-    if (project.pozicijos) updated.pozicijos = result.items;
-    if (project.darbu_sarasas) updated.darbu_sarasas = result.items;
     updated._last_applied_pricelist = { id: priceList.id, name: priceList.name, applied_at: new Date().toISOString() };
     onProjectChange?.(updated);
-    toast.success(`Pritaikyta: ${result.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${result.skipped}.`);
+    toast.success(`Pritaikyta: ${primary.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${primary.skipped}.`);
   };
 
   if (priceLists.length === 0) {

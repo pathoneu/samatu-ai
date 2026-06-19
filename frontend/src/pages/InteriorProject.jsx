@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
-  Zap, Droplets, Lightbulb, CornerUpRight, Ruler, Package, Droplet,
+  Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
   Map, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
 } from 'lucide-react';
@@ -19,7 +19,6 @@ import ProjectMainView from '@/components/project/ProjectMainView';
 // flow never shipped to production after 2026-04-26 rollback.
 import ExportDropdown from '@/components/project/ExportDropdown';
 import ShareButton from '@/components/project/ShareButton';
-import RulesOverridePanel from '@/components/project/RulesOverridePanel';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject, getProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
@@ -774,6 +773,24 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 ...project,
                 patalpos: result.rooms || project.patalpos,
                 pozicijos: result.pozicijos || project.pozicijos,
+                // The Kiekiai table, top-bar totals and export all read
+                // darbu_sarasas — keep it in sync with the recomputed quantities,
+                // preserving any prices the user already entered (match by
+                // aprasymas, recompute suma). Mirrors handleRoomsChange.
+                // (2026-06-19 workspace hunt: without this the recompute updated
+                // pozicijos but the visible/exported numbers stayed stale.)
+                darbu_sarasas: result.darbu_sarasas
+                  ? result.darbu_sarasas.map((newItem) => {
+                      const oldItem = (project.darbu_sarasas || []).find(
+                        (o) => (o.aprasymas || '').toLowerCase()
+                               === (newItem.aprasymas || '').toLowerCase(),
+                      );
+                      return oldItem?.kaina
+                        ? { ...newItem, kaina: oldItem.kaina,
+                            suma: (newItem.kiekis || 0) * oldItem.kaina }
+                        : newItem;
+                    })
+                  : project.darbu_sarasas,
                 _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
               };
               setProject(nextProject);
