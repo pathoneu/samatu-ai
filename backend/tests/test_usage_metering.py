@@ -80,6 +80,24 @@ def test_reservation_noop_on_anonymous_or_zero(tmp_path, monkeypatch):
     assert n == 0
 
 
+def test_hourly_extract_cap_ignores_light_reservations(tmp_path, monkeypatch):
+    """The hourly-EXTRACT cap counts only extraction events ('%extract%'), so a
+    flurry of light-endpoint reservations (chat/vision_fill/lasso/symbols) does
+    NOT falsely trip an 'extracts/hour' limit — while the EUR sum still includes
+    them. (2026-06-19: the reservation fix initially tripped the cap on light calls.)"""
+    _isolate(tmp_path, monkeypatch)
+    for _ in range(30):
+        db.record_reservation("u1", 0.03, "reserve:/chat-project")
+    spend, n_extracts = db.user_usage_since("u1", hours=1, kind_like="%extract%")
+    assert n_extracts == 0          # light reservations don't count as extracts
+    assert spend > 0                # but they DO count toward EUR spend
+    # extraction events (a reserve:/extract pre-charge + an extract-interior actual) count
+    db.record_reservation("u1", 0.30, "reserve:/extract")
+    db.record_usage("u1", _resp(1_000, 500), "extract-interior")
+    _, n_extracts = db.user_usage_since("u1", hours=1, kind_like="%extract%")
+    assert n_extracts == 2
+
+
 def test_reserve_billable_skips_extract_interior_meters_others(tmp_path, monkeypatch):
     """The reservation must fire for every billable path EXCEPT extract-interior
     (which self-reports actuals) — otherwise the cap stays dead for the other

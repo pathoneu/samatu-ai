@@ -349,6 +349,51 @@ function RoomCard({ room }) {
 
 // ── Detalus darbų sąrašas (rangovo-stiliaus sąmatos pozicijos) ───────────────────
 
+// Merge the user's manual edits onto a freshly-rebuilt darbu_sarasas (matched by
+// aprasymas), mirroring the backend _merge_user_edits. Preserves: entered prices
+// (kaina/suma), manual COUNT overrides (manual_override kiekis + markers), and
+// carries forward user-added rows the deterministic rebuild can't reproduce
+// (drawing symbol-count lines tagged source:'Pažymėjus brėžinyje'). Without this a
+// recompute reverted count corrections to the AI value and dropped symbol-count
+// lines + their prices. (2026-06-19 hunt.)
+function mergeDarbuSarasasEdits(rebuilt, old) {
+  if (!Array.isArray(rebuilt)) return old || [];
+  const oldList = old || [];
+  const oldByLabel = new Map();
+  for (const o of oldList) {
+    const k = (o.aprasymas || '').toLowerCase();
+    if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
+  }
+  const matched = new Set();
+  const merged = rebuilt.map((newItem) => {
+    const key = (newItem.aprasymas || '').toLowerCase();
+    const oldItem = oldByLabel.get(key);
+    if (!oldItem) return newItem;
+    matched.add(key);
+    const keepQty = oldItem.manual_override === true
+      || oldItem.quantity_source === 'manual_override';
+    const kiekis = keepQty ? oldItem.kiekis : newItem.kiekis;
+    const kaina = oldItem.kaina ?? newItem.kaina;
+    const out = { ...newItem };
+    if (keepQty) {
+      out.kiekis = kiekis;
+      out.manual_override = true;
+      out.quantity_source = 'manual_override';
+      if (oldItem.ai_kiekis_original != null) out.ai_kiekis_original = oldItem.ai_kiekis_original;
+    }
+    if (kaina != null) {
+      out.kaina = kaina;
+      out.suma = (kiekis || 0) * kaina;
+    }
+    return out;
+  });
+  for (const o of oldList) {
+    if (matched.has((o.aprasymas || '').toLowerCase())) continue;
+    if (o.source === 'Pažymėjus brėžinyje' || o.manual_override === true) merged.push(o);
+  }
+  return merged;
+}
+
 function DarbuSarasas({ items }) {
   const [expandedReasoning, setExpandedReasoning] = useState(new Set());
   const [feedback, setFeedback] = useState({}); // { [kategorija]: 'ok' | 'bad' }
@@ -645,19 +690,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         name: project.name,
         company_name: project.company_name,
         vat_rate: project.vat_rate,
-        // Preserve kainos in darbu_sarasas if user already set them
-        darbu_sarasas: result.darbu_sarasas
-          ? result.darbu_sarasas.map((newItem) => {
-              const oldItem = (project.darbu_sarasas || []).find(
-                (o) => (o.aprasymas || '').toLowerCase()
-                       === (newItem.aprasymas || '').toLowerCase(),
-              );
-              return oldItem?.kaina
-                ? { ...newItem, kaina: oldItem.kaina,
-                    suma: (newItem.kiekis || 0) * oldItem.kaina }
-                : newItem;
-            })
-          : project.darbu_sarasas,
+        // Carry the user's prices + manual count overrides forward, and keep
+        // drawing symbol-count lines (the rebuild can't reproduce them).
+        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
       };
       updateProject(project.id, merged);
       setProject(merged);
@@ -775,22 +810,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 pozicijos: result.pozicijos || project.pozicijos,
                 // The Kiekiai table, top-bar totals and export all read
                 // darbu_sarasas — keep it in sync with the recomputed quantities,
-                // preserving any prices the user already entered (match by
-                // aprasymas, recompute suma). Mirrors handleRoomsChange.
-                // (2026-06-19 workspace hunt: without this the recompute updated
-                // pozicijos but the visible/exported numbers stayed stale.)
-                darbu_sarasas: result.darbu_sarasas
-                  ? result.darbu_sarasas.map((newItem) => {
-                      const oldItem = (project.darbu_sarasas || []).find(
-                        (o) => (o.aprasymas || '').toLowerCase()
-                               === (newItem.aprasymas || '').toLowerCase(),
-                      );
-                      return oldItem?.kaina
-                        ? { ...newItem, kaina: oldItem.kaina,
-                            suma: (newItem.kiekis || 0) * oldItem.kaina }
-                        : newItem;
-                    })
-                  : project.darbu_sarasas,
+                // preserving prices + manual count overrides + drawing symbol
+                // lines. (2026-06-19 hunt: recompute updated pozicijos only and
+                // wiped count overrides / symbol lines.)
+                darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
                 _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
               };
               setProject(nextProject);

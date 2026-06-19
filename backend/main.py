@@ -84,8 +84,12 @@ def _check_user_spend_cap(user_id: str | None) -> None:
     if not user_id:
         return
     try:
-        spend_24h, n_24h = db.user_usage_since(user_id, hours=24)
-        spend_1h, n_1h = db.user_usage_since(user_id, hours=1)
+        spend_24h, _ = db.user_usage_since(user_id, hours=24)
+        # Hourly cap counts only EXTRACTION events ('%extract%') — not every
+        # billable reservation (chat/vision_fill/lasso/symbols), which would
+        # otherwise trip an "extracts/hour" limit on light clicks. The EUR cap
+        # (spend_24h) still includes every reservation's pre-charge.
+        _, n_1h = db.user_usage_since(user_id, hours=1, kind_like="%extract%")
     except Exception:
         return  # never block on spend-check failure
     if _USER_DAILY_SPEND_CAP_EUR > 0 and spend_24h >= _USER_DAILY_SPEND_CAP_EUR:
@@ -4087,9 +4091,12 @@ async def generate_excel(request: Request, data: dict):
                 (None,                    "right",  False),   # formula placeholder
             ], 1):
                 if col == 6:
-                    # Excel formula: Suma = Kiekis × Kaina
+                    # Excel formula: Suma = ROUND(Kiekis × Kaina, 2). The ROUND
+                    # makes SUM-of-lines equal the PDF total (which sums per-line
+                    # rounded sumas), so the same project's Excel and PDF show the
+                    # identical Suma be PVM / VISO. (2026-06-19 hunt.)
                     fc = ws.cell(row=r, column=6)
-                    fc.value        = f"=D{r}*E{r}"
+                    fc.value        = f"=ROUND(D{r}*E{r},2)"
                     fc.fill         = fill
                     fc.border       = border
                     fc.alignment    = Alignment(horizontal="right", vertical="center")
@@ -4107,6 +4114,10 @@ async def generate_excel(request: Request, data: dict):
             data_row_idx += 1
 
         return r
+
+    # Reverse-VAT (renovacija) — no output VAT line; VISO equals the be-PVM sum.
+    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
+                    or str(data.get("archetipas") or "").lower() == "renovacija")
 
     def _write_totals(ws, rows: list[dict], r: int):
         ws.row_dimensions[r].height = 6
@@ -4137,9 +4148,13 @@ async def generate_excel(request: Request, data: dict):
         sum_formula = f"=SUM(F{data_start}:F{data_end})"
 
         _tot(r,     "Suma be PVM:",  sum_formula,                  top=True)
-        _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
-        _tot(r + 2, "VISO su PVM:",  f"=F{r}+F{r+1}",
-             lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
+        if _reverse_vat:
+            _tot(r + 1, "VISO (be PVM):", f"=F{r}",
+                 lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
+        else:
+            _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
+            _tot(r + 2, "VISO su PVM:",  f"=F{r}+F{r+1}",
+                 lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Sheet 1: Sąmata (full combined list)
@@ -4379,8 +4394,13 @@ async def generate_pdf(request: Request, data: dict):
     # contractor adding the rows by hand gets the same number. (2026-06-19 hunt:
     # summing the raw floats could drift a cent from the visible lines.)
     viso_be_pvm  = round(sum(round(e.get("suma", 0) or 0, 2) for e in eilutes), 2)
-    pvm          = round(viso_be_pvm * 0.21, 2)
-    viso_su_pvm  = round(viso_be_pvm + pvm, 2)
+    # Reverse-VAT (atvirkštinis PVM) for renovation/modernizavimas: the contractor
+    # must NOT add output VAT — the užsakovas self-accounts (PVMĮ 96 str.). Charging
+    # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
+    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
+                    or str(data.get("archetipas") or "").lower() == "renovacija")
+    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
+    viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
     doc_title    = "VIDAUS APDAILOS KIEKIAI" if tipas_pdf == "interjeras" else "KIEKIŲ ŽINIARAŠTIS"
 
     # Branding + business-document fields (2026-06-19). All optional — KŽ exports
@@ -4637,8 +4657,12 @@ async def generate_pdf(request: Request, data: dict):
 
     ri_before_totals = len(table_data)
     tot_row("Suma be PVM:",  viso_be_pvm)
-    tot_row("PVM 21%:",      pvm)
-    tot_row("VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
+    if _reverse_vat:
+        # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
+        tot_row("VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
+    else:
+        tot_row("PVM 21%:",      pvm)
+        tot_row("VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
 
     # Global style
     style_cmds += [
@@ -4653,6 +4677,15 @@ async def generate_pdf(request: Request, data: dict):
     tbl = Table(table_data, colWidths=COL_W, repeatRows=1)
     tbl.setStyle(TableStyle(style_cmds))
     story.append(tbl)
+
+    if _reverse_vat:
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(
+            "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas "
+            "(PVMĮ 96 str.).",
+            ParagraphStyle("rvat", fontName=_FONT_NORMAL, fontSize=8,
+                           textColor=colors.HexColor("#666666"), leading=11),
+        ))
 
     # ── Task 8: Assumptions + warnings page at the end ────────────────────────
     from reportlab.platypus import PageBreak

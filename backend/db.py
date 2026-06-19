@@ -442,21 +442,34 @@ def record_reservation(user_id: str | None, cost_eur: float, kind: str = "reserv
     return cost_eur
 
 
-def user_usage_since(user_id: str, hours: int = 24) -> tuple[float, int]:
+def user_usage_since(user_id: str, hours: int = 24,
+                     kind_like: str | None = None) -> tuple[float, int]:
     """Sum cost_eur + count of usage_events for a user within the last N hours.
-    Returns (total_eur, event_count). Source of truth for the per-user spend cap
-    (replaces the project-joined query which was always 0 because extractions
-    were never written)."""
+    Returns (total_eur, event_count). Source of truth for the per-user spend cap.
+
+    `kind_like`: when set, the COUNT (n) includes ONLY events whose kind matches
+    this SQL LIKE pattern (the SUM always reflects every event). Used so the
+    hourly-EXTRACT cap counts only extraction events ('%extract%' — extract-interior
+    actuals + reserve:/extract* pre-charges) and is not tripped by light-endpoint
+    reservations (chat/vision_fill/lasso/symbols). (2026-06-19.)"""
     if not user_id:
         return (0.0, 0)
     from datetime import datetime, timedelta, timezone
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     with _conn() as c:
-        row = c.execute("""
-            SELECT COALESCE(SUM(cost_eur), 0) AS total_eur, COUNT(id) AS n
-              FROM usage_events
-             WHERE user_id = ? AND created_at >= ?
-        """, (user_id, cutoff)).fetchone()
+        if kind_like:
+            row = c.execute("""
+                SELECT COALESCE(SUM(cost_eur), 0) AS total_eur,
+                       COALESCE(SUM(CASE WHEN kind LIKE ? THEN 1 ELSE 0 END), 0) AS n
+                  FROM usage_events
+                 WHERE user_id = ? AND created_at >= ?
+            """, (kind_like, user_id, cutoff)).fetchone()
+        else:
+            row = c.execute("""
+                SELECT COALESCE(SUM(cost_eur), 0) AS total_eur, COUNT(id) AS n
+                  FROM usage_events
+                 WHERE user_id = ? AND created_at >= ?
+            """, (user_id, cutoff)).fetchone()
         return (float(row["total_eur"] or 0), int(row["n"] or 0))
 
 
