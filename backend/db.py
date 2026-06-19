@@ -100,6 +100,23 @@ def init_schema() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_extr_project ON extractions(project_id);
 
+            -- usage_events: user-keyed Vision-cost ledger for the per-user spend
+            -- cap. Decoupled from projects on purpose — extraction happens BEFORE
+            -- the project row is created (the frontend creates the project after
+            -- the extraction returns), so the extractions table (project_id FK)
+            -- can never be written at extract time. This ledger CAN. (2026-06-19)
+            CREATE TABLE IF NOT EXISTS usage_events (
+                id                TEXT PRIMARY KEY,
+                user_id           TEXT NOT NULL,
+                kind              TEXT,
+                input_tokens      INTEGER,
+                output_tokens     INTEGER,
+                cache_read_tokens INTEGER,
+                cost_eur          REAL,
+                created_at        TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_usage_user_time ON usage_events(user_id, created_at);
+
             CREATE TABLE IF NOT EXISTS corrections (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -325,7 +342,9 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
         """, (
             extraction_id, project_id, pdf_sha256, pdf_size, page_count,
             json.dumps(response, ensure_ascii=False),
-            in_tok, out_tok, cache_tok,
+            int(meta.get("input_tokens") or 0),
+            int(meta.get("output_tokens") or 0),
+            int(meta.get("cache_read_tokens") or 0),
             meta.get("elapsed_s") or response.get("_elapsed_s"),
             round(cost_eur, 4),
             _now_iso(),
@@ -360,6 +379,57 @@ def user_recent_spend_eur(user_id: str, hours: int = 24) -> tuple[float, int]:
               JOIN projects p ON p.id = e.project_id
              WHERE p.user_id = ?
                AND e.extracted_at >= ?
+        """, (user_id, cutoff)).fetchone()
+        return (float(row["total_eur"] or 0), int(row["n"] or 0))
+
+
+def record_usage(user_id: str | None, response: dict | None,
+                 kind: str = "extract") -> float:
+    """Record one Vision call's cost in the user-keyed usage_events ledger.
+    Returns the recorded cost in EUR (0.0 if nothing recorded). Best-effort —
+    callers wrap in try/except so metering never breaks an extraction.
+
+    This is what makes the per-user spend cap actually fire: ``save_extraction``
+    can't run at extract time (no project row yet), so cost is metered here
+    against the user instead. (2026-06-19 commercial level-up.)"""
+    if not user_id:
+        return 0.0
+    from pricing import calc_claude_cost_usd
+    import uuid as _uuid
+    meta = (response or {}).get("_meta") or {}
+    in_t = int(meta.get("input_tokens") or 0)
+    out_t = int(meta.get("output_tokens") or 0)
+    cache_t = int(meta.get("cache_read_tokens") or 0)
+    if in_t == 0 and out_t == 0 and cache_t == 0:
+        return 0.0  # nothing billable to record
+    cost_eur = calc_claude_cost_usd(
+        input_tokens=in_t, output_tokens=out_t, cache_read_tokens=cache_t,
+    ) * 0.93
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO usage_events
+                (id, user_id, kind, input_tokens, output_tokens,
+                 cache_read_tokens, cost_eur, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (_uuid.uuid4().hex, user_id, kind, in_t, out_t, cache_t,
+              round(cost_eur, 4), _now_iso()))
+    return cost_eur
+
+
+def user_usage_since(user_id: str, hours: int = 24) -> tuple[float, int]:
+    """Sum cost_eur + count of usage_events for a user within the last N hours.
+    Returns (total_eur, event_count). Source of truth for the per-user spend cap
+    (replaces the project-joined query which was always 0 because extractions
+    were never written)."""
+    if not user_id:
+        return (0.0, 0)
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    with _conn() as c:
+        row = c.execute("""
+            SELECT COALESCE(SUM(cost_eur), 0) AS total_eur, COUNT(id) AS n
+              FROM usage_events
+             WHERE user_id = ? AND created_at >= ?
         """, (user_id, cutoff)).fetchone()
         return (float(row["total_eur"] or 0), int(row["n"] or 0))
 

@@ -2249,7 +2249,13 @@ def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
         return runs[0]
 
     voted = vote_extraction(runs, min_votes=2)
-    voted["_meta"] = {**runs[0].get("_meta", {}), "voting_runs": len(runs)}
+    # Cost metering (2026-06-19): a voted extraction made N Pass-1 Vision calls,
+    # so SUM the token usage across all runs — keeping only runs[0] would make the
+    # per-user spend ledger undercount by ~N×. Other _meta keys come from runs[0].
+    _tok_sum = {}
+    for _k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
+        _tok_sum[_k] = sum(int((r.get("_meta") or {}).get(_k) or 0) for r in runs)
+    voted["_meta"] = {**runs[0].get("_meta", {}), **_tok_sum, "voting_runs": len(runs)}
     return voted
 
 

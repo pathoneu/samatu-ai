@@ -84,8 +84,8 @@ def _check_user_spend_cap(user_id: str | None) -> None:
     if not user_id:
         return
     try:
-        spend_24h, n_24h = db.user_recent_spend_eur(user_id, hours=24)
-        spend_1h, n_1h = db.user_recent_spend_eur(user_id, hours=1)
+        spend_24h, n_24h = db.user_usage_since(user_id, hours=24)
+        spend_1h, n_1h = db.user_usage_since(user_id, hours=1)
     except Exception:
         return  # never block on spend-check failure
     if _USER_DAILY_SPEND_CAP_EUR > 0 and spend_24h >= _USER_DAILY_SPEND_CAP_EUR:
@@ -4565,7 +4565,7 @@ async def extract_interior_endpoint(
     versijavimo, jokių pipeline'ų, jokių Tier-fallback'ų. Gali būti
     used backend'ui ir tiesiogiai (Python import).
     """
-    _billable_user(request)
+    _user = _billable_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
 
@@ -4602,6 +4602,14 @@ async def extract_interior_endpoint(
             ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
         result["_pdf_page_count"] = validation.get("page_count", 0)
 
+    # Meter Vision cost against the user so the per-user spend cap can fire
+    # (best-effort — never break the extraction on a metering hiccup).
+    try:
+        if _user and isinstance(result, dict):
+            db.record_usage(_user.get("id"), result, kind="extract-interior")
+    except Exception as _exc:
+        log.warning("record_usage failed (extract-interior): %r", _exc)
+
     return result
 
 
@@ -4622,7 +4630,7 @@ async def extract_interior_stream_endpoint(
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
 ):
-    _billable_user(request)
+    _user = _billable_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
 
@@ -4700,6 +4708,13 @@ async def extract_interior_stream_endpoint(
                         ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
                         ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
                     result["_pdf_page_count"] = validation.get("page_count", 0)
+                # Meter Vision cost against the user (best-effort) so the spend
+                # cap can fire. Only on a successful extraction with token usage.
+                try:
+                    if _user and result.get("status") != "error":
+                        db.record_usage(_user.get("id"), result, kind="extract-interior-stream")
+                except Exception as _exc:
+                    log.warning("record_usage failed (stream): %r", _exc)
 
             yield _format_sse(ev)
 
