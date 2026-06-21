@@ -79,6 +79,25 @@ def test_pdf_endpoints_roundtrip(tmp_path, monkeypatch):
     assert client.get("/api/projects/nope/pdf").status_code == 404
 
 
+def test_db_backup_to_storage(tmp_path, monkeypatch):
+    """A nightly backup must produce a valid SQLite snapshot in object storage."""
+    import db, storage, backup
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "live.db")
+    db.init_schema(); db._migrate_schema()
+    db.create_user("u@x.lt", "h", name="U")  # content to snapshot
+    for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "store"))
+    storage.reset_storage_for_test()
+
+    res = backup.backup_db(stamp="20260621T000000Z")
+    assert res["key"] == "backups/samatu-20260621T000000Z.db"
+    assert res["size"] > 0
+    data = storage.get_storage().get(res["key"])
+    assert data is not None
+    assert data[:16].startswith(b"SQLite format 3")  # a real, restorable snapshot
+
+
 def test_pdf_upload_rejects_non_pdf(tmp_path, monkeypatch):
     import db, auth, storage
     monkeypatch.setattr(db, "_DB_PATH", tmp_path / "pdf.db")
