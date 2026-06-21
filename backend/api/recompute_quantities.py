@@ -7,6 +7,7 @@ swap the canonical view in one re-render.
 
 Spec: §4.5, §5.4
 """
+import logging
 import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ from typing import Any
 from extractor.universal_rules import UNIVERSAL_RULES, paint_coverage_for_class
 
 router = APIRouter(prefix="/api", tags=["recompute"])
+
+log = logging.getLogger("samatu.recompute")
 
 
 class Edit(BaseModel):
@@ -376,6 +379,7 @@ def recompute(req: RecomputeRequest) -> dict:
     # the canonical builder, carrying the reader context so door/fixture/symbol
     # lines survive. Gesture-only edits keep the in-place pozicijos above.
     assumption_edited = any(e.field in _ASSUMPTION_FIELDS for e in req.edits)
+    degradations: list[str] = []
     if assumption_edited and req.context:
         try:
             from extractor.vision_call import _build_pozicijos_from_rooms
@@ -396,7 +400,10 @@ def recompute(req: RecomputeRequest) -> dict:
                 # locks) forward so the rebuild doesn't silently revert them.
                 pozicijos = _merge_user_edits(rebuilt["pozicijos"], list(req.pozicijos))
         except Exception as exc:  # noqa: BLE001 — never break the recompute
-            print(f"[recompute-quantities] canonical pozicijos rebuild failed: {exc}")
+            log.warning("canonical pozicijos rebuild failed: %s", exc, exc_info=True)
+            degradations.append(
+                "Dalis kambarių nebuvo iki galo perskaičiuoti — kiekiai gali būti seni."
+            )
 
     # Also emit the V8-compat darbu_sarasas from the final pozicijos. The Kiekiai
     # table, the top-bar totals AND the Excel/PDF export all read darbu_sarasas —
@@ -410,11 +417,15 @@ def recompute(req: RecomputeRequest) -> dict:
             {"pozicijos": pozicijos, "santrauka": {}}
         ).get("darbu_sarasas", [])
     except Exception as exc:  # noqa: BLE001 — never break the recompute on compat emit
-        print(f"[recompute-quantities] v8-compat emit failed: {exc}")
+        log.warning("v8-compat emit failed: %s", exc, exc_info=True)
+        degradations.append(
+            "Nepavyko atnaujinti kiekių lentelės — gali būti rodomi seni kiekiai."
+        )
 
     return {
         "rooms": rooms,
         "pozicijos": pozicijos,
         "darbu_sarasas": darbu_sarasas,
         "assumptions": assumptions,
+        "_degradations": degradations,
     }

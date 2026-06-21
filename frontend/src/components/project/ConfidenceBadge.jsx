@@ -88,7 +88,7 @@ export default function ConfidenceBadge({ room, projectId, onClick }) {
         <button
           onClick={handleVerify}
           title="Patvirtinti, kad skaičius teisingas"
-          className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] font-medium bg-muted/40 text-muted-foreground border-muted hover:bg-emerald-500/15 hover:text-emerald-300 hover:border-emerald-500/30"
+          className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] font-medium bg-muted/40 text-muted-foreground border-muted hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-600 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300 dark:hover:border-emerald-500/30"
           data-testid={`verify-button-${room.nr}`}
         >
           <Check className="w-2.5 h-2.5" />
