@@ -1,9 +1,23 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { FileUp, Zap, Clock, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileUp, Zap, Clock, CheckCircle2, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { seedDemoProject } from '@/lib/projectStore';
 
 export default function EmptyState() {
+  const navigate = useNavigate();
+  const [loadingDemo, setLoadingDemo] = useState(false);
+
+  const openDemo = async () => {
+    setLoadingDemo(true);
+    try {
+      await seedDemoProject();
+      navigate('/project/demo-berzu-24');
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-20 px-4">
       <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6">
@@ -13,16 +27,31 @@ export default function EmptyState() {
         Dar nėra projektų
       </h2>
       <p className="text-muted-foreground text-center max-w-md mb-8">
-        Įkelkite PDF su kiekių žiniaraščiu (KŽ) ir AI automatiškai
-        išskirs visas eilutes, skyrius ir kiekius per kelias sekundes.
+        Įkelkite interjero projekto brėžinį (PDF) — AI nuskaitys patalpas,
+        apskaičiuos apdailos kiekius ir paruoš sąmatą. Arba pirma apžiūrėkite
+        pavyzdinį projektą.
       </p>
 
-      <Link to="/new-project">
-        <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8">
-          <FileUp className="w-5 h-5 mr-2" />
-          Naujas projektas
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <Link to="/new-project">
+          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8">
+            <FileUp className="w-5 h-5 mr-2" />
+            Naujas projektas
+          </Button>
+        </Link>
+        <Button
+          size="lg"
+          variant="outline"
+          onClick={openDemo}
+          disabled={loadingDemo}
+          className="font-medium px-6"
+        >
+          {loadingDemo
+            ? <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            : <Eye className="w-5 h-5 mr-2" />}
+          Peržiūrėti pavyzdinį projektą
         </Button>
-      </Link>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12 max-w-2xl">
         {[

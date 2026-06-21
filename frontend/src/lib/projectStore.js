@@ -188,6 +188,20 @@ export function getProject(id) {
   return getProjects().find(p => p.id === id) || null;
 }
 
+// Seed the read-only sample project (real Beržų g. 24 extraction + demo prices)
+// so a prospect can explore a complete, priced sąmata without uploading a PDF.
+// Stable id (no duplicate on re-click); local-only — NOT synced to the backend.
+export async function seedDemoProject() {
+  const projects = getProjects();
+  const existing = projects.find(p => p.id === 'demo-berzu-24');
+  if (existing) return existing;
+  const { DEMO_PROJECT } = await import('@/demoData');
+  const demo = { ...DEMO_PROJECT, updated_at: new Date().toISOString() };
+  projects.unshift(demo);
+  try { localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); } catch { /* ignore */ }
+  return demo;
+}
+
 export function createProject(data) {
   const project = {
     ...data,
