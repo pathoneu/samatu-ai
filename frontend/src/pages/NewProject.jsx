@@ -8,7 +8,7 @@ import UploadZone from '@/components/upload/UploadZone';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { createProject, updateProject } from '@/lib/projectStore';
-import { savePdf } from '@/lib/pdfStore';
+import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
@@ -340,14 +340,17 @@ export default function NewProject() {
         });
       }
 
-      // Saugom PDF failą IndexedDB'e — kad Brėžinio tab'as galėtų rodyti
+      // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad
+      // brėžinys išliktų išvalius kešą / persijungus įrenginį. (2026-06-21)
       try {
         await savePdf(project.id, file);
       } catch (pdfErr) {
         console.warn('Nepavyko išsaugoti PDF į IndexedDB:', pdfErr);
-        // Nepavyko PDF saugoti — projektas vis tiek sukurtas, tik Brėžinio
-        // tab'as nebus prieinamas iš naujo.
       }
+      // Fire-and-forget — neblokuojam srauto; backendas yra durabli atsarginė kopija.
+      uploadPdfToBackend(project.id, file).then((ok) => {
+        if (!ok) console.warn('Nepavyko įkelti PDF į backendą (liks tik naršyklėje)');
+      });
 
       // Sprint §G5 (2026-04-29): scale auto-detect from PDF text layer
       // (regex „M 1:50 / 1:100" iš pdfplumber). Fire-and-forget — projektas
