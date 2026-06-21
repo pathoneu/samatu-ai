@@ -245,6 +245,21 @@ app = FastAPI(
     version="1.0.0",
 )
 
+import backup_scheduler
+
+
+@app.on_event("startup")
+async def _startup_nightly_backup() -> None:
+    # Durable nightly SQLite snapshot → object storage. No-op unless enabled
+    # (prod / SAMATU_NIGHTLY_BACKUP); see backup_scheduler.is_enabled().
+    backup_scheduler.start()
+
+
+@app.on_event("shutdown")
+async def _shutdown_nightly_backup() -> None:
+    await backup_scheduler.stop()
+
+
 from starlette.middleware.sessions import SessionMiddleware
 
 
