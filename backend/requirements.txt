@@ -32,3 +32,4 @@ pypdfium2>=4.30
 # detector_bench/detectors/p5_grounding_dino.py kept for future retest but
 # requires re-adding the dep manually if you want to run it.
 pyyaml>=6.0
+boto3>=1.34

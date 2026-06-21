@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 import logging
 import os
@@ -735,6 +735,49 @@ async def api_get_project(request: Request, project_id: str):
     if not p:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return p
+
+
+# ── Durable source-PDF storage (2026-06-21 durability track) ────────────────
+# The drawing used to live only in the uploader's browser (IndexedDB); a cache
+# clear / device switch / share link lost it. These persist + stream it back from
+# object storage (R2 in prod, local disk in dev). Owner-only.
+
+@app.post("/api/projects/{project_id}/pdf")
+async def api_put_project_pdf(request: Request, project_id: str,
+                              pdf_file: UploadFile = File(...)):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    data = await pdf_file.read()
+    # Light check — these bytes were already validated at extraction; here we only
+    # store them, so a magic + size guard is enough (no pdfplumber/page-count DoS
+    # surface, since nothing parses the file on this path).
+    if not data or not data[:5].startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Netinkamas PDF failas")
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Failas per didelis (max 200 MB)")
+    try:
+        from storage import get_storage, pdf_key
+        get_storage().put(pdf_key(project_id), data, "application/pdf")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pdf persist failed for %s: %r", project_id, exc)
+        raise HTTPException(status_code=502, detail="Nepavyko išsaugoti brėžinio")
+    return {"status": "ok", "size": len(data)}
+
+
+@app.get("/api/projects/{project_id}/pdf")
+async def api_get_project_pdf(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    from storage import get_storage, pdf_key
+    data = get_storage().get(pdf_key(project_id))
+    if data is None:
+        raise HTTPException(status_code=404, detail="Brėžinys nerastas")
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{project_id}.pdf"'})
 
 
 @app.put("/api/projects/{project_id}")
