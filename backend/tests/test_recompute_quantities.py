@@ -206,6 +206,26 @@ def test_recompute_emits_darbu_sarasas_in_sync_with_pozicijos():
         assert row["kiekis"] == poz_by.get(row["aprasymas"])
 
 
+def test_recompute_interior_tolerates_malformed_room():
+    """2026-06-19 hunt: one malformed room (e.g. a comma-decimal/non-numeric
+    plotas_m2 from a corrupted/legacy project) must NOT 500 the whole recompute
+    and lose every other room — it should degrade to the un-recomputed room."""
+    payload = {
+        "patalpos": [
+            {"nr": "1", "pavadinimas": "Bloga", "paskirtis": "gyvenamoji",
+             "plotas_m2": "12,5", "perimetras_m": 14, "lubu_aukstis_m": 2.8},  # comma-decimal → calc raises
+            {"nr": "2", "pavadinimas": "Gera", "paskirtis": "gyvenamoji",
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8},
+        ],
+    }
+    r = client.post("/recompute-interior", json=payload)
+    assert r.status_code == 200, r.text          # NOT a 500
+    body = r.json()
+    assert body.get("status") != "error", body
+    rooms = body.get("patalpos") or body.get("v8_rooms") or []
+    assert len(rooms) == 2                        # both rooms survive
+
+
 def test_recompute_invalid_field_returns_400():
     payload = {
         "rooms": [],

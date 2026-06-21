@@ -4981,6 +4981,18 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
 
     out_rooms: list[dict] = []
     for room in payload.patalpos:
+        # Defensively coerce client-supplied numerics (LT comma-decimals like
+        # "12,5", stray strings from corrupted/legacy projects) to floats so one
+        # bad field can't crash the calc OR the downstream plotas sums and 500 the
+        # whole recompute. (2026-06-19 hunt.) Comma-decimal recovers the real
+        # value; anything else degrades to 0.
+        for _k in ("plotas_m2", "perimetras_m", "lubu_aukstis_m"):
+            _v = room.get(_k)
+            if isinstance(_v, str):
+                try:
+                    room[_k] = float(_v.replace(",", ".").strip())
+                except (ValueError, AttributeError):
+                    room[_k] = 0.0
         # Preserve Vision-emitted fields we don't recompute
         preserved = {
             "nr": room.get("nr"),
@@ -5015,7 +5027,15 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
         # Build a single-room rules dict that calc_room_quantities expects
         single_rules = {paskirtis: rt_rules}
 
-        recalc = calc_room_quantities(room, rules=single_rules)
+        # Guard each room like the extraction pipeline does (vision_call.py) — a
+        # single malformed room (e.g. a non-numeric / comma-decimal plotas_m2 from
+        # a corrupted/legacy project) must degrade to the un-recomputed room, NOT
+        # 500 the whole recompute and lose every other room. (2026-06-19 hunt.)
+        try:
+            recalc = calc_room_quantities(room, rules=single_rules)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[recompute-interior] room {room.get('nr')} calc failed: {exc}")
+            recalc = {}
 
         merged = {**room, **recalc, **preserved}
         out_rooms.append(merged)
@@ -5410,8 +5430,17 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     user = _billable_user(request)
     _check_rate_limit(request.client.host if request.client else "unknown", "chat")
 
-    question = (payload.get("question") or "").strip()
-    history = payload.get("messages") or []  # [{role: "user"|"assistant", content: "..."}]
+    # Bound user-supplied input BEFORE building the Claude messages, so a huge
+    # question or hundreds of history turns can't burn far more tokens than the
+    # flat per-call spend reservation accounts for (2026-06-19 hunt: cap evasion).
+    _MAX_Q = 4000          # chars per message
+    _MAX_TURNS = 12        # most recent history turns kept
+    question = (payload.get("question") or "").strip()[:_MAX_Q]
+    history = [
+        {"role": m.get("role"), "content": str(m.get("content") or "")[:_MAX_Q]}
+        for m in (payload.get("messages") or [])[-_MAX_TURNS:]
+        if isinstance(m, dict)
+    ]
     project_id = payload.get("project_id")
     ctx = payload.get("project_context") or {}
 
@@ -5470,9 +5499,12 @@ async def chat_project(request: Request, payload: dict = Body(...)):
         log.info("chat-project tokens: in=%s out=%s",
                  getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
         return {"status": "ok", "answer": text}
-    except Exception as e:
+    except Exception:
+        # Log the detail server-side, but never return the raw exception to the
+        # client — it leaks the provider/model/error internals into the chat
+        # bubble. (2026-06-19 hunt.)
         log.exception("chat-project failed")
-        return {"status": "error", "error": f"AI klaida: {e}"}
+        return {"status": "error", "error": "AI laikinai nepasiekiamas. Bandykite dar kartą."}
 
 
 @app.post("/export/excel")
