@@ -196,8 +196,7 @@ from api.recompute_quantities import router as recompute_router
 from api.telemetry import router as telemetry_router
 from api.vision_fill import router as vision_fill_router
 from api.lasso_rerun import router as lasso_rerun_router
-# Week 5 Task 5.1 + 5.4 (canonical plan): per-quantity corrections + legends D4
-from api.corrections_v2 import router as corrections_v2_router
+# Week 5 Task 5.4 (canonical plan): legends D4
 from api.legends import router as legends_router
 # Week 7 (canonical plan): F2/F3 export + billing gate stub
 from api.exports_v2 import router as exports_v2_router
@@ -424,7 +423,6 @@ app.include_router(recompute_router)
 app.include_router(telemetry_router)
 app.include_router(vision_fill_router)
 app.include_router(lasso_rerun_router)
-app.include_router(corrections_v2_router)
 app.include_router(legends_router)
 app.include_router(exports_v2_router)
 app.include_router(billing_v2_router)
@@ -4119,14 +4117,42 @@ async def generate_excel(request: Request, data: dict):
     # Helper: write rows + totals block on a sheet starting at row `r`
     # Returns the next free row.
     # ─────────────────────────────────────────────────────────────────────────
-    def _write_rows(ws, rows: list[dict], start_row: int = 4) -> int:
+    def _write_rows(ws, rows: list[dict], start_row: int = 4,
+                    section_subtotals: bool = False) -> int:
+        # Section subtotals only make sense with >=2 sections, else the one
+        # "Skyriaus suma" just duplicates the grand total. (export step 4.)
+        _emit_sub = section_subtotals and len({
+            (e.get("skyrius") or "").strip()
+            for e in rows if (e.get("skyrius") or "").strip()}) >= 2
+
         current_section = None
+        section_start   = None
         data_row_idx    = 0
         r = start_row
+
+        def _section_subtotal(first, last):
+            nonlocal r
+            ws.merge_cells(f"A{r}:E{r}")
+            lc = ws[f"A{r}"]
+            lc.value     = "Skyriaus suma:"
+            lc.font      = Font(bold=True, size=9, color=C_MID)
+            lc.fill      = PatternFill("solid", fgColor=C_SEC)
+            lc.alignment = Alignment(horizontal="right", vertical="center")
+            lc.border    = border
+            vc = ws.cell(row=r, column=6, value=f"=SUBTOTAL(9,F{first}:F{last})")
+            vc.font      = Font(bold=True, size=9, color=C_MID)
+            vc.fill      = PatternFill("solid", fgColor=C_SEC)
+            vc.alignment = Alignment(horizontal="right", vertical="center")
+            vc.number_format = '#,##0.00 "€"'
+            vc.border    = border
+            ws.row_dimensions[r].height = 16
+            r += 1
 
         for e in rows:
             sec = (e.get("skyrius") or "").strip()
             if sec and sec != current_section:
+                if _emit_sub and section_start is not None and r > section_start:
+                    _section_subtotal(section_start, r - 1)
                 current_section = sec
                 ws.merge_cells(f"A{r}:F{r}")
                 sc = ws[f"A{r}"]
@@ -4142,6 +4168,7 @@ async def generate_excel(request: Request, data: dict):
                 ws.row_dimensions[r].height = 16
                 r += 1
                 data_row_idx = 0
+                section_start = r
 
             bg   = "FFFFFF" if data_row_idx % 2 == 0 else C_GRAY
             fill = PatternFill("solid", fgColor=bg)
@@ -4184,6 +4211,9 @@ async def generate_excel(request: Request, data: dict):
             r += 1
             data_row_idx += 1
 
+        if _emit_sub and section_start is not None and r > section_start:
+            _section_subtotal(section_start, r - 1)
+
         return r
 
     # Reverse-VAT (renovacija) — no output VAT line; VISO equals the be-PVM sum.
@@ -4216,7 +4246,9 @@ async def generate_excel(request: Request, data: dict):
             vc.border       = Border(left=thin, right=thin, top=tb, bottom=thin)
             ws.row_dimensions[sheet_row].height = 20 if fsize <= 10 else 24
 
-        sum_formula = f"=SUM(F{data_start}:F{data_end})"
+        # SUBTOTAL(9) ignores nested SUBTOTAL cells, so the grand total skips the
+        # per-section "Skyriaus suma" rows and never double-counts. (export step 4.)
+        sum_formula = f"=SUBTOTAL(9,F{data_start}:F{data_end})"
 
         _tot(r,     "Suma be PVM:",  sum_formula,                  top=True)
         if _reverse_vat:
@@ -4242,7 +4274,7 @@ async def generate_excel(request: Request, data: dict):
     ws_main = wb.active
     ws_main.title = "Sąmata"
     _write_sheet_header(ws_main, "SĄMATA")
-    last_r = _write_rows(ws_main, eilutes, start_row=4)
+    last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True)
     _write_totals(ws_main, eilutes, last_r)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -4481,7 +4513,16 @@ async def generate_pdf(request: Request, data: dict):
                     or str(data.get("archetipas") or "").lower() == "renovacija")
     pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
     viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
-    doc_title    = "VIDAUS APDAILOS KIEKIAI" if tipas_pdf == "interjeras" else "KIEKIŲ ŽINIARAŠTIS"
+    # A priced export is a LOKALINĖ SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by
+    # definition carries no prices, so that title over Kaina/Suma columns + a VISO
+    # su PVM total is self-contradicting. Title by content. (export step 1.)
+    _has_prices  = any((e.get("kaina") or 0) or (e.get("suma") or 0) for e in eilutes)
+    if _has_prices:
+        doc_title = "LOKALINĖ SĄMATA"
+    elif tipas_pdf == "interjeras":
+        doc_title = "VIDAUS APDAILOS KIEKIAI"
+    else:
+        doc_title = "KIEKIŲ ŽINIARAŠTIS"
 
     # Branding + business-document fields (2026-06-19). All optional — KŽ exports
     # without branding render exactly as before (the info block is skipped).
@@ -4601,34 +4642,43 @@ async def generate_pdf(request: Request, data: dict):
                            textColor=DARK, leading=12.5)
 
     def _info_lines(pairs):
-        flow = [Paragraph(f'<font color="#8a8a8a">{lbl}:</font> {val}', _ival)
-                for lbl, val in pairs if val]
+        # pairs: (label, value[, always]). always=True → show a grey '—' when the
+        # field is blank, so a sąmata never ships missing its parties block.
+        flow = []
+        for item in pairs:
+            lbl, val = item[0], item[1]
+            always = item[2] if len(item) > 2 else False
+            if val:
+                flow.append(Paragraph(f'<font color="#8a8a8a">{lbl}:</font> {val}', _ival))
+            elif always:
+                flow.append(Paragraph(
+                    f'<font color="#8a8a8a">{lbl}:</font> <font color="#bbbbbb">—</font>', _ival))
         return flow or [Paragraph("", _ival)]
 
     _left_info = _info_lines([
-        ("Vykdytojas", imone), ("Įmonės kodas", imones_kodas),
+        ("Vykdytojas", imone, True), ("Įmonės kodas", imones_kodas),
         ("PVM kodas", pvm_kodas), ("Adresas", adresas),
         ("Tel.", telefonas), ("El. paštas", el_pastas), ("IBAN", iban),
     ])
     _right_info = _info_lines([
-        ("Užsakovas", uzsakovas), ("Objektas", objektas),
-        ("Pasiūlymo nr.", pasiulymo_nr), ("Data", doc_date),
-        ("Galioja iki", galioja_iki),
+        ("Užsakovas", uzsakovas, True), ("Objektas", objektas, True),
+        ("Pasiūlymo nr.", pasiulymo_nr, True), ("Data", doc_date, True),
+        ("Galioja iki", galioja_iki, True),
     ])
-    if any([imone, imones_kodas, pvm_kodas, adresas, telefonas, el_pastas,
-            iban, uzsakovas, objektas, pasiulymo_nr]):
-        info_block = Table([[_left_info, _right_info]],
-                           colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
-        info_block.setStyle(TableStyle([
-            ("VALIGN",       (0,0), (-1,-1), "TOP"),
-            ("LEFTPADDING",  (0,0), (0,0), 0),
-            ("LEFTPADDING",  (1,0), (1,0), 10),
-            ("RIGHTPADDING", (0,0), (-1,-1), 6),
-            ("TOPPADDING",   (0,0), (-1,-1), 2),
-            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
-        ]))
-        story.append(info_block)
-        story.append(Spacer(1, 0.4*cm))
+    # Always render — a professional sąmata states who it is from and for, even if
+    # some fields are blank (shown as '—'). (export step 3.)
+    info_block = Table([[_left_info, _right_info]],
+                       colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
+    info_block.setStyle(TableStyle([
+        ("VALIGN",       (0,0), (-1,-1), "TOP"),
+        ("LEFTPADDING",  (0,0), (0,0), 0),
+        ("LEFTPADDING",  (1,0), (1,0), 10),
+        ("RIGHTPADDING", (0,0), (-1,-1), 6),
+        ("TOPPADDING",   (0,0), (-1,-1), 2),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 2),
+    ]))
+    story.append(info_block)
+    story.append(Spacer(1, 0.4*cm))
 
     # ── Project name ──────────────────────────────────────────────────────────
     story.append(Paragraph(projektas, ParagraphStyle(
@@ -4661,16 +4711,47 @@ async def generate_pdf(request: Request, data: dict):
         ("BOTTOMPADDING",(0,0), (-1,0), 6),
     ]
 
+    # Per-section subtotals: only when priced AND there are ≥2 sections, else a
+    # "Skyriaus suma" equals the grand total and just adds noise. (export step 4.)
+    _distinct_sections = len({(e.get("skyrius") or "").strip()
+                              for e in eilutes if (e.get("skyrius") or "").strip()})
+    _show_section_subtotals = _has_prices and _distinct_sections >= 2
+
     current_section = None
     data_idx        = 0   # for alternating rows
+    _section_sum    = 0.0
+    _section_rows   = False
+
+    def _emit_pdf_subtotal():
+        nonlocal _section_sum, _section_rows
+        sri = len(table_data)
+        table_data.append([
+            "", "", "", "",
+            Paragraph("Skyriaus suma:", b_r),
+            Paragraph(_n(round(_section_sum, 2)) + " €", b_r),
+        ])
+        style_cmds.extend([
+            ("SPAN",         (0, sri), (3, sri)),
+            ("BACKGROUND",   (0, sri), (-1, sri), SEC_BG),
+            ("TOPPADDING",   (0, sri), (-1, sri), 4),
+            ("BOTTOMPADDING",(0, sri), (-1, sri), 4),
+            ("LINEABOVE",    (0, sri), (-1, sri), 0.5, MID),
+            ("TEXTCOLOR",    (4, sri), (-1, sri), SEC_FG),
+        ])
+        _section_sum  = 0.0
+        _section_rows = False
 
     for e in eilutes:
         sec = (e.get("skyrius") or "").strip()
-        ri  = len(table_data)
 
         # Section header row
         if sec and sec != current_section:
+            if _show_section_subtotals and current_section is not None and _section_rows:
+                _emit_pdf_subtotal()
+            _section_sum  = 0.0
+            _section_rows = False
             current_section = sec
+            ri = len(table_data)
             table_data.append([
                 Paragraph(sec, ParagraphStyle(
                     "sec", fontName=_FONT_BOLD, fontSize=8,
@@ -4708,11 +4789,25 @@ async def generate_pdf(request: Request, data: dict):
         ]
         if isinstance(suma_val, (int, float)) and suma_val > 0:
             style_cmds.append(("TEXTCOLOR", (5, ri), (5, ri), GREEN))
+            _section_sum += suma_val
+        _section_rows = True
         data_idx += 1
+
+    # final section subtotal
+    if _show_section_subtotals and _section_rows:
+        _emit_pdf_subtotal()
 
     n_data_rows = len(table_data)
 
     # ── Totals ────────────────────────────────────────────────────────────────
+    totals_data: list = []
+    totals_style: list = [
+        ("FONTSIZE",     (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+    ]
+
     def tot_row(label, value, bold=False, orange=False):
         ls = ParagraphStyle("tl",
             fontName=_FONT_BOLD, fontSize=9 if not bold else 11,
@@ -4724,18 +4819,17 @@ async def generate_pdf(request: Request, data: dict):
             textColor=ORANGE if orange else colors.HexColor("#333333"),
             alignment=TA_RIGHT,
         )
-        ri = len(table_data)
-        table_data.append(["", "", "", "", Paragraph(label, ls), Paragraph(_n(value) + "\u202f€", vs)])
-        style_cmds.extend([
+        ri = len(totals_data)
+        totals_data.append(["", "", "", "", Paragraph(label, ls), Paragraph(_n(value) + "\u202f€", vs)])
+        totals_style.extend([
             ("BACKGROUND",   (0, ri), (-1, ri), TOTBG),
             ("TOPPADDING",   (0, ri), (-1, ri), 5 if not bold else 7),
             ("BOTTOMPADDING",(0, ri), (-1, ri), 5 if not bold else 7),
             ("SPAN",         (0, ri), (3,  ri)),
         ])
         if bold:
-            style_cmds.append(("LINEABOVE", (0, ri), (-1, ri), 1.5, ORANGE))
+            totals_style.append(("LINEABOVE", (0, ri), (-1, ri), 1.5, ORANGE))
 
-    ri_before_totals = len(table_data)
     tot_row("Suma be PVM:",  viso_be_pvm)
     if _reverse_vat:
         # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
@@ -4758,14 +4852,45 @@ async def generate_pdf(request: Request, data: dict):
     tbl.setStyle(TableStyle(style_cmds))
     story.append(tbl)
 
+    # Totals + reverse-VAT note + signatures kept together so they never split
+    # across a page break (a VISO stranded from its qualifier reads as an error).
+    totals_tbl = Table(totals_data, colWidths=COL_W)
+    totals_tbl.setStyle(TableStyle(totals_style))
+    _totals_group: list = [totals_tbl]
+
     if _reverse_vat:
-        story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(
+        _totals_group.append(Spacer(1, 0.3*cm))
+        _totals_group.append(Paragraph(
             "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas "
             "(PVMĮ 96 str.).",
             ParagraphStyle("rvat", fontName=_FONT_NORMAL, fontSize=8,
                            textColor=colors.HexColor("#666666"), leading=11),
         ))
+
+    # Signature block — a priced sąmata is a pre-contract offer; end it with
+    # signature lines so it reads as a signable document. (export step 3b.)
+    if _has_prices:
+        _sig_lbl  = ParagraphStyle("sigl", fontName=_FONT_BOLD, fontSize=8.5,
+                                   textColor=DARK, leading=12)
+        _sig_line = ParagraphStyle("sigln", fontName=_FONT_NORMAL, fontSize=7.5,
+                                   textColor=colors.HexColor("#888888"), leading=11)
+        _sig_tbl = Table([
+            [Paragraph("Vykdytojas", _sig_lbl), Paragraph("Užsakovas", _sig_lbl)],
+            [Paragraph("_____________________________<br/>(vardas, pavardė, parašas, data)", _sig_line),
+             Paragraph("_____________________________<br/>(vardas, pavardė, parašas, data)", _sig_line)],
+        ], colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
+        _sig_tbl.setStyle(TableStyle([
+            ("VALIGN",       (0,0), (-1,-1), "TOP"),
+            ("LEFTPADDING",  (0,0), (0,0), 0),
+            ("LEFTPADDING",  (1,0), (1,0), 10),
+            ("TOPPADDING",   (0,1), (-1,1), 22),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
+        ]))
+        _totals_group.append(Spacer(1, 0.9*cm))
+        _totals_group.append(_sig_tbl)
+
+    from reportlab.platypus import KeepTogether as _KeepTogether
+    story.append(_KeepTogether(_totals_group))
 
     # ── Task 8: Assumptions + warnings page at the end ────────────────────────
     from reportlab.platypus import PageBreak
