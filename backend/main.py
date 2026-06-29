@@ -4935,11 +4935,18 @@ async def generate_pdf(request: Request, data: dict):
             story.append(Paragraph(f"• {w.get('tekstas', '')}", small_style))
         story.append(Spacer(1, 0.4*cm))
 
-    story.append(Paragraph(
-        "Pastaba: šie kiekiai sugeneruoti AI ir turi būti patikrinti kvalifikuoto specialisto.",
-        ParagraphStyle("warn", fontName=_FONT_NORMAL, fontSize=7,
-                       textColor=colors.HexColor("#888888"), leading=10, spaceAfter=4)
-    ))
+    # The blanket "AI-generated, verify" note belongs on internal/draft exports,
+    # not on a priced client offer the samatininkas signs and owns. Drop it when
+    # priced unless the caller explicitly forces it. (export step 7.)
+    _show_ai_note = data.get("show_ai_disclaimer")
+    if _show_ai_note is None:
+        _show_ai_note = not _has_prices
+    if _show_ai_note:
+        story.append(Paragraph(
+            "Pastaba: šie kiekiai sugeneruoti AI ir turi būti patikrinti kvalifikuoto specialisto.",
+            ParagraphStyle("warn", fontName=_FONT_NORMAL, fontSize=7,
+                           textColor=colors.HexColor("#888888"), leading=10, spaceAfter=4)
+        ))
 
     doc.build(story, canvasmaker=_NumberedCanvas)
     buf.seek(0)
