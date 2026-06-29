@@ -5,11 +5,20 @@
   "status": "pending",
   "error": null,
   "input_tokens": 11308,
-  "output_tokens": 4417,
-  "cost_usd": 0.5009,
-  "seconds": 186.41504573822021,
-  "n_rooms": 7,
+  "output_tokens": 4701,
+  "cost_usd": 0.5222,
+  "seconds": 308.7289237976074,
+  "n_rooms": 6,
   "n_pages": null,
+  "voting_on": true,
+  "voting_n": 3,
+  "kampai": 266.89,
+  "combined_paint": 304.49,
+  "n_partition_walls_total": 18,
+  "ceiling_heights": [
+    2.82
+  ],
+  "apdailos_rooms_updated": null,
   "metas": [
     {
       "event": "rendering_pdf"
@@ -30,30 +39,58 @@
     },
     {
       "event": "pass1_started",
-      "page_count": 3
+      "page_count": 3,
+      "voting": true
+    },
+    {
+      "event": "voting_round_started",
+      "round": 1,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 1,
+      "rooms": 7
+    },
+    {
+      "event": "voting_round_started",
+      "round": 2,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 2,
+      "rooms": 7
+    },
+    {
+      "event": "voting_round_started",
+      "round": 3,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 3,
+      "rooms": 6
+    },
+    {
+      "event": "adjacency_applied",
+      "page": 1,
+      "rooms_matched": 17
     },
     {
       "event": "pass1_completed",
-      "rooms_count": 7,
+      "rooms_count": 6,
       "patalpos": [
         {
-          "nr": "1",
+          "nr": "01",
           "pavadinimas": "Miegamasis",
           "paskirtis": "miegamoji",
-          "plotas_m2": 16.0,
+          "plotas_m2": 15.5,
           "puslapio_nr": 1,
           "confidence": "medium"
         },
         {
-          "nr": "2",
-          "pavadinimas": "Drabužinė / spinta zona prie miegamojo",
-          "paskirtis": "drabuzine",
-          "plotas_m2": 3.0,
-          "puslapio_nr": 1,
-          "confidence": "low"
-        },
-        {
-          "nr": "3",
+          "nr": "02",
           "pavadinimas": "Vonia prie miegamojo",
           "paskirtis": "san",
           "plotas_m2": 4.5,
@@ -61,34 +98,34 @@
           "confidence": "low"
         },
         {
-          "nr": "4",
-          "pavadinimas": "Kambarys 1 (vaikų / svečių, prie sofos 210x80)",
+          "nr": "03",
+          "pavadinimas": "Kambarys 1 (svečių/vaikų)",
           "paskirtis": "miegamoji",
           "plotas_m2": 14.0,
           "puslapio_nr": 1,
           "confidence": "medium"
         },
         {
-          "nr": "5",
-          "pavadinimas": "Kambarys 2 (prie sofos 200x80)",
-          "paskirtis": "miegamoji",
-          "plotas_m2": 14.0,
-          "puslapio_nr": 1,
-          "confidence": "medium"
-        },
-        {
-          "nr": "6",
-          "pavadinimas": "Svetainė / valgomasis / virtuvė",
+          "nr": "04",
+          "pavadinimas": "Svetainė/Valgomasis/Virtuvė",
           "paskirtis": "gyvenamoji",
-          "plotas_m2": 40.0,
+          "plotas_m2": 26.5,
           "puslapio_nr": 1,
           "confidence": "medium"
         },
         {
-          "nr": "7",
+          "nr": "05",
+          "pavadinimas": "Kambarys 2",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 9.25,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "06",
           "pavadinimas": "Vonia prie lauko durų",
           "paskirtis": "san",
-          "plotas_m2": 4.0,
+          "plotas_m2": 23.25,
           "puslapio_nr": 1,
           "confidence": "low"
         }
@@ -102,8 +139,8 @@
     {
       "event": "schedule_anchored",
       "anchored_elements": 0,
-      "langai_match": "3/0",
-      "durys_match": "7/0"
+      "langai_match": "7/0",
+      "durys_match": "6/0"
     },
     {
       "event": "polygon_prepass_applied",
@@ -122,127 +159,112 @@
     },
     {
       "event": "zoom_started",
-      "total": 7,
+      "total": 6,
       "skipped_via_eksplikacija": 0
     },
     {
       "event": "zoom_room_started",
       "idx": 1,
-      "total": 7,
-      "room_nr": "1",
+      "total": 6,
+      "room_nr": "01",
       "pavadinimas": "Miegamasis"
     },
     {
       "event": "zoom_room_completed",
       "idx": 1,
-      "total": 7,
-      "room_nr": "1",
+      "total": 6,
+      "room_nr": "01",
       "applied": false,
-      "plotas_m2": 16.0
+      "plotas_m2": 15.5
     },
     {
       "event": "zoom_room_started",
       "idx": 2,
-      "total": 7,
-      "room_nr": "2",
-      "pavadinimas": "Drabužinė / spinta zona prie miegamojo"
-    },
-    {
-      "event": "zoom_room_completed",
-      "idx": 2,
-      "total": 7,
-      "room_nr": "2",
-      "applied": true,
-      "plotas_m2": 3.0
-    },
-    {
-      "event": "zoom_room_started",
-      "idx": 3,
-      "total": 7,
-      "room_nr": "3",
+      "total": 6,
+      "room_nr": "02",
       "pavadinimas": "Vonia prie miegamojo"
     },
     {
       "event": "zoom_room_completed",
-      "idx": 3,
-      "total": 7,
-      "room_nr": "3",
+      "idx": 2,
+      "total": 6,
+      "room_nr": "02",
       "applied": false,
       "plotas_m2": 4.5
     },
     {
       "event": "zoom_room_started",
-      "idx": 4,
-      "total": 7,
-      "room_nr": "4",
-      "pavadinimas": "Kambarys 1 (vaikų / svečių, prie sofos 210x80)"
+      "idx": 3,
+      "total": 6,
+      "room_nr": "03",
+      "pavadinimas": "Kambarys 1 (svečių/vaikų)"
     },
     {
       "event": "zoom_room_completed",
-      "idx": 4,
-      "total": 7,
-      "room_nr": "4",
+      "idx": 3,
+      "total": 6,
+      "room_nr": "03",
       "applied": false,
       "plotas_m2": 14.0
     },
     {
       "event": "zoom_room_started",
-      "idx": 5,
-      "total": 7,
-      "room_nr": "5",
-      "pavadinimas": "Kambarys 2 (prie sofos 200x80)"
+      "idx": 4,
+      "total": 6,
+      "room_nr": "04",
+      "pavadinimas": "Svetainė/Valgomasis/Virtuvė"
     },
     {
       "event": "zoom_room_completed",
-      "idx": 5,
-      "total": 7,
-      "room_nr": "5",
-      "applied": true,
-      "plotas_m2": 14.0
-    },
-    {
-      "event": "zoom_room_started",
-      "idx": 6,
-      "total": 7,
-      "room_nr": "6",
-      "pavadinimas": "Svetainė / valgomasis / virtuvė"
-    },
-    {
-      "event": "zoom_room_completed",
-      "idx": 6,
-      "total": 7,
-      "room_nr": "6",
+      "idx": 4,
+      "total": 6,
+      "room_nr": "04",
       "applied": false,
-      "plotas_m2": 40.0
+      "plotas_m2": 26.5
     },
     {
       "event": "zoom_room_started",
-      "idx": 7,
-      "total": 7,
-      "room_nr": "7",
+      "idx": 5,
+      "total": 6,
+      "room_nr": "05",
+      "pavadinimas": "Kambarys 2"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 5,
+      "total": 6,
+      "room_nr": "05",
+      "applied": false,
+      "plotas_m2": 9.25
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 6,
+      "total": 6,
+      "room_nr": "06",
       "pavadinimas": "Vonia prie lauko durų"
     },
     {
       "event": "zoom_room_completed",
-      "idx": 7,
-      "total": 7,
-      "room_nr": "7",
+      "idx": 6,
+      "total": 6,
+      "room_nr": "06",
       "applied": false,
-      "plotas_m2": 4.0
+      "plotas_m2": 23.25
     },
     {
       "event": "zoom_completed",
-      "attempted": 7,
-      "applied": 2,
+      "attempted": 6,
+      "applied": 0,
       "skipped_via_eksplikacija": 0,
-      "elapsed_s": 85.1
+      "elapsed_s": 67.5
     },
     {
       "event": "apdailos_started"
     },
     {
       "event": "apdailos_skipped",
-      "reason": "no IŠKLOTINIŲ/APDAILŲ page found in PDF"
+      "reason": "no apdailos page found"
     },
     {
       "event": "doors_started"
@@ -250,16 +272,33 @@
     {
       "event": "doors_completed",
       "page": 1,
-      "total": 7,
-      "interior": 6,
+      "total": 6,
+      "interior": 5,
       "exterior": 1
+    },
+    {
+      "event": "niche_locator_started",
+      "pages": [
+        3
+      ]
+    },
+    {
+      "event": "niche_locator_completed",
+      "primary_page": 3,
+      "primary_rooms_covered": 1,
+      "total_niches_kept": 5,
+      "backfill_ran": true
+    },
+    {
+      "event": "niche_inference_completed",
+      "rooms_inferred": 2
     },
     {
       "event": "post_processing"
     },
     {
       "event": "python_math_completed",
-      "rooms_computed": 7
+      "rooms_computed": 6
     }
   ]
 }

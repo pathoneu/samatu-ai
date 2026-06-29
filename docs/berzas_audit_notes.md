@@ -107,6 +107,31 @@ projects that would HIDE a collapsed metric; remove/flag that when scoring real 
 
 **Live re-verification of the full restoration: in progress (`/tmp/berzas_restore_verify.log`).**
 
+### 2026-06-09 PART 3 — benchmark-honesty regeneration ATTEMPTED, blocked on API credit
+
+Full write-up: **`docs/superpowers/research/2026-06-09-benchmark-honesty-regen.md`**.
+
+Acted on the PART-2 TODO ("regenerate every `ai_extract.json` with the restored
+pipeline"). Backed up all cached extracts → `eval_runs/cached_baseline_backup_2026-06-09/`
+(sha256-verified; git HEAD also preserves them). Fixed the eval "honest filter"
+(`eval_harness.py`): a *fresh* extract emitting `0.0` vs a real >0 truth now scores
+as the genuine −100% collapse **and** prints a `🔴 COLLAPSED METRICS` footnote
+(silent-drop kept only for legacy `replay`). Wrote `scripts/regenerate_truth_extracts.py`
+(`run_vision_on_truth_set.py` can't refresh berzas — it filters out `has_cached_extract`).
+
+**The live run ran out of Anthropic API credit after $2.31.** Result:
+- ✅ **ciurliu, lazunu** regenerated honestly. ciurliu MAE **11.53% → 27.42%** (enriched
+  cache overstated accuracy **2.4×**, partly a lost room 7→6). lazunu **10.61% → 10.24%**
+  (enrichment barely mattered there).
+- ⚠️ **berzas** died on voting round 3; apdailos+doors passes failed → paint-degraded
+  artifact → **rolled back to enriched baseline** (not scored — its collapse was a credit
+  artifact, not the pipeline).
+- ❌ **bacveviciaus, romainiai** never written (all Vision calls 400'd) → enriched baseline.
+
+So the benchmark is **partially honest** (overall 6.658% → 9.479%, a mixed figure).
+**To finish: top up credits, re-run `scripts/regenerate_truth_extracts.py --only berzas`
+(+ bacveviciaus, romainiai), then `eval_harness.py --totals-only`.**
+
 ---
 
 > ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the tables above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 corrections.** Per-line fresh-vs-cached deltas TBD.

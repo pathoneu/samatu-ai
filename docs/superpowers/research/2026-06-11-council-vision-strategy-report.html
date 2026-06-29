@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Council Report — Sąmatų AI Vision Strategy · 2026-06-11</title>
+<style>
+  :root {
+    --ink: #1a1d21; --muted: #6b7280; --line: #e5e7eb; --bg: #ffffff; --soft: #f8f9fa;
+    --blue: #2a6fb5; --green: #15803d; --amber: #b45309; --red: #b91c1c; --violet: #6d28d9;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         color: var(--ink); background: var(--bg); margin: 0; line-height: 1.55; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+  .q { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; font-size: 14.5px; margin-bottom: 36px; }
+  .q b { color: var(--blue); }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 40px 0 14px; }
+  .verdict { border: 2px solid var(--blue); border-radius: 12px; padding: 22px 26px; }
+  .verdict h3 { margin: 18px 0 8px; font-size: 16px; }
+  .verdict h3:first-child { margin-top: 0; }
+  .verdict ol, .verdict ul { margin: 6px 0 12px; padding-left: 22px; }
+  .verdict li { margin-bottom: 6px; font-size: 14.5px; }
+  .first-thing { background: #eef6ee; border: 1px solid #bbe0bb; border-radius: 8px; padding: 14px 18px; margin-top: 14px; font-size: 15px; }
+  .grid { display: grid; grid-template-columns: 160px repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 13px; }
+  .grid > div { padding: 10px 12px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .grid > div:nth-child(4n) { border-right: none; }
+  .grid .hdr { background: var(--soft); font-weight: 600; }
+  .pos-yes { color: var(--green); font-weight: 600; }
+  .pos-no { color: var(--red); font-weight: 600; }
+  .pos-mid { color: var(--amber); font-weight: 600; }
+  details { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; background: var(--bg); }
+  summary { cursor: pointer; padding: 14px 18px; font-weight: 600; font-size: 14.5px; list-style: none; display: flex; align-items: center; gap: 10px; }
+  summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details .body { padding: 0 18px 16px; font-size: 14px; color: #374151; white-space: pre-wrap; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .t-contrarian { background: #fee2e2; color: var(--red); }
+  .t-fp { background: #ede9fe; color: var(--violet); }
+  .t-exp { background: #dcfce7; color: var(--green); }
+  .t-out { background: #fef3c7; color: var(--amber); }
+  .t-exec { background: #dbeafe; color: var(--blue); }
+  .blind { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; font-size: 14.5px; }
+  .blind li { margin-bottom: 8px; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Council Report — Vision/Extraction Strategy Pressure-Test</h1>
+<div class="sub">Sąmatų AI · 2026-06-11 · 5 advisors → anonymized peer review → chairman synthesis</div>
+
+<div class="q">
+<b>The question:</b> Is the drafted hybrid pipeline strategy right — deterministic scale calibration → fine-tuned YOLO symbol detector (auto-label bootstrapped) → gated agentic VLM zoom → deterministic math → N-pass median voting + confidence flags → human-correction UI — with substrate-first sequencing and a universal-scaffold expansion to all construction types, accepting "80% AI + 20% human review" permanently?
+</div>
+
+<h2>Chairman's Verdict</h2>
+<div class="verdict">
+<h3>Where the council agrees (high-confidence)</h3>
+<ol>
+<li><b>All five advisors independently named the same missing lever: the correction UI as a data engine</b> — corrections-as-labels flywheel. Strongest convergence a council can produce.</li>
+<li><b>Move the correction UI from last to first.</b> It's the product customers pay for, the only affordable label factory, and our own bake-off's standing conclusion.</li>
+<li><b>The YOLO bootstrap as drafted is circular</b> — Grounding DINO auto-labels scored against AI-seeded truth = AI grading AI (the 7.5× benchmark trap, one layer down). Human-verified ground truth is a prerequisite.</li>
+<li><b>Scaffolding-over-model is correct</b> — because fine-tunes are downstream of owning labels.</li>
+<li><b>&gt;90% autonomous this year: no.</b> Reframe: near-perfect recall on "I might be wrong" (calibration), not omniscient extraction.</li>
+</ol>
+<h3>Where the council clashes</h3>
+<ul>
+<li><b>Expansion:</b> Expansionist's "enter each vertical manual-first, automate behind the corpus" vs. three advisors' "narrow and nail interior." Resolution: hold the ambition, but every new vertical enters as a correction-first product — and not before interior is genuinely strong.</li>
+<li><b>The detector:</b> "last-or-never" (Executor) vs. "eventually" (others). Resolution both accept: defer the decision until a human-verified corpus exists.</li>
+</ul>
+<h3>Blind spots only the peer-review round caught</h3>
+<ul>
+<li><b>The flywheel is currently impossible:</b> no auth, no DB — projects live in localStorage. Persistence + accounts + GDPR-grade consent for training on client drawings is unscoped prerequisite work.</li>
+<li><b>The flywheel poisons itself:</b> users rubber-stamp 🟢 items (anchoring bias), so false-greens never enter the corpus → periodic <b>blind audits</b> (no AI prefill) required.</li>
+<li><b>Cold start:</b> ~one real customer. Customer acquisition is on the critical path of the <i>technical</i> strategy.</li>
+<li><b>Nobody priced N-pass voting</b> (now default-on) per project.</li>
+<li><b>The false-green rate</b> — the load-bearing trust metric — appears nowhere in the plan.</li>
+</ul>
+<h3>The recommendation</h3>
+<ul>
+<li><b>Keep:</b> deterministic math, voting/median substrate, scale step (with cross-checks), confidence flags, one type at a time.</li>
+<li><b>Resequence:</b> substrate incl. false-green protocol → <b>correction UI now</b> (with persistence/auth/consent scoped in) → human ground-truth labeling flow → scale layer → <b>detector deferred</b> until a human-verified corpus exists.</li>
+<li><b>Add:</b> false-green rate as the tracked existential metric; blind-audit protocol; provenance/correction logging schema from day one; voting cost tracking.</li>
+</ul>
+<div class="first-thing"><b>The one thing to do first:</b> measure the false-green rate today — list every item the voted Beržų extraction would flag 🟢 and count how many are actually wrong vs contractor truth. One day, zero new infra, and it tests the assumption the entire trust model stands on. <i>(House rule: council output is hypothesis until verified on real PDFs — this step is that verification.)</i></div>
+</div>
+
+<h2>Advisor alignment</h2>
+<div class="grid">
+  <div class="hdr">Advisor</div><div class="hdr">Sequencing as drafted?</div><div class="hdr">Widen to all types?</div><div class="hdr">&gt;90% autonomous?</div>
+  <div><span class="tag t-contrarian">Contrarian</span></div><div class="pos-no">No — UI buried last; eval circular</div><div class="pos-no">No — platform roadmap in startup costume</div><div class="pos-no">No — needs corpus you don't have</div>
+  <div><span class="tag t-fp">First Principles</span></div><div class="pos-mid">Substrate yes, UI before detector</div><div class="pos-mid">Only at fixture-acquisition speed</div><div class="pos-mid">Reframe: perfect "I might be wrong" recall</div>
+  <div><span class="tag t-exp">Expansionist</span></div><div class="pos-yes">Yes + add data-capture layer</div><div class="pos-yes">Yes — manual-first vertical entry</div><div class="pos-yes">~90% reachable (peer-review: math flawed)</div>
+  <div><span class="tag t-out">Outsider</span></div><div class="pos-no">No — permanent part sequenced last</div><div class="pos-no">No — defensible part is being spread thin</div><div class="pos-no">No — nothing cited supports it</div>
+  <div><span class="tag t-exec">Executor</span></div><div class="pos-no">No — detector last-or-never</div><div class="pos-no">No — nail interior first</div><div class="pos-no">Not this year; accept 80/20</div>
+</div>
+
+<h2>Advisor responses (full)</h2>
+<details><summary><span class="tag t-contrarian">Contrarian</span> The evaluation loop is circular — that's the fatal flaw</summary><div class="body">Your evaluation loop is circular, and that's the fatal flaw. The detector will be trained on auto-labels from Grounding DINO — a model family that already fails on this task — and scored against ground truth your own docs admit is AI-seeded. Your benchmark already overstates production by ~7.5x, and the voting win was measured on one fixture. N=1. You cannot tell whether any of this strategy works, and the plan contains no step that fixes that. Human-verified ground truth isn't housekeeping; it's the prerequisite for every other line item.
+
+The sequencing buries the actual product. The correction UI is listed last, almost as garnish — but every competitor you cite ships human-in-the-loop as the product, your own bake-off concluded "ship 50% AI + fast correction tool," and that UI is also your only realistic label factory. Every contractor click is a verified training example. Build it first and the YOLO bootstrap problem solves itself; build it last and you're fine-tuning on garbage for months.
+
+Count the workstreams: scale calibration, YOLO pipeline, auto-labeling, gated agentic zoom, IR contract, confidence system, correction UI — plus per-type detectors and formulas for eleven construction types. Funded teams narrow because per-type accuracy work doesn't amortize; the "universal scaffold" is the cheap 20%. Two people just lost three weeks rediscovering deleted readers. This plan is a platform roadmap wearing a startup costume.
+
+And "deterministic scale" via OCR on iLovePDF re-rasterized scans isn't deterministic — it's a single point of silent catastrophic failure poisoning every downstream number.
+
+Missing lever: corrections-as-labels flywheel. Steelman: &gt;90% autonomous requires a large human-verified corpus per drafting style. You don't have one. Customers correcting your output is the only way you ever get one.</div></details>
+
+<details><summary><span class="tag t-fp">First Principles</span> You're optimizing the wrong variable — the false-green rate is existential</summary><div class="body">The product isn't "accurate extraction" — it's a number a contractor will stake a bid on. Errors are fine if they're caught cheaply; errors are fatal if they wear a green dot. So the load-bearing component of your entire strategy is the one you treat as plumbing: confidence calibration. Agreement-spread measures self-consistency, not correctness — N samples from one model family happily converge on the same geometric hallucination. Your existential metric is the false-green rate: of items flagged 🟢, how many are wrong? It appears nowhere in the plan. Measure it first; everything else is decoration until it's near zero.
+
+The biggest missing lever follows directly: the correction UI isn't a fallback, it's your data engine. Every human fix is a labeled datapoint — the only ground truth you'll ever afford, the calibration signal, and the YOLO training set. Your own benchmark is AI-seeded and overstates production ~7.5×; bootstrapping the detector from Grounding DINO auto-labels is AI grading AI, the same circularity again. Humans must enter the loop as labelers, not just reviewers.
+
+Sequencing: substrate-first is right, but ship the correction UI before the detector — it manufactures the detector's training data. Scaffold-over-model is correct because of the flywheel; fine-tunes are downstream of owning labels. Competitors narrow because ground truth is per-domain, not because scaffolds aren't universal. Your thesis holds only at the speed you acquire validated fixtures per type — currently one (Beržų).
+
+Steelman: &gt;90% autonomous doesn't require zero errors — it requires near-perfect recall on "I might be wrong." That's achievable; omniscient extraction isn't. Build the company that knows when it's guessing.</div></details>
+
+<details><summary><span class="tag t-exp">Expansionist</span> Every human correction is a labeled example — the moat nobody else can harvest</summary><div class="body">The asset they don't see: every human correction is a labeled training example, and they're the only player positioned to harvest it. The drafted strategy treats "80% AI + 20% human review" as a permanent tax. Wrong frame. The correction UI sitting on top of a typed IR is an annotation factory where customers pay you to generate ground truth on exactly the distribution that breaks everyone else — messy Lithuanian raster re-exports. Whoever owns the largest corpus of corrected messy-scan extractions owns the fine-tune nobody can replicate. Log every N-pass vote spread, every flagged item, every human fix, with provenance, from day one. That costs almost nothing now and is unrecoverable later.
+
+The expansion thesis is stronger than drafted. Competitors narrowing scope are validating it: each is hand-building one detector with no scaffold. With the scaffold amortized, you can enter a new construction type before building its detector — ship the correction UI as a fast manual takeoff tool for stogai/fasadai, Wizard-of-Oz the extraction, collect the corpus, then automate. Every vertical launches at human accuracy on day one and gets cheaper monthly.
+
+Steelman on &gt;90%: voting alone already moved paint from −25% to +2.3%. Errors are multiplicative across independent stages — deterministic scale kills one class, fine-tuned YOLO kills counting, gated zoom kills small reads. Stack three independent halvings on a 40% error rate and you're at ~90% without any frontier-model improvement. Within reach — but only if the flywheel is logging. <i>(Peer review challenged the independence assumption — errors correlate through scale.)</i></div></details>
+
+<details><summary><span class="tag t-out">Outsider</span> What does the customer pay for, and how fast do they get it?</summary><div class="body">Nobody is asking: what does the customer actually pay for, and how fast do they get it? This entire document is about extraction accuracy percentages. Not one number about turnaround time, price per project, or how long the correction session takes a non-technical contractor. Beam AI's "24–72h, ±1%" is the only customer-shaped metric here, and it belongs to a competitor.
+
+Contradictions to fresh eyes: (1) You cite research showing fine-tuned detectors beat VLMs, then plan to train YOLO on labels generated by other AI models — rebuilding the AI-seeded circular-measurement trap one layer down. (2) "Accept 80% AI + 20% human review as permanent" — but the correction UI is the LAST item and doesn't exist yet. If human review is permanent product reality, it's the product. Why is the permanent part sequenced after the experimental parts? (3) Validation rests on ONE contractor-validated PDF. How do you know any percentage generalizes before you have ten? (4) Everyone successful narrows scope; you widen — and scaffolding is exactly the part competitors could copy; per-type accuracy on messy Lithuanian PDFs is the defensible part you're spreading thin.
+
+Biggest missing lever: the correction UI as a labeling machine — build it first and training data, benchmarks, and calibration fall out of paying customers' clicks. &gt;90% autonomous on messy raster? Nothing cited supports it. Stop steelmanning; sell the 80%.</div></details>
+
+<details><summary><span class="tag t-exec">Executor</span> The YOLO detector is your hidden yak-shave — Monday plan included</summary><div class="body">Weakest point: the YOLO detector is your hidden yak-shave. "Bootstrapped from legend crops via Grounding DINO auto-labeling" — you already tried Grounding DINO (Pipeline 5: died at 1 call, 402 errors) and template matching (Pipeline 3: 1772 counted where truth=5). Auto-labeling from sources that already failed, plus GPU training, label QA, and per-drafting-style drift, is 4-6 weeks of infra for two people. Your own bake-off conclusion says: ship ~50% AI + fast correction UI, don't chase the detector.
+
+Sequencing is backwards at the end. Reliability substrate first — correct, and mostly shipped (voting is live; spread→confidence is days of work). But the symbol detector should be last or never until two cheaper things exist: (1) the count-correction UI — doesn't exist, but your frontend already has the viewer, polygon editor, and provenance popovers, so it's ~1-2 weeks and it's what customers actually pay for; (2) human ground truth — build_ground_truth.py is still vapor; all accuracy numbers measure agreement-with-Claude. You can't train or even evaluate a detector against AI-seeded labels. The ~1h interactive labeling flow dual-purposes as YOLO training data later.
+
+Scaffolding-over-model: yes — your math layer proves it. Universal-scaffold expansion: no — leaders narrow; nail interior fully before facade. Biggest missing lever: correction-data flywheel; log every fix from day one. &gt;90% autonomous: not this year; accept 80/20.
+
+Monday morning: spread→confidence wiring (1 day), then count-correction UI, then human ground-truth session. Detector decision deferred until those ship.</div></details>
+
+<h2>Peer-review highlights</h2>
+<div class="blind">
+<ul>
+<li><b>Strongest response:</b> 3 of 5 reviewers picked <b>First Principles</b> (the false-green rate is "the only genuinely new, decision-changing metric"); 2 picked <b>Executor</b> (every claim traceable to repo artifacts; best Monday plan).</li>
+<li><b>Biggest blind spot:</b> unanimous — the <b>Expansionist's</b> &gt;90% math assumes error independence, but a silent scale miscalibration corrupts detection, zoom, and formulas simultaneously; errors correlate, they don't stack.</li>
+<li><b>What ALL advisors missed:</b> (1) the flywheel is currently impossible — no auth/DB, projects in localStorage, GDPR consent unscoped; (2) the flywheel poisons itself — anchoring bias means false-greens never get corrected, so blind audits (no AI prefill) are required; (3) cold start — ~one customer means ~no labels; (4) nobody priced default-on N-pass voting.</li>
+</ul>
+</div>
+
+<footer>
+Counciled 2026-06-11 · Question: pressure-test the Sąmatų AI raster-extraction strategy · Full transcript: <code>2026-06-11-council-vision-strategy-transcript.md</code> · Companion research: <code>2026-06-11-vision-takeoff-sota.md</code> · Methodology: Karpathy LLM Council (5 advisors, anonymized peer review, chairman synthesis)
+</footer>
+
+</div>
+</body>
+</html>

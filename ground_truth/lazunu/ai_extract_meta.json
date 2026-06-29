@@ -5,11 +5,20 @@
   "status": "pending",
   "error": null,
   "input_tokens": 14993,
-  "output_tokens": 3602,
-  "cost_usd": 0.495,
-  "seconds": 79.1301691532135,
+  "output_tokens": 3232,
+  "cost_usd": 0.4673,
+  "seconds": 212.569011926651,
   "n_rooms": 4,
   "n_pages": null,
+  "voting_on": true,
+  "voting_n": 3,
+  "kampai": 131.87,
+  "combined_paint": 123.45,
+  "n_partition_walls_total": 0,
+  "ceiling_heights": [
+    2.82
+  ],
+  "apdailos_rooms_updated": null,
   "metas": [
     {
       "event": "rendering_pdf"
@@ -30,7 +39,43 @@
     },
     {
       "event": "pass1_started",
-      "page_count": 4
+      "page_count": 4,
+      "voting": true
+    },
+    {
+      "event": "voting_round_started",
+      "round": 1,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 1,
+      "rooms": 4
+    },
+    {
+      "event": "voting_round_started",
+      "round": 2,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 2,
+      "rooms": 4
+    },
+    {
+      "event": "voting_round_started",
+      "round": 3,
+      "of": 3
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 3,
+      "rooms": 4
+    },
+    {
+      "event": "adjacency_applied",
+      "page": 1,
+      "rooms_matched": 0
     },
     {
       "event": "pass1_completed",
@@ -79,7 +124,7 @@
       "event": "schedule_anchored",
       "anchored_elements": 4,
       "langai_match": "3/0",
-      "durys_match": "4/2"
+      "durys_match": "5/2"
     },
     {
       "event": "polygon_prepass_applied",
@@ -94,7 +139,7 @@
       "event": "lubu_auksciai_salvaged_from_warnings",
       "salvaged_count": 2,
       "rooms": [
-        "Virtuvė/svetainė",
+        "Miegamasis",
         "Įėjimo koridorius"
       ]
     },
@@ -106,23 +151,62 @@
     },
     {
       "event": "zoom_started",
-      "total": 0,
-      "skipped_via_eksplikacija": 4
+      "total": 2,
+      "skipped_via_eksplikacija": 2
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 1,
+      "total": 2,
+      "room_nr": "02",
+      "pavadinimas": "San. mazgas"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 1,
+      "total": 2,
+      "room_nr": "02",
+      "applied": false,
+      "plotas_m2": 4.0
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 2,
+      "total": 2,
+      "room_nr": "04",
+      "pavadinimas": "Virtuvė/svetainė"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 2,
+      "total": 2,
+      "room_nr": "04",
+      "applied": false,
+      "plotas_m2": 23.02
     },
     {
       "event": "zoom_completed",
-      "attempted": 0,
+      "attempted": 2,
       "applied": 0,
-      "skipped_via_eksplikacija": 4,
-      "elapsed_s": 0.0
+      "skipped_via_eksplikacija": 2,
+      "elapsed_s": 31.0
     },
     {
-      "event": "apdailos_error",
-      "message": "No module named 'extractor.apdailos_reader'"
+      "event": "apdailos_started"
     },
     {
-      "event": "doors_error",
-      "message": "No module named 'extractor.doors_reader'"
+      "event": "apdailos_skipped",
+      "reason": "no apdailos page found"
+    },
+    {
+      "event": "doors_started"
+    },
+    {
+      "event": "doors_completed",
+      "page": 1,
+      "total": 5,
+      "interior": 3,
+      "exterior": 2
     },
     {
       "event": "niche_locator_started",
