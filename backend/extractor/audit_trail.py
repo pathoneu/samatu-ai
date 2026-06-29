@@ -1,7 +1,10 @@
 """Audit trail rendering (Week 6 Task 6.4).
 
-Reads `data/corrections/<project_id>.jsonl` (written by `corrections_v2`)
-and renders rows ready for splicing into F2/F3 export (Week 7).
+Pure converter: takes correction events (any dict/obj with the documented
+keys) and renders rows ready for splicing into F2/F3 export (Week 7). The
+original JSONL feed (`corrections_v2`) was removed 2026-06-21; the durable
+correction log now lives in the `corrections` DB table and would need a
+translation pass before it can be fed here.
 """
 from __future__ import annotations
 

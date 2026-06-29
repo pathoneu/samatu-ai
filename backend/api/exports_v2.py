@@ -7,7 +7,13 @@ Endpoints:
 
 Reads:
   - lines from data/projects/<project_id>/lines.json (when present)
-  - corrections from data/corrections/<project_id>.jsonl (Week 5)
+
+The customer-facing audit column is not currently sourced: the legacy
+corrections_v2 JSONL store was removed (2026-06-21). The durable correction
+log now lives in the `corrections` DB table (db.list_corrections); wiring the
+F2/F3 audit column at it is a follow-up — its schema (field_path / room_nr /
+JSON-string values) differs from the audit_trail row shape, so it needs a
+translation pass before it can be spliced in.
 
 When the project store is not yet wired, the endpoint returns 501 with a
 clear message — the export builder is fully tested via direct
@@ -19,11 +25,11 @@ import io
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
+import auth as _auth
 import db
-from api.corrections_v2 import load_correction_events
 from extractor.audit_trail import audit_trail_rows
 from extractor.f2_export import (
     build_f2_export,
@@ -33,6 +39,30 @@ from extractor.f2_export import (
 router = APIRouter(prefix="/api/export/v2", tags=["export"])
 
 PROJECTS_DIR = Path(__file__).resolve().parents[2] / "data" / "projects"
+
+
+def _require_project_access(request: Request, project_id: str) -> dict:
+    """Auth + ownership gate for every F2/F3 export route.
+
+    Closes an IDOR / unauthenticated-data-exposure gap (2026-06-21): these routes
+    previously took only a project_id path param, so any caller who knew (or
+    guessed) a project UUID could GET the project's full priced line-item export
+    (quantities + unit prices + grand totals) with no login and no ownership
+    check. Mirrors the owner-scoping guard used across main.py's project routes
+    (require_user → admin sees all, otherwise scope db.get_project to user["id"]).
+
+    Raises 401 if not logged in, 403 if the project belongs to another user,
+    404 if there is no such project. Returns the caller's user dict.
+    """
+    user = _auth.require_user(request)  # 401 if not logged in
+    user_filter = None if user.get("is_admin") else user["id"]
+    if db.get_project(project_id, user_id=user_filter) is not None:
+        return user
+    # Owner-scoped fetch missed — distinguish "doesn't exist" (404) from
+    # "exists but you don't own it" (403) so the caller gets an honest status.
+    if db.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found.")
+    raise HTTPException(status_code=403, detail="Neturite teisės į šį projektą")
 
 
 _SALTINIS_TO_F2_SOURCE = {
@@ -107,11 +137,16 @@ def _load_project_lines(project_id: str) -> list[dict]:
 
 
 def _audit_rows(project_id: str) -> list[dict]:
-    events = load_correction_events(project_id)
-    return audit_trail_rows([e.model_dump() for e in events])
+    # The legacy corrections_v2 JSONL store (the only source that ever fed this
+    # audit column) was removed 2026-06-21. The durable correction log lives in
+    # the `corrections` DB table now, but its schema differs from the
+    # audit_trail row shape and F2/F3 is not exposed in the UI, so emit no audit
+    # rows until that translation is built. Returns [] — same behaviour the
+    # endpoint had in production, where the JSONL was never written.
+    return audit_trail_rows([])
 
 
-@router.get("/f2/{project_id}.json")
+@router.get("/f2/{project_id}.json", dependencies=[Depends(_require_project_access)])
 def export_f2_json(
     project_id: str,
     vat_mode: str = Query("be_pvm", pattern="^(be_pvm|with_pvm|reverse_vat)$"),
@@ -132,7 +167,7 @@ def export_f2_json(
     }
 
 
-@router.get("/f2/{project_id}.csv")
+@router.get("/f2/{project_id}.csv", dependencies=[Depends(_require_project_access)])
 def export_f2_csv(
     project_id: str,
     vat_mode: str = Query("be_pvm", pattern="^(be_pvm|with_pvm|reverse_vat)$"),
@@ -149,7 +184,7 @@ def export_f2_csv(
     )
 
 
-@router.get("/f3/{project_id}.json")
+@router.get("/f3/{project_id}.json", dependencies=[Depends(_require_project_access)])
 def export_f3_json(
     project_id: str,
     vat_mode: str = Query("be_pvm", pattern="^(be_pvm|with_pvm|reverse_vat)$"),

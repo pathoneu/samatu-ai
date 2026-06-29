@@ -8,8 +8,7 @@ import { useEffect } from 'react';
  * memory feature.
  *
  * The hook does NOT own state — caller passes lastClassification + onArm.
- * That keeps the shortcut composable across SymbolCounter, CorrectionPanel,
- * QuantityTable, etc.
+ * That keeps the shortcut composable across SymbolCounter, QuantityTable, etc.
  */
 export function useLastClassificationShortcut({ lastClassification, onArm }) {
   useEffect(() => {
