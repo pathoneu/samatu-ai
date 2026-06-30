@@ -123,6 +123,7 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     telefonas:    s.telefonas || '',
     el_pastas:    s.el_pastas || '',
     iban:         s.iban || '',
+    vadovas:      s.vadovas || '',
     uzsakovas:    extra.uzsakovas || project.uzsakovas || '',
     objektas:     extra.objektas || project.objektas || '',
     pasiulymo_nr: extra.pasiulymo_nr || project.pasiulymo_nr || '',

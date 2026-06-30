@@ -31,6 +31,7 @@ export default function Settings() {
   const [telefonas, setTelefonas] = useState('');
   const [elPastas, setElPastas] = useState('');
   const [iban, setIban] = useState('');
+  const [vadovas, setVadovas] = useState('');  // person shown under the company name on exports
 
   // Profile fields
   const [profileName, setProfileName] = useState('');
@@ -54,6 +55,7 @@ export default function Settings() {
     if (s.telefonas) setTelefonas(s.telefonas);
     if (s.el_pastas) setElPastas(s.el_pastas);
     if (s.iban) setIban(s.iban);
+    if (s.vadovas) setVadovas(s.vadovas);
   }, []);
 
   useEffect(() => {
@@ -89,6 +91,7 @@ export default function Settings() {
       telefonas,
       el_pastas: elPastas,
       iban,
+      vadovas,
     });
     setIsSaving(false);
     toast.success('Nustatymai išsaugoti');
@@ -171,6 +174,17 @@ export default function Settings() {
                 placeholder="UAB Statyba"
                 className="mt-1.5 bg-background border-border"
               />
+            </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground">Atstovas (pareigos, vardas, pavardė)</Label>
+              <Input
+                value={vadovas}
+                onChange={(e) => setVadovas(e.target.value)}
+                placeholder="Direktorius Vardas Pavardė"
+                className="mt-1.5 bg-background border-border"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Rodoma po įmonės pavadinimu pasiūlyme.</p>
             </div>
 
             <div>

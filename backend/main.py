@@ -4435,15 +4435,17 @@ async def generate_pdf(request: Request, data: dict):
     from reportlab.lib.units import mm
     from reportlab.pdfgen.canvas import Canvas as _RLCanvas
 
-    DARK   = colors.HexColor("#1F3864")
-    MID    = colors.HexColor("#2E4D7B")
-    SEC_BG = colors.HexColor("#D6E4F0")
-    SEC_FG = colors.HexColor("#1F3864")
-    ORANGE = colors.HexColor("#E67E22")
-    LGRAY  = colors.HexColor("#F5F5F5")
-    GREEN  = colors.HexColor("#1A7F37")
-    TOTBG  = colors.HexColor("#FFF8F0")
-    GRID_C = colors.HexColor("#DDDDDD")
+    # Plain greyscale palette — a construction pasiūlymas, not a marketing flyer.
+    # (2026-06-29 redesign: dropped the navy/orange after contractor feedback.)
+    DARK   = colors.HexColor("#333333")
+    MID    = colors.HexColor("#555555")
+    SEC_BG = colors.HexColor("#ECECEC")
+    SEC_FG = colors.HexColor("#222222")
+    ORANGE = colors.HexColor("#222222")
+    LGRAY  = colors.HexColor("#F7F7F7")
+    GREEN  = colors.HexColor("#222222")
+    TOTBG  = colors.HexColor("#F2F2F2")
+    GRID_C = colors.HexColor("#BBBBBB")
 
     PAGE_W = A4[0] - 3 * cm   # usable width
 
@@ -4569,125 +4571,80 @@ async def generate_pdf(request: Request, data: dict):
         except Exception:
             return None
 
-    # ── Logo + header bar ─────────────────────────────────────────────────────
-    logo_style = ParagraphStyle(
-        "logo_ph", fontName=_FONT_NORMAL, fontSize=8,
-        textColor=colors.HexColor("#888888"), alignment=TA_CENTER,
-    )
-    title_style = ParagraphStyle(
-        "htitle", fontName=_FONT_BOLD, fontSize=18,
-        textColor=colors.white, leading=22,
-    )
-    sub_style = ParagraphStyle(
-        "hsub", fontName=_FONT_NORMAL, fontSize=8,
-        textColor=colors.HexColor("#BBCCDD"), leading=11,
-    )
+    # ── Simple plain header (no colored banner): company identity left, offer
+    #    metadata right, thin rule under. (2026-06-29 redesign.) ───────────────
+    _co_name  = ParagraphStyle("co_name", fontName=_FONT_BOLD, fontSize=13,
+                               textColor=colors.black, leading=16)
+    _co_small = ParagraphStyle("co_small", fontName=_FONT_NORMAL, fontSize=8,
+                               textColor=colors.HexColor("#555555"), leading=11)
+    _meta_r   = ParagraphStyle("meta_r", fontName=_FONT_NORMAL, fontSize=8.5,
+                               textColor=colors.HexColor("#333333"), leading=13,
+                               alignment=TA_RIGHT)
 
-    # Logo: real uploaded image if provided, else the company name, else blank.
-    # Never the old grey "ĮMONĖS LOGOTIPAS" stub — it reads as an unfinished template.
+    _atstovas = (data.get("vadovas") or data.get("atstovas")
+                 or data.get("kontaktinis_asmuo") or "").strip()
+
+    # Left identity cell: logo (if uploaded) -> company name -> person + contacts.
     _logo_img = _logo_flowable(company_logo)
+    _ident = []
     if _logo_img is not None:
-        logo_cell = _logo_img
-    elif imone:
-        logo_cell = Paragraph(imone, ParagraphStyle(
-            "logo_name", fontName=_FONT_BOLD, fontSize=11,
-            textColor=DARK, leading=14))
-    else:
-        logo_cell = Paragraph("", logo_style)
-    logo_box = Table(
-        [[logo_cell]],
-        colWidths=[3.5*cm], rowHeights=[2.0*cm],
-    )
-    logo_box.setStyle(TableStyle([
-        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
-        ("LEFTPADDING",  (0,0), (-1,-1), 0),
-        ("RIGHTPADDING", (0,0), (-1,-1), 0),
-        ("TOPPADDING",   (0,0), (-1,-1), 4),
-        ("BOTTOMPADDING",(0,0), (-1,-1), 4),
-    ]))
+        _ident.append(_logo_img)
+    if imone:
+        _ident.append(Paragraph(imone, _co_name))
+    if _atstovas:
+        _ident.append(Paragraph(_atstovas, _co_small))
+    _id_contacts = [b for b in [
+        telefonas, el_pastas,
+        (f"Įm. k. {imones_kodas}" if imones_kodas else ""),
+        (f"PVM {pvm_kodas}" if pvm_kodas else ""),
+    ] if b]
+    if _id_contacts:
+        _ident.append(Paragraph("  ·  ".join(_id_contacts), _co_small))
+    if not _ident:
+        _ident = [Paragraph("", _co_small)]
 
-    # 2026-05-06: surface company name in header sub-line if provided.
-    header_sub = f"{imone} · {projektas} · {doc_date}" if imone else f"{projektas} · Sąmatų AI · {doc_date}"
-    title_block = Table(
-        [[Paragraph(doc_title, title_style)],
-         [Paragraph(header_sub, sub_style)]],
-        colWidths=[PAGE_W - 4*cm],
-    )
-    title_block.setStyle(TableStyle([
-        ("BACKGROUND",   (0,0), (-1,-1), DARK),
-        ("LEFTPADDING",  (0,0), (-1,-1), 14),
-        ("RIGHTPADDING", (0,0), (-1,-1), 14),
-        ("TOPPADDING",   (0,0), (0, 0),  12),
-        ("BOTTOMPADDING",(0,-1),(-1,-1), 12),
-        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
-    ]))
+    # Right metadata cell: small doc-type label + data / nr / galioja iki.
+    _meta_cell = [Paragraph(f"Data: {doc_date}", _meta_r)]
+    if pasiulymo_nr:
+        _meta_cell.append(Paragraph(f"Pasiūlymo nr.: {pasiulymo_nr}", _meta_r))
+    _meta_cell.append(Paragraph(f"Galioja iki: {galioja_iki}", _meta_r))
 
     header_row = Table(
-        [[logo_box, title_block]],
-        colWidths=[3.8*cm, PAGE_W - 3.8*cm],
+        [[_ident, _meta_cell]],
+        colWidths=[PAGE_W * 0.58, PAGE_W * 0.42],
     )
     header_row.setStyle(TableStyle([
-        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+        ("VALIGN",       (0,0), (-1,-1), "TOP"),
         ("LEFTPADDING",  (0,0), (-1,-1), 0),
         ("RIGHTPADDING", (0,0), (-1,-1), 0),
         ("TOPPADDING",   (0,0), (-1,-1), 0),
         ("BOTTOMPADDING",(0,0), (-1,-1), 0),
-        ("BACKGROUND",   (1,0), (1, 0),  DARK),
     ]))
     story.append(header_row)
-    story.append(Spacer(1, 0.45*cm))
+    story.append(Spacer(1, 0.15*cm))
+    story.append(HRFlowable(width="100%", thickness=0.8,
+                            color=colors.HexColor("#999999"),
+                            spaceBefore=2, spaceAfter=2))
+    story.append(Spacer(1, 0.3*cm))
 
-    # ── Vykdytojas / Užsakovas info block (LT pasiūlymas furniture) ───────────
-    _ival = ParagraphStyle("ival", fontName=_FONT_NORMAL, fontSize=8.5,
-                           textColor=DARK, leading=12.5)
+    # ── Who it's FOR (contractor identity is now in the top header) ───────────
+    _ival = ParagraphStyle("ival", fontName=_FONT_NORMAL, fontSize=9,
+                           textColor=colors.HexColor("#222222"), leading=13)
+    _for_bits = [b for b in [
+        (f'<font color="#888888">Užsakovas:</font> {uzsakovas}' if uzsakovas else ""),
+    ] if b]
+    if _for_bits:
+        story.append(Paragraph("&nbsp;&nbsp;&nbsp;&nbsp;".join(_for_bits), _ival))
+        story.append(Spacer(1, 0.3*cm))
 
-    def _info_lines(pairs):
-        # pairs: (label, value[, always]). always=True → show a grey '—' when the
-        # field is blank, so a sąmata never ships missing its parties block.
-        flow = []
-        for item in pairs:
-            lbl, val = item[0], item[1]
-            always = item[2] if len(item) > 2 else False
-            if val:
-                flow.append(Paragraph(f'<font color="#8a8a8a">{lbl}:</font> {val}', _ival))
-            elif always:
-                flow.append(Paragraph(
-                    f'<font color="#8a8a8a">{lbl}:</font> <font color="#bbbbbb">—</font>', _ival))
-        return flow or [Paragraph("", _ival)]
-
-    _left_info = _info_lines([
-        ("Vykdytojas", imone, True), ("Įmonės kodas", imones_kodas),
-        ("PVM kodas", pvm_kodas), ("Adresas", adresas),
-        ("Tel.", telefonas), ("El. paštas", el_pastas), ("IBAN", iban),
-    ])
-    _right_info = _info_lines([
-        ("Užsakovas", uzsakovas, True), ("Objektas", objektas, True),
-        ("Pasiūlymo nr.", pasiulymo_nr, True), ("Data", doc_date, True),
-        ("Galioja iki", galioja_iki, True),
-    ])
-    # Always render — a professional sąmata states who it is from and for, even if
-    # some fields are blank (shown as '—'). (export step 3.)
-    info_block = Table([[_left_info, _right_info]],
-                       colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
-    info_block.setStyle(TableStyle([
-        ("VALIGN",       (0,0), (-1,-1), "TOP"),
-        ("LEFTPADDING",  (0,0), (0,0), 0),
-        ("LEFTPADDING",  (1,0), (1,0), 10),
-        ("RIGHTPADDING", (0,0), (-1,-1), 6),
-        ("TOPPADDING",   (0,0), (-1,-1), 2),
-        ("BOTTOMPADDING",(0,0), (-1,-1), 2),
-    ]))
-    story.append(info_block)
-    story.append(Spacer(1, 0.4*cm))
-
-    # ── Project name ──────────────────────────────────────────────────────────
-    story.append(Paragraph(projektas, ParagraphStyle(
-        "pname", fontName=_FONT_BOLD, fontSize=11, textColor=DARK, leading=15,
+    # ── Heading ───────────────────────────────────────────────────────────────
+    story.append(Paragraph("Pasiūlymas", ParagraphStyle(
+        "pname", fontName=_FONT_BOLD, fontSize=15, textColor=DARK, leading=19,
     )))
     story.append(Spacer(1, 0.4*cm))
 
     # ── Table ─────────────────────────────────────────────────────────────────
-    COL_W = [1.1*cm, 8.8*cm, 1.5*cm, 1.8*cm, 2.0*cm, 2.2*cm]
+    COL_W = [1.1*cm, 8.3*cm, 1.5*cm, 1.7*cm, 2.0*cm, 2.7*cm]
 
     hdr_l = ParagraphStyle("hl", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white)
     hdr_c = ParagraphStyle("hc", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white, alignment=TA_CENTER)
@@ -4726,12 +4683,12 @@ async def generate_pdf(request: Request, data: dict):
         nonlocal _section_sum, _section_rows
         sri = len(table_data)
         table_data.append([
-            "", "", "", "",
             Paragraph("Skyriaus suma:", b_r),
+            "", "", "", "",
             Paragraph(_n(round(_section_sum, 2)) + " €", b_r),
         ])
         style_cmds.extend([
-            ("SPAN",         (0, sri), (3, sri)),
+            ("SPAN",         (0, sri), (4, sri)),
             ("BACKGROUND",   (0, sri), (-1, sri), SEC_BG),
             ("TOPPADDING",   (0, sri), (-1, sri), 4),
             ("BOTTOMPADDING",(0, sri), (-1, sri), 4),
@@ -4820,12 +4777,12 @@ async def generate_pdf(request: Request, data: dict):
             alignment=TA_RIGHT,
         )
         ri = len(totals_data)
-        totals_data.append(["", "", "", "", Paragraph(label, ls), Paragraph(_n(value) + "\u202f€", vs)])
+        totals_data.append([Paragraph(label, ls), "", "", "", "", Paragraph(_n(value) + "\u202f€", vs)])
         totals_style.extend([
             ("BACKGROUND",   (0, ri), (-1, ri), TOTBG),
             ("TOPPADDING",   (0, ri), (-1, ri), 5 if not bold else 7),
             ("BOTTOMPADDING",(0, ri), (-1, ri), 5 if not bold else 7),
-            ("SPAN",         (0, ri), (3,  ri)),
+            ("SPAN",         (0, ri), (4,  ri)),
         ])
         if bold:
             totals_style.append(("LINEABOVE", (0, ri), (-1, ri), 1.5, ORANGE))
@@ -4893,60 +4850,9 @@ async def generate_pdf(request: Request, data: dict):
     story.append(_KeepTogether(_totals_group))
 
     # ── Task 8: Assumptions + warnings page at the end ────────────────────────
-    from reportlab.platypus import PageBreak
-    story.append(PageBreak())
-
-    sect_style = ParagraphStyle("sect", fontName=_FONT_BOLD, fontSize=10,
-                                textColor=DARK, leading=14, spaceAfter=6)
-    small_style = ParagraphStyle("small", fontName=_FONT_NORMAL, fontSize=8,
-                                 textColor=colors.HexColor("#444444"), leading=11)
-
-    if prielaidos:
-        story.append(Paragraph("Skaičiavimo prielaidos", sect_style))
-        pr_rows = [["Parametras", "Reikšmė"]]
-        pr_map = {
-            "lubu_aukstis_m":  ("Lubų aukštis (vid.)", "m"),
-            "sienos_storis_m": ("Sienos storis", "m"),
-            "glaistimo_lygis": ("Glaistymo lygis", ""),
-            "langai_vnt":      ("Langų skaičius", "vnt."),
-            "durys_vnt":       ("Durų skaičius", "vnt."),
-        }
-        for k, (lbl, unit) in pr_map.items():
-            v = prielaidos.get(k)
-            if v is not None:
-                pr_rows.append([lbl, f"{v} {unit}".strip()])
-        pr_tbl = Table(pr_rows, colWidths=[9*cm, 5*cm])
-        pr_tbl.setStyle(TableStyle([
-            ("BACKGROUND",  (0,0), (-1,0), DARK),
-            ("TEXTCOLOR",   (0,0), (-1,0), colors.white),
-            ("FONTNAME",    (0,0), (-1,0), _FONT_BOLD),
-            ("FONTSIZE",    (0,0), (-1,-1), 8),
-            ("GRID",        (0,0), (-1,-1), 0.3, GRID_C),
-            ("LEFTPADDING", (0,0), (-1,-1), 6),
-            ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0,1), (-1,-1), ["FFFFFF", colors.HexColor("#F5F5F5")]),
-        ]))
-        story.append(pr_tbl)
-        story.append(Spacer(1, 0.4*cm))
-
-    if perspejimani:
-        story.append(Paragraph("Nepamirškite patikrinti:", sect_style))
-        for w in perspejimani:
-            story.append(Paragraph(f"• {w.get('tekstas', '')}", small_style))
-        story.append(Spacer(1, 0.4*cm))
-
-    # The blanket "AI-generated, verify" note belongs on internal/draft exports,
-    # not on a priced client offer the samatininkas signs and owns. Drop it when
-    # priced unless the caller explicitly forces it. (export step 7.)
-    _show_ai_note = data.get("show_ai_disclaimer")
-    if _show_ai_note is None:
-        _show_ai_note = not _has_prices
-    if _show_ai_note:
-        story.append(Paragraph(
-            "Pastaba: šie kiekiai sugeneruoti AI ir turi būti patikrinti kvalifikuoto specialisto.",
-            ParagraphStyle("warn", fontName=_FONT_NORMAL, fontSize=7,
-                           textColor=colors.HexColor("#888888"), leading=10, spaceAfter=4)
-        ))
+    # (2026-06-30: the assumptions / "Nepamirškite patikrinti" / AI-disclaimer
+    #  page was removed per contractor feedback — a client pasiūlymas is just the
+    #  offer, nothing appended after the totals + signatures.)
 
     doc.build(story, canvasmaker=_NumberedCanvas)
     buf.seek(0)
