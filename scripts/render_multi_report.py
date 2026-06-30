@@ -87,7 +87,7 @@ def main() -> int:
    <strong>Registry:</strong> <code>{html.escape(data.get('registry', '?'))}</code></p>
 
 <div class='banner'>
-  <strong>Single-contractor caveat:</strong> all 6 projects are from Rangovas A (Rangovas A).
+  <strong>Single-contractor caveat:</strong> all 6 projects are from Rangovas A.
   This is a single-contractor cross-project benchmark, NOT cross-contractor.
 </div>
 

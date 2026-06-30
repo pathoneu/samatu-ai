@@ -62,7 +62,7 @@ Weights (R4 research):
 
 ## Reference R4 invoice data
 
-Confirmed via rangovas P2-P5 audit (`docs/superpowers/research/2026-04-28-rangovas-p2-p5-audit.md`):
+Confirmed via Rangovas P2-P5 audit (`docs/superpowers/research/2026-04-28-rangovas-p2-p5-audit.md`):
 
 - Bundled glaistymas + dažymas: **13–15 €/m²**
 - Wall tiles labor: 15–30 €/m²; large-format (>80 cm): 50–70 €/m²
@@ -70,4 +70,4 @@ Confirmed via rangovas P2-P5 audit (`docs/superpowers/research/2026-04-28-rangov
 - Q4 sanding adds +50–100 % over Q3 (DIN 18363 raking-light requirement)
 - Vilnius runs +15–25 % over Kaunas mid-market
 
-Bootstrap defaults (`scripts/bootstrap_human_gt.py`) use rangovas mid-market Kaunas prices.
+Bootstrap defaults (`scripts/bootstrap_human_gt.py`) use Rangovas mid-market Kaunas prices.

@@ -23,7 +23,7 @@ Sąmatų AI is a Lithuanian construction takeoff app in beta. It uses Claude Opu
 4. Handwritten/scanned annotations not special-cased.
 5. Vision prompting: page label not consistently placed BEFORE each image, `output_config.format` JSON schema not used (still relying on regex repair fallback), `bbox_pct` field still in schema (wastes attention).
 6. `learn_from_corrections.py` exists but corrections never auto-feed back into the system prompt.
-7. Deterministic-formula bugs: default window area uses 1.40 m² (US) instead of LT STR 1.80 m² (22% undercount); reveals computed for 3 sides instead of 4 (29% undercount); grindjuostės double-counts shared interior walls (+88% over-estimate vs rangovas baseline).
+7. Deterministic-formula bugs: default window area uses 1.40 m² (US) instead of LT STR 1.80 m² (22% undercount); reveals computed for 3 sides instead of 4 (29% undercount); grindjuostės double-counts shared interior walls (+88% over-estimate vs Rangovas baseline).
 8. Hidden positions missing: "Angokraščių apdirbimas GKP" (~€1,410/project), tile microwork (~€1,300/project), paslėptų durų staktu apdirbimas (~€2,000/project).
 
 **Stage:** Beta testers using it now. Stack locked (react-pdf + Konva). No human-confirmed ground truth exists.

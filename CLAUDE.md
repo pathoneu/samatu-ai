@@ -32,7 +32,7 @@ I do not want a yes-man. The single most valuable thing you can do is push back 
 ## What we tried — worked
 
 - **Deterministic refactor (2026-04-27)** — backend simplified, code audit passed (`docs/superpowers/research/2026-04-29-code-audit.md`).
-- **LT-pro pozicijų coverage** — rangovo audits + follow-up done (`docs/superpowers/research/2026-04-2[89]-rangovas-*`).
+- **LT-pro pozicijų coverage** — Rangovo audits + follow-up done (`docs/superpowers/research/2026-04-2[89]-rangovas-*`).
 - **Sonnet 4.6 vision for legend extraction** — clean per-symbol JSON; powers `detector_bench/core/legend_extractor.py`.
 - **Pipeline 1 (Claude Vision direct)** — 49.3% mean accuracy, $0.10/page, ~3s/symbol. Best of the 6 we tested.
 - **Pipeline 2 (pdfplumber regex)** — 41.8% accuracy, **$0**, fast. Solid free fallback for text-annotated PDFs.

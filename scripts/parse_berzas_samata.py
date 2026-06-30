@@ -80,7 +80,7 @@ def parse_pdf(pdf_path: Path) -> dict:
     return {
         "source": str(pdf_path.relative_to(REPO)),
         "project": "Beržų g. 24",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "n_line_items": len(line_items),
         "sections": sections,
         "line_items": line_items,

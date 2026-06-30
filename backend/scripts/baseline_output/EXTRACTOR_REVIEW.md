@@ -77,6 +77,6 @@ Per ACCURACY_GATE.md decision rules:
 
 ## Open issues (not blockers, address in Phase 6 / future)
 
-1. **Kampai variance vs rangovas** (P1: -39%, P3: +49% from rangovas P3 reference). Universal formula matches NRM2; rangovas-specific per-contractor adjustments are personalization scope, not refactor scope.
+1. **Kampai variance vs Rangovas** (P1: -39%, P3: +49% from Rangovas P3 reference). Universal formula matches NRM2; Rangovas-specific per-contractor adjustments are personalization scope, not refactor scope.
 2. **P5 zero rooms** — `projektas_5(8)_breziniai.pdf` is detail/specification content, not a floor plan. Pipeline correctly returns 0. Could be improved by enabling multi-PDF concatenation when user uploads multiple files, but out of scope for this refactor.
 3. **P4 dažymas=0** — uploaded PDF only contains wall_elevation pages, no floor plan. Pipeline finds tiles from elevations but no rooms with paint zones. Same root cause as P5.

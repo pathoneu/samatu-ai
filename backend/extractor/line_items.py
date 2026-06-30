@@ -12,7 +12,7 @@ What's covered:
   - hidden_door_count / hidden_door_frame_lm (no longer always 0)
   - silikonas_lm, plyteliu_45_suleidimas_lm, plyteliu_profiliai_lm (Week 4 microworks)
 
-Defaults reflect rangovas mid-market Kaunas reality + LT STR norms (R4 research).
+Defaults reflect Rangovas mid-market Kaunas reality + LT STR norms (R4 research).
 """
 from __future__ import annotations
 

@@ -71,7 +71,7 @@ One line: `frontend/src/pages/NewProject.jsx:62` — `interior` endpoint changed
 
 ## Open issues (not blockers, future work)
 
-1. **Kampai variance vs rangovas** (rangovo P1: 580m, ours: 353m). rangovas counts additional outer corners (kolonų briaunos, balkonų reveals) that Vision can't always detect from drawings alone. Personalization-tier (per-contractor adjustments), not refactor scope.
+1. **Kampai variance vs Rangovas** (Rangovo P1: 580m, ours: 353m). Rangovas counts additional outer corners (kolonų briaunos, balkonų reveals) that Vision can't always detect from drawings alone. Personalization-tier (per-contractor adjustments), not refactor scope.
 2. **P5 zero rooms** — `projektas_5(8)_breziniai.pdf` has detail-only content. Pipeline correctly returns 0. Multi-PDF concatenation could help (out of scope for this PR).
 3. **Stress tests pending** (Phase 6.5 in plan): edge-case matrix (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated PDFs), determinism check (3× run variance), adversarial inputs, perf characterization.
 4. **togal.ai-inspired UX iteration** (Phase 7): separate plan to be drafted once accuracy is dialed in.

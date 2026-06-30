@@ -11,7 +11,7 @@ Architecture (synthesized from Phase 0.5 research):
 - output_config.format JSON schema (replaces fragile regex repair)
 - effort="high" for adaptive thinking on ambiguous scale/symbols
 - Kreo-style hierarchical schema (rooms → quantities → calculation_trace)
-- Universal LT positions vocabulary from rangovo P1+P3 cross-reference
+- Universal LT positions vocabulary from Rangovo P1+P3 cross-reference
 - Formula corrections from formula-validation.md:
     * 1.0 m² opening threshold (NRM2 §29, not 0.5 m²)
     * 4-sided window reveals (2H + 2W, not 3 sides)
@@ -426,7 +426,7 @@ hidroizoliacijos_vnt santraukoje = vonia/wc/dušo zonos kiekis
 gkp_lubu_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis ≤ 3.0m
 gkp_lubu_virs_3m_m2 = Σ patalpa.plotas_m2 jei lubu_tipas == "gkp" IR lubu_aukstis > 3.0m
 ```
-Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (pvz. rangovo P1 atskirai 68.28 m²).
+Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (pvz. Rangovo P1 atskirai 68.28 m²).
 
 </quantity_formulas>
 

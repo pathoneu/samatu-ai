@@ -35,7 +35,7 @@ def project_to_predictions(project: dict) -> dict[str, float]:
     rather than per-pozicija — V8 splits bundle into 8+ rows of the SAME
     surface (lyginimas / Q1 / Q2 / šlifavimas / gruntavimas / dažymas×2),
     so summing pozicijos would 8× the bundle area. v8_rooms has the canonical
-    per-surface m² that maps cleanly onto rangovas's bundled invoice.
+    per-surface m² that maps cleanly onto Rangovas's bundled invoice.
 
     For microworks not captured per-room (silikonas), we still classify
     matching pozicijos, but defensive: only those that didn't already feed
@@ -46,7 +46,7 @@ def project_to_predictions(project: dict) -> dict[str, float]:
     rooms = project.get("v8_rooms") or project.get("patalpos") or []
     for r in rooms:
         # 1. Glaistymas+dažymas bundle = paintable surface (walls + ceiling).
-        #    rangovas charges €14/m² for the whole stack on one m².
+        #    Rangovas charges €14/m² for the whole stack on one m².
         sums["glaistymas_dazymas_bundle"] += float(r.get("dazymo_plotas_m2") or 0)
         # 2. Wall tiles per room.
         sums["plyteles_sienos_m2"] += float(r.get("plyteles_sienos_m2") or 0)

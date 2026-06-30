@@ -6,7 +6,7 @@
   "source": {
     "notes_md": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/contractor-notes-verbatim.md",
     "samata_pdf": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf",
-    "contractor": "Rangovas A (Rangovas A)",
+    "contractor": "Rangovas A",
     "date_collected": "2026-05-26"
   },
   "notes_for_evaluator": "gt_dimensions are pulled from the latest app extract (app-output-to-the-dot.json). Floor area (plotas_m2) is green: read directly from eksplikacija. Perimeter, ceiling height and elementai are yellow: Vision-derived, not contractor-validated. gt_totals reflect samata-truth.pdf + verbatim notes (green). gt_per_room contains the rooms the contractor described explicitly.",

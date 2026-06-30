@@ -3,7 +3,7 @@
 **Date:** 2026-06-05
 **Branch:** `viewer-rebuild` (commit `c613415`)
 **Project:** Beržų g. 24, MAK Group A1675
-**Contractor truth:** Rangovas A (Rangovas A), captured 2026-05-26/27
+**Contractor truth:** Rangovas A, captured 2026-05-26/27
 **Cost incurred:** $0.00 (no new Vision calls — used cached extract +
 parsed the contractor samata PDF)
 

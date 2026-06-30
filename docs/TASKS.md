@@ -5,7 +5,7 @@
 
 ---
 
-## 🟢 ŠIANDIENOS BATCH (2026-04-29) — 14 užduočių baigta + rangovas additions
+## 🟢 ŠIANDIENOS BATCH (2026-04-29) — 14 užduočių baigta + Rangovas additions
 
 | # | Task | Files |
 |---|------|-------|
@@ -38,7 +38,7 @@
 | 23 | **G5 Phase 1** Scale auto-detect endpoint `/detect-scale-hint` (regex „1:50" iš text layer) | main.py |
 | 24 | Error tracking lite — `errorTracker.js` (localStorage 100 entries) + Settings eksportas | lib/errorTracker.js (new), main.jsx, Settings.jsx |
 
-### rangovas coverage audit additions (3 priority items, 78%→85%+ coverage target)
+### Rangovas coverage audit additions (3 priority items, 78%→85%+ coverage target)
 - **Sienų lyginimas Knauf Rotband** (description fix — exact LT pro wording, 5/5 projects)
 - **Dažymo kampų montavimas** (NEW labor line, 5/5 projects, 665.98 m on test project)
 - **Plytelių vidinių kampų silikonavimas** (split from sanitaryware sealing, 4/5 projects, 15.24 m)
@@ -62,7 +62,7 @@ Reference: [`docs/superpowers/research/2026-04-29-rangovas-coverage-audit.md`](s
 
 | # | Task | Files |
 |---|------|-------|
-| 25 | rangovas audit #4-#7 — niche framing GKP + epoxy 45° pjovimas (Klasė 1 only) | vision_call.py |
+| 25 | Rangovas audit #4-#7 — niche framing GKP + epoxy 45° pjovimas (Klasė 1 only) | vision_call.py |
 | 26 | Project archetype templates — paint_class + paint_deduction_standard į PRESETS | ltLibrary.js |
 | 27 | Sanity warnings UI — grouped by severity, dismissable per-warning, localStorage state | SanityWarningsBanner.jsx (rewritten) |
 | 28 | Project soft delete + Šiukšliadėžė (30d. retention) | projectStore.js, Settings.jsx, Dashboard.jsx |
@@ -87,7 +87,7 @@ Reference: [`docs/superpowers/research/2026-04-29-rangovas-coverage-audit.md`](s
 | 36 | **Share token expiry + view tracking** — POST/GET /api/projects/{id}/share su expires_in_days + view_count + last_viewed_at + revoke | main.py, db.py |
 | 37 | **F2/F3 PDF variants** — printable reportlab versions su signatūrų laukais. `/export/f2-pdf` + `/export/f3-pdf` endpoints + frontend dropdown | main.py, ExportDropdown.jsx |
 | 38 | **Pytest edge cases** — empty rooms, single garažas, single-room, NRM2+Q4+Class3 combo, all-wet, cellar floor, high ceiling, paskirtis Unicode (9 testai) | test_edge_cases.py |
-| 39 | **rangovas coverage analysis** — static comparison (no $$ extraction) — agent dispatched | research/2026-04-29-rangovas-coverage-followup.md |
+| 39 | **Rangovas coverage analysis** — static comparison (no $$ extraction) — agent dispatched | research/2026-04-29-rangovas-coverage-followup.md |
 
 ### Bug fixes per user feedback
 | # | Issue | Sprendimas |
@@ -101,13 +101,13 @@ Reference: [`docs/superpowers/research/2026-04-29-rangovas-coverage-audit.md`](s
 
 ### Research findings (Phase A+)
 - **Sienų išklotinių varieties** (`docs/superpowers/research/2026-04-29-isklotines-quality.md`) — 40% LT projektų turi mm-precision išklotines, 60% schematiniai. Verdict: keep wall_elevation as opt-in fallback.
-- **rangovas coverage v2** — agent runs background'e
+- **Rangovas coverage v2** — agent runs background'e
 
 **Final verify (2026-04-29 vakaras)**: 162/162 backend pytest ✅ · Vite 310KB main bundle ✅ · Playwright comprehensive audit ALL PASS ✅
 
 ---
 
-## 🟢 PHASE A++ (2026-04-29 vėlyvas vakaras) — 3 nauji task'ai po rangovas v2 audit
+## 🟢 PHASE A++ (2026-04-29 vėlyvas vakaras) — 3 nauji task'ai po Rangovas v2 audit
 
 | # | Task | Files | Tests |
 |---|------|-------|-------|
@@ -115,7 +115,7 @@ Reference: [`docs/superpowers/research/2026-04-29-rangovas-coverage-audit.md`](s
 | 41 | **Tile format split** — didžiaformatės plytelės (>600×600) gauna papildomas labor lines (back-buttering klijai 5kg/m² + lygio kontrolė). Trigger when `_plyteliu_specs` turi `format_label="Didžiaformatė"` | vision_call.py | (validation per existing tests) |
 | 42 | **Frontend `_scale_hint` display** — kai NewProject upload aptiko mastelį per text layer, rodom info banner'į „Brėžinio mastelis aptiktas automatiškai: 1:50" | InteriorProject.jsx | manual UI confirm |
 
-**rangovas v2 coverage finding**: All 5 audit items now COVERED in code. By labor-category: 85% solid for residential typical. By line-item exact match: 31% (granularity, not coverage). Top gap addressed: **HVAC ortakiai** (was 0%, now backend-ready).
+**Rangovas v2 coverage finding**: All 5 audit items now COVERED in code. By labor-category: 85% solid for residential typical. By line-item exact match: 31% (granularity, not coverage). Top gap addressed: **HVAC ortakiai** (was 0%, now backend-ready).
 
 **Final state**: 168/168 backend pytest ✅ · Vite 310KB main bundle ✅ · 6 background research agents successfully completed.
 
@@ -154,7 +154,7 @@ Research'as parodė, kad **competitive moat** = **eksplikacija-grounded confiden
 ### Architektūra
 - ✅ Deterministic refactor — Vision tik primityvai, Python skaičiuoja
 - ✅ pdfplumber eksplikacijos extractor (P3 atveju 100% deterministic, $0)
-- ✅ Cross-page consistency validator (9 + 1 rangovas-empirical taisyklės)
+- ✅ Cross-page consistency validator (9 + 1 Rangovas-empirical taisyklės)
 - ✅ Pdfplumber bbox extraction → frontend row highlight on eksplikacijos puslapyje
 - ✅ Symbol counts (`detected_symbols_summary`) į main Vision prompt'ą — 14 tipų
 
@@ -185,7 +185,7 @@ Research'as parodė, kad **competitive moat** = **eksplikacija-grounded confiden
 - ✅ `extractor/pdfplumber_eksplikacija.py` — deterministic table parser su row bbox
 - ✅ `extractor/material_specs.py` — on-demand designer specs ($0.20/click)
 - ✅ `extractor/page_filter.py` — vendor catalog detection
-- ✅ `extractor/cross_page_validator.py` — 9 sanity rules + rangovas-empirical bounds
+- ✅ `extractor/cross_page_validator.py` — 9 sanity rules + Rangovas-empirical bounds
 - ✅ `extractor/plyteliu_specifikacija.py` — pdfplumber tile size reader, $0
 - ✅ `extractor/wall_elevation.py` — Vision per-page extractor (opt-in via `WALL_ELEVATION_EXTRACT=1` env)
 
@@ -244,7 +244,7 @@ Research'as parodė, kad **competitive moat** = **eksplikacija-grounded confiden
 #### 2B. Esami planai (priority adjusted)
 - 🟡 **Wall elevation extractor real-world test** — modulis padarytas (`extractor/wall_elevation.py`), bet niekad neleistas su realiu projektu. Reikia: paleisti su `WALL_ELEVATION_EXTRACT=1` ant P1 ir P3, palyginti tile_zones precision vs paskirtis-based default. Cost ~$1-3/projektui. **Atlikti DRAUGE su 2A polygon tile task'u — abu naudoja tą patį `_wall_elevations` data flow.** (0.5 d. + ~$5)
 - 🟡 **Wall elevation → pozicijos override** — kai `_wall_elevations` turi tile_zones su mm precision, override `plyteles_sienos_m2` paskirtis-based aproksimacijos. Reikia merge logic + tests. **Sutampa su 2A polygon tile task'u — vykdyti kaip vieną.** (1 d.)
-- 🟡 **Real rangovas benchmark per visus 5 projektus** — paleisti `/extract-interior` ant P1+P3 (kuriuose veikia text layer), lyginti row-by-row su parsed_pasiulymai.json. Tracking matrix per skyrius (coverage %, EUR drift). **Po 2A fix'ų — tada matuojam improvement.** (0.5 d. + ~$10)
+- 🟡 **Real Rangovas benchmark per visus 5 projektus** — paleisti `/extract-interior` ant P1+P3 (kuriuose veikia text layer), lyginti row-by-row su parsed_pasiulymai.json. Tracking matrix per skyrius (coverage %, EUR drift). **Po 2A fix'ų — tada matuojam improvement.** (0.5 d. + ~$10)
 - 🟡 **Multi-floor support** — `aukstu_skaicius` veikia kaip multiplier, bet Vision sumaišo 1 vs 2 vs 3 aukštus. Pridėti per-room `aukstas` field, expose į Setup Wizard, validate cross-page (room nrs starting with 2F vs 1F should split). (0.5 d.)
 
 ### 2.5. SPRINT G — PDF INTERACTIVE LEAP-UP (NAUJA, 2026-04-28 research)
@@ -289,7 +289,7 @@ Research'as parodė, kad **competitive moat** = **eksplikacija-grounded confiden
 - 🟢 **Backup/restore localStorage** projektų — user'iai praras viską jei brauserio istoriją valys. Add export/import JSON button to Settings page. (0.5 d.)
 - 🟢 **Error tracking on Vision failures** — šiandien spausdina `console.error`, neraportuoja. Wire to Sentry / similar. Pre-req: Sentry account (laikoma su auth re-enable). (1 val.)
 
-### 5. RESEARCH (paliekamas niekam neperkeliant rangovo/Sistelos referencų)
+### 5. RESEARCH (paliekamas niekam neperkeliant Rangovo/Sistelos referencų)
 - ✅ ~~**LT samata best practices iš STR + NRM2**~~ — DONE 2026-04-28: [`docs/superpowers/research/2026-04-28-takeoff-standards-and-pdf-ux.md`](superpowers/research/2026-04-28-takeoff-standards-and-pdf-ux.md) part A (NRM2 3m² rule, DIN 18363, Q4 Merkblatt 2, Tikkurila/Caparol coverage rates, polygon tile measurement, sloped/stairwell formulas). 5 actionable additions feed'inami į §2A.
 - ✅ ~~**Competitor pattern analysis**~~ — DONE 2026-04-28: same file part B (Togal.AI 2025 features, Bluebeam Dynamic Fill, Kreo Auto Measure 2.0, STACK Assist, OST, eTakeoff, full feature matrix). 9 actionable additions feed'inami į Sprint G.
 - 🟡 **Sienų išklotinių kokybės varieties** — kiek LT projektų realiai turi išklotines su mm precision vs schematinius brėžinius? Šitai pagrindas wall_elevation extractor decision'ams. **Vykdyti DRAUGE su §2A polygon tile zones implementation** — bus matavimo duomenys. (0.25 d.)
@@ -375,7 +375,7 @@ index.css                        — design tokens + utility classes
 ### Test data
 ```
 training-data/
-├── parsed_pasiulymai.json       — 5 rangovas pasiulymai parsed (242 line items)
+├── parsed_pasiulymai.json       — 5 Rangovas pasiulymai parsed (242 line items)
 ├── gap_analysis.md              — early gap analysis (V8 column outdated)
 └── projektas_{1-5}/             — original PDFs
 ```
@@ -414,7 +414,7 @@ http://localhost:5173/project/04bc3f42-4e9e-49e5-ba6a-fc127b41cc0b
 
 ## 📝 VARTOTOJO PREFERENCIJOS (svarbu)
 
-- ❌ **NEnaudoti rangovo (kontraktoriaus) kaip pasirinktiną kainynų preset** — jis tiesiog vienas rangovas, ne ground truth
+- ❌ **NEnaudoti Rangovo (kontraktoriaus) kaip pasirinktiną kainynų preset** — jis tiesiog vienas rangovas, ne ground truth
 - ❌ **NEintegruoti Sistela** — galima būti intellectual property concerns
 - ❌ **NErašyti tech kalbos UI'uje** ("python deterministic", "Vision", "_zoom_changes" — visada slėpti arba versti į LT)
 - ✅ **UI tekstas LT'iškas su tinkamais simboliais** (ąčęėįšųūž)
@@ -453,7 +453,7 @@ nohup npm run dev >/tmp/frontend.log 2>&1 &
 
 - localStorage UUID: `04bc3f42-4e9e-49e5-ba6a-fc127b41cc0b` (Interjero projektas, 20 patalpų, 56 pozicijos)
 - Test PDFs: `backend/test_pdfs/` (03_SA.pdf, vidaus_apdaila.pdf, SA-02.pdf, etc.)
-- rangovas reference: `training-data/parsed_pasiulymai.json` (5 projektai)
+- Rangovas reference: `training-data/parsed_pasiulymai.json` (5 projektai)
 
 ### Pažangos rodikliai (track these)
 
@@ -461,8 +461,8 @@ nohup npm run dev >/tmp/frontend.log 2>&1 &
 |---|---|---|
 | Backend pytest | 74/74 | maintain |
 | Frontend bundle (main) | 304 KB | < 350 KB |
-| rangovas P1 coverage | ~57% (65/113 pozicijų) | > 80% |
-| rangovas P5 coverage | ~70% (35/50) | > 85% |
+| Rangovas P1 coverage | ~57% (65/113 pozicijų) | > 80% |
+| Rangovas P5 coverage | ~70% (35/50) | > 85% |
 | Per-projekto cost | ~$3.20 (auto) | maintain |
 | Determinism CV | byte-identical | maintain |
 

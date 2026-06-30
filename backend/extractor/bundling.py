@@ -1,7 +1,7 @@
 """LT invoice bundling rules (Week 4 Task 4.2 — D5 verdict).
 
 Default mode collapses glaistymas + dažymas + gruntavimas into a single
-`glaistymas_dazymas_bundle` line at ~14 €/m² (rangovas mid-market Kaunas,
+`glaistymas_dazymas_bundle` line at ~14 €/m² (Rangovas mid-market Kaunas,
 verified across P2-P5 in R4 research). Advanced mode keeps the per-Q-level
 breakdown for engineers who want it.
 
@@ -15,7 +15,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 BUNDLE_GLAISTYMAS_DAZYMAS = "glaistymas_dazymas_bundle"
-DEFAULT_BUNDLED_PRICE_EUR = 14.0  # R4 research: rangovas P2-P5 bundled rate
+DEFAULT_BUNDLED_PRICE_EUR = 14.0  # R4 research: Rangovas P2-P5 bundled rate
 
 # Member line codes that collapse into the bundle in default mode.
 BUNDLE_MEMBERS = {

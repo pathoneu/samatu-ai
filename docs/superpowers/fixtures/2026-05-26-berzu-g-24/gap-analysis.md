@@ -157,7 +157,7 @@ Contractor's pozicijos structure that we should match (per ankstesni user notes)
 ## Saved artifacts for this fixture
 
 - `project.pdf` — original Beržų g. 24 PDF (17 pages, 5,5 MB)
-- `samata-truth.pdf` — rangovas's contractor-validated samata (53 line items)
+- `samata-truth.pdf` — Rangovas's contractor-validated samata (53 line items)
 - `app-output-baseline.json` — app output before any fixes (2026-05-26 baseline)
-- `contractor-notes-verbatim.md` — rangovas's hand-typed per-room calculation notes
+- `contractor-notes-verbatim.md` — Rangovas's hand-typed per-room calculation notes
 - `gap-analysis.md` — this file

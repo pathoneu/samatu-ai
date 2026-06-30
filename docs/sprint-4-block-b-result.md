@@ -49,7 +49,7 @@ Pattern matches expectation: rooms with many adjacent neighbors (Miegamasis with
 
 ## Why this matters
 
-- **Pure math, no rangovas comparison.** LT industry math says interior walls are shared between two rooms and should be counted once. wall_adjacency implements the deterministic geometry.
+- **Pure math, no Rangovas comparison.** LT industry math says interior walls are shared between two rooms and should be counted once. wall_adjacency implements the deterministic geometry.
 - **Fixes a known credibility liability.** Pre-fix grindjuostės/floor ratio was 0.65 (at empirical cap) — any LT estimator can spot it: should be ~0.55. Now lands at 0.591, in expected band.
 - **Replaces empirical cap (`GRINDJUOSCIU_RATIO_CAP = 0.65`) with proper shared-edge math.** The cap was a band-aid; this is the underlying fix.
 

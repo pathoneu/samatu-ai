@@ -5,7 +5,7 @@
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Gytis ir Simona_2025naujausias.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf",
-    "contractor": "Rangovas A (Rangovas A)",
+    "contractor": "Rangovas A",
     "date_collected": "2026-04-13"
   },
   "notes_for_evaluator": "gt_dimensions intentionally empty — per-room data not extracted yet. Totals derived from pasiūlymas 2026-04-13. Largest of the 5 batch projects (65-page TP).",

@@ -1,6 +1,6 @@
 """HVAC ductwork (ortakiai) tests (Sprint §40, 2026-04-29).
 
-rangovas audit v2 identified ductwork as #1 gap (40% premium projects, 0 coverage).
+Rangovas audit v2 identified ductwork as #1 gap (40% premium projects, 0 coverage).
 Now backend emits per-diameter ortakių line items + izoliacija + tvirtinimas
 when symbols.detected_symbols_summary.ortakiai_d{100,125,160}_m > 0.
 """
