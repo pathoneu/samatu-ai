@@ -49,3 +49,55 @@ export const CONFIDENCE_HEX = {
 export function confidenceHex(confidence) {
   return CONFIDENCE_HEX[confidence] || CONFIDENCE_HEX.unknown;
 }
+
+// polygon_source values that mean "we approximated the shape" → dashed border.
+const APPROXIMATE_POLYGON_SOURCES = new Set([
+  'synthesized_from_bbox', 'bbox_fallback', 'manual_needed',
+]);
+
+/**
+ * buildRoomZone — one room → a render-ready descriptor, or null if the room
+ * has no geometry we can honestly place on the plan.
+ *
+ * geometry is one of:
+ *   { type: 'polygon', points: [[x,y], …] }   // from polygon_pct
+ *   { type: 'rect', left, top, width, height } // from bbox_pct fallback
+ * `approximate` is true when the shape is synthesized (dashed border in the UI).
+ */
+export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
+  if (!room || !renderedWidth || !renderedHeight) return null;
+
+  let geometry = null;
+  let approximate = false;
+
+  const polyPoints = getPolygonPctPoints(room.polygon_pct, { renderedWidth, renderedHeight });
+  if (polyPoints) {
+    geometry = { type: 'polygon', points: polyPoints };
+    approximate = APPROXIMATE_POLYGON_SOURCES.has(room.polygon_source);
+  } else {
+    const rect = getBboxPctRect(room.bbox_pct, { width: renderedWidth, height: renderedHeight });
+    if (rect) {
+      geometry = { type: 'rect', ...rect };
+      approximate = true; // a bbox rectangle is never an exact room outline
+    }
+  }
+
+  if (!geometry) return null;
+
+  const { confidence } = computeAreaConfidence(room);
+  const area = Number.isFinite(room.plotas_m2) ? room.plotas_m2 : null;
+
+  return {
+    nr: room.nr,
+    label: room.pavadinimas || `#${room.nr}`,
+    areaLabel: area != null
+      ? `${area.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} m²`
+      : '',
+    paskirtis: room.paskirtis || null,
+    color: roomZoneColor(room.paskirtis),
+    confidence,
+    confidenceColor: confidenceHex(confidence),
+    approximate,
+    geometry,
+  };
+}
