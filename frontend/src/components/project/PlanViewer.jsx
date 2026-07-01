@@ -25,6 +25,7 @@ import {
 } from '@/lib/symbolOverlay';
 import { getPlanSymbolTypes } from '@/lib/planSymbolTypes';
 import { API_BASE } from '@/lib/apiBase';
+import RoomZoneLayer from './RoomZoneLayer';
 
 if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   console.error(`[PlanViewer] pdfjs version drift detected: API=${pdfjs.version}, expected 4.8.69`);
@@ -213,6 +214,8 @@ export default function PlanViewer({
   focusedPage = null,
   focusedRoom = null,
   eksplikacija_source_page = null,
+  rooms = [],
+  onRoomZoneClick = null,
 }) {
   const viewportRef = useRef(null);
   const [numPages, setNumPages] = useState(null);
@@ -974,6 +977,16 @@ export default function PlanViewer({
                     loading={<div className="w-[680px] h-[820px] bg-white flex items-center justify-center text-sm text-muted-foreground">Renderiuojamas puslapis...</div>}
                   />
                 </Document>
+
+                {renderedSize && rooms.length > 0 && (
+                  <RoomZoneLayer
+                    rooms={rooms}
+                    page={pageNumber}
+                    renderedSize={renderedSize}
+                    focusedRoomNr={focusedRoom?.nr ?? null}
+                    onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: pageNumber })}
+                  />
+                )}
 
                 {symbolPickMode && (
                   <button
