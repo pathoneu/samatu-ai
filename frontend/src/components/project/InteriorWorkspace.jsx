@@ -430,6 +430,7 @@ export default function InteriorWorkspace({
       >
         <WorkspacePanel
           project={project}
+          focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
           onJumpToPage={(pageNr, room) => {
             setLocalFocusedPage(pageNr);
             setLocalFocusedRoom(room || null);

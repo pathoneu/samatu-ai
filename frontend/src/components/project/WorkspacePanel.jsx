@@ -7,7 +7,7 @@
  * Replaces previous rooms-only table layout with positions-aware unified panel.
  */
 
-import { useState, useMemo, useEffect, useCallback, memo } from 'react';
+import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff,
 } from 'lucide-react';
@@ -85,7 +85,7 @@ function useTakeoff(projectId) {
 // ── Wet-room paskirtis check (for "drėgna" pill) ──────────────────────────
 const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla']);
 
-export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange }) {
+export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange, focusedRoomNr = null }) {
   const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
@@ -204,6 +204,13 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
     if (r && onJumpToPage) onJumpToPage(r.puslapio_nr, r);
   }, [project.v8_rooms, project.patalpos, onJumpToPage]);
 
+  const focusedRowRef = useRef(null);
+  useEffect(() => {
+    if (focusedRoomNr != null && focusedRowRef.current) {
+      focusedRowRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [focusedRoomNr]);
+
   return (
     <div
       className="flex flex-col h-full overflow-hidden"
@@ -281,15 +288,19 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           const targetPage = r.puslapio_nr ?? r.page_nr;
           const canJump = !!(onJumpToPage && targetPage);
           const isWet = WET_PASKIRTYS.has((r.paskirtis || '').toLowerCase());
+          const isFocused = focusedRoomNr != null && String(r.nr) === String(focusedRoomNr);
           return (
             <div
               key={`${r.nr}-${i}`}
+              ref={isFocused ? focusedRowRef : undefined}
               onClick={canJump ? () => onJumpToPage(targetPage, r) : undefined}
               className="row-hover-halo grid items-center cursor-pointer transition-colors"
               style={{
                 gridTemplateColumns: '24px 1fr auto',
                 gap: 8, padding: '6px 12px', fontSize: 12,
                 borderBottom: '1px solid hsl(var(--border) / 0.5)',
+                background: isFocused ? 'hsl(var(--primary) / 0.10)' : undefined,
+                boxShadow: isFocused ? 'inset 3px 0 0 hsl(var(--primary))' : undefined,
               }}
               title={canJump ? `Atidaryti psl. ${targetPage}` : undefined}
             >
