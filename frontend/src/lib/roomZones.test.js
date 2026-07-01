@@ -118,3 +118,36 @@ test('buildRoomZone: plotas_m2 null → unknown confidence, empty areaLabel', ()
   assert.equal(z.confidenceColor, '#9ca3af');
   assert.equal(z.areaLabel, '');
 });
+
+import { buildPageRoomZones, countRoomsMissingGeometry } from './roomZones.js';
+
+const poly = (nr, page) => ({
+  nr, pavadinimas: `R${nr}`, paskirtis: 'gyvenamoji',
+  puslapio_nr: page, plotas_m2: 10, plotas_saltinis: 'eksplikacija',
+  polygon_pct: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]],
+});
+const noGeom = (nr, page) => ({ nr, puslapio_nr: page, plotas_m2: 8 });
+
+test('buildPageRoomZones: keeps only current-page drawable rooms', () => {
+  const rooms = [poly('1', 2), poly('2', 3), noGeom('3', 2)];
+  const zones = buildPageRoomZones(rooms, { renderedWidth: 1000, renderedHeight: 800, page: 2 });
+  assert.equal(zones.length, 1);        // room 2 is page 3, room 3 has no geometry
+  assert.equal(zones[0].nr, '1');
+});
+
+test('buildPageRoomZones: honours page_nr as well as puslapio_nr', () => {
+  const rooms = [{ ...poly('4', undefined), page_nr: 5, puslapio_nr: undefined }];
+  const zones = buildPageRoomZones(rooms, { renderedWidth: 1000, renderedHeight: 800, page: 5 });
+  assert.equal(zones.length, 1);
+});
+
+test('buildPageRoomZones: non-array / empty → []', () => {
+  assert.deepEqual(buildPageRoomZones(null, { renderedWidth: 1000, renderedHeight: 800, page: 2 }), []);
+  assert.deepEqual(buildPageRoomZones([], { renderedWidth: 1000, renderedHeight: 800, page: 2 }), []);
+});
+
+test('countRoomsMissingGeometry: counts current-page rooms we cannot place', () => {
+  const rooms = [poly('1', 2), noGeom('3', 2), noGeom('4', 3)];
+  const n = countRoomsMissingGeometry(rooms, { renderedWidth: 1000, renderedHeight: 800, page: 2 });
+  assert.equal(n, 1);                   // only room 3 (page 2, no geometry)
+});

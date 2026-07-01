@@ -101,3 +101,32 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
     geometry,
   };
 }
+
+function roomPage(room) {
+  return room?.page_nr ?? room?.puslapio_nr ?? null;
+}
+
+/**
+ * buildPageRoomZones — all rooms on `page` that CAN be drawn, as descriptors.
+ * Rooms without geometry are dropped here (they still surface in the review
+ * worklist and in countRoomsMissingGeometry).
+ */
+export function buildPageRoomZones(rooms, { renderedWidth, renderedHeight, page }) {
+  if (!Array.isArray(rooms)) return [];
+  return rooms
+    .filter((r) => roomPage(r) === page)
+    .map((r) => buildRoomZone(r, { renderedWidth, renderedHeight }))
+    .filter(Boolean);
+}
+
+/**
+ * countRoomsMissingGeometry — rooms on `page` we could NOT place on the plan.
+ * Surfaced as an honest "N patalpų be vietos plane" chip (spec §9), never hidden.
+ */
+export function countRoomsMissingGeometry(rooms, { renderedWidth, renderedHeight, page }) {
+  if (!Array.isArray(rooms)) return 0;
+  return rooms
+    .filter((r) => roomPage(r) === page)
+    .filter((r) => !buildRoomZone(r, { renderedWidth, renderedHeight }))
+    .length;
+}
