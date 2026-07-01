@@ -306,6 +306,17 @@ export default function InteriorWorkspace({
             missingTypes={missingTypes}
             focusedPage={effectiveFocusedPage}
             focusedRoom={effectiveFocusedRoom}
+            rooms={project?.v8_rooms || project?.patalpos || []}
+            onRoomZoneClick={(room) => {
+              // Canvas → panel: selecting a zone focuses that room. We already
+              // are on its page (zones are page-filtered), so puslapio_nr is the
+              // current page. effectiveFocusedRoom (line ~114) re-derives the
+              // full room from the live patalpos by nr, so {nr, puslapio_nr} is
+              // enough to drive both the canvas marker and the panel highlight.
+              if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
+              setLocalFocusedRoom(room);
+              onJumpToPage?.(room.puslapio_nr, room);
+            }}
             eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
             pdfFile={pdfBlob}
             onRoomPolygonFill={handleRoomPolygonFill}
