@@ -189,7 +189,9 @@ test('buildRoomZone: polygon_pct → scaled polygon geometry', () => {
   const z = buildRoomZone(roomPolygon, SIZE);
   assert.equal(z.geometry.type, 'polygon');
   assert.deepEqual(z.geometry.points[0], [100, 104]);      // 0.1*1000, 0.13*800
-  assert.deepEqual(z.geometry.points[2], [500, 440]);      // 0.5*1000, 0.55*800
+  // NOTE: 0.55*800 === 440.00000000000006 in IEEE-754 — assert X exactly, Y within epsilon.
+  assert.equal(z.geometry.points[2][0], 500);              // 0.5*1000
+  assert.ok(Math.abs(z.geometry.points[2][1] - 440) < 1e-6);
   assert.equal(z.nr, '102');
   assert.equal(z.label, 'Svetainė/virtuvė');
   assert.equal(z.color, '#f59e0b');                        // valgomasis
