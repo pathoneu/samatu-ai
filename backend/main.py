@@ -5819,41 +5819,49 @@ async def detect_room_polygons_endpoint(
     bbox_by_nr = {str(r.get("nr")): r.get("bbox_pct") for r in rooms if r.get("nr") is not None}
     label_seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
 
-    # marker_pct = where to put the Tier-2 circled number: the printed label if
-    # pdfplumber found it, else the bbox centroid. Every room gets one if we have
-    # ANY location signal.
-    marker_by_nr: dict[str, list[float]] = {}
-    for nr in nrs:
-        if nr in label_seeds:
-            marker_by_nr[nr] = [label_seeds[nr][0], label_seeds[nr][1]]
-        else:
-            bc = bbox_centroid_seed(bbox_by_nr.get(nr))
-            if bc:
-                marker_by_nr[nr] = [bc[0], bc[1]]
+    # marker_pct = where to put the Tier-2 circled number when the polygon fails.
+    # ONLY the pdfplumber label seed (the actual printed room-number location) is
+    # trustworthy enough to anchor a marker. We deliberately do NOT fall back to
+    # the Vision bbox centroid: on furnished/rotated plans those bboxes are often
+    # garbage, and a marker on a garbage centroid is exactly the "marked random
+    # places" failure. A room with no label seed gets NO marker → it surfaces in
+    # the honest "N patalpų be vietos" chip instead of a misplaced circle.
+    marker_by_nr: dict[str, list[float]] = {
+        nr: [label_seeds[nr][0], label_seeds[nr][1]] for nr in nrs if nr in label_seeds
+    }
 
-    # Two-pass scale calibration (unchanged) — seeded from label seeds.
+    # Per-room seeds: primary = printed label (if found) else bbox centroid;
+    # extra = the other. Same seeding drives BOTH calibration passes (pass-1
+    # label-only left ciurliu/romainiai with no samples → no area prior → unsafe
+    # 'pick largest' fills; seeding pass-1 from bbox centroids too recovers scale).
+    seeds_by_nr: dict[str, tuple[tuple[float, float], list]] = {}
+    for nr in nrs:
+        label = label_seeds.get(nr)
+        bc = bbox_centroid_seed(bbox_by_nr.get(nr))
+        primary = label or bc
+        if primary is None:
+            continue
+        seeds_by_nr[nr] = (primary, [bc] if (label and bc) else [])
+
+    # Two-pass scale calibration: pass-1 = no area prior, collect (area_pct, m²).
     samples = []
-    for nr, (sx, sy) in label_seeds.items():
-        r0 = auto_room_polygon(raster, sx, sy)
-        if r0 is not None:
+    for nr, (primary, extra) in seeds_by_nr.items():
+        r0 = auto_room_polygon(raster, primary[0], primary[1], seeds_pct=extra)
+        if r0 is not None and plotas.get(nr):
             ap = float(_cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(_np.int32))) / (h * w)
-            if plotas.get(nr):
-                samples.append((ap, plotas[nr]))
+            samples.append((ap, plotas[nr]))
     scale = calibrate_page_scale(samples)
 
     results: dict[str, dict] = {}
     n_auto = n_manual = 0
     for nr in nrs:
         marker = marker_by_nr.get(nr)
-        # Primary seed: label if present, else bbox centroid. Extra seed: the other one.
-        bc = bbox_centroid_seed(bbox_by_nr.get(nr))
-        label = label_seeds.get(nr)
-        primary = label or bc
-        if primary is None:
+        seed = seeds_by_nr.get(nr)
+        if seed is None:  # no label seed AND no bbox → cannot place at all
             results[nr] = {"polygon_source": "manual_needed", "confidence": "manual"}
             n_manual += 1
             continue
-        extra = [bc] if (label and bc) else []
+        (primary, extra) = seed
         r = auto_room_polygon(
             raster, primary[0], primary[1], seeds_pct=extra,
             room_plotas_m2=plotas.get(nr) or None, page_scale_m2_per_pct=scale,

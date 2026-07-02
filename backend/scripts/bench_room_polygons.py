@@ -18,9 +18,14 @@ import page_raster_cache as cache
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def load_project(gt_dir):
-    """Return (pdf_bytes, page_nr, [rooms]) or None. rooms: {nr, plotas_m2, bbox_pct}."""
+    """Return (pdf_bytes, page_nr, [rooms]) or None. rooms: {nr, plotas_m2, bbox_pct}.
+
+    The source PDF lives under docs/superpowers/fixtures/… and its repo-relative
+    path is recorded in the project's truth.json `pdf_path` (ground_truth dirs
+    hold no PDFs of their own)."""
     ai = os.path.join(gt_dir, "ai_extract.json")
-    if not os.path.exists(ai):
+    truth = os.path.join(gt_dir, "truth.json")
+    if not os.path.exists(ai) or not os.path.exists(truth):
         return None
     data = json.load(open(ai))
     rooms = data.get("v8_rooms") or data.get("patalpos") or []
@@ -28,33 +33,46 @@ def load_project(gt_dir):
     if not rooms:
         return None
     page_nr = rooms[0].get("puslapio_nr") or rooms[0].get("page_nr") or 1
-    pdfs = glob.glob(os.path.join(gt_dir, "*.pdf")) or glob.glob(os.path.join(gt_dir, "..", "*.pdf"))
-    if not pdfs:
+    pdf_rel = (json.load(open(truth)) or {}).get("pdf_path")
+    if not pdf_rel:
         return None
-    return open(pdfs[0], "rb").read(), int(page_nr), rooms
+    pdf_abs = os.path.join(ROOT, pdf_rel)
+    if not os.path.exists(pdf_abs):
+        return None
+    return open(pdf_abs, "rb").read(), int(page_nr), rooms
 
 def bench(name, pdf_bytes, page_nr, rooms):
-    raster = cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+    try:
+        raster = cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+    except Exception as e:
+        print(f"{name:14s} SKIP (page {page_nr} render failed: {e})")
+        return None
     h, w = raster.shape[:2]
     nrs = [str(r["nr"]) for r in rooms]
     plot = {str(r["nr"]): float(r.get("plotas_m2") or 0) for r in rooms}
     bbox = {str(r["nr"]): r.get("bbox_pct") for r in rooms}
     label_seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
+    # Per-room seeds (primary + extra), same as the endpoint; drives BOTH passes.
+    seeds_by_nr = {}
+    for nr in nrs:
+        label = label_seeds.get(nr); bc = bbox_centroid_seed(bbox.get(nr))
+        primary = label or bc
+        if primary is not None:
+            seeds_by_nr[nr] = (primary, [bc] if (label and bc) else [])
     samples = []
-    for nr, (x, y) in label_seeds.items():
-        r0 = auto_room_polygon(raster, x, y)
+    for nr, (primary, extra) in seeds_by_nr.items():
+        r0 = auto_room_polygon(raster, primary[0], primary[1], seeds_pct=extra)
         if r0 is not None and plot.get(nr):
             samples.append((cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(np.int32)) / (h * w), plot[nr]))
     scale = calibrate_page_scale(samples)
     auto = manual = wrong = 0
     errs = []
     for nr in nrs:
-        label = label_seeds.get(nr)
         bc = bbox_centroid_seed(bbox.get(nr))
-        primary = label or bc
-        if primary is None:
+        seed = seeds_by_nr.get(nr)
+        if seed is None:
             manual += 1; continue
-        extra = [bc] if (label and bc) else []
+        (primary, extra) = seed
         r = auto_room_polygon(raster, primary[0], primary[1], seeds_pct=extra,
                               room_plotas_m2=plot.get(nr) or None, page_scale_m2_per_pct=scale)
         if r is None:
@@ -62,8 +80,11 @@ def bench(name, pdf_bytes, page_nr, rooms):
         auto += 1
         if r.area_err is not None:
             errs.append(r.area_err)
-        # wrong-room check: the printed label (if any) must be inside the polygon
-        if label and not point_in_polygon_px(r.polygon_px, label[0] * w, label[1] * h):
+        # wrong-room check: a room's bbox CENTROID (a reliable interior anchor)
+        # must fall inside its detected polygon. The printed number label is a
+        # callout that often sits OUTSIDE the room outline, so it is not a valid
+        # test; the bbox centroid is. Only checked for rooms that carry a bbox.
+        if bc and not point_in_polygon_px(r.polygon_px, bc[0] * w, bc[1] * h):
             wrong += 1
     mean_err = round(sum(errs) / len(errs), 3) if errs else None
     print(f"{name:14s} total={len(nrs):2d} auto={auto:2d} manual={manual:2d} "
