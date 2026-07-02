@@ -17,6 +17,7 @@ import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-ma
 import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
+import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import PageOverlayHost from './PageOverlayHost';
 
@@ -97,14 +98,22 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
       onPagePoint?.(pt);
       return;
     }
-    const { x, y, pageIndex, pageWidth, pageHeight } = pt;
+    const { x, y, pageIndex, pageWidth, pageHeight, pageRotation } = pt;
     if (!pageWidth || !pageHeight) { setFillFor(null); return; }
+    // BUGFIX (2026-07-02): the click lands in DISPLAY space (page shown with
+    // PDFium's /Rotate complement — see displayRotationFor), but the
+    // click-to-fill backend rasters the UNROTATED mediabox page (pdf2image
+    // ignores /Rotate). Inverse-rotate the pct so the flood-fill seed lands
+    // where the user actually clicked. Zones render correctly because
+    // PageOverlayHost applies the FORWARD transform with the same helper.
+    const rot = displayRotationFor(pageRotation ?? 0);
+    const [mx, my] = inverseRotatePctPoint(x / pageWidth, y / pageHeight, rot);
     try {
       const data = await clickToFill({
         projectId,
         pageNr: pageIndex + 1,
-        clickXPct: x / pageWidth,
-        clickYPct: y / pageHeight,
+        clickXPct: mx,
+        clickYPct: my,
         sensitivity: 0.7,
         pdfBlob,
       });

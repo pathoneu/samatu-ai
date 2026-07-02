@@ -8,14 +8,16 @@ import { RenderLayer } from '@embedpdf/plugin-render/react';
 import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { PagePointerProvider, usePointerHandlers } from '@embedpdf/plugin-interaction-manager/react';
 import { makeViewport } from '@/lib/viewerEngine/pageViewport';
-import { rotateRoomGeometry, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
+import { rotateRoomGeometry, displayRotationFor } from '@/lib/viewerEngine/pageRotation';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 
-function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, onPagePoint }) {
+function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
+  // pageRotation = the page's REPORTED /Rotate — included so consumers
+  // (TakeoffViewer.handlePagePoint) can inverse-map display clicks to mediabox.
   useEffect(() => register({
-    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight }),
-  }), [register, pageIndex, pageWidth, pageHeight, onPagePoint]);
+    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation }),
+  }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint]);
   return null;
 }
 
@@ -27,9 +29,10 @@ export default function PageOverlayHost({ documentId, layout, rooms, pageRotatio
   // overlay on the Beržų /Rotate-270 sheet: the page shows as mediabox rotated 90°
   // CW, so room 102 (mediabox 0.30,0.34) sits upper-right (0.66,0.30) and the title
   // block (0.85,0.90) sits bottom-left (0.10,0.85). The mediabox→display map is thus
-  // (1-y,x) = the 90° transform for a /Rotate-270 page. So swap 90<->270 here.
-  const reported = normalizeRotation(pageRotation);
-  const rot = reported === 90 ? 270 : reported === 270 ? 90 : reported;
+  // (1-y,x) = the 90° transform for a /Rotate-270 page. So swap 90<->270 — via the
+  // shared displayRotationFor helper, which TakeoffViewer's handlePagePoint also
+  // uses for the INVERSE (click → mediabox) transform, so the two can't diverge.
+  const rot = displayRotationFor(pageRotation);
   const displayRooms = useMemo(
     () => (rot === 0 ? rooms : (rooms || []).map((r) => rotateRoomGeometry(r, rot))),
     [rooms, rot],
@@ -41,7 +44,7 @@ export default function PageOverlayHost({ documentId, layout, rooms, pageRotatio
     <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
       <RenderLayer documentId={documentId} pageIndex={layout.pageIndex} />
       <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={width} pageHeight={height} onPagePoint={onPagePoint} />
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={width} pageHeight={height} pageRotation={pageRotation} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <RoomZoneLayer

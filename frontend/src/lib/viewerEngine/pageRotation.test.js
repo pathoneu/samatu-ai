@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeRotation, rotatePctPoint, rotateBboxPct, rotateRoomGeometry } from './pageRotation.js';
+import {
+  normalizeRotation, rotatePctPoint, rotateBboxPct, rotateRoomGeometry,
+  inverseRotatePctPoint, displayRotationFor,
+} from './pageRotation.js';
 
 test('normalizeRotation: quarter-turns and degrees', () => {
   assert.equal(normalizeRotation(3), 270);
@@ -47,4 +50,50 @@ test('rotateRoomGeometry: rotates bbox_pct + polygon_pct', () => {
   const r = rotateRoomGeometry(room, 270);
   assert.deepEqual(r.polygon_pct[0], [0.1, 0.9]); // (0.1,0.1)->(0.1,0.9)
   assert.ok(Math.abs(r.bbox_pct.w - 0.4) < 1e-9);
+});
+
+test('inverseRotatePctPoint: round-trips rotatePctPoint for every quarter turn', () => {
+  const pts = [[0.3, 0.7], [0.0, 0.0], [1.0, 1.0], [0.66, 0.30]];
+  for (const rot of [0, 90, 180, 270]) {
+    for (const [x, y] of pts) {
+      const [rx, ry] = rotatePctPoint(x, y, rot);
+      const [ix, iy] = inverseRotatePctPoint(rx, ry, rot);
+      assert.ok(Math.abs(ix - x) < 1e-9 && Math.abs(iy - y) < 1e-9,
+        `round-trip failed for rot=${rot} point=(${x},${y}) -> (${ix},${iy})`);
+    }
+  }
+});
+
+test('inverseRotatePctPoint: display click on a 90-display page maps back to mediabox', () => {
+  // Mirror of the verified room-102 forward mapping on the Beržų /Rotate-270
+  // sheet (displayed as mediabox rotated 90° CW): mediabox (0.30, 0.34) shows
+  // at display (0.66, 0.30). A click at display (0.66, 0.30) must therefore
+  // land back at mediabox (0.30, 0.34).
+  const [mx, my] = inverseRotatePctPoint(0.66, 0.30, 90);
+  assert.ok(Math.abs(mx - 0.30) < 1e-9, `mx=${mx}`);
+  assert.ok(Math.abs(my - 0.34) < 1e-9, `my=${my}`);
+});
+
+test('displayRotationFor: swaps 90<->270 (PDFium complement), keeps 0/180', () => {
+  assert.equal(displayRotationFor(0), 0);
+  assert.equal(displayRotationFor(90), 270);
+  assert.equal(displayRotationFor(180), 180);
+  assert.equal(displayRotationFor(270), 90);
+  // quarter-turn form: 3 -> 270 reported -> 90 display
+  assert.equal(displayRotationFor(3), 90);
+  assert.equal(displayRotationFor(undefined), 0);
+});
+
+test('display->mediabox via displayRotationFor + inverseRotatePctPoint matches overlay forward map', () => {
+  // The overlay renders mediabox points with rotatePctPoint(p, displayRotationFor(reported)).
+  // A click at that rendered spot, inverse-rotated with the SAME display rotation,
+  // must recover the original mediabox point — for every reported /Rotate.
+  const mediabox = [0.30, 0.34];
+  for (const reported of [0, 90, 180, 270]) {
+    const rot = displayRotationFor(reported);
+    const display = rotatePctPoint(mediabox[0], mediabox[1], rot);
+    const back = inverseRotatePctPoint(display[0], display[1], rot);
+    assert.ok(Math.abs(back[0] - mediabox[0]) < 1e-9 && Math.abs(back[1] - mediabox[1]) < 1e-9,
+      `reported=${reported}: ${back} != ${mediabox}`);
+  }
 });

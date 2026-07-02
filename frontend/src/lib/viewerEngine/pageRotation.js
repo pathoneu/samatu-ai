@@ -28,6 +28,25 @@ export function rotatePctPoint(x, y, rot) {
   }
 }
 
+// Exact inverse of rotatePctPoint: undo a CW rotation by rotating CW the rest
+// of the way around (inverse of 90 is 270 and vice versa; 180 is self-inverse).
+// Use for DISPLAY-space clicks that must map back to the UNROTATED (mediabox)
+// raster — e.g. click-to-fill seeds, whose backend ignores /Rotate.
+export function inverseRotatePctPoint(x, y, rot) {
+  return rotatePctPoint(x, y, (360 - normalizeRotation(rot)) % 360);
+}
+
+// The rotation EmbedPDF/PDFium actually APPLIES on screen for a reported page
+// /Rotate. Empirically PDFium displays the COMPLEMENT of the reported quarter
+// turns (verified on the Beržų /Rotate-270 sheet — see PageOverlayHost), so
+// 90 and 270 swap while 0/180 pass through. Shared by PageOverlayHost (forward
+// overlay transform) and TakeoffViewer's handlePagePoint (inverse click
+// transform) so the two sites can never diverge.
+export function displayRotationFor(reported) {
+  const r = normalizeRotation(reported);
+  return r === 90 ? 270 : r === 270 ? 90 : r;
+}
+
 export function rotateBboxPct(bbox, rot) {
   const r = normalizeRotation(rot);
   if (!bbox || r === 0) return bbox;
