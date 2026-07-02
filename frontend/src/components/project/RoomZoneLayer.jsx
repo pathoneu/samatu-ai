@@ -18,6 +18,7 @@ import { useMemo } from 'react';
 import { buildPageRoomZones, countRoomsMissingGeometry } from '@/lib/roomZones';
 
 function centroidOf(geometry) {
+  if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
   if (geometry.type === 'rect') {
     return {
       cx: geometry.left + geometry.width / 2,
@@ -75,7 +76,17 @@ export default function RoomZoneLayer({
             style={{ pointerEvents: 'auto', cursor: onRoomClick ? 'pointer' : 'default' }}
             onClick={() => onRoomClick?.(z)}
           >
-            {z.geometry.type === 'polygon' ? (
+            {z.geometry.type === 'marker' ? (
+              <g transform={`translate(${z.geometry.cx}, ${z.geometry.cy})`}>
+                <circle r={15} fill="white" fillOpacity={0.9} stroke={z.color}
+                  strokeWidth={2} strokeDasharray="4 3" />
+                <text x={0} y={0} textAnchor="middle" dominantBaseline="central"
+                  fontSize={12} fontWeight="700" fill={z.color}
+                  style={{ pointerEvents: 'none' }}>
+                  {z.nr}
+                </text>
+              </g>
+            ) : z.geometry.type === 'polygon' ? (
               <polygon
                 points={z.geometry.points.map((p) => `${p[0]},${p[1]}`).join(' ')}
                 fill={z.color}
@@ -99,28 +110,31 @@ export default function RoomZoneLayer({
               />
             )}
 
-            {/* Label chip: white bg, confidence dot, name + area */}
-            <g transform={`translate(${cx}, ${cy})`}>
-              <rect
-                x={-58} y={-17} width={116} height={34} rx={4}
-                fill="white" stroke={z.color} strokeWidth={1} opacity={0.96}
-              />
-              <circle cx={-48} cy={-6} r={4} fill={z.confidenceColor}>
-                <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
-              </circle>
-              <text
-                x={-40} y={-2} fontSize={11} fontWeight="700" fill="#1f2937"
-                style={{ pointerEvents: 'none' }}
-              >
-                {z.label.length > 12 ? `${z.label.slice(0, 11)}…` : z.label}
-              </text>
-              <text
-                x={-40} y={11} fontSize={10} fill={z.color}
-                style={{ pointerEvents: 'none' }}
-              >
-                {z.areaLabel}{z.approximate ? ' · apytikslė vieta' : ''}
-              </text>
-            </g>
+            {/* Label chip: white bg, confidence dot, name + area.
+                Suppressed for markers — a marker already shows its number. */}
+            {z.geometry.type !== 'marker' && (
+              <g transform={`translate(${cx}, ${cy})`}>
+                <rect
+                  x={-58} y={-17} width={116} height={34} rx={4}
+                  fill="white" stroke={z.color} strokeWidth={1} opacity={0.96}
+                />
+                <circle cx={-48} cy={-6} r={4} fill={z.confidenceColor}>
+                  <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
+                </circle>
+                <text
+                  x={-40} y={-2} fontSize={11} fontWeight="700" fill="#1f2937"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {z.label.length > 12 ? `${z.label.slice(0, 11)}…` : z.label}
+                </text>
+                <text
+                  x={-40} y={11} fontSize={10} fill={z.color}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {z.areaLabel}{z.approximate ? ' · apytikslė vieta' : ''}
+                </text>
+              </g>
+            )}
           </g>
         );
       })}
