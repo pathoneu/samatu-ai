@@ -120,6 +120,11 @@ export default function InteriorWorkspace({
   // bubbling up). Prop changes take priority — local override resets on prop.
   const [localFocusedPage, setLocalFocusedPage] = useState(null);
   const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
+  // Phase 1 declutter (2026-07-02): panel-driven per-room canvas visibility.
+  // Set of String(nr) hidden from the canvas + the panel-row hover that
+  // brightens the matching zone (panel → canvas half of the hover sync).
+  const [hiddenRoomNrs, setHiddenRoomNrs] = useState(() => new Set());
+  const [hoveredRoomNr, setHoveredRoomNr] = useState(null);
   const effectiveFocusedPage = localFocusedPage ?? focusedPage;
   // Re-derive the focused room from the LIVE patalpos by nr — the focusedRoom
   // prop / local state is a captured object and can carry a stale polygon after
@@ -244,22 +249,30 @@ export default function InteriorWorkspace({
     onProjectChange?.(updated);
   };
 
-  // "Tikrinti pirmiausia": rooms the auto-detector couldn't solve (or that fell
-  // back to a coarse bbox) — surfaced so the user fixes them with "Taisyti zoną".
-  const manualRooms = useMemo(() => {
-    const v8 = project.v8_rooms || [];
-    const pat = project.patalpos || [];
-    // polygon_source may live in either array; merge by nr, but only count REAL
-    // detected sources — ignore the placeholder 'synthesized_from_bbox' that
-    // stale v8_rooms may still carry.
-    const srcByNr = {};
-    [...pat, ...v8].forEach((r) => {
-      const s = r.polygon_source;
-      if (s && (DETECTED_SOURCES.includes(s) || s === 'bbox_fallback')) srcByNr[String(r.nr)] = s;
+  // Per-room canvas visibility handlers (panel eye toggles, Phase 1 declutter).
+  const handleToggleRoomVisibility = (nr) => {
+    const key = String(nr);
+    setHiddenRoomNrs((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
-    const base = v8.length ? v8 : pat;
-    return base.filter((r) => ['manual_needed', 'bbox_fallback'].includes(srcByNr[String(r.nr)]));
-  }, [project.v8_rooms, project.patalpos]);
+  };
+
+  // Ctrl/Cmd+click isolate: hide every OTHER room; a second isolate on the
+  // already-isolated room restores all.
+  const handleIsolateRoom = (nr) => {
+    const key = String(nr);
+    const allNrs = (project.v8_rooms || project.patalpos || []).map((r) => String(r.nr));
+    const others = allNrs.filter((n) => n !== key);
+    setHiddenRoomNrs((prev) => {
+      const alreadyIsolated = !prev.has(key)
+        && others.length > 0
+        && others.every((n) => prev.has(n));
+      return alreadyIsolated ? new Set() : new Set(others);
+    });
+  };
 
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
     [project.puslapiai, project.v8_pages]);
@@ -295,35 +308,14 @@ export default function InteriorWorkspace({
             Aptinkamos tikslios patalpų zonos…
           </div>
         )}
-        {/* Polygon worklist banner hidden 2026-06-17 — we no longer auto-draw
-            room polygons, so "rooms needing refinement" is no longer the primary
-            UX. Manual zone-tracing stays available via "Taisyti zoną". */}
-        {false && manualRooms.length > 0 && (
-          <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-900">
-            <span className="font-medium">⚠ {manualRooms.length} patalpų reikia patikslinti:</span>
-            {manualRooms.map((r) => (
-              <button
-                key={r.nr}
-                type="button"
-                onClick={() => {
-                  setLocalFocusedPage(r.puslapio_nr ?? r.page_nr ?? null);
-                  setLocalFocusedRoom(r);
-                }}
-                title={`${r.nr} ${r.pavadinimas || ''} — pasirink ir spausk „Taisyti zoną"`}
-                className="rounded border border-amber-300 bg-white px-1.5 py-0.5 font-medium tabular-nums hover:bg-amber-100"
-              >
-                {r.nr}
-              </button>
-            ))}
-            <span className="text-amber-700">— pasirink ir spausk „Taisyti zoną“</span>
-          </div>
-        )}
         {pdfUrl ? (
           viewerEngineIsEmbed() ? (
             <TakeoffViewer
               fileUrl={pdfUrl}
               rooms={project?.v8_rooms || project?.patalpos || []}
               focusedRoom={effectiveFocusedRoom}
+              hiddenRoomNrs={hiddenRoomNrs}
+              hoveredRoomNrExternal={hoveredRoomNr}
               projectId={project.id}
               pdfBlob={pdfBlob}
               onRoomPolygonFill={handleRoomPolygonFill}
@@ -466,6 +458,11 @@ export default function InteriorWorkspace({
         <WorkspacePanel
           project={project}
           focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+          hiddenRoomNrs={hiddenRoomNrs}
+          onToggleRoomVisibility={handleToggleRoomVisibility}
+          onIsolateRoom={handleIsolateRoom}
+          onShowAllRooms={() => setHiddenRoomNrs(new Set())}
+          onRoomRowHover={setHoveredRoomNr}
           onJumpToPage={(pageNr, room) => {
             setLocalFocusedPage(pageNr);
             setLocalFocusedRoom(room || null);

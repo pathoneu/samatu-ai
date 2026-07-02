@@ -85,7 +85,20 @@ function useTakeoff(projectId) {
 // ── Wet-room paskirtis check (for "drėgna" pill) ──────────────────────────
 const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla']);
 
-export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange, focusedRoomNr = null }) {
+export default function WorkspacePanel({
+  project,
+  onJumpToPage,
+  onJumpToProvenance,
+  onProjectChange,
+  focusedRoomNr = null,
+  // Phase 1 declutter (2026-07-02): panel is the source of truth for which
+  // zones are drawn on the canvas. All null-safe — panel works standalone.
+  hiddenRoomNrs = null,
+  onToggleRoomVisibility = null,
+  onIsolateRoom = null,
+  onShowAllRooms = null,
+  onRoomRowHover = null,
+}) {
   const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
@@ -129,6 +142,16 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
   }, [project.v8_rooms, project.patalpos, takeoff.polygons]);
 
   const totalArea = allRooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
+
+  // Canvas visibility: nr may be number or string in data — compare as String.
+  const hiddenRoomSet = useMemo(
+    () => new Set(Array.from(hiddenRoomNrs || []).map(String)),
+    [hiddenRoomNrs],
+  );
+  const hiddenCount = useMemo(
+    () => allRooms.filter(r => hiddenRoomSet.has(String(r.nr))).length,
+    [allRooms, hiddenRoomSet],
+  );
 
   // Positions grouped by skyrius (preserve server-side order)
   const positionGroups = useMemo(() => {
@@ -283,20 +306,44 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           collapsed={collapsed.rooms}
           onToggle={() => toggleSection('rooms')}
           top={0}
+          action={hiddenCount > 0 && onShowAllRooms ? (
+            // span, not button — SectionHeader itself is a <button>, and nested
+            // interactive elements are invalid HTML. stopPropagation keeps the
+            // click from also toggling the section.
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onShowAllRooms(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onShowAllRooms(); }
+              }}
+              className="rounded border px-1.5 whitespace-nowrap transition-colors hover:bg-[#eef4fb]"
+              style={{
+                fontSize: 10, lineHeight: '16px',
+                color: '#2a6fb5', borderColor: '#cfe0f2',
+              }}
+              title="Rodyti visas paslėptas zonas plane"
+            >
+              Rodyti visas ({hiddenCount} paslėpta)
+            </span>
+          ) : null}
         />
         {!collapsed.rooms && filteredRooms.map((r, i) => {
           const targetPage = r.puslapio_nr ?? r.page_nr;
           const canJump = !!(onJumpToPage && targetPage);
           const isWet = WET_PASKIRTYS.has((r.paskirtis || '').toLowerCase());
           const isFocused = focusedRoomNr != null && String(r.nr) === String(focusedRoomNr);
+          const isHidden = hiddenRoomSet.has(String(r.nr));
           return (
             <div
               key={`${r.nr}-${i}`}
               ref={isFocused ? focusedRowRef : undefined}
               onClick={canJump ? () => onJumpToPage(targetPage, r) : undefined}
-              className="row-hover-halo grid items-center cursor-pointer transition-colors"
+              onMouseEnter={onRoomRowHover ? () => onRoomRowHover(r.nr) : undefined}
+              onMouseLeave={onRoomRowHover ? () => onRoomRowHover(null) : undefined}
+              className={`row-hover-halo grid items-center cursor-pointer transition-colors${isHidden ? ' opacity-50' : ''}`}
               style={{
-                gridTemplateColumns: '24px 1fr auto',
+                gridTemplateColumns: onToggleRoomVisibility ? '24px 1fr auto 20px' : '24px 1fr auto',
                 gap: 8, padding: '6px 12px', fontSize: 12,
                 borderBottom: '1px solid hsl(var(--border) / 0.5)',
                 background: isFocused ? 'hsl(var(--primary) / 0.10)' : undefined,
@@ -359,6 +406,21 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
                   ) : null;
                 })()}
               </span>
+              {onToggleRoomVisibility && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if ((e.ctrlKey || e.metaKey) && onIsolateRoom) onIsolateRoom(r.nr);
+                    else onToggleRoomVisibility(r.nr);
+                  }}
+                  className="flex items-center justify-center justify-self-end text-[#8a857d] hover:text-[#4a4640] transition-colors"
+                  style={{ width: 16, height: 16 }}
+                  title="Rodyti/slėpti zoną plane · Ctrl+spustelėjimas — rodyti tik šią"
+                >
+                  {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
             </div>
           );
         })}
@@ -518,7 +580,7 @@ function PlyteliuSpecsSection({ specs }) {
 }
 
 // ── Section header (sticky) ──────────────────────────────────────────────
-function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle, top = 0 }) {
+function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle, top = 0, action = null }) {
   const isToggleable = !!onToggle;
   return (
     <button
@@ -546,8 +608,11 @@ function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle,
           {count}
         </span>
       </div>
-      <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
-        {summary}
+      <span className="flex items-center gap-2">
+        {action}
+        <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
+          {summary}
+        </span>
       </span>
     </button>
   );

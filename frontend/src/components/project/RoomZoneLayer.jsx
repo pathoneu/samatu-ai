@@ -53,6 +53,7 @@ export default function RoomZoneLayer({
   renderedSize,
   focusedRoomNr = null,
   hiddenRoomNrs = null,
+  hoveredRoomNrExternal = null,
   onRoomClick = null,
 }) {
   const width = renderedSize?.width;
@@ -86,7 +87,11 @@ export default function RoomZoneLayer({
   if (zones.length === 0 && missingCount === 0) return null;
 
   const isFocusedZone = (z) => focusedRoomNr != null && String(z.nr) === String(focusedRoomNr);
-  const isHoveredZone = (z) => hoverNr != null && String(z.nr) === hoverNr;
+  // Hover = internal (cursor on the zone) OR external (cursor on the panel row) —
+  // the panel→canvas half of the cheap bidirectional hover sync.
+  const isHoveredZone = (z) =>
+    (hoverNr != null && String(z.nr) === hoverNr)
+    || (hoveredRoomNrExternal != null && String(z.nr) === String(hoveredRoomNrExternal));
 
   return (
     <svg

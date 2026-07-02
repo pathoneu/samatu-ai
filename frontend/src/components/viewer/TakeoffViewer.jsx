@@ -83,7 +83,7 @@ function FocusScroller({ documentId, focusedRoom }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, onRoomZoneClick, onPagePoint, projectId, pdfBlob, onRoomPolygonFill }) {
+function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, projectId, pdfBlob, onRoomPolygonFill }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -141,6 +141,8 @@ function ViewerInner({ rooms, focusedRoom, onRoomZoneClick, onPagePoint, project
                     rooms={rooms}
                     pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
                     focusedRoomNr={focusedRoomNr}
+                    hiddenRoomNrs={hiddenRoomNrs}
+                    hoveredRoomNrExternal={hoveredRoomNrExternal}
                     onRoomZoneClick={onRoomZoneClick}
                     onPagePoint={handlePagePoint}
                   />
@@ -158,6 +160,8 @@ export default function TakeoffViewer({
   fileUrl,
   rooms = [],
   focusedRoom = null,
+  hiddenRoomNrs = null,
+  hoveredRoomNrExternal = null,
   onRoomZoneClick = null,
   onPagePoint = null,
   projectId = null,
@@ -174,6 +178,8 @@ export default function TakeoffViewer({
         <ViewerInner
           rooms={rooms}
           focusedRoom={focusedRoom}
+          hiddenRoomNrs={hiddenRoomNrs}
+          hoveredRoomNrExternal={hoveredRoomNrExternal}
           onRoomZoneClick={onRoomZoneClick}
           onPagePoint={onPagePoint}
           projectId={projectId}

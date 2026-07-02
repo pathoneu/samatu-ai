@@ -19,7 +19,7 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, onPagePoint 
   return null;
 }
 
-export default function PageOverlayHost({ documentId, layout, rooms, pageRotation = 0, focusedRoomNr, onRoomZoneClick, onPagePoint }) {
+export default function PageOverlayHost({ documentId, layout, rooms, pageRotation = 0, focusedRoomNr, hiddenRoomNrs = null, hoveredRoomNrExternal = null, onRoomZoneClick, onPagePoint }) {
   // Correct the extraction-vs-display rotation mismatch: room pct are computed on
   // the UNROTATED (mediabox) raster by the extractor, but EmbedPDF/PDFium DISPLAYS
   // the page with /Rotate applied — and empirically applies the COMPLEMENT of the
@@ -49,6 +49,8 @@ export default function PageOverlayHost({ documentId, layout, rooms, pageRotatio
           page={layout.pageNumber}
           renderedSize={{ width, height }}
           focusedRoomNr={focusedRoomNr}
+          hiddenRoomNrs={hiddenRoomNrs}
+          hoveredRoomNrExternal={hoveredRoomNrExternal}
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
