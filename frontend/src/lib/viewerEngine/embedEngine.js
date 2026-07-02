@@ -15,6 +15,7 @@ import { RenderPluginPackage } from '@embedpdf/plugin-render/react';
 import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/react';
 import { TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
 import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react';
+import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
 
 export function engineOptions() {
   return {
@@ -36,5 +37,6 @@ export function makeViewerPlugins(initialUrl) {
     createPluginRegistration(ZoomPluginPackage, { defaultZoomLevel: ZoomMode.FitPage }),
     createPluginRegistration(TilingPluginPackage),
     createPluginRegistration(InteractionManagerPluginPackage),
+    createPluginRegistration(ThumbnailPluginPackage, { width: 120, gap: 8, labelHeight: 16 }),
   ];
 }

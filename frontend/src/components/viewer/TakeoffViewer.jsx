@@ -15,13 +15,14 @@ import { Viewport } from '@embedpdf/plugin-viewport/react';
 import { Scroller, useScroll } from '@embedpdf/plugin-scroll/react';
 import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-manager/react';
 import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X } from 'lucide-react';
+import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import PageOverlayHost from './PageOverlayHost';
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -32,6 +33,12 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const canFill = focusedRoomNr != null && onStartFill;
   return (
     <div className="h-9 shrink-0 border-b border-[#e6e2da] bg-[#fbfaf7] px-3 flex items-center gap-1 text-[12px] text-[#4a4640]">
+      <button
+        className={btn + (railOpen ? ' bg-[#efece6] text-[#2a6fb5]' : '')}
+        title="Puslapių juosta (T)"
+        onClick={onToggleThumbs}
+      ><PanelLeft className="w-4 h-4" /></button>
+      <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
       <button className={btn} title="Ankstesnis puslapis" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPreviousPage()}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
       <button className={btn} title="Kitas puslapis" disabled={cur >= total} onClick={() => scrollApi?.scrollToNextPage()}><ChevronRight className="w-4 h-4" /></button>
@@ -72,6 +79,49 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   );
 }
 
+/**
+ * ThumbnailRail — left collapsible page rail on @embedpdf/plugin-thumbnail.
+ * ThumbnailsPane virtualizes rows; each ThumbMeta row is absolutely positioned
+ * at meta.top inside the pane (that's the plugin's windowing contract).
+ */
+function ThumbnailRail({ documentId }) {
+  const { state: scroll, provides: scrollApi } = useScroll(documentId);
+  const cur = scroll?.currentPage ?? 1;
+  return (
+    <aside className="w-[148px] shrink-0 bg-[#fbfaf7] border-r border-[#e6e2da]">
+      <ThumbnailsPane documentId={documentId} style={{ height: '100%' }}>
+        {(m) => {
+          const pageNumber = m.pageIndex + 1;
+          const isCurrent = pageNumber === cur;
+          return (
+            <button
+              key={m.pageIndex}
+              type="button"
+              title={`Puslapis ${pageNumber}`}
+              onClick={() => scrollApi?.scrollToPage({ pageNumber, behavior: 'smooth' })}
+              style={{ position: 'absolute', top: m.top, height: m.wrapperHeight, left: 0, right: 0 }}
+              className="flex flex-col items-center group focus:outline-none"
+            >
+              <ThumbImg
+                documentId={documentId}
+                meta={m}
+                style={{ width: m.width, height: m.height }}
+                className={`bg-white rounded-[2px] ${isCurrent ? 'ring-2 ring-[#2a6fb5]' : 'ring-1 ring-[#e6e2da] group-hover:ring-[#c9c4ba]'}`}
+              />
+              <span
+                style={{ height: m.labelHeight, lineHeight: `${m.labelHeight}px` }}
+                className={`mono tabular text-[10px] ${isCurrent ? 'text-[#2a6fb5]' : 'text-[#8a857d]'}`}
+              >
+                {pageNumber}
+              </span>
+            </button>
+          );
+        }}
+      </ThumbnailsPane>
+    </aside>
+  );
+}
+
 // Scroll the viewport to a focused room's page when it changes (panel → canvas nav).
 function FocusScroller({ documentId, focusedRoom }) {
   const { provides: scrollApi } = useScroll(documentId);
@@ -91,6 +141,18 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const [fillFor, setFillFor] = useState(null);
   // Drop the armed room if focus changes away (avoid filling the wrong room).
   useEffect(() => { setFillFor(null); }, [focusedRoomNr]);
+  // Thumbnail rail preference: null = "no explicit choice yet" → default OPEN
+  // when the document has more than one page (resolved where pageCount is known).
+  const [thumbsPref, setThumbsPref] = useState(() => {
+    try {
+      const v = localStorage.getItem('samatu_viewer_thumbs');
+      return v == null ? null : v === '1';
+    } catch { return null; }
+  });
+  const setRailOpen = (next) => {
+    try { localStorage.setItem('samatu_viewer_thumbs', next ? '1' : '0'); } catch { /* private mode */ }
+    setThumbsPref(next);
+  };
 
   const handlePagePoint = async (pt) => {
     // Not in fill mode → normal viewing: forward to any external consumer.
@@ -128,39 +190,50 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
-      {({ isLoaded, documentState }) => (isLoaded ? (
+      {({ isLoaded, documentState }) => {
+        if (!isLoaded) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
+        const totalPages = documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null;
+        // No explicit user choice yet → open by default on multi-page documents.
+        const railOpen = thumbsPref ?? ((totalPages ?? 1) > 1);
+        return (
         <div className="flex flex-col h-full">
           <Toolbar
             documentId={activeDocumentId}
-            totalPages={documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null}
+            totalPages={totalPages}
             focusedRoomNr={onRoomPolygonFill ? focusedRoomNr : null}
             fillFor={fillFor}
             onStartFill={setFillFor}
             onCancelFill={() => setFillFor(null)}
+            railOpen={railOpen}
+            onToggleThumbs={() => setRailOpen(!railOpen)}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
-          <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0 }}>
-            <Viewport documentId={activeDocumentId} style={{ height: '100%', background: '#e9e7e2' }}>
-              <Scroller
-                documentId={activeDocumentId}
-                renderPage={(layout) => (
-                  <PageOverlayHost
-                    documentId={activeDocumentId}
-                    layout={layout}
-                    rooms={rooms}
-                    pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
-                    focusedRoomNr={focusedRoomNr}
-                    hiddenRoomNrs={hiddenRoomNrs}
-                    hoveredRoomNrExternal={hoveredRoomNrExternal}
-                    onRoomZoneClick={onRoomZoneClick}
-                    onPagePoint={handlePagePoint}
-                  />
-                )}
-              />
-            </Viewport>
-          </ZoomGestureWrapper>
+          <div className="flex flex-1 min-h-0">
+            {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
+            <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+              <Viewport documentId={activeDocumentId} style={{ height: '100%', background: '#e9e7e2' }}>
+                <Scroller
+                  documentId={activeDocumentId}
+                  renderPage={(layout) => (
+                    <PageOverlayHost
+                      documentId={activeDocumentId}
+                      layout={layout}
+                      rooms={rooms}
+                      pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
+                      focusedRoomNr={focusedRoomNr}
+                      hiddenRoomNrs={hiddenRoomNrs}
+                      hoveredRoomNrExternal={hoveredRoomNrExternal}
+                      onRoomZoneClick={onRoomZoneClick}
+                      onPagePoint={handlePagePoint}
+                    />
+                  )}
+                />
+              </Viewport>
+            </ZoomGestureWrapper>
+          </div>
         </div>
-      ) : <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>)}
+        );
+      }}
     </DocumentContent>
   );
 }
