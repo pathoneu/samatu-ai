@@ -77,6 +77,7 @@ function ViewerInner({ rooms, focusedRoom, onRoomZoneClick, onPagePoint }) {
                     documentId={activeDocumentId}
                     layout={layout}
                     rooms={rooms}
+                    pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
                     focusedRoomNr={focusedRoomNr}
                     onRoomZoneClick={onRoomZoneClick}
                     onPagePoint={onPagePoint}
