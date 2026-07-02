@@ -21,10 +21,13 @@ function PageClicks({ documentId, pageIndex, onPagePoint }) {
 
 export default function PageOverlayHost({ documentId, layout, rooms, pageRotation = 0, focusedRoomNr, onRoomZoneClick, onPagePoint }) {
   // Correct the extraction-vs-display rotation mismatch: room pct are computed on
-  // the unrotated (mediabox) raster; the page displays with /Rotate applied. The
-  // mediabox→display mapping is the INVERSE of the reported /Rotate (verified
-  // against the eksplikacija-table position on the real Beržų /Rotate-270 sheet:
-  // mediabox (0.08,0.90) → display top-left, which is the 90° = inverse-of-270 map).
+  // the UNROTATED (mediabox) raster by the extractor, but EmbedPDF/PDFium DISPLAYS
+  // the page with /Rotate applied — and empirically applies the COMPLEMENT of the
+  // reported /Rotate. Verified by compositing the real viewer raster with the
+  // overlay on the Beržų /Rotate-270 sheet: the page shows as mediabox rotated 90°
+  // CW, so room 102 (mediabox 0.30,0.34) sits upper-right (0.66,0.30) and the title
+  // block (0.85,0.90) sits bottom-left (0.10,0.85). The mediabox→display map is thus
+  // (1-y,x) = the 90° transform for a /Rotate-270 page. So swap 90<->270 here.
   const reported = normalizeRotation(pageRotation);
   const rot = reported === 90 ? 270 : reported === 270 ? 90 : reported;
   const displayRooms = useMemo(
