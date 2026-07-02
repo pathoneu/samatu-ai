@@ -199,6 +199,7 @@ def auto_room_polygon(
     label_x_pct: float,
     label_y_pct: float,
     *,
+    seeds_pct: list[tuple[float, float]] | None = None,
     room_plotas_m2: float | None = None,
     page_scale_m2_per_pct: float | None = None,
     sensitivities: tuple[float, ...] = (0.5, 0.6, 0.7, 0.8),
@@ -218,7 +219,11 @@ def auto_room_polygon(
     if raster.ndim == 3:
         raster = cv2.cvtColor(raster, cv2.COLOR_BGR2GRAY)
     h, w = raster.shape
-    cx, cy = int(round(label_x_pct * w)), int(round(label_y_pct * h))
+    centers_px: list[tuple[int, int]] = []
+    for (px, py) in [(label_x_pct, label_y_pct), *(seeds_pct or [])]:
+        c = (int(round(px * w)), int(round(py * h)))
+        if c not in centers_px:
+            centers_px.append(c)
     page_area = float(h * w)
     binary = binarize_page(raster)
 
@@ -227,29 +232,40 @@ def auto_room_polygon(
         kernel, epsilon = _sensitivity_to_params(sens)
         closed = gap_fill_doors(binary, kernel_size=kernel)
         covered = np.zeros((h, w), dtype=np.uint8)  # dedup seeds already inside a found basin
-        for sx, sy in seed_grid(cx, cy):
-            if not (0 <= sx < w and 0 <= sy < h):
-                continue
-            if closed[sy, sx] == 0 or covered[sy, sx]:
-                continue
-            mask = flood_fill_from_click(closed, sx, sy)
-            if mask.sum() == 0:
-                continue
-            covered |= mask
-            poly = extract_polygon(mask, simplify_epsilon_pct=epsilon)
-            if len(poly) < 3:
-                continue
-            try:
-                validate_polygon(poly, page_dims=(h, w), max_area_pct=max_area_pct)
-            except PolygonValidationError:
-                continue
-            area_px = float(cv2.contourArea(poly.reshape(-1, 1, 2).astype(np.int32)))
-            area_pct = area_px / page_area
-            area_err = None
-            if page_scale_m2_per_pct and room_plotas_m2:
-                est_m2 = area_pct * page_scale_m2_per_pct
-                area_err = abs(est_m2 - room_plotas_m2) / room_plotas_m2
-            candidates.append((poly, area_pct, area_err))
+        for (gcx, gcy) in centers_px:                       # NEW: iterate all centers
+            for sx, sy in seed_grid(gcx, gcy):
+                if not (0 <= sx < w and 0 <= sy < h):
+                    continue
+                if closed[sy, sx] == 0 or covered[sy, sx]:
+                    continue
+                mask = flood_fill_from_click(closed, sx, sy)
+                if mask.sum() == 0:
+                    continue
+                covered |= mask
+                poly = extract_polygon(mask, simplify_epsilon_pct=epsilon)
+                if len(poly) < 3:
+                    continue
+                try:
+                    validate_polygon(poly, page_dims=(h, w), max_area_pct=max_area_pct)
+                except PolygonValidationError:
+                    continue
+                # GUARD: the fill must contain the seed that produced it, else the
+                # simplified contour escaped into a different space (wrong-room fill).
+                # NB: we test the producing grid seed (sx, sy) — NOT the raw label
+                # centre — because on many LT plans the printed room-number label
+                # lands on ink / a callout geometrically OUTSIDE the room polygon
+                # (verified on Beržų 103-110), which would wrongly reject correct
+                # fills. The producing seed is always in the room's white basin, so
+                # this rejects only genuinely leaked/degenerate contours.
+                if not point_in_polygon_px(poly, sx, sy):
+                    continue
+                area_px = float(cv2.contourArea(poly.reshape(-1, 1, 2).astype(np.int32)))
+                area_pct = area_px / page_area
+                area_err = None
+                if page_scale_m2_per_pct and room_plotas_m2:
+                    est_m2 = area_pct * page_scale_m2_per_pct
+                    area_err = abs(est_m2 - room_plotas_m2) / room_plotas_m2
+                candidates.append((poly, area_pct, area_err))
 
     if not candidates:
         return None
