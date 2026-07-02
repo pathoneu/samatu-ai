@@ -160,11 +160,15 @@ export default function InteriorWorkspace({
   const [detecting, setDetecting] = useState(false);
   const detectRanRef = useRef(false);
   useEffect(() => {
-    // 2026-06-17 (founder): auto flood-fill polygons disabled — the viewer now
-    // shows a clean room-number marker (centred on the existing room rect), not
-    // an auto-traced boundary. Accurate polygons stay available on demand via
-    // "Taisyti zoną". This also avoids the on-load CV cost + the PDF-cache churn.
-    const AUTO_DETECT_POLYGONS = false;
+    // 2026-06-17 (founder): auto flood-fill polygons disabled — the viewer showed
+    // a clean room-number marker (centred on the existing room rect), not an
+    // auto-traced boundary.
+    // 2026-07-02: re-enabled after the multi-seed accuracy lift (label seed +
+    // bbox-centroid) + seed-inside-polygon guard + ground-truth benchmark gate
+    // (Phase A: Beržų auto >= 8, wrong_room_fills = 0 on every project). The
+    // detector now traces walls where confident and emits a label-anchored
+    // marker_pct where it can't — never a fabricated coarse rectangle.
+    const AUTO_DETECT_POLYGONS = true;
     if (!AUTO_DETECT_POLYGONS) return;
     if (!pdfBlob || detectRanRef.current) return;
     const rooms = project.v8_rooms || project.patalpos || [];
@@ -204,8 +208,9 @@ export default function InteriorWorkspace({
               polygon_source: res.polygon_source,
               polygon_confidence: res.confidence,
               area_err: res.area_err,
+              marker_pct: res.marker_pct ?? null,
             }
-            : { polygon_source: res.polygon_source };  // manual_needed (keep bbox as 🔴 fallback)
+            : { polygon_source: res.polygon_source, marker_pct: res.marker_pct ?? null };
         }
         const updated = applyRoomPatch(project, patchByNr);
         updateProject(project.id, updated);
