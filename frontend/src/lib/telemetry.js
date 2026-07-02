@@ -4,7 +4,7 @@
  * Backend persists to JSONL; Sprint 4 reads to compare against manual baseline.
  */
 
-import { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase.js';
 
 export function createSession({ projectId, now = () => Date.now() }) {
   const startedAt = now();

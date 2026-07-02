@@ -5,7 +5,7 @@
  * ignored paint class and 1.8× absorption.
  */
 
-import { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase.js';
 
 export async function recompute({ rooms, edits, current_assumptions, pozicijos, context }) {
   const body = { rooms, edits, current_assumptions };
