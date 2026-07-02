@@ -5812,13 +5812,28 @@ async def detect_room_polygons_endpoint(
     px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
     page_w_pt, page_h_pt = float(w) * px_to_pt, float(h) * px_to_pt
 
+    from extractor.room_seeds import bbox_centroid_seed
+
     nrs = [str(r.get("nr")) for r in rooms if r.get("nr") is not None]
     plotas = {str(r.get("nr")): float(r.get("plotas_m2") or 0) for r in rooms}
-    seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
+    bbox_by_nr = {str(r.get("nr")): r.get("bbox_pct") for r in rooms if r.get("nr") is not None}
+    label_seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
 
-    # Two-pass: rectangularity-best fills → median page scale → area-prior pass.
+    # marker_pct = where to put the Tier-2 circled number: the printed label if
+    # pdfplumber found it, else the bbox centroid. Every room gets one if we have
+    # ANY location signal.
+    marker_by_nr: dict[str, list[float]] = {}
+    for nr in nrs:
+        if nr in label_seeds:
+            marker_by_nr[nr] = [label_seeds[nr][0], label_seeds[nr][1]]
+        else:
+            bc = bbox_centroid_seed(bbox_by_nr.get(nr))
+            if bc:
+                marker_by_nr[nr] = [bc[0], bc[1]]
+
+    # Two-pass scale calibration (unchanged) — seeded from label seeds.
     samples = []
-    for nr, (sx, sy) in seeds.items():
+    for nr, (sx, sy) in label_seeds.items():
         r0 = auto_room_polygon(raster, sx, sy)
         if r0 is not None:
             ap = float(_cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(_np.int32))) / (h * w)
@@ -5829,16 +5844,25 @@ async def detect_room_polygons_endpoint(
     results: dict[str, dict] = {}
     n_auto = n_manual = 0
     for nr in nrs:
-        if nr not in seeds:
+        marker = marker_by_nr.get(nr)
+        # Primary seed: label if present, else bbox centroid. Extra seed: the other one.
+        bc = bbox_centroid_seed(bbox_by_nr.get(nr))
+        label = label_seeds.get(nr)
+        primary = label or bc
+        if primary is None:
             results[nr] = {"polygon_source": "manual_needed", "confidence": "manual"}
             n_manual += 1
             continue
-        sx, sy = seeds[nr]
-        r = auto_room_polygon(raster, sx, sy, room_plotas_m2=plotas.get(nr) or None,
-                              page_scale_m2_per_pct=scale)
+        extra = [bc] if (label and bc) else []
+        r = auto_room_polygon(
+            raster, primary[0], primary[1], seeds_pct=extra,
+            room_plotas_m2=plotas.get(nr) or None, page_scale_m2_per_pct=scale,
+        )
         if r is None:
-            results[nr] = {"polygon_source": "manual_needed", "confidence": "manual",
-                           "label_pct": [sx, sy]}
+            res = {"polygon_source": "manual_needed", "confidence": "manual"}
+            if marker:
+                res["marker_pct"] = marker
+            results[nr] = res
             n_manual += 1
             continue
         poly_pct = [[float(x) / w, float(y) / h] for x, y in r.polygon_px]
@@ -5851,6 +5875,7 @@ async def detect_room_polygons_endpoint(
             "polygon_source": "auto_floodfill",
             "confidence": r.confidence,
             "area_err": r.area_err,
+            "marker_pct": marker,
         }
         n_auto += 1
 
