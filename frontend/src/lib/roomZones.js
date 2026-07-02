@@ -15,7 +15,7 @@
  */
 
 import { computeAreaConfidence } from './areaConfidence.js';
-import { getPolygonPctPoints, getBboxPctRect } from './planOverlayGeometry.js';
+import { getPolygonPctPoints } from './planOverlayGeometry.js';
 
 // paskirtis → hex. Moved verbatim from AiRoomOverlay (Kreo per-category hues)
 // so a glance reveals functional zones without reading labels.
@@ -50,35 +50,57 @@ export function confidenceHex(confidence) {
   return CONFIDENCE_HEX[confidence] || CONFIDENCE_HEX.unknown;
 }
 
-// polygon_source values that mean "we approximated the shape" → dashed border.
-const APPROXIMATE_POLYGON_SOURCES = new Set([
-  'synthesized_from_bbox', 'bbox_fallback', 'manual_needed',
-]);
+// A polygon whose source is in this set is NOT a real traced outline — the
+// polygon it may carry is a fabricated coarse rectangle, so the room becomes a
+// Tier-2 marker (circled number), never a solid zone.
+const NON_TRACED_SOURCES = new Set(['synthesized_from_bbox', 'bbox_fallback', 'manual_needed']);
+
+function markerCenter(room, { renderedWidth, renderedHeight }) {
+  // ONLY a reliable printed-number anchor (marker_pct = the backend's label seed,
+  // or label_pct) may place a marker. Do NOT fall back to the bbox centroid — on
+  // furnished/rotated plans Vision bboxes are garbage and a bbox-centroid marker
+  // is the "marked random places" failure. No anchor → null → the room falls to
+  // the honest "N patalpų be vietos" chip.
+  const mp = room.marker_pct || room.label_pct;
+  if (Array.isArray(mp) && mp.length === 2) {
+    return { cx: mp[0] * renderedWidth, cy: mp[1] * renderedHeight };
+  }
+  return null;
+}
 
 /**
  * buildRoomZone — one room → a render-ready descriptor, or null if the room
  * has no geometry we can honestly place on the plan.
  *
- * geometry is one of:
- *   { type: 'polygon', points: [[x,y], …] }   // from polygon_pct
- *   { type: 'rect', left, top, width, height } // from bbox_pct fallback
- * `approximate` is true when the shape is synthesized (dashed border in the UI).
+ * Three honest tiers:
+ *   Tier 1 (traced)  { type: 'polygon', points: [[x,y], …] }  — real flood-fill
+ *     outline (polygon_source NOT in NON_TRACED_SOURCES). approximate = false.
+ *   Tier 2 (located) { type: 'marker', cx, cy }               — no traced shape
+ *     but a label-anchored marker_pct/label_pct exists. approximate = true.
+ *   Tier 3 (no place) → null                                  — no polygon and
+ *     no anchor; surfaced by countRoomsMissingGeometry as the "be vietos" chip.
+ * A coarse bbox rectangle is NEVER drawn.
  */
 export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
   if (!room || !renderedWidth || !renderedHeight) return null;
 
+  const traced = room.polygon_pct && !NON_TRACED_SOURCES.has(room.polygon_source);
   let geometry = null;
   let approximate = false;
 
-  const polyPoints = getPolygonPctPoints(room.polygon_pct, { renderedWidth, renderedHeight });
-  if (polyPoints) {
-    geometry = { type: 'polygon', points: polyPoints };
-    approximate = APPROXIMATE_POLYGON_SOURCES.has(room.polygon_source);
-  } else {
-    const rect = getBboxPctRect(room.bbox_pct, { width: renderedWidth, height: renderedHeight });
-    if (rect) {
-      geometry = { type: 'rect', ...rect };
-      approximate = true; // a bbox rectangle is never an exact room outline
+  if (traced) {
+    const polyPoints = getPolygonPctPoints(room.polygon_pct, { renderedWidth, renderedHeight });
+    if (polyPoints) {
+      geometry = { type: 'polygon', points: polyPoints };
+      approximate = false;
+    }
+  }
+  if (!geometry) {
+    // Tier 2: circled-number marker at the printed label (label-anchored only).
+    const c = markerCenter(room, { renderedWidth, renderedHeight });
+    if (c) {
+      geometry = { type: 'marker', cx: c.cx, cy: c.cy };
+      approximate = true;
     }
   }
 

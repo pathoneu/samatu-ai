@@ -36,11 +36,12 @@ import { buildRoomZone } from './roomZones.js';
 
 const SIZE = { renderedWidth: 1000, renderedHeight: 800 };
 
-// A real-shaped eksplikacija room WITH a polygon (synthesized from bbox).
+// A real-shaped eksplikacija room WITH a REAL traced polygon (flood-fill).
+// (Only a source NOT in NON_TRACED_SOURCES renders as a solid Tier-1 polygon.)
 const roomPolygon = {
   nr: '102', pavadinimas: 'Svetainė/virtuvė', paskirtis: 'valgomasis',
   puslapio_nr: 2, plotas_m2: 50.54, plotas_saltinis: 'eksplikacija',
-  polygon_source: 'synthesized_from_bbox',
+  polygon_source: 'auto_floodfill',
   polygon_pct: [[0.1, 0.13], [0.5, 0.13], [0.5, 0.55], [0.1, 0.55]],
   bbox_pct: { x: 0.1, y: 0.13, w: 0.4, h: 0.42 },
 };
@@ -66,9 +67,10 @@ test('buildRoomZone: eksplikacija area → high confidence, green dot', () => {
   assert.equal(z.areaLabel, '50,5 m²');                    // lt-LT, 1 decimal
 });
 
-test('buildRoomZone: synthesized polygon is flagged approximate', () => {
+test('buildRoomZone: traced flood-fill polygon is NOT approximate', () => {
   const z = buildRoomZone(roomPolygon, SIZE);
-  assert.equal(z.approximate, true);                       // polygon_source synthesized
+  assert.equal(z.geometry.type, 'polygon');
+  assert.equal(z.approximate, false);                      // real traced outline
 });
 
 test('buildRoomZone: real/manual polygon is NOT approximate', () => {
@@ -76,17 +78,29 @@ test('buildRoomZone: real/manual polygon is NOT approximate', () => {
   assert.equal(z.approximate, false);
 });
 
-test('buildRoomZone: no polygon → bbox rect fallback, always approximate', () => {
+test('buildRoomZone: synthesized_from_bbox polygon is a fake rect → not traced', () => {
+  // A synthesized polygon is a fabricated coarse rectangle; with no label anchor
+  // it is NEVER drawn (no solid zone, no rect) — the room falls to Tier 3 (null).
+  const z = buildRoomZone(
+    { ...roomPolygon, polygon_source: 'synthesized_from_bbox' }, SIZE);
+  assert.equal(z, null);
+});
+
+test('buildRoomZone: synthesized_from_bbox WITH marker_pct → located marker, not a polygon', () => {
+  const z = buildRoomZone(
+    { ...roomPolygon, polygon_source: 'synthesized_from_bbox', marker_pct: [0.3, 0.4] }, SIZE);
+  assert.equal(z.geometry.type, 'marker');
+  assert.deepEqual([z.geometry.cx, z.geometry.cy], [300, 320]);  // 0.3*1000, 0.4*800
+  assert.equal(z.approximate, true);
+});
+
+test('buildRoomZone: no polygon, only bbox (no anchor) → null (no rect fallback)', () => {
   const z = buildRoomZone({
     nr: '101', pavadinimas: 'Tambūras', paskirtis: 'tamburas',
     puslapio_nr: 2, plotas_m2: 11.01, plotas_saltinis: 'eksplikacija',
     bbox_pct: { x: 0.1, y: 0.13, w: 0.4, h: 0.42 },
   }, SIZE);
-  assert.equal(z.geometry.type, 'rect');
-  assert.equal(z.geometry.left, 100);
-  assert.equal(z.geometry.width, 400);
-  assert.equal(z.approximate, true);
-  assert.equal(z.color, '#64748b');                        // tamburas
+  assert.equal(z, null);                                   // bbox-centroid marker is banned
 });
 
 test('buildRoomZone: vision-sourced area → low confidence (red)', () => {
@@ -117,6 +131,52 @@ test('buildRoomZone: plotas_m2 null → unknown confidence, empty areaLabel', ()
   assert.equal(z.confidence, 'unknown');
   assert.equal(z.confidenceColor, '#9ca3af');
   assert.equal(z.areaLabel, '');
+});
+
+// ── Three-tier geometry (Task C1): traced polygon / located marker / null ──
+// markerCenter is label-anchored ONLY: marker_pct || label_pct. A bbox WITHOUT
+// an anchor never produces a marker (bbox-centroid markers = "marked random
+// places" on furnished plans) — that room falls to the Tier-3 "be vietos" chip.
+
+test('C1(a): real auto_floodfill polygon → solid polygon tier, not approximate', () => {
+  const z = buildRoomZone(
+    { nr: '101', polygon_pct: [[0.1, 0.1], [0.3, 0.1], [0.3, 0.3]], polygon_source: 'auto_floodfill' },
+    { renderedWidth: 1000, renderedHeight: 1000 });
+  assert.equal(z.geometry.type, 'polygon');
+  assert.equal(z.approximate, false);
+});
+
+test('C1(b): manual_needed with marker_pct → marker tier at the printed label', () => {
+  const z = buildRoomZone(
+    { nr: '108', polygon_source: 'manual_needed', marker_pct: [0.55, 0.30] },
+    { renderedWidth: 1000, renderedHeight: 2000 });
+  assert.equal(z.geometry.type, 'marker');
+  assert.deepEqual([z.geometry.cx, z.geometry.cy], [550, 600]);  // 0.55*1000, 0.30*2000
+  assert.equal(z.approximate, true);
+});
+
+test('C1(c): manual_needed with label_pct (no marker_pct) → marker at label_pct', () => {
+  const z = buildRoomZone(
+    { nr: '109', polygon_source: 'manual_needed', label_pct: [0.40, 0.25] },
+    { renderedWidth: 1000, renderedHeight: 2000 });
+  assert.equal(z.geometry.type, 'marker');
+  assert.deepEqual([z.geometry.cx, z.geometry.cy], [400, 500]);  // 0.40*1000, 0.25*2000
+  assert.equal(z.approximate, true);
+});
+
+test('C1(d): synthesized_from_bbox with only bbox_pct (no anchor) → null (Tier 3)', () => {
+  const z = buildRoomZone(
+    { nr: '102',
+      polygon_pct: [[0.1, 0.13], [0.5, 0.13], [0.5, 0.55], [0.1, 0.55]],
+      polygon_source: 'synthesized_from_bbox', bbox_pct: { x: 0.1, y: 0.13, w: 0.4, h: 0.42 } },
+    { renderedWidth: 1000, renderedHeight: 1000 });
+  assert.equal(z, null);
+});
+
+test('C1(e): no geometry, no anchor → null (Tier 3, counted as missing)', () => {
+  const z = buildRoomZone({ nr: '900', polygon_source: 'manual_needed' },
+    { renderedWidth: 1000, renderedHeight: 1000 });
+  assert.equal(z, null);
 });
 
 import { buildPageRoomZones, countRoomsMissingGeometry } from './roomZones.js';
