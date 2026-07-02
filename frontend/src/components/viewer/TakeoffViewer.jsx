@@ -62,11 +62,19 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               <span>Taisyti zoną</span>
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-[#eef4fb] border border-[#cfe0f2] text-[#2a6fb5]">
-              <span>Spustelėkite patalpos {fillFor} viduje</span>
+            /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
+            <span className="inline-flex items-center gap-1">
               <button
-                className="p-0.5 rounded hover:bg-[#dceafa]"
-                title="Atšaukti"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#eef4fb] border border-[#cfe0f2] text-[#2a6fb5]"
+                title={`Taisyti patalpos ${fillFor} zoną — spustelėkite plane`}
+                onClick={onCancelFill}
+              >
+                <SquarePen className="w-3.5 h-3.5" />
+                <span>Taisyti zoną</span>
+              </button>
+              <button
+                className="p-1 rounded hover:bg-[#efece6]"
+                title="Atšaukti (Esc)"
                 onClick={onCancelFill}
               >
                 <X className="w-3.5 h-3.5" />
@@ -75,6 +83,50 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ISO A sheet sizes in mm (portrait). Matched in either orientation, ±2mm.
+const ISO_A_SIZES = [
+  ['A4', 210, 297],
+  ['A3', 297, 420],
+  ['A2', 420, 594],
+  ['A1', 594, 841],
+  ['A0', 841, 1189],
+];
+
+function isoALabel(wMm, hMm) {
+  const lo = Math.min(wMm, hMm);
+  const hi = Math.max(wMm, hMm);
+  const hit = ISO_A_SIZES.find(([, a, b]) => Math.abs(lo - a) <= 2 && Math.abs(hi - b) <= 2);
+  return hit ? hit[0] : null;
+}
+
+/**
+ * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
+ * fill-mode hint or scale placeholder (real scale arrives with Phase 3).
+ */
+function StatusBar({ documentId, totalPages, pages, fillFor }) {
+  const { state: zoom } = useZoom(documentId);
+  const { state: scroll } = useScroll(documentId);
+  const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
+  const cur = scroll?.currentPage ?? 1;
+  const size = pages?.[cur - 1]?.size;
+  let sheet = null;
+  if (size?.width && size?.height) {
+    const wMm = Math.round((size.width * 25.4) / 72);
+    const hMm = Math.round((size.height * 25.4) / 72);
+    const label = isoALabel(wMm, hMm);
+    sheet = `${wMm}×${hMm} mm${label ? ` (${label})` : ''}`;
+  }
+  return (
+    <div className="h-6 shrink-0 bg-[#fbfaf7] border-t border-[#e6e2da] text-[11px] text-[#8a857d] px-3 flex items-center gap-3">
+      <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
+      {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
+      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[#2a6fb5]' : ''}`}>
+        {fillFor != null ? `Spustelėkite patalpos ${fillFor} viduje` : 'Mastelis: nekalibruotas'}
+      </span>
     </div>
   );
 }
@@ -275,6 +327,12 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
               </Viewport>
             </ZoomGestureWrapper>
           </div>
+          <StatusBar
+            documentId={activeDocumentId}
+            totalPages={totalPages}
+            pages={documentState?.document?.pages}
+            fillFor={fillFor}
+          />
         </div>
         );
       }}
