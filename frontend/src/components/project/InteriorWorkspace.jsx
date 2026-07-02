@@ -318,6 +318,7 @@ export default function InteriorWorkspace({
               hoveredRoomNrExternal={hoveredRoomNr}
               projectId={project.id}
               pdfBlob={pdfBlob}
+              onClearFocus={() => setLocalFocusedRoom(null)}
               onRoomPolygonFill={handleRoomPolygonFill}
               onRoomZoneClick={(room) => {
                 if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);

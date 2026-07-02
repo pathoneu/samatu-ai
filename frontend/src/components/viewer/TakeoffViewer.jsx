@@ -39,16 +39,16 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
-      <button className={btn} title="Ankstesnis puslapis" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPreviousPage()}><ChevronLeft className="w-4 h-4" /></button>
+      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPreviousPage()}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
-      <button className={btn} title="Kitas puslapis" disabled={cur >= total} onClick={() => scrollApi?.scrollToNextPage()}><ChevronRight className="w-4 h-4" /></button>
+      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => scrollApi?.scrollToNextPage()}><ChevronRight className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
-      <button className={btn} title="Tolinti" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
+      <button className={btn} title="Tolinti (−)" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
       <span className="mono tabular w-11 text-center">{pct}%</span>
-      <button className={btn} title="Artinti" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
+      <button className={btn} title="Artinti (+)" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
-      <button className={btn} title="Pritaikyti plotį" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
-      <button className={btn} title="Visas puslapis" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
+      <button className={btn} title="Pritaikyti plotį (1)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
+      <button className={btn} title="Visas puslapis (0)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
       {canFill && (
         <>
           <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
@@ -122,6 +122,43 @@ function ThumbnailRail({ documentId }) {
   );
 }
 
+/**
+ * ViewerHotkeys — the viewer keyboard contract (Task 2.2), one window keydown
+ * listener. Guarded: typing surfaces (input/textarea/select/contentEditable)
+ * and browser combos (meta/ctrl) are never intercepted.
+ *   +/= zoom in · − zoom out · 0 fit page · 1 fit width ·
+ *   ]/PageDown next page · [/PageUp prev page · T thumbnail rail ·
+ *   Esc cancel fill-mode, else clear focused room.
+ */
+function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs }) {
+  const { provides: zoomApi } = useZoom(documentId);
+  const { provides: scrollApi } = useScroll(documentId);
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey) return; // leave browser/app combos alone
+      switch (e.key) {
+        case '+': case '=': e.preventDefault(); zoomApi?.zoomIn(); break;
+        case '-': e.preventDefault(); zoomApi?.zoomOut(); break;
+        case '0': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitPage); break;
+        case '1': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitWidth); break;
+        case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
+        case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
+        case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
+        case 'Escape':
+          if (fillArmed) { e.preventDefault(); onCancelFill?.(); }
+          else onClearFocus?.();
+          break;
+        default: break;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs]);
+  return null;
+}
+
 // Scroll the viewport to a focused room's page when it changes (panel → canvas nav).
 function FocusScroller({ documentId, focusedRoom }) {
   const { provides: scrollApi } = useScroll(documentId);
@@ -134,7 +171,7 @@ function FocusScroller({ documentId, focusedRoom }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, projectId, pdfBlob, onRoomPolygonFill }) {
+function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -208,6 +245,13 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             onToggleThumbs={() => setRailOpen(!railOpen)}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
+          <ViewerHotkeys
+            documentId={activeDocumentId}
+            fillArmed={fillFor != null}
+            onCancelFill={() => setFillFor(null)}
+            onClearFocus={onClearFocus}
+            onToggleThumbs={() => setRailOpen(!railOpen)}
+          />
           <div className="flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
@@ -246,6 +290,7 @@ export default function TakeoffViewer({
   hoveredRoomNrExternal = null,
   onRoomZoneClick = null,
   onPagePoint = null,
+  onClearFocus = null,
   projectId = null,
   pdfBlob = null,
   onRoomPolygonFill = null,
@@ -264,6 +309,7 @@ export default function TakeoffViewer({
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           onRoomZoneClick={onRoomZoneClick}
           onPagePoint={onPagePoint}
+          onClearFocus={onClearFocus}
           projectId={projectId}
           pdfBlob={pdfBlob}
           onRoomPolygonFill={onRoomPolygonFill}
