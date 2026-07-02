@@ -665,12 +665,15 @@ Add a helper near the top of `roomZones.js`:
 const NON_TRACED_SOURCES = new Set(['synthesized_from_bbox', 'bbox_fallback', 'manual_needed']);
 
 function markerCenter(room, { renderedWidth, renderedHeight }) {
+  // ONLY a reliable printed-number anchor (marker_pct = the backend's label seed,
+  // or label_pct) may place a marker. Do NOT fall back to the bbox centroid — on
+  // furnished/rotated plans Vision bboxes are garbage and a bbox-centroid marker
+  // is the "marked random places" failure. No anchor → null → the room falls to
+  // the honest "N patalpų be vietos" chip.
   const mp = room.marker_pct || room.label_pct;
   if (Array.isArray(mp) && mp.length === 2) {
     return { cx: mp[0] * renderedWidth, cy: mp[1] * renderedHeight };
   }
-  const rect = getBboxPctRect(room.bbox_pct, { width: renderedWidth, height: renderedHeight });
-  if (rect) return { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
   return null;
 }
 ```
