@@ -11,11 +11,11 @@ import { makeViewport } from '@/lib/viewerEngine/pageViewport';
 import { rotateRoomGeometry, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 
-function PageClicks({ documentId, pageIndex, onPagePoint }) {
+function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, onPagePoint }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
   useEffect(() => register({
-    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y }),
-  }), [register, pageIndex, onPagePoint]);
+    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight }),
+  }), [register, pageIndex, pageWidth, pageHeight, onPagePoint]);
   return null;
 }
 
@@ -41,7 +41,7 @@ export default function PageOverlayHost({ documentId, layout, rooms, pageRotatio
     <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
       <RenderLayer documentId={documentId} pageIndex={layout.pageIndex} />
       <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} onPagePoint={onPagePoint} />
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={width} pageHeight={height} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <RoomZoneLayer

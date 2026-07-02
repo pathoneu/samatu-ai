@@ -324,6 +324,9 @@ export default function InteriorWorkspace({
               fileUrl={pdfUrl}
               rooms={project?.v8_rooms || project?.patalpos || []}
               focusedRoom={effectiveFocusedRoom}
+              projectId={project.id}
+              pdfBlob={pdfBlob}
+              onRoomPolygonFill={handleRoomPolygonFill}
               onRoomZoneClick={(room) => {
                 if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
                 setLocalFocusedRoom(room);
