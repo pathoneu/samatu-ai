@@ -88,13 +88,17 @@ const SYMBOL_CATEGORIES = {
   radiatoriai: 'Šildymas',
 };
 
-// Viewer-engine toggle: ?viewer=embed (or localStorage samatu_viewer_engine=embed)
-// renders the new EmbedPDF TakeoffViewer; otherwise the current PlanViewer stays default.
+// Viewer engine: the new EmbedPDF TakeoffViewer is now the DEFAULT. Opt back into
+// the legacy react-pdf PlanViewer with ?viewer=legacy (or localStorage
+// samatu_viewer_engine=legacy) — kept as a one-flag safety net until the remaining
+// tools (click-to-fill, symbol-count) are re-homed and parity is confirmed.
 function viewerEngineIsEmbed() {
   try {
-    return new URLSearchParams(window.location.search).get('viewer') === 'embed'
-      || localStorage.getItem('samatu_viewer_engine') === 'embed';
-  } catch { return false; }
+    const q = new URLSearchParams(window.location.search).get('viewer');
+    if (q === 'legacy') return false;
+    if (q === 'embed') return true;
+    return localStorage.getItem('samatu_viewer_engine') !== 'legacy';
+  } catch { return true; }
 }
 
 export default function InteriorWorkspace({
