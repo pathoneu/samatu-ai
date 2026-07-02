@@ -24,6 +24,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
+import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
@@ -86,6 +87,15 @@ const SYMBOL_CATEGORIES = {
   skalbimo_masinos: 'Santechnika',
   radiatoriai: 'Šildymas',
 };
+
+// Viewer-engine toggle: ?viewer=embed (or localStorage samatu_viewer_engine=embed)
+// renders the new EmbedPDF TakeoffViewer; otherwise the current PlanViewer stays default.
+function viewerEngineIsEmbed() {
+  try {
+    return new URLSearchParams(window.location.search).get('viewer') === 'embed'
+      || localStorage.getItem('samatu_viewer_engine') === 'embed';
+  } catch { return false; }
+}
 
 export default function InteriorWorkspace({
   project,
@@ -300,6 +310,18 @@ export default function InteriorWorkspace({
           </div>
         )}
         {pdfUrl ? (
+          viewerEngineIsEmbed() ? (
+            <TakeoffViewer
+              fileUrl={pdfUrl}
+              rooms={project?.v8_rooms || project?.patalpos || []}
+              focusedRoom={effectiveFocusedRoom}
+              onRoomZoneClick={(room) => {
+                if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
+                setLocalFocusedRoom(room);
+                onJumpToPage?.(room.puslapio_nr, room);
+              }}
+            />
+          ) : (
           <PlanViewer
             fileUrl={pdfUrl}
             pageMeta={pageMetaDict}
@@ -357,6 +379,7 @@ export default function InteriorWorkspace({
               updateProject(project.id, { ...project, darbu_sarasas: darbai });
             }}
           />
+          )
         ) : pdfMissing ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
             <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />

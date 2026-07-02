@@ -13,6 +13,17 @@
     "test:units": "node --test src/lib/*.test.js"
   },
   "dependencies": {
+    "@embedpdf/core": "^2.14.4",
+    "@embedpdf/engines": "^2.14.4",
+    "@embedpdf/pdfium": "^2.14.4",
+    "@embedpdf/plugin-document-manager": "^2.14.4",
+    "@embedpdf/plugin-interaction-manager": "^2.14.4",
+    "@embedpdf/plugin-pan": "^2.14.4",
+    "@embedpdf/plugin-render": "^2.14.4",
+    "@embedpdf/plugin-scroll": "^2.14.4",
+    "@embedpdf/plugin-tiling": "^2.14.4",
+    "@embedpdf/plugin-viewport": "^2.14.4",
+    "@embedpdf/plugin-zoom": "^2.14.4",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
