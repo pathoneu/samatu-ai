@@ -101,6 +101,16 @@ def flood_fill_from_click(binary: np.ndarray, click_x: int, click_y: int) -> np.
     return (src == 128).astype(np.uint8)
 
 
+def point_in_polygon_px(polygon_px, x: float, y: float) -> bool:
+    """True if pixel (x, y) is inside or on the polygon. Used to reject
+    'wrong room' fills — the seed that produced a polygon must lie within it,
+    else the flood escaped into a different space (the 'marked random places'
+    bug)."""
+    contour = np.asarray(polygon_px, dtype=np.int32).reshape(-1, 1, 2)
+    # measureDist=False → +1 inside, 0 on edge, -1 outside
+    return cv2.pointPolygonTest(contour, (float(x), float(y)), False) >= 0
+
+
 def extract_polygon(mask: np.ndarray, simplify_epsilon_pct: float = 1.0) -> np.ndarray:
     """Find external contour of the mask + Douglas-Peucker simplify.
 
