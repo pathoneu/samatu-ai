@@ -20,7 +20,9 @@ export async function detectRoomPolygons({ projectId, pageNr, rooms, pdfBlob = n
   const fd = new FormData();
   fd.set('page_nr', String(pageNr));
   fd.set('rooms_json', JSON.stringify(
-    (rooms || []).map((r) => ({ nr: String(r.nr), plotas_m2: r.plotas_m2 ?? r.plotas ?? 0 }))));
+    (rooms || []).map((r) => ({
+      nr: String(r.nr), plotas_m2: r.plotas_m2 ?? r.plotas ?? 0, bbox_pct: r.bbox_pct ?? null,
+    }))));
   if (pdfBlob) fd.set('pdf_file', pdfBlob, pdfBlob.name || 'project.pdf');
   try {
     const res = await fetch(`${API_BASE}/api/projects/${projectId}/detect-room-polygons`, {
