@@ -70,3 +70,22 @@ def calibrate_page_scale(area_pcts_to_m2: list[tuple[float, float]]) -> float | 
     ratios.sort()
     n = len(ratios)
     return ratios[n // 2] if n % 2 else (ratios[n // 2 - 1] + ratios[n // 2]) / 2
+
+
+def bbox_centroid_seed(bbox_pct) -> tuple[float, float] | None:
+    """Room-interior seed (x_pct, y_pct) from a Vision bbox_pct {x,y,w,h}.
+
+    The pdfplumber label seed lands on the printed room NUMBER, which on many LT
+    plans is a callout in the corridor away from the room. The bbox centroid
+    points INSIDE the room, so it is a much better flood-fill seed. Returns None
+    for missing / zero-size bboxes."""
+    if not isinstance(bbox_pct, dict):
+        return None
+    try:
+        x, y = float(bbox_pct.get("x")), float(bbox_pct.get("y"))
+        w, h = float(bbox_pct.get("w")), float(bbox_pct.get("h"))
+    except (TypeError, ValueError):
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    return (round(x + w / 2, 4), round(y + h / 2, 4))
