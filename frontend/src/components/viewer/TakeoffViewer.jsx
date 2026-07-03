@@ -16,14 +16,27 @@ import { Scroller, useScroll } from '@embedpdf/plugin-scroll/react';
 import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-manager/react';
 import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { DEFAULT_COUNT_TYPES } from '@/lib/measurements';
+import { uncalibratedScale } from '@/lib/measureGeometry';
 import PageOverlayHost from './PageOverlayHost';
+import CalibrateDialog from './CalibrateDialog';
+import CountLegendPanel from './CountLegendPanel';
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs }) {
+// Measurement tool palette (Phase 3). 'select' exists so committed measurements
+// can be picked (→ delete affordance); drawing keys 2/3/6 match the hotkeys.
+const MEASURE_TOOLS = [
+  { id: 'select', Icon: MousePointer2, title: 'Žymėti matavimą' },
+  { id: 'distance', Icon: Ruler, title: 'Atstumas (2)' },
+  { id: 'area', Icon: Pentagon, title: 'Plotas (3)' },
+  { id: 'count', Icon: Hash, title: 'Skaičiuoti (6)' },
+  { id: 'calibrate', Icon: Scaling, title: 'Kalibruoti mastelį' },
+];
+
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -31,6 +44,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
   const total = totalPages || 1;
   const btn = 'p-1 rounded hover:bg-[#efece6] disabled:opacity-40 disabled:hover:bg-transparent';
+  const pressed = 'p-1 rounded bg-[#eef4fb] text-[#2a6fb5]';
   const canFill = focusedRoomNr != null && onStartFill;
   return (
     <div className="h-9 shrink-0 border-b border-[#e6e2da] bg-[#fbfaf7] px-3 flex items-center gap-1 text-[12px] text-[#4a4640]">
@@ -50,6 +64,33 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
       <button className={btn} title="Pritaikyti plotį (1)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
       <button className={btn} title="Visas puslapis (0)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
+      {onMeasureTool && (
+        <>
+          <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+          {MEASURE_TOOLS.map(({ id, Icon, title }) => (
+            <button
+              key={id}
+              className={measureTool === id ? pressed : btn}
+              title={title}
+              aria-pressed={measureTool === id}
+              onClick={() => onMeasureTool(id)}
+            ><Icon className="w-4 h-4" /></button>
+          ))}
+          <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+          <button
+            className={snapEnabled ? pressed : btn}
+            title="Pritraukti prie taškų"
+            aria-pressed={!!snapEnabled}
+            onClick={onToggleSnap}
+          ><Magnet className="w-4 h-4" /></button>
+          <button
+            className={(orthoEnabled ? pressed : btn) + ' w-7'}
+            title="Statmenai (Shift)"
+            aria-pressed={!!orthoEnabled}
+            onClick={onToggleOrtho}
+          ><span className="mono text-[10px] leading-none">90°</span></button>
+        </>
+      )}
       {canFill && (
         <>
           <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
@@ -104,11 +145,22 @@ function isoALabel(wMm, hMm) {
   return hit ? hit[0] : null;
 }
 
+// Human scale text for the status bar. PageScale stores metres of reality per
+// PDF point; 1 pt = 1/72 inch of paper, so ratio = mpp / (0.0254/72). A named
+// label (e.g. standard "1:50") wins over the computed ratio.
+function scaleStatusText(pageScale) {
+  if (!pageScale?.calibrated) return 'Mastelis: nekalibruotas';
+  if (pageScale.label) return `Mastelis: ${pageScale.label}`;
+  const mpp = pageScale.metersPerPointX || 0;
+  const ratio = mpp > 0 ? Math.round((mpp * 72) / 0.0254) : 0;
+  return ratio > 0 ? `Mastelis: 1:${ratio}` : 'Mastelis: kalibruotas';
+}
+
 /**
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
- * fill-mode hint or scale placeholder (real scale arrives with Phase 3).
+ * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, measureScales }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -121,12 +173,14 @@ function StatusBar({ documentId, totalPages, pages, fillFor }) {
     const label = isoALabel(wMm, hMm);
     sheet = `${wMm}×${hMm} mm${label ? ` (${label})` : ''}`;
   }
+  const pageScale = measureScales?.[cur];
+  const scaleText = scaleStatusText(pageScale);
   return (
     <div className="h-6 shrink-0 bg-[#fbfaf7] border-t border-[#e6e2da] text-[11px] text-[#8a857d] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
-      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[#2a6fb5]' : ''}`}>
-        {fillFor != null ? `Spustelėkite patalpos ${fillFor} viduje` : 'Mastelis: nekalibruotas'}
+      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[#2a6fb5]' : (pageScale?.calibrated ? 'text-[#4a4640]' : '')}`}>
+        {fillFor != null ? `Spustelėkite patalpos ${fillFor} viduje` : scaleText}
       </span>
     </div>
   );
@@ -176,14 +230,18 @@ function ThumbnailRail({ documentId }) {
 }
 
 /**
- * ViewerHotkeys — the viewer keyboard contract (Task 2.2), one window keydown
- * listener. Guarded: typing surfaces (input/textarea/select/contentEditable)
- * and browser combos (meta/ctrl) are never intercepted.
+ * ViewerHotkeys — the viewer keyboard contract (Task 2.2 + 3.3), one window
+ * keydown listener. Guarded: typing surfaces (input/textarea/select/content-
+ * Editable) and browser combos (meta/ctrl) are never intercepted.
  *   +/= zoom in · − zoom out · 0 fit page · 1 fit width ·
  *   ]/PageDown next page · [/PageUp prev page · T thumbnail rail ·
- *   Esc cancel fill-mode, else clear focused room.
+ *   2 distance · 3 area · 6 count (measure tools; ignored while fill armed) ·
+ *   Delete/Backspace delete the selected measurement (select mode only, so it
+ *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
+ *   Esc chain: measure (close calibration dialog / drop tool) → cancel
+ *   fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs }) {
+function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { provides: scrollApi } = useScroll(documentId);
   useEffect(() => {
@@ -196,11 +254,18 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
         case '-': e.preventDefault(); zoomApi?.zoomOut(); break;
         case '0': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitPage); break;
         case '1': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitWidth); break;
+        case '2': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('distance'); } break;
+        case '3': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('area'); } break;
+        case '6': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('count'); } break;
         case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
         case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
         case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
+        case 'Delete': case 'Backspace':
+          if (canDeleteSelected) { e.preventDefault(); onDeleteSelected?.(); }
+          break;
         case 'Escape':
-          if (fillArmed) { e.preventDefault(); onCancelFill?.(); }
+          if (onMeasureEscape?.()) e.preventDefault();
+          else if (fillArmed) { e.preventDefault(); onCancelFill?.(); }
           else onClearFocus?.();
           break;
         default: break;
@@ -208,7 +273,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs]);
+  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected]);
   return null;
 }
 
@@ -260,15 +325,30 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
     setMeasurements((prev) => prev.filter((m) => m.id !== id));
     setSelectedMeasureId((cur) => (cur === id ? null : cur));
   };
+  // Esc chain, measure segment: close the calibration dialog first, then drop
+  // the active tool (MeasureLayer resets its own draft when the tool changes).
+  const measureEscape = () => {
+    if (calibRequest) { setCalibRequest(null); return true; }
+    if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
+    return false;
+  };
+  const countTallies = useMemo(() => measurements.reduce((acc, m) => {
+    if (m.kind === 'count' && m.typeId) acc[m.typeId] = (acc[m.typeId] || 0) + 1;
+    return acc;
+  }, {}), [measurements]);
   // Persist measurement data to the parent (project save flow), DEBOUNCED, and
-  // skipping the mount pass so hydration never writes back immediately.
+  // skipping the mount pass so hydration never writes back immediately. The
+  // callback lives in a ref: the parent recreates it on every render (each save
+  // triggers onProjectChange → re-render), and depending on its identity would
+  // re-schedule saves of identical data forever.
+  const onMeasureDataChangeRef = useRef(onMeasureDataChange);
+  useEffect(() => { onMeasureDataChangeRef.current = onMeasureDataChange; });
   const measureDirtyRef = useRef(false);
   useEffect(() => {
-    if (!onMeasureDataChange) return undefined;
     if (!measureDirtyRef.current) { measureDirtyRef.current = true; return undefined; } // skip mount
-    const t = setTimeout(() => onMeasureDataChange({ measurements, measureScales }), 600);
+    const t = setTimeout(() => onMeasureDataChangeRef.current?.({ measurements, measureScales }), 600);
     return () => clearTimeout(t);
-  }, [measurements, measureScales, onMeasureDataChange]);
+  }, [measurements, measureScales]);
   // Thumbnail rail preference: null = "no explicit choice yet" → default OPEN
   // when the document has more than one page (resolved where pageCount is known).
   const [thumbsPref, setThumbsPref] = useState(() => {
@@ -334,6 +414,12 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             onCancelFill={() => setFillFor(null)}
             railOpen={railOpen}
             onToggleThumbs={() => setRailOpen(!railOpen)}
+            measureTool={measureTool}
+            onMeasureTool={armMeasureTool}
+            snapEnabled={snapEnabled}
+            onToggleSnap={() => setSnapEnabled((v) => !v)}
+            orthoEnabled={orthoEnabled}
+            onToggleOrtho={() => setOrthoEnabled((v) => !v)}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
           <ViewerHotkeys
@@ -342,8 +428,12 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             onCancelFill={() => setFillFor(null)}
             onClearFocus={onClearFocus}
             onToggleThumbs={() => setRailOpen(!railOpen)}
+            onMeasureToolKey={armMeasureTool}
+            onMeasureEscape={measureEscape}
+            canDeleteSelected={measureTool === 'select' && selectedMeasureId != null}
+            onDeleteSelected={() => deleteMeasurement(selectedMeasureId)}
           />
-          <div className="flex flex-1 min-h-0">
+          <div className="relative flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
               <Viewport documentId={activeDocumentId} style={{ height: '100%', background: '#e9e7e2' }}>
@@ -378,12 +468,40 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
                 />
               </Viewport>
             </ZoomGestureWrapper>
+            {/* Floating count-type legend while the count tool is armed. */}
+            {measureTool === 'count' && (
+              <div
+                className="absolute top-2 z-30 w-60 shadow-lg"
+                style={{ left: railOpen ? 156 : 8 }}
+              >
+                <CountLegendPanel
+                  countTypes={DEFAULT_COUNT_TYPES}
+                  activeCountTypeId={activeCountTypeId}
+                  onSelectType={setActiveCountTypeId}
+                  tallies={countTallies}
+                />
+              </div>
+            )}
           </div>
           <StatusBar
             documentId={activeDocumentId}
             totalPages={totalPages}
             pages={documentState?.document?.pages}
             fillFor={fillFor}
+            measureScales={measureScales}
+          />
+          <CalibrateDialog
+            request={calibRequest}
+            numPages={totalPages}
+            currentScale={calibRequest ? (measureScales[calibRequest.pageNr] || uncalibratedScale()) : null}
+            onConfirm={(scale, pages) => {
+              setMeasureScales((prev) => {
+                const next = { ...prev };
+                for (const p of (pages || [calibRequest.pageNr])) next[p] = scale;
+                return next;
+              });
+            }}
+            onClose={() => setCalibRequest(null)}
           />
         </div>
         );
@@ -404,6 +522,11 @@ export default function TakeoffViewer({
   projectId = null,
   pdfBlob = null,
   onRoomPolygonFill = null,
+  // Measurement persistence (Phase 3): hydrate from the project, report back
+  // debounced ({ measurements, measureScales }) for the project save flow.
+  initialMeasurements = null,
+  initialMeasureScales = null,
+  onMeasureDataChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(() => (fileUrl ? makeViewerPlugins(fileUrl) : null), [fileUrl]);
@@ -423,6 +546,9 @@ export default function TakeoffViewer({
           projectId={projectId}
           pdfBlob={pdfBlob}
           onRoomPolygonFill={onRoomPolygonFill}
+          initialMeasurements={initialMeasurements}
+          initialMeasureScales={initialMeasureScales}
+          onMeasureDataChange={onMeasureDataChange}
         />
       </EmbedPDF>
     </div>

@@ -249,6 +249,15 @@ export default function InteriorWorkspace({
     onProjectChange?.(updated);
   };
 
+  // Persist measurements + per-page calibration scales from the viewer's local
+  // state onto the project. New top-level keys (measurements / pageScalesDurable)
+  // ride the existing project JSON — zero backend changes. The viewer debounces.
+  const handleMeasureDataChange = ({ measurements, measureScales }) => {
+    const updated = { ...project, measurements, pageScalesDurable: measureScales };
+    updateProject(project.id, updated);
+    onProjectChange?.(updated);
+  };
+
   // Per-room canvas visibility handlers (panel eye toggles, Phase 1 declutter).
   const handleToggleRoomVisibility = (nr) => {
     const key = String(nr);
@@ -320,6 +329,9 @@ export default function InteriorWorkspace({
               pdfBlob={pdfBlob}
               onClearFocus={() => setLocalFocusedRoom(null)}
               onRoomPolygonFill={handleRoomPolygonFill}
+              initialMeasurements={project?.measurements || []}
+              initialMeasureScales={project?.pageScalesDurable || {}}
+              onMeasureDataChange={handleMeasureDataChange}
               onRoomZoneClick={(room) => {
                 if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
                 setLocalFocusedRoom(room);
