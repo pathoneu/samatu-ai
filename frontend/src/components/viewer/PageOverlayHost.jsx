@@ -12,6 +12,7 @@ import { useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { RenderLayer } from '@embedpdf/plugin-render/react';
 import { TilingLayer } from '@embedpdf/plugin-tiling/react';
+import { SearchLayer } from '@embedpdf/plugin-search/react';
 import { PagePointerProvider, usePointerHandlers } from '@embedpdf/plugin-interaction-manager/react';
 import { makeViewport } from '@/lib/viewerEngine/pageViewport';
 import { rotateRoomGeometry, displayRotationFor } from '@/lib/viewerEngine/pageRotation';
@@ -109,6 +110,9 @@ export default function PageOverlayHost({
     <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
       <RenderLayer documentId={documentId} pageIndex={layout.pageIndex} />
       <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
+      {/* Search hit highlights (Task 4.1) — page-glued, pointer-transparent,
+          below the room zones so measure/zone interactions are unaffected. */}
+      <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
       <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={width} pageHeight={height} pageRotation={pageRotation} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>

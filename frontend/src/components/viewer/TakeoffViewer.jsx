@@ -16,7 +16,8 @@ import { Scroller, useScroll } from '@embedpdf/plugin-scroll/react';
 import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-manager/react';
 import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet } from 'lucide-react';
+import { useSearch } from '@embedpdf/plugin-search/react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
@@ -36,7 +37,78 @@ const MEASURE_TOOLS = [
   { id: 'calibrate', Icon: Scaling, title: 'Kalibruoti mastelį' },
 ];
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho }) {
+/**
+ * SearchBox — inline toolbar search (Task 4.1). Debounced live query through
+ * useSearch; jumping is OURS (the plugin's goToResult only mutates state — it
+ * never scrolls), wired via onActiveResultChange → scrollToPage. The session
+ * dies with the box (unmount → stopSearch) so highlights never linger.
+ */
+function SearchBox({ documentId, onClose }) {
+  const { state: search, provides: searchApi } = useSearch(documentId);
+  const { provides: scrollApi } = useScroll(documentId);
+  const [query, setQuery] = useState('');
+  // Live query, debounced ~300ms. Empty string clears results (plugin API).
+  useEffect(() => {
+    if (!searchApi) return undefined;
+    const t = setTimeout(() => { searchApi.searchAllPages(query); }, 300);
+    return () => clearTimeout(t);
+  }, [query, searchApi]);
+  // Active hit changed (fresh search lands on 0, Enter/chevrons navigate) →
+  // scroll its page into view.
+  useEffect(() => {
+    if (!searchApi) return undefined;
+    return searchApi.onActiveResultChange((idx) => {
+      const hit = searchApi.getState().results[idx];
+      if (hit) scrollApi?.scrollToPage({ pageNumber: hit.pageIndex + 1, behavior: 'smooth' });
+    });
+  }, [searchApi, scrollApi]);
+  // stopSearch on unmount — via ref so the cleanup sees the live capability.
+  const searchApiRef = useRef(searchApi);
+  useEffect(() => { searchApiRef.current = searchApi; });
+  useEffect(() => () => { searchApiRef.current?.stopSearch(); }, []);
+  const total = search?.total ?? 0;
+  const committed = search?.query ?? '';
+  const hasQuery = committed !== '' && committed === query.trim();
+  // Raster honesty: only after OUR typed query finished searching with 0 hits.
+  const noHits = hasQuery && !search?.loading && total === 0;
+  const btn = 'p-1 rounded hover:bg-[#efece6] disabled:opacity-40 disabled:hover:bg-transparent';
+  return (
+    <span className="relative inline-flex items-center gap-1">
+      <input
+        autoFocus
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (e.shiftKey) searchApi?.previousResult(); else searchApi?.nextResult();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onClose?.();
+          }
+        }}
+        placeholder="Ieškoti brėžinyje…"
+        aria-label="Paieška dokumente"
+        className="w-44 h-6 px-2 rounded border border-[#e6e2da] bg-white text-[12px] text-[#4a4640] placeholder:text-[#b5b0a6] focus:outline-none focus:border-[#2a6fb5]"
+      />
+      {hasQuery && (
+        <span className="mono tabular text-[11px] text-[#8a857d] whitespace-nowrap px-0.5">
+          {total > 0 ? `${(search.activeResultIndex ?? 0) + 1} / ${total}` : '0 / 0'}
+        </span>
+      )}
+      <button className={btn} title="Ankstesnis rezultatas (Shift+Enter)" disabled={total === 0} onClick={() => searchApi?.previousResult()}><ChevronUp className="w-4 h-4" /></button>
+      <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
+      {noHits && (
+        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[#e6e2da] bg-[#fbfaf7] text-[11px] text-[#8a857d] whitespace-nowrap shadow-sm">
+          Rezultatų nėra — PDF gali neturėti teksto sluoksnio
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho, searchOpen, onToggleSearch, onCloseSearch }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -125,6 +197,16 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           )}
         </>
       )}
+      {/* Right group: search (print/download live here too). */}
+      <div className="ml-auto flex items-center gap-1">
+        {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
+        <button
+          className={searchOpen ? pressed : btn}
+          title="Paieška (Ctrl+F)"
+          aria-pressed={!!searchOpen}
+          onClick={onToggleSearch}
+        ><Search className="w-4 h-4" /></button>
+      </div>
     </div>
   );
 }
@@ -238,17 +320,23 @@ function ThumbnailRail({ documentId }) {
  *   2 distance · 3 area · 6 count (measure tools; ignored while fill armed) ·
  *   Delete/Backspace delete the selected measurement (select mode only, so it
  *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
- *   Esc chain: measure (close calibration dialog / drop tool) → cancel
- *   fill-mode → clear focused room.
+ *   Ctrl/Cmd+F or / open search · Esc chain: close search → measure (close
+ *   calibration dialog / drop tool) → cancel fill-mode → clear focused room.
+ *   (When focus is IN the search input, its own onKeyDown handles Esc —
+ *   the input guard below keeps this listener out of typing surfaces.)
  */
-function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected }) {
+function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { provides: scrollApi } = useScroll(documentId);
   useEffect(() => {
     const onKeyDown = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      if (e.metaKey || e.ctrlKey) return; // leave browser/app combos alone
+      if (e.metaKey || e.ctrlKey) {
+        // Our explicit combos; everything else stays with the browser.
+        if (!e.altKey && (e.key === 'f' || e.key === 'F') && onOpenSearch) { e.preventDefault(); onOpenSearch(); }
+        return;
+      }
       switch (e.key) {
         case '+': case '=': e.preventDefault(); zoomApi?.zoomIn(); break;
         case '-': e.preventDefault(); zoomApi?.zoomOut(); break;
@@ -260,11 +348,13 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
         case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
         case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
         case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
+        case '/': if (onOpenSearch) { e.preventDefault(); onOpenSearch(); } break;
         case 'Delete': case 'Backspace':
           if (canDeleteSelected) { e.preventDefault(); onDeleteSelected?.(); }
           break;
         case 'Escape':
-          if (onMeasureEscape?.()) e.preventDefault();
+          if (onSearchEscape?.()) e.preventDefault();
+          else if (onMeasureEscape?.()) e.preventDefault();
           else if (fillArmed) { e.preventDefault(); onCancelFill?.(); }
           else onClearFocus?.();
           break;
@@ -273,7 +363,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected]);
+  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape]);
   return null;
 }
 
@@ -330,6 +420,14 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const measureEscape = () => {
     if (calibRequest) { setCalibRequest(null); return true; }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
+    return false;
+  };
+  // ---- Text search (Task 4.1) ----------------------------------------------
+  // Open/closed only — query + results live in SearchBox (its unmount ends the
+  // plugin search session, clearing highlights).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchEscape = () => {
+    if (searchOpen) { setSearchOpen(false); return true; }
     return false;
   };
   const countTallies = useMemo(() => measurements.reduce((acc, m) => {
@@ -420,6 +518,9 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             onToggleSnap={() => setSnapEnabled((v) => !v)}
             orthoEnabled={orthoEnabled}
             onToggleOrtho={() => setOrthoEnabled((v) => !v)}
+            searchOpen={searchOpen}
+            onToggleSearch={() => setSearchOpen((v) => !v)}
+            onCloseSearch={() => setSearchOpen(false)}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
           <ViewerHotkeys
@@ -432,6 +533,8 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             onMeasureEscape={measureEscape}
             canDeleteSelected={measureTool === 'select' && selectedMeasureId != null}
             onDeleteSelected={() => deleteMeasurement(selectedMeasureId)}
+            onOpenSearch={() => setSearchOpen(true)}
+            onSearchEscape={searchEscape}
           />
           <div className="relative flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
