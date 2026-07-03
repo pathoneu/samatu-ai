@@ -96,6 +96,7 @@ def init_schema() -> None:
                 cache_read_tokens INTEGER,
                 elapsed_s       REAL,
                 cost_eur        REAL,
+                model           TEXT,                  -- W1.1 (2026-07-03)
                 extracted_at    TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_extr_project ON extractions(project_id);
@@ -113,6 +114,7 @@ def init_schema() -> None:
                 output_tokens     INTEGER,
                 cache_read_tokens INTEGER,
                 cost_eur          REAL,
+                model             TEXT,                -- W1.1 (2026-07-03)
                 created_at        TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_usage_user_time ON usage_events(user_id, created_at);
@@ -334,10 +336,13 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
     # constants in both backend and frontend).
     from pricing import calc_claude_cost_usd
     meta = response.get("_meta") or {}
+    model = meta.get("model") or "claude-opus-4-8"
     cost_usd = calc_claude_cost_usd(
         input_tokens=meta.get("input_tokens") or 0,
         output_tokens=meta.get("output_tokens") or 0,
         cache_read_tokens=meta.get("cache_read_tokens") or 0,
+        cache_write_tokens=meta.get("cache_write_tokens") or 0,
+        model=model,
     )
     cost_eur = cost_usd * 0.93  # rough USD→EUR
     with _conn() as c:
@@ -345,8 +350,8 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
             INSERT INTO extractions
                 (id, project_id, pdf_sha256, pdf_size_bytes, pdf_page_count,
                  raw_response, input_tokens, output_tokens, cache_read_tokens,
-                 elapsed_s, cost_eur, extracted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 elapsed_s, cost_eur, model, extracted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             extraction_id, project_id, pdf_sha256, pdf_size, page_count,
             json.dumps(response, ensure_ascii=False),
@@ -355,6 +360,7 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
             int(meta.get("cache_read_tokens") or 0),
             meta.get("elapsed_s") or response.get("_elapsed_s"),
             round(cost_eur, 4),
+            model,
             _now_iso(),
         ))
 
@@ -364,7 +370,7 @@ def list_extractions(project_id: str) -> list[dict]:
         rows = c.execute("""
             SELECT id, pdf_sha256, pdf_size_bytes, pdf_page_count,
                    input_tokens, output_tokens, cache_read_tokens,
-                   elapsed_s, cost_eur, extracted_at
+                   elapsed_s, cost_eur, model, extracted_at
               FROM extractions
              WHERE project_id = ?
           ORDER BY extracted_at DESC
@@ -408,19 +414,22 @@ def record_usage(user_id: str | None, response: dict | None,
     in_t = int(meta.get("input_tokens") or 0)
     out_t = int(meta.get("output_tokens") or 0)
     cache_t = int(meta.get("cache_read_tokens") or 0)
-    if in_t == 0 and out_t == 0 and cache_t == 0:
+    cache_w = int(meta.get("cache_write_tokens") or 0)
+    model = meta.get("model") or "claude-opus-4-8"
+    if in_t == 0 and out_t == 0 and cache_t == 0 and cache_w == 0:
         return 0.0  # nothing billable to record
     cost_eur = calc_claude_cost_usd(
         input_tokens=in_t, output_tokens=out_t, cache_read_tokens=cache_t,
+        cache_write_tokens=cache_w, model=model,
     ) * 0.93
     with _conn() as c:
         c.execute("""
             INSERT INTO usage_events
                 (id, user_id, kind, input_tokens, output_tokens,
-                 cache_read_tokens, cost_eur, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 cache_read_tokens, cost_eur, model, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (_uuid.uuid4().hex, user_id, kind, in_t, out_t, cache_t,
-              round(cost_eur, 4), _now_iso()))
+              round(cost_eur, 4), model, _now_iso()))
     return cost_eur
 
 
@@ -567,6 +576,14 @@ def _migrate_schema() -> None:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL")
         if ucols and "avatar_url" not in ucols:
             c.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
+        # W1.1 (2026-07-03): model-aware telemetry — which Claude model
+        # produced each extraction / usage event (Opus 4.8 vs Fable 5 bench).
+        ecols = {row["name"] for row in c.execute("PRAGMA table_info(extractions)").fetchall()}
+        if ecols and "model" not in ecols:
+            c.execute("ALTER TABLE extractions ADD COLUMN model TEXT")
+        uecols = {row["name"] for row in c.execute("PRAGMA table_info(usage_events)").fetchall()}
+        if uecols and "model" not in uecols:
+            c.execute("ALTER TABLE usage_events ADD COLUMN model TEXT")
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────
