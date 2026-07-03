@@ -27,7 +27,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-8"
+from models_config import model_for  # role: "sanitary" — resolved at call time
 MAX_TOKENS = 4096
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
 _FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai")
@@ -117,9 +117,10 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
                 "_elapsed_s": round(time.time() - t0, 2)}
     content.append({"type": "text", "text": build_user_text(rooms)})
     try:
+        model = model_for("sanitary")  # call-time resolution (MODEL_OVERRIDE etc.)
         client = client or anthropic.Anthropic()
         resp = client.messages.create(
-            model=MODEL, max_tokens=MAX_TOKENS,
+            model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": content}],
         )
@@ -143,7 +144,7 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
         "prietaisai": parsed.get("prietaisai") or [],
         "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
-                  "output_tokens": getattr(usage, "output_tokens", None), "model": MODEL},
+                  "output_tokens": getattr(usage, "output_tokens", None), "model": model},
     }
 
 

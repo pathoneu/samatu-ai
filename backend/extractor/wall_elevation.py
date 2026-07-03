@@ -64,7 +64,7 @@ from typing import Any
 
 import anthropic
 
-from .prompt import MODEL
+from models_config import model_for  # call-time model resolution
 from .vision_call import pdf_to_b64_images
 
 __all__ = ["extract_wall_elevations"]
@@ -254,10 +254,11 @@ def _extract_one_page(
     content = _build_user_content(image_b64, page_idx, room_list=room_list)
 
     last_err = None
+    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
     for attempt in range(3):
         try:
             with client.messages.stream(
-                model=MODEL,
+                model=model,
                 max_tokens=8192,  # one page = small output
                 system=system,
                 messages=[{"role": "user", "content": content}],

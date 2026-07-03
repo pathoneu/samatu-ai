@@ -8,7 +8,9 @@ from __future__ import annotations
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-MODEL = "claude-opus-4-8"
+# Model resolved per-call via models_config.model_for("vision_pass1"/"vision_pass2")
+# — the old module-level MODEL constant was removed (W1.1, 2026-07-03) so
+# MODEL_OVERRIDE / SAMATU_MODEL_* env changes apply without re-imports.
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
 # Provider's max image long-edge before it silently downscales. Opus 4.7 raised

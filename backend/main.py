@@ -143,6 +143,7 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
                      len(stale_keys), len(_RATE_BUCKET))
 import pdfplumber
 import anthropic
+from models_config import model_for
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4
@@ -1799,15 +1800,15 @@ def _parse_eilutes(raw: str) -> list:
     return items
 
 
-# Model used for the Claude fallback extraction path.
-# Opus delivers the highest accuracy; override with the env var for cost/speed
-# trade-offs (e.g. EXTRACTION_MODEL=claude-haiku-4-5 for fast/cheap).
-EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "claude-opus-4-8")
+# Model for the Claude fallback extraction path resolves via
+# models_config.model_for("extraction") at CALL time — legacy EXTRACTION_MODEL
+# env still works (it slots into the resolution chain), as do MODEL_OVERRIDE
+# and SAMATU_MODEL_EXTRACTION.
 
 
 def _call_claude(prompt: str) -> str:
     msg = client.messages.create(
-        model=EXTRACTION_MODEL,
+        model=model_for("extraction"),
         max_tokens=8096,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -1967,7 +1968,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
                     "chunks_processed": len(chunks),
                     "chunks_with_data": chunks_with_data,
                     "extraction_method": "claude",
-                    "extraction_model": EXTRACTION_MODEL,
+                    "extraction_model": model_for("extraction"),
                 },
             }
 
@@ -1981,7 +1982,8 @@ async def extract(request: Request, file: UploadFile = File(...)):
 
 import base64
 
-VISION_MODEL = os.getenv("VISION_MODEL", "claude-opus-4-8")
+# Vision model resolves via models_config.model_for("vision_pass1") at CALL
+# time — legacy VISION_MODEL env still works via the resolution chain.
 
 _INTERIOR_MARKERS = [
     "INTERJERO PROJEKTAS", "IŠKLOTINĖ", "IŠKLOTINIŲ",
@@ -2398,7 +2400,7 @@ def _pdf_to_images(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
 def _call_vision(b64_image: str, prompt: str) -> str:
     """Send a base64 JPEG + prompt to Claude Vision. Returns raw text."""
     msg = client.messages.create(
-        model=VISION_MODEL,
+        model=model_for("vision_pass1"),
         max_tokens=4096,
         messages=[{
             "role": "user",
@@ -5580,7 +5582,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
 
     def _call():
         return client.messages.create(
-            model="claude-opus-4-8",
+            model=model_for("chat"),
             max_tokens=2000,
             system=_CHAT_SYSTEM_PROMPT,
             messages=messages,

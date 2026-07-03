@@ -22,6 +22,8 @@ from typing import Any
 from ._cache import VisionCache, cache_key
 from .dimension_extractor import _detect_image_media_type
 
+from models_config import model_for
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "prompts" / "symbol_detection.txt"
 
@@ -106,7 +108,7 @@ def _load_prompt() -> str:
 def detect_symbols(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
     max_tokens: int = 32768,
     cache: VisionCache | None = None,
     no_cache: bool = False,
@@ -115,6 +117,7 @@ def detect_symbols(
     """Run the symbol-detection Vision pass on a single page image."""
     prompt = _load_prompt()
     img_bytes = base64.b64decode(image_b64)
+    model = model or model_for("symbols")
     key = cache_key(img_bytes, prompt, model, str(max_tokens))
 
     if cache is None:

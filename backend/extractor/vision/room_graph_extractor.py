@@ -2,6 +2,8 @@
 
 The model is shown the same floor-plan image plus the JSON dimension list
 from pass 1, and must emit a graph of {vertices, walls, rooms, openings}
+
+from models_config import model_for
 where every numeric length is a *reference* to a dimension id (never a new
 number). The deterministic plan_assembler then uses the IDs to assemble
 perimeters/areas, and the geometry_solver enforces closure/orthogonality.
@@ -273,7 +275,7 @@ def extract_room_graph(
     *,
     image_b64: str,
     dimensions_payload: dict[str, Any],
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
     max_tokens: int = 32768,
     cache: VisionCache | None = None,
     no_cache: bool = False,
@@ -283,6 +285,7 @@ def extract_room_graph(
     prompt = _load_prompt()
     img_bytes = base64.b64decode(image_b64)
     dim_json = json.dumps(dimensions_payload, sort_keys=True)
+    model = model or model_for("vision_pass1")
     key = cache_key(img_bytes, prompt, model, str(max_tokens), dim_json)
 
     if cache is None:

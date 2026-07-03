@@ -19,8 +19,13 @@ from typing import Any
 
 import anthropic
 
-OPUS_MODEL = "claude-opus-4-8"
+from models_config import model_for
+
 DEFAULT_MAX_TOKENS = 12_000
+
+# Heavy vision turns on Fable 5 can run many minutes — per-call timeout
+# override (never mutate the caller's global client config).
+VISION_TIMEOUT_S = 600.0
 
 
 def call_opus_vision(
@@ -48,8 +53,8 @@ def call_opus_vision(
         Anthropic Message object whose content is guaranteed valid JSON
         matching `schema` (or stop_reason='refusal' on schema impossibility).
     """
-    return client.messages.create(
-        model=OPUS_MODEL,
+    return client.with_options(timeout=VISION_TIMEOUT_S).messages.create(
+        model=model_for("vision_pass1"),
         max_tokens=max_tokens,
         system=[
             {

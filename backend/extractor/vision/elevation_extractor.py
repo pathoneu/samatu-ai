@@ -1,6 +1,8 @@
 """Vision pass #3 — extract material zones (tile / paint / wood / mirror)
 from wall-elevation pages (sienų išklotinės).
 
+from models_config import model_for
+
 Per CLAUDE.md §4 Section "Wall Development … MOST IMPORTANT FOR INTERIOR".
 The output drives the tile_calculator, which produces exact per-room tile
 area and paint area instead of the percentage-of-perimeter approximation
@@ -149,7 +151,7 @@ def _load_prompt() -> str:
 def extract_elevation_zones(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
     max_tokens: int = 32768,
     cache: VisionCache | None = None,
     no_cache: bool = False,
@@ -158,6 +160,7 @@ def extract_elevation_zones(
     """Vision pass 3: elevation material zones."""
     prompt = _load_prompt()
     img_bytes = base64.b64decode(image_b64)
+    model = model or model_for("vision_pass1")
     key = cache_key(img_bytes, prompt, model, str(max_tokens))
 
     if cache is None:

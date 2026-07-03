@@ -10,8 +10,9 @@ strategy. Designed to be iterated against `ground_truth/*_roof.yaml`
 fixtures — each prompt's accuracy is measured per-field, not just
 yes/no.
 
-Default model is Opus 4.7 per user policy ("strongest model for LT
-brėžinių tasks"). Override via `model=` kwarg for cheap dry-runs.
+Model resolves via models_config.model_for("vision_pass1") at call time
+(user policy: "strongest model for LT brėžinių tasks"). Override via
+`model=` kwarg for cheap dry-runs.
 """
 from __future__ import annotations
 
@@ -20,7 +21,8 @@ from typing import Any
 
 import anthropic
 
-from extractor.page_classifier import OPUS_MODEL, PageType
+from extractor.page_classifier import PageType
+from models_config import model_for
 from extractor.roof.evidence import DimensionEvidence, HITLFlag, HITLFlagReason
 from extractor.roof.page_authority import PAGE_AUTHORITY, RoofInputField
 from extractor.roof.strategies import RoofInput
@@ -134,7 +136,7 @@ def extract_stogo_planas_dims(
     image_b64: str,
     *,
     client: anthropic.Anthropic | None = None,
-    model: str = OPUS_MODEL,
+    model: str | None = None,
 ) -> dict:
     """Run Vision extraction on a rendered STOGO PLANAS page.
 
@@ -144,7 +146,7 @@ def extract_stogo_planas_dims(
     """
     client = client or anthropic.Anthropic()
     resp = client.messages.create(
-        model=model,
+        model=model or model_for("vision_pass1"),
         max_tokens=600,
         system=[{
             "type": "text",
@@ -520,7 +522,7 @@ def extract_pjuvis_dims(
     image_b64: str,
     *,
     client: anthropic.Anthropic | None = None,
-    model: str = OPUS_MODEL,
+    model: str | None = None,
 ) -> dict:
     """Run Vision extraction on a rendered PJŪVIS page.
 
@@ -528,7 +530,7 @@ def extract_pjuvis_dims(
     """
     client = client or anthropic.Anthropic()
     resp = client.messages.create(
-        model=model,
+        model=model or model_for("vision_pass1"),
         max_tokens=400,
         system=[{
             "type": "text",

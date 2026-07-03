@@ -30,7 +30,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-8"
+from models_config import model_for  # role: "apdailos" — resolved at call time
 MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = """Tu esi LT interjero brėžinio analizės agentas. Tau duotas vienas puslapis — IŠKLOTINIŲ IR APDAILŲ PLANAS (wall finishes plan).
@@ -194,9 +194,10 @@ def read_apdailos_finishes(
                       "skaityk apdailą iš jo žymėjimų/legendos.")
     content.append({"type": "text", "text": user_text})
     try:
+        model = model_for("apdailos")  # call-time resolution (MODEL_OVERRIDE etc.)
         client = client or anthropic.Anthropic()
         resp = client.messages.create(
-            model=MODEL, max_tokens=MAX_TOKENS,
+            model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": content}],
@@ -226,7 +227,7 @@ def read_apdailos_finishes(
         "_error": None, "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
                   "output_tokens": getattr(usage, "output_tokens", None),
-                  "model": MODEL},
+                  "model": model},
     }
 
 

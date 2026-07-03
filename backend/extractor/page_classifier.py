@@ -19,22 +19,21 @@ import re
 import anthropic
 import pdfplumber
 
-# Model tiers — pick at call site. Default is the historical Haiku
-# choice, but stogai V1 bake-off (2026-05-14) treats this as a
-# parameter, not a default. Promote based on empirical evaluation
-# results, not assumption.
-# 2026-06-17: all tiers promoted to Opus 4.8 for maximum accuracy (names kept
-# for the tier-selection call sites; every tier now resolves to the same model).
-HAIKU_MODEL = "claude-opus-4-8"
-SONNET_MODEL = "claude-opus-4-8"
-OPUS_MODEL = "claude-opus-4-8"
-# Default: Opus 4.8 — aligned with the interior pipeline. LT brėžiniai
-# are stricter than generic floor plans (LT abbreviations, dense
-# annotations, hand-drawn-style scans); user policy is "use the
-# strongest model for these tasks, don't optimise cost when accuracy
-# stakes are high." Sonnet/Haiku stay available as `model=...` overrides
-# for low-stakes batch / debugging / cost-sensitive paths only.
-DEFAULT_MODEL = OPUS_MODEL
+from models_config import model_for
+
+# Model tiers — historically Haiku/Sonnet/Opus picked at call site; on
+# 2026-06-17 all tiers were promoted to Opus 4.8, and since W1.1
+# (2026-07-03) every tier resolves through models_config.model_for
+# ("page_classifier") at CALL time so MODEL_OVERRIDE / SAMATU_MODEL_*
+# apply without re-imports. The legacy tier names are kept for external
+# scripts (scripts/eval_roof_*.py, scripts/build_roof_ground_truth.py)
+# via the module __getattr__ below.
+
+
+def __getattr__(name: str):  # PEP 562 — legacy tier-constant compat
+    if name in ("HAIKU_MODEL", "SONNET_MODEL", "OPUS_MODEL", "DEFAULT_MODEL"):
+        return model_for("page_classifier")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # LT statybų projektų dalies (sections) — codes as they appear in the
 # `Dokumento žymuo` field of the antspaudas (title block):
@@ -233,17 +232,18 @@ def parse_classification(payload: dict) -> PageClassification:
 def _call_haiku(
     image_b64: str,
     client: anthropic.Anthropic | None = None,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
 ) -> PageClassification:
     """Single-page classification via a Claude vision model.
 
     Function name kept for backward compatibility — `model` may be Haiku,
-    Sonnet, or Opus. Production callers pass their own client; tests
-    inject a fake.
+    Sonnet, or Opus. None (default) resolves model_for("page_classifier")
+    at call time. Production callers pass their own client; tests inject
+    a fake.
     """
     client = client or anthropic.Anthropic()
     resp = client.messages.create(
-        model=model,
+        model=model or model_for("page_classifier"),
         max_tokens=200,
         system=[{
             "type": "text",
@@ -325,7 +325,7 @@ def classify_page(
     *,
     pdf_path: str | Path | None = None,
     page_num: int | None = None,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
 ) -> PageClassification:
     """Public entry: classify one rendered page (hybrid text-first + vision).
 

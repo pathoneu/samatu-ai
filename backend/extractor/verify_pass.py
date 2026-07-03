@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 import anthropic
 
 from extractor.feature_flags import get_flags
-from extractor.prompt import MODEL
+from models_config import model_for
 
 log = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def _call_opus(prompt: str) -> dict:
         )
     client = anthropic.Anthropic()
     resp = client.messages.create(
-        model=MODEL,
+        model=model_for("vision_pass2"),
         max_tokens=4096,
         system=[{"type": "text", "text": _VERIFY_SYSTEM,
                  "cache_control": {"type": "ephemeral"}}],

@@ -16,6 +16,8 @@ from typing import Any, Iterable
 
 from ._cache import VisionCache, cache_key
 
+from models_config import model_for
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "prompts" / "dimension_list.txt"
 
@@ -183,7 +185,7 @@ def parse_dimension_payload(raw_json: dict[str, Any]) -> DimensionList:
 def extract_dimensions(
     *,
     image_b64: str,
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
     max_tokens: int = 32768,
     cache: VisionCache | None = None,
     no_cache: bool = False,
@@ -197,7 +199,7 @@ def extract_dimensions(
         PNG base64 string for the floor plan page. The caller is responsible
         for rasterising the right page at a useful DPI (≥200).
     model : str
-        Anthropic model id. Defaults to claude-opus-4-8.
+        Anthropic model id. None resolves model_for("vision_pass1") at call time.
     cache, no_cache : VisionCache | bool
         File cache controls. ``no_cache=True`` forces a fresh API call (used by
         determinism tests).
@@ -212,6 +214,7 @@ def extract_dimensions(
     """
     prompt = _load_prompt()
     img_bytes = base64.b64decode(image_b64)
+    model = model or model_for("vision_pass1")
     key = cache_key(img_bytes, prompt, model, str(max_tokens))
 
     if cache is None:

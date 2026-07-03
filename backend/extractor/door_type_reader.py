@@ -32,7 +32,7 @@ import anthropic
 import pdfplumber
 from pdf2image import convert_from_bytes
 
-MODEL = "claude-opus-4-8"
+from models_config import model_for  # role: "doors" — resolved at call time
 MAX_TOKENS = 4096
 # Keep each rendered page's long edge under Claude's silent-downscale threshold so
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus
@@ -144,9 +144,10 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
                 "_error": "page render failed", "_elapsed_s": round(time.time() - t0, 2)}
     content.append({"type": "text", "text": build_user_text(rooms)})
     try:
+        model = model_for("doors")  # call-time resolution (MODEL_OVERRIDE etc.)
         client = client or anthropic.Anthropic()
         resp = client.messages.create(
-            model=MODEL, max_tokens=MAX_TOKENS,
+            model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": content}],
         )
@@ -176,7 +177,7 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
         "pastabos": parsed.get("pastabos"),
         "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
-                  "output_tokens": getattr(usage, "output_tokens", None), "model": MODEL},
+                  "output_tokens": getattr(usage, "output_tokens", None), "model": model},
     }
 
 

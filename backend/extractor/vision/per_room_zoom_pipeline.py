@@ -46,6 +46,7 @@ from ..plan_assembler import (
 from ..geometry_solver import solve_plan, walk_polygon
 from .dimension_extractor import extract_dimensions, DimensionList
 from .room_graph_extractor import extract_room_graph, RoomGraph
+from models_config import model_for
 
 
 @dataclass
@@ -98,7 +99,7 @@ def run_zoom_on_room(
     pdf_bytes: bytes,
     page_number: int,
     room_primitive: dict[str, Any],
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
     crop_dpi: int = 300,
     crop_max_dim: int = 2576,
     crop_padding: float = 0.05,
@@ -108,6 +109,8 @@ def run_zoom_on_room(
     Caller is responsible for skipping rooms without bbox_pct.
     """
     from ..vision_call import _crop_room_image
+
+    model = model or model_for("vision_pass2")  # zoom = pass-2 measurement
 
     nr = str(room_primitive.get("nr") or "?")
     name = str(room_primitive.get("pavadinimas") or "")
@@ -180,7 +183,7 @@ def run_pilot(
     old_extract_path: Path,
     page_number: int = 2,
     limit: int | None = None,
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Run the zoom pipeline on every room in ``old_extract`` that has a bbox.
 

@@ -21,9 +21,14 @@ from pdf2image import convert_from_bytes
 from .prompt import (
     SYSTEM_TEXT, build_user_content,
     ZOOM_SYSTEM_TEXT, build_zoom_user_content,
-    MODEL, MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
+    MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
+from models_config import model_for
+
+# Heavy vision turns on Fable 5 can run many minutes — per-call timeout
+# override on the pass-1 stream (do NOT change the global client).
+VISION_TIMEOUT_S = 600.0
 
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
 # parents[1] = backend/ (extractor/vision_call.py → extractor/ → backend/)
@@ -128,7 +133,7 @@ def _vision_zoom_room(
     ]
     try:
         with client.messages.stream(
-            model=MODEL,
+            model=model_for("vision_pass2"),
             max_tokens=4096,  # zoom output is small per room
             system=system,
             messages=[{"role": "user", "content": build_zoom_user_content(cropped_b64, room)}],
@@ -2123,10 +2128,11 @@ def _run_pass1_once(client, system, pages) -> dict:
     `_meta`) on success, or an error dict `{"status":"error", ...}` on failure
     — same error shapes the old inline loop returned."""
     last_err: Exception | None = None
+    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
     for attempt in range(3):
         try:
-            with client.messages.stream(
-                model=MODEL,
+            with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
+                model=model,
                 max_tokens=MAX_OUTPUT_TOKENS,
                 system=system,
                 messages=[{"role": "user", "content": build_user_content(pages)}],
@@ -2159,7 +2165,7 @@ def _run_pass1_once(client, system, pages) -> dict:
                 "stop_reason": resp.stop_reason,
                 "attempt": attempt + 1,
                 "pages_sent": len(pages),
-                "model": MODEL,
+                "model": model,
             }
             return parsed
         except Exception as exc:

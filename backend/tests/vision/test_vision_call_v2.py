@@ -24,7 +24,8 @@ def test_module_does_not_use_regex_repair():
 
 def test_call_uses_output_config_format_and_explicit_ttl():
     fake_client = MagicMock()
-    fake_client.messages.create.return_value = MagicMock()
+    create = fake_client.with_options.return_value.messages.create
+    create.return_value = MagicMock()
 
     schema = {"type": "object", "properties": {}}
     vision_call_v2.call_opus_vision(
@@ -35,8 +36,15 @@ def test_call_uses_output_config_format_and_explicit_ttl():
         effort="high",
     )
 
-    fake_client.messages.create.assert_called_once()
-    kwargs = fake_client.messages.create.call_args.kwargs
+    # W1.1: heavy vision calls get a per-call timeout override (Fable turns
+    # can run many minutes) — never mutate the global client config.
+    fake_client.with_options.assert_called_once_with(
+        timeout=vision_call_v2.VISION_TIMEOUT_S)
+    create.assert_called_once()
+    kwargs = create.call_args.kwargs
+    # W1.1: model resolves per-role at call time (MODEL_OVERRIDE-aware).
+    from models_config import model_for
+    assert kwargs["model"] == model_for("vision_pass1")
     # Strict JSON schema enforcement (no regex repair fallback).
     output_cfg = kwargs["output_config"]
     assert output_cfg["format"]["type"] == "json_schema"

@@ -77,7 +77,7 @@ def dispatch_secondary_passes(
     classifications: list[dict[str, Any]],
     *,
     enabled: set[str] | None = None,
-    model: str = "claude-opus-4-8",
+    model: str | None = None,
 ) -> SecondaryResults:
     """Run each enabled secondary extractor on its matching pages.
 
