@@ -17,7 +17,9 @@ import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-ma
 import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search } from 'lucide-react';
+import { usePrint } from '@embedpdf/plugin-print/react';
+import { useExport } from '@embedpdf/plugin-export/react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search, Printer, Download } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
@@ -111,6 +113,8 @@ function SearchBox({ documentId, onClose }) {
 function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho, searchOpen, onToggleSearch, onCloseSearch }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
+  const { provides: printApi } = usePrint(documentId);
+  const { provides: exportApi } = useExport(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
   const cur = scroll?.currentPage ?? 1;
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
@@ -197,7 +201,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           )}
         </>
       )}
-      {/* Right group: search (print/download live here too). */}
+      {/* Right group: search + print + download. */}
       <div className="ml-auto flex items-center gap-1">
         {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
         <button
@@ -206,6 +210,9 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           aria-pressed={!!searchOpen}
           onClick={onToggleSearch}
         ><Search className="w-4 h-4" /></button>
+        <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+        <button className={btn} title="Spausdinti (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
+        <button className={btn} title="Atsisiųsti PDF" disabled={!exportApi} onClick={() => exportApi?.download()}><Download className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -320,14 +327,16 @@ function ThumbnailRail({ documentId }) {
  *   2 distance · 3 area · 6 count (measure tools; ignored while fill armed) ·
  *   Delete/Backspace delete the selected measurement (select mode only, so it
  *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
- *   Ctrl/Cmd+F or / open search · Esc chain: close search → measure (close
- *   calibration dialog / drop tool) → cancel fill-mode → clear focused room.
- *   (When focus is IN the search input, its own onKeyDown handles Esc —
- *   the input guard below keeps this listener out of typing surfaces.)
+ *   Ctrl/Cmd+F or / open search · Ctrl/Cmd+P print · Esc chain: close search
+ *   → measure (close calibration dialog / drop tool) → cancel fill-mode →
+ *   clear focused room. (When focus is IN the search input, its own onKeyDown
+ *   handles Esc — the input guard below keeps this listener out of typing
+ *   surfaces.)
  */
 function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { provides: scrollApi } = useScroll(documentId);
+  const { provides: printApi } = usePrint(documentId);
   useEffect(() => {
     const onKeyDown = (e) => {
       const t = e.target;
@@ -335,6 +344,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       if (e.metaKey || e.ctrlKey) {
         // Our explicit combos; everything else stays with the browser.
         if (!e.altKey && (e.key === 'f' || e.key === 'F') && onOpenSearch) { e.preventDefault(); onOpenSearch(); }
+        else if (!e.altKey && (e.key === 'p' || e.key === 'P') && printApi) { e.preventDefault(); printApi.print(); }
         return;
       }
       switch (e.key) {
@@ -363,7 +373,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape]);
   return null;
 }
 

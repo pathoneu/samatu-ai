@@ -17,6 +17,10 @@ import { TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
 import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
 import { SearchPluginPackage } from '@embedpdf/plugin-search/react';
+// The /react print+export packages self-mount their hidden DOM (print iframe,
+// download anchor) as EmbedPDF "utilities" — no manual <PrintFrame/> needed.
+import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
+import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 
 export function engineOptions() {
   return {
@@ -40,5 +44,8 @@ export function makeViewerPlugins(initialUrl) {
     createPluginRegistration(InteractionManagerPluginPackage),
     createPluginRegistration(ThumbnailPluginPackage, { width: 120, gap: 8, labelHeight: 16 }),
     createPluginRegistration(SearchPluginPackage),
+    createPluginRegistration(PrintPluginPackage),
+    // Fallback name only — export prefers the loaded document's own name.
+    createPluginRegistration(ExportPluginPackage, { defaultFileName: 'brezinys.pdf' }),
   ];
 }
