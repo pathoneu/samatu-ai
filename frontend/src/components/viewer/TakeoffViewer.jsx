@@ -8,7 +8,7 @@
  * Deferred (Phase 3): measurement/symbol/click-to-fill re-home, thumbnail rail,
  *           layer toggles, then flip to default + delete PlanViewer.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { Viewport } from '@embedpdf/plugin-viewport/react';
@@ -20,6 +20,7 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2, 
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
+import { DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import PageOverlayHost from './PageOverlayHost';
 
 function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs }) {
@@ -223,13 +224,51 @@ function FocusScroller({ documentId, focusedRoom }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill }) {
+function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
   const [fillFor, setFillFor] = useState(null);
   // Drop the armed room if focus changes away (avoid filling the wrong room).
   useEffect(() => { setFillFor(null); }, [focusedRoomNr]);
+
+  // ---- Measurement subsystem (Phase 3) ------------------------------------
+  // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
+  // Measurements + per-page scales in PDF-point space (see MeasureLayer);
+  // hydrated from the project, persisted back via onMeasureDataChange.
+  const [measureTool, setMeasureTool] = useState(null);
+  const [measurements, setMeasurements] = useState(() => initialMeasurements || []);
+  const [measureScales, setMeasureScales] = useState(() => initialMeasureScales || {});
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const [orthoEnabled, setOrthoEnabled] = useState(false);
+  const [activeCountTypeId, setActiveCountTypeId] = useState(DEFAULT_COUNT_TYPES[0]?.id ?? null);
+  const [selectedMeasureId, setSelectedMeasureId] = useState(null);
+  // Pending 2-point calibration pick: { pageNr, a, b } | null → CalibrateDialog.
+  const [calibRequest, setCalibRequest] = useState(null);
+  // Fill-mode and measure tools are mutually exclusive pointer owners.
+  const armMeasureTool = (tool) => {
+    setFillFor(null);
+    setMeasureTool((cur) => {
+      const next = cur === tool ? null : tool;
+      if (next == null) setSelectedMeasureId(null);
+      return next;
+    });
+  };
+  const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); setFillFor(nr); };
+  const deleteMeasurement = (id) => {
+    if (id == null) return;
+    setMeasurements((prev) => prev.filter((m) => m.id !== id));
+    setSelectedMeasureId((cur) => (cur === id ? null : cur));
+  };
+  // Persist measurement data to the parent (project save flow), DEBOUNCED, and
+  // skipping the mount pass so hydration never writes back immediately.
+  const measureDirtyRef = useRef(false);
+  useEffect(() => {
+    if (!onMeasureDataChange) return undefined;
+    if (!measureDirtyRef.current) { measureDirtyRef.current = true; return undefined; } // skip mount
+    const t = setTimeout(() => onMeasureDataChange({ measurements, measureScales }), 600);
+    return () => clearTimeout(t);
+  }, [measurements, measureScales, onMeasureDataChange]);
   // Thumbnail rail preference: null = "no explicit choice yet" → default OPEN
   // when the document has more than one page (resolved where pageCount is known).
   const [thumbsPref, setThumbsPref] = useState(() => {
@@ -291,7 +330,7 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             totalPages={totalPages}
             focusedRoomNr={onRoomPolygonFill ? focusedRoomNr : null}
             fillFor={fillFor}
-            onStartFill={setFillFor}
+            onStartFill={startFill}
             onCancelFill={() => setFillFor(null)}
             railOpen={railOpen}
             onToggleThumbs={() => setRailOpen(!railOpen)}
@@ -316,11 +355,24 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
                       layout={layout}
                       rooms={rooms}
                       pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
+                      pageSizePt={documentState?.document?.pages?.[layout.pageIndex]?.size ?? null}
                       focusedRoomNr={focusedRoomNr}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
+                      measureTool={measureTool}
+                      measurements={measurements}
+                      measureScale={measureScales[layout.pageNumber] || null}
+                      snapEnabled={snapEnabled}
+                      orthoEnabled={orthoEnabled}
+                      countTypes={DEFAULT_COUNT_TYPES}
+                      activeCountTypeId={activeCountTypeId}
+                      selectedMeasureId={selectedMeasureId}
+                      onMeasureCommit={(m) => setMeasurements((prev) => [...prev, m])}
+                      onMeasureCalibrate={(pageNr, a, b) => setCalibRequest({ pageNr, a, b })}
+                      onMeasureSelect={setSelectedMeasureId}
+                      onMeasureDelete={deleteMeasurement}
                     />
                   )}
                 />

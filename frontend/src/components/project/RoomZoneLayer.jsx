@@ -55,6 +55,9 @@ export default function RoomZoneLayer({
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
   onRoomClick = null,
+  // false while a measurement tool is armed: zones stay visible but must not
+  // swallow the measure clicks (their <g> normally re-enable pointer events).
+  interactive = true,
 }) {
   const width = renderedSize?.width;
   const height = renderedSize?.height;
@@ -111,7 +114,10 @@ export default function RoomZoneLayer({
         return (
           <g
             key={z.nr}
-            style={{ pointerEvents: 'auto', cursor: onRoomClick ? 'pointer' : 'default' }}
+            style={{
+              pointerEvents: interactive ? 'auto' : 'none',
+              cursor: interactive && onRoomClick ? 'pointer' : 'default',
+            }}
             onClick={() => onRoomClick?.(z)}
             onMouseEnter={() => setHoverNr(String(z.nr))}
             onMouseLeave={() => setHoverNr((cur) => (cur === String(z.nr) ? null : cur))}
