@@ -43,6 +43,37 @@ REGISTRY: dict[str, dict[str, str]] = {
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 
+def _merge_registry_yaml() -> None:
+    """W1.2: fold ground_truth/registry.yaml projects into REGISTRY so
+    single-project modes (``--project ciurliu --vision``) reach every
+    benchmark project, not just the hardcoded berzas entry. The YAML key
+    ``project_pdf`` maps to the in-file ``pdf_path``. Hardcoded entries win
+    (berzas keeps its replay_path)."""
+    reg_path = GROUND_TRUTH_ROOT / "registry.yaml"
+    if not reg_path.exists():
+        return
+    try:
+        import yaml
+        reg = yaml.safe_load(reg_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # malformed registry — single-project berzas still works
+        print(f"  ⚠ registry.yaml not merged: {exc}")
+        return
+    for entry in reg.get("projects") or []:
+        slug = entry.get("slug")
+        if not slug or slug in REGISTRY or not entry.get("truth_path"):
+            continue
+        merged: dict[str, str] = {
+            "name": entry.get("name", slug),
+            "truth_path": entry["truth_path"],
+        }
+        if entry.get("project_pdf"):
+            merged["pdf_path"] = entry["project_pdf"]
+        REGISTRY[slug] = merged
+
+
+_merge_registry_yaml()
+
+
 # ── Metric mapping: contractor truth field → extractor output field/extractor ──
 # Each entry: truth_key → (label, accessor(parsed_extractor_output) → float)
 def _santrauka_get(parsed: dict, key: str) -> float:
@@ -829,14 +860,53 @@ def run_debug_project(slug: str) -> int:
     return 0
 
 
+def _meta_rollup(parsed: dict, wall_time_s: float,
+                 model_requested: str | None) -> dict:
+    """W1.2: per-project cost/token roll-up for the model benchmark.
+
+    Reads the pipeline's top-level ``_meta`` (model, input/output/cache
+    tokens) and prices it via backend/pricing.py (model-aware). ``raw_meta``
+    passes the whole _meta through so compare_model_runs.py can surface any
+    per-reader detail it carries.
+    """
+    meta = (parsed.get("_meta") or {}) if isinstance(parsed, dict) else {}
+    model = meta.get("model") or model_requested
+    tokens = {
+        "input_tokens": int(meta.get("input_tokens") or 0),
+        "output_tokens": int(meta.get("output_tokens") or 0),
+        "cache_read_tokens": int(meta.get("cache_read_tokens") or 0),
+        "cache_write_tokens": int(meta.get("cache_write_tokens") or 0),
+    }
+    cost_usd = cost_eur = None
+    pricing_note = None
+    if model:
+        try:
+            from pricing import calc_claude_cost_usd  # backend/ on sys.path
+            cost_usd = round(calc_claude_cost_usd(model=model, **tokens), 4)
+            cost_eur = round(cost_usd * 0.93, 4)  # same USD→EUR as db.py
+        except Exception as exc:  # unknown model rate etc. — keep run scored
+            pricing_note = f"cost unavailable: {exc}"
+    return {
+        "model": model,
+        **tokens,
+        "cost_usd": cost_usd,
+        "cost_eur": cost_eur,
+        "pricing_note": pricing_note,
+        "wall_time_s": round(wall_time_s, 1),
+        "raw_meta": meta,
+    }
+
+
 def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
             apply_calibration: bool = False, track_drift: bool = False,
-            verbose: bool = False) -> int:
+            verbose: bool = False, model: str | None = None) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
     calibration = _load_project_calibration(project_id) if apply_calibration else None
 
+    import time as _time
+    t0 = _time.monotonic()
     if mode == "use_gt_inputs":
         parsed = run_pipeline_use_gt_inputs(
             truth,
@@ -849,6 +919,7 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
         parsed = run_pipeline_vision(REPO_ROOT / entry["pdf_path"])
     else:
         raise SystemExit(f"Unknown mode {mode!r}")
+    wall_time_s = _time.monotonic() - t0
 
     if verbose:
         _print_extraction_timeline(parsed)
@@ -858,14 +929,21 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     summary = _summarize(results)
     print_report(project_id, mode, results, per_room)
 
+    meta_rollup = _meta_rollup(parsed, wall_time_s, model)
+
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = EVAL_RUNS_ROOT / f"{ts}_{project_id}_{mode}"
+    # W1.2: benchmark runs (--model) are namespaced per model so Opus and
+    # Fable runs can never overwrite or be confused with each other.
+    base_dir = EVAL_RUNS_ROOT / model if model else EVAL_RUNS_ROOT
+    run_dir = base_dir / f"{ts}_{project_id}_{mode}"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "parsed.json").write_text(json.dumps(parsed, ensure_ascii=False, indent=2))
     (run_dir / "results.json").write_text(json.dumps({
         "project": project_id,
         "mode": mode,
+        "model": meta_rollup["model"],
         "summary": summary,
+        "meta_rollup": meta_rollup,
         "metrics": [r.__dict__ for r in results],
         "per_room": per_room,
     }, ensure_ascii=False, indent=2))
@@ -1209,7 +1287,35 @@ def main() -> int:
                     help="report the human-confirmed correction corpus (2nd "
                          "oracle) + per-class confirmed counts + frozen-formula "
                          "thaw status")
+    ap.add_argument("--model", default=None, metavar="MODEL_ID",
+                    help="W1.2 benchmark axis: force the whole pipeline onto "
+                         "this Claude model (sets MODEL_OVERRIDE before the "
+                         "pipeline is imported). REQUIRES --vision — cached "
+                         "extracts were produced by a different model and "
+                         "scoring them under this label would corrupt the "
+                         "benchmark. Output lands in eval_runs/<model>/...")
     args = ap.parse_args()
+
+    if args.model:
+        # FAIL LOUDLY on any cache-reading mode: --replay reuses a saved
+        # extract, --totals-only/--all/--debug-project read ai_extract.json,
+        # and --use-gt-inputs (also the implicit default) never calls Vision
+        # at all. A cached Opus extract scored under a --model claude-fable-5
+        # label would corrupt the benchmark.
+        if not args.vision:
+            raise SystemExit(
+                "--model requires --vision: benchmark runs must be FRESH "
+                "Vision extractions. Cached/replayed/GT-input modes "
+                "(--replay, --use-gt-inputs, --totals-only, --all, "
+                "--debug-project, or no mode flag) would score an extract "
+                "produced by a different model under this label."
+            )
+        # Set BEFORE the pipeline is imported/instantiated (run_pipeline_vision
+        # imports extractor.vision_call lazily, and models_config.model_for
+        # resolves env at call time — belt and suspenders).
+        os.environ["MODEL_OVERRIDE"] = args.model
+        print(f"  MODEL_OVERRIDE={args.model} (fresh --vision run; "
+              f"output → eval_runs/{args.model}/)")
 
     if args.human_corpus:
         import json as _json
@@ -1237,7 +1343,8 @@ def main() -> int:
                    estimate_exterior=args.estimate_exterior,
                    apply_calibration=args.apply_calibration,
                    track_drift=args.track_drift,
-                   verbose=args.verbose)
+                   verbose=args.verbose,
+                   model=args.model)
 
 
 if __name__ == "__main__":
