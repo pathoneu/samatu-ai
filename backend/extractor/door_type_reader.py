@@ -209,6 +209,11 @@ def _aggregate_door_votes(runs: list[dict]) -> dict:
     out["stumdomos_count"] = _mode_int([int(r.get("stumdomos_count") or 0) for r in ok])
     out["_vote"] = {"n": len(ok), "beapvadines_values": beap_vals,
                     "spread": max(beap_vals) - min(beap_vals)}
+    # Cost metering (2026-07-04): voting made N Anthropic calls, but only the
+    # representative round's _meta survived above — the other rounds' tokens
+    # were dropped, undercounting spend. Expose EVERY OK round's _meta so the
+    # extraction flow can roll each into _meta.extra_calls (priced per-model).
+    out["_round_metas"] = [r.get("_meta") or {} for r in ok]
     return out
 
 

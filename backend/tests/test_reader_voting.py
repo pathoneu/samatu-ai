@@ -48,3 +48,45 @@ def test_aggregate_fixture_votes_modes_each_key():
     assert out["counts"]["praustuves"] == 4       # mode of (4,3,4)
     assert out["counts"]["klozetai"] == 2
     assert out["_vote"]["spread"]["praustuves"] == 1
+
+
+# ── Per-round token roll-up for cost metering (2026-07-04) ─────────────────────
+# Voted readers make N Anthropic calls but returned only the representative
+# round's _meta — the other rounds' tokens were dropped, undercounting cost.
+# The aggregators now expose EVERY OK round's _meta under _round_metas so the
+# extraction flow can append each into _meta.extra_calls (priced per-model).
+
+def test_aggregate_door_votes_exposes_every_round_meta():
+    runs = [
+        {"status": "ok", "beapvadines_count": 2,
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 5000, "output_tokens": 300}},
+        {"status": "ok", "beapvadines_count": 2,
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 5100, "output_tokens": 310}},
+        {"status": "ok", "beapvadines_count": 7,
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 4900, "output_tokens": 290}},
+    ]
+    out = _aggregate_door_votes(runs)
+    assert len(out["_round_metas"]) == 3          # ALL 3 calls, not just the rep
+    assert [m["input_tokens"] for m in out["_round_metas"]] == [5000, 5100, 4900]
+
+
+def test_aggregate_door_votes_round_metas_excludes_failed_rounds():
+    runs = [
+        {"status": "ok", "beapvadines_count": 2,
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 5000, "output_tokens": 300}},
+        {"status": "error", "beapvadines_count": 0, "_error": "boom"},  # no API tokens billed
+    ]
+    out = _aggregate_door_votes(runs)
+    assert len(out["_round_metas"]) == 1
+
+
+def test_aggregate_fixture_votes_exposes_every_round_meta():
+    runs = [
+        {"status": "ok", "counts": {"praustuves": 4, "klozetai": 2, "vonios": 1, "dusai": 1, "wc_remai": 2},
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 6000, "output_tokens": 200}},
+        {"status": "ok", "counts": {"praustuves": 3, "klozetai": 2, "vonios": 1, "dusai": 1, "wc_remai": 2},
+         "_meta": {"model": "claude-opus-4-8", "input_tokens": 6100, "output_tokens": 210}},
+    ]
+    out = _aggregate_fixture_votes(runs)
+    assert len(out["_round_metas"]) == 2
+    assert [m["input_tokens"] for m in out["_round_metas"]] == [6000, 6100]

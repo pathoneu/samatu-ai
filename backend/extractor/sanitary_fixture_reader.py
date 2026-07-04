@@ -173,6 +173,10 @@ def _aggregate_fixture_votes(runs: list[dict]) -> dict:
         spread[k] = max(vals) - min(vals)
     out["counts"] = merged
     out["_vote"] = {"n": len(ok), "spread": spread}
+    # Cost metering (2026-07-04): voting made N Anthropic calls, but only ok[0]'s
+    # _meta survived above. Expose EVERY OK round's _meta so the extraction flow
+    # can roll each into _meta.extra_calls (priced per-model).
+    out["_round_metas"] = [r.get("_meta") or {} for r in ok]
     return out
 
 

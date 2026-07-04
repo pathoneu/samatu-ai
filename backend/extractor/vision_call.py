@@ -92,6 +92,61 @@ def _group_rounds_by_model(models: list[str]) -> list[str]:
     return [m for o in order for m in models if m == o]
 
 
+def _append_extra_call(parsed: dict, reader_meta: dict | None) -> None:
+    """Roll one sub-Vision call's tokens into ``parsed["_meta"]["extra_calls"]``
+    so the SINGLE per-extraction usage_event prices the WHOLE pipeline, not
+    just Pass-1 (2026-07-04 sub-call metering fix).
+
+    ``reader_meta`` is a sub-reader's own ``_meta`` block (apdailos, doors, one
+    door_type round, eksplikacija Vision fallback, a zoom call, an agentic-zoom
+    room, sanitary fixtures …). Priced later by pricing.calc_meta_cost_usd,
+    each entry at ITS OWN model's rate.
+
+    Purely additive token/cost CAPTURE — never touches extraction output. No-op
+    (nothing appended) when the call was free or didn't happen:
+      * ``reader_meta`` falsy, or
+      * no ``model`` (e.g. the pdfplumber eksplikacija path: source-only, $0), or
+      * all token counts zero/None (reader errored before the API call).
+    None token values (readers use ``getattr(usage, ..., None)``) coerce to 0.
+    """
+    if not reader_meta:
+        return
+    model = reader_meta.get("model")
+    if not model:
+        return  # free/deterministic path (no Anthropic call) — nothing to price
+    in_t = int(reader_meta.get("input_tokens") or 0)
+    out_t = int(reader_meta.get("output_tokens") or 0)
+    cr_t = int(reader_meta.get("cache_read_tokens") or 0)
+    cw_t = int(reader_meta.get("cache_write_tokens") or 0)
+    if in_t == 0 and out_t == 0 and cr_t == 0 and cw_t == 0:
+        return  # nothing billable
+    parsed.setdefault("_meta", {}).setdefault("extra_calls", []).append({
+        "model": model,
+        "input_tokens": in_t,
+        "output_tokens": out_t,
+        "cache_read_tokens": cr_t,
+        "cache_write_tokens": cw_t,
+    })
+
+
+def _reader_call_metas(result: dict | None) -> list[dict]:
+    """Normalize a sub-reader result into a list of per-call ``_meta`` blocks.
+
+    Voted readers (read_door_types_voted / read_fixtures_voted) made N Anthropic
+    calls and expose every OK round under ``_round_metas`` — return all of them.
+    Single-pass readers expose their one call under ``_meta``. An errored reader
+    (no tokens billed) yields ``[]``. The caller appends each via
+    _append_extra_call so every billed round is metered exactly once.
+    """
+    if not result:
+        return []
+    rounds = result.get("_round_metas")
+    if rounds:
+        return list(rounds)
+    m = result.get("_meta")
+    return [m] if m else []
+
+
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
 # instruction text + JSON envelope. Above this the native-PDF experiment
 # falls back to the image path for that extraction (recorded in _meta).
@@ -310,14 +365,25 @@ def _vision_zoom_room(
     client: anthropic.Anthropic,
     cropped_b64: str,
     room: dict,
-) -> dict | None:
-    """Pass-2 zoom Vision call for one room. Returns ZoomResult dict or None."""
+) -> tuple[dict | None, dict]:
+    """Pass-2 zoom Vision call for one room.
+
+    Returns ``(zoom_result_or_None, zoom_meta)``. The zoom_result dict is the
+    ZoomResult schema, UNCHANGED (no token keys injected — it is stored verbatim
+    in ``room["_zoom"]`` for the UI, so mutating it would change extraction
+    output). ``zoom_meta`` carries this call's token usage + model so the caller
+    can roll it into ``_meta.extra_calls`` — before 2026-07-04 ``resp.usage``
+    was discarded and every zoom call went unmetered.
+    """
+    model = model_for("vision_pass2")
+    zoom_meta: dict = {"model": model, "input_tokens": 0, "output_tokens": 0,
+                       "cache_read_tokens": 0, "cache_write_tokens": 0}
     system = [
         {"type": "text", "text": ZOOM_SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
     ]
     try:
         with client.messages.stream(
-            model=model_for("vision_pass2"),
+            model=model,
             max_tokens=4096,  # zoom output is small per room
             system=system,
             messages=[{"role": "user", "content": build_zoom_user_content(cropped_b64, room)}],
@@ -328,19 +394,26 @@ def _vision_zoom_room(
         ) as stream:
             resp = stream.get_final_message()
 
+        usage = getattr(resp, "usage", None)
+        if usage is not None:
+            zoom_meta["input_tokens"] = int(getattr(usage, "input_tokens", 0) or 0)
+            zoom_meta["output_tokens"] = int(getattr(usage, "output_tokens", 0) or 0)
+            zoom_meta["cache_read_tokens"] = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+            zoom_meta["cache_write_tokens"] = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+
         if resp.stop_reason in ("refusal", "max_tokens"):
-            return None
+            return None, zoom_meta
         text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
         try:
-            return json.loads(text)
+            return json.loads(text), zoom_meta
         except json.JSONDecodeError:
             try:
-                return json.loads(_repair_json(text))
+                return json.loads(_repair_json(text)), zoom_meta
             except json.JSONDecodeError:
-                return None
+                return None, zoom_meta
     except Exception as exc:
         print(f"[extractor] zoom call failed for room {room.get('nr')}: {exc}")
-        return None
+        return None, zoom_meta
 
 
 def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
@@ -2726,6 +2799,12 @@ def extract_interior(
         _emit({"event": "error", "message": str(err)})
         return parsed or {"status": "error", "_error": "Unknown error"}
 
+    # Roll the eksplikacija PRE-pass Vision-fallback tokens into extra_calls now
+    # that `parsed` (and its Pass-1 _meta) exists. No-op on the pdfplumber path
+    # (source-only _meta, no model → free, not billed). The pre-pass ran before
+    # Pass-1 above, so it couldn't attach to `parsed` at its own call site.
+    _append_extra_call(parsed, (eks or {}).get("_meta"))
+
     _pass1_rooms = parsed.get("patalpos") or []
     _emit({
         "event": "pass1_completed",
@@ -3157,7 +3236,10 @@ def extract_interior(
                 "room_nr": room.get("nr"),
                 "pavadinimas": room.get("pavadinimas"),
             })
-            zoom_result = _vision_zoom_room(client, cropped, room)
+            zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
+            # Roll this zoom call's tokens into extra_calls (was discarded before
+            # 2026-07-04) — even a null/parse-fail result still billed tokens.
+            _append_extra_call(parsed, _zmeta)
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -3191,10 +3273,13 @@ def extract_interior(
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
     if _zoom_agentic_on:
+        # Cost metering (2026-07-04): roll every agentic-zoom room's per-turn
+        # tokens into extra_calls so the single per-extraction usage_event prices
+        # them (each room's meta already carries its own model + summed tokens).
+        for _m in _agentic_rooms_meta:
+            _append_extra_call(parsed, _m)
         # Provenance for the agentic-zoom experiment: per-room loop stats
-        # (crops, turns, tokens, refusals/aborts) + aggregates. NOTE: like the
-        # fixed-crop zoom, these tokens are NOT rolled into the top-level
-        # _meta token sums (which cover Pass-1 only) — price them from here.
+        # (crops, turns, tokens, refusals/aborts) + aggregates.
         parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
             "rooms": _agentic_rooms_meta,
             "crops_served_total": sum(m.get("crops_served", 0)
@@ -3223,6 +3308,7 @@ def extract_interior(
         from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
         _emit({"event": "apdailos_started"})
         apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
+        _append_extra_call(parsed, apdailos_result.get("_meta"))  # roll tokens into cost
         if apdailos_result.get("status") == "ok":
             n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
             parsed.setdefault("_meta", {})["apdailos_page"] = apdailos_result.get("page")
@@ -3262,6 +3348,7 @@ def extract_interior(
             parsed.get("patalpos") or [],
             page_classifications=parsed.get("puslapiai") or [],
         )
+        _append_extra_call(parsed, doors_result.get("_meta"))  # roll tokens into cost
         if doors_result.get("status") == "ok":
             n_updated = merge_doors_into_rooms(parsed.get("patalpos") or [], doors_result)
             parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
@@ -3307,6 +3394,11 @@ def extract_interior(
               if _voting_on else
               read_door_types(pdf_bytes, rooms_now,
                               page_classifications=parsed.get("puslapiai") or []))
+        # Roll door-type reader tokens into cost. Voted: one extra_call per round
+        # (_round_metas); single-pass: the one _meta. Each round may run a
+        # different model (mixed voting) → priced per-model downstream.
+        for _rm in _reader_call_metas(dt):
+            _append_extra_call(parsed, _rm)
         if dt.get("status") == "ok":
             n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
                            for el in (r.get("elementai") or [])
@@ -3354,6 +3446,9 @@ def extract_interior(
         fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [])
               if _voting_on else
               read_fixtures(pdf_bytes, parsed.get("patalpos") or []))
+        # Roll fixture-reader tokens into cost (voted: per-round; single: one).
+        for _rm in _reader_call_metas(fx):
+            _append_extra_call(parsed, _rm)
         if fx.get("status") == "ok":
             rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
                                            fx.get("counts") or {})

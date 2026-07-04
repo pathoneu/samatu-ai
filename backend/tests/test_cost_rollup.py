@@ -180,3 +180,225 @@ def test_record_usage_extra_calls_strictly_greater_than_pass1_only(tmp_path, mon
     pass1_only = db.record_usage("u1", {"_meta": dict(base_meta)}, "extract-interior")
     with_subs = db.record_usage("u2", {"_meta": full_meta}, "extract-interior")
     assert with_subs > pass1_only > 0
+
+
+# ── _append_extra_call helper — the single merge point for every sub-reader ────
+
+def test_append_extra_call_records_model_and_tokens():
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {"input_tokens": 100, "model": "claude-opus-4-8"}}
+    _append_extra_call(parsed, {"input_tokens": 5_000, "output_tokens": 300,
+                                "cache_read_tokens": 1_000,
+                                "cache_write_tokens": 200,
+                                "model": "claude-opus-4-8"})
+    ec = parsed["_meta"]["extra_calls"]
+    assert ec == [{"model": "claude-opus-4-8", "input_tokens": 5_000,
+                   "output_tokens": 300, "cache_read_tokens": 1_000,
+                   "cache_write_tokens": 200}]
+
+
+def test_append_extra_call_creates_list_and_appends_multiple():
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {}}
+    _append_extra_call(parsed, {"input_tokens": 1_000, "output_tokens": 100,
+                                "model": "claude-opus-4-8"})
+    _append_extra_call(parsed, {"input_tokens": 2_000, "output_tokens": 200,
+                                "model": "claude-fable-5"})
+    assert len(parsed["_meta"]["extra_calls"]) == 2
+    assert [c["model"] for c in parsed["_meta"]["extra_calls"]] == [
+        "claude-opus-4-8", "claude-fable-5"]
+
+
+def test_append_extra_call_skips_pdfplumber_meta_without_model():
+    """The pdfplumber eksplikacija path returns _meta with source=pdfplumber_table
+    and NO model / tokens (cost $0). It must NOT be appended (an entry without a
+    model would later RAISE in pricing)."""
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {}}
+    _append_extra_call(parsed, {"source": "pdfplumber_table", "elapsed_s": 0.4,
+                                "pages_scanned": 12})
+    assert parsed["_meta"].get("extra_calls") in (None, [])
+
+
+def test_append_extra_call_skips_zero_token_meta():
+    """A reader that errored before the API call returns an empty/zero _meta —
+    nothing billable, don't append."""
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {}}
+    _append_extra_call(parsed, {})
+    _append_extra_call(parsed, {"model": "claude-opus-4-8", "input_tokens": 0,
+                                "output_tokens": 0})
+    assert parsed["_meta"].get("extra_calls") in (None, [])
+
+
+def test_append_extra_call_handles_none_token_values():
+    """Reader _meta uses getattr(usage, ..., None) → None token values must be
+    coerced to 0, not crash and not skip a real call (output_tokens present)."""
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {}}
+    _append_extra_call(parsed, {"model": "claude-opus-4-8",
+                                "input_tokens": None, "output_tokens": 300})
+    ec = parsed["_meta"]["extra_calls"]
+    assert ec == [{"model": "claude-opus-4-8", "input_tokens": 0,
+                   "output_tokens": 300, "cache_read_tokens": 0,
+                   "cache_write_tokens": 0}]
+
+
+def test_append_extra_call_priced_end_to_end():
+    """A parsed built only via _append_extra_call prices as the sum of Pass-1 +
+    each appended sub-call — the full production path in miniature."""
+    from extractor.vision_call import _append_extra_call
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    _append_extra_call(parsed, {"model": "claude-opus-4-8",
+                                "input_tokens": 10_000, "output_tokens": 800})
+    _append_extra_call(parsed, {"model": "claude-fable-5",
+                                "input_tokens": 8_000, "output_tokens": 400})
+    got = calc_meta_cost_usd(parsed["_meta"])
+    expected = (calc_claude_cost_usd(40_000, 6_000, model="claude-opus-4-8")
+                + calc_claude_cost_usd(10_000, 800, model="claude-opus-4-8")
+                + calc_claude_cost_usd(8_000, 400, model="claude-fable-5"))
+    assert got == pytest.approx(expected)
+
+
+# ── zoom fixed-crop returns its token meta (was discarded entirely) ────────────
+
+class _FakeUsage:
+    def __init__(self, i, o, cr=0, cw=0):
+        self.input_tokens = i
+        self.output_tokens = o
+        self.cache_read_input_tokens = cr
+        self.cache_creation_input_tokens = cw
+
+
+class _FakeBlock:
+    type = "text"
+    def __init__(self, text):
+        self.text = text
+
+
+class _FakeResp:
+    def __init__(self, text, usage, stop_reason="end_turn"):
+        self.content = [_FakeBlock(text)]
+        self.usage = usage
+        self.stop_reason = stop_reason
+
+
+class _FakeStreamCtx:
+    def __init__(self, resp):
+        self._resp = resp
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+    def get_final_message(self):
+        return self._resp
+
+
+class _FakeMessages:
+    def __init__(self, resp):
+        self._resp = resp
+    def stream(self, **kwargs):
+        return _FakeStreamCtx(self._resp)
+
+
+class _FakeClient:
+    def __init__(self, resp):
+        self.messages = _FakeMessages(resp)
+
+
+def test_vision_zoom_room_returns_result_and_token_meta():
+    """_vision_zoom_room must ALSO return the call's token meta (model +
+    input/output/cache) — it used to drop resp.usage entirely, so every zoom
+    call was unmetered. Output zoom dict itself is unchanged (no _meta key)."""
+    from extractor import vision_call
+    import json as _json
+    zoom_json = {"confidence_zoom": "high", "perimetras_m": 12.3}
+    resp = _FakeResp(_json.dumps(zoom_json), _FakeUsage(3000, 250, cr=1000))
+    client = _FakeClient(resp)
+    result, zmeta = vision_call._vision_zoom_room(client, "b64crop", {"nr": "1"})
+    assert result == zoom_json                       # zoom output unchanged
+    assert zmeta["input_tokens"] == 3000
+    assert zmeta["output_tokens"] == 250
+    assert zmeta["cache_read_tokens"] == 1000
+    assert zmeta["model"]                            # resolved model id present
+
+
+def test_vision_zoom_room_none_result_still_returns_meta_shape():
+    """A refusal/parse-fail returns (None, meta) — the tuple contract holds so
+    the caller never unpacks a bare None."""
+    from extractor import vision_call
+    resp = _FakeResp("not json", _FakeUsage(3000, 250), stop_reason="end_turn")
+    client = _FakeClient(resp)
+    result, zmeta = vision_call._vision_zoom_room(client, "b64crop", {"nr": "1"})
+    assert result is None
+    assert "model" in zmeta  # meta still returned so tokens for the failed-parse call are captured
+
+
+# ── _reader_call_metas: normalize voted (_round_metas) vs single-pass (_meta) ──
+
+def test_reader_call_metas_voted_returns_every_round():
+    from extractor.vision_call import _reader_call_metas
+    result = {"status": "ok", "_round_metas": [
+        {"model": "claude-opus-4-8", "input_tokens": 5000},
+        {"model": "claude-opus-4-8", "input_tokens": 5100},
+        {"model": "claude-opus-4-8", "input_tokens": 4900},
+    ]}
+    metas = _reader_call_metas(result)
+    assert [m["input_tokens"] for m in metas] == [5000, 5100, 4900]
+
+
+def test_reader_call_metas_single_pass_returns_one():
+    from extractor.vision_call import _reader_call_metas
+    result = {"status": "ok",
+              "_meta": {"model": "claude-opus-4-8", "input_tokens": 5000}}
+    metas = _reader_call_metas(result)
+    assert len(metas) == 1
+    assert metas[0]["input_tokens"] == 5000
+
+
+def test_reader_call_metas_errored_reader_returns_empty():
+    from extractor.vision_call import _reader_call_metas
+    assert _reader_call_metas({"status": "error", "_error": "boom"}) == []
+    assert _reader_call_metas({}) == []
+
+
+def test_flow_appends_each_reader_meta_into_extra_calls():
+    """Simulate the extraction merge points: append apdailos + doors +
+    (voted) door_type rounds + fixtures into ONE parsed._meta.extra_calls,
+    then price the whole thing. Proves each sub-reader's tokens are captured
+    exactly once and summed per-model on top of Pass-1."""
+    from extractor.vision_call import _append_extra_call, _reader_call_metas
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    apdailos = {"status": "ok",
+                "_meta": {"model": "claude-opus-4-8", "input_tokens": 12_000, "output_tokens": 900}}
+    doors = {"status": "ok",
+             "_meta": {"model": "claude-opus-4-8", "input_tokens": 9_000, "output_tokens": 700}}
+    door_type_voted = {"status": "ok", "_round_metas": [
+        {"model": "claude-opus-4-8", "input_tokens": 6_000, "output_tokens": 300},
+        {"model": "claude-opus-4-8", "input_tokens": 6_100, "output_tokens": 310},
+        {"model": "claude-opus-4-8", "input_tokens": 5_900, "output_tokens": 290},
+    ]}
+    fixtures = {"status": "ok",
+                "_meta": {"model": "claude-fable-5", "input_tokens": 7_000, "output_tokens": 250}}
+
+    _append_extra_call(parsed, apdailos.get("_meta"))
+    _append_extra_call(parsed, doors.get("_meta"))
+    for m in _reader_call_metas(door_type_voted):
+        _append_extra_call(parsed, m)
+    for m in _reader_call_metas(fixtures):
+        _append_extra_call(parsed, m)
+
+    assert len(parsed["_meta"]["extra_calls"]) == 1 + 1 + 3 + 1  # apdailos, doors, 3 door rounds, fixtures
+    total = calc_meta_cost_usd(parsed["_meta"])
+    expected = (
+        calc_claude_cost_usd(40_000, 6_000, model="claude-opus-4-8")  # Pass-1
+        + calc_claude_cost_usd(12_000, 900, model="claude-opus-4-8")   # apdailos
+        + calc_claude_cost_usd(9_000, 700, model="claude-opus-4-8")    # doors
+        + calc_claude_cost_usd(6_000, 300, model="claude-opus-4-8")    # door round 1
+        + calc_claude_cost_usd(6_100, 310, model="claude-opus-4-8")    # door round 2
+        + calc_claude_cost_usd(5_900, 290, model="claude-opus-4-8")    # door round 3
+        + calc_claude_cost_usd(7_000, 250, model="claude-fable-5")     # fixtures (Fable)
+    )
+    assert total == pytest.approx(expected)
