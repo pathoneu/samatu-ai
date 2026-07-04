@@ -5096,6 +5096,19 @@ async def extract_interior_endpoint(
     except Exception as _exc:
         log.warning("record_usage failed (extract-interior): %r", _exc)
 
+    # W3 billing (2026-07-04): count this successful billable extraction into
+    # the project-quota ledger — exactly once, only when BILLING_ENABLED (a
+    # hard no-op otherwise so today's behavior is byte-for-byte). Reached only
+    # on the success path (a failed/refused extraction raises before here), so
+    # failures never consume quota. project_id is None: no project row exists
+    # at extract time (same reason record_usage meters against the user).
+    try:
+        from billing.flag import billing_enabled
+        if billing_enabled() and _user and _user.get("id") and isinstance(result, dict):
+            db.record_billing_usage(_user["id"], kind="extract", project_id=None)
+    except Exception as _exc:
+        log.warning("record_billing_usage failed (extract-interior): %r", _exc)
+
     return result
 
 
