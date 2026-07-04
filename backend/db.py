@@ -210,6 +210,16 @@ def update_user_login(user_id: str) -> None:
         c.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now_iso(), user_id))
 
 
+def set_stripe_customer_id(user_id: str, customer_id: str) -> None:
+    """Persist the user's Stripe Customer id on their row (create-or-reuse).
+
+    W3 billing: written once, on first Checkout, then reused so a user maps to a
+    single Stripe customer across subscriptions and one-off purchases."""
+    with _conn() as c:
+        c.execute("UPDATE users SET stripe_customer_id = ? WHERE id = ?",
+                  (customer_id, user_id))
+
+
 def bump_session_version(user_id: str) -> int:
     """F2 (2026-07-04 pentest): invalidate every existing session for this user
     by incrementing the session_version nonce. Called on logout and on
