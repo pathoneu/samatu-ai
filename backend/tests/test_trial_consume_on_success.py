@@ -11,6 +11,9 @@ test_billing_usage_increment.py.
 """
 import asyncio
 
+import pytest
+from fastapi import HTTPException
+
 import db
 import main
 import billing.trial as trial
@@ -82,8 +85,15 @@ def test_no_company_code_no_consume(tmp_path, monkeypatch):
     monkeypatch.setenv("BILLING_ENABLED", "1")
     user = db.create_user("e@f.lt", "x", name="E")  # free, no company_code
     _patch_pipeline(monkeypatch, user_id=user["id"])
-    _run(user["id"])
-    # Nothing to consume (no company identity) — consumed_trials stays empty.
+    # With the paywall now gating /extract-interior, a free user with no company
+    # code is blocked at _check_trial_gate (403) BEFORE any extraction/consume —
+    # so the run never reaches the consume path. Strictly stronger than the old
+    # "reached the endpoint but consumed nothing" assertion.
+    with pytest.raises(HTTPException) as e:
+        _run(user["id"])
+    assert e.value.status_code == 403
+    assert e.value.detail["error"] == "company_code_required"
+    # And consumed_trials stays empty (nothing to consume, no company identity).
     with db._conn() as c:
         n = c.execute("SELECT COUNT(*) AS n FROM consumed_trials").fetchone()["n"]
     assert n == 0

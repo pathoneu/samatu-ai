@@ -394,6 +394,15 @@ def _billable_user(request: Request) -> dict:
     enforces the cap consistently — call instead of `_auth.require_user`
     everywhere a request triggers a paid Claude call.
     """
+    # TODO(billing): this helper enforces ONLY the € spend cap + reservation. The
+    # project-quota + free-trial gate lives on the project-CREATING extraction
+    # (/extract-interior — the sole endpoint that increments the project counter),
+    # NOT here. When other extract types (/extract KŽ, facade/roof/earthworks/
+    # concrete, detect-type — call sites below) become billable PROJECTS, each
+    # needs the same _check_user_quota + _check_trial_gate gate AND a matching
+    # counter increment (db.record_extract_and_maybe_consume_credit) added
+    # alongside; their quota semantics are undefined for this interior MVP, so
+    # they are intentionally left un-gated for now.
     user = _auth.require_user(request)
     _check_user_spend_cap(user["id"])
     _reserve_billable(user["id"], request.url.path)
@@ -5113,6 +5122,18 @@ async def extract_interior_endpoint(
     used backend'ui ir tiesiogiai (Python import).
     """
     _user = _billable_user(request)
+    # W3 billing (2026-07-04): project-quota + free-trial paywall. This is the
+    # sole endpoint that increments the project counter (see the success-path
+    # db.record_extract_and_maybe_consume_credit below), so the GATE belongs
+    # here — on the project CREATOR, not on the corrections. Order:
+    # _billable_user (auth + € spend cap + reserve) → quota → trial → extract →
+    # (on success) the counter increment. Both calls are HARD no-ops when
+    # BILLING_ENABLED != '1' (today's behavior, byte-for-byte). Placed BEFORE
+    # any extraction work so a blocked request does zero paid work:
+    #   _check_user_quota → 402 quota_exceeded when over the monthly project quota
+    #   _check_trial_gate → 403 company_code_required / 402 trial_used (free tier)
+    _check_user_quota(_user["id"])
+    _check_trial_gate(_user["id"])
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
 

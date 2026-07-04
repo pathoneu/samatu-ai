@@ -12,34 +12,30 @@ The non-negotiable launch invariant:
       quota slot and the 2nd is blocked (402); a pro user gets exactly 10 then
       402 on the 11th; the F2/F3 feature is gated for free, allowed for pro.
 
-APPROACH (documented per the Task-19 fallback clause):
-  The billable PAYWALL lives in `auth.require_billable_user` — that dependency
-  runs the chain spend-cap → _check_user_quota → _check_trial_gate → reserve and
-  RE-RAISES its 402/403. The `/extract-interior` endpoint, however, authenticates
-  via `main._billable_user`, which (by current design) runs only require_user +
-  spend-cap + reserve and does NOT invoke the quota/trial gates — so a TestClient
-  hit on /extract-interior returns 200 even at quota and would NOT prove the
-  paywall. (Finding surfaced by this task; see the module note below.)
+APPROACH:
+  The billable PAYWALL (project quota + free trial) lives on the project-CREATING
+  extraction — `POST /extract-interior`, the sole endpoint that increments the
+  project counter. Its handler runs the chain _billable_user (auth + € spend cap +
+  reserve) → _check_user_quota → _check_trial_gate → extract → (on success) the
+  counter increment, and its 402/403 rejections propagate to the client.
 
-  So the ON-proof exercises the gate through its REAL seam — `auth.require_billable_user`
-  (true end-to-end for the paywall) — and additionally asserts the `main._check_user_quota`
-  / `main._check_trial_gate` helper wiring directly. The OFF-proof drives the actual
-  `/extract-interior` endpoint through a TestClient (where the endpoint genuinely
-  matters — proving extractions run AND write no ledger rows when the flag is off).
+  So the ON-proof drives the gate through its REAL location — the actual
+  `/extract-interior` endpoint via a TestClient — and additionally asserts the
+  `main._check_user_quota` / `main._check_trial_gate` helper wiring directly. The
+  OFF-proof also drives `/extract-interior` (proving extractions run unlimited AND
+  write no ledger rows when the flag is off).
+
+  Corrections (the api/* routers wired with Depends(auth.require_billable_user):
+  vision_fill / lasso_rerun / cv_tools / symbols) operate on an already-created,
+  already-counted project — they keep spend-cap protection but are NOT quota/trial
+  gated. That placement is locked down separately in test_quota_gate_placement.py.
 
   Vision is fully MOCKED (zero API): `extractor.extract_interior` returns a canned
-  dict and `main._validate_pdf_upload` is neutralized. Each test uses an ISOLATED
-  temp DB (monkeypatch db._DB_PATH) so the shared dev-DB rate-limiter pollution
-  429 flake cannot leak in.
-
-  NOTE (wiring gap found while writing this proof): the quota/trial paywall is NOT
-  enforced on POST /extract-interior — it fires only on the api/* routers wired
-  with Depends(auth.require_billable_user) (vision_fill / lasso_rerun / cv_tools /
-  symbols). If the intent is to paywall the primary interior-extraction endpoint,
-  main._billable_user must call _check_user_quota + _check_trial_gate (or the route
-  must depend on auth.require_billable_user). This test proves the gate itself is
-  correct in both flag states; it deliberately does NOT assert /extract-interior
-  returns 402, because today it does not.
+  dict, `main._validate_pdf_upload` is neutralized, and `main._check_user_spend_cap`
+  is patched to a no-op so the € spend cap's hourly-extract rate-limiter cannot mask
+  the QUOTA/TRIAL gate under many TestClient calls. Each test uses an ISOLATED temp
+  DB (monkeypatch db._DB_PATH) so the shared dev-DB rate-limiter pollution 429 flake
+  cannot leak in.
 """
 from __future__ import annotations
 
@@ -81,11 +77,24 @@ def _mock_vision(monkeypatch):
                         lambda pdf_bytes, overrides: {"rooms": [], "_meta": {}})
 
 
+def _no_spend_cap(monkeypatch):
+    """Neutralize the € spend cap / hourly-extract rate-limiter so an assertion on
+    402/403 isolates the QUOTA/TRIAL gate (never a masked 429) across many calls."""
+    monkeypatch.setattr(main, "_check_user_spend_cap", lambda user_id: None)
+
+
 def _login(email):
     c = TestClient(app)
     r = c.post("/api/auth/login", json={"email": email, "password": _PW})
     assert r.status_code == 200, r.text
     return c
+
+
+def _post_extract(client):
+    return client.post(
+        "/extract-interior",
+        files={"files": ("plan.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
 
 
 def _force_user(monkeypatch, user):
@@ -174,72 +183,76 @@ def test_off_billable_gate_never_raises(tmp_path, monkeypatch):
 
 # ═════════════════════════════════════════════════════════════════════════════
 # ON proof — BILLING_ENABLED=1 ⇒ the full paywall.
-# The gate is exercised through its real seam, auth.require_billable_user, which
-# runs spend-cap → _check_user_quota → _check_trial_gate → reserve and re-raises.
+# The gate is exercised through its REAL location — POST /extract-interior, which
+# runs _billable_user (auth + spend cap + reserve) → _check_user_quota →
+# _check_trial_gate → extract → (on success) the counter increment, and whose
+# 402/403 propagate to the client. The spend cap is patched off so the assertion
+# isolates the QUOTA/TRIAL gate (no masked 429).
 # ═════════════════════════════════════════════════════════════════════════════
 
 def test_on_free_no_company_blocked_403(tmp_path, monkeypatch):
-    """Trial gate: a free user WITHOUT a company_code → 403 company_code_required."""
+    """Trial gate: a free user WITHOUT a company_code calling /extract-interior →
+    403 company_code_required."""
     _isolate(tmp_path, monkeypatch, "on_403.db")
     monkeypatch.setenv("BILLING_ENABLED", "1")
-    user = db.create_user("free403@x.lt", auth.hash_password(_PW), name="F403")
-    _force_user(monkeypatch, db.get_user_by_id(user["id"]))
-    with pytest.raises(HTTPException) as e:
-        auth.require_billable_user(_FakeRequest())
-    assert e.value.status_code == 403
-    assert e.value.detail["error"] == "company_code_required"
+    _mock_vision(monkeypatch)
+    _no_spend_cap(monkeypatch)
+    db.create_user("free403@x.lt", auth.hash_password(_PW), name="F403")
+    c = _login("free403@x.lt")
+    r = _post_extract(c)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "company_code_required"
 
 
 def test_on_free_trial_first_allows_second_blocks_402(tmp_path, monkeypatch):
-    """Trial/free end-to-end: identify the company → 1st billable call is allowed
-    (consumes trial + the single free quota slot); the 2nd is blocked with 402.
+    """Trial/free end-to-end through /extract-interior: identify the company → the
+    1st call succeeds (consumes trial + the single free quota slot); the 2nd is
+    blocked with 402.
 
     The 402 is `quota_exceeded` (the gate order is quota BEFORE trial, and the
     free quota of 1 is spent by the recorded extraction) — which satisfies the
-    Task-19 spec of "blocked (402 — trial_used and/or quota_exceeded)"."""
+    spec of "blocked (402 — trial_used and/or quota_exceeded)"."""
     _isolate(tmp_path, monkeypatch, "on_free_flow.db")
     monkeypatch.setenv("BILLING_ENABLED", "1")
+    _mock_vision(monkeypatch)
+    _no_spend_cap(monkeypatch)
     user = db.create_user("freeflow@x.lt", auth.hash_password(_PW), name="FFlow")
     db.set_user_company(user["id"], _COMPANY)
-    _force_user(monkeypatch, db.get_user_by_id(user["id"]))
+    c = _login("freeflow@x.lt")
 
-    # 1st: allowed (fresh trial, quota 1/1 free).
-    got = auth.require_billable_user(_FakeRequest())
-    assert got["id"] == user["id"]
-
-    # Simulate the /extract-interior success path: record the extraction into the
-    # quota ledger AND consume the company's one-time trial.
-    db.record_extract_and_maybe_consume_credit(user["id"])
-    assert trial.consume_trial(_COMPANY, user["id"]) is True
+    # 1st: allowed (fresh trial, quota 1/1 free) — the endpoint's own success path
+    # records the extraction into the quota ledger AND consumes the trial.
+    r1 = _post_extract(c)
+    assert r1.status_code == 200, r1.text
     assert _ledger_count(user["id"], "extract") == 1  # the free slot is now spent
+    assert trial.trial_available(_COMPANY) is False   # trial consumed on success
 
     # 2nd: blocked — 402.
-    with pytest.raises(HTTPException) as e:
-        auth.require_billable_user(_FakeRequest())
-    assert e.value.status_code == 402
-    assert e.value.detail["error"] in ("quota_exceeded", "trial_used")
+    r2 = _post_extract(c)
+    assert r2.status_code == 402, r2.text
+    assert r2.json()["detail"]["error"] in ("quota_exceeded", "trial_used")
 
 
 def test_on_pro_gets_ten_then_402_on_eleventh(tmp_path, monkeypatch):
-    """Pro: exactly 10 billable extractions succeed; the 11th → 402 quota_exceeded."""
+    """Pro through /extract-interior: exactly 10 extractions succeed; the 11th →
+    402 quota_exceeded. Each successful call increments the quota ledger via the
+    endpoint's own success path (no manual recording)."""
     _isolate(tmp_path, monkeypatch, "on_pro.db")
     monkeypatch.setenv("BILLING_ENABLED", "1")
+    _mock_vision(monkeypatch)
+    _no_spend_cap(monkeypatch)
     user = db.create_user("pro@x.lt", auth.hash_password(_PW), name="Pro")
     db.set_user_plan(user["id"], plan="pro", plan_status="active")
-    _force_user(monkeypatch, db.get_user_by_id(user["id"]))
+    c = _login("pro@x.lt")
 
     passed = 0
     for i in range(1, 12):
-        try:
-            auth.require_billable_user(_FakeRequest())
-        except HTTPException as e:
-            assert i == 11, f"pro blocked too early at call {i}"
-            assert e.status_code == 402
-            assert e.detail["error"] == "quota_exceeded"
+        r = _post_extract(c)
+        if r.status_code != 200:
+            assert i == 11, f"pro blocked too early at call {i}: {r.text}"
+            assert r.status_code == 402
+            assert r.json()["detail"]["error"] == "quota_exceeded"
             break
-        # Record the successful extraction into the quota ledger (the /extract
-        # success path does this once per call).
-        db.record_extract_and_maybe_consume_credit(user["id"])
         passed += 1
     assert passed == 10, f"expected 10 successful pro extractions, got {passed}"
     assert _ledger_count(user["id"], "extract") == 10
