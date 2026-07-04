@@ -5,7 +5,7 @@
  * Layout (left → right):
  *   [logo] {projectName} / {subtitle}  |  ← {page/total ▾} →  {pageTitle}
  *   ...flex spacer...
- *   [− zoom% +]  [🔍 Ieškoti]  [✨ Sąmatų AI]  [⋯]
+ *   [− zoom% +]  [🔍 Ieškoti]  [✨ Pathon]  [⋯]
  *
  * Sprint 3-B: dropped the Patikrinti queue badge along with the
  * verification wizard. Trust by default, fix by exception.
@@ -81,7 +81,7 @@ export function TopBar({
         padding: '6px 14px', borderRadius: 5, fontSize: 12, fontWeight: 600,
         display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
         boxShadow: '0 1px 3px rgba(42,111,181,0.3)',
-      }}>✨ Sąmatų AI</button>
+      }}>✨ Pathon</button>
       <button onClick={onMore} style={{
         background: '#fff', border: '1px solid #d4d2cb', color: '#3b3b3b',
         padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',

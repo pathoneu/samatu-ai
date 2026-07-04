@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,64 +8,65 @@
   :root {
     --font-sans: 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
 
     /* ──────────────────────────────────────────────────────────────────────
-       Sąmatų AI — Refreshed Design Tokens (2026-04-28)
-       Light, warm paper, single construction-blue accent.
-       Inspired by prototype: warm off-whites + graphite ink + restrained blue.
+       Pathon — Brand Design Tokens (2026-07-03)
+       Warm paper, graphite ink, one confident indigo accent.
+       Restraint of Linear / Vercel / Stripe with a construction-document edge.
        ────────────────────────────────────────────────────────────────────── */
 
-    /* Surfaces — warm off-whites, paper feel (#f6f5f2 / #fff / #f0eeea) */
-    --background: 45 17% 95%;            /* #f6f5f2 page */
-    --foreground: 0 0% 10%;              /* #1a1a1a graphite ink */
-    --card: 0 0% 100%;                   /* #ffffff cards/panels */
-    --card-foreground: 0 0% 10%;
+    /* Surfaces — warm paper, near-white cards */
+    --background: 60 20% 98%;            /* #FAFAF8 warm paper page */
+    --foreground: 225 14% 6%;            /* #0E0F12 graphite ink */
+    --card: 0 0% 100%;                   /* #FFFFFF cards/panels */
+    --card-foreground: 225 14% 6%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 225 14% 6%;
 
-    /* Accent — construction blue (Togal × Intercom blend, restrained) */
-    --primary: 211 62% 44%;              /* #2a6fb5 construction blue */
+    /* Accent — confident indigo (Pathon brand) */
+    --primary: 231 64% 47%;              /* #2B44C7 confident indigo */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — warm tan, used sparingly for badges */
-    --secondary: 40 12% 93%;             /* #f0eeea sub-surface */
-    --secondary-foreground: 0 0% 18%;
+    /* Secondary — crisp cool-neutral sub-surface */
+    --secondary: 240 8% 95%;             /* #F1F1F3 sub-surface */
+    --secondary-foreground: 225 12% 18%;
 
-    /* Muted — warm mid-tone for soft text + hover backgrounds */
-    --muted: 40 12% 93%;                 /* #f0eeea hover bg */
-    --muted-foreground: 30 4% 40%;       /* #6b6863 warm muted text */
+    /* Muted — cool mid-tone for soft text + hover backgrounds */
+    --muted: 240 8% 95%;                 /* #F1F1F3 hover bg */
+    --muted-foreground: 232 6% 42%;      /* #66687A cool muted text */
 
     /* Accent (component-state, NOT brand) */
-    --accent: 40 13% 90%;                /* #e8e5df selected row */
-    --accent-foreground: 0 0% 18%;
+    --accent: 240 9% 92%;                /* #E9E9ED selected row */
+    --accent-foreground: 225 12% 18%;
 
     /* Destructive (errors / red dots) — desaturated brick */
     --destructive: 0 39% 51%;            /* #b94a4a */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders — subtle, paper-like */
-    --border: 40 13% 85%;                /* #e2dfd9 default 1px */
-    --input: 40 13% 85%;
-    --ring: 211 62% 44%;                 /* match primary for focus rings */
+    /* Borders — crisp cool-neutral hairlines */
+    --border: 240 9% 89%;                /* #E1E1E6 default 1px */
+    --input: 240 9% 89%;
+    --ring: 231 64% 47%;                 /* match primary for focus rings */
 
     /* Charts (kept for future analytics) */
-    --chart-1: 211 62% 44%;
-    --chart-2: 30 4% 40%;
+    --chart-1: 231 64% 47%;
+    --chart-2: 232 6% 42%;
     --chart-3: 145 47% 33%;              /* green */
     --chart-4: 30 60% 47%;               /* amber */
-    --chart-5: 0 0% 10%;
+    --chart-5: 225 14% 6%;
 
-    --radius: 0.375rem;                  /* tighter radius for paper-feel UI */
+    --radius: 0.5rem;                    /* softer paper-feel corners */
 
-    /* Sidebar — LIGHT off-white (matches prototype's narrow icon rail) */
-    --sidebar-background: 40 14% 97%;     /* #fbfaf7 — warm paper-1 */
-    --sidebar-foreground: 30 4% 40%;      /* warm muted ink for icons */
-    --sidebar-primary: 211 62% 44%;       /* construction blue accent */
+    /* Sidebar — light cool paper (matches narrow icon rail) */
+    --sidebar-background: 60 20% 99%;     /* #FDFDFC — paper-1 */
+    --sidebar-foreground: 232 6% 42%;     /* cool muted ink for icons */
+    --sidebar-primary: 231 64% 47%;       /* indigo accent */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 13% 90%;         /* selected item bg #e8e5df */
-    --sidebar-accent-foreground: 0 0% 10%; /* graphite when active */
-    --sidebar-border: 40 13% 85%;         /* match main border */
-    --sidebar-ring: 211 62% 44%;
+    --sidebar-accent: 240 9% 92%;         /* selected item bg */
+    --sidebar-accent-foreground: 225 14% 6%; /* graphite when active */
+    --sidebar-border: 240 9% 89%;         /* match main border */
+    --sidebar-ring: 231 64% 47%;
 
     /* ──── Provenance dots (data source indicator, 3-color system) ──── */
     --source-table: 145 47% 33%;         /* #2f7d5b — slate green: from eksplikacija/spec table */
@@ -78,10 +79,10 @@
     --conf-low:  0 39% 51%;              /* red — fallback default */
 
     /* Surface elevation tiers */
-    --bg-1: 40 14% 97%;                  /* #fbfaf7 slight elevation */
-    --surface-2: 40 12% 93%;             /* hover */
-    --surface-3: 40 13% 90%;             /* selected/deep hover */
-    --border-strong: 40 9% 77%;          /* #cdc8be input/button border */
+    --bg-1: 60 20% 99%;                  /* #FDFDFC slight elevation */
+    --surface-2: 240 8% 95%;             /* hover */
+    --surface-3: 240 9% 92%;             /* selected/deep hover */
+    --border-strong: 240 8% 80%;         /* #C7C8CF input/button border */
 
     /* ──── Viewer chrome (PDF viewer ONLY — Kreo-style dark navy with cyan
             accents). Drawing area stays white; the surrounding chrome
@@ -99,38 +100,38 @@
   /* Dark mode kept identical to light for now — app is light-only by design.
      Kept block so any `.dark`-prefixed components don't break. */
   .dark {
-    --background: 45 17% 95%;
-    --foreground: 0 0% 10%;
+    --background: 60 20% 98%;
+    --foreground: 225 14% 6%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 225 14% 6%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 211 62% 44%;
+    --popover-foreground: 225 14% 6%;
+    --primary: 231 64% 47%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 40 12% 93%;
-    --secondary-foreground: 0 0% 18%;
-    --muted: 40 12% 93%;
-    --muted-foreground: 30 4% 40%;
-    --accent: 40 13% 90%;
-    --accent-foreground: 0 0% 18%;
+    --secondary: 240 8% 95%;
+    --secondary-foreground: 225 12% 18%;
+    --muted: 240 8% 95%;
+    --muted-foreground: 232 6% 42%;
+    --accent: 240 9% 92%;
+    --accent-foreground: 225 12% 18%;
     --destructive: 0 39% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 13% 85%;
-    --input: 40 13% 85%;
-    --ring: 211 62% 44%;
-    --chart-1: 211 62% 44%;
-    --chart-2: 30 4% 40%;
+    --border: 240 9% 89%;
+    --input: 240 9% 89%;
+    --ring: 231 64% 47%;
+    --chart-1: 231 64% 47%;
+    --chart-2: 232 6% 42%;
     --chart-3: 145 47% 33%;
     --chart-4: 30 60% 47%;
-    --chart-5: 0 0% 10%;
-    --sidebar-background: 40 14% 97%;
-    --sidebar-foreground: 30 4% 40%;
-    --sidebar-primary: 211 62% 44%;
+    --chart-5: 225 14% 6%;
+    --sidebar-background: 60 20% 99%;
+    --sidebar-foreground: 232 6% 42%;
+    --sidebar-primary: 231 64% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 13% 90%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 40 13% 85%;
-    --sidebar-ring: 211 62% 44%;
+    --sidebar-accent: 240 9% 92%;
+    --sidebar-accent-foreground: 225 14% 6%;
+    --sidebar-border: 240 9% 89%;
+    --sidebar-ring: 231 64% 47%;
   }
 }
 

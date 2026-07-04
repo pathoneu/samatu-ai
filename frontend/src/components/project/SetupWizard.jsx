@@ -218,7 +218,7 @@ export default function SetupWizard({ onComplete, onClose }) {
           {currentStep.id === 'welcome' && (
             <div className="bg-muted border border-border rounded-lg p-4 text-sm text-stone-700">
               <p className="mb-2">
-                <strong>Sąmatų AI</strong> dirba pagal tarptautinius industries
+                <strong>Pathon</strong> dirba pagal tarptautinius industries
                 standartus (RICS NRM2, DIN 18363, CSI MasterFormat).
               </p>
               <p>

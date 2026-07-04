@@ -111,7 +111,7 @@ export default function Sidebar({ onNavigate = null }) {
       {/* North arrow logo — matches landing + brėžinių stilius */}
       <Link
         to="/"
-        title="Sąmatų AI — į pradžią"
+        title="Pathon — į pradžią"
         className="mx-auto mb-4 flex items-center justify-center"
         style={{
           width: 32, height: 32,

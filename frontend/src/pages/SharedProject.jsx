@@ -216,7 +216,7 @@ export default function SharedProject() {
 
         <div className="mt-10 pt-4 border-t border-border text-center">
           <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-            <ArrowLeft className="w-3 h-3" /> Sąmatų AI
+            <ArrowLeft className="w-3 h-3" /> Pathon
           </Link>
         </div>
       </div>

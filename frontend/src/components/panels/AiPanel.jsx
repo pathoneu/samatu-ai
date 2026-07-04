@@ -2,7 +2,7 @@
 /**
  * Sprint 3: AI tab content.
  *
- * - "Run Sąmatų AI" button (calls existing /extract-interior)
+ * - "Run Pathon" button (calls existing /extract-interior)
  * - Recent runs list (timestamps, page count, ✓/✗ status)
  * - Click history item → loads that run back into Kiekiai (Sprint 4)
  *
@@ -22,7 +22,7 @@ export function AiPanel({ onRunAi, isRunning = false, recentRuns = [] }) {
           cursor: isRunning ? 'wait' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}>
-          {isRunning ? '⏳ AI dirba…' : '✨ Paleisti Sąmatų AI'}
+          {isRunning ? '⏳ AI dirba…' : '✨ Paleisti Pathon'}
         </button>
         <p style={{ marginTop: 10, fontSize: 11, color: '#6b6863', lineHeight: 1.5 }}>
           AI peržvelgs visus puslapius ir užpildys KŽ pozicijas. Esamos

@@ -1,5 +1,5 @@
 // Phase C-1 Task 24: MobileViewOnlyBanner — bottom banner shown to
-// coarse-pointer (touch) devices stating that Sąmatų AI editing is
+// coarse-pointer (touch) devices stating that Pathon editing is
 // desktop-only. Mobile editing is Phase D. Dismissal persisted to
 // localStorage so the banner only nags once per device.
 

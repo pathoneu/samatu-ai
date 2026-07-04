@@ -521,7 +521,7 @@ export function importProjectsBackup(jsonText, opts = {}) {
     throw new Error('Failas neatitinka backup struktūros (laukiamas { version, projects: [], settings })');
   }
   if (parsed.version > BACKUP_VERSION) {
-    throw new Error(`Backup'as iš naujesnės versijos (${parsed.version}). Atnaujink Sąmatų AI ir bandyk vėl.`);
+    throw new Error(`Backup'as iš naujesnės versijos (${parsed.version}). Atnaujink Pathon ir bandyk vėl.`);
   }
   // Sprint §AUDIT (2026-04-29): explicit version migration table. Old
   // backups silently succeeded; now we apply known migrations + warn user

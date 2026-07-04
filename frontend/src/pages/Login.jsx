@@ -50,7 +50,7 @@ export default function Login() {
         <div className="border border-border bg-card rounded-xl p-6">
           <h1 className="text-xl font-semibold mb-1">Prisijungti</h1>
           <p className="text-sm text-muted-foreground mb-6">
-            Naudoti Sąmatų AI — įveskite savo el. paštą ir slaptažodį.
+            Naudoti Pathon — įveskite savo el. paštą ir slaptažodį.
           </p>
 
           {error && (

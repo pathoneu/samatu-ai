@@ -19,7 +19,7 @@ export default function Terms() {
 
           <h2>1. Paslaugos aprašymas</h2>
           <p>
-            Sąmatų AI yra dirbtinio intelekto pagalba veikianti vidaus apdailos
+            Pathon yra dirbtinio intelekto pagalba veikianti vidaus apdailos
             sąmatų skaičiavimo paslauga. Įkėlus statybos projekto PDF brėžinį,
             sistema automatiškai atpažįsta patalpas, matmenis ir pateikia
             kiekių žiniaraštį (m², m, vnt.) be kainų.
@@ -54,7 +54,7 @@ export default function Terms() {
 
           <h2>5. Atsakomybės ribojimas</h2>
           <p>
-            Sąmatų AI atsakomybė ribojama suma, sumokėta už paslaugą per
+            Pathon atsakomybė ribojama suma, sumokėta už paslaugą per
             pastaruosius 12 mėnesių. Mes neatsakome už netiesioginius nuostolius,
             negautas pajamas ar trečiųjų asmenų pretenzijas, kilusias dėl
             naudojimosi paslauga.

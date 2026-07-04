@@ -24,7 +24,7 @@ export default function Privacy() {
 
           <h2>1. Duomenų valdytojas</h2>
           <p>
-            Šią paslaugą tiekia <strong>Pathon, MB</strong> (toliau — „Sąmatų AI",
+            Šią paslaugą tiekia <strong>Pathon, MB</strong> (toliau — „Pathon",
             „mes" arba „mūsų"). Įmonės kodas: registruojama LT registrų centre.
             Kontaktai duomenų klausimais: <a href="mailto:solutions@pathon.eu">solutions@pathon.eu</a>.
           </p>
