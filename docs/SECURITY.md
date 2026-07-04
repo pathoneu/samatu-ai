@@ -122,6 +122,7 @@ Config, not code — the app is safe only when the environment is correct:
 - **`GET /api/legends/architect/{architect}`** requires login but not per-architect ownership — by design (architect legends are built only from a user's own verified projects).
 - **CSRF** relies on `SameSite=lax` + credentialed CORS allowlist; no explicit CSRF tokens. Pass 4 confirmed no exploitable vector (no state-changing GET, cross-site POST can't carry the cookie). Re-evaluate if cross-origin embedding is ever added.
 - **Spend caps are env-disabled during beta.** The reservation path is exploit-safe when enabled; re-enable tiered (admin/free/paid) when the payment wall ships.
+- **`POST /api/billing/v2/webhook` is intentionally unauthenticated** (Stripe, not a logged-in user, calls it) but **Stripe-signature-verified**: the raw request bytes are checked against `STRIPE_WEBHOOK_SECRET` via `stripe_client.construct_event`; a missing/tampered signature or unset secret → **400** before any handler runs. Events are de-duped on `event.id` (a re-delivery is a 200 no-op), and a handler exception never 500s the endpoint. Accepted — the signature is the auth. **Invoice retrieval is owner-scoped:** `GET /api/billing/v2/invoices/{id}` runs `db.get_invoice(id, user_id=caller)`, so a non-owner (or unknown) id returns **404, not 403** — same no-existence-leak convention as `get_project` (§3).
 
 ## 11. Secrets & rotation runbook
 
