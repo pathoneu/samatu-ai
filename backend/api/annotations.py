@@ -24,7 +24,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Request
+
+import auth as _auth
+import db as _db
 
 # Storage root. Lives under backend/data so it inherits the existing
 # .gitignore rule (backend/data/*.db) without polluting source control.
@@ -46,10 +49,29 @@ def _path_for(project_id: str) -> Path:
     return DATA_ROOT / f"{project_id}.json"
 
 
+def _require_project_access(request: Request, project_id: str) -> dict:
+    """Auth + ownership gate (F1, 2026-07-04 pentest).
+
+    These file-backed annotation routes previously had NO auth and NO ownership
+    check — any anonymous caller who knew a project UUID could read/overwrite/
+    DELETE that project's annotations. Mirror the owner-scoping guard used across
+    main.py's project routes and exports_v2._require_project_access: require a
+    logged-in user (401 if not), then scope db.get_project to the caller (admins
+    see all). A missing/foreign project returns 404 — NOT 403 — so we don't leak
+    the existence of other users' projects. Returns the caller's user dict.
+    """
+    user = _auth.require_user(request)  # 401 if not logged in
+    user_filter = None if user.get("is_admin") else user["id"]
+    if _db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    return user
+
+
 @router.get("/{project_id}/annotations")
-def get_annotations(project_id: str) -> dict[str, Any]:
+def get_annotations(project_id: str, request: Request) -> dict[str, Any]:
     """Return the saved annotation payload for a project, or an empty
     stub when nothing is saved yet."""
+    _require_project_access(request, project_id)
     p = _path_for(project_id)
     if not p.exists():
         return {
@@ -70,6 +92,7 @@ def get_annotations(project_id: str) -> dict[str, Any]:
 @router.put("/{project_id}/annotations")
 def put_annotations(
     project_id: str,
+    request: Request,
     payload: dict[str, Any] = Body(...),
 ) -> dict[str, Any]:
     """Overwrite the project's annotation payload.
@@ -79,6 +102,7 @@ def put_annotations(
     format. We just stamp ``schema_version`` and ``updated_at`` so
     consumers can detect staleness.
     """
+    _require_project_access(request, project_id)
     p = _path_for(project_id)
 
     if not isinstance(payload, dict):
@@ -104,7 +128,8 @@ def put_annotations(
 
 
 @router.delete("/{project_id}/annotations")
-def delete_annotations(project_id: str) -> dict[str, Any]:
+def delete_annotations(project_id: str, request: Request) -> dict[str, Any]:
+    _require_project_access(request, project_id)
     p = _path_for(project_id)
     existed = p.exists()
     if existed:

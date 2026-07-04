@@ -17,8 +17,19 @@ import api.legends as legends  # noqa: E402
 
 @pytest.fixture
 def client(tmp_path: Path):
-    with patch.object(legends, "LEGENDS_DIR", tmp_path), \
+    # Legend routes are now ownership-gated (F1, 2026-07-04). require_user must
+    # resolve to the dev user (dev bypass); AUTH_DISABLED can be frozen False by
+    # import order across the suite, so force it on here (restored at teardown),
+    # then create the dev-owned project rows the ownership check expects.
+    import db as _db
+    import auth as _auth
+    with pytest.MonkeyPatch.context() as mp, \
+         patch.object(legends, "LEGENDS_DIR", tmp_path), \
          patch.object(legends, "ARCHITECT_DIR", tmp_path / "architect"):
+        mp.setattr(_auth, "AUTH_DISABLED", True)
+        dev = _auth._ensure_dev_user()
+        for pid in ("p1", "p2", "url_id"):
+            _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])
         from main import app
         yield TestClient(app)
 

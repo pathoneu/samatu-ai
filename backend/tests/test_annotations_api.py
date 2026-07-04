@@ -23,7 +23,21 @@ def client(tmp_path_factory):
     from fastapi import FastAPI
     app = FastAPI()
     app.include_router(ann_mod.router)
-    return TestClient(app)
+    # The annotation verbs are now ownership-gated (F1, 2026-07-04). This minimal
+    # app never imports main, so auth.AUTH_DISABLED was never populated from .env
+    # and no SessionMiddleware is installed — force the dev bypass on so
+    # require_user resolves to the dev user without a session cookie. Then create
+    # the project rows the ownership check expects, owned by that dev user.
+    # MonkeyPatch context manager restores AUTH_DISABLED so this module can't
+    # leak the dev bypass into tests that rely on real auth (e.g. test_export_auth).
+    import auth as _auth
+    import db as _db
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_auth, "AUTH_DISABLED", True)
+        dev = _auth._ensure_dev_user()
+        for pid in ("test-project", "to-delete"):
+            _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])
+        yield TestClient(app)
 
 
 def test_get_empty_returns_stub(client):

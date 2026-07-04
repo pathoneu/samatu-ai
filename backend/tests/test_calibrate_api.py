@@ -24,7 +24,27 @@ def client(tmp_path_factory):
     calib_mod.CALIB_ROOT = tmp_path_factory.mktemp("calibrations")
     app = FastAPI()
     app.include_router(calib_mod.router)
-    return TestClient(app)
+    # The GET/DELETE calibration verbs are now ownership-gated (F1, 2026-07-04).
+    # This minimal app never imports main, so auth.AUTH_DISABLED was never
+    # populated from .env and no SessionMiddleware is installed — force the dev
+    # bypass on so require_user resolves to the dev user without a session cookie.
+    # MonkeyPatch context restores AUTH_DISABLED at teardown so real-auth tests
+    # (e.g. test_export_auth) are unaffected.
+    import auth as _auth
+    import db as _db
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_auth, "AUTH_DISABLED", True)
+        dev = _auth._ensure_dev_user()
+        for pid in ("unknown", "round-trip-test", "to-delete-calib"):
+            _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])
+        yield TestClient(app)
+
+
+@pytest.fixture(scope="module")
+def dev_owned():
+    """Marker dependency so ownership-gated GET/DELETE tests request the client
+    fixture (which sets up the dev bypass + dev-owned project rows)."""
+    return True
 
 
 def test_compute_factors_pure_function():
@@ -82,7 +102,7 @@ def test_endpoint_returns_factors_on_fixture(client):
     assert "led_nisos_m" in body["factors"]
 
 
-def test_get_returns_stub_for_uncalibrated_project(client):
+def test_get_returns_stub_for_uncalibrated_project(client, dev_owned):
     r = client.get("/api/projects/unknown/calibrate")
     assert r.status_code == 200
     body = r.json()
@@ -90,7 +110,7 @@ def test_get_returns_stub_for_uncalibrated_project(client):
     assert body["factors"] == {}
 
 
-def test_round_trip_put_then_get(client):
+def test_round_trip_put_then_get(client, dev_owned):
     payload = {"overrides": {"led_nisos_m": 42.30}}
     r1 = client.post("/api/projects/round-trip-test/calibrate?fixture=berzas",
                      json=payload)
@@ -113,7 +133,7 @@ def test_non_numeric_override_rejected(client):
     assert r.status_code == 400
 
 
-def test_delete_clears_calibration(client):
+def test_delete_clears_calibration(client, dev_owned):
     client.post("/api/projects/to-delete-calib/calibrate?fixture=berzas",
                 json={"overrides": {"led_nisos_m": 42.30}})
     r = client.delete("/api/projects/to-delete-calib/calibrate")

@@ -125,6 +125,21 @@ def _load_project_for_calibration(
     return proj
 
 
+def _require_project_access(request: Request, project_id: str) -> dict:
+    """Auth + ownership gate for the GET/DELETE calibration verbs (F1,
+    2026-07-04 pentest). POST was correctly gated via
+    _load_project_for_calibration; GET (:228) and DELETE (:243) were missed —
+    they read/deleted the per-project calibration file (which carries the user's
+    KNOWN category totals) keyed only by project_id, with no auth. Require a
+    login (401), scope db.get_project to the caller (admins see all); missing/
+    foreign project → 404 (do not leak existence)."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if _db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    return user
+
+
 def compute_factors(
     parsed: dict[str, Any],
     overrides: dict[str, float],
@@ -226,8 +241,9 @@ async def calibrate_project(
 
 
 @router.get("/{project_id}/calibrate")
-async def get_calibration(project_id: str) -> dict[str, Any]:
+async def get_calibration(project_id: str, request: Request) -> dict[str, Any]:
     project_id = _safe_project_id(project_id)
+    _require_project_access(request, project_id)
     p = _calib_path(project_id)
     if not p.exists():
         return {
@@ -241,8 +257,9 @@ async def get_calibration(project_id: str) -> dict[str, Any]:
 
 
 @router.delete("/{project_id}/calibrate")
-async def delete_calibration(project_id: str) -> dict[str, Any]:
+async def delete_calibration(project_id: str, request: Request) -> dict[str, Any]:
     project_id = _safe_project_id(project_id)
+    _require_project_access(request, project_id)
     p = _calib_path(project_id)
     existed = p.exists()
     if existed:
