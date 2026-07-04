@@ -1,6 +1,6 @@
 # Pathon Pricing & Margin Model (W3.2)
 
-**Status:** DRAFT for founder decision gate (2026-07-04). Tiers here are a **proposal**; Stripe build (W3.3) does not start until these are approved.
+**Status:** Founder-approved tiers (2026-07-04): **Pro €49/10 · Studio €149/40 · one-off €12/project · free trial (anti-abuse TBD)**. True-cost measured run in progress to confirm Studio margin. Stripe build (W3.3) starts after the measured number lands.
 
 **Locked cost basis:** Opus 4.8 + native-PDF Pass-1, voting×3 (the accuracy-locked config). All figures EUR. Anthropic USD→EUR at 0.93.
 
@@ -61,12 +61,23 @@ Margin at **full utilization** (user consumes all included projects — the cons
 
 ## 3. Proposed tiers (recommended)
 
-| Tier | €/mo | Incl. | Overage | €/proj (full) | Margin @€2 | Change |
+| Tier | €/mo | Incl. | Overage | €/proj (full) | Margin @€2 | Status |
 |---|---|---|---|---|---|---|
-| **Trial** | 0 | 1 project **one-time** | — | — | CAC (bounded) | was 1/mo → one-time |
-| **Vienkartinis** (one-off) | €12 / project | — | — | 12.00 | **83%** | **NEW** |
-| **Pro** | 49 | 10/mo | €8 | 4.90 | 59% | keep |
-| **Studio** | **149** | 40/mo | €5 | 3.73 | **46%** | €129→€149 |
+| **Nemokamas bandymas** (trial) | 0 | 1 project | — | — | CAC (bounded) | ✅ approved; anti-abuse = §3a |
+| **Vienkartinis** (one-off) | €12 / project | — | — | 12.00 | **83%** | ✅ approved |
+| **Pro** | 49 | 10/mo | €8 | 4.90 | 59% | ✅ approved (keep) |
+| **Studio** | **149** | 40/mo | €5 | 3.73 | **46%** | ✅ approved (€129→€149) |
+
+### 3a. Free-trial anti-abuse (founder concern: stop serial-signup free riders)
+
+Layered, B2B-native, server-enforced. The core idea: the free-project entitlement is tied to a **verified company identity that persists across account deletion**, not to a disposable account row.
+
+1. **Email verification** (baseline) — no unverified account gets the trial.
+2. **One trial per LT company code (įmonės kodas), enforced server-side** — required at signup (it's invoice data we need anyway for the PVM sąskaita-faktūra). Uniqueness checked against a `consumed_trials` table keyed by normalized company code, which persists **independently of the user row** — deleting/recreating an account with the same company does NOT reset the trial. Optionally validate the code against the LT business registry (Registrų centras JAR) for existence, not just format.
+3. **Reservation hard cap** already bounds per-account spend (a compromised trial can't run unlimited projects).
+4. **Escalation ladder if telemetry shows abuse** (do NOT build upfront): (a) card-on-file for the trial via Stripe SetupIntent — the single strongest deterrent (Stripe Radar flags duplicate cards), at the cost of top-of-funnel friction; (b) phone/SMS verification. Add only if the company-code gate proves insufficient.
+
+**Open fork for founder:** require a card on file to start the trial (max protection, less funnel) vs company-code-gated-only (more signups, rely on escalation if abused). Recommendation: **company-code-gated-only at launch** — real customers give the company code willingly, abusers would need many registered companies, and card-required trials suppress exactly the skeptical-contractor top-of-funnel you're trying to win. Keep the card-on-file path built-but-off as the escalation lever.
 
 - **One-off €12/project:** 83% margin, no commitment — the try-a-real-project entry point. (A contractor bills their client hundreds for a sąmata; €12 is trivially justified.)
 - **Studio €149/40:** clears the 40% floor at conservative COGS (46%). Alt if you prefer to hold €129: cut included to **30** (€4.30/proj → 53%).
@@ -98,11 +109,12 @@ This is *good news* for margins — no 21% haircut on the tiers above.
 
 ---
 
-## 7. Recommendation to founder (the gate)
+## 7. Decisions (2026-07-04 founder gate)
 
-1. **Approve Pro €49/10 and the €12 one-off as-is** (margins robust).
-2. **Pick a Studio fix:** €149/40 (46%) *or* €129/30 (53%).
-3. **Trial:** one-time 1-project (bounded CAC) vs the current 1/month.
-4. **Green-light the ~€5–7 measured run** to nail the exact COGS multiplier before Studio is finalized — or say "ship on the conservative estimate, don't spend."
+- **Pro €49/10** — approved, keep.
+- **Studio €149/40** — approved (was €129/40; now 46% margin, clears the floor).
+- **One-off €12/project** — approved (new SKU, 83% margin).
+- **Free trial** — approved in principle; anti-abuse per §3a (company-code-gated, server-persistent entitlement); card-on-file escalation built-but-off. Card-vs-no-card-for-trial fork pending final founder call.
+- **Measured cost run** — approved (~€5–7); in progress on the complete meter to replace the estimate band with an exact multiplier and confirm Studio's 46%.
 
-On approval, W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).
+Next: once the measured number lands, W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator + the trial anti-abuse gate, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).
