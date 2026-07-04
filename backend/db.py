@@ -781,6 +781,89 @@ def _migrate_schema() -> None:
                 created_at TEXT NOT NULL
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_billing_usage_user_time ON billing_usage(user_id, created_at)")
+        # webhook_events: Stripe delivery de-dup. event_id is the PRIMARY KEY, so
+        # a re-delivered event fails the INSERT (IntegrityError) — seen_webhook
+        # turns that into an atomic "already processed" signal, guaranteeing each
+        # event's effect (credit grant, plan mutation) is applied exactly once.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id    TEXT PRIMARY KEY,
+                received_at TEXT NOT NULL
+            )""")
+
+
+# ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────
+
+def seen_webhook(event_id: str) -> bool:
+    """Atomically record a Stripe event id and report whether it was ALREADY
+    seen. Try to INSERT; on IntegrityError (the PRIMARY KEY already holds this
+    id) the event is a re-delivery → return True. A fresh insert → return False
+    (this caller owns applying the effect). This is the idempotency keystone: two
+    concurrent deliveries race on the same INSERT and exactly one wins.
+
+    An empty event_id is treated as "new" (returns False) so a malformed event
+    still flows to the handlers, which defend themselves with .get()."""
+    if not event_id:
+        return False
+    try:
+        with _conn() as c:
+            c.execute(
+                "INSERT INTO webhook_events (event_id, received_at) VALUES (?, ?)",
+                (event_id, _now_iso()),
+            )
+        return False
+    except sqlite3.IntegrityError:
+        return True
+
+
+def get_user_by_stripe_customer_id(customer_id: str) -> dict | None:
+    """Resolve a user row from their Stripe Customer id. Used by subscription /
+    invoice webhooks, which carry `customer` but not our internal user id.
+    Returns None for an unknown / empty customer id (handler logs + skips)."""
+    if not customer_id:
+        return None
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM users WHERE stripe_customer_id = ?", (customer_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+# Sentinel so set_user_plan can distinguish "leave stripe_subscription_id
+# untouched" (default) from "explicitly clear it to NULL" (pass None).
+_UNSET = object()
+
+
+def set_user_plan(user_id: str, plan: str | None = None,
+                  plan_status: str | None = None,
+                  stripe_subscription_id: object = _UNSET,
+                  current_period_end: str | None = None) -> None:
+    """Mirror Stripe subscription state onto the users row. Updates ONLY the
+    fields explicitly provided — a bare call is a no-op. `plan`, `plan_status`,
+    and `current_period_end` are updated when non-None; `stripe_subscription_id`
+    is updated whenever it is passed at all (including None, to clear it on
+    cancellation) via the _UNSET sentinel. No-ops for an empty user_id."""
+    if not user_id:
+        return
+    sets: list[str] = []
+    params: list[object] = []
+    if plan is not None:
+        sets.append("plan = ?")
+        params.append(plan)
+    if plan_status is not None:
+        sets.append("plan_status = ?")
+        params.append(plan_status)
+    if stripe_subscription_id is not _UNSET:
+        sets.append("stripe_subscription_id = ?")
+        params.append(stripe_subscription_id)
+    if current_period_end is not None:
+        sets.append("current_period_end = ?")
+        params.append(current_period_end)
+    if not sets:
+        return
+    params.append(user_id)
+    with _conn() as c:
+        c.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", params)
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────
