@@ -976,9 +976,47 @@ def _meta_rollup(parsed: dict, wall_time_s: float,
     }
 
 
+# ── Experiments (2026-07-04 accuracy deep-dive #5-7) ──────────────────────────
+# Each experiment is an opt-in env var read by the pipeline at call time.
+# _apply_experiment_env sets it BEFORE the (lazy) pipeline import in
+# run_pipeline_vision, and returns a filesystem-safe tag for the run dir.
+_EXPERIMENT_ENVS = ("SAMATU_PDF_NATIVE", "SAMATU_ZOOM_AGENTIC",
+                    "SAMATU_VOTING_MODELS")
+
+
+def _apply_experiment_env(spec: str) -> str:
+    """Translate an --experiment spec into pipeline env vars.
+
+    Specs:
+      native-pdf          → SAMATU_PDF_NATIVE=1   (pass-1 document block)
+      agentic-zoom        → SAMATU_ZOOM_AGENTIC=1 (model-driven crop loop)
+      mixed-vote:<m1,m2>  → SAMATU_VOTING_MODELS=<m1,m2> (model per round)
+
+    Returns the run-dir tag (eval_runs/<model-or-config>__<tag>/).
+    """
+    if spec == "native-pdf":
+        os.environ["SAMATU_PDF_NATIVE"] = "1"
+        return "native-pdf"
+    if spec == "agentic-zoom":
+        os.environ["SAMATU_ZOOM_AGENTIC"] = "1"
+        return "agentic-zoom"
+    if spec.startswith("mixed-vote:"):
+        models = spec.split(":", 1)[1].strip()
+        if not models or not [m for m in models.split(",") if m.strip()]:
+            raise SystemExit(
+                "--experiment mixed-vote needs a model list, e.g. "
+                "--experiment mixed-vote:claude-fable-5,claude-fable-5,claude-opus-4-8")
+        os.environ["SAMATU_VOTING_MODELS"] = models
+        return "mixed-vote_" + models.replace(",", "+").replace(" ", "")
+    raise SystemExit(
+        f"unknown --experiment {spec!r} — expected native-pdf | agentic-zoom "
+        f"| mixed-vote:<m1,m2,...>")
+
+
 def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
             apply_calibration: bool = False, track_drift: bool = False,
-            verbose: bool = False, model: str | None = None) -> int:
+            verbose: bool = False, model: str | None = None,
+            experiment: str | None = None) -> int:
     truth = _load_truth(project_id)
     entry = REGISTRY[project_id]
 
@@ -1013,7 +1051,15 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # W1.2: benchmark runs (--model) are namespaced per model so Opus and
     # Fable runs can never overwrite or be confused with each other.
-    base_dir = EVAL_RUNS_ROOT / model if model else EVAL_RUNS_ROOT
+    # Experiments (2026-07-04) are additionally tagged:
+    # eval_runs/<model-or-config>__<experiment>/ — an experiment run can
+    # never be confused with a baseline run of the same model.
+    if experiment:
+        base_dir = EVAL_RUNS_ROOT / f"{model or 'default-config'}__{experiment}"
+    elif model:
+        base_dir = EVAL_RUNS_ROOT / model
+    else:
+        base_dir = EVAL_RUNS_ROOT
     run_dir = base_dir / f"{ts}_{project_id}_{mode}"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "parsed.json").write_text(json.dumps(parsed, ensure_ascii=False, indent=2))
@@ -1021,6 +1067,7 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
         "project": project_id,
         "mode": mode,
         "model": meta_rollup["model"],
+        "experiment": experiment,
         "summary": summary,
         "meta_rollup": meta_rollup,
         "metrics": [r.__dict__ for r in results],
@@ -1489,6 +1536,13 @@ def main() -> int:
                          "extracts were produced by a different model and "
                          "scoring them under this label would corrupt the "
                          "benchmark. Output lands in eval_runs/<model>/...")
+    ap.add_argument("--experiment", default=None, metavar="SPEC",
+                    help="2026-07-04 accuracy A/B axis: "
+                         "native-pdf | agentic-zoom | mixed-vote:<m1,m2,...>. "
+                         "Sets the experiment env var BEFORE the (lazy) "
+                         "pipeline import. REQUIRES --vision (same guard as "
+                         "--model: experiments must be FRESH reads). Output "
+                         "lands in eval_runs/<model-or-config>__<experiment>/")
     args = ap.parse_args()
 
     if args.model:
@@ -1511,6 +1565,23 @@ def main() -> int:
         os.environ["MODEL_OVERRIDE"] = args.model
         print(f"  MODEL_OVERRIDE={args.model} (fresh --vision run; "
               f"output → eval_runs/{args.model}/)")
+
+    experiment_tag = None
+    if args.experiment:
+        # Same guard as --model: a cached extract was produced WITHOUT the
+        # experiment env, so scoring it under an experiment label would
+        # corrupt the A/B. Fresh Vision reads only.
+        if not args.vision:
+            raise SystemExit(
+                "--experiment requires --vision: experiment runs must be "
+                "FRESH Vision extractions. Cached/replayed/GT-input modes "
+                "would score a non-experiment extract under this label."
+            )
+        # Set env BEFORE run_one → run_pipeline_vision lazily imports
+        # extractor.vision_call, whose experiment gates read env at call time.
+        experiment_tag = _apply_experiment_env(args.experiment)
+        print(f"  EXPERIMENT {args.experiment} (fresh --vision run; output → "
+              f"eval_runs/{args.model or 'default-config'}__{experiment_tag}/)")
 
     if args.human_corpus:
         import json as _json
@@ -1542,7 +1613,8 @@ def main() -> int:
                    apply_calibration=args.apply_calibration,
                    track_drift=args.track_drift,
                    verbose=args.verbose,
-                   model=args.model)
+                   model=args.model,
+                   experiment=experiment_tag)
 
 
 if __name__ == "__main__":
