@@ -450,6 +450,41 @@ class FrontendErrorPayload(BaseModel):
 # F7 (2026-07-04 pentest): bound the unauthenticated frontend error sink.
 _LOG_ERROR_MSG_CAP = 2 * 1024    # 2 KB
 _LOG_ERROR_STACK_CAP = 8 * 1024  # 8 KB
+# F8 (2026-07-04 pentest follow-up): cap the raw request body BEFORE buffering it.
+# A legit client error report = message (≤2 KB logged) + optional stack (≤8 KB
+# logged) + a few small string fields. 64 KB is generous headroom above any real
+# payload yet rejects the memory-amplification PoC (pentest accepted a 20 MB body
+# because FastAPI buffered + JSON-parsed it into the Pydantic model before our
+# truncation ran). This cap is SCOPED to /api/log-error only — the PDF upload
+# endpoints keep their own 200 MB limit (_validate_pdf_upload); no global cap.
+_LOG_ERROR_BODY_CAP = 64 * 1024  # 64 KB
+
+
+async def _read_body_capped(request: Request, cap: int) -> bytes:
+    """Read the request body but refuse to buffer more than `cap` bytes.
+
+    Rejects with 413 BEFORE the whole body is in memory. Content-Length is
+    checked first (fast path) but not trusted alone — it can be absent on
+    chunked transfers or spoofed, so the actual stream is also bounded: we stop
+    and raise as soon as the accumulated chunks exceed the cap.
+    """
+    # Fast reject on a declared oversize length (don't even start streaming).
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            if int(cl) > cap:
+                raise HTTPException(status_code=413, detail="Užklausa per didelė.")
+        except ValueError:
+            pass  # malformed header — fall through to the stream-level guard
+    # Stream-level guard: covers chunked / absent / spoofed Content-Length.
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > cap:
+            raise HTTPException(status_code=413, detail="Užklausa per didelė.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _strip_control_chars(s: str | None, cap: int) -> str:
@@ -466,17 +501,30 @@ def _strip_control_chars(s: str | None, cap: int) -> str:
 
 
 @app.post("/api/log-error")
-async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
+async def log_frontend_error(request: Request):
     """Frontend ErrorBoundary + manual try/catch can POST here.
     Lightweight error sink — production should swap for Sentry SDK.
 
     Stays unauthenticated (the frontend must be able to report errors even before
-    login / when auth itself breaks) but is bounded: per-IP rate limit + length
-    caps + control-char stripping so it can't be used to flood the log file or
-    inject forged log lines (F7, 2026-07-04 pentest).
+    login / when auth itself breaks) but is bounded: per-IP rate limit + a 64 KB
+    raw-body cap (F8) + length caps + control-char stripping so it can't be used
+    to flood the log file, inject forged log lines (F7), or amplify memory by
+    forcing us to buffer a huge body (F8, 2026-07-04 pentest follow-up).
+
+    The handler takes the raw Request (not a Pydantic body param) on purpose:
+    binding `payload: FrontendErrorPayload` would make FastAPI buffer + JSON-parse
+    the WHOLE body before our code runs, re-opening the memory-amplification hole.
+    We cap the raw read first, THEN parse.
     """
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "log-error")  # 429 on overflow
+    # F8: reject oversized bodies BEFORE buffering the whole thing.
+    raw = await _read_body_capped(request, _LOG_ERROR_BODY_CAP)  # 413 on overflow
+    try:
+        payload = FrontendErrorPayload.model_validate_json(raw)
+    except Exception:
+        # Malformed JSON / wrong shape — generic 400, no parser detail leaked.
+        raise HTTPException(status_code=400, detail="Neteisingas užklausos formatas.")
     log.error(
         "[FRONTEND] component=%s url=%s ip=%s msg=%s\nstack: %s",
         _strip_control_chars(payload.component or "?", 256),
