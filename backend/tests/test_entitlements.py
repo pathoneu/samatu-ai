@@ -57,14 +57,22 @@ def test_flag_off_never_exceeds(monkeypatch, tmp_path):
     assert ent.quota_exceeded(u) is False   # flag OFF ⇒ no enforcement
 
 
-def test_oneoff_never_quota_blocks(monkeypatch, tmp_path):
-    """one-off users are gated at purchase, not by a monthly quota."""
+def test_oneoff_is_a_credit_not_an_unlimited_plan(monkeypatch, tmp_path):
+    """A one-off is a non-expiring CREDIT, not a plan state.
+
+    Old (buggy) behavior: plan="oneoff" short-circuited quota_exceeded to False,
+    handing the buyer UNLIMITED projects. New model: a user is never on this
+    plan; a one-off is +1 credit added to their real tier's remaining. Here a
+    free user (quota 1) + 1 credit gets exactly 2 projects, then is blocked."""
     _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("BILLING_ENABLED", "1")
-    u = _mkuser(id="o1", plan="oneoff")
-    for _ in range(5):
-        db.record_billing_usage("o1", kind="extract")
-    assert ent.quota_exceeded(u) is False
+    u = _mkuser(id="o1", plan="free")
+    db.grant_oneoff_credit("o1")
+    assert ent.projects_remaining(u) == 2        # 1 monthly + 1 credit
+    db.record_billing_usage("o1", kind="extract")           # monthly slot
+    db.record_billing_usage("o1", kind="extract")           # credit slot
+    db.record_billing_usage("o1", kind="credit_consumed")   # draw the credit
+    assert ent.quota_exceeded(u) is True         # both exhausted ⇒ blocked
 
 
 def test_feature_gate(monkeypatch):
@@ -102,10 +110,12 @@ def test_subscriber_period_window(monkeypatch, tmp_path):
 
 
 def test_kind_filter(monkeypatch, tmp_path):
-    """Only rows of the requested kind count toward projects_used."""
+    """Only kind='extract' rows count toward projects_used; credit-ledger rows
+    (credit_granted / credit_consumed) never inflate the monthly counter."""
     _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("BILLING_ENABLED", "1")
     u = _mkuser(id="k1", plan="pro")
     db.record_billing_usage("k1", kind="extract")
-    db.record_billing_usage("k1", kind="oneoff-credit")
+    db.grant_oneoff_credit("k1")                         # credit_granted row
+    db.record_billing_usage("k1", kind="credit_consumed")
     assert ent.projects_used(u) == 1

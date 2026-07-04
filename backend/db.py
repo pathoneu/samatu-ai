@@ -577,6 +577,39 @@ def rolled_over_credits(user_id: str) -> int:
     return 0
 
 
+# ── One-off credits (non-expiring, ledger-backed) ─────────────────────────────
+#
+# A one-off purchase (€12) is a CREDIT, not a plan state — a user is never set to
+# plan="oneoff". Credits live in the same billing_usage table as extract usage,
+# distinguished by kind, so no new table is needed:
+#   kind="credit_granted"  = +1 credit (grant_oneoff_credit; the Phase-3 webhook
+#                            calls this on a successful one-off Checkout)
+#   kind="credit_consumed" = -1 credit (main.py draws one after the monthly slot)
+# Balance = count(granted) - count(consumed). LIFETIME — never period-scoped, so
+# credits do not expire when a billing period rolls over.
+
+def grant_oneoff_credit(user_id: str) -> None:
+    """Grant one non-expiring project credit (one-off purchase). Idempotency is
+    the caller's concern (the webhook keys on the Stripe event id)."""
+    record_billing_usage(user_id, kind="credit_granted", project_id=None)
+
+
+def credits_balance(user_id: str) -> int:
+    """Lifetime one-off credit balance = granted − consumed (never < 0 in
+    practice; consumption is gated on a positive balance). 0 for empty user."""
+    if not user_id:
+        return 0
+    with _conn() as c:
+        row = c.execute(
+            "SELECT "
+            "SUM(CASE WHEN kind = 'credit_granted' THEN 1 "
+            "         WHEN kind = 'credit_consumed' THEN -1 ELSE 0 END) AS bal "
+            "FROM billing_usage WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    return int(row["bal"] or 0)
+
+
 # ── Corrections (audit log for future learning-loop) ──────────────────────────
 
 def log_correction(project_id: str, field_path: str,
