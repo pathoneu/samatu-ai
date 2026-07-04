@@ -496,6 +496,77 @@ def user_usage_since(user_id: str, hours: int = 24,
         return (float(row["total_eur"] or 0), int(row["n"] or 0))
 
 
+# ── W3 billing usage ledger (project-count quota) ─────────────────────────────
+#
+# Separate from usage_events (the € cost ledger / spend cap): billing_usage
+# counts *projects* consumed against a plan's monthly quota. One row per
+# successful billable extraction. Written only when BILLING_ENABLED (the
+# caller guards on the flag); read by billing/entitlements.py.
+
+def record_billing_usage(user_id: str, kind: str = "extract",
+                         project_id: str | None = None) -> None:
+    """Append one billable-usage row (one successful project analysis).
+    Caller guards on billing_enabled(); this is a plain durable insert."""
+    if not user_id:
+        return
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO billing_usage (user_id, kind, project_id, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, kind, project_id, _now_iso()),
+        )
+
+
+def billing_usage_in_period(user_id: str, current_period_end: str | None = None,
+                            kind: str = "extract") -> int:
+    """Count billing_usage rows of `kind` for a user within the current billing
+    period. Subscriber (current_period_end set): window is
+    [current_period_end − ~30 days, current_period_end). Otherwise: calendar
+    month (first-of-this-month → now). Returns 0 for an unknown/empty user."""
+    if not user_id:
+        return 0
+    from datetime import datetime, timedelta, timezone
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    window_start: str
+    window_end: str | None = None
+    if current_period_end:
+        try:
+            # current_period_end may carry a trailing 'Z'; strip it before parse.
+            pe = datetime.strptime(current_period_end.replace("Z", ""),
+                                   "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+            window_start = (pe - timedelta(days=30)).strftime(fmt)
+            window_end = pe.strftime(fmt)
+        except ValueError:
+            # Malformed period end → fall back to calendar month.
+            current_period_end = None
+    if not current_period_end:
+        now = datetime.now(timezone.utc)
+        window_start = now.replace(day=1, hour=0, minute=0, second=0,
+                                   microsecond=0).strftime(fmt)
+    with _conn() as c:
+        if window_end is not None:
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM billing_usage "
+                "WHERE user_id = ? AND kind = ? "
+                "AND created_at >= ? AND created_at < ?",
+                (user_id, kind, window_start, window_end),
+            ).fetchone()
+        else:
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM billing_usage "
+                "WHERE user_id = ? AND kind = ? AND created_at >= ?",
+                (user_id, kind, window_start),
+            ).fetchone()
+        return int(row["n"] or 0)
+
+
+def rolled_over_credits(user_id: str) -> int:
+    """Unused quota carried from prior periods. Returns 0 until a rollover
+    QUOTA_POLICY is chosen (YAGNI — the founder deferred the rollover
+    decision). Only read by entitlements when QUOTA_POLICY != 'expire'."""
+    return 0
+
+
 # ── Corrections (audit log for future learning-loop) ──────────────────────────
 
 def log_correction(project_id: str, field_path: str,
