@@ -1,0 +1,92 @@
+"""F3 (MED) — vision-fill / lasso-rerun: authed but no project-ownership check.
+
+2026-07-04 pentest, finding F3. Before this fix, a logged-in user could POST
+another tenant's project_id to /api/vision-fill or /api/lasso-rerun and make
+THAT project run/pay for a Vision call (and leak crops from its PDF). The fix
+adds an ownership check after require_billable_user.
+
+These tests REPLAY the PoC: user A, logged in with a valid cookie, targets a
+project owned by user B → 404 (existence not leaked), and the Vision shim is
+never invoked.
+
+Import main BEFORE auth so load_dotenv() runs first; force real auth so the dev
+bypass doesn't mask the gate.
+"""
+from __future__ import annotations
+
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from main import app  # noqa: E402  (must precede `import auth`)
+
+import auth  # noqa: E402
+import db  # noqa: E402
+
+_PW = "passw0rd123"
+
+
+def _isolate(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "f3_vision.db")
+    monkeypatch.setattr(auth, "AUTH_DISABLED", False)
+    db.init_schema()
+    db._migrate_schema()
+
+
+def _login(email):
+    c = TestClient(app)
+    r = c.post("/api/auth/login", json={"email": email, "password": _PW})
+    assert r.status_code == 200, r.text
+    return c
+
+
+def _seed(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    owner = db.create_user("owner@x.lt", auth.hash_password(_PW), name="Owner")
+    db.create_user("attacker@x.lt", auth.hash_password(_PW), name="Att")
+    db.upsert_project("proj-B", {"name": "B's project", "tipas": "interjeras"},
+                      user_id=owner["id"])
+
+
+def test_f3_vision_fill_blocks_cross_user(tmp_path, monkeypatch):
+    _seed(tmp_path, monkeypatch)
+    att = _login("attacker@x.lt")
+    with patch("api.vision_fill.call_vision_for_polygon") as spy:
+        r = att.post("/api/vision-fill", json={
+            "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
+        })
+    assert r.status_code == 404, r.text
+    spy.assert_not_called()  # the paid Vision call must never fire
+
+
+def test_f3_lasso_rerun_blocks_cross_user(tmp_path, monkeypatch):
+    _seed(tmp_path, monkeypatch)
+    att = _login("attacker@x.lt")
+    with patch("api.lasso_rerun.vision_lasso_extract") as spy:
+        r = att.post("/api/lasso-rerun", json={
+            "project_id": "proj-B", "page_idx": 0,
+            "lasso_polygon_pct": [[0.3, 0.4], [0.4, 0.4], [0.4, 0.5]],
+        })
+    assert r.status_code == 404, r.text
+    spy.assert_not_called()
+
+
+def test_f3_vision_fill_rejects_anonymous(tmp_path, monkeypatch):
+    _seed(tmp_path, monkeypatch)
+    r = TestClient(app).post("/api/vision-fill", json={
+        "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
+    })
+    assert r.status_code == 401, r.text
+
+
+def test_f3_owner_can_run_vision_fill(tmp_path, monkeypatch):
+    _seed(tmp_path, monkeypatch)
+    owner_c = _login("owner@x.lt")
+    fake = {"polygon_pct": [[0.3, 0.3], [0.3, 0.5], [0.5, 0.5]],
+            "room_name_guess": "Vonia", "confidence": "medium"}
+    with patch("api.vision_fill.call_vision_for_polygon", return_value=fake):
+        r = owner_c.post("/api/vision-fill", json={
+            "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
+        })
+    assert r.status_code == 200, r.text
+    assert r.json()["confidence"] == "medium"
