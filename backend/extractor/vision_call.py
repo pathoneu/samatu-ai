@@ -74,6 +74,42 @@ def _group_rounds_by_model(models: list[str]) -> list[str]:
 # falls back to the image path for that extraction (recorded in _meta).
 _PDF_NATIVE_MAX_B64_BYTES = 25 * 1024 * 1024
 
+# B-2 lock-in condition (2026-07-04): text-richness gate. Native mode's edge
+# over raster is the extracted text layer; Anthropic's internal PDF rendering
+# is ~45% of our raster pixel budget, so a text-FREE native document is
+# plausibly WORSE than our own raster images — and ungated evidence for that
+# case doesn't exist (the one "text-free native ≈ raster" datapoint fell back
+# via the size cap and never tested true native). Below this median we send
+# raster images and record fallback_reason="text_free_pdf".
+_PDF_NATIVE_MIN_MEDIAN_CHARS = 10
+
+
+def _median_chars_per_page(pdf_bytes: bytes, page_indices: list[int]) -> float | None:
+    """Median extractable-text length (chars) across the SELECTED 1-based
+    pages, via pdfplumber (same text source page_filter.py uses; zero API
+    cost). None → text layer unmeasurable (broken/unopenable PDF) — the
+    caller proceeds and lets the pypdf subset build decide the fallback."""
+    try:
+        import statistics
+        import pdfplumber
+        counts: list[int] = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            n_src = len(pdf.pages)
+            for idx in page_indices:
+                if 1 <= int(idx) <= n_src:
+                    try:
+                        text = pdf.pages[int(idx) - 1].extract_text() or ""
+                    except Exception:
+                        text = ""
+                    counts.append(len(text.strip()))
+        if not counts:
+            return None
+        return round(float(statistics.median(counts)), 1)
+    except Exception as exc:
+        print(f"[experiment:native_pdf] text-richness scan failed "
+              f"(gate skipped): {exc}")
+        return None
+
 
 def build_pdf_subset_b64(pdf_bytes: bytes, page_indices: list[int]) -> dict:
     """Split the source PDF to the given 1-based pages via pypdf and base64
@@ -104,21 +140,36 @@ def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
     """Build the native-PDF payload for Pass-1 (SAMATU_PDF_NATIVE=1).
 
     Returns either {"b64", "n_pages", "page_indices", "b64_bytes",
-    "page_map_note"} (send as document block) or {"fallback_reason": ...}
-    (send image blocks; fallback recorded in _meta.experiment)."""
+    "page_map_note", "text_median_chars_page"} (send as document block) or
+    {"fallback_reason": ..., "text_median_chars_page": ...} (send image
+    blocks; fallback recorded in _meta.experiment).
+
+    text_median_chars_page is recorded on EVERY native-considered run
+    (document or fallback) — it is the production segmentation metric for
+    native-vs-raster accuracy analysis."""
     indices = [int(p["page_index"]) for p in pages]
+    # B-2: text-richness gate BEFORE building the document payload.
+    median_chars = _median_chars_per_page(pdf_bytes, indices)
+    if median_chars is not None and median_chars < _PDF_NATIVE_MIN_MEDIAN_CHARS:
+        print(f"[experiment:native_pdf] text-free PDF (median "
+              f"{median_chars} chars/page < {_PDF_NATIVE_MIN_MEDIAN_CHARS}) "
+              f"→ raster image mode")
+        return {"fallback_reason": "text_free_pdf",
+                "text_median_chars_page": median_chars}
     subset = build_pdf_subset_b64(pdf_bytes, indices)
     if subset.get("error"):
         print(f"[experiment:native_pdf] subset build failed → image fallback: "
               f"{subset['error']}")
-        return {"fallback_reason": subset["error"]}
+        return {"fallback_reason": subset["error"],
+                "text_median_chars_page": median_chars}
     if subset["b64_bytes"] > _PDF_NATIVE_MAX_B64_BYTES:
         print(f"[experiment:native_pdf] WARNING: subset b64 is "
               f"{subset['b64_bytes'] / 1e6:.1f} MB > "
               f"{_PDF_NATIVE_MAX_B64_BYTES / 1e6:.0f} MB — falling back to "
               f"image mode for this call")
         return {"fallback_reason": "subset_exceeds_size_limit",
-                "b64_bytes": subset["b64_bytes"]}
+                "b64_bytes": subset["b64_bytes"],
+                "text_median_chars_page": median_chars}
     # When the subset renumbers pages (vendor pages dropped mid-document),
     # tell the model the document→original mapping so puslapio_nr stays in
     # ORIGINAL numbering (zoom crops render from the original PDF).
@@ -133,7 +184,8 @@ def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
             f"brėžinių PDF puslapius taip (dokumento=originalus): {pairs}. "
             "Visuose `puslapio_nr` laukuose naudok ORIGINALŲ puslapio numerį."
         )
-    return {**subset, "page_map_note": note}
+    return {**subset, "page_map_note": note,
+            "text_median_chars_page": median_chars}
 
 # Heavy vision turns on Fable 5 can run many minutes — per-call timeout
 # override on the pass-1 stream (do NOT change the global client).
@@ -2282,6 +2334,11 @@ def _run_pass1_once(client, system, pages, *,
         }}
     else:
         user_content = build_user_content(pages)
+    # B-2: the text-richness median is the production segmentation metric —
+    # record it on every native-considered run, document mode or fallback.
+    if experiment_meta and native_pdf and "text_median_chars_page" in native_pdf:
+        experiment_meta["native_pdf"]["text_median_chars_page"] = \
+            native_pdf["text_median_chars_page"]
 
     def _flip_to_image_fallback(reason: str) -> None:
         """B-1: rebuild this round as raster images AND flip the shared
@@ -2295,6 +2352,9 @@ def _run_pass1_once(client, system, pages, *,
             "input": "image_fallback",
             "fallback_reason": reason,
         }}
+        if "text_median_chars_page" in native_pdf:
+            experiment_meta["native_pdf"]["text_median_chars_page"] = \
+                native_pdf["text_median_chars_page"]
         using_document = False
 
     max_attempts = 3
@@ -2622,7 +2682,8 @@ def extract_interior(
                "input": "document" if _native_pdf.get("b64") else "image_fallback",
                "fallback_reason": _native_pdf.get("fallback_reason"),
                "pdf_pages": _native_pdf.get("n_pages"),
-               "pdf_b64_bytes": _native_pdf.get("b64_bytes")})
+               "pdf_b64_bytes": _native_pdf.get("b64_bytes"),
+               "text_median_chars_page": _native_pdf.get("text_median_chars_page")})
 
     if _voting_on:
         parsed = _run_pass1_voted(client, system, pages, _voting_n(), _emit,
