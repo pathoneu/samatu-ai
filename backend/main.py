@@ -5832,11 +5832,19 @@ async def detect_room_polygons_endpoint(
     'manual_needed' — never ships a leaked/wrong polygon. rooms_json is a JSON
     list of {nr, plotas_m2}. PDF is taken from pdf_file (cached) or the cache.
     """
-    _billable_user(request)
+    _n6_user = _billable_user(request)
     _check_rate_limit(
         request.client.host if request.client else "unknown",
         "detect-room-polygons",
     )
+    # N6 (2026-07-04 pentest, pass 2): F4 authed this route but added no
+    # ownership check, so tenant A could prime/poison the PDF byte cache under
+    # tenant B's project_id (the cache is keyed purely on project_id) and drive
+    # compute against B. Gate on ownership BEFORE any store_pdf / get_pdf /
+    # render. Admins bypass the filter; missing/foreign project → 404.
+    _n6_filter = None if _n6_user.get("is_admin") else _n6_user["id"]
+    if db.get_project(project_id, user_id=_n6_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     import json as _json
     from extractor.cv_polygon import auto_room_polygon
     from extractor.room_seeds import locate_room_seeds, calibrate_page_scale

@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel, Field
 
 import auth as _auth
+import db as _db
 import page_raster_cache as _pdf_cache
 from extractor.cv_match import find_similar_symbols
 from extractor.cv_render_cache import render_page
@@ -28,6 +29,18 @@ from extractor.cv_wand import suggest_room_polygon
 from extractor.training_data import record_label
 
 router = APIRouter(prefix="/api/cv", tags=["cv-tools"])
+
+
+def _require_owned_project(user: dict, project_id: str) -> None:
+    """N6 (2026-07-04 pentest, pass 2): F4 added require_billable_user to the
+    /api/cv/* routes but no ownership check — so tenant A could drive CV compute
+    against, and POISON the PDF cache + training data of, tenant B's project_id
+    (the cache/record are keyed purely on project_id). Gate every route on
+    ownership BEFORE any store_pdf / get_pdf / render / record. Admins bypass the
+    filter; a missing or foreign project → 404 (never leak existence)."""
+    user_filter = None if user.get("is_admin") else user["id"]
+    if _db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
 
 def _rate_limit(request: Request, endpoint: str) -> None:
@@ -82,6 +95,7 @@ async def upload_pdf(
     first match-template / magic-wand request; subsequent JSON calls
     reuse the cached bytes. Same pattern as /v9/click-to-fill."""
     _rate_limit(request, "upload-pdf")
+    _require_owned_project(user, project_id)  # N6: ownership BEFORE store_pdf
     pdf_bytes = await pdf_file.read()
     if not pdf_bytes or not pdf_bytes[:4].startswith(b"%PDF"):
         raise HTTPException(400, "pdf_file is not a valid PDF")
@@ -111,6 +125,7 @@ def match_template(
     user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     _rate_limit(request, "match-template")
+    _require_owned_project(user, body.project_id)  # N6: ownership BEFORE compute
     x, y, w, h = body.bbox
     if w <= 0 or h <= 0 or x < 0 or y < 0:
         raise HTTPException(400, "bbox must be positive [x, y, w, h]")
@@ -132,6 +147,7 @@ def magic_wand(
     user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     _rate_limit(request, "magic-wand")
+    _require_owned_project(user, body.project_id)  # N6: ownership BEFORE compute
     pdf = _load_project_pdf(body.project_id)
     page = render_page(pdf, body.page_idx, body.dpi)
     cx, cy = body.click
@@ -150,6 +166,7 @@ def record_decision(
     user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     _rate_limit(request, "record-decision")
+    _require_owned_project(user, body.project_id)  # N6: ownership BEFORE record
     if body.decision not in ("accept", "reject"):
         raise HTTPException(400, "decision must be 'accept' or 'reject'")
     pdf = _load_project_pdf(body.project_id)
