@@ -193,13 +193,13 @@ export default function ProjectDetail() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="px-6 py-4 max-w-[90rem] mx-auto">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <Link to="/" className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link to="/" className="p-1.5 hover:bg-secondary rounded-lg transition-colors shrink-0">
                 <ArrowLeft className="w-4 h-4 text-muted-foreground" />
               </Link>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">{project.name}</h1>
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold text-foreground truncate">{project.name}</h1>
                 <div className="flex items-center gap-2 mt-0.5">
                   {project.company_name && (
                     <span className="text-xs text-muted-foreground">{project.company_name}</span>
@@ -215,7 +215,7 @@ export default function ProjectDetail() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Button variant="outline" size="sm" onClick={toggleAll} className="border-border">
                 <ChevronsUpDown className="w-4 h-4 mr-1.5" />
                 <span className="hidden sm:inline">Sutraukti</span>

@@ -69,13 +69,13 @@ function ConfidenceDot({ level }) {
 function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete }) {
   return (
     <div
-      className="flex items-center bg-background border-b border-border"
-      style={{ height: 52, padding: '0 16px', gap: 12, flexShrink: 0 }}
+      className="flex items-center flex-wrap bg-background border-b border-border py-2 sm:py-0 gap-y-2"
+      style={{ minHeight: 52, padding: '0 16px', gap: 12, flexShrink: 0 }}
     >
       <Link
         to="/"
         title="Į projektų sąrašą"
-        className="flex items-center justify-center rounded transition-colors"
+        className="flex items-center justify-center rounded transition-colors shrink-0"
         style={{
           width: 28, height: 28, color: 'hsl(var(--muted-foreground))',
         }}
@@ -103,10 +103,10 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
           Interjeras
         </span>
       </div>
-      <div className="flex-1" />
+      <div className="flex-1 min-w-0" />
       <div
-        className="flex items-center pr-3"
-        style={{ gap: 24, borderRight: '1px solid hsl(var(--border))', height: 28 }}
+        className="flex items-center pr-3 gap-4 sm:gap-6"
+        style={{ borderRight: '1px solid hsl(var(--border))', height: 28 }}
       >
         <div className="flex items-baseline" style={{ gap: 6 }}>
           <span className="skyrius-header" style={{ fontSize: 10 }}>Be PVM</span>
@@ -176,7 +176,7 @@ function TabBar({ tab, setTab, hasPdf }) {
     { id: 'aichat',   label: 'AI Chat',   Icon: MessageSquare },
   ];
   return (
-    <div className="flex items-center gap-0 border-b border-border" style={{ paddingLeft: 16 }}>
+    <div className="flex items-center gap-0 border-b border-border overflow-x-auto" style={{ paddingLeft: 16 }}>
       {tabs.map(t => {
         const Icon = t.Icon;
         const isActive = tab === t.id;
@@ -184,7 +184,7 @@ function TabBar({ tab, setTab, hasPdf }) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 shrink-0 whitespace-nowrap ${
               isActive
                 ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'

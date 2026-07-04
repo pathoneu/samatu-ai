@@ -78,7 +78,7 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
             00 / Projektai
@@ -86,7 +86,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">Projektai</h1>
           <p className="text-sm text-muted-foreground mt-1">Statybų sąmatų valdymas</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             onClick={() => setShowWizard(true)}
@@ -95,8 +95,8 @@ export default function Dashboard() {
             <Settings className="w-4 h-4 mr-2" />
             Nustatymai
           </Button>
-          <Link to="/new-project">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+          <Link to="/new-project" className="flex-1 sm:flex-none">
+            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
               <FolderPlus className="w-4 h-4 mr-2" />
               Naujas projektas
             </Button>
