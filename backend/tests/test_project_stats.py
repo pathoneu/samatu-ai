@@ -1,4 +1,10 @@
-"""Tests for /api/projects/{id}/stats."""
+"""Tests for /api/projects/{id}/stats.
+
+P1 (2026-07-04 pentest, pass 3): the endpoint now requires auth + URL-project
+ownership BEFORE the ``?fixture=`` branch (see api/project_stats._load_project).
+These functional tests therefore log in as the project owner; the P1 IDOR PoC
+(anon + fixture → leak) is replayed in test_p1_stats_fixture_auth.py.
+"""
 
 from __future__ import annotations
 
@@ -6,19 +12,34 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
+_PW = "passw0rd123"
 
-@pytest.fixture(scope="module")
-def client():
-    from api.project_stats import router
-    app = FastAPI()
-    app.include_router(router)
-    return TestClient(app)
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    """A TestClient logged in as the owner of project 'test'."""
+    from main import app
+    import auth
+    import db
+
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "stats.db")
+    monkeypatch.setattr(auth, "AUTH_DISABLED", False)
+    db.init_schema()
+    db._migrate_schema()
+    owner = db.create_user("owner@x.lt", auth.hash_password(_PW), name="Owner")
+    # The fixture supplies the KŽ body; the DB row just has to EXIST + be owned so
+    # the ownership gate passes. project_id 'test' matches the URL used below.
+    db.upsert_project("test", {"name": "T", "tipas": "interjeras"}, user_id=owner["id"])
+
+    c = TestClient(app)
+    r = c.post("/api/auth/login", json={"email": "owner@x.lt", "password": _PW})
+    assert r.status_code == 200, r.text
+    return c
 
 
 def test_stats_on_fixture_returns_counts(client):

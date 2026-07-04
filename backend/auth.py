@@ -213,3 +213,33 @@ def require_admin(request: Request) -> dict:
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Reikia administratoriaus teisių")
     return user
+
+
+def require_owned_project(request: Request, project_id: str) -> dict:
+    """Canonical auth + ownership gate for any per-project route (pass 3
+    hardening, 2026-07-04).
+
+    Three passes of the pentest found the SAME recurring class: a router-local
+    ``_load_project(project_id, ..., fixture=None)`` helper whose ``fixture``
+    branch RETURNED before ``require_user`` ran, so ``?fixture=<name>`` bypassed
+    auth; the handler then read a ``{URL_project_id}``-keyed per-user store
+    (``data/calibrations/{id}.json``, ``data/annotations/{id}.json``, the PDF
+    byte cache) under the ATTACKER's URL id → unauth cross-tenant read.
+
+    This helper is the single place that gets the order right, so new routers
+    can't reintroduce the bug: it (1) requires a login (401), (2) scopes
+    ``db.get_project`` to the caller (admins see all), (3) returns 404 for a
+    missing/foreign project — never leaking existence. Prefer wiring it as a
+    route-level ``Depends(require_owned_project)`` in the handler SIGNATURE (runs
+    before the body, cannot be short-circuited by a load-helper branch), or —
+    when a ``fixture`` may seed reference data — call it FIRST, before the
+    fixture branch, so no ``{URL_id}``-keyed store is ever read for an
+    unauthenticated/unowned caller.
+
+    Returns the caller's user dict.
+    """
+    user = require_user(request)  # 401 if not logged in
+    user_filter = None if user.get("is_admin") else user["id"]
+    if db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    return user

@@ -29,12 +29,26 @@ router = APIRouter(prefix="/api/projects", tags=["stats"])
 
 
 def _load_project(request: Request, project_id: str, fixture: str | None) -> dict[str, Any]:
+    """Resolve the parsed KŽ for the stats payload.
+
+    P1 (2026-07-04 pentest, pass 3): AUTH + URL-project ownership FIRST, ALWAYS —
+    BEFORE the fixture branch. Previously ``?fixture=`` returned before
+    ``require_user`` ran, and the handler then read
+    ``data/annotations/{URL_id}.json`` + ``data/calibrations/{URL_id}.json``
+    keyed by the attacker's URL project_id → an anonymous
+    ``GET /stats?fixture=berzas`` leaked another tenant's verification progress +
+    calibration metadata. The URL project_id is what keys those per-user stores,
+    so it MUST be owned regardless of ``fixture``. The fixture may still seed the
+    reference KŽ body, but never authorizes the store reads. Mirrors the N1
+    calibrate fix.
+    """
+    user = _auth.require_owned_project(request, project_id)  # 401 anon / 404 foreign — MUST precede fixture
     if fixture:
         p = FIXTURES.get(fixture)
         if not p or not p.exists():
             raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")
         return json.loads(p.read_text(encoding="utf-8"))
-    user = _auth.require_user(request)
+    # Ownership already confirmed above; re-fetch the row as the parsed payload.
     user_filter = None if user.get("is_admin") else user["id"]
     proj = _db.get_project(project_id, user_id=user_filter)
     if not proj:
