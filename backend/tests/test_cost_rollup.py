@@ -431,3 +431,18 @@ def test_chat_path_is_self_metered_no_double_count(tmp_path, monkeypatch):
     main._reserve_billable("u1", "/chat-project")
     _, n = db.user_usage_since("u1")
     assert n == 0  # no reservation — chat self-reports actuals like extract-interior
+
+
+# ── True €/project helper for the pricing analysis ────────────────────────────
+
+def test_true_cost_eur_per_project_sums_complete_meta():
+    """true_cost_eur_per_project prices a COMPLETE _meta (Pass-1 + extra_calls)
+    in EUR — the number the pricing analysis wants per project."""
+    from pricing import true_cost_eur_per_project
+    meta = {"input_tokens": 40_000, "output_tokens": 6_000,
+            "model": "claude-opus-4-8",
+            "extra_calls": [
+                {"model": "claude-opus-4-8", "input_tokens": 12_000, "output_tokens": 900},
+            ]}
+    usd = calc_meta_cost_usd(meta)
+    assert true_cost_eur_per_project(meta) == pytest.approx(usd * 0.93)

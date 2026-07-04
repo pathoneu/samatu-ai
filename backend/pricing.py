@@ -154,3 +154,35 @@ def calc_meta_cost_usd(
         model=meta.get("model") or default_model,
         cache_ttl=cache_ttl,
     )
+
+
+# EUR conversion factor — kept in sync with db.py's record_usage / save_extraction
+# (both apply this same fixed rate). Single knob for the whole cost stack.
+USD_TO_EUR = 0.93
+
+
+def true_cost_eur_per_project(meta: dict) -> float:
+    """True €/project given COMPLETE metering.
+
+    Feed a project's extraction ``_meta`` that carries BOTH the Pass-1 (or
+    voting) token sums AND the ``extra_calls`` list of every sub-Vision call
+    (2026-07-04 sub-call metering fix). Returns the full USD cost converted to
+    EUR — the per-project number the pricing analysis consumes.
+
+    ── OFFLINE RECOVERABILITY (verified 2026-07-04 against eval_runs artifacts) ──
+    Existing ``eval_runs/<config>/<run>_vision/{results.json,parsed.json}``
+    artifacts DROPPED the sub-call token data: ``_meta`` (aka results.json's
+    ``meta_rollup.raw_meta``) carries only the Pass-1/voting token sums plus
+    sub-reader ELAPSED times + counts — no ``extra_calls``, no apdailos/doors/
+    door_type/fixtures tokens, and the per-room ``_zoom`` dicts hold the
+    ZoomResult schema but NO usage (resp.usage was discarded). The stored
+    ``cost_usd``/``cost_eur`` were therefore computed from Pass-1 alone — the
+    exact 34-76% undercount this fix addresses.
+
+    => True €/project is NOT recoverable offline from the historical artifacts.
+       A FRESH instrumented run (this code path, which now populates
+       ``extra_calls``) is the only way to obtain true per-project cost.
+       The elapsed-time proxies in the old artifacts can bound the MAGNITUDE of
+       the historical undercount, but not its exact euros.
+    """
+    return calc_meta_cost_usd(meta) * USD_TO_EUR
