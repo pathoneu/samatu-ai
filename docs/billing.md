@@ -29,18 +29,28 @@ exactly `"1"` — unset, `"0"`, `"true"`, `""`, anything else = **OFF**
 
 This is proven end-to-end in `backend/tests/test_billing_flag_flip.py` (the OFF
 proof reproduces pre-billing behavior byte-for-byte; the ON proof exercises the
-full paywall).
+full paywall through the real `/extract-interior` endpoint).
 
-> **Wiring caveat (known, 2026-07-04):** the quota/trial paywall fires through
-> the `auth.require_billable_user` dependency, which today is wired onto the
-> `api/*` Vision routers (`vision_fill`, `lasso_rerun`, `cv_tools`, `symbols`).
-> The primary `POST /extract-interior` endpoint authenticates via
-> `main._billable_user`, which runs the € spend cap + reservation but **not** the
-> quota/trial gate — so an at-quota user is not blocked on that specific route yet.
-> If you want the interior-extraction endpoint itself paywalled, wire
-> `_check_user_quota` + `_check_trial_gate` into `main._billable_user` (or make the
-> route `Depends(auth.require_billable_user)`) before go-live and add a
-> regression test. The ledger increment on `/extract-interior` already works.
+**Where the paywall fires (2026-07-04):** the project quota + free-trial gate is
+on the project-**creating** extraction — `POST /extract-interior`, the sole
+endpoint that increments the project counter
+(`db.record_extract_and_maybe_consume_credit`). Its handler runs
+`_billable_user` (auth + € spend cap + reserve) → `_check_user_quota` (402
+`quota_exceeded`) → `_check_trial_gate` (403 `company_code_required` / 402
+`trial_used`) → extract → (on success) the counter increment, with the gate
+BEFORE any extraction work so a blocked request does zero paid work.
+
+**Corrections are spend-cap only.** The `api/*` Vision routers (`vision_fill`,
+`lasso_rerun`, `cv_tools`, `symbols`) authenticate via `auth.require_billable_user`,
+which enforces the € spend cap + reservation but **not** quota/trial — a correction
+operates on an already-created, already-counted project, so it must not re-consume
+or re-enforce the project quota or the one-time trial. Placement is locked down by
+`backend/tests/test_quota_gate_placement.py`.
+
+> When other extract types (`/extract` KŽ, facade/roof/earthworks/concrete,
+> detect-type) become billable **projects**, each needs the same
+> `_check_user_quota` + `_check_trial_gate` gate AND a matching counter increment
+> — see the `TODO(billing)` at `main._billable_user`.
 
 ---
 
