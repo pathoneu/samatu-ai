@@ -2923,11 +2923,19 @@ def extract_interior(
             return False
         return True
 
+    # EXPERIMENT (SAMATU_ZOOM_AGENTIC=1): route zoom through the model-driven
+    # crop loop instead of the fixed-bbox re-read. Same inputs (room dict) and
+    # same ZoomResult output schema → _apply_zoom_refinements untouched.
+    _zoom_agentic_on = _zoom_agentic_enabled()
+    _agentic_render_cache: dict = {}   # (page, dpi) → PIL image, shared across rooms
+    _agentic_rooms_meta: list[dict] = []
+
     _zoomable = [r for r in rooms
                  if r.get("bbox_pct") and r.get("puslapio_nr")
                  and not _can_skip_zoom(r)]
     _emit({"event": "zoom_started", "total": len(_zoomable),
-           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r))})
+           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r)),
+           "agentic": _zoom_agentic_on})
     for idx, room in enumerate(rooms, start=1):
         bbox = room.get("bbox_pct")
         page_nr = room.get("puslapio_nr")
@@ -2937,18 +2945,32 @@ def extract_interior(
         if _can_skip_zoom(room):
             zoom_count_skipped += 1
             continue
-        cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
-        if not cropped:
-            continue
-        zoom_count_attempted += 1
-        _emit({
-            "event": "zoom_room_started",
-            "idx": zoom_count_attempted,
-            "total": len(_zoomable),
-            "room_nr": room.get("nr"),
-            "pavadinimas": room.get("pavadinimas"),
-        })
-        zoom_result = _vision_zoom_room(client, cropped, room)
+        if _zoom_agentic_on:
+            from .agentic_crop import agentic_zoom_room
+            zoom_count_attempted += 1
+            _emit({
+                "event": "zoom_room_started",
+                "idx": zoom_count_attempted,
+                "total": len(_zoomable),
+                "room_nr": room.get("nr"),
+                "pavadinimas": room.get("pavadinimas"),
+            })
+            zoom_result, _zmeta = agentic_zoom_room(
+                client, pdf_bytes, room, render_cache=_agentic_render_cache)
+            _agentic_rooms_meta.append({"room_nr": room.get("nr"), **_zmeta})
+        else:
+            cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
+            if not cropped:
+                continue
+            zoom_count_attempted += 1
+            _emit({
+                "event": "zoom_room_started",
+                "idx": zoom_count_attempted,
+                "total": len(_zoomable),
+                "room_nr": room.get("nr"),
+                "pavadinimas": room.get("pavadinimas"),
+            })
+            zoom_result = _vision_zoom_room(client, cropped, room)
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -2981,8 +3003,27 @@ def extract_interior(
     parsed["_meta"]["zoom_skipped_via_eksplikacija"] = zoom_count_skipped
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
+    if _zoom_agentic_on:
+        # Provenance for the agentic-zoom experiment: per-room loop stats
+        # (crops, turns, tokens, refusals/aborts) + aggregates. NOTE: like the
+        # fixed-crop zoom, these tokens are NOT rolled into the top-level
+        # _meta token sums (which cover Pass-1 only) — price them from here.
+        parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
+            "rooms": _agentic_rooms_meta,
+            "crops_served_total": sum(m.get("crops_served", 0)
+                                      for m in _agentic_rooms_meta),
+            "api_turns_total": sum(m.get("api_turns", 0)
+                                   for m in _agentic_rooms_meta),
+            "input_tokens_total": sum(m.get("input_tokens", 0)
+                                      for m in _agentic_rooms_meta),
+            "output_tokens_total": sum(m.get("output_tokens", 0)
+                                       for m in _agentic_rooms_meta),
+            "aborted_rooms": [m["room_nr"] for m in _agentic_rooms_meta
+                              if m.get("outcome") not in ("ok",)],
+        }
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
-          f"{zoom_count_applied} applied, {zoom_elapsed}s")
+          f"{zoom_count_applied} applied, {zoom_elapsed}s"
+          + (" [agentic]" if _zoom_agentic_on else ""))
 
     # Step 2.85: APDAILOS READER (2026-05-27).
     # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
