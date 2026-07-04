@@ -20,42 +20,45 @@ Cost metering was **Pass-1-only** until 2026-07-04 — it ignored every sub-read
 | bacvevičiaus | 2.80 | 65-page, text-free (worst-case commercial) |
 | **avg** | **1.21** | |
 
-**True cost = Pass-1 × (1.34–1.76)** for the dropped sub-calls:
+**MEASURED true cost** (2026-07-04, complete meter, locked config, 3 representative projects):
 
-| Project | Pass-1 | True (low ×1.34) | True (high ×1.76) |
-|---|---|---|---|
-| lazūnu | 0.47 | 0.63 | 0.83 |
-| čiurlių | 0.51 | 0.68 | 0.90 |
-| beržu | 1.07 | 1.43 | 1.88 |
-| bacvevičiaus | 2.80 | 3.75 | 4.93 |
-| **avg** | **1.21** | **1.62** | **2.13** |
+| Project | Pass-1 € | sub-calls € | **TRUE €** | ×mult | dominant sub-costs |
+|---|---|---|---|---|---|
+| lazūnu (small) | 0.35 | 0.34 | **0.69** | 1.95× | eksplikacija, door_type×3 |
+| čiurlių (raster) | 0.45 | 0.30 | **0.75** | 1.67× | zoom×8, doors |
+| beržu (typical apt) | 1.04 | 1.32 | **2.36** | 2.26× | apdailos €0.34, eksplikacija €0.35, door_type×3 €0.31, fixtures×3 |
+| bacvevičiaus (worst, *extrapolated*) | 2.80 | — | **~5.8** | ~2.06× | — |
 
-**Planning figures used below:**
-- **Typical** small/medium interior project (the target customer's bread & butter): **~€1.5**
-- **Conservative blended COGS** (what I hold margins against): **€2.00/project**
-- **Worst-case** large commercial project (rare in target segment): **~€5**
+**The measured multiplier is ~2.06× Pass-1 — higher than the 1.34–1.76× literature estimate.** Sub-readers cost more than expected; on a full apartment (beržu) they *more than double* Pass-1.
 
-> The €2.00 conservative sits at the top of the estimate band. The band is wide because the sub-call multiplier is *estimated*, not yet *measured* on the fixed meter — see §6.
+**Planning figures (measured):**
+- **Small/simple project:** €0.7
+- **Typical full apartment (beržu — the realistic paying-customer project):** **€2.36**
+- **Corpus average (skewed by 2 tiny projects):** €1.27
+- **Worst-case large commercial (rare):** ~€5.8
+- **Conservative planning COGS:** **€2.36** (a real estimator's projects skew to full apartments, not single rooms)
+
+> Reducible: sub-reader voting (door_type ×3, fixtures ×3) triples those readers' cost, and beržu shows a €0.35 eksplikacija *Vision* call on a text-rich PDF that pdfplumber should arguably handle free. ~€0.5–0.7/project looks recoverable without touching accuracy — a follow-up cost lever (see §5).
 
 ---
 
 ## 2. Draft tiers (existing `billing_v2.py`) — stress-tested
 
-Margin at **full utilization** (user consumes all included projects — the conservative case; light users have far higher margin, overage is priced above COGS):
+Margin at **full utilization** (user consumes all included projects — the conservative case; light users have far higher margin, overage is priced above COGS). Columns now use **MEASURED** cost: corpus-average €1.27 vs conservative typical-apartment €2.36:
 
-| Tier | €/mo | Incl. | €/proj (full) | Margin @€2 | Margin @€1.5 | Verdict |
+| Tier | €/mo | Incl. | €/proj (full) | Margin @€1.27 (avg) | Margin @€2.36 (typ. apt) | Verdict |
 |---|---|---|---|---|---|---|
-| Free | 0 | 1/mo | 0 | **−€2 loss** | −€1.5 | COGS exposure |
-| **Pro** | 49 | 10 | 4.90 | **59%** | 69% | ✅ healthy |
-| **Studio** | 129 | 40 | 3.23 | **38%** | 54% | ⚠️ under 40% floor |
-| Pro overage | — | — | 8.00 | 75% | 83% | ✅ |
-| Studio overage | — | — | 5.00 | 60% | 70% | ✅ |
+| Free | 0 | 1/mo | 0 | **−€1.27 loss** | −€2.36 | COGS exposure |
+| **Pro** | 49 | 10 | 4.90 | 74% | **52%** | ✅ healthy at both |
+| **Studio (draft €149)** | 149 | 40 | 3.73 | 66% | **37%** | ⚠️ still under 40% at typical-apt cost |
+| Pro overage | — | — | 8.00 | 84% | 70% | ✅ |
+| Studio overage | — | — | 5.00 | 75% | 53% | ✅ |
 
-**Findings:**
-1. **Pro (€49/10) is priced right** — 59% margin even at conservative COGS. Keep.
-2. **Studio (€129/40) fails the 40% floor at conservative COGS (38%).** €129÷40 = €3.23/project is too thin once true cost is counted. It only clears 40% if real COGS stays near the *typical* €1.5, which a Studio user (higher volume, possibly bigger projects) is the least likely to.
-3. **Free (1 project/month) is a recurring COGS drain** — €1.5–2 per redeemed free project, €0 revenue. Fine as trial/CAC at low volume; at 1,000 idle free users it's ~€2k/mo of pure loss. The hard cap + 1-project limit bound it, but "per month, forever" is generous.
-4. **No one-off single-project option** — the master plan called for it; it's the lowest-friction way for a skeptical contractor to try a real paid project.
+**Findings (measured):**
+1. **Pro (€49/10) holds** — 52% even at the conservative €2.36 COGS. Keep.
+2. **Studio €149/40 still slips below 40% at conservative cost (37%).** My €149 fix was sized to a €2.00 *estimate*; the *measured* €2.36 pushes it back under. €149÷40 = €3.73/project clears 40% only if a Studio user's average project stays ≤ €2.24 — true for a mixed project load (66% at the €1.27 corpus avg), false if they run mostly full apartments. To *guarantee* the floor: **€149/35** (€4.26 → 45%) or **€129/30** (€4.30 → 45%).
+3. **Free (1 project/month) is a recurring COGS drain** — €0.7–2.4 per redeemed project, €0 revenue. Bounded by the company-code gate (§3a) + hard cap.
+4. **One-off €12** — 80% margin even at €2.36. ✅
 
 ---
 
@@ -105,16 +108,16 @@ This is *good news* for margins — no 21% haircut on the tiers above.
 ## 6. Break-even & the one open number
 
 - **Fixed infra** (Render + R2 + Neon + domain) ≈ **€50–100/mo**. Break-even ≈ **3–5 Pro subscribers** (or the 5 concierge-pilot estimators). The business is not infra-constrained; it's demand-constrained.
-- **The one number worth measuring before locking Studio:** the sub-call multiplier is *estimated* (34–76%), not *measured on the fixed meter*. Studio's viability sits right on the 40% line, so the exact figure is decision-relevant. **A ~€5–7 instrumented run** (2–3 representative projects on the now-complete meter: beržu typical, čiurlių raster, bacvevičiaus worst-case) would replace the band with an exact multiplier and confirm Studio's margin. Pro/Trial/one-off decisions don't need it — their margins are robust across the whole band.
+- **Measured (2026-07-04, done):** the sub-call multiplier is **2.06×**, not the 1.34–1.76× estimate. This is what moved Studio back under the 40% floor at conservative cost — see §2. Pro/one-off margins survived the correction; Studio needs the €149/35 (or €129/30) trim to guarantee the floor.
 
 ---
 
 ## 7. Decisions (2026-07-04 founder gate)
 
-- **Pro €49/10** — approved, keep.
-- **Studio €149/40** — approved (was €129/40; now 46% margin, clears the floor).
-- **One-off €12/project** — approved (new SKU, 83% margin).
-- **Free trial** — approved in principle; anti-abuse per §3a (company-code-gated, server-persistent entitlement); card-on-file escalation built-but-off. Card-vs-no-card-for-trial fork pending final founder call.
-- **Measured cost run** — approved (~€5–7); in progress on the complete meter to replace the estimate band with an exact multiplier and confirm Studio's 46%.
+- **Pro €49/10** — approved, holds at measured cost (52% at €2.36). ✅
+- **One-off €12/project** — approved, 80% at €2.36. ✅
+- **Studio €149/40** — ⚠️ **RE-OPENED by measurement.** The €149 fix was sized to a €2.00 estimate; measured €2.36 puts €149/40 at 37%, under the floor. Needs one more nudge: **€149/35 (45%)** or **€129/30 (45%)** — pending founder pick.
+- **Free trial** — approved in principle; anti-abuse per §3a (company-code-gated, server-persistent entitlement); card-on-file escalation built-but-off. Card-vs-no-card-for-trial fork: recommend no-card at launch.
+- **Cost lever (follow-up):** ~€0.5–0.7/project looks recoverable (drop door_type/fixtures sub-reader voting ×3→×1; stop the eksplikacija Vision call on text-rich PDFs). If pursued, beržu drops ~€2.36→~€1.8 and €149/40 clears 40% on its own — an alternative to trimming Studio's quota. Touches the accuracy pipeline, so measure before shipping.
 
-Next: once the measured number lands, W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator + the trial anti-abuse gate, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).
+Next (after the Studio pick): W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator + the trial anti-abuse gate, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).
