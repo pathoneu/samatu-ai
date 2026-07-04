@@ -35,7 +35,10 @@ def client(tmp_path_factory):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_auth, "AUTH_DISABLED", True)
         dev = _auth._ensure_dev_user()
-        for pid in ("unknown", "round-trip-test", "to-delete-calib"):
+        # N1 (pass 2): calibrate WRITE now requires the URL project_id to be an
+        # owned project even when ?fixture= seeds the baseline. Upsert every
+        # project_id these tests POST/GET/DELETE so they resolve as dev-owned.
+        for pid in ("unknown", "round-trip-test", "to-delete-calib", "test1", "x"):
             _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])
         yield TestClient(app)
 

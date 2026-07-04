@@ -112,16 +112,31 @@ def _load_project_for_calibration(
     project_id: str,
     fixture: str | None,
 ) -> dict[str, Any]:
-    if fixture:
-        p = FIXTURES.get(fixture)
-        if not p or not p.exists():
-            raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")
-        return json.loads(p.read_text(encoding="utf-8"))
+    """Resolve the parsed KŽ used as the AI baseline for calibration.
+
+    N1 (2026-07-04 pentest, pass 2): AUTH FIRST, ALWAYS. Previously the
+    ``fixture`` branch returned before ``require_user`` ran, so an anonymous
+    caller could POST ``?fixture=X`` and drive a WRITE to
+    ``data/calibrations/{url_project_id}.json`` — overwriting another tenant's
+    calibration (their KNOWN category totals) or creating an arbitrary
+    ``{forged_id}.json`` (disk-DoS). The URL project_id is the WRITE target and
+    MUST be owned regardless of ``fixture``. The fixture may legitimately seed
+    the *input* baseline data, but never authorizes the write.
+
+    Order: require a login (401) → verify the caller owns ``project_id`` (404 if
+    missing/foreign, never leak existence) → only then read the baseline (from
+    the fixture when supplied, else from the owned project row).
+    """
     user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
     proj = _db.get_project(project_id, user_id=user_filter)
     if not proj:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    if fixture:
+        p = FIXTURES.get(fixture)
+        if not p or not p.exists():
+            raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")
+        return json.loads(p.read_text(encoding="utf-8"))
     return proj
 
 
