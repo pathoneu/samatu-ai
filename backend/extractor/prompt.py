@@ -945,6 +945,21 @@ def build_zoom_user_content(cropped_image_b64: str, room: dict) -> list[dict]:
     ]
 
 
+def _final_instruction_text(n: int) -> str:
+    """The Pass-1 closing instruction. Shared between the image path
+    (build_user_content) and the EXPERIMENTAL native-PDF path
+    (build_user_content_pdf_native) so both send byte-identical prompts."""
+    return (
+        f"Iš {n} puslapių aukščiau ištrauk visus kambarius, jų matmenis, sutartinius "
+        f"ženklus, ir suskaičiuok kiekius pagal pateiktą schemą. "
+        f"PRIVALOMA: užpildyk `detected_symbols_summary` lauką — suskaičiuok rozetes, "
+        f"jungiklius, šviestuvus, difuzorius, klozetus, ir kitus sutartinius ženklus "
+        f"(žr. <symbol_recognition> sekciją). Šitas sumarinis count'as pildo elektros "
+        f"ir santechnikos pozicijas, todėl jo trūkumas reiškia spragas vartotojo sąmatoj. "
+        f"Grąžink VIENĄ JSON objektą."
+    )
+
+
 def build_user_content(pages: list[dict]) -> list[dict]:
     """Build user message: page label + image interleaved (image-first order)."""
     n = len(pages)
@@ -966,14 +981,40 @@ def build_user_content(pages: list[dict]) -> list[dict]:
         content[-1]["cache_control"] = {"type": "ephemeral"}
     content.append({
         "type": "text",
-        "text": (
-            f"Iš {n} puslapių aukščiau ištrauk visus kambarius, jų matmenis, sutartinius "
-            f"ženklus, ir suskaičiuok kiekius pagal pateiktą schemą. "
-            f"PRIVALOMA: užpildyk `detected_symbols_summary` lauką — suskaičiuok rozetes, "
-            f"jungiklius, šviestuvus, difuzorius, klozetus, ir kitus sutartinius ženklus "
-            f"(žr. <symbol_recognition> sekciją). Šitas sumarinis count'as pildo elektros "
-            f"ir santechnikos pozicijas, todėl jo trūkumas reiškia spragas vartotojo sąmatoj. "
-            f"Grąžink VIENĄ JSON objektą."
-        ),
+        "text": _final_instruction_text(n),
+    })
+    return content
+
+
+def build_user_content_pdf_native(pdf_b64: str, n_pages: int,
+                                  page_map_note: str | None = None) -> list[dict]:
+    """EXPERIMENTAL (SAMATU_PDF_NATIVE=1): Pass-1 user message with a single
+    PDF `document` block instead of pdf2image-rendered image blocks. The API
+    then feeds the model BOTH the rendered page image AND the extracted text
+    layer per page (official base64-document behavior, no beta header).
+
+    Block ordering mirrors build_user_content's caching layout exactly:
+    stable heavy payload first (here: the document block, cache_control on it —
+    the counterpart of the last image block), volatile closing instruction
+    after the breakpoint. N-pass voting re-sends the byte-identical document,
+    so rounds 2..N read it from cache.
+
+    page_map_note is only set when the page subset renumbers pages (vendor
+    pages dropped) — it maps document page → original brėžinio page so the
+    model's `puslapio_nr` output stays in ORIGINAL numbering (downstream
+    zoom crops render from the original PDF).
+    """
+    content: list[dict] = []
+    if page_map_note:
+        # Stable per-run (identical across voting rounds) → cache-safe prefix.
+        content.append({"type": "text", "text": page_map_note})
+    content.append({
+        "type": "document",
+        "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64},
+        "cache_control": {"type": "ephemeral"},
+    })
+    content.append({
+        "type": "text",
+        "text": _final_instruction_text(n_pages),
     })
     return content

@@ -27,6 +27,10 @@ numpy>=1.26.0
 # than pdf2image+poppler for the dpi/grayscale path. Apache 2.0 / BSD.
 pypdfium2>=4.30
 
+# EXPERIMENT native-PDF pass-1 input (SAMATU_PDF_NATIVE=1, 2026-07-04) —
+# splits the source PDF to the selected page subset for the document block.
+pypdf>=5.0
+
 # pyyaml — used by detector_bench/ ground_truth files (read-only at runtime).
 # replicate dep removed 2026-05-07 — Pipeline 5 (GroundingDINO) abandoned;
 # detector_bench/detectors/p5_grounding_dino.py kept for future retest but

@@ -19,12 +19,121 @@ import anthropic
 from pdf2image import convert_from_bytes
 
 from .prompt import (
-    SYSTEM_TEXT, build_user_content,
+    SYSTEM_TEXT, build_user_content, build_user_content_pdf_native,
     ZOOM_SYSTEM_TEXT, build_zoom_user_content,
     MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
 from models_config import model_for
+
+_ENV_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _env_flag(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in _ENV_TRUTHY
+
+
+def _pdf_native_enabled() -> bool:
+    """EXPERIMENT gate (SAMATU_PDF_NATIVE=1): send Pass-1 pages as ONE native
+    PDF `document` block (image + extracted text layer per page) instead of
+    pdf2image-rendered image blocks. Default OFF — zero behavior change."""
+    return _env_flag("SAMATU_PDF_NATIVE")
+
+
+def _zoom_agentic_enabled() -> bool:
+    """EXPERIMENT gate (SAMATU_ZOOM_AGENTIC=1): route the Pass-2 zoom re-read
+    through the model-driven crop loop (extractor.agentic_crop) instead of
+    the fixed-bbox crop. Default OFF — zero behavior change."""
+    return _env_flag("SAMATU_ZOOM_AGENTIC")
+
+
+def _mixed_voting_models() -> list[str] | None:
+    """EXPERIMENT gate (SAMATU_VOTING_MODELS="m1,m2,m3"): one model PER voting
+    round (list length = number of rounds). Unset/empty → None (default OFF)."""
+    raw = (os.getenv("SAMATU_VOTING_MODELS") or "").strip()
+    if not raw:
+        return None
+    models = [m.strip() for m in raw.split(",") if m.strip()]
+    return models or None
+
+
+def _group_rounds_by_model(models: list[str]) -> list[str]:
+    """Stable-group round models so same-model rounds run consecutively —
+    prompt cache is per-model, so grouping maximizes cache hits (each model
+    pays one cache write, its later rounds read). First-appearance order of
+    distinct models is preserved."""
+    order: list[str] = []
+    for m in models:
+        if m not in order:
+            order.append(m)
+    return [m for o in order for m in models if m == o]
+
+
+# Anthropic hard request limit is 32 MB; leave headroom for system prompt +
+# instruction text + JSON envelope. Above this the native-PDF experiment
+# falls back to the image path for that extraction (recorded in _meta).
+_PDF_NATIVE_MAX_B64_BYTES = 25 * 1024 * 1024
+
+
+def build_pdf_subset_b64(pdf_bytes: bytes, page_indices: list[int]) -> dict:
+    """Split the source PDF to the given 1-based pages via pypdf and base64
+    the subset. Returns {"b64", "n_pages", "page_indices", "b64_bytes"} on
+    success or {"error": "..."} on failure (caller falls back to images)."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+        n_src = len(reader.pages)
+        used: list[int] = []
+        for idx in page_indices:
+            if 1 <= int(idx) <= n_src:
+                writer.add_page(reader.pages[int(idx) - 1])
+                used.append(int(idx))
+        if not used:
+            return {"error": "no_valid_pages"}
+        buf = io.BytesIO()
+        writer.write(buf)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return {"b64": b64, "n_pages": len(used), "page_indices": used,
+                "b64_bytes": len(b64)}
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
+    """Build the native-PDF payload for Pass-1 (SAMATU_PDF_NATIVE=1).
+
+    Returns either {"b64", "n_pages", "page_indices", "b64_bytes",
+    "page_map_note"} (send as document block) or {"fallback_reason": ...}
+    (send image blocks; fallback recorded in _meta.experiment)."""
+    indices = [int(p["page_index"]) for p in pages]
+    subset = build_pdf_subset_b64(pdf_bytes, indices)
+    if subset.get("error"):
+        print(f"[experiment:native_pdf] subset build failed → image fallback: "
+              f"{subset['error']}")
+        return {"fallback_reason": subset["error"]}
+    if subset["b64_bytes"] > _PDF_NATIVE_MAX_B64_BYTES:
+        print(f"[experiment:native_pdf] WARNING: subset b64 is "
+              f"{subset['b64_bytes'] / 1e6:.1f} MB > "
+              f"{_PDF_NATIVE_MAX_B64_BYTES / 1e6:.0f} MB — falling back to "
+              f"image mode for this call")
+        return {"fallback_reason": "subset_exceeds_size_limit",
+                "b64_bytes": subset["b64_bytes"]}
+    # When the subset renumbers pages (vendor pages dropped mid-document),
+    # tell the model the document→original mapping so puslapio_nr stays in
+    # ORIGINAL numbering (zoom crops render from the original PDF).
+    note = None
+    if subset["page_indices"] != list(range(1, subset["n_pages"] + 1)):
+        pairs = ", ".join(
+            f"{doc_nr}={orig_nr}"
+            for doc_nr, orig_nr in enumerate(subset["page_indices"], start=1)
+        )
+        note = (
+            "Puslapių numeracija: šio dokumento puslapiai atitinka originalaus "
+            f"brėžinių PDF puslapius taip (dokumento=originalus): {pairs}. "
+            "Visuose `puslapio_nr` laukuose naudok ORIGINALŲ puslapio numerį."
+        )
+    return {**subset, "page_map_note": note}
 
 # Heavy vision turns on Fable 5 can run many minutes — per-call timeout
 # override on the pass-1 stream (do NOT change the global client).
@@ -2126,19 +2235,52 @@ def _recompute_santrauka(parsed: dict) -> dict:
     return parsed
 
 
-def _run_pass1_once(client, system, pages) -> dict:
+def _run_pass1_once(client, system, pages, *,
+                    native_pdf: dict | None = None,
+                    model: str | None = None) -> dict:
     """One Pass-1 extraction (≤3 retries). Returns the parsed dict (with
     `_meta`) on success, or an error dict `{"status":"error", ...}` on failure
-    — same error shapes the old inline loop returned."""
+    — same error shapes the old inline loop returned.
+
+    native_pdf (EXPERIMENT SAMATU_PDF_NATIVE=1): payload from
+    _prepare_native_pdf. With "b64" → the page subset goes as ONE document
+    block (image + text layer per page); with "fallback_reason" → image
+    blocks as usual, fallback recorded in _meta.experiment. None → default.
+
+    model (EXPERIMENT SAMATU_VOTING_MODELS): per-round model override for
+    mixed-model voting. None → model_for("vision_pass1") as always.
+    """
     last_err: Exception | None = None
-    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+    model = model or model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+
+    experiment_meta: dict | None = None
+    if native_pdf and native_pdf.get("b64"):
+        user_content = build_user_content_pdf_native(
+            native_pdf["b64"], native_pdf["n_pages"],
+            native_pdf.get("page_map_note"),
+        )
+        experiment_meta = {"native_pdf": {
+            "input": "document",
+            "pdf_pages": native_pdf["n_pages"],
+            "pdf_b64_bytes": native_pdf["b64_bytes"],
+            "page_map_note_sent": bool(native_pdf.get("page_map_note")),
+        }}
+    elif native_pdf and native_pdf.get("fallback_reason"):
+        user_content = build_user_content(pages)
+        experiment_meta = {"native_pdf": {
+            "input": "image_fallback",
+            "fallback_reason": native_pdf["fallback_reason"],
+        }}
+    else:
+        user_content = build_user_content(pages)
+
     for attempt in range(3):
         try:
             with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
                 model=model,
                 max_tokens=MAX_OUTPUT_TOKENS,
                 system=system,
-                messages=[{"role": "user", "content": build_user_content(pages)}],
+                messages=[{"role": "user", "content": user_content}],
                 output_config={"effort": "high"},
             ) as stream:
                 resp = stream.get_final_message()
@@ -2170,6 +2312,8 @@ def _run_pass1_once(client, system, pages) -> dict:
                 "pages_sent": len(pages),
                 "model": model,
             }
+            if experiment_meta:
+                parsed["_meta"]["experiment"] = experiment_meta
             return parsed
         except Exception as exc:
             last_err = exc
@@ -2206,7 +2350,8 @@ def _resolve_floor_b64(pages, runs):
     return (pages[0]["image_b64"], pages[0].get("page_index")) if pages else (None, None)
 
 
-def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
+def _run_pass1_voted(client, system, pages, n, _emit, *,
+                     native_pdf: dict | None = None) -> dict:
     """Run Pass-1 ``n`` times (+ one shared adjacency pass) and median-vote into
     a single consensus parsed dict.
 
@@ -2215,6 +2360,9 @@ def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
     benchmark script before. Median voting means a single adjacency-bail or
     perimeter-jitter run can't tank the consensus. Degrades gracefully: 0 good
     runs → error; 1 good run → that run (adjacency still applied).
+
+    native_pdf: EXPERIMENT payload forwarded to every round (see
+    _run_pass1_once). Byte-identical across rounds → cache-friendly.
     """
     from .vision.extraction_voter import vote_extraction
 
@@ -2222,7 +2370,7 @@ def _run_pass1_voted(client, system, pages, n, _emit) -> dict:
     runs: list[dict] = []
     for i in range(n):
         _emit({"event": "voting_round_started", "round": i + 1, "of": n})
-        p = _run_pass1_once(client, system, pages)
+        p = _run_pass1_once(client, system, pages, native_pdf=native_pdf)
         if p.get("status") == "error":
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
@@ -2365,10 +2513,23 @@ def extract_interior(
     _voting_on = bool(_vflags.get("extraction_voting"))
     _emit({"event": "pass1_started", "page_count": len(pages), "voting": _voting_on})
 
+    # EXPERIMENT (SAMATU_PDF_NATIVE=1): build the native-PDF document payload
+    # ONCE (byte-identical across voting rounds → cache-friendly) and forward
+    # it to Pass-1. Default OFF → _native_pdf stays None, zero behavior change.
+    _native_pdf = None
+    if _pdf_native_enabled():
+        _native_pdf = _prepare_native_pdf(pdf_bytes, pages)
+        _emit({"event": "native_pdf_prepared",
+               "input": "document" if _native_pdf.get("b64") else "image_fallback",
+               "fallback_reason": _native_pdf.get("fallback_reason"),
+               "pdf_pages": _native_pdf.get("n_pages"),
+               "pdf_b64_bytes": _native_pdf.get("b64_bytes")})
+
     if _voting_on:
-        parsed = _run_pass1_voted(client, system, pages, _voting_n(), _emit)
+        parsed = _run_pass1_voted(client, system, pages, _voting_n(), _emit,
+                                  native_pdf=_native_pdf)
     else:
-        parsed = _run_pass1_once(client, system, pages)
+        parsed = _run_pass1_once(client, system, pages, native_pdf=_native_pdf)
 
     if not parsed or parsed.get("status") == "error":
         # Error shapes (model_refused, output_truncated, json_decode_failure,
