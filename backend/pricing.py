@@ -77,12 +77,38 @@ def calc_claude_cost_usd(
     )
 
 
+def _calc_extra_calls_cost_usd(meta: dict, cache_ttl: str) -> float:
+    """Price ``meta["extra_calls"]`` — the sub-Vision calls the extraction
+    pipeline makes beyond Pass-1 (eksplikacija Vision fallback, apdailos,
+    doors, door_type ×N voted rounds, zoom fixed-crop, agentic zoom, sanitary
+    fixtures). Each entry is ``{model, input_tokens, output_tokens,
+    cache_read_tokens, cache_write_tokens}`` and is priced at ITS OWN model's
+    rate (sub-readers each resolve their own model_for(...), so a call may run
+    on a DIFFERENT model than Pass-1).
+
+    An extra_call with no ``model`` key is a capture bug, not a free call —
+    raise (via calc_claude_cost_usd's unknown-model guard) rather than
+    silently pricing at the default and undercounting again.
+    """
+    total = 0.0
+    for c in (meta.get("extra_calls") or []):
+        total += calc_claude_cost_usd(
+            input_tokens=int(c.get("input_tokens") or 0),
+            output_tokens=int(c.get("output_tokens") or 0),
+            cache_read_tokens=int(c.get("cache_read_tokens") or 0),
+            cache_write_tokens=int(c.get("cache_write_tokens") or 0),
+            model=c.get("model") or "",  # "" → ValueError (never silent)
+            cache_ttl=cache_ttl,
+        )
+    return total
+
+
 def calc_meta_cost_usd(
     meta: dict,
     default_model: str = "claude-opus-4-8",
     cache_ttl: str = "1h",
 ) -> float:
-    """Price a pipeline ``_meta`` block, mixed-model-voting aware.
+    """Price a pipeline ``_meta`` block, mixed-model-voting + sub-call aware.
 
     Mixed-model voting runs (env ``SAMATU_VOTING_MODELS``, 2026-07-04
     experiment #7) carry a per-round token/model split in
@@ -95,13 +121,21 @@ def calc_meta_cost_usd(
     sums at ``meta["model"]`` — byte-identical to the previous behaviour of
     every call site.
 
-    Raises ValueError on an unknown model rate, same as calc_claude_cost_usd
-    — never silently price wrong.
+    On TOP of the main/voting cost, the cost of every sub-Vision call captured
+    in ``meta["extra_calls"]`` is added (2026-07-04 sub-call metering fix) —
+    each at its own model's rate. Absent/empty → adds nothing (regression-safe:
+    metas that predate the fix price identically).
+
+    Raises ValueError on an unknown model rate — in the main sums, a voting
+    round, OR an extra_call — same as calc_claude_cost_usd; never silently
+    price wrong.
     """
+    extra = _calc_extra_calls_cost_usd(meta, cache_ttl)
+
     rounds = [r for r in (meta.get("voting_models") or [])
               if r.get("model") and not r.get("error")]
     if rounds:
-        return sum(
+        return extra + sum(
             calc_claude_cost_usd(
                 input_tokens=int(r.get("input_tokens") or 0),
                 output_tokens=int(r.get("output_tokens") or 0),
@@ -112,7 +146,7 @@ def calc_meta_cost_usd(
             )
             for r in rounds
         )
-    return calc_claude_cost_usd(
+    return extra + calc_claude_cost_usd(
         input_tokens=int(meta.get("input_tokens") or 0),
         output_tokens=int(meta.get("output_tokens") or 0),
         cache_read_tokens=int(meta.get("cache_read_tokens") or 0),
