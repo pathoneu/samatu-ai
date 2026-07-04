@@ -78,8 +78,10 @@ export default function Pricing() {
   // Flag-off invariant: no billing → route is invisible.
   if (!enabled) return <Navigate to="/dashboard" replace />;
 
-  const planByName = (name) => plans.find((p) => p.name === name);
-  const orderedPlans = ORDER.map((name) => ({ name, plan: planByName(name), meta: PLAN_META[name] }))
+  // ORDER holds plan IDs ('pro'/'studio'/'oneoff'); match the backend plan by
+  // its `id` (NOT `name`, which is the display label "Pro"/"Studio"/…).
+  const planById = (id) => plans.find((p) => p.id === id);
+  const orderedPlans = ORDER.map((id) => ({ name: id, plan: planById(id), meta: PLAN_META[id] }))
     .filter((x) => x.plan && x.meta);
 
   const handleCheckout = async (name) => {
