@@ -124,6 +124,11 @@ async def get_room_graph(
     """Return per-room polygons + paint quantities for the Annotator overlay."""
     if fixture:
         # Demo / dev mode — no auth, no DB. Useful for the Beržų fixture.
+        # SECURITY (pass-3 sweep, 2026-07-04): safe ONLY because this branch reads
+        # nothing but the fixed FIXTURES file and echoes ``fixture:{name}`` as the
+        # id — it never touches a ``{URL_project_id}``-keyed per-user store. If you
+        # add such a read, call ``_auth.require_owned_project(request, project_id)``
+        # FIRST, or ``?fixture=`` becomes an unauth cross-tenant read (P1/P2 class).
         parsed = _load_fixture(fixture)
         rg = _build_room_graph(parsed)
         rg["project_id"] = f"fixture:{fixture}"

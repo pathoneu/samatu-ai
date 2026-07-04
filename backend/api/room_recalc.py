@@ -42,6 +42,14 @@ router = APIRouter(prefix="/api/projects", tags=["room-recalc"])
 
 
 def _load_project(request: Request, project_id: str, fixture: str | None) -> dict[str, Any]:
+    # SECURITY (pass-3 sweep, 2026-07-04): the ``fixture`` branch RETURNS BEFORE
+    # auth. This is only safe because recalc_room is a PURE in-memory compute — it
+    # reads NO ``{URL_project_id}``-keyed per-user store (no data/annotations,
+    # data/calibrations, PDF cache). If you EVER add such a store read to this
+    # handler, you MUST call ``_auth.require_owned_project(request, project_id)``
+    # FIRST (before this fixture branch), or ``?fixture=`` becomes an unauth
+    # cross-tenant read (the P1/P2 class). Do not "optimise" the fixture branch to
+    # touch a per-project file.
     if fixture:
         p = FIXTURES.get(fixture)
         if not p or not p.exists():
