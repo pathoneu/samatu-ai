@@ -25,6 +25,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 import db as _db
 import auth as _auth
+from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = {
@@ -88,7 +89,9 @@ def _write_kz_sheet(ws, parsed: dict[str, Any], calibration: dict[str, Any] | No
     align_right = Alignment(horizontal="right")
 
     santrauka = parsed.get("santrauka") or {}
-    project_name = parsed.get("pavadinimas") or parsed.get("name") or "Projektas"
+    # F6 (2026-07-04 pentest): the project name is user/AI-supplied text — a
+    # leading = + - @ would be evaluated as a formula when the .xlsx is opened.
+    project_name = _safe(parsed.get("pavadinimas") or parsed.get("name") or "Projektas")
 
     ws["A1"] = project_name
     ws["A1"].font = title_font
@@ -141,8 +144,10 @@ def _write_kz_sheet(ws, parsed: dict[str, Any], calibration: dict[str, Any] | No
         cell.fill = header_fill
     row += 1
     for r in parsed.get("patalpos") or []:
-        ws.cell(row=row, column=1, value=str(r.get("nr") or ""))
-        ws.cell(row=row, column=2, value=str(r.get("pavadinimas") or ""))
+        # F6: room nr + name are user/AI text — neutralise formula injection.
+        # Plotas / perimetras / dažymas stay numeric (untouched).
+        ws.cell(row=row, column=1, value=_safe(str(r.get("nr") or "")))
+        ws.cell(row=row, column=2, value=_safe(str(r.get("pavadinimas") or "")))
         ws.cell(row=row, column=3, value=round(float(r.get("plotas_m2") or 0), 2)).alignment = align_right
         ws.cell(row=row, column=4, value=round(float(r.get("perimetras_m") or 0), 2)).alignment = align_right
         ws.cell(row=row, column=5, value=round(float(r.get("dazymo_plotas_m2") or 0), 2)).alignment = align_right
