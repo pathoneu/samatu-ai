@@ -130,6 +130,50 @@ def _check_user_quota(user_id: str | None) -> None:
         )
 
 
+def _check_trial_gate(user_id: str | None) -> None:
+    """W3 billing (Phase 5): free-trial company-code anti-abuse gate.
+
+    HARD no-op when BILLING_ENABLED != '1' (pre-billing behavior) or no user_id.
+    Only gates FREE-plan users who are drawing their one-time trial slot:
+      - plan != 'free'        → no-op (trial only bounds the free tier).
+      - credits_balance > 0   → no-op (allowed via the purchased-credit path,
+                                not the trial).
+      - else (free, no credit): the company must be identified AND its trial
+        must still be available:
+          * missing company_code       → 403 company_code_required
+          * company_code but consumed   → 402 trial_used
+          * available                   → allow (do NOT consume here; the trial
+                                          is consumed on a SUCCESSFUL extraction
+                                          in the /extract-interior success path).
+    """
+    from billing.flag import billing_enabled
+    if not billing_enabled() or not user_id:
+        return
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return
+    if (user.get("plan") or "free") != "free":
+        return  # trial only gates free users
+    if db.credits_balance(user_id) > 0:
+        return  # a purchased credit covers this run — not a trial slot
+    company_code = user.get("company_code")
+    if not company_code:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "company_code_required",
+                    "message": "Nurodykite įmonės kodą, kad pradėtumėte "
+                               "nemokamą bandymą."},
+        )
+    from billing.trial import trial_available
+    if not trial_available(company_code):
+        raise HTTPException(
+            status_code=402,
+            detail={"error": "trial_used",
+                    "message": "Nemokamas bandymas jau panaudotas šiai "
+                               "įmonei. Įsigykite planą."},
+        )
+
+
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     """Sliding-window rate limit. Raises 429 on overflow.
 
@@ -700,13 +744,30 @@ async def api_change_password(payload: PasswordChangePayload, request: Request):
 class ProfileUpdatePayload(BaseModel):
     name: str | None = None
     company_name: str | None = None
+    # W3 billing Phase 5: LT įmonės kodas (+ optional PVM kodas). Required before
+    # a free user can consume the trial (the gate reads company_code) and is the
+    # invoice buyer identity. Omitting them leaves today's behavior unchanged.
+    company_code: str | None = None
+    pvm_code: str | None = None
 
 
 @app.put("/api/auth/profile")
 async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
     """Update user's display name + company. Email NOT changeable here
-    (would need verification flow)."""
+    (would need verification flow).
+
+    W3 billing: when a `company_code` is supplied it is validated + normalized
+    via billing.trial.normalize_company_code (400 on an invalid code) and
+    persisted (with the optional `pvm_code`). Omitting `company_code` leaves any
+    existing company_code untouched — it is never wiped by a name-only update."""
     user = _auth.require_user(request)
+    if payload.company_code is not None:
+        from billing.trial import normalize_company_code
+        try:
+            code = normalize_company_code(payload.company_code)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.set_user_company(user["id"], code, pvm_code=payload.pvm_code)
     with db._conn() as c:
         c.execute(
             "UPDATE users SET name = ?, company_name = ? WHERE id = ?",
@@ -5109,6 +5170,18 @@ async def extract_interior_endpoint(
         from billing.flag import billing_enabled
         if billing_enabled() and _user and _user.get("id") and isinstance(result, dict):
             db.record_extract_and_maybe_consume_credit(_user["id"])
+            # W3 billing Phase 5: if THIS was a free user's trial-slot extraction
+            # (free plan, no purchased credit) and they've identified their
+            # company, mark the company's trial consumed — so a 2nd free project
+            # (this account OR a re-registered account with the same įmonės
+            # kodas) is blocked by _check_trial_gate. Best-effort; the outer
+            # try/except guarantees it never breaks a successful extraction.
+            _bu = db.get_user_by_id(_user["id"])
+            if (_bu and (_bu.get("plan") or "free") == "free"
+                    and db.credits_balance(_user["id"]) == 0
+                    and _bu.get("company_code")):
+                from billing.trial import consume_trial
+                consume_trial(_bu["company_code"], _user["id"])
     except Exception as _exc:
         log.warning("record_billing_usage failed (extract-interior): %r", _exc)
 

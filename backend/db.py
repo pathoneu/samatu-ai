@@ -638,6 +638,60 @@ def record_extract_and_maybe_consume_credit(user_id: str) -> None:
         record_billing_usage(user_id, kind="credit_consumed", project_id=None)
 
 
+# ── Free-trial anti-abuse (company-code gated, survives account deletion) ─────
+#
+# consumed_trials is keyed by the NORMALIZED company code and is NOT
+# FK-referenced to users — deleting a user leaves the row, so a re-registered
+# account with the same įmonės kodas cannot reclaim the one free trial. See
+# backend/billing/trial.py for the normalization + gate.
+
+def trial_consumed(company_code: str) -> bool:
+    """True iff this (already-normalized) company code is in consumed_trials.
+    Empty code → False (never claimed)."""
+    if not company_code:
+        return False
+    with _conn() as c:
+        row = c.execute(
+            "SELECT 1 FROM consumed_trials WHERE company_code = ?",
+            (company_code,),
+        ).fetchone()
+        return row is not None
+
+
+def consume_trial(company_code: str, user_id: str | None) -> bool:
+    """Insert the (already-normalized) company code into consumed_trials
+    (UNIQUE). Returns True on a fresh consume, False if this company already
+    consumed its trial (IntegrityError on the UNIQUE column) or the code is
+    empty. The UNIQUE constraint makes this the atomic one-per-company gate."""
+    if not company_code:
+        return False
+    try:
+        with _conn() as c:
+            c.execute(
+                "INSERT INTO consumed_trials (company_code, user_id, consumed_at) "
+                "VALUES (?, ?, ?)",
+                (company_code, user_id, _now_iso()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def set_user_company(user_id: str, company_code: str,
+                     pvm_code: str | None = None) -> None:
+    """Persist the user's company_code (+ optional PVM kodas) on their row.
+    Caller validates/normalizes via billing.trial.normalize_company_code before
+    calling. No-op for an empty user_id."""
+    if not user_id:
+        return
+    with _conn() as c:
+        c.execute(
+            "UPDATE users SET company_code = ?, "
+            "pvm_code = COALESCE(?, pvm_code) WHERE id = ?",
+            (company_code, pvm_code, user_id),
+        )
+
+
 # ── Corrections (audit log for future learning-loop) ──────────────────────────
 
 def log_correction(project_id: str, field_path: str,
