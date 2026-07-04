@@ -63,7 +63,8 @@ def init_schema() -> None:
                 is_admin      INTEGER NOT NULL DEFAULT 0,
                 is_active     INTEGER NOT NULL DEFAULT 1,
                 created_at    TEXT NOT NULL,
-                last_login_at TEXT
+                last_login_at TEXT,
+                session_version INTEGER NOT NULL DEFAULT 1  -- F2: logout/pw-change nonce
             );
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
@@ -207,6 +208,23 @@ def get_user_by_id(user_id: str) -> dict | None:
 def update_user_login(user_id: str) -> None:
     with _conn() as c:
         c.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now_iso(), user_id))
+
+
+def bump_session_version(user_id: str) -> int:
+    """F2 (2026-07-04 pentest): invalidate every existing session for this user
+    by incrementing the session_version nonce. Called on logout and on
+    change-password. Returns the new version. require_user rejects any session
+    cookie whose embedded 'sv' no longer matches, so a captured pre-logout cookie
+    stops replaying immediately."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE users SET session_version = COALESCE(session_version, 1) + 1 WHERE id = ?",
+            (user_id,),
+        )
+        row = c.execute(
+            "SELECT session_version FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    return int(row["session_version"]) if row else 1
 
 
 def list_users(admin_only: bool = False) -> list[dict]:
@@ -580,6 +598,14 @@ def _migrate_schema() -> None:
         uecols = {row["name"] for row in c.execute("PRAGMA table_info(usage_events)").fetchall()}
         if uecols and "model" not in uecols:
             c.execute("ALTER TABLE usage_events ADD COLUMN model TEXT")
+        # F2 (2026-07-04 pentest): session-version nonce for logout /
+        # change-password invalidation. Every session cookie stores the value it
+        # was minted against; require_user rejects when it no longer matches, so
+        # a captured pre-logout cookie stops replaying. SQLite ADD COLUMN can't
+        # carry a non-constant default, but the literal 1 is fine and existing
+        # rows backfill to 1.
+        if ucols and "session_version" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1")
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────

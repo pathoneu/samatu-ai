@@ -514,6 +514,7 @@ async def api_register(payload: RegisterPayload, request: Request):
         is_admin=is_first,
     )
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_first)
     user.pop("password_hash", None)
     return {"user": user, "is_first_admin": is_first}
@@ -532,6 +533,7 @@ async def api_login(payload: LoginPayload, request: Request):
                     request.client.host if request.client else "?")
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     user.pop("password_hash", None)
     return {"user": user}
@@ -539,6 +541,16 @@ async def api_login(payload: LoginPayload, request: Request):
 
 @app.post("/api/auth/logout")
 async def api_logout(request: Request):
+    # F2 (2026-07-04 pentest): clearing the browser cookie is not enough — the
+    # signed cookie value stays cryptographically valid for 30 days and replays.
+    # Bump the user's session_version so every outstanding cookie for this user
+    # (including one captured before logout) fails the require_user nonce check.
+    uid = request.session.get("user_id")
+    if uid:
+        try:
+            db.bump_session_version(uid)
+        except Exception:
+            log.exception("logout: failed to bump session_version for %s", uid)
     request.session.clear()
     return {"status": "logged_out"}
 
@@ -573,6 +585,13 @@ async def api_change_password(payload: PasswordChangePayload, request: Request):
     new_hash = _auth.hash_password(payload.new_password)
     with db._conn() as c:
         c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
+    # F2 (2026-07-04 pentest): a password change must invalidate every other
+    # outstanding session (e.g. a session on a stolen/old device). Bump the
+    # nonce so all existing cookies fail the require_user check, then re-stamp
+    # THIS request's session with the new version so the acting user stays
+    # logged in rather than being kicked out mid-flow.
+    new_sv = db.bump_session_version(user["id"])
+    request.session["sv"] = new_sv
     log.info("password changed for user_id=%s", user["id"])
     return {"status": "ok"}
 
@@ -724,6 +743,7 @@ async def api_google_callback(request: Request, code: str | None = None,
                 avatar_url=avatar, is_admin=is_first,
             )
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     # Re-sanitize on use (defense in depth) before redirecting.
     return RedirectResponse(url=_safe_next_path(next_url), status_code=302)

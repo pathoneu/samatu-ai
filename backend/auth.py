@@ -130,11 +130,23 @@ def get_current_user(request: Request) -> dict | None:
     """Returns user dict (sans password_hash) if logged in, else None."""
     if AUTH_DISABLED:
         return _ensure_dev_user()
-    user_id = request.session.get("user_id") if hasattr(request, "session") else None
+    session = request.session if hasattr(request, "session") else {}
+    user_id = session.get("user_id")
     if not user_id:
         return None
     user = db.get_user_by_id(user_id)
     if not user or not user.get("is_active"):
+        return None
+    # F2 (2026-07-04 pentest): reject sessions minted against a stale
+    # session_version. Logout / change-password bump the user row's version, so a
+    # captured pre-logout cookie (cryptographically valid for 30 days) no longer
+    # matches and is refused. A cookie with no "sv" at all is a pre-F2 legacy
+    # session — treat it as stale and force a fresh login.
+    cookie_sv = session.get("sv")
+    current_sv = user.get("session_version")
+    if current_sv is None:
+        current_sv = 1  # rows predating the migration default to 1
+    if cookie_sv != current_sv:
         return None
     user.pop("password_hash", None)
     return user
