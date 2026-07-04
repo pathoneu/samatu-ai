@@ -116,8 +116,9 @@ This is *good news* for margins — no 21% haircut on the tiers above.
 
 - **Pro €49/10** — approved, holds at measured cost (52% at €2.36). ✅
 - **One-off €12/project** — approved, 80% at €2.36. ✅
-- **Studio €149/40** — ⚠️ **RE-OPENED by measurement.** The €149 fix was sized to a €2.00 estimate; measured €2.36 puts €149/40 at 37%, under the floor. Needs one more nudge: **€149/35 (45%)** or **€129/30 (45%)** — pending founder pick.
-- **Free trial** — approved in principle; anti-abuse per §3a (company-code-gated, server-persistent entitlement); card-on-file escalation built-but-off. Card-vs-no-card-for-trial fork: recommend no-card at launch.
+- **Studio €149/35** — ✅ approved (2026-07-04). Trimmed quota 40→35 to clear the floor at measured cost (45%). 35/mo is still high volume.
+- **Free trial** — company-code-gated, no card at launch (server-persistent entitlement, §3a); card-on-file escalation built-but-off.
+- **Unused monthly quota** — ⏸ founder deferred (billing is dormant; decide before activation). Build quota **policy-driven, default use-it-or-lose-it**, so rollover is a config flip not a rewrite. Light-user right-sizing (one-off + downgrade nudge) ships regardless.
 - **Cost lever (follow-up):** ~€0.5–0.7/project looks recoverable (drop door_type/fixtures sub-reader voting ×3→×1; stop the eksplikacija Vision call on text-rich PDFs). If pursued, beržu drops ~€2.36→~€1.8 and €149/40 clears 40% on its own — an alternative to trimming Studio's quota. Touches the accuracy pipeline, so measure before shipping.
 
 Next (after the Studio pick): W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator + the trial anti-abuse gate, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).
