@@ -304,8 +304,8 @@ export default function Annotator() {
       }}
       className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm transition ${
         tool === id
-          ? 'border-blue-500 bg-blue-50 text-blue-700'
-          : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400'
+          ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+          : 'border-border bg-card text-foreground hover:border-primary/40'
       }`}
     >
       <span>{glyph}</span><span>{label}</span>
@@ -313,10 +313,10 @@ export default function Annotator() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-100">
+    <div className="flex h-screen flex-col bg-background">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 text-sm">
-        <strong className="mr-3 text-neutral-700">Matavimas</strong>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2 text-sm">
+        <strong className="mr-3 text-foreground">Matavimas</strong>
         {toolBtn(TOOLS.NONE,      'Pasirinkti', '🖱')}
         {toolBtn(TOOLS.CALIBRATE, 'Kalibruoti', '🔍')}
         {toolBtn(TOOLS.MEASURE,   'Matuoti',    '📏')}
@@ -324,11 +324,11 @@ export default function Annotator() {
           type="button"
           onClick={handleDetectSymbols}
           disabled={detecting}
-          className="flex items-center gap-1.5 rounded border border-purple-300 bg-white px-3 py-1.5 text-sm text-purple-700 hover:border-purple-500"
+          className="flex items-center gap-1.5 rounded border border-purple-300 bg-card px-3 py-1.5 text-sm text-purple-300 hover:border-purple-500"
         >
           <span>💡</span><span>{detecting ? 'Aptinkama…' : 'Aptikti simbolius'}</span>
         </button>
-        <span className="mx-2 text-neutral-300">|</span>
+        <span className="mx-2 text-muted-foreground/70">|</span>
         <button
           type="button"
           onClick={() => {
@@ -337,13 +337,13 @@ export default function Annotator() {
             if (roomsWithPolygons[0]) setSelectedRoomNr(roomsWithPolygons[0].nr);
           }}
           disabled={roomsWithPolygons.length === 0}
-          className="rounded border border-sky-500 bg-sky-50 px-3 py-1.5 text-sky-700"
+          className="rounded border border-sky-500 bg-sky-500/10 px-3 py-1.5 text-sky-300"
           title="Praeiti per visus kambarius ir patvirtinti / pakoreguoti"
         >🚶 Tikrinti kambarius</button>
         <button
           type="button"
           onClick={() => setCalibrationModalOpen(true)}
-          className="rounded border border-amber-500 bg-amber-50 px-3 py-1.5 text-amber-700"
+          className="rounded border border-amber-500 bg-amber-500/10 px-3 py-1.5 text-amber-300"
           title="Kalibruoti AI sumas pagal jūsų žinomus skaičius"
         >⚖ Kalibruoti</button>
         <button
@@ -361,27 +361,27 @@ export default function Annotator() {
             a.click();
             URL.revokeObjectURL(a.href);
           }}
-          className="rounded border border-green-600 bg-green-50 px-3 py-1.5 text-green-700"
+          className="rounded border border-green-600 bg-green-500/10 px-3 py-1.5 text-emerald-300"
           title="Eksportuoti KŽ į Excel"
         >📊 Eksportuoti</button>
         <button
           type="button"
           onClick={handleSave}
           disabled={saveStatus === 'saving'}
-          className="rounded border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-emerald-700"
+          className="rounded border border-emerald-500 bg-emerald-500/10 px-3 py-1.5 text-emerald-300"
         >💾 Įrašyti</button>
         <button
           type="button"
           onClick={handleLoad}
           disabled={saveStatus === 'saving'}
-          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700"
+          className="rounded border border-border bg-card px-3 py-1.5 text-foreground"
         >↺ Atkurti</button>
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-muted-foreground">
           {saveStatus === 'saving' && '⏳'}
           {saveStatus === 'saved' && lastSavedAt && `✓ ${new Date(lastSavedAt * 1000).toLocaleTimeString('lt-LT')}`}
           {saveStatus === 'error' && '⚠ klaida'}
         </span>
-        <span className="ml-auto text-neutral-600">
+        <span className="ml-auto text-muted-foreground">
           Mastelis: <strong>{scale ? `1 mm = ${(1 / scale).toFixed(2)} px` : 'nekalibruota'}</strong>
           {' · '}
           Matavimai: <strong>{measurements.length}</strong>
@@ -394,8 +394,8 @@ export default function Annotator() {
 
       {/* Symbol palette — when no other tool active */}
       {(tool === TOOLS.NONE || tool === TOOLS.PLACE_SYMBOL) && (
-        <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-4 py-1.5 text-xs">
-          <span className="text-neutral-500">Simboliai:</span>
+        <div className="flex items-center gap-2 border-b border-border bg-card px-4 py-1.5 text-xs">
+          <span className="text-muted-foreground">Simboliai:</span>
           {Object.entries(SYMBOL_ICONS).map(([type, meta]) => (
             <button
               key={type}
@@ -406,22 +406,22 @@ export default function Annotator() {
               }}
               className={`flex items-center gap-1.5 rounded border px-2 py-1 ${
                 placeSymbolType === type
-                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                  : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                  ? 'border-purple-500 bg-purple-500/10 text-purple-300'
+                  : 'border-border bg-card text-foreground hover:border-primary/40'
               }`}
               style={{ borderLeftWidth: 4, borderLeftColor: meta.color }}
             >
               <span>{meta.glyph}</span>{meta.label}
             </button>
           ))}
-          <span className="ml-2 text-neutral-400">
+          <span className="ml-2 text-muted-foreground/70">
             Dešinysis pelės klavišas = ištrinti.  Vilkti = perkelti.
           </span>
         </div>
       )}
 
       {loadError && (
-        <div className="bg-red-50 border-y border-red-200 px-4 py-2 text-sm text-red-700">
+        <div className="bg-red-500/10 border-y border-red-300 px-4 py-2 text-sm text-red-300">
           PDF įkėlimo klaida: {loadError}
         </div>
       )}
@@ -494,32 +494,32 @@ export default function Annotator() {
             setSelectedRoomNr(roomsWithPolygons[nextIdx].nr);
           };
           return (
-            <div className="absolute right-4 top-32 z-40 w-80 rounded-lg border border-sky-300 bg-white p-4 shadow-2xl">
-              <div className="mb-1 text-xs uppercase text-sky-600">
+            <div className="absolute right-4 top-32 z-40 w-80 rounded-lg border border-sky-300 bg-card p-4 shadow-2xl">
+              <div className="mb-1 text-xs uppercase text-sky-300">
                 Tikrinimas {walkthroughIdx + 1} / {total}
               </div>
-              <div className="text-base font-semibold text-neutral-800">
+              <div className="text-base font-semibold text-foreground">
                 {current.nr} {current.name}
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-neutral-600">
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <div>Plotas: <strong>{current.area_m2.toFixed(2)} m²</strong></div>
                 <div>Perim.: <strong>{(current.perimeter_mm / 1000).toFixed(2)} m</strong></div>
                 <div>H: <strong>{current.ceiling_height_m.toFixed(2)} m</strong></div>
                 <div>Dažym.: <strong>{current.dazymo_plotas_m2.toFixed(1)} m²</strong></div>
               </div>
-              <p className="mt-3 text-sm font-medium text-neutral-700">
+              <p className="mt-3 text-sm font-medium text-foreground">
                 Ar AI matmenys teisingi?
               </p>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
                   onClick={() => { confirmRoom(current.nr); advance(); }}
-                  className="flex-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-1.5 text-sm text-emerald-700"
+                  className="flex-1 rounded border border-emerald-500 bg-emerald-500/10 px-2 py-1.5 text-sm text-emerald-300"
                 >✓ Taip</button>
                 <button
                   type="button"
                   onClick={() => markCorrected(current.nr)}
-                  className="flex-1 rounded border border-amber-500 bg-amber-50 px-2 py-1.5 text-sm text-amber-700"
+                  className="flex-1 rounded border border-amber-500 bg-amber-500/10 px-2 py-1.5 text-sm text-amber-300"
                   title="Pakoreguokite sienas dešinėje, tada Toliau"
                 >✎ Koreguoti</button>
               </div>
@@ -527,15 +527,15 @@ export default function Annotator() {
                 <button
                   type="button"
                   onClick={advance}
-                  className="flex-1 rounded border border-neutral-300 px-2 py-1 text-neutral-600"
+                  className="flex-1 rounded border border-border px-2 py-1 text-muted-foreground"
                 >→ Toliau</button>
                 <button
                   type="button"
                   onClick={() => setWalkthroughActive(false)}
-                  className="rounded border border-neutral-300 px-2 py-1 text-neutral-500"
+                  className="rounded border border-border px-2 py-1 text-muted-foreground"
                 >Nutraukti</button>
               </div>
-              <div className="mt-2 text-xs text-neutral-400">
+              <div className="mt-2 text-xs text-muted-foreground/70">
                 ✓ {confirmed}  ·  ✎ {corrected}  ·  liko {total - walkthroughIdx - 1}
               </div>
             </div>
@@ -554,17 +554,17 @@ export default function Annotator() {
         )}
 
         {/* Sidebar */}
-        <aside className="flex w-[36%] min-w-[320px] flex-col border-l border-neutral-200 bg-neutral-50">
+        <aside className="flex w-[36%] min-w-[320px] flex-col border-l border-border bg-card">
           {/* KŽ summary */}
-          <section className="border-b border-neutral-200 bg-white px-4 py-3">
+          <section className="border-b border-border bg-card px-4 py-3">
             <div className="mb-1 flex items-center justify-between">
-              <div className="text-xs font-medium uppercase text-neutral-500">KŽ santrauka</div>
+              <div className="text-xs font-medium uppercase text-muted-foreground">KŽ santrauka</div>
               {Object.keys(calibrationFactors).length > 0 && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">⚖ Kalibruota</span>
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">⚖ Kalibruota</span>
               )}
             </div>
             <table className="w-full text-sm">
-              <thead><tr className="text-xs text-neutral-500">
+              <thead><tr className="text-xs text-muted-foreground">
                 <th className="text-left">Kategorija</th>
                 <th className="text-right">AI</th>
                 <th className="text-right">Jūsų</th>
@@ -582,10 +582,10 @@ export default function Annotator() {
                     ? override
                     : (factor ? ai * factor : null);
                   return (
-                    <tr key={key} className="border-t border-neutral-100">
-                      <td className="py-1 text-neutral-700">{label}</td>
-                      <td className="py-1 text-right font-mono text-neutral-600">{ai.toFixed(2)} {unit}</td>
-                      <td className="py-1 text-right font-mono font-semibold text-amber-700">
+                    <tr key={key} className="border-t border-border">
+                      <td className="py-1 text-foreground">{label}</td>
+                      <td className="py-1 text-right font-mono text-muted-foreground">{ai.toFixed(2)} {unit}</td>
+                      <td className="py-1 text-right font-mono font-semibold text-amber-300">
                         {calibrated !== null && calibrated !== undefined ? `${calibrated.toFixed(2)} ${unit}` : '—'}
                       </td>
                     </tr>
@@ -596,36 +596,36 @@ export default function Annotator() {
             <button
               type="button"
               onClick={() => setCalibrationModalOpen(true)}
-              className="mt-2 w-full rounded border border-amber-300 bg-amber-50 py-1.5 text-sm text-amber-700 hover:bg-amber-100"
+              className="mt-2 w-full rounded border border-amber-300 bg-amber-500/10 py-1.5 text-sm text-amber-300 hover:bg-amber-500/20"
             >⚖ Kalibruoti pagal mano sumas</button>
           </section>
 
           {/* Selected room card + per-wall edit */}
           {selectedRoom && (
-            <section className="border-b border-neutral-200 bg-blue-50/40 px-4 py-3">
+            <section className="border-b border-border bg-blue-500/10 px-4 py-3">
               <div className="mb-1 flex items-center justify-between">
-                <div className="text-xs font-medium uppercase text-neutral-500">Pasirinkta patalpa</div>
+                <div className="text-xs font-medium uppercase text-muted-foreground">Pasirinkta patalpa</div>
                 {verificationState[selectedRoom.nr] === 'confirmed' && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">✓ Patvirtinta</span>
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">✓ Patvirtinta</span>
                 )}
                 {verificationState[selectedRoom.nr] === 'corrected' && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">✎ Pakoreguota</span>
+                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">✎ Pakoreguota</span>
                 )}
               </div>
-              <div className="text-base font-semibold text-neutral-800">
+              <div className="text-base font-semibold text-foreground">
                 {selectedRoom.nr} {selectedRoom.name}
               </div>
               <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
-                <div><span className="text-neutral-500">Plotas: </span><strong>{selectedRoom.area_m2.toFixed(2)} m²</strong></div>
-                <div><span className="text-neutral-500">Perimetras: </span><strong>{(selectedRoom.perimeter_mm / 1000).toFixed(2)} m</strong></div>
-                <div><span className="text-neutral-500">H: </span><strong>{selectedRoom.ceiling_height_m.toFixed(2)} m</strong></div>
-                <div><span className="text-neutral-500">Sienos dažomos: </span><strong>{selectedRoom.walls_paintable_m2.toFixed(1)} m²</strong></div>
-                <div><span className="text-neutral-500">Lubos: </span><strong>{selectedRoom.ceiling_paintable_m2.toFixed(1)} m²</strong></div>
-                <div><span className="text-neutral-500">Σ dažymas: </span><strong>{selectedRoom.dazymo_plotas_m2.toFixed(1)} m²</strong></div>
+                <div><span className="text-muted-foreground">Plotas: </span><strong>{selectedRoom.area_m2.toFixed(2)} m²</strong></div>
+                <div><span className="text-muted-foreground">Perimetras: </span><strong>{(selectedRoom.perimeter_mm / 1000).toFixed(2)} m</strong></div>
+                <div><span className="text-muted-foreground">H: </span><strong>{selectedRoom.ceiling_height_m.toFixed(2)} m</strong></div>
+                <div><span className="text-muted-foreground">Sienos dažomos: </span><strong>{selectedRoom.walls_paintable_m2.toFixed(1)} m²</strong></div>
+                <div><span className="text-muted-foreground">Lubos: </span><strong>{selectedRoom.ceiling_paintable_m2.toFixed(1)} m²</strong></div>
+                <div><span className="text-muted-foreground">Σ dažymas: </span><strong>{selectedRoom.dazymo_plotas_m2.toFixed(1)} m²</strong></div>
               </div>
               {selectedRoom.polygon_pct && (
                 <div className="mt-3">
-                  <div className="mb-1 text-xs font-medium text-neutral-500">Sienos</div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">Sienos</div>
                   <ul className="space-y-1">
                     {selectedRoom.polygon_pct.map((_, idx) => {
                       const wallId = `w${idx + 1}`;
@@ -633,11 +633,11 @@ export default function Annotator() {
                       const aiLen = (selectedRoom.perimeter_mm / selectedRoom.polygon_pct.length / 1000).toFixed(2);
                       return (
                         <li key={wallId} className="flex items-center gap-2 text-xs">
-                          <span className="w-8 font-mono text-neutral-500">{wallId}</span>
+                          <span className="w-8 font-mono text-muted-foreground">{wallId}</span>
                           <span className="flex-1">
                             AI: {aiLen} m
                             {override !== undefined && (
-                              <span className="ml-2 font-mono font-semibold text-amber-700">
+                              <span className="ml-2 font-mono font-semibold text-amber-300">
                                 → {(override / 1000).toFixed(2)} m
                               </span>
                             )}
@@ -647,7 +647,7 @@ export default function Annotator() {
                             onClick={() => startWallEdit(selectedRoom.nr, wallId)}
                             disabled={!scale}
                             title={scale ? 'Pertaškyti sieną' : 'Pirmiausia kalibruokite'}
-                            className="rounded border border-blue-300 bg-white px-2 py-0.5 text-blue-700 hover:border-blue-500"
+                            className="rounded border border-blue-300 bg-card px-2 py-0.5 text-blue-300 hover:border-blue-500"
                           >✎ Pertaškyti</button>
                         </li>
                       );
@@ -659,20 +659,20 @@ export default function Annotator() {
                 <button
                   type="button"
                   onClick={() => confirmRoom(selectedRoom.nr)}
-                  className="flex-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
+                  className="flex-1 rounded border border-emerald-500 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300"
                 >✓ Patvirtinti</button>
                 <button
                   type="button"
                   onClick={() => markCorrected(selectedRoom.nr)}
-                  className="flex-1 rounded border border-amber-500 bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                  className="flex-1 rounded border border-amber-500 bg-amber-500/10 px-2 py-1 text-xs text-amber-300"
                 >✎ Pakoregavau</button>
               </div>
             </section>
           )}
 
           {/* Rooms list */}
-          <section className="border-b border-neutral-200">
-            <header className="px-4 py-2 text-xs font-medium uppercase text-neutral-500">
+          <section className="border-b border-border">
+            <header className="px-4 py-2 text-xs font-medium uppercase text-muted-foreground">
               Patalpos ({rooms.length})
             </header>
             <ul className="max-h-72 overflow-auto text-sm">
@@ -683,13 +683,13 @@ export default function Annotator() {
                   onClick={() => setSelectedRoomNr(r.nr)}
                   onMouseEnter={() => setHoveredRoomNr(r.nr)}
                   onMouseLeave={() => setHoveredRoomNr(null)}
-                  className={`flex cursor-pointer items-center justify-between gap-2 border-b border-neutral-100 px-4 py-1.5 ${
-                    r.nr === selectedRoomNr ? 'bg-blue-100' : 'hover:bg-neutral-100'
+                  className={`flex cursor-pointer items-center justify-between gap-2 border-b border-border px-4 py-1.5 ${
+                    r.nr === selectedRoomNr ? 'bg-blue-500/20' : 'hover:bg-muted'
                   }`}
                 >
-                  <span className="font-mono text-xs text-neutral-500">{r.nr}</span>
-                  <span className="flex-1 truncate text-neutral-800">{r.name}</span>
-                  <span className="text-xs text-neutral-500">{r.area_m2.toFixed(1)} m²</span>
+                  <span className="font-mono text-xs text-muted-foreground">{r.nr}</span>
+                  <span className="flex-1 truncate text-foreground">{r.name}</span>
+                  <span className="text-xs text-muted-foreground">{r.area_m2.toFixed(1)} m²</span>
                   {!r.polygon_pct && (
                     <span title="No polygon — sidebar-only room" className="text-xs text-amber-600">⚠</span>
                   )}
@@ -700,23 +700,23 @@ export default function Annotator() {
 
           {/* Measurements */}
           <section className="flex-1 overflow-auto">
-            <header className="flex items-center justify-between px-4 py-2 text-xs font-medium uppercase text-neutral-500">
+            <header className="flex items-center justify-between px-4 py-2 text-xs font-medium uppercase text-muted-foreground">
               <span>Matavimai ({measurements.length})</span>
               {measurements.length > 0 && (
                 <button
                   onClick={() => setMeasurements([])}
-                  className="rounded border border-neutral-300 px-2 py-0.5 text-xs"
+                  className="rounded border border-border px-2 py-0.5 text-xs"
                 >Išvalyti</button>
               )}
             </header>
             <ul className="text-sm">
               {measurements.map((m, i) => (
-                <li key={m.id} className="flex items-center justify-between gap-2 border-b border-neutral-100 px-4 py-1.5">
-                  <span className="text-neutral-500">#{i + 1}</span>
-                  <span className="font-mono text-blue-700">{m.length_mm.toFixed(1)} mm</span>
+                <li key={m.id} className="flex items-center justify-between gap-2 border-b border-border px-4 py-1.5">
+                  <span className="text-muted-foreground">#{i + 1}</span>
+                  <span className="font-mono text-blue-300">{m.length_mm.toFixed(1)} mm</span>
                   <button
                     onClick={() => setMeasurements((prev) => prev.filter((x) => x.id !== m.id))}
-                    className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600"
+                    className="rounded border border-border px-2 py-0.5 text-xs text-muted-foreground"
                   >Trinti</button>
                 </li>
               ))}
@@ -726,7 +726,7 @@ export default function Annotator() {
       </div>
 
       {/* Status bar */}
-      <footer className="border-t border-neutral-200 bg-white px-4 py-1.5 text-xs text-neutral-500">
+      <footer className="border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
         Įrankis: <strong>{tool}</strong>
         {' · '}Snap: 20px
         {' · '}Patalpos su poligonais: <strong>{rooms.filter((r) => r.polygon_pct).length}/{rooms.length}</strong>
@@ -775,11 +775,11 @@ function CalibrationModal({ initialAi, initialOverrides, onCancel, onSubmit, bus
       onClick={onCancel}
     >
       <div
-        className="w-[520px] max-w-[90vw] rounded-lg bg-white p-6 shadow-2xl"
+        className="w-[520px] max-w-[90vw] rounded-lg bg-card p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-800">Kalibruoti pagal jūsų sumas</h2>
-        <p className="mb-4 text-sm text-neutral-500">
+        <h2 className="mb-1 text-lg font-semibold text-foreground">Kalibruoti pagal jūsų sumas</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
           Įveskite jums žinomas sumas kategorijoms, kurias norite pakoreguoti.
           Sistema saugos koregavimo koeficientus tik šiam projektui — bendra
           AI formulė lieka nepakitusi.
@@ -787,9 +787,9 @@ function CalibrationModal({ initialAi, initialOverrides, onCancel, onSubmit, bus
         <form onSubmit={handleSubmit} className="space-y-2">
           {CALIBRATION_FIELDS.map((f) => (
             <div key={f.key} className="flex items-center gap-3">
-              <label className="flex-1 text-sm text-neutral-700">
+              <label className="flex-1 text-sm text-foreground">
                 {f.label}
-                <span className="ml-2 text-xs text-neutral-400">
+                <span className="ml-2 text-xs text-muted-foreground/70">
                   {f.key in initialAi && `AI: ${initialAi[f.key].toFixed(2)} ${f.unit}`}
                 </span>
               </label>
@@ -800,14 +800,14 @@ function CalibrationModal({ initialAi, initialOverrides, onCancel, onSubmit, bus
                 value={values[f.key]}
                 onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
                 placeholder={`mano ${f.unit}`}
-                className="w-28 rounded border border-neutral-300 px-2 py-1 text-right font-mono text-sm"
+                className="w-28 rounded border border-border bg-card px-2 py-1 text-right font-mono text-sm text-foreground"
               />
-              <span className="w-8 text-xs text-neutral-400">{f.unit}</span>
+              <span className="w-8 text-xs text-muted-foreground/70">{f.unit}</span>
             </div>
           ))}
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onCancel}
-              className="rounded border border-neutral-300 px-4 py-1.5 text-sm">Atšaukti</button>
+              className="rounded border border-border px-4 py-1.5 text-sm text-foreground">Atšaukti</button>
             <button type="submit" disabled={busy}
               className="rounded border border-amber-500 bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
               {busy ? 'Saugoma…' : 'Kalibruoti'}

@@ -73,7 +73,7 @@ function SearchBox({ documentId, onClose }) {
   const hasQuery = committed !== '' && committed === query.trim();
   // Raster honesty: only after OUR typed query finished searching with 0 hits.
   const noHits = hasQuery && !search?.loading && total === 0;
-  const btn = 'p-1 rounded hover:bg-[#efece6] disabled:opacity-40 disabled:hover:bg-transparent';
+  const btn = 'p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40 disabled:hover:bg-transparent';
   return (
     <span className="relative inline-flex items-center gap-1">
       <input
@@ -92,17 +92,17 @@ function SearchBox({ documentId, onClose }) {
         }}
         placeholder="Ieškoti brėžinyje…"
         aria-label="Paieška dokumente"
-        className="w-44 h-6 px-2 rounded border border-[#e6e2da] bg-white text-[12px] text-[#4a4640] placeholder:text-[#b5b0a6] focus:outline-none focus:border-[#2a6fb5]"
+        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-[12px] text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
       />
       {hasQuery && (
-        <span className="mono tabular text-[11px] text-[#8a857d] whitespace-nowrap px-0.5">
+        <span className="mono tabular text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
           {total > 0 ? `${(search.activeResultIndex ?? 0) + 1} / ${total}` : '0 / 0'}
         </span>
       )}
       <button className={btn} title="Ankstesnis rezultatas (Shift+Enter)" disabled={total === 0} onClick={() => searchApi?.previousResult()}><ChevronUp className="w-4 h-4" /></button>
       <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
       {noHits && (
-        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[#e6e2da] bg-[#fbfaf7] text-[11px] text-[#8a857d] whitespace-nowrap shadow-sm">
+        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
           Rezultatų nėra — PDF gali neturėti teksto sluoksnio
         </span>
       )}
@@ -119,30 +119,30 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const cur = scroll?.currentPage ?? 1;
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
   const total = totalPages || 1;
-  const btn = 'p-1 rounded hover:bg-[#efece6] disabled:opacity-40 disabled:hover:bg-transparent';
-  const pressed = 'p-1 rounded bg-[#eef4fb] text-[#2a6fb5]';
+  const btn = 'p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40 disabled:hover:bg-transparent';
+  const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
   const canFill = focusedRoomNr != null && onStartFill;
   return (
-    <div className="h-9 shrink-0 border-b border-[#e6e2da] bg-[#fbfaf7] px-3 flex items-center gap-1 text-[12px] text-[#4a4640]">
+    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))]">
       <button
-        className={btn + (railOpen ? ' bg-[#efece6] text-[#2a6fb5]' : '')}
+        className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
         title="Puslapių juosta (T)"
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPreviousPage()}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
       <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => scrollApi?.scrollToNextPage()}><ChevronRight className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Tolinti (−)" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
       <span className="mono tabular w-11 text-center">{pct}%</span>
       <button className={btn} title="Artinti (+)" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Pritaikyti plotį (1)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
       <button className={btn} title="Visas puslapis (0)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
       {onMeasureTool && (
         <>
-          <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
           {MEASURE_TOOLS.map(({ id, Icon, title }) => (
             <button
               key={id}
@@ -152,7 +152,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               onClick={() => onMeasureTool(id)}
             ><Icon className="w-4 h-4" /></button>
           ))}
-          <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
           <button
             className={snapEnabled ? pressed : btn}
             title="Pritraukti prie taškų"
@@ -169,10 +169,10 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       )}
       {canFill && (
         <>
-          <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
           {fillFor == null ? (
             <button
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#e6e2da] hover:bg-[#efece6] text-[#4a4640]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
               title={`Taisyti patalpos ${focusedRoomNr} zoną`}
               onClick={() => onStartFill(focusedRoomNr)}
             >
@@ -183,7 +183,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
             <span className="inline-flex items-center gap-1">
               <button
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#eef4fb] border border-[#cfe0f2] text-[#2a6fb5]"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))]"
                 title={`Taisyti patalpos ${fillFor} zoną — spustelėkite plane`}
                 onClick={onCancelFill}
               >
@@ -191,7 +191,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
                 <span>Taisyti zoną</span>
               </button>
               <button
-                className="p-1 rounded hover:bg-[#efece6]"
+                className="p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
                 title="Atšaukti (Esc)"
                 onClick={onCancelFill}
               >
@@ -210,7 +210,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           aria-pressed={!!searchOpen}
           onClick={onToggleSearch}
         ><Search className="w-4 h-4" /></button>
-        <span className="w-px h-4 bg-[#e0dcd3] mx-1.5" />
+        <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
         <button className={btn} title="Spausdinti (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
         <button className={btn} title="Atsisiųsti PDF" disabled={!exportApi} onClick={() => exportApi?.download()}><Download className="w-4 h-4" /></button>
       </div>
@@ -265,10 +265,10 @@ function StatusBar({ documentId, totalPages, pages, fillFor, measureScales }) {
   const pageScale = measureScales?.[cur];
   const scaleText = scaleStatusText(pageScale);
   return (
-    <div className="h-6 shrink-0 bg-[#fbfaf7] border-t border-[#e6e2da] text-[11px] text-[#8a857d] px-3 flex items-center gap-3">
+    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
-      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[#2a6fb5]' : (pageScale?.calibrated ? 'text-[#4a4640]' : '')}`}>
+      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[hsl(var(--viewer-chrome-active))]' : (pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : '')}`}>
         {fillFor != null ? `Spustelėkite patalpos ${fillFor} viduje` : scaleText}
       </span>
     </div>
@@ -284,7 +284,7 @@ function ThumbnailRail({ documentId }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const cur = scroll?.currentPage ?? 1;
   return (
-    <aside className="w-[148px] shrink-0 bg-[#fbfaf7] border-r border-[#e6e2da]">
+    <aside className="w-[148px] shrink-0 bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]">
       <ThumbnailsPane documentId={documentId} style={{ height: '100%' }}>
         {(m) => {
           const pageNumber = m.pageIndex + 1;
@@ -302,11 +302,11 @@ function ThumbnailRail({ documentId }) {
                 documentId={documentId}
                 meta={m}
                 style={{ width: m.width, height: m.height }}
-                className={`bg-white rounded-[2px] ${isCurrent ? 'ring-2 ring-[#2a6fb5]' : 'ring-1 ring-[#e6e2da] group-hover:ring-[#c9c4ba]'}`}
+                className={`bg-white rounded-[2px] ${isCurrent ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))] group-hover:ring-[hsl(var(--viewer-chrome-foreground)/0.35)]'}`}
               />
               <span
                 style={{ height: m.labelHeight, lineHeight: `${m.labelHeight}px` }}
-                className={`mono tabular text-[10px] ${isCurrent ? 'text-[#2a6fb5]' : 'text-[#8a857d]'}`}
+                className={`mono tabular text-[10px] ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
               >
                 {pageNumber}
               </span>
@@ -549,7 +549,7 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
           <div className="relative flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
-              <Viewport documentId={activeDocumentId} style={{ height: '100%', background: '#e9e7e2' }}>
+              <Viewport documentId={activeDocumentId} style={{ height: '100%', background: 'hsl(var(--viewer-blueprint-bg))' }}>
                 <Scroller
                   documentId={activeDocumentId}
                   renderPage={(layout) => (

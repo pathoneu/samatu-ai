@@ -97,7 +97,7 @@ export default function CountReviewPanel({
       </div>
 
       {candidates.length === 0 ? (
-        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+        <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded p-2">
           Brėžinyje nieko panašaus nerasta. Pabandykite apvesti simbolį tiksliau
           (be papildomų linijų aplinkui), arba pasirinkite kitą simbolį.
         </div>
@@ -150,14 +150,14 @@ export default function CountReviewPanel({
               </span>
               <button
                 onClick={() => decide(i, 'accept')}
-                className={`px-1.5 rounded ${dec === 'accept' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50'}`}
+                className={`px-1.5 rounded ${dec === 'accept' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-500/15'}`}
                 title="Priimti (A)"
               >
                 ✓
               </button>
               <button
                 onClick={() => decide(i, 'reject')}
-                className={`px-1.5 rounded ${dec === 'reject' ? 'bg-red-600 text-white' : 'hover:bg-red-50'}`}
+                className={`px-1.5 rounded ${dec === 'reject' ? 'bg-red-600 text-white' : 'hover:bg-red-500/15'}`}
                 title="Atmesti (R)"
               >
                 ✕

@@ -29,7 +29,7 @@ export default function PdfPage({
       file={file}
       onLoadSuccess={({ numPages }) => onNumPages && onNumPages(numPages)}
       onLoadError={(err) => onLoadError && onLoadError(err)}
-      loading={<div className="p-12 text-neutral-500">Kraunama PDF…</div>}
+      loading={<div className="p-12 text-muted-foreground">Kraunama PDF…</div>}
     >
       <Page
         pageNumber={pageNumber}

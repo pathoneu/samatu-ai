@@ -312,7 +312,7 @@ export default function InteriorWorkspace({
         style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
       >
         {detecting && (
-          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-50 border-b border-blue-200 text-xs text-blue-900">
+          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 text-xs text-blue-300">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             Aptinkamos tikslios patalpų zonos…
           </div>

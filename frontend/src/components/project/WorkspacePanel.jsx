@@ -317,10 +317,9 @@ export default function WorkspacePanel({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onShowAllRooms(); }
               }}
-              className="rounded border px-1.5 whitespace-nowrap transition-colors hover:bg-[#eef4fb]"
+              className="rounded border px-1.5 whitespace-nowrap transition-colors text-primary border-primary/30 hover:bg-primary/10"
               style={{
                 fontSize: 10, lineHeight: '16px',
-                color: '#2a6fb5', borderColor: '#cfe0f2',
               }}
               title="Rodyti visas paslėptas zonas plane"
             >
@@ -414,7 +413,7 @@ export default function WorkspacePanel({
                     if ((e.ctrlKey || e.metaKey) && onIsolateRoom) onIsolateRoom(r.nr);
                     else onToggleRoomVisibility(r.nr);
                   }}
-                  className="flex items-center justify-center justify-self-end text-[#8a857d] hover:text-[#4a4640] transition-colors"
+                  className="flex items-center justify-center justify-self-end text-muted-foreground hover:text-foreground transition-colors"
                   style={{ width: 16, height: 16 }}
                   title="Rodyti/slėpti zoną plane · Ctrl+spustelėjimas — rodyti tik šią"
                 >

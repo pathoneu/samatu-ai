@@ -910,7 +910,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
           {/* Low-confidence banner */}
           {project.confidence === 'low' && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>
                 Vizualinė analizė nebuvo atlikta — kiekiai apytiksliai.
@@ -921,7 +921,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
           {/* Window fallback warning */}
           {prielaidos.langai_fallback && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">Langai nerasti brėžiniuose</p>
@@ -940,10 +940,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 const text = typeof n === 'string' ? n : (n?.message || JSON.stringify(n));
                 const level = typeof n === 'object' ? (n?.level || 'INFO') : 'INFO';
                 const colorClass = level === 'ERROR'
-                  ? 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
                   : level === 'WARNING'
-                    ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                    : 'bg-blue-50 border-blue-200 text-blue-800';
+                    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                    : 'bg-blue-500/10 border-blue-500/30 text-blue-300';
                 return (
                   <div key={i} className={`flex items-center gap-2 p-2.5 border rounded-lg text-xs ${colorClass}`}>
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />

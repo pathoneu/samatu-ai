@@ -154,7 +154,7 @@ export default function PageOverlayHost({
               onClick={(e) => { e.stopPropagation(); onMeasureDelete(selectedMeasurement.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               style={{ position: 'absolute', left: deleteAt.x + 10, top: deleteAt.y - 26, pointerEvents: 'auto' }}
-              className="w-5 h-5 rounded-full bg-white border border-[#e6e2da] shadow-sm flex items-center justify-center text-[#4a4640] hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+              className="w-5 h-5 rounded-full bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] shadow-sm flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground))] hover:bg-red-600 hover:text-white hover:border-red-500"
             >
               <X className="w-3 h-3" />
             </button>

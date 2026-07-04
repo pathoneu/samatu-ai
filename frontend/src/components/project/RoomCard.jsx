@@ -161,7 +161,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
   const isHigh = (room.lubu_aukstis_m || 2.82) > 3.0;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 min-w-0">
@@ -170,15 +170,15 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
               type="text"
               value={draft.pavadinimas}
               onChange={e => setDraft({ ...draft, pavadinimas: e.target.value })}
-              className="border border-stone-300 rounded px-2 py-1 text-sm font-semibold w-44"
+              className="border border-input rounded px-2 py-1 text-sm font-semibold w-44"
             />
           ) : (
             <div className="min-w-0">
-              <div className="font-semibold text-stone-800 truncate">
-                <span className="text-xs font-mono text-stone-400 mr-1.5">#{room.nr}</span>
+              <div className="font-semibold text-foreground truncate">
+                <span className="text-xs font-mono text-muted-foreground/70 mr-1.5">#{room.nr}</span>
                 {room.pavadinimas}
               </div>
-              <div className="text-xs text-stone-500 mt-0.5 flex items-center gap-2">
+              <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
                 <span>{info.label}</span>
                 <ConfidenceBadge
                   room={room}
@@ -193,11 +193,11 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
           {editing ? (
             <>
               <button onClick={handleSave}
-                className="p-1.5 hover:bg-green-50 text-green-600 rounded">
+                className="p-1.5 hover:bg-emerald-500/10 text-emerald-400 rounded">
                 <Check className="w-4 h-4" />
               </button>
               <button onClick={handleCancel}
-                className="p-1.5 hover:bg-red-50 text-red-600 rounded">
+                className="p-1.5 hover:bg-red-500/10 text-red-400 rounded">
                 <X className="w-4 h-4" />
               </button>
             </>
@@ -205,18 +205,18 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
             <>
               {onShowOnPdf && room.puslapio_nr && (
                 <button onClick={() => onShowOnPdf(room.puslapio_nr, room)}
-                  className="p-1.5 hover:bg-blue-50 text-blue-600 rounded"
+                  className="p-1.5 hover:bg-blue-500/10 text-blue-400 rounded"
                   title={`Rodyti brėžinyje (psl. ${room.puslapio_nr})`}>
                   <Eye className="w-4 h-4" />
                 </button>
               )}
               <button onClick={() => setEditing(true)}
-                className="p-1.5 hover:bg-stone-100 text-stone-500 rounded">
+                className="p-1.5 hover:bg-muted text-muted-foreground rounded">
                 <Edit2 className="w-4 h-4" />
               </button>
               {onRemove && (
                 <button onClick={() => onRemove(room)}
-                  className="p-1.5 hover:bg-red-50 text-red-600 rounded">
+                  className="p-1.5 hover:bg-red-500/10 text-red-400 rounded">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -228,16 +228,16 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
       {/* Pagrindiniai dydžiai */}
       <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
         <div>
-          <div className="text-stone-500 mb-0.5 flex items-center">
+          <div className="text-muted-foreground mb-0.5 flex items-center">
             Plotas
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'plotas_m2')} />}
           </div>
           {editing ? (
             <input type="number" step="0.01" value={draft.plotas_m2}
               onChange={e => setDraft({ ...draft, plotas_m2: e.target.value })}
-              className="border border-stone-300 rounded px-1.5 py-1 w-full text-sm" />
+              className="border border-input rounded px-1.5 py-1 w-full text-sm" />
           ) : (
-            <div className="font-semibold text-stone-800 flex items-center gap-1">
+            <div className="font-semibold text-foreground flex items-center gap-1">
               {dazymo > 0 || room.plotas_m2 ? `${room.plotas_m2} m²` : '—'}
               {room.plotas_saltinis === 'eksplikacija' && (
                 <span
@@ -249,39 +249,39 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
           )}
         </div>
         <div>
-          <div className="text-stone-500 mb-0.5 flex items-center">
+          <div className="text-muted-foreground mb-0.5 flex items-center">
             Perimetras
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'perimetras_m')} />}
           </div>
           {editing ? (
             <input type="number" step="0.01" value={draft.perimetras_m}
               onChange={e => setDraft({ ...draft, perimetras_m: e.target.value })}
-              className="border border-stone-300 rounded px-1.5 py-1 w-full text-sm" />
+              className="border border-input rounded px-1.5 py-1 w-full text-sm" />
           ) : (
-            <div className="font-semibold text-stone-800">{room.perimetras_m ? `${room.perimetras_m} m` : '—'}</div>
+            <div className="font-semibold text-foreground">{room.perimetras_m ? `${room.perimetras_m} m` : '—'}</div>
           )}
         </div>
         <div>
-          <div className="text-stone-500 mb-0.5 flex items-center">
+          <div className="text-muted-foreground mb-0.5 flex items-center">
             Lubos H
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'lubu_aukstis_m')} />}
           </div>
           {editing ? (
             <input type="number" step="0.01" value={draft.lubu_aukstis_m}
               onChange={e => setDraft({ ...draft, lubu_aukstis_m: e.target.value })}
-              className="border border-stone-300 rounded px-1.5 py-1 w-full text-sm" />
+              className="border border-input rounded px-1.5 py-1 w-full text-sm" />
           ) : (
-            <div className="font-semibold text-stone-800">{room.lubu_aukstis_m || 2.82} m</div>
+            <div className="font-semibold text-foreground">{room.lubu_aukstis_m || 2.82} m</div>
           )}
         </div>
       </div>
 
       {editing && (
         <div className="mb-3">
-          <div className="text-xs text-stone-500 mb-1">Paskirtis</div>
+          <div className="text-xs text-muted-foreground mb-1">Paskirtis</div>
           <select value={draft.paskirtis}
             onChange={e => setDraft({ ...draft, paskirtis: e.target.value })}
-            className="w-full border border-stone-300 rounded px-2 py-1.5 text-sm">
+            className="w-full border border-input rounded px-2 py-1.5 text-sm">
             {PASKIRTIS_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -291,66 +291,66 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 
       {/* Kiekiai */}
       {!editing && (
-        <div className="border-t border-stone-100 pt-3 space-y-1.5 text-sm">
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
           {dazymo > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Dažomas plotas</span>
-              <span className="font-medium text-stone-800">{dazymo.toFixed(2)} m²</span>
+              <span className="text-muted-foreground">Dažomas plotas</span>
+              <span className="font-medium text-foreground">{dazymo.toFixed(2)} m²</span>
             </div>
           )}
           {sienos > 0 && (
             <div className="flex justify-between text-xs pl-3">
-              <span className="text-stone-500">└ Sienos (neto)</span>
-              <span className="text-stone-600">{sienos.toFixed(2)} m²</span>
+              <span className="text-muted-foreground">└ Sienos (neto)</span>
+              <span className="text-muted-foreground">{sienos.toFixed(2)} m²</span>
             </div>
           )}
           {lubos > 0 && (
             <div className="flex justify-between text-xs pl-3">
-              <span className="text-stone-500">└ Lubos {isHigh ? '(virš 3m)' : ''}</span>
-              <span className="text-stone-600">{lubos.toFixed(2)} m²</span>
+              <span className="text-muted-foreground">└ Lubos {isHigh ? '(virš 3m)' : ''}</span>
+              <span className="text-muted-foreground">{lubos.toFixed(2)} m²</span>
             </div>
           )}
           {kampai > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Dažymo kampai</span>
-              <span className="font-medium text-stone-800">{kampai.toFixed(2)} m</span>
+              <span className="text-muted-foreground">Dažymo kampai</span>
+              <span className="font-medium text-foreground">{kampai.toFixed(2)} m</span>
             </div>
           )}
           {plytSienos > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Plytelės sienose</span>
-              <span className="font-medium text-stone-800">{plytSienos.toFixed(2)} m²</span>
+              <span className="text-muted-foreground">Plytelės sienose</span>
+              <span className="font-medium text-foreground">{plytSienos.toFixed(2)} m²</span>
             </div>
           )}
           {plytGrindys > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Plytelės grindyse</span>
-              <span className="font-medium text-stone-800">{plytGrindys.toFixed(2)} m²</span>
+              <span className="text-muted-foreground">Plytelės grindyse</span>
+              <span className="font-medium text-foreground">{plytGrindys.toFixed(2)} m²</span>
             </div>
           )}
           {grindjuostes > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Grindjuostės</span>
-              <span className="font-medium text-stone-800">{grindjuostes.toFixed(2)} m</span>
+              <span className="text-muted-foreground">Grindjuostės</span>
+              <span className="font-medium text-foreground">{grindjuostes.toFixed(2)} m</span>
             </div>
           )}
           {angokrasciaiM2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600" title="Langų ir durų angokraščiai (apdailai)">
+              <span className="text-muted-foreground" title="Langų ir durų angokraščiai (apdailai)">
                 Angokraščiai
               </span>
-              <span className="font-medium text-stone-800">
-                {angokrasciaiM2.toFixed(2)} m² <span className="text-stone-400 text-xs">({angokrasciaiLm.toFixed(2)} m)</span>
+              <span className="font-medium text-foreground">
+                {angokrasciaiM2.toFixed(2)} m² <span className="text-muted-foreground/70 text-xs">({angokrasciaiLm.toFixed(2)} m)</span>
               </span>
             </div>
           )}
           {pasleptosKompl > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600" title="Paslėptos durys (be matomos staktos)">
+              <span className="text-muted-foreground" title="Paslėptos durys (be matomos staktos)">
                 Paslėptos durys
               </span>
-              <span className="font-medium text-stone-800">
-                {pasleptosKompl} kompl. <span className="text-stone-400 text-xs">({pasleptosStaktosM.toFixed(2)} m staktų)</span>
+              <span className="font-medium text-foreground">
+                {pasleptosKompl} kompl. <span className="text-muted-foreground/70 text-xs">({pasleptosStaktosM.toFixed(2)} m staktų)</span>
               </span>
             </div>
           )}
@@ -359,7 +359,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 
       {/* Warning jei garažas/tambūras (nedažoma) */}
       {!editing && (room.paskirtis === 'garazas' || room.paskirtis === 'tambūras') && (
-        <div className="mt-3 flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+        <div className="mt-3 flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-300">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>{info.label} — pagal industries standartą NEDAŽOMA. Pakeiskite paskirtį, jei norite įtraukti.</span>
         </div>
@@ -367,7 +367,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 
       {/* High ceiling badge */}
       {!editing && isHigh && (
-        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
+        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/30">
           Virš 3m — atskira pozicija
         </div>
       )}

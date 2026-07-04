@@ -188,7 +188,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           <Info className="w-4 h-4 text-muted-foreground" />
           {title}
           {isFallback && (
-            <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200 border font-normal">
+            <Badge className="text-xs bg-amber-500/15 text-amber-300 border-amber-500/30 border font-normal">
               langai — prielaida
             </Badge>
           )}
@@ -210,7 +210,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
           {/* Window fallback warning */}
           {isFallback && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 mb-3">
+            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300 mb-3">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">Langai nerasti brėžiniuose</p>

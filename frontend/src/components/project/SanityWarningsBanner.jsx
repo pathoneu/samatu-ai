@@ -15,9 +15,9 @@ import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, Refre
 import { revalidateProject } from '../../lib/revalidateApi';
 
 const LEVEL_META = {
-  ERROR:   { icon: AlertCircle,   color: 'text-red-700 bg-red-50 border-red-200',   label: 'Klaidos',     order: 0 },
-  WARNING: { icon: AlertTriangle, color: 'text-amber-800 bg-amber-50 border-amber-200', label: 'Įspėjimai', order: 1 },
-  INFO:    { icon: Info,          color: 'text-blue-700 bg-blue-50 border-blue-200',   label: 'Info',       order: 2 },
+  ERROR:   { icon: AlertCircle,   color: 'text-red-300 bg-red-500/10 border-red-500/30',   label: 'Klaidos',     order: 0 },
+  WARNING: { icon: AlertTriangle, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30', label: 'Įspėjimai', order: 1 },
+  INFO:    { icon: Info,          color: 'text-blue-300 bg-blue-500/10 border-blue-500/30',   label: 'Info',       order: 2 },
 };
 
 const DISMISSED_KEY = 'samatu_sanity_dismissed';
@@ -142,7 +142,7 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
         )}
       </div>
       {revalidateError && (
-        <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+        <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-2 py-1">
           {revalidateError}
         </div>
       )}

@@ -74,7 +74,7 @@ export default function ScaleInfoBanner({ scaleInfo }) {
         )}
 
         {sanity && sanity.suggested_scale_multiplier && (
-          <div className="mt-2 text-xs bg-white/50 rounded px-2 py-1.5 border border-current/20">
+          <div className="mt-2 text-xs bg-background/40 rounded px-2 py-1.5 border border-current/20">
             <strong>Patarimas:</strong> Plotai atrodo netinkamo dydžio
             ({sanity.anomaly_pct}% patalpų už normos ribų). Galimas mastelio
             koregavimas: ×{sanity.suggested_scale_multiplier.toFixed(2)}.
