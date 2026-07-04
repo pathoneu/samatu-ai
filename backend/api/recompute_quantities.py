@@ -9,10 +9,12 @@ Spec: §4.5, §5.4
 """
 import logging
 import re
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
 from extractor.universal_rules import UNIVERSAL_RULES, paint_coverage_for_class
+
+import auth as _auth
 
 router = APIRouter(prefix="/api", tags=["recompute"])
 
@@ -351,7 +353,10 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
 
 
 @router.post("/recompute-quantities")
-def recompute(req: RecomputeRequest) -> dict:
+def recompute(
+    req: RecomputeRequest,
+    user: dict = Depends(_auth.require_user),  # F4 (2026-07-04): no anon compute
+) -> dict:
     # 1. Validate
     for e in req.edits:
         if e.field not in _VALID_FIELDS:

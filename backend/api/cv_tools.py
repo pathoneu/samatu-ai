@@ -17,9 +17,10 @@ frontend can re-upload from local browser state.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
+import auth as _auth
 import page_raster_cache as _pdf_cache
 from extractor.cv_match import find_similar_symbols
 from extractor.cv_render_cache import render_page
@@ -27,6 +28,21 @@ from extractor.cv_wand import suggest_room_polygon
 from extractor.training_data import record_label
 
 router = APIRouter(prefix="/api/cv", tags=["cv-tools"])
+
+
+def _rate_limit(request: Request, endpoint: str) -> None:
+    """F4 (2026-07-04 pentest): the /api/cv/* endpoints render pages via OpenCV
+    (CPU) and were fully unauthenticated — a DoS lever. They now require a
+    billable user (via Depends); on top of that, key the shared sliding-window
+    rate limiter (main._check_rate_limit) by client IP so one account can't loop
+    the render. Imported lazily to avoid a circular import (main includes this
+    router). Best-effort: never block a request on a limiter hiccup."""
+    try:
+        from main import _check_rate_limit
+    except Exception:
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, f"cv-{endpoint}")
 
 
 class MatchTemplateBody(BaseModel):
@@ -57,12 +73,15 @@ class RecordDecisionBody(BaseModel):
 
 @router.post("/upload-pdf")
 async def upload_pdf(
+    request: Request,
     project_id: str = Form(...),
     pdf_file: UploadFile = File(...),
+    user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
     """Prime the PDF cache for a session. Frontend calls once before the
     first match-template / magic-wand request; subsequent JSON calls
     reuse the cached bytes. Same pattern as /v9/click-to-fill."""
+    _rate_limit(request, "upload-pdf")
     pdf_bytes = await pdf_file.read()
     if not pdf_bytes or not pdf_bytes[:4].startswith(b"%PDF"):
         raise HTTPException(400, "pdf_file is not a valid PDF")
@@ -86,7 +105,12 @@ def _load_project_pdf(project_id: str) -> bytes:
 
 
 @router.post("/match-template")
-def match_template(body: MatchTemplateBody) -> dict:
+def match_template(
+    body: MatchTemplateBody,
+    request: Request,
+    user: dict = Depends(_auth.require_billable_user),
+) -> dict:
+    _rate_limit(request, "match-template")
     x, y, w, h = body.bbox
     if w <= 0 or h <= 0 or x < 0 or y < 0:
         raise HTTPException(400, "bbox must be positive [x, y, w, h]")
@@ -102,7 +126,12 @@ def match_template(body: MatchTemplateBody) -> dict:
 
 
 @router.post("/magic-wand")
-def magic_wand(body: MagicWandBody) -> dict:
+def magic_wand(
+    body: MagicWandBody,
+    request: Request,
+    user: dict = Depends(_auth.require_billable_user),
+) -> dict:
+    _rate_limit(request, "magic-wand")
     pdf = _load_project_pdf(body.project_id)
     page = render_page(pdf, body.page_idx, body.dpi)
     cx, cy = body.click
@@ -115,7 +144,12 @@ def magic_wand(body: MagicWandBody) -> dict:
 
 
 @router.post("/record-decision")
-def record_decision(body: RecordDecisionBody) -> dict:
+def record_decision(
+    body: RecordDecisionBody,
+    request: Request,
+    user: dict = Depends(_auth.require_billable_user),
+) -> dict:
+    _rate_limit(request, "record-decision")
     if body.decision not in ("accept", "reject"):
         raise HTTPException(400, "decision must be 'accept' or 'reject'")
     pdf = _load_project_pdf(body.project_id)
