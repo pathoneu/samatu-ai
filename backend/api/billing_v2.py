@@ -286,8 +286,89 @@ def _plan_from_session(session_obj: dict) -> str | None:
     return None
 
 
-# Handler registry. Task 9 wires the checkout handler; Task 10 adds the
-# subscription/invoice handlers below.
+# ── Stripe subscription status → our plan_status vocabulary ──────────────────
+# active → active; past_due / unpaid → past_due (keep access, grace); canceled →
+# canceled. Anything else falls through to the raw string so we never silently
+# drop an unexpected status.
+_STATUS_MAP = {
+    "active": "active",
+    "trialing": "active",
+    "past_due": "past_due",
+    "unpaid": "past_due",
+    "canceled": "canceled",
+    "incomplete_expired": "canceled",
+}
+
+
+def _plan_from_subscription(sub_obj: dict) -> str | None:
+    """Resolve a plan id from a subscription object's price (items.data[].price).
+    None when the price is absent / unmapped (caller leaves plan untouched)."""
+    price_to_plan = _price_to_plan_map()
+    items = (sub_obj.get("items") or {})
+    for item in (items.get("data") or []):
+        price = (item or {}).get("price") or {}
+        pid = price.get("id") if isinstance(price, dict) else price
+        if pid and pid in price_to_plan:
+            return price_to_plan[pid]
+    return None
+
+
+def _user_from_customer(obj: dict, event_label: str) -> dict | None:
+    """Resolve our user row from an event object's `customer` id, or log + None."""
+    customer_id = obj.get("customer")
+    user = db.get_user_by_stripe_customer_id(customer_id)
+    if not user:
+        log.warning("%s: unresolvable customer %r", event_label, customer_id)
+    return user
+
+
+def _handle_subscription_updated(event: dict) -> None:
+    """`customer.subscription.updated` — refresh plan_status, current_period_end,
+    and (if the price mapped to a different tier) plan. Resolve via `customer`."""
+    obj = _obj(event)
+    user = _user_from_customer(obj, "customer.subscription.updated")
+    if not user:
+        return
+    raw_status = obj.get("status")
+    plan_status = _STATUS_MAP.get(raw_status, raw_status) if raw_status else None
+    db.set_user_plan(
+        user["id"],
+        plan=_plan_from_subscription(obj),  # None → tier left unchanged.
+        plan_status=plan_status,            # None → status left unchanged.
+        current_period_end=_iso_from_epoch(obj.get("current_period_end")),
+    )
+
+
+def _handle_subscription_deleted(event: dict) -> None:
+    """`customer.subscription.deleted` — subscription ended → revert to free,
+    mark canceled, and clear the stored subscription id."""
+    obj = _obj(event)
+    user = _user_from_customer(obj, "customer.subscription.deleted")
+    if not user:
+        return
+    db.set_user_plan(
+        user["id"],
+        plan="free",
+        plan_status="canceled",
+        stripe_subscription_id=None,  # explicit clear via the sentinel path.
+    )
+
+
+def _handle_invoice_payment_failed(event: dict) -> None:
+    """`invoice.payment_failed` — mark past_due but KEEP the plan/access. Grace
+    lasts until Stripe emits customer.subscription.deleted."""
+    obj = _obj(event)
+    user = _user_from_customer(obj, "invoice.payment_failed")
+    if not user:
+        return
+    db.set_user_plan(user["id"], plan_status="past_due")
+
+
+# Handler registry — verified events dispatch here by event.type. Any type not
+# present is logged + skipped (still 200).
 _WEBHOOK_HANDLERS: dict = {
     "checkout.session.completed": _handle_checkout_completed,
+    "customer.subscription.updated": _handle_subscription_updated,
+    "customer.subscription.deleted": _handle_subscription_deleted,
+    "invoice.payment_failed": _handle_invoice_payment_failed,
 }
