@@ -28,6 +28,9 @@ const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const Landing = lazy(() => import('@/pages/Landing'));
 // Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
 const Annotator = lazy(() => import('@/pages/Annotator'));
+// Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
+const Pricing = lazy(() => import('@/pages/Pricing'));
+const BillingResult = lazy(() => import('@/pages/BillingResult'));
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -98,6 +101,12 @@ function App() {
                 <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/project/:id/annotator" element={<Annotator />} />
                 <Route path="/price-lists" element={<PriceLists />} />
+                {/* Phase 7 billing — pages self-gate via useBilling(): when the
+                    flag is off, /pricing redirects to /dashboard and result
+                    pages simply bounce back. No billing UI leaks when disabled. */}
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/billing/success" element={<BillingResult variant="success" />} />
+                <Route path="/billing/cancel" element={<BillingResult variant="cancel" />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Route>

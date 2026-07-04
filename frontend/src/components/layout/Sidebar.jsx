@@ -13,9 +13,10 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut,
+  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
+import { useBilling } from '@/hooks/useBilling';
 
 // 2026-05-06: removed '/exports' — route never existed (404). Eksportai
 // are accessible from each project's top-bar 'Eksportuoti' button instead.
@@ -79,6 +80,8 @@ export default function Sidebar({ onNavigate = null }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
+  // Phase 7: the /pricing rail entry appears ONLY when billing is enabled.
+  const { enabled: billingEnabled } = useBilling();
 
   const isActiveProjectRoute = location.pathname.startsWith('/project/');
   const items = NAV_ITEMS.filter(it => !it.requiresProject || isActiveProjectRoute);
@@ -157,6 +160,15 @@ export default function Sidebar({ onNavigate = null }) {
 
       {/* Bottom: settings + avatar */}
       <div className="flex flex-col items-center gap-2 pb-1">
+        {billingEnabled && (
+          <NavBtn
+            to="/pricing"
+            icon={CreditCard}
+            label="Planai"
+            isActive={location.pathname.startsWith('/pricing')}
+            onClick={onNavigate}
+          />
+        )}
         <NavBtn
           to="/settings"
           icon={Settings}

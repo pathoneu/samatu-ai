@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import StatsBar from '@/components/dashboard/StatsBar';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import EmptyState from '@/components/dashboard/EmptyState';
+import UsageMeter from '@/components/billing/UsageMeter';
 import { getProjects, pullProjectsFromBackend } from '@/lib/projectStore';
 import { useQueryClient } from '@tanstack/react-query';
 import SetupWizard, { loadPrefs } from '@/components/project/SetupWizard';
@@ -102,6 +103,10 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Phase 7 — usage meter. Renders null unless billing is enabled, so the
+          flag-off Dashboard is byte-identical to before (no wrapper, no spacer). */}
+      <UsageMeter />
 
       {projects.length > 0 ? (
         <>

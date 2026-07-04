@@ -13,6 +13,9 @@ import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 import { API_BASE as API } from '@/lib/apiBase';
+import { useBilling } from '@/hooks/useBilling';
+import UpgradeDialog from '@/components/billing/UpgradeDialog';
+import { detectPaywall } from '@/lib/paywall';
 
 // Pirmoji versija: Interjero projektas yra DEFAULT. Kiti tipai (KŽ, Fasadai,
 // Stogas, Žemės, Betonas) — paslėpti į "Kitas tipas" advanced.
@@ -163,6 +166,9 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
 export default function NewProject() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { enabled: billingEnabled } = useBilling();
+  // Paywall block dialog: { reason, message } when the backend refuses creation.
+  const [paywall, setPaywall] = useState(null);
   const [projectName, setProjectName]   = useState('');
   const [companyName, setCompanyName]   = useState('');
   const [file, setFile]                 = useState(null);
@@ -273,6 +279,14 @@ export default function NewProject() {
       }
 
       if (!res.ok) {
+        // Paywall (402 quota/trial, 403 company-code) — carry status + body so
+        // the catch can open the UpgradeDialog instead of a generic error.
+        if (res.status === 402 || res.status === 403) {
+          const err = new Error(json?.message || json?.error || `HTTP ${res.status}`);
+          err.status = res.status;
+          err.body = json;
+          throw err;
+        }
         const msg = Array.isArray(json?.detail)
           ? json.detail.map(d => d.msg).join(', ')
           : json?.detail || `Serverio klaida (${res.status})`;
@@ -402,6 +416,19 @@ export default function NewProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate(`/project/${project.id}`);
     } catch (e) {
+      // Paywall intercept (Phase 7): a 402/403 from /extract-interior means
+      // billing refused the creation. Open the UpgradeDialog rather than
+      // showing a raw error. Only when billing is enabled — otherwise these
+      // codes can't occur, and we fall through to the generic handler.
+      const pw = billingEnabled ? detectPaywall(e) : null;
+      if (pw) {
+        console.warn('Billing block on project creation:', pw.reason);
+        setPaywall(pw);
+        setIsProcessing(false);
+        setStatus('');
+        setAbortController(null);
+        return;
+      }
       // User-friendly error mapping. Stack only kept in console for debugging.
       console.error('Upload pipeline failed:', e);
       let userMessage;
@@ -469,6 +496,15 @@ export default function NewProject() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
+      {/* Phase 7 — paywall block. `paywall` stays null unless billing is on and
+          the backend refused creation, so nothing mounts when the flag is off. */}
+      <UpgradeDialog
+        reason={paywall?.reason || null}
+        message={paywall?.message}
+        onClose={() => setPaywall(null)}
+        onRetry={() => { setPaywall(null); handleCreate(); }}
+      />
+
       <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
         <ArrowLeft className="w-4 h-4" />
         Grįžti į projektus

@@ -15,6 +15,7 @@ import { useConfirm } from '@/components/ui/confirm-provider';
 import { ltPlural } from '@/lib/ltPlural';
 import { useAuth } from '@/lib/authContext';
 import { API_BASE } from '@/lib/apiBase';
+import BillingSettings from '@/components/billing/BillingSettings';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -327,6 +328,9 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* Phase 7: Atsiskaitymas — renders null unless billing is enabled. */}
+        <BillingSettings />
 
         {/* Sprint §13: Projektų atsarginė kopija (export/import) */}
         <BackupSection />
