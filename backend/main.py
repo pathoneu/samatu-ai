@@ -447,19 +447,43 @@ class FrontendErrorPayload(BaseModel):
     user_agent: str | None = None
 
 
+# F7 (2026-07-04 pentest): bound the unauthenticated frontend error sink.
+_LOG_ERROR_MSG_CAP = 2 * 1024    # 2 KB
+_LOG_ERROR_STACK_CAP = 8 * 1024  # 8 KB
+
+
+def _strip_control_chars(s: str | None, cap: int) -> str:
+    """F7: neutralise log-injection. Strip CR/LF/other control chars (which let
+    an attacker forge extra log lines) and truncate to `cap` bytes so a single
+    POST can't flood the log file."""
+    if not s:
+        return ""
+    # Drop CR/LF and other C0 control chars except tab; collapse to spaces.
+    cleaned = "".join(" " if (ord(ch) < 32 and ch != "\t") else ch for ch in s)
+    if len(cleaned) > cap:
+        cleaned = cleaned[:cap] + "…[truncated]"
+    return cleaned
+
+
 @app.post("/api/log-error")
 async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
     """Frontend ErrorBoundary + manual try/catch can POST here.
     Lightweight error sink — production should swap for Sentry SDK.
+
+    Stays unauthenticated (the frontend must be able to report errors even before
+    login / when auth itself breaks) but is bounded: per-IP rate limit + length
+    caps + control-char stripping so it can't be used to flood the log file or
+    inject forged log lines (F7, 2026-07-04 pentest).
     """
     client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, "log-error")  # 429 on overflow
     log.error(
         "[FRONTEND] component=%s url=%s ip=%s msg=%s\nstack: %s",
-        payload.component or "?",
-        payload.url or "?",
+        _strip_control_chars(payload.component or "?", 256),
+        _strip_control_chars(payload.url or "?", 512),
         client_ip,
-        payload.message,
-        (payload.stack or "")[:2000],
+        _strip_control_chars(payload.message, _LOG_ERROR_MSG_CAP),
+        _strip_control_chars(payload.stack, _LOG_ERROR_STACK_CAP),
     )
     return {"status": "ok", "logged": True}
 
