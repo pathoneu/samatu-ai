@@ -45,3 +45,7 @@ pypdf>=5.0
 # requires re-adding the dep manually if you want to run it.
 pyyaml>=6.0
 boto3>=1.34
+
+# W3 billing (2026-07-04) — Stripe Checkout + webhooks. Dormant behind
+# BILLING_ENABLED (default OFF); see backend/billing/flag.py.
+stripe>=11,<13
