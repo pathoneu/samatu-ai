@@ -1023,9 +1023,10 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
         return
 
+    from .universal_rules import is_high_ceiling as _is_high
     virs_3m = round(sum(
         (float(r.get("walls_paintable_m2") or 0) + float(r.get("ceiling_paintable_m2") or 0))
-        for r in rooms if float(r.get("lubu_aukstis_m") or 0) > 3.0
+        for r in rooms if _is_high(r.get("lubu_aukstis_m"))
     ), 2)
     virs_3m = min(max(virs_3m, 0.0), dazymo_total)
     iki_3m = round(dazymo_total - virs_3m, 2)
@@ -1243,9 +1244,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # dvigubas count, o kaip subset HIGHLIGHT — premium aukšto darbas.
         # rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
         # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
+        from .universal_rules import is_high_ceiling as _is_high
         lubos_virs_3m = round(sum(
             float(r.get("ceiling_paintable_m2") or 0) for r in rooms
-            if float(r.get("lubu_aukstis_m") or 0) > 3.0
+            if _is_high(r.get("lubu_aukstis_m"))
         ), 2)
         if lubos_virs_3m > 0:
             pozicijos.append({
@@ -1976,9 +1978,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # ════════════════════════════════════════════════════════════════════════
 
     # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4)
+    from .universal_rules import is_high_ceiling as _is_high
     high_ceiling_dazymo = round(sum(
         float(r.get("dazymo_plotas_m2") or 0) for r in rooms
-        if float(r.get("lubu_aukstis_m") or 0) > 3.0
+        if _is_high(r.get("lubu_aukstis_m"))
     ), 2)
     if high_ceiling_dazymo > 0:
         # ~1 d.d. per ~50 m² didelio aukščio dažomo ploto

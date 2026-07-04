@@ -153,6 +153,24 @@ def calc_paint_liters(
     return area_m2 * eff / cov
 
 
+def is_high_ceiling(h_m) -> bool:
+    """LT "virš 3 m" billing bucket — boundary-INCLUSIVE (H ≥ 3.00 m).
+
+    2026-07-04 fix (Bacevičiaus GKP height-split): drawings annotate nominal
+    heights (+3.000 → 3.00 m) and the contractor bills a 3.00 m ceiling in the
+    premium bucket — Bacevičiaus pasiūlymas item 2 puts the svetainė zone
+    (Vision-read at exactly 3.0 m) under "GKP ant lubų virš 3m" (68.28 m²),
+    and ceiling/upper-wall work at 3.0 m already needs staging. The previous
+    strict ``>`` silently dropped exactly-3.0 rooms into the standard bucket,
+    zeroing gkp_lubu_virs_3m on any project whose tall zone reads 3.0.
+    Epsilon guards float noise (2.9999999 from unit conversions)."""
+    try:
+        h = float(h_m or 0)
+    except (TypeError, ValueError):
+        return False
+    return h >= UNIVERSAL_RULES["high_ceiling_threshold_m"] - 1e-6
+
+
 def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
     """Gipso kartono lapai per CLAUDE.md §1.8.
 
@@ -933,7 +951,7 @@ def calc_room_quantities(room: dict,
     # separately by ceiling_type — otherwise concrete or pakabinamos
     # ceilings would be priced as GKP install (they aren't installed by
     # the painter).
-    is_high_ceiling = H > UNIVERSAL_RULES["high_ceiling_threshold_m"]
+    room_is_high = is_high_ceiling(H)  # boundary-inclusive ≥3.0 (2026-07-04)
     gkp_eligible = ceiling_type in ("gkp", "tempiamos")
     # Partial high-ceiling support (e.g. master bedroom with a 12.28 m² coffer
     # zone at 3.4m and the rest at 2.8m). When the room primitive supplies
@@ -947,8 +965,8 @@ def calc_room_quantities(room: dict,
         gkp_lubu_standart = max(0.0, ceiling_paintable - high_area)
         gkp_lubu_virs_3m = high_area
     else:
-        gkp_lubu_standart = ceiling_paintable if (gkp_eligible and not is_high_ceiling) else 0
-        gkp_lubu_virs_3m = ceiling_paintable if (gkp_eligible and is_high_ceiling) else 0
+        gkp_lubu_standart = ceiling_paintable if (gkp_eligible and not room_is_high) else 0
+        gkp_lubu_virs_3m = ceiling_paintable if (gkp_eligible and room_is_high) else 0
 
     # Partial-GKP rooms — primarily betonas-ceiling spaces (garažas, tambūras
     # in some projects) that nonetheless have a small GKP soffit ("karobkė")
@@ -1230,7 +1248,7 @@ def calc_totals(rooms: list[dict]) -> dict:
             lubu_aukstis = float(r.get("lubu_aukstis_m", 2.82))
             plotas = float(r.get("plotas_m2", 0))
             if lubu_tipas in ("gkp", "tempiamos"):
-                if lubu_aukstis > 3.0:
+                if is_high_ceiling(lubu_aukstis):
                     totals["gkp_lubu_virs_3m_m2_total"] += plotas
                 else:
                     totals["gkp_lubu_m2_total"] += plotas
