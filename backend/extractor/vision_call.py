@@ -147,6 +147,21 @@ def _reader_call_metas(result: dict | None) -> list[dict]:
     return [m] if m else []
 
 
+def _meter_niche_call(parsed: dict, nl: Any) -> None:
+    """Roll ONE niche_locator.extract_niches call's tokens into
+    ``parsed["_meta"]["extra_calls"]`` (2026-07-04 — the last unmetered paid
+    sub-call). ``nl`` is the returned ``NicheList``; its ``_meta`` carries
+    ``{model, input_tokens, output_tokens, ...}`` on a cache MISS, or
+    ``{model, cache:"hit"}`` (no tokens) on a HIT.
+
+    Delegates to _append_extra_call, so a cache HIT (model present, tokens
+    absent) contributes €0 and never raises. Pure token CAPTURE — niche
+    detection output is untouched."""
+    if nl is None:
+        return
+    _append_extra_call(parsed, getattr(nl, "_meta", None))
+
+
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
 # instruction text + JSON envelope. Above this the native-PDF experiment
 # falls back to the image path for that extraction (recorded in _meta).
@@ -3518,6 +3533,7 @@ def extract_interior(
             image_b64 = _render_one_page(primary_pg)
             if image_b64:
                 nl_p = extract_niches(image_b64=image_b64)
+                _meter_niche_call(parsed, nl_p)  # roll primary-page tokens into cost
                 for n in nl_p.niches:
                     if n.type in ("ceiling_led", "wall_led") and (n.length_mm or 0) > 0:
                         covered.add(str(n.room_nr))
@@ -3529,6 +3545,7 @@ def extract_interior(
                         if not img:
                             continue
                         nl_s = extract_niches(image_b64=img)
+                        _meter_niche_call(parsed, nl_s)  # roll secondary-page tokens into cost
                         for n in nl_s.niches:
                             is_led = n.type in ("ceiling_led", "wall_led")
                             if (not is_led) or (str(n.room_nr) not in covered):

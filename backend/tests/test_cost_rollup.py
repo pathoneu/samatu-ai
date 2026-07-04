@@ -404,6 +404,110 @@ def test_flow_appends_each_reader_meta_into_extra_calls():
     assert total == pytest.approx(expected)
 
 
+# ── niche_locator.extract_niches — the last unmetered paid sub-call ────────────
+
+def test_niche_call_meta_appends_into_extra_calls():
+    """extract_niches returns a NicheList whose ._meta carries a real model +
+    token counts (miss path). Appending it via _append_extra_call must add ONE
+    extra_calls entry priced at that call's own model — proving the exact object
+    shape extract_niches returns is meterable (not just a hand-built dict)."""
+    from extractor.vision_call import _append_extra_call
+    from extractor.vision.niche_locator import NicheList
+    nl = NicheList()
+    nl._meta = {"cache": "miss", "key": "abc", "model": "claude-opus-4-8",
+                "input_tokens": 7_000, "output_tokens": 450}
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    _append_extra_call(parsed, nl._meta)
+    ec = parsed["_meta"]["extra_calls"]
+    assert len(ec) == 1
+    assert ec[0]["model"] == "claude-opus-4-8"
+    assert ec[0]["input_tokens"] == 7_000
+    assert ec[0]["output_tokens"] == 450
+    total = calc_meta_cost_usd(parsed["_meta"])
+    expected = (calc_claude_cost_usd(40_000, 6_000, model="claude-opus-4-8")
+                + calc_claude_cost_usd(7_000, 450, model="claude-opus-4-8"))
+    assert total == pytest.approx(expected)
+
+
+def test_niche_cache_hit_meta_prices_to_zero_no_raise():
+    """A niche cache HIT returns _meta = {model, cache:"hit"} with NO token
+    counts. Appending it must NOT raise and must add €0 (model present, tokens
+    absent → skipped as nothing billable), so a cache hit never crashes or
+    mis-bills."""
+    from extractor.vision_call import _append_extra_call
+    from extractor.vision.niche_locator import NicheList
+    nl = NicheList()
+    nl._meta = {"cache": "hit", "key": "abc", "model": "claude-opus-4-8"}
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    _append_extra_call(parsed, nl._meta)          # must not raise
+    assert parsed["_meta"].get("extra_calls") in (None, [])
+    total = calc_meta_cost_usd(parsed["_meta"])
+    assert total == pytest.approx(
+        calc_claude_cost_usd(40_000, 6_000, model="claude-opus-4-8"))
+
+
+def test_meter_niche_call_appends_real_nichelist_meta():
+    """The production seam _meter_niche_call takes the ACTUAL NicheList object
+    (as returned by extract_niches) and rolls its ._meta tokens into
+    extra_calls. This is the exact wiring both niche call sites use."""
+    from extractor.vision_call import _meter_niche_call
+    from extractor.vision.niche_locator import NicheList
+    nl = NicheList()
+    nl._meta = {"cache": "miss", "model": "claude-opus-4-8",
+                "input_tokens": 6_000, "output_tokens": 400}
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    _meter_niche_call(parsed, nl)
+    ec = parsed["_meta"]["extra_calls"]
+    assert len(ec) == 1
+    assert ec[0]["input_tokens"] == 6_000 and ec[0]["output_tokens"] == 400
+
+
+def test_meter_niche_call_cache_hit_is_zero_and_none_safe():
+    """_meter_niche_call on a cache-HIT NicheList (model, no tokens) adds €0 and
+    doesn't raise; None (no page rendered / call skipped) is a no-op."""
+    from extractor.vision_call import _meter_niche_call
+    from extractor.vision.niche_locator import NicheList
+    parsed = {"_meta": {}}
+    hit = NicheList()
+    hit._meta = {"cache": "hit", "model": "claude-opus-4-8"}
+    _meter_niche_call(parsed, hit)         # cache hit → €0, no raise
+    _meter_niche_call(parsed, None)        # nothing rendered → no-op
+    assert parsed["_meta"].get("extra_calls") in (None, [])
+
+
+def test_niche_flow_meters_primary_and_secondary_calls():
+    """End-to-end wiring of the niche block: the PRIMARY page and one SECONDARY
+    (backfill) page each return a NicheList with a distinct token _meta. Driving
+    both through the production seam _meter_niche_call must land BOTH real API
+    calls in extra_calls (one entry each) — the primary token meta was
+    previously dropped entirely."""
+    from extractor.vision_call import _meter_niche_call
+    from extractor.vision.niche_locator import NicheList
+
+    primary = NicheList()
+    primary._meta = {"cache": "miss", "model": "claude-opus-4-8",
+                     "input_tokens": 6_000, "output_tokens": 400}
+    secondary = NicheList()
+    secondary._meta = {"cache": "miss", "model": "claude-opus-4-8",
+                       "input_tokens": 5_500, "output_tokens": 380}
+
+    parsed = {"_meta": {"input_tokens": 40_000, "output_tokens": 6_000,
+                        "model": "claude-opus-4-8"}}
+    _meter_niche_call(parsed, primary)
+    _meter_niche_call(parsed, secondary)
+
+    ec = parsed["_meta"]["extra_calls"]
+    assert len(ec) == 2  # primary + secondary, both metered
+    total = calc_meta_cost_usd(parsed["_meta"])
+    expected = (calc_claude_cost_usd(40_000, 6_000, model="claude-opus-4-8")
+                + calc_claude_cost_usd(6_000, 400, model="claude-opus-4-8")
+                + calc_claude_cost_usd(5_500, 380, model="claude-opus-4-8"))
+    assert total == pytest.approx(expected)
+
+
 # ── Chat metering: its own usage_event, NOT counted as an extract ─────────────
 
 def test_chat_usage_event_does_not_count_as_extract(tmp_path, monkeypatch):
