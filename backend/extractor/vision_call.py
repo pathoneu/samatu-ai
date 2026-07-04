@@ -2242,10 +2242,17 @@ def _run_pass1_once(client, system, pages, *,
     `_meta`) on success, or an error dict `{"status":"error", ...}` on failure
     — same error shapes the old inline loop returned.
 
-    native_pdf (EXPERIMENT SAMATU_PDF_NATIVE=1): payload from
-    _prepare_native_pdf. With "b64" → the page subset goes as ONE document
-    block (image + text layer per page); with "fallback_reason" → image
-    blocks as usual, fallback recorded in _meta.experiment. None → default.
+    native_pdf: payload from _prepare_native_pdf. With "b64" → the page
+    subset goes as ONE document block (image + text layer per page); with
+    "fallback_reason" → image blocks as usual, fallback recorded in
+    _meta.experiment. None → default image blocks.
+
+    B-1 lock-in condition (2026-07-04): if the API rejects the document
+    payload (anthropic.BadRequestError) — or the same document payload fails
+    twice for any reason — this round rebuilds its content as raster images
+    and retries. The shared native_pdf dict is flipped in place, so the
+    REMAINING voting rounds also go raster (no per-round re-tripping).
+    Recorded as fallback_reason="api_rejected_document".
 
     model (EXPERIMENT SAMATU_VOTING_MODELS): per-round model override for
     mixed-model voting. None → model_for("vision_pass1") as always.
@@ -2254,11 +2261,13 @@ def _run_pass1_once(client, system, pages, *,
     model = model or model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
 
     experiment_meta: dict | None = None
+    using_document = False
     if native_pdf and native_pdf.get("b64"):
         user_content = build_user_content_pdf_native(
             native_pdf["b64"], native_pdf["n_pages"],
             native_pdf.get("page_map_note"),
         )
+        using_document = True
         experiment_meta = {"native_pdf": {
             "input": "document",
             "pdf_pages": native_pdf["n_pages"],
@@ -2274,7 +2283,24 @@ def _run_pass1_once(client, system, pages, *,
     else:
         user_content = build_user_content(pages)
 
-    for attempt in range(3):
+    def _flip_to_image_fallback(reason: str) -> None:
+        """B-1: rebuild this round as raster images AND flip the shared
+        native_pdf payload so subsequent voting rounds skip the document
+        path entirely (payload is shared across rounds by design)."""
+        nonlocal user_content, experiment_meta, using_document
+        native_pdf.pop("b64", None)
+        native_pdf["fallback_reason"] = reason
+        user_content = build_user_content(pages)
+        experiment_meta = {"native_pdf": {
+            "input": "image_fallback",
+            "fallback_reason": reason,
+        }}
+        using_document = False
+
+    max_attempts = 3
+    attempt = 0
+    doc_failures = 0
+    while attempt < max_attempts:
         try:
             with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
                 model=model,
@@ -2318,9 +2344,19 @@ def _run_pass1_once(client, system, pages, *,
         except Exception as exc:
             last_err = exc
             print(f"[extractor] attempt {attempt + 1} failed: {exc}")
-            if attempt == 2:
+            if using_document:
+                doc_failures += 1
+                if isinstance(exc, anthropic.BadRequestError) or doc_failures >= 2:
+                    print("[experiment:native_pdf] API rejected the document "
+                          f"payload ({type(exc).__name__}) → retrying this and "
+                          "all remaining rounds as raster images")
+                    _flip_to_image_fallback("api_rejected_document")
+                    attempt = 0  # fresh retry budget for the image path
+                    continue
+            attempt += 1
+            if attempt >= max_attempts:
                 return {"status": "error", "_error": f"vision_call_failed: {exc}"}
-            time.sleep(1.5 ** attempt)
+            time.sleep(1.5 ** (attempt - 1))
     return {"status": "error", "_error": str(last_err or "Unknown error")}
 
 

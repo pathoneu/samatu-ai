@@ -199,6 +199,122 @@ def test_env_gate_default_off(monkeypatch):
     assert vc._pdf_native_enabled() is False
 
 
+# ── B-1 lock-in: API-reject boundary → retry as images ────────────────────────
+def _bad_request_error(msg: str = "document rejected"):
+    import anthropic
+    import httpx
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    return anthropic.BadRequestError(
+        msg, response=httpx.Response(400, request=req), body=None)
+
+
+class _RejectDocumentClient(_FakeClient):
+    """Raises on document-block payloads; succeeds on image payloads.
+    exc_factory controls WHICH exception the document path raises."""
+
+    def __init__(self, message, exc_factory=_bad_request_error):
+        super().__init__(message)
+        self._exc_factory = exc_factory
+
+    def _stream(self, **kwargs):
+        self.calls.append(kwargs)
+        content = kwargs["messages"][0]["content"]
+        if any(b.get("type") == "document" for b in content):
+            raise self._exc_factory()
+        return _FakeStream(self._message)
+
+
+def test_pass1_bad_request_on_document_retries_as_images():
+    """anthropic.BadRequestError on the document round → same round retried
+    with raster images; fallback_reason=api_rejected_document in _meta."""
+    pdf = _make_pdf(2)
+    pages = [{"page_index": i, "image_b64": "IMGB64"} for i in (1, 2)]
+    native = vc._prepare_native_pdf(pdf, pages)
+    assert native.get("b64")  # sanity: document mode prepared
+    client = _RejectDocumentClient(_ok_message())
+
+    parsed = vc._run_pass1_once(client, system=[], pages=pages, native_pdf=native)
+
+    assert parsed.get("status") != "error"
+    # call 1 = document (rejected), call 2 = images (accepted)
+    assert len(client.calls) == 2
+    first = [b["type"] for b in client.calls[0]["messages"][0]["content"]]
+    second = [b["type"] for b in client.calls[1]["messages"][0]["content"]]
+    assert "document" in first
+    assert "image" in second and "document" not in second
+
+    exp = parsed["_meta"]["experiment"]["native_pdf"]
+    assert exp["input"] == "image_fallback"
+    assert exp["fallback_reason"] == "api_rejected_document"
+
+
+def test_pass1_document_flip_propagates_to_remaining_rounds():
+    """The native_pdf payload dict is shared across voting rounds: once the
+    API rejects it, the flip mutates the shared dict so the NEXT round goes
+    straight to images without re-tripping the document path."""
+    pdf = _make_pdf(1)
+    pages = [{"page_index": 1, "image_b64": "IMGB64"}]
+    native = vc._prepare_native_pdf(pdf, pages)
+    client = _RejectDocumentClient(_ok_message())
+
+    # Round 1: document rejected → image retry
+    vc._run_pass1_once(client, system=[], pages=pages, native_pdf=native)
+    assert "b64" not in native
+    assert native["fallback_reason"] == "api_rejected_document"
+    calls_after_round1 = len(client.calls)
+
+    # Round 2 with the same (now flipped) shared payload: exactly ONE call,
+    # images from the start
+    parsed2 = vc._run_pass1_once(client, system=[], pages=pages, native_pdf=native)
+    round2_calls = client.calls[calls_after_round1:]
+    assert len(round2_calls) == 1
+    types = [b["type"] for b in round2_calls[0]["messages"][0]["content"]]
+    assert "image" in types and "document" not in types
+    exp = parsed2["_meta"]["experiment"]["native_pdf"]
+    assert exp["fallback_reason"] == "api_rejected_document"
+
+
+def test_pass1_document_failing_twice_flips_even_without_bad_request(monkeypatch):
+    """Non-BadRequest errors (network etc.): the document payload gets ONE
+    retry as a document; a second failure flips to images."""
+    monkeypatch.setattr(vc.time, "sleep", lambda s: None)  # no retry backoff in tests
+    pdf = _make_pdf(1)
+    pages = [{"page_index": 1, "image_b64": "IMGB64"}]
+    native = vc._prepare_native_pdf(pdf, pages)
+    client = _RejectDocumentClient(
+        _ok_message(), exc_factory=lambda: ConnectionError("boom"))
+
+    parsed = vc._run_pass1_once(client, system=[], pages=pages, native_pdf=native)
+
+    assert parsed.get("status") != "error"
+    payload_kinds = [
+        "document" if any(b.get("type") == "document"
+                          for b in c["messages"][0]["content"]) else "image"
+        for c in client.calls
+    ]
+    assert payload_kinds == ["document", "document", "image"]
+    exp = parsed["_meta"]["experiment"]["native_pdf"]
+    assert exp["fallback_reason"] == "api_rejected_document"
+
+
+def test_pass1_image_failures_do_not_trip_document_fallback(monkeypatch):
+    """Plain image mode keeps the pre-patch retry contract: 3 attempts, then
+    vision_call_failed — the B-1 flip never engages without a document."""
+    monkeypatch.setattr(vc.time, "sleep", lambda s: None)
+
+    class _AlwaysFails(_FakeClient):
+        def _stream(self, **kwargs):
+            self.calls.append(kwargs)
+            raise ConnectionError("down")
+
+    client = _AlwaysFails(_ok_message())
+    pages = [{"page_index": 1, "image_b64": "IMGB64"}]
+    parsed = vc._run_pass1_once(client, system=[], pages=pages)
+    assert parsed["status"] == "error"
+    assert parsed["_error"].startswith("vision_call_failed")
+    assert len(client.calls) == 3
+
+
 # ── prompt builder ordering (cache-stability contract) ────────────────────────
 def test_native_content_block_ordering_mirrors_image_layout():
     content = build_user_content_pdf_native("B64DATA", 5)
