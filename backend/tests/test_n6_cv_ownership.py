@@ -110,6 +110,20 @@ def test_n6_detect_room_polygons_blocks_cross_tenant(env):
     assert _pdf_cache.get_pdf("proj-B") is None
 
 
+def test_n6_click_to_fill_blocks_cross_tenant(env):
+    """Re-audit sibling: /api/click-to-fill shares the same project-keyed PDF
+    cache and had auth but no ownership gate. A-vs-B → 404, cache not poisoned."""
+    att = _login("attacker@x.lt")
+    r = att.post(
+        "/api/click-to-fill",
+        data={"project_id": "proj-B", "page_nr": "1",
+              "click_x_pct": "0.5", "click_y_pct": "0.5"},
+        files={"pdf_file": ("t.pdf", _MIN_PDF, "application/pdf")},
+    )
+    assert r.status_code == 404, r.text
+    assert _pdf_cache.get_pdf("proj-B") is None
+
+
 def test_n6_owner_upload_pdf_still_works(env):
     owner = _login("owner@x.lt")
     r = owner.post(

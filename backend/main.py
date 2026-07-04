@@ -5782,6 +5782,15 @@ async def click_to_fill_endpoint(
         request.client.host if request.client else "unknown",
         "click-to-fill",
     )
+    # N6 (2026-07-04 pentest, pass 2 — re-audit): this route shares the same
+    # project-keyed PDF byte cache (page_raster_cache._PDF_CACHE) as the cv_tools
+    # + detect-room-polygons routes and had auth but NO ownership check, so a
+    # logged-in tenant A could prime/POISON or read tenant B's cached PDF under
+    # B's project_id. Gate on ownership BEFORE any store_pdf / get_pdf / render.
+    # Admins bypass the filter; missing/foreign project → 404 (no existence leak).
+    _n6_filter = None if _user.get("is_admin") else _user["id"]
+    if db.get_project(project_id, user_id=_n6_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
     from extractor.cv_polygon import (
         click_to_fill_pipeline, PolygonValidationError,
