@@ -24,23 +24,23 @@ export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
   const fmt = (n) => n.toFixed(2).replace('.', ',') + ' €';
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 16, background: '#fff', fontSize: 12 }}>
+    <div style={{ height: '100%', overflow: 'auto', padding: 16, background: 'hsl(var(--background))', fontSize: 12, color: 'hsl(var(--foreground))' }}>
       <div style={{
-        background: '#fbfaf7', border: '1px solid #d4d2cb', borderRadius: 8,
+        background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8,
         padding: 14, marginBottom: 16,
       }}>
-        <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b6863' }}>
+        <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'hsl(var(--muted-foreground))' }}>
           Suvestinė
         </div>
         <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
           {fmt(grand)}
         </div>
-        <div style={{ fontSize: 11, color: '#6b6863', marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
           Σ neto: <strong>{fmt(total)}</strong> &nbsp;·&nbsp; PVM 21%: {fmt(pvm)}
         </div>
       </div>
 
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b6863', marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'hsl(var(--muted-foreground))', marginBottom: 8 }}>
         Pagal skyrius
       </div>
       {sorted.map(([cat, value]) => {
@@ -49,27 +49,27 @@ export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
           <div key={cat} style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
               <span>{cat}</span>
-              <span style={{ fontVariantNumeric: 'tabular-nums', color: '#3b3b3b' }}>{fmt(value)}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', color: 'hsl(var(--muted-foreground))' }}>{fmt(value)}</span>
             </div>
-            <div style={{ height: 6, background: '#f0eeea', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: '#2a6fb5' }} />
+            <div style={{ height: 6, background: 'hsl(var(--muted))', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: 'hsl(var(--primary))' }} />
             </div>
           </div>
         );
       })}
       {sorted.length === 0 && (
-        <div style={{ padding: '20px 0', textAlign: 'center', color: '#94a3b8' }}>
+        <div style={{ padding: '20px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
           Nėra duomenų.
         </div>
       )}
 
       <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
         <button style={{
-          flex: 1, background: '#2a6fb5', border: '1px solid #2a6fb5', color: '#fff',
+          flex: 1, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary))', color: 'hsl(var(--primary-foreground))',
           padding: '8px 12px', borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer',
         }}>Eksportuoti Excel</button>
         <button style={{
-          flex: 1, background: '#fff', border: '1px solid #d4d2cb', color: '#3b3b3b',
+          flex: 1, background: 'hsl(var(--card))', border: '1px solid hsl(var(--border-strong))', color: 'hsl(var(--foreground))',
           padding: '8px 12px', borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer',
         }}>PDF</button>
       </div>
