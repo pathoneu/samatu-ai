@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { useBilling } from '@/hooks/useBilling';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // 2026-05-06: removed '/exports' — route never existed (404). Eksportai
 // are accessible from each project's top-bar 'Eksportuoti' button instead.
@@ -51,16 +52,16 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
       <Icon style={{ width: 16, height: 16 }} />
     </>
   );
+  let trigger;
   if (disabled) {
-    return (
-      <span title={label} className={className} style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}>
+    trigger = (
+      <span className={className} style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}>
         {inner}
       </span>
     );
-  }
-  if (to) {
-    return (
-      <Link to={to} title={label} className={className} style={isActive ? activeStyle : idleStyle}
+  } else if (to) {
+    trigger = (
+      <Link to={to} aria-label={label} className={className} style={isActive ? activeStyle : idleStyle}
         onClick={onClick}
         onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--surface-2))'; }}
         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
@@ -68,11 +69,21 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
         {inner}
       </Link>
     );
+  } else {
+    trigger = (
+      <button onClick={onClick} aria-label={label} className={className} style={isActive ? activeStyle : idleStyle}>
+        {inner}
+      </button>
+    );
   }
+
+  // shadcn Tooltip on hover (side=right — rail sits on the left edge). The
+  // `label` doubles as the accessible name via aria-label above.
   return (
-    <button onClick={onClick} title={label} className={className} style={isActive ? activeStyle : idleStyle}>
-      {inner}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 

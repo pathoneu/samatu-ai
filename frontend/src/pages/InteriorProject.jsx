@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
@@ -46,17 +47,21 @@ function heightLabel(mm) {
 function ConfidenceDot({ level }) {
   if (!level) return null;
   const map = {
-    high:   { color: 'bg-green-500',  title: 'Aukštas: vertė perskaityta tiesiogiai iš matmenų' },
-    medium: { color: 'bg-yellow-400', title: 'Vidutinis: apskaičiuota iš dalinių duomenų' },
-    low:    { color: 'bg-red-500',    title: 'Žemas: spėjama pagal standartus (patikrink!)' },
+    high:   { color: 'bg-green-500',  emoji: '🟢', title: 'Nuskaityta tiesiai iš brėžinio' },
+    medium: { color: 'bg-yellow-400', emoji: '🟡', title: 'Apskaičiuota su prielaida' },
+    low:    { color: 'bg-red-500',    emoji: '🔴', title: 'Numatytoji reikšmė — patikrinkite' },
   };
   const c = map[level];
   if (!c) return null;
   return (
-    <span
-      title={c.title}
-      className={`inline-block w-2.5 h-2.5 rounded-full ${c.color} shrink-0`}
-    />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-block w-2.5 h-2.5 rounded-full ${c.color} shrink-0 cursor-help`}
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top">{c.emoji} {c.title}</TooltipContent>
+    </Tooltip>
   );
 }
 

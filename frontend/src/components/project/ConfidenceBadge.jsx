@@ -14,6 +14,7 @@
 import { computeAreaConfidence } from '@/lib/areaConfidence';
 import { markRoomVerified } from '@/lib/projectStore';
 import { Check } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Dark graphite palette (2026-07-05). -300 text on a /15 fill of the same
 // hue reads clearly and passes AA on the graphite background; the previous
@@ -24,16 +25,19 @@ const STYLES = {
     cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     dot: '🟢',
     label: 'tikslus',
+    meaning: 'Nuskaityta tiesiai iš brėžinio — šaltiniai sutampa.',
   },
   medium: {
     cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     dot: '🟡',
     label: 'tikrinti',
+    meaning: 'Apskaičiuota su prielaida — vertėtų patikrinti.',
   },
   low: {
     cls: 'bg-red-500/15 text-red-300 border-red-500/30',
     dot: '🔴',
     label: 'neaišku',
+    meaning: 'Numatytoji reikšmė arba šaltiniai nesutampa — patikrinkite.',
   },
 };
 
@@ -50,15 +54,13 @@ export default function ConfidenceBadge({ room, projectId, onClick }) {
   if (!style) return null;
 
   const sourceList = result.sources
-    .map((s) => `${s.label}: ${s.value?.toFixed?.(2) ?? '—'} m²`)
-    .join('\n');
+    .map((s) => `${s.label}: ${s.value?.toFixed?.(2) ?? '—'} m²`);
   const verifiedLine = result.userVerified
-    ? `\nPatvirtinta: ${new Date(room.user_verified_at).toLocaleDateString('lt-LT')}`
-    : '';
+    ? `Patvirtinta: ${new Date(room.user_verified_at).toLocaleDateString('lt-LT')}`
+    : null;
   const disagreementLine = result.disagreement
-    ? '\n⚠ Šaltiniai nesutampa — patikrinti rankiniu būdu.'
-    : '';
-  const title = `Plotas: ${room.plotas_m2?.toFixed?.(2) ?? '—'} m²\n${sourceList}${verifiedLine}${disagreementLine}`;
+    ? '⚠ Šaltiniai nesutampa — patikrinti rankiniu būdu.'
+    : null;
 
   const showVerifyButton =
     result.confidence === 'medium' &&
@@ -74,16 +76,30 @@ export default function ConfidenceBadge({ room, projectId, onClick }) {
 
   return (
     <span className="inline-flex items-center gap-1">
-      <button
-        onClick={onClick}
-        title={title}
-        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${style.cls}`}
-        data-testid={`confidence-badge-${room.nr}`}
-        data-confidence={result.confidence}
-      >
-        <span>{style.dot}</span>
-        <span>{style.label}</span>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={onClick}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${style.cls}`}
+            data-testid={`confidence-badge-${room.nr}`}
+            data-confidence={result.confidence}
+          >
+            <span>{style.dot}</span>
+            <span>{style.label}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[240px] text-left">
+          <div className="font-semibold">{style.dot} {style.meaning}</div>
+          <div className="mt-1 opacity-90">Plotas: {room.plotas_m2?.toFixed?.(2) ?? '—'} m²</div>
+          {sourceList.length > 0 && (
+            <ul className="mt-0.5 opacity-90">
+              {sourceList.map((s, i) => <li key={i}>{s}</li>)}
+            </ul>
+          )}
+          {verifiedLine && <div className="mt-1 opacity-90">{verifiedLine}</div>}
+          {disagreementLine && <div className="mt-1">{disagreementLine}</div>}
+        </TooltipContent>
+      </Tooltip>
       {showVerifyButton && (
         <button
           onClick={handleVerify}

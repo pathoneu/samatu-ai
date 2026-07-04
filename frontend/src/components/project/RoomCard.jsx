@@ -17,6 +17,7 @@ import { Edit2, Check, X, AlertCircle, Eye, BookOpen, Palette, Loader2, ChevronD
 import { getPdfBlob } from '@/lib/pdfStore';
 import ConfidenceBadge from './ConfidenceBadge';
 import { API_BASE } from '@/lib/apiBase';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // ── Confidence dot (žalia/geltona/raudona) ────────────────────────────────────
 
@@ -27,16 +28,23 @@ function ConfidenceDot({ level, hint }) {
     medium: 'bg-yellow-400',
     low:    'bg-red-500',
   };
+  const emojis = { high: '🟢', medium: '🟡', low: '🔴' };
   const titles = {
-    high:   'Aukšto patikimumo (vertė skaityta tiesiogiai iš brėžinio)',
-    medium: 'Vidutinio patikimumo (apskaičiuota iš dalinių duomenų)',
-    low:    'Žemo patikimumo (numatyta iš defaults — patikrink!)',
+    high:   'Nuskaityta tiesiai iš brėžinio',
+    medium: 'Apskaičiuota su prielaida',
+    low:    'Numatytoji reikšmė — patikrinkite',
   };
   return (
-    <span
-      title={hint || titles[level]}
-      className={`inline-block w-1.5 h-1.5 rounded-full ${colors[level]} shrink-0 ml-1`}
-    />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-block w-1.5 h-1.5 rounded-full ${colors[level]} shrink-0 ml-1 cursor-help`}
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        {hint || `${emojis[level]} ${titles[level]}`}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -240,10 +248,16 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
             <div className="font-semibold text-foreground flex items-center gap-1">
               {dazymo > 0 || room.plotas_m2 ? `${room.plotas_m2} m²` : '—'}
               {room.plotas_saltinis === 'eksplikacija' && (
-                <span
-                  title="Plotas paimtas iš eksplikacijos lentelės (ground-truth)"
-                  className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 cursor-help"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    🟢 Plotas paimtas iš eksplikacijos lentelės (nuskaityta tiesiai iš brėžinio)
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           )}
