@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,87 +8,90 @@
   :root {
     --font-sans: 'Hanken Grotesk', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
-    --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', sans-serif;
+    --font-display: 'Sora', 'Hanken Grotesk', sans-serif;
 
     /* ──────────────────────────────────────────────────────────────────────
-       Pathon — Brand Design Tokens (2026-07-04)
-       Terracotta + graphite on warm paper. A precise architectural document
-       that's alive: clay accent, warm-stone neutrals, blueprint hairlines,
+       Pathon — Dark Graphite Design Tokens (2026-07-05)
+       Orange-on-graphite. A serious, technical construction-AI product:
+       deep graphite surfaces, molten-orange accent, blueprint hairlines,
        JetBrains Mono numerals as the estimator-precision signature.
+       Reference bar: Togal.ai + Kreo (dark, product-led) — distinct via
+       orange, not their green/blue. The whole app shell is dark by default.
        ────────────────────────────────────────────────────────────────────── */
 
-    /* Surfaces — warm paper, paper-1 cards */
-    --background: 40 33% 92%;            /* #F3EEE4 warm paper page */
-    --foreground: 38 18% 9%;             /* #1A1712 warm near-black ink */
-    --card: 43 41% 97%;                  /* #FBF9F4 paper-1 cards/panels */
-    --card-foreground: 38 18% 9%;
-    --popover: 43 41% 97%;
-    --popover-foreground: 38 18% 9%;
+    /* Surfaces — deep graphite page, elevated panels */
+    --background: 220 18% 10%;           /* #15181E graphite page */
+    --foreground: 216 16% 94%;           /* #EDEFF2 near-white ink */
+    --card: 220 18% 13%;                 /* #1B1F27 elevated panel */
+    --card-foreground: 216 16% 94%;
+    --popover: 220 18% 13%;              /* #1B1F27 */
+    --popover-foreground: 216 16% 94%;
 
-    /* Accent — clay terracotta (Pathon brand) */
-    --primary: 15 64% 50%;               /* #D2572E clay terracotta */
-    --primary-foreground: 0 0% 100%;
+    /* Accent — molten orange (Pathon brand) */
+    --primary: 22 93% 54%;               /* #F76B1C orange */
+    --primary-foreground: 220 18% 10%;   /* #15181E dark text on orange */
 
-    /* Secondary — warm stone sub-surface */
-    --secondary: 40 30% 88%;             /* #E9E3D7 warm stone */
-    --secondary-foreground: 41 11% 26%;
+    /* Secondary — graphite sub-surface */
+    --secondary: 222 16% 16%;            /* #22262F */
+    --secondary-foreground: 216 16% 94%;
 
-    /* Muted — warm stone for soft text + hover backgrounds */
-    --muted: 40 30% 88%;                 /* #E9E3D7 hover bg */
-    --muted-foreground: 37 10% 40%;      /* #6E675C warm muted text */
+    /* Muted — graphite for soft text + hover backgrounds */
+    --muted: 222 16% 16%;                /* #22262F hover bg */
+    --muted-foreground: 215 11% 59%;     /* #8A94A2 cool muted text */
 
     /* Accent (component-state, NOT brand) */
-    --accent: 40 28% 85%;                /* selected row — deeper stone */
-    --accent-foreground: 41 11% 26%;
+    --accent: 217 18% 14%;               /* selected row — surface-2 */
+    --accent-foreground: 216 16% 94%;
 
-    /* Destructive (errors / red dots) — desaturated brick */
-    --destructive: 0 45% 48%;            /* warm brick red */
-    --destructive-foreground: 0 0% 100%;
+    /* Destructive (errors / red dots) — clear red on dark */
+    --destructive: 0 62% 52%;            /* red */
+    --destructive-foreground: 216 16% 94%;
 
-    /* Borders — warm hairlines */
-    --border: 40 24% 83%;                /* #DED7C8 default 1px */
-    --input: 40 24% 83%;
-    --ring: 15 64% 50%;                  /* match primary for focus rings */
+    /* Borders — cool graphite hairlines */
+    --border: 220 15% 19%;               /* #2A2F39 default 1px */
+    --input: 220 15% 19%;
+    --ring: 22 93% 54%;                  /* match primary for focus rings */
 
-    /* Extra brand tokens (per 2026-07-04 identity) */
-    --ink-2: 41 11% 26%;                 /* #4A453C warm graphite mid */
-    --terracotta-deep: 15 71% 41%;       /* #B4441F pressed / deep clay */
-    --accent-sand: 41 37% 69%;           /* #C9B896 warm sand accent */
+    /* Extra brand tokens (per 2026-07-05 dark identity) */
+    --ink-2: 216 12% 78%;                /* softer near-white body text */
+    --accent-2: 22 100% 64%;             /* #FF8A47 lighter orange */
+    --surface-2: 217 18% 14%;            /* #1E232B nested surface */
+    --terracotta-deep: 20 90% 46%;       /* pressed / deep orange */
+    --accent-sand: 22 100% 64%;          /* alias → accent-2 (compat) */
 
     /* Charts (kept for future analytics) */
-    --chart-1: 15 64% 50%;               /* terracotta */
-    --chart-2: 37 10% 40%;               /* warm muted */
-    --chart-3: 145 40% 34%;              /* green */
-    --chart-4: 41 37% 55%;               /* sand */
-    --chart-5: 38 18% 9%;
+    --chart-1: 22 93% 54%;               /* orange */
+    --chart-2: 215 11% 59%;              /* cool muted */
+    --chart-3: 152 45% 45%;              /* green */
+    --chart-4: 22 100% 64%;              /* light orange */
+    --chart-5: 216 16% 94%;
 
-    --radius: 0.625rem;                  /* ~10px warm paper corners */
+    --radius: 0.625rem;                  /* ~10px */
 
-    /* Sidebar — warm paper (matches narrow icon rail) */
-    --sidebar-background: 43 41% 97%;     /* paper-1 */
-    --sidebar-foreground: 37 10% 40%;     /* warm muted ink for icons */
-    --sidebar-primary: 15 64% 50%;        /* terracotta accent */
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 28% 85%;         /* selected item bg */
-    --sidebar-accent-foreground: 38 18% 9%; /* ink when active */
-    --sidebar-border: 40 24% 83%;         /* match main border */
-    --sidebar-ring: 15 64% 50%;
+    /* Sidebar — graphite (matches narrow icon rail) */
+    --sidebar-background: 220 18% 13%;    /* elevated panel */
+    --sidebar-foreground: 215 11% 59%;    /* muted icons */
+    --sidebar-primary: 22 93% 54%;        /* orange accent */
+    --sidebar-primary-foreground: 220 18% 10%;
+    --sidebar-accent: 217 18% 14%;        /* selected item bg */
+    --sidebar-accent-foreground: 216 16% 94%; /* ink when active */
+    --sidebar-border: 220 15% 19%;        /* match main border */
+    --sidebar-ring: 22 93% 54%;
 
     /* ──── Provenance dots (data source indicator, 3-color system) ──── */
-    --source-table: 145 47% 33%;         /* #2f7d5b — slate green: from eksplikacija/spec table */
-    --source-computed: 257 30% 51%;      /* #6f5fa3 — slate violet: Python computed */
-    --source-ai: 30 60% 47%;             /* #c97a2c — burnt amber: AI inferred */
+    --source-table: 152 45% 45%;         /* green: from eksplikacija/spec table */
+    --source-computed: 255 55% 68%;      /* violet: Python computed */
+    --source-ai: 22 93% 54%;             /* orange: AI inferred */
 
     /* ──── Confidence dots (data quality indicator) ──── */
-    --conf-high: 145 47% 33%;            /* green — read directly */
-    --conf-med:  30 60% 47%;             /* amber — derived */
-    --conf-low:  0 39% 51%;              /* red — fallback default */
+    --conf-high: 152 45% 45%;            /* green — read directly */
+    --conf-med:  22 93% 54%;             /* orange — derived */
+    --conf-low:  0 62% 52%;              /* red — fallback default */
 
     /* Surface elevation tiers */
-    --bg-1: 43 41% 97%;                  /* paper-1 slight elevation */
-    --surface-2: 40 30% 88%;             /* hover */
-    --surface-3: 40 28% 85%;             /* selected/deep hover */
-    --border-strong: 40 22% 74%;         /* warm stone input/button border */
+    --bg-1: 220 18% 13%;                 /* panel slight elevation */
+    --surface-3: 220 15% 19%;            /* selected/deep hover */
+    --border-strong: 218 14% 26%;        /* #3A414D stronger input/button border */
 
     /* ──── Viewer chrome (PDF viewer ONLY — Kreo-style dark navy with cyan
             accents). Drawing area stays white; the surrounding chrome
@@ -103,41 +106,42 @@
     --viewer-blueprint-bg: 220 35% 8%;        /* darkest — drawing-area "frame" */
   }
 
-  /* Dark mode kept identical to light for now — app is light-only by design.
-     Kept block so any `.dark`-prefixed components don't break. */
+  /* Dark parity block — the app is dark by default now (tokens above are
+     already dark). Kept identical so any `.dark`-prefixed components render
+     the same as the default shell. */
   .dark {
-    --background: 40 33% 92%;
-    --foreground: 38 18% 9%;
-    --card: 43 41% 97%;
-    --card-foreground: 38 18% 9%;
-    --popover: 43 41% 97%;
-    --popover-foreground: 38 18% 9%;
-    --primary: 15 64% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 40 30% 88%;
-    --secondary-foreground: 41 11% 26%;
-    --muted: 40 30% 88%;
-    --muted-foreground: 37 10% 40%;
-    --accent: 40 28% 85%;
-    --accent-foreground: 41 11% 26%;
-    --destructive: 0 45% 48%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 40 24% 83%;
-    --input: 40 24% 83%;
-    --ring: 15 64% 50%;
-    --chart-1: 15 64% 50%;
-    --chart-2: 37 10% 40%;
-    --chart-3: 145 40% 34%;
-    --chart-4: 41 37% 55%;
-    --chart-5: 38 18% 9%;
-    --sidebar-background: 43 41% 97%;
-    --sidebar-foreground: 37 10% 40%;
-    --sidebar-primary: 15 64% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 28% 85%;
-    --sidebar-accent-foreground: 38 18% 9%;
-    --sidebar-border: 40 24% 83%;
-    --sidebar-ring: 15 64% 50%;
+    --background: 220 18% 10%;
+    --foreground: 216 16% 94%;
+    --card: 220 18% 13%;
+    --card-foreground: 216 16% 94%;
+    --popover: 220 18% 13%;
+    --popover-foreground: 216 16% 94%;
+    --primary: 22 93% 54%;
+    --primary-foreground: 220 18% 10%;
+    --secondary: 222 16% 16%;
+    --secondary-foreground: 216 16% 94%;
+    --muted: 222 16% 16%;
+    --muted-foreground: 215 11% 59%;
+    --accent: 217 18% 14%;
+    --accent-foreground: 216 16% 94%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 216 16% 94%;
+    --border: 220 15% 19%;
+    --input: 220 15% 19%;
+    --ring: 22 93% 54%;
+    --chart-1: 22 93% 54%;
+    --chart-2: 215 11% 59%;
+    --chart-3: 152 45% 45%;
+    --chart-4: 22 100% 64%;
+    --chart-5: 216 16% 94%;
+    --sidebar-background: 220 18% 13%;
+    --sidebar-foreground: 215 11% 59%;
+    --sidebar-primary: 22 93% 54%;
+    --sidebar-primary-foreground: 220 18% 10%;
+    --sidebar-accent: 217 18% 14%;
+    --sidebar-accent-foreground: 216 16% 94%;
+    --sidebar-border: 220 15% 19%;
+    --sidebar-ring: 22 93% 54%;
   }
 }
 
@@ -219,19 +223,19 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   Landing page — Pathon terracotta identity (2026-07-04).
-   A precise architectural document that's alive: clay accent on warm
-   paper, paper grain + blueprint hairlines, warm layered shadows,
-   Bricolage Grotesque display, JetBrains Mono numerals.
-   Reference bar: Linear / Vercel / Framer.
+   Landing page — Pathon DARK GRAPHITE identity (2026-07-05).
+   Orange-on-graphite. Serious, technical, premium construction-AI.
+   Deep graphite surfaces, blueprint hairlines on dark, orange radial
+   glow, top-lit panel borders. Sora display, JetBrains Mono numerals.
+   Reference bar: Togal.ai + Kreo (dark, product-led) — distinct via orange.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Root wrapper for the landing — establishes the warm base + paper grain.
-   The grain is a tiled fractal-noise SVG at very low opacity; it sits
-   fixed behind everything so scrolling reveals subtle tooth in the paper. */
+/* Root wrapper for the landing — establishes the dark base. A subtle
+   vignette + faint grain gives depth so surfaces never read flat. */
 .pathon-landing {
   position: relative;
   isolation: isolate;
+  background: hsl(var(--background));
 }
 .pathon-landing::before {
   content: '';
@@ -239,37 +243,41 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.5;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.10, 0 0 0 0 0.09, 0 0 0 0 0.07, 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1, 0 0 0 0 1, 0 0 0 0 1, 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .pathon-landing > * { position: relative; z-index: 1; }
 
-/* Highlighted noun — terracotta ink, no filled box (editorial). */
+/* Highlighted noun — orange ink, no filled box (editorial). */
 .h-accent {
   color: hsl(var(--primary));
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
-/* Blueprint hairline grid — faint construction-paper texture. Two scales:
-   fine 26px cells + a heavier 130px major line, like drafting paper. */
+/* Blueprint hairline grid on dark — cool light lines, radial-masked so
+   the grid fades toward the edges instead of tiling flat to the frame.
+   Two scales: fine 56px cells + a heavier 224px major line. */
 .blueprint-grid {
   background-image:
-    linear-gradient(hsl(var(--foreground) / 0.030) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.030) 1px, transparent 1px);
-  background-size: 26px 26px;
+    linear-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, #000 55%, transparent 100%);
+          mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, #000 55%, transparent 100%);
 }
 .blueprint-grid-major {
   background-image:
-    linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px),
-    linear-gradient(hsl(var(--foreground) / 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.022) 1px, transparent 1px);
-  background-size: 130px 130px, 130px 130px, 26px 26px, 26px 26px;
+    linear-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.05) 1px, transparent 1px),
+    linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+  background-size: 224px 224px, 224px 224px, 56px 56px, 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 50%, transparent 100%);
+          mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 50%, transparent 100%);
 }
 
-/* Primary CTA — solid clay terracotta, warm depth, precise press. */
+/* Primary CTA — solid orange, dark depth + inner top-light, precise press. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -279,24 +287,24 @@
   font-weight: 600;
   border-radius: calc(var(--radius) - 2px);
   box-shadow:
-    0 1px 2px hsl(var(--terracotta-deep) / 0.30),
-    0 6px 16px -8px hsl(var(--terracotta-deep) / 0.45),
-    inset 0 1px 0 hsl(0 0% 100% / 0.20);
+    0 1px 2px hsl(220 30% 4% / 0.55),
+    0 8px 22px -10px hsl(var(--primary) / 0.55),
+    inset 0 1px 0 hsl(0 0% 100% / 0.28);
   transition: transform 150ms cubic-bezier(.16,1,.3,1),
               box-shadow 150ms cubic-bezier(.16,1,.3,1),
               background 150ms ease;
 }
 .btn-primary:hover {
-  background: hsl(var(--terracotta-deep));
+  background: hsl(var(--accent-2));
   box-shadow:
-    0 2px 4px hsl(var(--terracotta-deep) / 0.35),
-    0 12px 28px -10px hsl(var(--terracotta-deep) / 0.55),
-    inset 0 1px 0 hsl(0 0% 100% / 0.22);
+    0 2px 4px hsl(220 30% 4% / 0.6),
+    0 14px 34px -10px hsl(var(--primary) / 0.7),
+    inset 0 1px 0 hsl(0 0% 100% / 0.32);
   transform: translateY(-1.5px);
 }
 .btn-primary:active { transform: translateY(0.5px) scale(0.99); }
 
-/* Secondary / ghost button — warm hairline border, paper fill */
+/* Secondary / ghost button — cool graphite border, panel fill, top-lit. */
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -306,16 +314,18 @@
   font-weight: 600;
   border: 1px solid hsl(var(--border-strong));
   border-radius: calc(var(--radius) - 2px);
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+  box-shadow:
+    0 1px 2px hsl(220 30% 4% / 0.4),
+    inset 0 1px 0 hsl(0 0% 100% / 0.04);
   transition: border-color 150ms ease, background 150ms ease,
               transform 150ms cubic-bezier(.16,1,.3,1),
               box-shadow 150ms ease;
 }
 .btn-ghost:hover {
-  border-color: hsl(var(--primary) / 0.55);
-  background: hsl(var(--card));
+  border-color: hsl(var(--primary) / 0.6);
+  background: hsl(var(--surface-2));
   transform: translateY(-1.5px);
-  box-shadow: 0 6px 18px -10px hsl(var(--foreground) / 0.22);
+  box-shadow: 0 10px 26px -14px hsl(220 40% 2% / 0.7);
 }
 .btn-ghost:active { transform: translateY(0.5px); }
 
@@ -337,16 +347,17 @@
 .link-draw:hover { color: hsl(var(--foreground)); }
 .link-draw:hover::after { transform: scaleX(1); }
 
-/* Product frame — the hero visual "device" chrome. Paper card, warm
-   layered shadow, thin terracotta top accent. */
+/* Product frame — the hero visual "device" chrome. Dark elevated panel,
+   deep layered shadow, top-lit border. */
 .product-frame {
   background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  border: 1px solid hsl(var(--border-strong));
   border-radius: var(--radius);
   box-shadow:
-    0 1px 1px hsl(var(--foreground) / 0.04),
-    0 10px 30px -14px hsl(38 30% 20% / 0.28),
-    0 30px 60px -30px hsl(38 30% 20% / 0.20);
+    inset 0 1px 0 hsl(0 0% 100% / 0.05),
+    0 2px 4px hsl(220 40% 2% / 0.5),
+    0 24px 60px -24px hsl(220 40% 2% / 0.75),
+    0 40px 90px -50px hsl(var(--primary) / 0.25);
 }
 
 /* Card lift — tactile hover for feature / step / pricing cards. */
@@ -357,10 +368,10 @@
 }
 .card-lift:hover {
   transform: translateY(-3px);
-  border-color: hsl(var(--primary) / 0.35);
+  border-color: hsl(var(--primary) / 0.45);
   box-shadow:
-    0 1px 1px hsl(var(--foreground) / 0.04),
-    0 14px 34px -18px hsl(38 30% 20% / 0.30);
+    inset 0 1px 0 hsl(0 0% 100% / 0.05),
+    0 18px 40px -20px hsl(220 40% 2% / 0.8);
 }
 
 /* Anchor offset for sticky nav */
@@ -376,7 +387,7 @@ section[id] { scroll-margin-top: 84px; }
   font-size: 150px;
   line-height: 1;
   color: hsl(var(--primary));
-  opacity: 0.07;
+  opacity: 0.10;
   pointer-events: none;
   user-select: none;
   z-index: 0;
@@ -391,58 +402,72 @@ section[id] { scroll-margin-top: 84px; }
   color: hsl(var(--muted-foreground));
 }
 
-/* ── Hero floor-plan reveal (SVG). Robust: final state visible without JS.
-   JSX toggles `.in` via framer-motion's onViewportEnter; if JS never runs,
-   the base rules below still leave strokes fully drawn (dashoffset 0 via
-   the .in class is the *animation target*, so we default plan visible and
-   only animate when the wrapper explicitly gets `.play`). ── */
-.hero-plan .wall,
-.hero-plan .opening { stroke-dashoffset: 0; }
+/* ══════════════════════════════════════════════════════════════════════
+   Hero centerpiece — "AI aptinka kiekius" detection panel (SVG + CSS).
 
-.hero-plan.play .wall {
-  stroke-dasharray: 1400;
-  stroke-dashoffset: 1400;
-  animation: drawStroke 1000ms cubic-bezier(.16,1,.3,1) 200ms forwards;
-}
-.hero-plan.play .opening {
-  stroke-dasharray: 130;
-  stroke-dashoffset: 130;
-  animation: drawStroke 320ms cubic-bezier(.16,1,.3,1) 1000ms forwards;
-}
-@keyframes drawStroke { to { stroke-dashoffset: 0; } }
+   ROBUSTNESS CONTRACT: the base rules (no `.play`) render the FINAL state —
+   floor plan visible, all detection boxes + labels present, scan line
+   hidden. JSX only ADDS `.play` when JS runs, motion is allowed, and the
+   panel scrolls into view. If JS never runs, or prefers-reduced-motion is
+   set, `.play` is never added → the panel shows fully-detected + static.
+   The animation classes never emit a stuck opacity:0 base.
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* Scan line — a terracotta sweep that crosses the plan once on play. */
+/* Base = fully detected. */
 .hero-plan .scan-line { opacity: 0; }
+.hero-plan .det-box,
+.hero-plan .det-label,
+.hero-plan .plan-line { opacity: 1; }
+.hero-plan .plan-line { stroke-dashoffset: 0; }
+
+/* On play: faint plan hairlines draw in first. */
+.hero-plan.play .plan-line {
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  animation: heroDraw 900ms cubic-bezier(.16,1,.3,1) 120ms forwards;
+}
+@keyframes heroDraw { to { stroke-dashoffset: 0; } }
+
+/* Scan line — an orange sweep that crosses the plan top→bottom once. */
 .hero-plan.play .scan-line {
-  animation: scanSweep 1100ms cubic-bezier(.4,0,.2,1) 900ms 1;
+  animation: heroScan 1500ms cubic-bezier(.45,0,.25,1) 700ms 1;
 }
-@keyframes scanSweep {
-  0%   { opacity: 0; transform: translateX(0); }
-  12%  { opacity: 0.9; }
-  88%  { opacity: 0.9; }
-  100% { opacity: 0; transform: translateX(370px); }
+@keyframes heroScan {
+  0%   { opacity: 0; transform: translateY(0); }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(232px); }
 }
 
-/* Room fills + labels — default fully visible; animate in on play. */
-.hero-plan .room-fill { opacity: 0.0; }
-.hero-plan .room-label { opacity: 1; }
-.hero-plan.play .room-fill { opacity: 0; animation: roomFill 600ms ease forwards; }
-.hero-plan.play .room-label { opacity: 0; animation: fadeIn 400ms ease forwards; }
-@keyframes roomFill { to { opacity: 0.10; } }
-@keyframes fadeIn { to { opacity: 1; } }
+/* Detection boxes — SNAP on one-by-one as the scan line passes. A quick
+   scale-from-95% + opacity pop, staggered top→bottom to track the sweep. */
+.hero-plan.play .det-box {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroSnap 340ms cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes heroSnap {
+  0%   { opacity: 0; transform: scale(0.94); }
+  60%  { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.hero-plan.play .det-label {
+  opacity: 0;
+  animation: heroFade 320ms ease both;
+}
+@keyframes heroFade { to { opacity: 1; } }
 
-.hero-plan.play .room-1 { animation-delay: 1250ms; }
-.hero-plan.play .room-2 { animation-delay: 1330ms; }
-.hero-plan.play .room-3 { animation-delay: 1410ms; }
-.hero-plan.play .room-4 { animation-delay: 1490ms; }
-.hero-plan.play .room-5 { animation-delay: 1570ms; }
-.hero-plan.play .room-6 { animation-delay: 1650ms; }
-
-.hero-plan .meta-element { opacity: 1; }
-.hero-plan.play .meta-element { opacity: 0; animation: fadeIn 400ms ease 1750ms forwards; }
+/* Stagger — boxes + their labels share timing, tracking the scan sweep. */
+.hero-plan.play .d1 { animation-delay: 900ms; }
+.hero-plan.play .d2 { animation-delay: 1040ms; }
+.hero-plan.play .d3 { animation-delay: 1180ms; }
+.hero-plan.play .d4 { animation-delay: 1320ms; }
+.hero-plan.play .d5 { animation-delay: 1460ms; }
+.hero-plan.play .d6 { animation-delay: 1600ms; }
 
 /* Extracted-quantities table rows — staggered fade, robust default.
-   Base = visible (opacity 1). Only the `.play` parent animates them from 0. */
+   Base = visible (opacity 1). Only the `.play` parent animates from 0. */
 .qty-row { opacity: 1; }
 .qty-table.play .qty-row {
   opacity: 0;
@@ -453,14 +478,15 @@ section[id] { scroll-margin-top: 84px; }
   to   { opacity: 1; transform: none; }
 }
 
+/* Trade tabs under the panel — active ones pulse-in on play. */
+.trade-tab { transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+
 /* ── Reduced motion: everything final + static ── */
 @media (prefers-reduced-motion: reduce) {
-  .hero-plan .wall,
-  .hero-plan .opening { stroke-dashoffset: 0 !important; animation: none !important; }
+  .hero-plan .plan-line { stroke-dashoffset: 0 !important; animation: none !important; }
   .hero-plan .scan-line { display: none !important; }
-  .hero-plan .room-fill { opacity: 0.10 !important; animation: none !important; }
-  .hero-plan .room-label,
-  .hero-plan .meta-element { opacity: 1 !important; animation: none !important; }
+  .hero-plan .det-box,
+  .hero-plan .det-label { opacity: 1 !important; animation: none !important; transform: none !important; }
   .qty-row { opacity: 1 !important; animation: none !important; transform: none !important; }
   .pathon-landing::before { display: none; }
   .card-lift, .btn-primary, .btn-ghost { transition: none !important; }
