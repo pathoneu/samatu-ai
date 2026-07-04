@@ -1,4 +1,11 @@
-"""Tests for /api/projects/{id}/export-excel."""
+"""Tests for /api/projects/{id}/export-excel.
+
+P2 (2026-07-04 pentest, pass 3): the endpoint now requires auth + URL-project
+ownership BEFORE the ``?fixture=`` branch (see api/export_excel._load_project).
+These functional tests therefore log in as the project owner; the P2 IDOR PoC
+(anon + fixture → XLSX leaking another tenant's calibration) is replayed in
+test_p2_export_excel_fixture_auth.py.
+"""
 
 from __future__ import annotations
 
@@ -7,20 +14,34 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
+_PW = "passw0rd123"
 
-@pytest.fixture(scope="module")
-def client():
-    from api.export_excel import router
-    app = FastAPI()
-    app.include_router(router)
-    return TestClient(app)
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    """A TestClient logged in as the owner of the projects used below."""
+    from main import app
+    import auth
+    import db
+
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "export.db")
+    monkeypatch.setattr(auth, "AUTH_DISABLED", False)
+    db.init_schema()
+    db._migrate_schema()
+    owner = db.create_user("owner@x.lt", auth.hash_password(_PW), name="Owner")
+    for pid in ("test", "no-calibration-yet"):
+        db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=owner["id"])
+
+    c = TestClient(app)
+    r = c.post("/api/auth/login", json={"email": "owner@x.lt", "password": _PW})
+    assert r.status_code == 200, r.text
+    return c
 
 
 def test_export_returns_xlsx_with_ai_sheet(client):

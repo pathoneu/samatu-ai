@@ -58,12 +58,24 @@ router = APIRouter(prefix="/api/projects", tags=["export-excel"])
 
 
 def _load_project(request: Request, project_id: str, fixture: str | None) -> dict[str, Any]:
+    """Resolve the parsed KŽ written into the XLSX.
+
+    P2 (2026-07-04 pentest, pass 3): AUTH + URL-project ownership FIRST, ALWAYS —
+    BEFORE the fixture branch. Previously ``?fixture=`` returned before
+    ``require_user`` ran; the endpoint then called ``_load_calibration(project_id)``
+    which reads ``data/calibrations/{URL_id}.json`` keyed by the attacker's URL
+    project_id, so an anonymous ``POST /export-excel?fixture=berzas`` produced an
+    XLSX leaking another tenant's secret calibration ``user_value`` totals (their
+    KNOWN category quantities). The URL project_id keys that per-user store, so it
+    MUST be owned regardless of ``fixture``. Fixture may seed the reference body
+    only. Mirrors the N1 calibrate fix.
+    """
+    user = _auth.require_owned_project(request, project_id)  # 401 anon / 404 foreign — MUST precede fixture
     if fixture:
         p = FIXTURES.get(fixture)
         if not p or not p.exists():
             raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")
         return json.loads(p.read_text(encoding="utf-8"))
-    user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
     proj = _db.get_project(project_id, user_id=user_filter)
     if not proj:
