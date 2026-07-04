@@ -292,7 +292,10 @@ import db as _db  # noqa: E402
 # 2026-06-19 bug-hunt: the cap previously only ever saw extract-interior actuals,
 # so it could never fire for /extract, /chat-project, /v9/symbols/*, facade/roof,
 # vision_fill/lasso/symbols — i.e. it was still dead for ~13 of 15 endpoints.
-_SELF_METERED_PATHS = ("/extract-interior",)
+# 2026-07-04: /chat-project now self-reports its ACTUAL usage after the call
+# (db.record_usage(kind="chat")), so — like /extract-interior — it must skip the
+# conservative pre-charge reservation to avoid double-counting.
+_SELF_METERED_PATHS = ("/extract-interior", "/chat-project")
 _RESERVE_EUR = (
     ("/chat-project", 0.03),
     ("/detect-type", 0.10),
@@ -5743,6 +5746,22 @@ async def chat_project(request: Request, payload: dict = Body(...)):
         usage = msg.usage
         log.info("chat-project tokens: in=%s out=%s",
                  getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
+        # Meter the ACTUAL chat cost against the user so the per-user spend cap
+        # covers chat with real tokens (not just the flat pre-charge — which is
+        # now skipped for /chat-project to avoid double-counting). kind="chat"
+        # deliberately does NOT match the hourly-EXTRACT count filter ('%extract%'),
+        # so chat use can't trip the extracts/hour limit. (2026-07-04)
+        try:
+            resp_like = {"_meta": {
+                "input_tokens": getattr(usage, "input_tokens", 0),
+                "output_tokens": getattr(usage, "output_tokens", 0),
+                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
+                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
+                "model": model_for("chat"),
+            }}
+            db.record_usage(user.get("id"), resp_like, kind="chat")
+        except Exception as _exc:
+            log.warning("record_usage failed (chat): %r", _exc)
         return {"status": "ok", "answer": text}
     except Exception:
         # Log the detail server-side, but never return the raw exception to the

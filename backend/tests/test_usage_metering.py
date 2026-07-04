@@ -98,19 +98,20 @@ def test_hourly_extract_cap_ignores_light_reservations(tmp_path, monkeypatch):
     assert n_extracts == 2
 
 
-def test_reserve_billable_skips_extract_interior_meters_others(tmp_path, monkeypatch):
-    """The reservation must fire for every billable path EXCEPT extract-interior
-    (which self-reports actuals) — otherwise the cap stays dead for the other
-    ~13 endpoints, or double-counts extract-interior."""
+def test_reserve_billable_skips_self_metered_meters_others(tmp_path, monkeypatch):
+    """The reservation must fire for every billable path EXCEPT the self-metered
+    ones (extract-interior + chat-project, which self-report actuals) — otherwise
+    the cap stays dead for the other endpoints, or double-counts a self-metered
+    path. (2026-07-04: /chat-project joined the self-metered set.)"""
     _isolate(tmp_path, monkeypatch)
     import main
     main._reserve_billable("u1", "/extract-interior")
     main._reserve_billable("u1", "/extract-interior-stream")
+    main._reserve_billable("u1", "/chat-project")        # self-metered now → no reservation
     _, n0 = db.user_usage_since("u1")
     assert n0 == 0  # self-metered → no reservation
-    main._reserve_billable("u1", "/chat-project")        # 0.03
     main._reserve_billable("u1", "/extract")             # 0.30
     main._reserve_billable("u1", "/v9/symbols/detect")   # 0.10
     total, n = db.user_usage_since("u1")
-    assert n == 3
-    assert abs(total - 0.43) < 1e-6
+    assert n == 2
+    assert abs(total - 0.40) < 1e-6

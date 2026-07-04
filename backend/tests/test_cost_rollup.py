@@ -402,3 +402,32 @@ def test_flow_appends_each_reader_meta_into_extra_calls():
         + calc_claude_cost_usd(7_000, 250, model="claude-fable-5")     # fixtures (Fable)
     )
     assert total == pytest.approx(expected)
+
+
+# ── Chat metering: its own usage_event, NOT counted as an extract ─────────────
+
+def test_chat_usage_event_does_not_count_as_extract(tmp_path, monkeypatch):
+    """A chat call recorded with kind='chat' must NOT match the hourly-EXTRACT
+    COUNT filter ('%extract%'), so heavy chat use can't trip the extracts/hour
+    cap — while its EUR still counts toward the spend total."""
+    _isolate(tmp_path, monkeypatch)
+    resp = {"_meta": {"input_tokens": 3_000, "output_tokens": 400,
+                      "model": "claude-opus-4-8"}}
+    cost = db.record_usage("u1", resp, kind="chat")
+    assert cost > 0
+    spend, n_extracts = db.user_usage_since("u1", hours=1, kind_like="%extract%")
+    assert n_extracts == 0     # chat is NOT an extract
+    assert spend > 0           # but it DOES count toward EUR spend
+    total_all, n_all = db.user_usage_since("u1", hours=1)
+    assert n_all == 1          # the chat event exists in the ledger
+
+
+def test_chat_path_is_self_metered_no_double_count(tmp_path, monkeypatch):
+    """/chat-project is self-metered (records the actual after the call), so the
+    conservative pre-charge reservation must be SKIPPED — otherwise chat is
+    counted twice (reservation + actual), same rule as /extract-interior."""
+    _isolate(tmp_path, monkeypatch)
+    import main
+    main._reserve_billable("u1", "/chat-project")
+    _, n = db.user_usage_since("u1")
+    assert n == 0  # no reservation — chat self-reports actuals like extract-interior
