@@ -1938,8 +1938,20 @@ async def extract(request: Request, file: UploadFile = File(...)):
                 projektas, chunks = await asyncio.to_thread(
                     _pdf_to_chunks, contents
                 )
-            except Exception as e:
-                return {"error": f"PDF nepavyko nuskaityti: {type(e).__name__}: {e}"}
+            except HTTPException:
+                # N5 (2026-07-04 pentest, pass 2): same class as F5, sibling path.
+                # Let a real HTTP status propagate instead of masking it as a 200.
+                raise
+            except Exception:
+                # N5: do NOT echo the internal exception (type(e).__name__: {e}) —
+                # it leaked library internals like "PdfminerException: No /Root
+                # object!" in a 200 body. Log server-side; return a generic LT
+                # message with a proper 4xx (a PDF we can't parse is bad input).
+                log.exception("/extract Path-2 _pdf_to_chunks failed")
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF nepavyko nuskaityti. Patikrinkite, ar failas tinkamas.",
+                )
 
             if not chunks:
                 return {"error": "PDF tekstas nerastas — galbūt skanuotas vaizdas?"}
