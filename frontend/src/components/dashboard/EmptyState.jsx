@@ -27,8 +27,8 @@ export default function EmptyState() {
         Dar nėra projektų
       </h2>
       <p className="text-muted-foreground text-center max-w-md mb-8">
-        Įkelkite interjero projekto brėžinį (PDF) — AI nuskaitys patalpas,
-        apskaičiuos apdailos kiekius ir paruoš sąmatą. Arba pirma apžiūrėkite
+        Įkelkite statybų projekto brėžinį (PDF) — Pathon nuskaitys ir
+        apskaičiuos kiekius bei paruoš sąmatą. Arba pirma apžiūrėkite
         pavyzdinį projektą.
       </p>
 

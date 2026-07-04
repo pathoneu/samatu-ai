@@ -26,7 +26,7 @@ const PLAN_META = {
     highlight: true,
     features: [
       'Iki 10 projektų per mėnesį',
-      'Interjero apdailos kiekiai',
+      'Statybų kiekiai (visų tipų)',
       'PDF ir Excel eksportas',
       'Kiekių koregavimo įrankiai',
     ],

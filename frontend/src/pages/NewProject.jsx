@@ -512,7 +512,7 @@ export default function NewProject() {
 
       <h1 className="text-2xl font-bold text-foreground mb-1">Naujas projektas</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Įkelkite PDF — KŽ arba interjero projektą. AI automatiškai atpažins tipą ir išskirs duomenis.
+        Įkelkite statybų projekto brėžinį (PDF). Pathon automatiškai atpažins tipą ir išskirs kiekius.
       </p>
 
       {error && (
@@ -596,7 +596,7 @@ export default function NewProject() {
 
         <div>
           <Label className="text-sm text-muted-foreground mb-1.5 block">Projekto PDF</Label>
-          <UploadZone onFileSelect={setFile} accept=".pdf" label="PDF — KŽ arba interjero projektas" />
+          <UploadZone onFileSelect={setFile} accept=".pdf" label="PDF — statybų projekto brėžinys" />
         </div>
 
         <Button
