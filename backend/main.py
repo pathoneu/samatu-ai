@@ -1994,8 +1994,18 @@ async def extract(request: Request, file: UploadFile = File(...)):
 
     except asyncio.TimeoutError:
         return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+    except HTTPException:
+        # F5 (2026-07-04 pentest): let the 400/413 raised by _validate_pdf_upload
+        # (invalid PDF, oversized upload) propagate as the real HTTP status
+        # instead of being swallowed by the broad catch below and returned as a
+        # 200 body. Re-raise BEFORE the generic handler.
+        raise
     except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+        # F5: do NOT echo the internal exception (type(e).__name__: {e}) to the
+        # client — it leaks stack/library internals. Log the detail server-side;
+        # return a generic Lithuanian message.
+        log.exception("/extract failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── Interior project extraction ───────────────────────────────────────────────
