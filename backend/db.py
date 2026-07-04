@@ -606,6 +606,39 @@ def _migrate_schema() -> None:
         # rows backfill to 1.
         if ucols and "session_version" not in ucols:
             c.execute("ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1")
+        # W3 (2026-07-04): billing subsystem — plan state lives on the users
+        # row (Stripe is the source of truth, mirrored locally via webhooks).
+        # Dormant: BILLING_ENABLED defaults OFF (backend/billing/flag.py), so
+        # these columns/tables exist but are unread on the hot path until the
+        # flag flips. Append-only, mirrors the google_sub/session_version
+        # pattern above.
+        if "plan" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+        if "plan_status" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN plan_status TEXT NOT NULL DEFAULT 'active'")
+        for col in ("stripe_customer_id", "stripe_subscription_id",
+                    "current_period_end", "company_code", "pvm_code"):
+            if col not in ucols:
+                c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        # consumed_trials: keyed by company code, SURVIVES user deletion —
+        # anti-abuse gate for the 1-project free trial.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS consumed_trials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_code TEXT NOT NULL UNIQUE,
+                user_id TEXT,
+                consumed_at TEXT NOT NULL
+            )""")
+        # billing_usage: per-billable-extraction ledger, keyed to billing period.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS billing_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                project_id TEXT,
+                created_at TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_billing_usage_user_time ON billing_usage(user_id, created_at)")
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────
