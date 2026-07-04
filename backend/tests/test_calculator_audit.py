@@ -157,6 +157,9 @@ def _reference_plyteles_grindys(room: dict) -> float:
         tile_floor = paskirtis in (
             "virtuve", "vonia", "wc", "san", "katiline", "skalbykla",
             "tamburas", "tambūras", "laiptine", "laiptinė",
+            # 2026-07-04: garage floors tiled by default (2/2 contractor
+            # fixtures bill garage floor tile; see universal_rules ROOM_TYPES)
+            "garazas", "garažas",
         )
     return float(room.get("plotas_m2") or 0) if tile_floor else 0.0
 

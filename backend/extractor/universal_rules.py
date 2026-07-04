@@ -315,7 +315,16 @@ ROOM_TYPE_RULES = {
     "skalbykla":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
     "tamburas":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
     "tambūras":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
-    "garazas":     {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": False},
+    # 2026-07-04: tile_floor flipped False → True. Both contractor-validated
+    # fixtures tile the garage floor: Beržų bills 10.10 m² (notes p105
+    # grindys; GT previously needed a per-room tile_floor_override to hit
+    # truth) and Bacevičiaus bills garage tiling explicitly (pasiūlymas items
+    # 40-43: laiptų garaže įrengimas, plytelių pripjovimas prie trapo garaže,
+    # aliuminio kampas ant plytelių garaže, garažo plytelės). ``floor`` stays
+    # "concrete" deliberately — no screed (Bacevičiaus screed 182.62 m² truth
+    # excludes the garage slab), no baseboards, no soft covering. Per-room
+    # tile_floor_override still wins for genuinely raw-slab garages.
+    "garazas":     {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": True},
     "sandėliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
     "sandeliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
     # Sprint §2A.3: stairwell. Multi-height walls (max_height_m + num_steps),
