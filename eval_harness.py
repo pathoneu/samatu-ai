@@ -933,14 +933,59 @@ def run_debug_project(slug: str) -> int:
     return 0
 
 
+def _extra_calls_breakdown(meta: dict) -> dict:
+    """Per-sub-reader €/USD breakdown of ``meta["extra_calls"]`` for auditing.
+
+    Each extra_call carries a ``reader`` tag (apdailos / doors / door_type /
+    fixtures / zoom / eksplikacija / niche / …) set at its merge point — group
+    by it so the run report can attribute the true-cost premium to the exact
+    sub-Vision calls that drove it. Untagged calls fall into ``"unknown"``.
+    Priced per-call at its OWN model (calc_claude_cost_usd), mirroring
+    pricing._calc_extra_calls_cost_usd so the breakdown sums to the same total.
+    """
+    from pricing import calc_claude_cost_usd, USD_TO_EUR  # backend/ on sys.path
+    groups: dict[str, dict] = {}
+    for c in (meta.get("extra_calls") or []):
+        reader = c.get("reader") or "unknown"
+        model = c.get("model") or ""
+        usd = calc_claude_cost_usd(
+            input_tokens=int(c.get("input_tokens") or 0),
+            output_tokens=int(c.get("output_tokens") or 0),
+            cache_read_tokens=int(c.get("cache_read_tokens") or 0),
+            cache_write_tokens=int(c.get("cache_write_tokens") or 0),
+            model=model, cache_ttl="1h",
+        )
+        g = groups.setdefault(reader, {"n_calls": 0, "cost_usd": 0.0,
+                                       "models": set()})
+        g["n_calls"] += 1
+        g["cost_usd"] += usd
+        if model:
+            g["models"].add(model)
+    return {
+        reader: {
+            "n_calls": g["n_calls"],
+            "cost_usd": round(g["cost_usd"], 4),
+            "cost_eur": round(g["cost_usd"] * USD_TO_EUR, 4),
+            "models": sorted(g["models"]),
+        }
+        for reader, g in sorted(groups.items())
+    }
+
+
 def _meta_rollup(parsed: dict, wall_time_s: float,
                  model_requested: str | None) -> dict:
     """W1.2: per-project cost/token roll-up for the model benchmark.
 
-    Reads the pipeline's top-level ``_meta`` (model, input/output/cache
-    tokens) and prices it via backend/pricing.py (model-aware). ``raw_meta``
-    passes the whole _meta through so compare_model_runs.py can surface any
-    per-reader detail it carries.
+    Reads the pipeline's ``_meta`` and prices the COMPLETE per-project cost via
+    backend/pricing.py (model-aware): Pass-1 (or mixed-model voting rounds) PLUS
+    every sub-Vision call captured in ``_meta["extra_calls"]`` (2026-07-04
+    sub-call metering fix — apdailos/doors/door_type/fixtures/zoom/eksplikacija/
+    niche). ``cost_eur`` is therefore the TRUE €/project, not Pass-1-only.
+
+    ``cost_eur_pass1`` retains the Pass-1(+voting)-only cost so the run report
+    can show the true/Pass-1 multiplier, and ``extra_calls_breakdown`` attributes
+    the premium per sub-reader. ``raw_meta`` passes the whole _meta through
+    (extra_calls included) so results.json stays fully auditable.
     """
     meta = (parsed.get("_meta") or {}) if isinstance(parsed, dict) else {}
     model = meta.get("model") or model_requested
@@ -951,18 +996,29 @@ def _meta_rollup(parsed: dict, wall_time_s: float,
         "cache_write_tokens": int(meta.get("cache_write_tokens") or 0),
     }
     cost_usd = cost_eur = None
+    cost_usd_pass1 = cost_eur_pass1 = None
+    extra_calls_cost_eur = None
+    extra_calls_breakdown: dict = {}
     pricing_note = None
     if model or meta.get("voting_models"):
         try:
-            # calc_meta_cost_usd is mixed-model-voting aware (2026-07-04):
-            # SAMATU_VOTING_MODELS runs carry per-round model/token splits in
-            # _meta.voting_models; each round is priced at ITS OWN model's
-            # rates. Single-model metas price exactly as before.
+            # calc_meta_cost_usd is mixed-model-voting AND sub-call aware
+            # (2026-07-04): voting_models rounds price at their own model each;
+            # extra_calls sub-Vision calls are summed ON TOP, also per-model.
             from pricing import calc_meta_cost_usd  # backend/ on sys.path
-            cost_usd = round(calc_meta_cost_usd(
+            # Pass-1(+voting)-only — deliberately WITHOUT extra_calls, for the
+            # true/Pass-1 multiplier the pricing analysis reports.
+            cost_usd_pass1 = round(calc_meta_cost_usd(
                 {**tokens, "model": model,
                  "voting_models": meta.get("voting_models")}), 4)
+            cost_eur_pass1 = round(cost_usd_pass1 * 0.93, 4)
+            # TRUE per-project cost — pass the WHOLE _meta so extra_calls are
+            # priced too (each sub-call at its own model). This is the number
+            # db.record_usage ledgers in production.
+            cost_usd = round(calc_meta_cost_usd(meta), 4)
             cost_eur = round(cost_usd * 0.93, 4)  # same USD→EUR as db.py
+            extra_calls_cost_eur = round(cost_eur - cost_eur_pass1, 4)
+            extra_calls_breakdown = _extra_calls_breakdown(meta)
         except Exception as exc:  # unknown model rate etc. — keep run scored
             pricing_note = f"cost unavailable: {exc}"
     return {
@@ -970,6 +1026,10 @@ def _meta_rollup(parsed: dict, wall_time_s: float,
         **tokens,
         "cost_usd": cost_usd,
         "cost_eur": cost_eur,
+        "cost_usd_pass1": cost_usd_pass1,
+        "cost_eur_pass1": cost_eur_pass1,
+        "extra_calls_cost_eur": extra_calls_cost_eur,
+        "extra_calls_breakdown": extra_calls_breakdown,
         "pricing_note": pricing_note,
         "wall_time_s": round(wall_time_s, 1),
         "raw_meta": meta,

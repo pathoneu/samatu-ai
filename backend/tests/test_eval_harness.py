@@ -132,3 +132,72 @@ def test_summary_shape(harness, berzas_truth):
     ):
         assert k in s
     assert s["headline_total"] >= 4
+
+
+# ── _meta_rollup: reported cost must include _meta.extra_calls sub-Vision calls ──
+# (2026-07-04 sub-call metering fix). Before the fix the harness priced Pass-1
+# only; a measured run's headline €/project would undercount by 34-76%.
+
+def test_meta_rollup_includes_extra_calls_cost(harness):
+    """The reported cost_eur must price the WHOLE _meta (Pass-1 + extra_calls),
+    matching backend db.record_usage — not Pass-1 alone."""
+    sys.path.insert(0, str(REPO_ROOT / "backend"))
+    from pricing import calc_meta_cost_usd
+    meta = {
+        "input_tokens": 40_000, "output_tokens": 6_000,
+        "cache_read_tokens": 100_000, "cache_write_tokens": 20_000,
+        "model": "claude-opus-4-8",
+        "extra_calls": [
+            {"model": "claude-opus-4-8", "input_tokens": 12_000,
+             "output_tokens": 900, "reader": "apdailos"},
+            {"model": "claude-opus-4-8", "input_tokens": 9_000,
+             "output_tokens": 700, "reader": "doors"},
+        ],
+    }
+    mr = harness._meta_rollup({"_meta": meta}, 12.3, "claude-opus-4-8")
+    expected_usd = round(calc_meta_cost_usd(meta), 4)
+    assert mr["cost_usd"] == pytest.approx(expected_usd)
+    assert mr["cost_eur"] == pytest.approx(round(expected_usd * 0.93, 4))
+    # Pass-1-only cost is retained for the true/Pass-1 multiplier and is STRICTLY
+    # smaller than the true cost when sub-calls fired.
+    assert mr["cost_eur_pass1"] < mr["cost_eur"]
+    assert mr["extra_calls_cost_eur"] == pytest.approx(
+        round(mr["cost_eur"] - mr["cost_eur_pass1"], 4))
+    # raw_meta retains extra_calls for offline auditing.
+    assert "extra_calls" in mr["raw_meta"]
+    assert len(mr["raw_meta"]["extra_calls"]) == 2
+
+
+def test_meta_rollup_no_extra_calls_matches_pass1(harness):
+    """Regression guard: without extra_calls, true cost == Pass-1 cost (the
+    pre-fix number), so historical single-call runs price identically."""
+    meta = {"input_tokens": 40_000, "output_tokens": 6_000,
+            "model": "claude-opus-4-8"}
+    mr = harness._meta_rollup({"_meta": meta}, 5.0, "claude-opus-4-8")
+    assert mr["cost_eur"] == pytest.approx(mr["cost_eur_pass1"])
+    assert mr["extra_calls_cost_eur"] == pytest.approx(0.0)
+    assert mr["extra_calls_breakdown"] == {}
+
+
+def test_meta_rollup_breakdown_attributes_cost_per_reader(harness):
+    """extra_calls_breakdown groups sub-call cost by reader tag and its per-reader
+    costs sum to the total extra_calls cost."""
+    meta = {
+        "input_tokens": 30_000, "output_tokens": 4_000,
+        "model": "claude-opus-4-8",
+        "extra_calls": [
+            {"model": "claude-opus-4-8", "input_tokens": 12_000,
+             "output_tokens": 900, "reader": "apdailos"},
+            {"model": "claude-opus-4-8", "input_tokens": 6_000,
+             "output_tokens": 300, "reader": "door_type"},
+            {"model": "claude-opus-4-8", "input_tokens": 6_100,
+             "output_tokens": 310, "reader": "door_type"},
+        ],
+    }
+    mr = harness._meta_rollup({"_meta": meta}, 8.0, "claude-opus-4-8")
+    bd = mr["extra_calls_breakdown"]
+    assert set(bd) == {"apdailos", "door_type"}
+    assert bd["door_type"]["n_calls"] == 2
+    assert bd["apdailos"]["n_calls"] == 1
+    total_eur = round(sum(v["cost_eur"] for v in bd.values()), 4)
+    assert total_eur == pytest.approx(mr["extra_calls_cost_eur"], abs=1e-3)

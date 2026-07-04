@@ -92,7 +92,8 @@ def _group_rounds_by_model(models: list[str]) -> list[str]:
     return [m for o in order for m in models if m == o]
 
 
-def _append_extra_call(parsed: dict, reader_meta: dict | None) -> None:
+def _append_extra_call(parsed: dict, reader_meta: dict | None,
+                       reader: str | None = None) -> None:
     """Roll one sub-Vision call's tokens into ``parsed["_meta"]["extra_calls"]``
     so the SINGLE per-extraction usage_event prices the WHOLE pipeline, not
     just Pass-1 (2026-07-04 sub-call metering fix).
@@ -101,6 +102,11 @@ def _append_extra_call(parsed: dict, reader_meta: dict | None) -> None:
     door_type round, eksplikacija Vision fallback, a zoom call, an agentic-zoom
     room, sanitary fixtures …). Priced later by pricing.calc_meta_cost_usd,
     each entry at ITS OWN model's rate.
+
+    ``reader`` is an optional attribution label (apdailos / doors / door_type /
+    fixtures / zoom / eksplikacija / niche) stored on the entry for cost
+    breakdowns. It is IGNORED by pricing (calc_meta_cost_usd reads only the
+    token/model keys), so tagging never changes the billed amount.
 
     Purely additive token/cost CAPTURE — never touches extraction output. No-op
     (nothing appended) when the call was free or didn't happen:
@@ -120,13 +126,16 @@ def _append_extra_call(parsed: dict, reader_meta: dict | None) -> None:
     cw_t = int(reader_meta.get("cache_write_tokens") or 0)
     if in_t == 0 and out_t == 0 and cr_t == 0 and cw_t == 0:
         return  # nothing billable
-    parsed.setdefault("_meta", {}).setdefault("extra_calls", []).append({
+    entry = {
         "model": model,
         "input_tokens": in_t,
         "output_tokens": out_t,
         "cache_read_tokens": cr_t,
         "cache_write_tokens": cw_t,
-    })
+    }
+    if reader:
+        entry["reader"] = reader
+    parsed.setdefault("_meta", {}).setdefault("extra_calls", []).append(entry)
 
 
 def _reader_call_metas(result: dict | None) -> list[dict]:
@@ -159,7 +168,7 @@ def _meter_niche_call(parsed: dict, nl: Any) -> None:
     detection output is untouched."""
     if nl is None:
         return
-    _append_extra_call(parsed, getattr(nl, "_meta", None))
+    _append_extra_call(parsed, getattr(nl, "_meta", None), reader="niche")
 
 
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
@@ -2818,7 +2827,7 @@ def extract_interior(
     # that `parsed` (and its Pass-1 _meta) exists. No-op on the pdfplumber path
     # (source-only _meta, no model → free, not billed). The pre-pass ran before
     # Pass-1 above, so it couldn't attach to `parsed` at its own call site.
-    _append_extra_call(parsed, (eks or {}).get("_meta"))
+    _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
 
     _pass1_rooms = parsed.get("patalpos") or []
     _emit({
@@ -3254,7 +3263,7 @@ def extract_interior(
             zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
             # Roll this zoom call's tokens into extra_calls (was discarded before
             # 2026-07-04) — even a null/parse-fail result still billed tokens.
-            _append_extra_call(parsed, _zmeta)
+            _append_extra_call(parsed, _zmeta, reader="zoom")
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -3292,7 +3301,7 @@ def extract_interior(
         # tokens into extra_calls so the single per-extraction usage_event prices
         # them (each room's meta already carries its own model + summed tokens).
         for _m in _agentic_rooms_meta:
-            _append_extra_call(parsed, _m)
+            _append_extra_call(parsed, _m, reader="zoom")
         # Provenance for the agentic-zoom experiment: per-room loop stats
         # (crops, turns, tokens, refusals/aborts) + aggregates.
         parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
@@ -3323,7 +3332,7 @@ def extract_interior(
         from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
         _emit({"event": "apdailos_started"})
         apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
-        _append_extra_call(parsed, apdailos_result.get("_meta"))  # roll tokens into cost
+        _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # roll tokens into cost
         if apdailos_result.get("status") == "ok":
             n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
             parsed.setdefault("_meta", {})["apdailos_page"] = apdailos_result.get("page")
@@ -3363,7 +3372,7 @@ def extract_interior(
             parsed.get("patalpos") or [],
             page_classifications=parsed.get("puslapiai") or [],
         )
-        _append_extra_call(parsed, doors_result.get("_meta"))  # roll tokens into cost
+        _append_extra_call(parsed, doors_result.get("_meta"), reader="doors")  # roll tokens into cost
         if doors_result.get("status") == "ok":
             n_updated = merge_doors_into_rooms(parsed.get("patalpos") or [], doors_result)
             parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
@@ -3413,7 +3422,7 @@ def extract_interior(
         # (_round_metas); single-pass: the one _meta. Each round may run a
         # different model (mixed voting) → priced per-model downstream.
         for _rm in _reader_call_metas(dt):
-            _append_extra_call(parsed, _rm)
+            _append_extra_call(parsed, _rm, reader="door_type")
         if dt.get("status") == "ok":
             n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
                            for el in (r.get("elementai") or [])
@@ -3463,7 +3472,7 @@ def extract_interior(
               read_fixtures(pdf_bytes, parsed.get("patalpos") or []))
         # Roll fixture-reader tokens into cost (voted: per-round; single: one).
         for _rm in _reader_call_metas(fx):
-            _append_extra_call(parsed, _rm)
+            _append_extra_call(parsed, _rm, reader="fixtures")
         if fx.get("status") == "ok":
             rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
                                            fx.get("counts") or {})
