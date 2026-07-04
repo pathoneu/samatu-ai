@@ -2363,19 +2363,65 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
 
     native_pdf: EXPERIMENT payload forwarded to every round (see
     _run_pass1_once). Byte-identical across rounds → cache-friendly.
+
+    EXPERIMENT (SAMATU_VOTING_MODELS="m1,m2,m3"): mixed-model voting — the
+    env lists the model PER round (its length overrides ``n``); rounds are
+    grouped so same-model rounds run consecutively (prompt cache is
+    per-model). Aggregation (vote_extraction) is untouched; per-round
+    models + tokens + cost land in _meta.voting_models.
     """
     from .vision.extraction_voter import vote_extraction
 
+    mixed_models = _mixed_voting_models()
+    if mixed_models:
+        round_models: list[str | None] = list(_group_rounds_by_model(mixed_models))
+        n = len(round_models)
+        print(f"[voting] mixed-model experiment: rounds → {round_models}")
+    else:
+        round_models = [None] * n
+
+    def _round_cost_usd(meta: dict) -> float | None:
+        """Price one round at ITS model's rates (best-effort — unknown model
+        rates must not fail the extraction)."""
+        try:
+            from pricing import calc_claude_cost_usd
+            return round(calc_claude_cost_usd(
+                input_tokens=int(meta.get("input_tokens") or 0),
+                output_tokens=int(meta.get("output_tokens") or 0),
+                cache_read_tokens=int(meta.get("cache_read_tokens") or 0),
+                cache_write_tokens=int(meta.get("cache_write_tokens") or 0),
+                model=meta.get("model") or "",
+            ), 4)
+        except Exception:
+            return None
+
     # Run all Pass-1 rounds FIRST so we know which page the rooms are on.
     runs: list[dict] = []
+    per_round_meta: list[dict] = []
     for i in range(n):
-        _emit({"event": "voting_round_started", "round": i + 1, "of": n})
-        p = _run_pass1_once(client, system, pages, native_pdf=native_pdf)
+        _emit({"event": "voting_round_started", "round": i + 1, "of": n,
+               "model": round_models[i]})
+        p = _run_pass1_once(client, system, pages, native_pdf=native_pdf,
+                            model=round_models[i])
         if p.get("status") == "error":
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
+            if mixed_models:
+                per_round_meta.append({"round": i + 1, "model": round_models[i],
+                                       "error": p.get("_error")})
             continue
         runs.append(p)
+        if mixed_models:
+            _rm = p.get("_meta") or {}
+            per_round_meta.append({
+                "round": i + 1,
+                "model": _rm.get("model") or round_models[i],
+                "input_tokens": int(_rm.get("input_tokens") or 0),
+                "output_tokens": int(_rm.get("output_tokens") or 0),
+                "cache_read_tokens": int(_rm.get("cache_read_tokens") or 0),
+                "cache_write_tokens": int(_rm.get("cache_write_tokens") or 0),
+                "cost_usd": _round_cost_usd(_rm),
+            })
         _emit({"event": "voting_round_completed", "round": i + 1,
                "rooms": len(p.get("patalpos") or [])})
 
@@ -2400,9 +2446,25 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         except Exception as exc:
             print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
 
+    def _attach_mixed_vote_meta(meta: dict) -> None:
+        """Record mixed-model provenance: per-round model/tokens/cost split
+        (each round priced at ITS OWN model's rates — pricing per-model caches
+        and rates differ) + the run order. Consumed by
+        pricing.calc_meta_cost_usd so cost aggregation stays correct."""
+        if not mixed_models:
+            return
+        meta["voting_models"] = per_round_meta
+        costs = [r["cost_usd"] for r in per_round_meta if r.get("cost_usd") is not None]
+        meta["voting_cost_usd"] = round(sum(costs), 4) if costs else None
+        meta.setdefault("experiment", {})["mixed_vote"] = {
+            "models_requested": mixed_models,
+            "models_run_order": [m for m in round_models],
+        }
+
     if len(runs) == 1:
         runs[0]["_voting"] = {"n_runs": 1, "degraded": True,
                               "note": "only 1 of N runs succeeded — unvoted"}
+        _attach_mixed_vote_meta(runs[0].setdefault("_meta", {}))
         return runs[0]
 
     voted = vote_extraction(runs, min_votes=2)
@@ -2413,6 +2475,7 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
     for _k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
         _tok_sum[_k] = sum(int((r.get("_meta") or {}).get(_k) or 0) for r in runs)
     voted["_meta"] = {**runs[0].get("_meta", {}), **_tok_sum, "voting_runs": len(runs)}
+    _attach_mixed_vote_meta(voted["_meta"])
     return voted
 
 

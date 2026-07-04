@@ -75,3 +75,48 @@ def calc_claude_cost_usd(
         + cache_read_tokens * in_rate * CACHE_READ_MULT
         + cache_write_tokens * in_rate * CACHE_WRITE_MULT[cache_ttl]
     )
+
+
+def calc_meta_cost_usd(
+    meta: dict,
+    default_model: str = "claude-opus-4-8",
+    cache_ttl: str = "1h",
+) -> float:
+    """Price a pipeline ``_meta`` block, mixed-model-voting aware.
+
+    Mixed-model voting runs (env ``SAMATU_VOTING_MODELS``, 2026-07-04
+    experiment #7) carry a per-round token/model split in
+    ``meta["voting_models"]`` — the top-level token sums span rounds on
+    DIFFERENT models, so pricing them at ``meta["model"]`` (the first
+    round's model) would be wrong. Here each round is priced at ITS OWN
+    model's rates and summed.
+
+    Single-model metas (no ``voting_models`` key) price the top-level token
+    sums at ``meta["model"]`` — byte-identical to the previous behaviour of
+    every call site.
+
+    Raises ValueError on an unknown model rate, same as calc_claude_cost_usd
+    — never silently price wrong.
+    """
+    rounds = [r for r in (meta.get("voting_models") or [])
+              if r.get("model") and not r.get("error")]
+    if rounds:
+        return sum(
+            calc_claude_cost_usd(
+                input_tokens=int(r.get("input_tokens") or 0),
+                output_tokens=int(r.get("output_tokens") or 0),
+                cache_read_tokens=int(r.get("cache_read_tokens") or 0),
+                cache_write_tokens=int(r.get("cache_write_tokens") or 0),
+                model=r["model"],
+                cache_ttl=cache_ttl,
+            )
+            for r in rounds
+        )
+    return calc_claude_cost_usd(
+        input_tokens=int(meta.get("input_tokens") or 0),
+        output_tokens=int(meta.get("output_tokens") or 0),
+        cache_read_tokens=int(meta.get("cache_read_tokens") or 0),
+        cache_write_tokens=int(meta.get("cache_write_tokens") or 0),
+        model=meta.get("model") or default_model,
+        cache_ttl=cache_ttl,
+    )

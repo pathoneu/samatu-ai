@@ -333,17 +333,14 @@ def save_extraction(project_id: str, extraction_id: str, response: dict,
                      page_count: int = 0) -> None:
     """Archive a Vision extraction response for cost analysis + audit."""
     # Sprint §AUDIT (2026-04-29): use shared pricing module (was duplicate
-    # constants in both backend and frontend).
-    from pricing import calc_claude_cost_usd
+    # constants in both backend and frontend). 2026-07-04: calc_meta_cost_usd
+    # is voting_models-aware — mixed-model voting rounds are priced per-round
+    # at each round's model rates; single-model metas price identically to
+    # the old inline call.
+    from pricing import calc_meta_cost_usd
     meta = response.get("_meta") or {}
     model = meta.get("model") or "claude-opus-4-8"
-    cost_usd = calc_claude_cost_usd(
-        input_tokens=meta.get("input_tokens") or 0,
-        output_tokens=meta.get("output_tokens") or 0,
-        cache_read_tokens=meta.get("cache_read_tokens") or 0,
-        cache_write_tokens=meta.get("cache_write_tokens") or 0,
-        model=model,
-    )
+    cost_usd = calc_meta_cost_usd(meta, default_model="claude-opus-4-8")
     cost_eur = cost_usd * 0.93  # rough USD→EUR
     with _conn() as c:
         c.execute("""
@@ -408,7 +405,7 @@ def record_usage(user_id: str | None, response: dict | None,
     against the user instead. (2026-06-19 commercial level-up.)"""
     if not user_id:
         return 0.0
-    from pricing import calc_claude_cost_usd
+    from pricing import calc_meta_cost_usd
     import uuid as _uuid
     meta = (response or {}).get("_meta") or {}
     in_t = int(meta.get("input_tokens") or 0)
@@ -418,10 +415,9 @@ def record_usage(user_id: str | None, response: dict | None,
     model = meta.get("model") or "claude-opus-4-8"
     if in_t == 0 and out_t == 0 and cache_t == 0 and cache_w == 0:
         return 0.0  # nothing billable to record
-    cost_eur = calc_claude_cost_usd(
-        input_tokens=in_t, output_tokens=out_t, cache_read_tokens=cache_t,
-        cache_write_tokens=cache_w, model=model,
-    ) * 0.93
+    # 2026-07-04: voting_models-aware — mixed-model rounds priced per-round
+    # at each round's model rates; identical result when the key is absent.
+    cost_eur = calc_meta_cost_usd(meta, default_model="claude-opus-4-8") * 0.93
     with _conn() as c:
         c.execute("""
             INSERT INTO usage_events

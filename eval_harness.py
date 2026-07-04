@@ -952,10 +952,16 @@ def _meta_rollup(parsed: dict, wall_time_s: float,
     }
     cost_usd = cost_eur = None
     pricing_note = None
-    if model:
+    if model or meta.get("voting_models"):
         try:
-            from pricing import calc_claude_cost_usd  # backend/ on sys.path
-            cost_usd = round(calc_claude_cost_usd(model=model, **tokens), 4)
+            # calc_meta_cost_usd is mixed-model-voting aware (2026-07-04):
+            # SAMATU_VOTING_MODELS runs carry per-round model/token splits in
+            # _meta.voting_models; each round is priced at ITS OWN model's
+            # rates. Single-model metas price exactly as before.
+            from pricing import calc_meta_cost_usd  # backend/ on sys.path
+            cost_usd = round(calc_meta_cost_usd(
+                {**tokens, "model": model,
+                 "voting_models": meta.get("voting_models")}), 4)
             cost_eur = round(cost_usd * 0.93, 4)  # same USD→EUR as db.py
         except Exception as exc:  # unknown model rate etc. — keep run scored
             pricing_note = f"cost unavailable: {exc}"
