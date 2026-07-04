@@ -62,6 +62,18 @@
       "value": 4.94,
       "confidence": "green",
       "source": "pasiūlymas item 7 (grindų skyrius)"
+    },
+    "walls_paint_total_m2": {
+      "value": 276.17,
+      "confidence": "derived",
+      "source": "derived: dazymo_walls_plus_ceilings_combined 388.01 − billed GKP ceilings 111.84 (item 1)",
+      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Beržų; single-tier ceiling project)."
+    },
+    "ceiling_paint_total_m2": {
+      "value": 111.84,
+      "confidence": "derived",
+      "source": "derived: billed GKP lubos 111.84 (item 1 'GKP ant lubų')",
+      "notes": "See walls_paint_total_m2 derivation note."
     }
   }
 }

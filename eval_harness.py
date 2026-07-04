@@ -95,6 +95,24 @@ def _gkp_lubu_only_for_type(parsed: dict, field: str) -> float:
     return round(total, 2)
 
 
+def _pozicijos_sum(parsed: dict, substr: str) -> float | None:
+    """Sum kiekis over pozicijos whose aprašymas contains ``substr``
+    (case-insensitive). Returns None when no matching pozicija exists —
+    the metric then scores as "missing", not as 0.
+
+    2026-07-04 mapping fix: several contractor truth lines (e.g. "Sienų
+    lyginimas Rotband") ARE produced by the pipeline — as pozicijos[]
+    line items, not santrauka keys — but the eval never read them, so
+    they scored as missing coverage on every project."""
+    total = 0.0
+    found = False
+    for item in (parsed.get("pozicijos") or []):
+        if substr in (item.get("aprasymas") or "").lower():
+            total += float(item.get("kiekis") or 0)
+            found = True
+    return round(total, 2) if found else None
+
+
 METRICS: dict[str, dict[str, Any]] = {
     "dazymo_walls_plus_ceilings_combined_m2": {
         # Truth 584.81 is samata items 16+17 (sienos + lubos paint, excluding
@@ -159,11 +177,63 @@ METRICS: dict[str, dict[str, Any]] = {
         "unit": "m",
         "tier": "category",
     },
-    # The following truth fields don't have a current extractor output — they
-    # surface as "MISSING" in the report and signal the next gap to close.
     "rotband_lyginimas_m2": {
+        # 2026-07-04: WAS accessor None ("not emitted as a single total") —
+        # but the pipeline emits it as the pozicija "Sienų lyginimas Knauf
+        # Rotband" (kiekis = 30% of walls_paint by default, override via
+        # _overrides.rotband_share). All 4 benchmark truths carry this line;
+        # the eval just never read it.
         "label": "Sienų lyginimas Rotband",
-        "accessor": lambda p: None,  # not currently emitted as a single total
+        "accessor": lambda p: _pozicijos_sum(p, "rotband"),
+        "unit": "m²",
+        "tier": "category",
+    },
+    # ── 2026-07-04 mapping-layer additions ────────────────────────────────
+    # Produced santrauka/pozicijos totals that contractor truths bill under
+    # per-project key names (wired in each ground_truth/<slug>/truth.json).
+    "plyteles_sienos_grindys_combined_m2": {
+        # Rangovas A bills wall+floor tiling as combined m² lines (per tile
+        # format). Compare against our grindys+sienos sum. Projects with
+        # per-surface truth (berzas) keep the split metrics above instead.
+        "label": "Plytelės (sienos+grindys kartu)",
+        "accessor": lambda p: round(
+            _santrauka_get(p, "plyteles_grindys_m2_total")
+            + _santrauka_get(p, "plyteles_sienos_m2_total"), 2),
+        "unit": "m²",
+        "tier": "category",
+    },
+    "pvc_grindys_m2": {
+        # Engine bucket = non-tile finished floor covering (rt_rules floor ==
+        # "parquet" family: PVC / parketas / laminatas). Truth wires the
+        # project's covering line (ciurliu/lazunu: PVC; bacveviciaus: parketas).
+        "label": "Grindų danga (PVC/parketas)",
+        "accessor": lambda p: _santrauka_get(p, "pvc_grindys_m2_total"),
+        "unit": "m²",
+        "tier": "category",
+    },
+    "isliginamasis_grindys_m2": {
+        "label": "Išlyginamasis grindims",
+        "accessor": lambda p: _santrauka_get(p, "isliginamasis_m2_total"),
+        "unit": "m²",
+        "tier": "category",
+    },
+    "grindjuostes_total_m": {
+        "label": "Grindjuostės (viso)",
+        "accessor": lambda p: _santrauka_get(p, "grindjuosciu_m_total"),
+        "unit": "m",
+        "tier": "category",
+    },
+    "pasleptu_duru_staktos_m": {
+        "label": "Paslėptų durų staktos",
+        "accessor": lambda p: _santrauka_get(p, "pasleptu_duru_staktu_m_total"),
+        "unit": "m",
+        "tier": "category",
+    },
+    "sienu_molio_tinkas_m2": {
+        # Produced per-room (molio_tinko_m2, split out of walls_paintable by
+        # the 2026-06-11 apdailos molio fix) but never summed into santrauka.
+        "label": "Sienų molio tinkas",
+        "accessor": lambda p: round(_sum_room_field(p, "molio_tinko_m2"), 2),
         "unit": "m²",
         "tier": "category",
     },
@@ -173,6 +243,9 @@ METRICS: dict[str, dict[str, Any]] = {
         "unit": "m",
         "tier": "category",
     },
+    # The following truth fields don't have a current extractor output — they
+    # surface as "MISSING" in the report and signal the next gap to close
+    # (unbuilt readers: symbol counts + waste volume).
     "rozetes_jungtukai_count": {
         "label": "Rozetės + jungtukai",
         "accessor": lambda p: None,
@@ -1205,6 +1278,108 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
     return 1 if breached else 0
 
 
+def _infer_slug_from_run_name(name: str) -> str | None:
+    """Infer the project slug from a run-dir name like
+    ``2026-07-03_11-16-18_berzas_vision``. Longest slug wins so future
+    slugs that contain another slug as a substring can't mis-match."""
+    hits = [slug for slug in REGISTRY if f"_{slug}_" in f"_{name}_"]
+    return max(hits, key=len) if hits else None
+
+
+def _rerun_deterministic_tail(parsed: dict) -> dict:
+    """Re-run the deterministic (zero-API) tail of the pipeline on a saved
+    extract's primitives:
+
+      1. height salvage from warnings[] (same gate as production — only when
+         the model structured no per-room heights),
+      2. height plausibility gate,
+      3. per-room recompute (calc_room_quantities via primitives),
+      4. santrauka recompute,
+      5. pozicijos rebuild.
+
+    This is exactly what a saved run would produce under the CURRENT
+    formula code — the honest way to measure formula fixes against
+    already-paid-for Vision reads without any API spend."""
+    vc = importlib.import_module("extractor.vision_call")
+    rooms = parsed.get("patalpos") or []
+
+    if rooms and not (parsed.get("lubu_auksciai") or {}):
+        from extractor.height_markers import salvage_heights_from_warnings
+        salvaged = salvage_heights_from_warnings(parsed.get("warnings") or [], rooms)
+        for r in rooms:
+            h = salvaged.get(r.get("pavadinimas"))
+            if h is None:
+                continue
+            old = float(r.get("lubu_aukstis_m") or 0)
+            # Upward-only, same spirit as production's asymmetric guard:
+            # salvage exists because "Vision saw a non-default height".
+            if h > old:
+                r["lubu_aukstis_m"] = float(h)
+                r["lubu_aukstis_saltinis"] = "warning_salvage_rescore"
+
+    try:
+        from extractor.universal_rules import apply_height_plausibility_gate
+        apply_height_plausibility_gate(rooms)
+    except Exception as exc:
+        print(f"  ⚠ plausibility gate failed during rescore: {exc}")
+
+    parsed = vc._recompute_per_room_via_python(parsed, None)
+    parsed = vc._recompute_santrauka(parsed)
+    parsed = vc._build_pozicijos_from_rooms(parsed)
+    return parsed
+
+
+def run_rescore(path_arg: str, project_id: str | None, *,
+                recompute: bool = False) -> int:
+    """Offline re-score of a SAVED run against the current truth mappings.
+
+    NO API calls, ever: reads <run_dir>/parsed.json, evaluates it against
+    the current METRICS + ground_truth/<slug>/truth.json, and writes
+    results_rescored.json (or results_rescored_recomputed.json with
+    --recompute) alongside the original. The original results.json is
+    never touched."""
+    path = Path(path_arg)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    if path.is_dir():
+        run_dir, parsed_path = path, path / "parsed.json"
+    else:
+        run_dir, parsed_path = path.parent, path
+    if not parsed_path.exists():
+        raise SystemExit(f"--rescore: no parsed.json at {parsed_path}")
+
+    slug = project_id or _infer_slug_from_run_name(run_dir.name)
+    if not slug:
+        raise SystemExit(
+            f"--rescore: cannot infer project slug from {run_dir.name!r}; "
+            f"pass --project explicitly")
+
+    truth = _load_truth(slug)
+    parsed = json.loads(parsed_path.read_text(encoding="utf-8"))
+    stage = "rescored_recomputed" if recompute else "rescored"
+    if recompute:
+        parsed = _rerun_deterministic_tail(parsed)
+
+    results = evaluate(parsed, truth)
+    per_room = evaluate_per_room(parsed, truth)
+    summary = _summarize(results)
+    print_report(slug, f"rescore({stage})", results, per_room)
+
+    out_path = run_dir / f"results_{stage}.json"
+    out_path.write_text(json.dumps({
+        "project": slug,
+        "mode": stage,
+        "rescore_of": str(parsed_path.relative_to(REPO_ROOT)),
+        "recompute": recompute,
+        "rescored_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        "summary": summary,
+        "metrics": [r.__dict__ for r in results],
+        "per_room": per_room,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n  Rescore → {out_path}")
+    return 0
+
+
 THAW_N = 3  # human-confirmed values needed before a frozen formula may re-derive
 
 
@@ -1243,7 +1418,9 @@ def human_corpus_summary() -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sąmatų AI evaluation harness")
-    ap.add_argument("--project", default="berzas", help="project id in REGISTRY")
+    ap.add_argument("--project", default=None,
+                    help="project id in REGISTRY (default: berzas; for "
+                         "--rescore it is inferred from the run-dir name)")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--use-gt-inputs", action="store_true",
                      help="bypass Vision; feed GT primitives into the deterministic engine")
@@ -1255,8 +1432,20 @@ def main() -> int:
                      help="multi-project mode: iterate ground_truth/registry.yaml, "
                           "diff AI totals (cached or use-gt-inputs) against each "
                           "project's gt_totals; emit baseline_multi.json")
+    grp.add_argument("--rescore", metavar="RUN_DIR_OR_PARSED_JSON",
+                     help="offline re-score a saved run's parsed.json against "
+                          "the CURRENT truth mappings — zero API calls. Writes "
+                          "results_rescored.json alongside (never overwrites "
+                          "results.json). Project slug is inferred from the "
+                          "run-dir name or taken from --project.")
     ap.add_argument("--all", action="store_true",
                     help="alias for --totals-only (spec compatibility)")
+    ap.add_argument("--recompute", action="store_true",
+                    help="with --rescore: re-run the deterministic tail "
+                         "(height salvage + plausibility gate + per-room "
+                         "recompute + santrauka + pozicijos) on the saved "
+                         "primitives before scoring — measures CURRENT "
+                         "formula code against saved Vision reads, no API")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -1325,6 +1514,9 @@ def main() -> int:
     if args.debug_project:
         return run_debug_project(args.debug_project)
 
+    if args.rescore:
+        return run_rescore(args.rescore, args.project, recompute=args.recompute)
+
     if args.totals_only or args.all:
         return run_totals_only_multi(
             GROUND_TRUTH_ROOT / "registry.yaml",
@@ -1339,7 +1531,7 @@ def main() -> int:
         mode = "vision"
     else:
         mode = "use_gt_inputs"  # default: cheapest, safest
-    return run_one(args.project, mode,
+    return run_one(args.project or "berzas", mode,
                    estimate_exterior=args.estimate_exterior,
                    apply_calibration=args.apply_calibration,
                    track_drift=args.track_drift,
