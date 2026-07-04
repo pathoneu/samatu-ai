@@ -4557,9 +4557,21 @@ async def generate_pdf(request: Request, data: dict):
     b_r = ParagraphStyle("br", fontName=_FONT_BOLD,   fontSize=8,  leading=10, alignment=TA_RIGHT)
     b_c = ParagraphStyle("bc", fontName=_FONT_BOLD,   fontSize=8,  leading=10, alignment=TA_CENTER)
 
+    # N3 (2026-07-04 pentest, pass 2): reportlab Paragraph() parses an XML-ish
+    # mini-markup, so any user/AI-controlled string fed in raw is an injection
+    # vector — `<a href="http://evil">x</a>` becomes a LIVE PDF link (phishing,
+    # and these strings can be AI-extracted from an untrusted drawing), and
+    # malformed markup (`<unclosed & tag`) throws inside doc.build() → HTTP 500.
+    # Escape every user/AI string with xml.sax.saxutils.escape before it reaches
+    # a Paragraph. Escaping at extraction covers both header and table renders.
+    from xml.sax.saxutils import escape as _xml_escape
+
+    def _esc(v) -> str:
+        return _xml_escape(str(v)) if v is not None else ""
+
     from datetime import date as _date
     projektas    = data.get("projektas", "Projektas")
-    imone        = (data.get("imone") or data.get("company_name") or "").strip()
+    imone        = _esc((data.get("imone") or data.get("company_name") or "").strip())
     doc_date     = _date.today().strftime("%Y-%m-%d")
     eilutes      = data.get("eilutes", [])
     prielaidos   = data.get("prielaidos") or {}
@@ -4590,17 +4602,19 @@ async def generate_pdf(request: Request, data: dict):
 
     # Branding + business-document fields (2026-06-19). All optional — KŽ exports
     # without branding render exactly as before (the info block is skipped).
+    # company_logo is a base64 image (decoded, not rendered as markup) — leave
+    # raw. Every other field below is rendered inside a Paragraph → escape (N3).
     company_logo = (data.get("company_logo") or "").strip()
-    imones_kodas = (data.get("imones_kodas") or "").strip()
-    pvm_kodas    = (data.get("pvm_kodas") or "").strip()
-    adresas      = (data.get("adresas") or "").strip()
-    telefonas    = (data.get("telefonas") or "").strip()
-    el_pastas    = (data.get("el_pastas") or "").strip()
-    iban         = (data.get("iban") or "").strip()
-    uzsakovas    = (data.get("uzsakovas") or "").strip()
-    objektas     = (data.get("objektas") or "").strip()
-    pasiulymo_nr = (data.get("pasiulymo_nr") or "").strip()
-    galioja_iki  = (data.get("galioja_iki") or "").strip()
+    imones_kodas = _esc((data.get("imones_kodas") or "").strip())
+    pvm_kodas    = _esc((data.get("pvm_kodas") or "").strip())
+    adresas      = _esc((data.get("adresas") or "").strip())
+    telefonas    = _esc((data.get("telefonas") or "").strip())
+    el_pastas    = _esc((data.get("el_pastas") or "").strip())
+    iban         = _esc((data.get("iban") or "").strip())
+    uzsakovas    = _esc((data.get("uzsakovas") or "").strip())
+    objektas     = _esc((data.get("objektas") or "").strip())
+    pasiulymo_nr = _esc((data.get("pasiulymo_nr") or "").strip())
+    galioja_iki  = _esc((data.get("galioja_iki") or "").strip())
     if not galioja_iki:
         from datetime import timedelta as _timedelta
         galioja_iki = (_date.today() + _timedelta(days=30)).strftime("%Y-%m-%d")
@@ -4643,8 +4657,8 @@ async def generate_pdf(request: Request, data: dict):
                                textColor=colors.HexColor("#333333"), leading=13,
                                alignment=TA_RIGHT)
 
-    _atstovas = (data.get("vadovas") or data.get("atstovas")
-                 or data.get("kontaktinis_asmuo") or "").strip()
+    _atstovas = _esc((data.get("vadovas") or data.get("atstovas")
+                      or data.get("kontaktinis_asmuo") or "").strip())
 
     # Left identity cell: logo (if uploaded) -> company name -> person + contacts.
     _logo_img = _logo_flowable(company_logo)
@@ -4772,7 +4786,7 @@ async def generate_pdf(request: Request, data: dict):
             current_section = sec
             ri = len(table_data)
             table_data.append([
-                Paragraph(sec, ParagraphStyle(
+                Paragraph(_esc(sec), ParagraphStyle(  # N3: section name is user/AI text
                     "sec", fontName=_FONT_BOLD, fontSize=8,
                     textColor=SEC_FG,
                 )),
@@ -4792,9 +4806,9 @@ async def generate_pdf(request: Request, data: dict):
         bg = colors.white if data_idx % 2 == 0 else LGRAY
         suma_val = e.get("suma", 0)
         table_data.append([
-            Paragraph(str(e.get("nr",        "")), n_),
-            Paragraph(str(e.get("aprasymas", "")), n_),
-            Paragraph(str(e.get("mato_vnt",  "")), n_c),
+            Paragraph(_esc(e.get("nr",        "")), n_),   # N3: escape user/AI row text
+            Paragraph(_esc(e.get("aprasymas", "")), n_),
+            Paragraph(_esc(e.get("mato_vnt",  "")), n_c),
             Paragraph(_n(e.get("kiekis", 0)),       n_r),
             Paragraph(_n(e.get("kaina",  0)),       n_r),
             Paragraph(_n(suma_val),
