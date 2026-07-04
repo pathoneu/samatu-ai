@@ -110,6 +110,26 @@ def _check_user_spend_cap(user_id: str | None) -> None:
             ),
         )
 
+
+def _check_user_quota(user_id: str | None) -> None:
+    """W3 billing: raise 402 when a logged-in user is over their plan's monthly
+    project quota. HARD no-op when BILLING_ENABLED != '1' (pre-billing
+    behavior) or when there is no user_id. Additive to _check_user_spend_cap —
+    it does not replace the € spend cap, which still runs regardless of flag."""
+    from billing.flag import billing_enabled
+    if not billing_enabled() or not user_id:
+        return
+    from billing.entitlements import quota_exceeded
+    user = db.get_user_by_id(user_id)
+    if user and quota_exceeded(user):
+        raise HTTPException(
+            status_code=402,
+            detail={"error": "quota_exceeded", "plan": user.get("plan"),
+                    "message": "Išnaudotas mėnesio projektų limitas. "
+                               "Atnaujinkite planą."},
+        )
+
+
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     """Sliding-window rate limit. Raises 429 on overflow.
 

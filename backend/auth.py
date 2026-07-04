@@ -192,8 +192,12 @@ def require_billable_user(request: Request) -> dict:
     it is imported lazily so this module stays free of a circular import."""
     user = require_user(request)
     try:
-        from main import _check_user_spend_cap, _reserve_billable
+        from main import _check_user_spend_cap, _reserve_billable, _check_user_quota
         _check_user_spend_cap(user["id"])
+        # W3 billing (2026-07-04): additive plan-quota gate. Hard no-op when
+        # BILLING_ENABLED != '1' (today's behavior); raises 402 when a user is
+        # over their monthly project quota. Runs alongside the € spend cap.
+        _check_user_quota(user["id"])
         # 2026-06-19 bug-hunt: also record the pre-charge so the cap actually
         # counts these api/* router calls (vision_fill / lasso_rerun / symbols),
         # which previously ran the cap check but never wrote any usage.
