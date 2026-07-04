@@ -13,13 +13,14 @@ import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 import db
 from auth import require_user
 from billing import stripe_client
 from billing.flag import billing_enabled
+from billing.invoice import build_invoice_fields, render_pvm_invoice_pdf
 from billing.plans import PLAN_BY_ID, PUBLIC_PLANS
 
 router = APIRouter(prefix="/api/billing/v2", tags=["billing"])
@@ -246,6 +247,9 @@ def _handle_checkout_completed(event: dict) -> None:
     mode = obj.get("mode")
     if mode == "payment":
         db.grant_oneoff_credit(user_id)
+        # Best-effort: a €12 one-off is a taxable sale → emit its PVM invoice.
+        # A render/storage failure must NOT undo the credit or 500 the webhook.
+        _emit_invoice(user_id, PLAN_BY_ID["oneoff"])
         return
     if mode == "subscription":
         plan_id = _plan_from_session(obj)
@@ -381,6 +385,77 @@ def _handle_subscription_deleted(event: dict) -> None:
     )
 
 
+def _handle_invoice_paid(event: dict) -> None:
+    """`invoice.paid` — a subscription period was paid. Emit the PVM invoice for
+    the paid plan (resolved from the invoice line's price). Best-effort: never
+    crashes the webhook. Resolve the user via `customer`."""
+    obj = _obj(event)
+    user = _user_from_customer(obj, "invoice.paid")
+    if not user:
+        return
+    plan = _plan_from_invoice(obj)
+    if plan is None:
+        log.info("invoice.paid: unresolvable plan (unmapped price) — skipping emit")
+        return
+    _emit_invoice(user["id"], plan)
+
+
+def _plan_from_invoice(invoice_obj: dict) -> dict | None:
+    """Resolve the paid plan dict from an `invoice.paid` object's line price
+    (lines.data[].price). None when absent / unmapped."""
+    price_to_plan = _price_to_plan_map()
+    lines = (invoice_obj.get("lines") or {})
+    for line in (lines.get("data") or []):
+        price = (line or {}).get("price") or {}
+        pid = price.get("id") if isinstance(price, dict) else price
+        if pid and pid in price_to_plan:
+            return PLAN_BY_ID.get(price_to_plan[pid])
+    return None
+
+
+def _emit_invoice(user_id: str, plan: dict) -> None:
+    """Build + render + persist + index a PVM sąskaita-faktūra for one paid item.
+
+    BEST-EFFORT by contract: this runs inside the webhook, which must return 200
+    regardless. Any failure (missing user, render error, storage error) is
+    logged and swallowed — it must never undo the credit/plan mirror or 500 the
+    webhook. The item is the purchased plan (price from PLAN_BY_ID)."""
+    try:
+        user = db.get_user_by_id(user_id)
+        if not user:
+            log.warning("invoice emit: unresolvable user %r", user_id)
+            return
+        import uuid
+        from storage import get_storage, invoice_key
+
+        inv_id = str(uuid.uuid4())
+        number = db.next_invoice_number()
+        item = {
+            "description": f"Pathon {plan['name']}",
+            "qty": 1,
+            "unit_price_eur": float(plan["price_eur"]),
+        }
+        fields = build_invoice_fields(
+            user, item, number=number, issued_at=_today_iso())
+        pdf = render_pvm_invoice_pdf(fields)
+        key = invoice_key(inv_id)
+        get_storage().put(key, pdf, "application/pdf")
+        db.insert_invoice(
+            id=inv_id, user_id=user_id, number=number,
+            vat_mode=fields["vat_mode"], total_eur=fields["total_eur"],
+            pdf_path=key)
+        log.info("Emitted invoice %s (%s) for user %s", number,
+                 fields["vat_mode"], user_id)
+    except Exception:  # noqa: BLE001 — emission is best-effort; never break the webhook.
+        log.exception("invoice emit failed for user %s (plan %s) — continuing",
+                      user_id, (plan or {}).get("id"))
+
+
+def _today_iso() -> str:
+    import time as _time
+    return _time.strftime("%Y-%m-%d", _time.gmtime())
+
+
 def _handle_invoice_payment_failed(event: dict) -> None:
     """`invoice.payment_failed` — mark past_due but KEEP the plan/access. Grace
     lasts until Stripe emits customer.subscription.deleted."""
@@ -397,5 +472,47 @@ _WEBHOOK_HANDLERS: dict = {
     "checkout.session.completed": _handle_checkout_completed,
     "customer.subscription.updated": _handle_subscription_updated,
     "customer.subscription.deleted": _handle_subscription_deleted,
+    "invoice.paid": _handle_invoice_paid,
     "invoice.payment_failed": _handle_invoice_payment_failed,
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Invoice retrieval — OWNER-SCOPED (Task 14). require_user regardless of the
+# billing flag (an owner must always be able to fetch their own invoices). The
+# gate is db.get_invoice(id, user_id=...), which returns None for a non-owner —
+# we map that to 404 (NOT 403), mirroring the app's no-existence-leak IDOR
+# convention (get_project / the file-router 404s).
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/invoices")
+def list_invoices(user: dict = Depends(require_user)) -> dict:
+    """The CALLER's invoices only (never another user's — parameterized on
+    user['id'])."""
+    rows = db.list_invoices(user["id"])
+    return {"invoices": [
+        {"id": r["id"], "number": r["number"], "vat_mode": r["vat_mode"],
+         "total_eur": r["total_eur"], "created_at": r["created_at"]}
+        for r in rows
+    ]}
+
+
+@router.get("/invoices/{invoice_id}")
+def get_invoice_pdf(invoice_id: str, user: dict = Depends(require_user)):
+    """Stream one invoice PDF, ONLY if owned by the caller — else 404 (no leak).
+
+    Ownership is enforced in the query (db.get_invoice returns None when the
+    invoice's user_id != caller), so a cross-user id is indistinguishable from a
+    non-existent one."""
+    inv = db.get_invoice(invoice_id, user_id=user["id"])
+    if not inv:
+        raise HTTPException(status_code=404, detail="Sąskaita nerasta")
+    from storage import get_storage, invoice_key
+    data = get_storage().get(inv.get("pdf_path") or invoice_key(invoice_id))
+    if data is None:
+        raise HTTPException(status_code=404, detail="Sąskaita nerasta")
+    return Response(
+        content=data, media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f'inline; filename="{inv.get("number") or invoice_id}.pdf"'})

@@ -844,6 +844,21 @@ def _migrate_schema() -> None:
                 event_id    TEXT PRIMARY KEY,
                 received_at TEXT NOT NULL
             )""")
+        # invoices: one row per emitted PVM sąskaita-faktūra (Task 14). The PDF
+        # bytes live in object storage (invoices/<id>.pdf); this row is the
+        # owner-scoped index + numbering ledger. user_id is NOT NULL so every
+        # invoice has an owner (drives the IDOR-safe get_invoice accessor).
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS invoices (
+                id          TEXT PRIMARY KEY,
+                user_id     TEXT NOT NULL,
+                number      TEXT,
+                vat_mode    TEXT,
+                total_eur   REAL,
+                pdf_path    TEXT,
+                created_at  TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_invoices_user_time ON invoices(user_id, created_at)")
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────
@@ -918,6 +933,61 @@ def set_user_plan(user_id: str, plan: str | None = None,
     params.append(user_id)
     with _conn() as c:
         c.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", params)
+
+
+# ── W3 billing: PVM sąskaita-faktūra persistence (Task 14) ───────────────────
+
+def next_invoice_number() -> str:
+    """Sequential invoice number, `PATHON-{year}-{6-digit seq}`. seq is derived
+    from the current invoice count (+1), zero-padded — simple + monotonic. Not
+    strictly gap-free across years, but always increasing and human-readable.
+    Called just before insert_invoice; the tiny race window (two concurrent
+    emissions) is acceptable for a dormant one-emission-per-payment path and the
+    `id` PK is the true uniqueness guarantee."""
+    year = time.strftime("%Y", time.gmtime())
+    with _conn() as c:
+        row = c.execute("SELECT COUNT(*) AS n FROM invoices").fetchone()
+    seq = int(row["n"] or 0) + 1
+    return f"PATHON-{year}-{seq:06d}"
+
+
+def insert_invoice(id: str, user_id: str, number: str, vat_mode: str,
+                   total_eur: float, pdf_path: str) -> None:
+    """Insert one emitted-invoice row. The PDF bytes live at `pdf_path` in object
+    storage; this row is the owner-scoped index."""
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO invoices (id, user_id, number, vat_mode, total_eur, "
+            "pdf_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (id, user_id, number, vat_mode, total_eur, pdf_path, _now_iso()),
+        )
+
+
+def get_invoice(invoice_id: str, user_id: str | None = None) -> dict | None:
+    """Fetch an invoice row. When user_id is given, enforce ownership — returns
+    None if the invoice is not owned by that user (the IDOR-safe accessor;
+    mirrors get_project). None also for an unknown id."""
+    with _conn() as c:
+        if user_id:
+            row = c.execute(
+                "SELECT * FROM invoices WHERE id = ? AND user_id = ?",
+                (invoice_id, user_id)).fetchone()
+        else:
+            row = c.execute(
+                "SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_invoices(user_id: str) -> list[dict]:
+    """All invoices owned by user_id, newest first. Never leaks another user's
+    rows (parameterized on user_id). Empty list for an unknown user."""
+    if not user_id:
+        return []
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM invoices WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)).fetchall()
+        return [dict(r) for r in rows]
 
 
 # ── SM04 share-link helpers ──────────────────────────────────────────────────

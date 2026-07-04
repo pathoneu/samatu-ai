@@ -163,3 +163,9 @@ def reset_storage_for_test() -> None:
 
 def pdf_key(project_id: str) -> str:
     return f"projects/{project_id}.pdf"
+
+
+def invoice_key(invoice_id: str) -> str:
+    """Object-storage key for an emitted PVM sąskaita-faktūra PDF (W3 Task 14).
+    Same backend selection as pdf_key (R2 in prod, local disk in dev/tests)."""
+    return f"invoices/{invoice_id}.pdf"
