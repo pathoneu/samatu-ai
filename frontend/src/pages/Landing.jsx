@@ -30,6 +30,7 @@ import {
   animate,
 } from 'framer-motion';
 import { PathonMark } from '@/components/layout/Logo';
+import { openCookieSettings } from '@/components/CookieBanner';
 
 // ─── Number formatting (LT convention: comma decimals) ──────────────
 
@@ -856,10 +857,17 @@ function LandingFooter() {
         <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-start
                         sm:items-center justify-between gap-4 text-[12.5px] text-muted-foreground">
           <div>© 2026 Pathon</div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link to="/privacy" className="hover:text-foreground transition-colors">Privatumas</Link>
             <Link to="/cookies" className="hover:text-foreground transition-colors">Slapukai</Link>
             <Link to="/terms" className="hover:text-foreground transition-colors">Sąlygos</Link>
+            <button
+              type="button"
+              onClick={openCookieSettings}
+              className="hover:text-foreground transition-colors"
+            >
+              Slapukų nustatymai
+            </button>
           </div>
         </div>
       </div>

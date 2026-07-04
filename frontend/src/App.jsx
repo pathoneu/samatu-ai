@@ -21,6 +21,7 @@ const PriceLists = lazy(() => import('@/pages/PriceLists'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Register = lazy(() => import('@/pages/Register'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
+const Cookies = lazy(() => import('@/pages/Cookies'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
@@ -91,6 +92,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/cookies" element={<Cookies />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/share/:token" element={<SharedProject />} />
 
