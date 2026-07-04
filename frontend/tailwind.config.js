@@ -5,9 +5,9 @@ module.exports = {
   theme: {
   	extend: {
   		fontFamily: {
-  			sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
+  			sans: ['var(--font-sans)', 'Hanken Grotesk', 'system-ui', 'sans-serif'],
   			mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
-  			display: ['var(--font-display)', 'Space Grotesk', 'Inter', 'sans-serif'],
+  			display: ['var(--font-display)', 'Bricolage Grotesque', 'Hanken Grotesk', 'sans-serif'],
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -48,6 +48,10 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
+  			'ink-2': 'hsl(var(--ink-2))',
+  			'terracotta-deep': 'hsl(var(--terracotta-deep))',
+  			'accent-sand': 'hsl(var(--accent-sand))',
+  			'border-strong': 'hsl(var(--border-strong))',
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',

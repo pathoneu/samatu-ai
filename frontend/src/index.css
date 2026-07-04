@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,67 +6,73 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', sans-serif;
+    --font-sans: 'Hanken Grotesk', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
-    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', sans-serif;
 
     /* ──────────────────────────────────────────────────────────────────────
-       Pathon — Brand Design Tokens (2026-07-03)
-       Warm paper, graphite ink, one confident indigo accent.
-       Restraint of Linear / Vercel / Stripe with a construction-document edge.
+       Pathon — Brand Design Tokens (2026-07-04)
+       Terracotta + graphite on warm paper. A precise architectural document
+       that's alive: clay accent, warm-stone neutrals, blueprint hairlines,
+       JetBrains Mono numerals as the estimator-precision signature.
        ────────────────────────────────────────────────────────────────────── */
 
-    /* Surfaces — warm paper, near-white cards */
-    --background: 60 20% 98%;            /* #FAFAF8 warm paper page */
-    --foreground: 225 14% 6%;            /* #0E0F12 graphite ink */
-    --card: 0 0% 100%;                   /* #FFFFFF cards/panels */
-    --card-foreground: 225 14% 6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 225 14% 6%;
+    /* Surfaces — warm paper, paper-1 cards */
+    --background: 40 33% 92%;            /* #F3EEE4 warm paper page */
+    --foreground: 38 18% 9%;             /* #1A1712 warm near-black ink */
+    --card: 43 41% 97%;                  /* #FBF9F4 paper-1 cards/panels */
+    --card-foreground: 38 18% 9%;
+    --popover: 43 41% 97%;
+    --popover-foreground: 38 18% 9%;
 
-    /* Accent — confident indigo (Pathon brand) */
-    --primary: 231 64% 47%;              /* #2B44C7 confident indigo */
+    /* Accent — clay terracotta (Pathon brand) */
+    --primary: 15 64% 50%;               /* #D2572E clay terracotta */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — crisp cool-neutral sub-surface */
-    --secondary: 240 8% 95%;             /* #F1F1F3 sub-surface */
-    --secondary-foreground: 225 12% 18%;
+    /* Secondary — warm stone sub-surface */
+    --secondary: 40 30% 88%;             /* #E9E3D7 warm stone */
+    --secondary-foreground: 41 11% 26%;
 
-    /* Muted — cool mid-tone for soft text + hover backgrounds */
-    --muted: 240 8% 95%;                 /* #F1F1F3 hover bg */
-    --muted-foreground: 232 6% 42%;      /* #66687A cool muted text */
+    /* Muted — warm stone for soft text + hover backgrounds */
+    --muted: 40 30% 88%;                 /* #E9E3D7 hover bg */
+    --muted-foreground: 37 10% 40%;      /* #6E675C warm muted text */
 
     /* Accent (component-state, NOT brand) */
-    --accent: 240 9% 92%;                /* #E9E9ED selected row */
-    --accent-foreground: 225 12% 18%;
+    --accent: 40 28% 85%;                /* selected row — deeper stone */
+    --accent-foreground: 41 11% 26%;
 
     /* Destructive (errors / red dots) — desaturated brick */
-    --destructive: 0 39% 51%;            /* #b94a4a */
+    --destructive: 0 45% 48%;            /* warm brick red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders — crisp cool-neutral hairlines */
-    --border: 240 9% 89%;                /* #E1E1E6 default 1px */
-    --input: 240 9% 89%;
-    --ring: 231 64% 47%;                 /* match primary for focus rings */
+    /* Borders — warm hairlines */
+    --border: 40 24% 83%;                /* #DED7C8 default 1px */
+    --input: 40 24% 83%;
+    --ring: 15 64% 50%;                  /* match primary for focus rings */
+
+    /* Extra brand tokens (per 2026-07-04 identity) */
+    --ink-2: 41 11% 26%;                 /* #4A453C warm graphite mid */
+    --terracotta-deep: 15 71% 41%;       /* #B4441F pressed / deep clay */
+    --accent-sand: 41 37% 69%;           /* #C9B896 warm sand accent */
 
     /* Charts (kept for future analytics) */
-    --chart-1: 231 64% 47%;
-    --chart-2: 232 6% 42%;
-    --chart-3: 145 47% 33%;              /* green */
-    --chart-4: 30 60% 47%;               /* amber */
-    --chart-5: 225 14% 6%;
+    --chart-1: 15 64% 50%;               /* terracotta */
+    --chart-2: 37 10% 40%;               /* warm muted */
+    --chart-3: 145 40% 34%;              /* green */
+    --chart-4: 41 37% 55%;               /* sand */
+    --chart-5: 38 18% 9%;
 
-    --radius: 0.5rem;                    /* softer paper-feel corners */
+    --radius: 0.625rem;                  /* ~10px warm paper corners */
 
-    /* Sidebar — light cool paper (matches narrow icon rail) */
-    --sidebar-background: 60 20% 99%;     /* #FDFDFC — paper-1 */
-    --sidebar-foreground: 232 6% 42%;     /* cool muted ink for icons */
-    --sidebar-primary: 231 64% 47%;       /* indigo accent */
+    /* Sidebar — warm paper (matches narrow icon rail) */
+    --sidebar-background: 43 41% 97%;     /* paper-1 */
+    --sidebar-foreground: 37 10% 40%;     /* warm muted ink for icons */
+    --sidebar-primary: 15 64% 50%;        /* terracotta accent */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 9% 92%;         /* selected item bg */
-    --sidebar-accent-foreground: 225 14% 6%; /* graphite when active */
-    --sidebar-border: 240 9% 89%;         /* match main border */
-    --sidebar-ring: 231 64% 47%;
+    --sidebar-accent: 40 28% 85%;         /* selected item bg */
+    --sidebar-accent-foreground: 38 18% 9%; /* ink when active */
+    --sidebar-border: 40 24% 83%;         /* match main border */
+    --sidebar-ring: 15 64% 50%;
 
     /* ──── Provenance dots (data source indicator, 3-color system) ──── */
     --source-table: 145 47% 33%;         /* #2f7d5b — slate green: from eksplikacija/spec table */
@@ -79,10 +85,10 @@
     --conf-low:  0 39% 51%;              /* red — fallback default */
 
     /* Surface elevation tiers */
-    --bg-1: 60 20% 99%;                  /* #FDFDFC slight elevation */
-    --surface-2: 240 8% 95%;             /* hover */
-    --surface-3: 240 9% 92%;             /* selected/deep hover */
-    --border-strong: 240 8% 80%;         /* #C7C8CF input/button border */
+    --bg-1: 43 41% 97%;                  /* paper-1 slight elevation */
+    --surface-2: 40 30% 88%;             /* hover */
+    --surface-3: 40 28% 85%;             /* selected/deep hover */
+    --border-strong: 40 22% 74%;         /* warm stone input/button border */
 
     /* ──── Viewer chrome (PDF viewer ONLY — Kreo-style dark navy with cyan
             accents). Drawing area stays white; the surrounding chrome
@@ -100,38 +106,38 @@
   /* Dark mode kept identical to light for now — app is light-only by design.
      Kept block so any `.dark`-prefixed components don't break. */
   .dark {
-    --background: 60 20% 98%;
-    --foreground: 225 14% 6%;
-    --card: 0 0% 100%;
-    --card-foreground: 225 14% 6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 225 14% 6%;
-    --primary: 231 64% 47%;
+    --background: 40 33% 92%;
+    --foreground: 38 18% 9%;
+    --card: 43 41% 97%;
+    --card-foreground: 38 18% 9%;
+    --popover: 43 41% 97%;
+    --popover-foreground: 38 18% 9%;
+    --primary: 15 64% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 8% 95%;
-    --secondary-foreground: 225 12% 18%;
-    --muted: 240 8% 95%;
-    --muted-foreground: 232 6% 42%;
-    --accent: 240 9% 92%;
-    --accent-foreground: 225 12% 18%;
-    --destructive: 0 39% 51%;
+    --secondary: 40 30% 88%;
+    --secondary-foreground: 41 11% 26%;
+    --muted: 40 30% 88%;
+    --muted-foreground: 37 10% 40%;
+    --accent: 40 28% 85%;
+    --accent-foreground: 41 11% 26%;
+    --destructive: 0 45% 48%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 9% 89%;
-    --input: 240 9% 89%;
-    --ring: 231 64% 47%;
-    --chart-1: 231 64% 47%;
-    --chart-2: 232 6% 42%;
-    --chart-3: 145 47% 33%;
-    --chart-4: 30 60% 47%;
-    --chart-5: 225 14% 6%;
-    --sidebar-background: 60 20% 99%;
-    --sidebar-foreground: 232 6% 42%;
-    --sidebar-primary: 231 64% 47%;
+    --border: 40 24% 83%;
+    --input: 40 24% 83%;
+    --ring: 15 64% 50%;
+    --chart-1: 15 64% 50%;
+    --chart-2: 37 10% 40%;
+    --chart-3: 145 40% 34%;
+    --chart-4: 41 37% 55%;
+    --chart-5: 38 18% 9%;
+    --sidebar-background: 43 41% 97%;
+    --sidebar-foreground: 37 10% 40%;
+    --sidebar-primary: 15 64% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 9% 92%;
-    --sidebar-accent-foreground: 225 14% 6%;
-    --sidebar-border: 240 9% 89%;
-    --sidebar-ring: 231 64% 47%;
+    --sidebar-accent: 40 28% 85%;
+    --sidebar-accent-foreground: 38 18% 9%;
+    --sidebar-border: 40 24% 83%;
+    --sidebar-ring: 15 64% 50%;
   }
 }
 
@@ -212,174 +218,250 @@
   background: hsl(var(--primary) / 0.05);
 }
 
-/* ──────────────────────────────────────────────────────────────────────
-   Landing page — Pathon brand aesthetic (2026-07-03).
-   Confident indigo accent, blueprint-hairline precision, Space Grotesk
-   display hierarchy. Restraint of Linear / Vercel / Stripe.
-   ────────────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════
+   Landing page — Pathon terracotta identity (2026-07-04).
+   A precise architectural document that's alive: clay accent on warm
+   paper, paper grain + blueprint hairlines, warm layered shadows,
+   Bricolage Grotesque display, JetBrains Mono numerals.
+   Reference bar: Linear / Vercel / Framer.
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* Highlighted noun pill — underlines one word per H1/H2 with an indigo
-   hairline instead of a filled box (calmer, more editorial). */
-.h-pill {
-  display: inline;
+/* Root wrapper for the landing — establishes the warm base + paper grain.
+   The grain is a tiled fractal-noise SVG at very low opacity; it sits
+   fixed behind everything so scrolling reveals subtle tooth in the paper. */
+.pathon-landing {
+  position: relative;
+  isolation: isolate;
+}
+.pathon-landing::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.10, 0 0 0 0 0.09, 0 0 0 0 0.07, 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.pathon-landing > * { position: relative; z-index: 1; }
+
+/* Highlighted noun — terracotta ink, no filled box (editorial). */
+.h-accent {
   color: hsl(var(--primary));
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
-/* Blueprint hairline grid — faint construction-paper texture for section
-   backgrounds. Layered on top of --card / --background. */
+/* Blueprint hairline grid — faint construction-paper texture. Two scales:
+   fine 26px cells + a heavier 130px major line, like drafting paper. */
 .blueprint-grid {
   background-image:
-    linear-gradient(hsl(var(--foreground) / 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.028) 1px, transparent 1px);
-  background-size: 28px 28px;
+    linear-gradient(hsl(var(--foreground) / 0.030) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.030) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+.blueprint-grid-major {
+  background-image:
+    linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+    linear-gradient(hsl(var(--foreground) / 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.022) 1px, transparent 1px);
+  background-size: 130px 130px, 130px 130px, 26px 26px, 26px 26px;
 }
 
-/* Primary CTA — solid indigo, subtle depth, precise hover lift */
+/* Primary CTA — solid clay terracotta, warm depth, precise press. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  font-weight: 500;
-  border-radius: calc(var(--radius) - 1px);
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.08),
-              inset 0 1px 0 hsl(0 0% 100% / 0.12);
-  transition: transform 140ms cubic-bezier(.16,1,.3,1),
-              box-shadow 140ms cubic-bezier(.16,1,.3,1),
-              background 140ms ease;
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow:
+    0 1px 2px hsl(var(--terracotta-deep) / 0.30),
+    0 6px 16px -8px hsl(var(--terracotta-deep) / 0.45),
+    inset 0 1px 0 hsl(0 0% 100% / 0.20);
+  transition: transform 150ms cubic-bezier(.16,1,.3,1),
+              box-shadow 150ms cubic-bezier(.16,1,.3,1),
+              background 150ms ease;
 }
 .btn-primary:hover {
-  background: hsl(231 64% 43%);
-  box-shadow: 0 3px 10px hsl(var(--primary) / 0.28),
-              inset 0 1px 0 hsl(0 0% 100% / 0.12);
-  transform: translateY(-1px);
+  background: hsl(var(--terracotta-deep));
+  box-shadow:
+    0 2px 4px hsl(var(--terracotta-deep) / 0.35),
+    0 12px 28px -10px hsl(var(--terracotta-deep) / 0.55),
+    inset 0 1px 0 hsl(0 0% 100% / 0.22);
+  transform: translateY(-1.5px);
 }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active { transform: translateY(0.5px) scale(0.99); }
 
-/* Secondary / ghost button — hairline border, paper fill */
+/* Secondary / ghost button — warm hairline border, paper fill */
 .btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   background: hsl(var(--card));
   color: hsl(var(--foreground));
-  font-weight: 500;
+  font-weight: 600;
   border: 1px solid hsl(var(--border-strong));
-  border-radius: calc(var(--radius) - 1px);
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms cubic-bezier(.16,1,.3,1);
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+  transition: border-color 150ms ease, background 150ms ease,
+              transform 150ms cubic-bezier(.16,1,.3,1),
+              box-shadow 150ms ease;
 }
 .btn-ghost:hover {
-  border-color: hsl(var(--foreground) / 0.35);
-  background: hsl(var(--muted));
-  transform: translateY(-1px);
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--card));
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px -10px hsl(var(--foreground) / 0.22);
 }
+.btn-ghost:active { transform: translateY(0.5px); }
 
-/* Product frame — the hero visual "device" chrome. Paper card, hairline
-   border, soft layered shadow, thin indigo top accent. */
+/* Underline-draw link — hairline sweeps in from the left on hover. */
+.link-draw {
+  position: relative;
+  transition: color 150ms ease;
+}
+.link-draw::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -2px;
+  height: 1.5px; width: 100%;
+  background: hsl(var(--primary));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms cubic-bezier(.16,1,.3,1);
+}
+.link-draw:hover { color: hsl(var(--foreground)); }
+.link-draw:hover::after { transform: scaleX(1); }
+
+/* Product frame — the hero visual "device" chrome. Paper card, warm
+   layered shadow, thin terracotta top accent. */
 .product-frame {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   box-shadow:
     0 1px 1px hsl(var(--foreground) / 0.04),
-    0 8px 24px -12px hsl(var(--foreground) / 0.18),
-    0 24px 48px -24px hsl(var(--foreground) / 0.12);
+    0 10px 30px -14px hsl(38 30% 20% / 0.28),
+    0 30px 60px -30px hsl(38 30% 20% / 0.20);
 }
 
-/* Fade-up-on-scroll utility (paired with useInView -> .reveal.in) */
-.reveal {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 620ms cubic-bezier(.16,1,.3,1),
-              transform 620ms cubic-bezier(.16,1,.3,1);
+/* Card lift — tactile hover for feature / step / pricing cards. */
+.card-lift {
+  transition: transform 200ms cubic-bezier(.16,1,.3,1),
+              box-shadow 200ms cubic-bezier(.16,1,.3,1),
+              border-color 200ms ease;
 }
-.reveal.in { opacity: 1; transform: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+.card-lift:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.35);
+  box-shadow:
+    0 1px 1px hsl(var(--foreground) / 0.04),
+    0 14px 34px -18px hsl(38 30% 20% / 0.30);
 }
 
 /* Anchor offset for sticky nav */
-section[id] { scroll-margin-top: 80px; }
+section[id] { scroll-margin-top: 84px; }
 
-/* Ghost numeral — large decorative number in step-card corner */
+/* Ghost numeral — large decorative index in a card corner */
 .ghost-numeral {
   position: absolute;
-  right: -6px;
-  bottom: -26px;
+  right: -4px;
+  bottom: -34px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 130px;
+  font-size: 150px;
   line-height: 1;
   color: hsl(var(--primary));
-  opacity: 0.05;
+  opacity: 0.07;
   pointer-events: none;
   user-select: none;
   z-index: 0;
 }
 
-/* Hero product frame — staggered row fade-in */
+/* Mono coordinate tick — tiny signature annotation (e.g. 01 / HERO). */
+.mono-tick {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Hero floor-plan reveal (SVG). Robust: final state visible without JS.
+   JSX toggles `.in` via framer-motion's onViewportEnter; if JS never runs,
+   the base rules below still leave strokes fully drawn (dashoffset 0 via
+   the .in class is the *animation target*, so we default plan visible and
+   only animate when the wrapper explicitly gets `.play`). ── */
+.hero-plan .wall,
+.hero-plan .opening { stroke-dashoffset: 0; }
+
+.hero-plan.play .wall {
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: drawStroke 1000ms cubic-bezier(.16,1,.3,1) 200ms forwards;
+}
+.hero-plan.play .opening {
+  stroke-dasharray: 130;
+  stroke-dashoffset: 130;
+  animation: drawStroke 320ms cubic-bezier(.16,1,.3,1) 1000ms forwards;
+}
+@keyframes drawStroke { to { stroke-dashoffset: 0; } }
+
+/* Scan line — a terracotta sweep that crosses the plan once on play. */
+.hero-plan .scan-line { opacity: 0; }
+.hero-plan.play .scan-line {
+  animation: scanSweep 1100ms cubic-bezier(.4,0,.2,1) 900ms 1;
+}
+@keyframes scanSweep {
+  0%   { opacity: 0; transform: translateX(0); }
+  12%  { opacity: 0.9; }
+  88%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateX(370px); }
+}
+
+/* Room fills + labels — default fully visible; animate in on play. */
+.hero-plan .room-fill { opacity: 0.0; }
+.hero-plan .room-label { opacity: 1; }
+.hero-plan.play .room-fill { opacity: 0; animation: roomFill 600ms ease forwards; }
+.hero-plan.play .room-label { opacity: 0; animation: fadeIn 400ms ease forwards; }
+@keyframes roomFill { to { opacity: 0.10; } }
+@keyframes fadeIn { to { opacity: 1; } }
+
+.hero-plan.play .room-1 { animation-delay: 1250ms; }
+.hero-plan.play .room-2 { animation-delay: 1330ms; }
+.hero-plan.play .room-3 { animation-delay: 1410ms; }
+.hero-plan.play .room-4 { animation-delay: 1490ms; }
+.hero-plan.play .room-5 { animation-delay: 1570ms; }
+.hero-plan.play .room-6 { animation-delay: 1650ms; }
+
+.hero-plan .meta-element { opacity: 1; }
+.hero-plan.play .meta-element { opacity: 0; animation: fadeIn 400ms ease 1750ms forwards; }
+
+/* Extracted-quantities table rows — staggered fade, robust default.
+   Base = visible (opacity 1). Only the `.play` parent animates them from 0. */
+.qty-row { opacity: 1; }
+.qty-table.play .qty-row {
+  opacity: 0;
+  animation: fadeRow 520ms cubic-bezier(.16,1,.3,1) forwards;
+}
 @keyframes fadeRow {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ── Reduced motion: everything final + static ── */
 @media (prefers-reduced-motion: reduce) {
-  [style*="fadeRow"] { opacity: 1 !important; transform: none !important; animation: none !important; }
-}
-
-/* Hero floor plan reveal animation. Triggered when `.hero-plan.in`. */
-.hero-plan .sheet-border {
-  stroke-dasharray: 2000;
-  stroke-dashoffset: 2000;
-  transition: stroke-dashoffset 700ms cubic-bezier(.16, 1, .3, 1);
-}
-.hero-plan .wall {
-  stroke-dasharray: 1400;
-  stroke-dashoffset: 1400;
-  transition: stroke-dashoffset 900ms cubic-bezier(.16, 1, .3, 1) 200ms;
-}
-.hero-plan .opening {
-  stroke-dasharray: 120;
-  stroke-dashoffset: 120;
-  transition: stroke-dashoffset 300ms cubic-bezier(.16, 1, .3, 1) 900ms;
-}
-.hero-plan .room-label,
-.hero-plan .meta-element {
-  opacity: 0;
-  transition: opacity 320ms cubic-bezier(.16, 1, .3, 1);
-}
-
-.hero-plan.in .sheet-border,
-.hero-plan.in .wall,
-.hero-plan.in .opening { stroke-dashoffset: 0; }
-
-.hero-plan.in .room-label,
-.hero-plan.in .meta-element { opacity: 1; }
-
-/* Staggered room reveals */
-.hero-plan.in .room-1 { transition-delay: 1100ms; }
-.hero-plan.in .room-2 { transition-delay: 1180ms; }
-.hero-plan.in .room-3 { transition-delay: 1260ms; }
-.hero-plan.in .room-4 { transition-delay: 1340ms; }
-.hero-plan.in .room-5 { transition-delay: 1420ms; }
-.hero-plan.in .room-6 { transition-delay: 1500ms; }
-
-/* Meta elements (title block, scale bar, north arrow) appear last */
-.hero-plan.in .meta-element { transition-delay: 1600ms; }
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-plan .sheet-border,
   .hero-plan .wall,
-  .hero-plan .opening {
-    stroke-dashoffset: 0 !important;
-    transition: none !important;
-  }
+  .hero-plan .opening { stroke-dashoffset: 0 !important; animation: none !important; }
+  .hero-plan .scan-line { display: none !important; }
+  .hero-plan .room-fill { opacity: 0.10 !important; animation: none !important; }
   .hero-plan .room-label,
-  .hero-plan .meta-element {
-    opacity: 1 !important;
-    transition: none !important;
-  }
+  .hero-plan .meta-element { opacity: 1 !important; animation: none !important; }
+  .qty-row { opacity: 1 !important; animation: none !important; transform: none !important; }
+  .pathon-landing::before { display: none; }
+  .card-lift, .btn-primary, .btn-ghost { transition: none !important; }
 }

@@ -3,9 +3,9 @@ import React from 'react';
 /**
  * Logo — Pathon monogram (geometric P + accent node) + wordmark.
  *
- * Brand 2026-07-03: replaced the north-arrow mark with the "Monogram P"
- * — a geometric P stem + bowl with an indigo accent node where the bowl
- * meets the stem. Wordmark set in font-display (Space Grotesk) semibold.
+ * Brand 2026-07-04: the "Monogram P" — a geometric P stem + bowl with a
+ * terracotta accent node where the bowl meets the stem. Wordmark set in
+ * font-display (Bricolage Grotesque) semibold.
  */
 export default function Logo({ size = 'md', showSub = true, showVersion = false }) {
   const sizes = {
