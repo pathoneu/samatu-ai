@@ -4104,6 +4104,13 @@ async def generate_excel(request: Request, data: dict):
     # to abuse (each call spins up openpyxl + heavy I/O).
     _auth.require_user(request)
     from datetime import date as _date
+    # P3 (2026-07-04 pentest, pass 3): this /generate-excel path writes user/AI
+    # text (imone, projektas, skyrius, nr, aprašymas, mato_vnt) straight into
+    # openpyxl cells. F6 (78041cd) neutralised the sibling api/export_excel.py +
+    # f2_export.py but missed THIS handler, so a leading = + - @ still lands as a
+    # live formula when the recipient opens the .xlsx. Wrap the text/label cells
+    # (never the numeric kiekis/kaina cells) with sanitize_spreadsheet_cell.
+    from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe_cell
 
     C_DARK   = "1F3864"
     C_MID    = "2E4D7B"
@@ -4154,7 +4161,9 @@ async def generate_excel(request: Request, data: dict):
         # 2026-05-06: prepend imone if set so the company appears in the
         # banner: 'UAB Statyba · Pasiūlymas · Projekto pavadinimas'.
         prefix = f"{imone}  ·  " if imone else ""
-        c.value     = f"{prefix}{title}  ·  {projektas}"
+        # P3: imone / projektas are user-supplied and can lead the banner cell —
+        # neutralise formula injection on the composed value.
+        c.value     = _safe_cell(f"{prefix}{title}  ·  {projektas}")
         c.font      = Font(bold=True, size=12, color="FFFFFF")
         c.fill      = PatternFill("solid", fgColor=C_DARK)
         c.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4230,7 +4239,7 @@ async def generate_excel(request: Request, data: dict):
                 current_section = sec
                 ws.merge_cells(f"A{r}:F{r}")
                 sc = ws[f"A{r}"]
-                sc.value     = sec
+                sc.value     = _safe_cell(sec)  # P3: skyrius is AI/user text
                 sc.font      = Font(bold=True, size=9, color=C_MID)
                 sc.fill      = PatternFill("solid", fgColor=C_SEC)
                 sc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -4275,7 +4284,11 @@ async def generate_excel(request: Request, data: dict):
                     fc.number_format = "#,##0.00"
                     fc.font         = Font(bold=True, color=C_GREEN)
                 else:
-                    c = ws.cell(row=r, column=col, value=val)
+                    # P3: cols 1-3 are user/AI text (nr, aprašymas, mato_vnt) —
+                    # neutralise formula injection; cols 4-5 (kiekis, kaina) stay
+                    # numeric and MUST NOT be quoted.
+                    cell_val = _safe_cell(val) if col in (1, 2, 3) else val
+                    c = ws.cell(row=r, column=col, value=cell_val)
                     c.fill      = fill
                     c.border    = border
                     c.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
