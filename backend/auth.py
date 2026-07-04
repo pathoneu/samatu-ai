@@ -95,6 +95,25 @@ def _ensure_dev_user() -> dict:
     return user
 
 
+# N4 (2026-07-04 pentest, pass 2): a precomputed bcrypt hash (work factor 12) of
+# a fixed throwaway string. The login handler verifies the submitted password
+# against THIS when no user row exists, so the ~168ms bcrypt cost is paid on both
+# the user-exists and no-user paths — closing the ~120× timing oracle that let an
+# attacker enumerate registered emails. It is never a valid credential (no user
+# has this hash; the plaintext is not accepted anywhere).
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(
+    b"n4-timing-equalizer-not-a-real-password", bcrypt.gensalt(rounds=12)
+).decode("utf-8")
+
+
+def dummy_verify_password(plain: str) -> None:
+    """Constant-cost bcrypt verify against a throwaway hash. Return value is
+    intentionally discarded — this exists only to equalize login timing between
+    the user-exists and no-user branches (N4). Call on the no-user path before
+    returning the generic auth error."""
+    verify_password(plain, _DUMMY_PASSWORD_HASH)
+
+
 def hash_password(plain: str) -> str:
     """bcrypt hash with work factor 12 (~250ms on modern CPU)."""
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")

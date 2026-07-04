@@ -551,6 +551,12 @@ async def api_login(payload: LoginPayload, request: Request):
     email = _auth.validate_email(payload.email)
     user = db.get_user_by_email(email)
     if not user or not user.get("is_active"):
+        # N4 (2026-07-04 pentest, pass 2): the no-user path used to return here in
+        # ~1.4ms while the user-exists path spent ~168ms in bcrypt — a ~120×
+        # timing oracle that let an attacker enumerate registered emails. Pay the
+        # same bcrypt cost against a fixed dummy hash so both paths take ~equal
+        # time, then return the identical generic error.
+        _auth.dummy_verify_password(payload.password)
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
     if not _auth.verify_password(payload.password, user.get("password_hash", "")):
         log.warning("failed login: email=%s ip=%s", email,
