@@ -19,53 +19,35 @@ import db
 from auth import require_user
 from billing import stripe_client
 from billing.flag import billing_enabled
-from billing.plans import PLAN_BY_ID
+from billing.plans import PLAN_BY_ID, PUBLIC_PLANS
 
 router = APIRouter(prefix="/api/billing/v2", tags=["billing"])
 
 
-PLANS = [
-    {
-        "name": "Free",
-        "price_eur": 0,
-        "pdf_quota_per_month": 1,
-        "overage_eur_per_pdf": None,
-        "seats": 1,
-        "features": ["Watermarked export", "Basic interior only"],
-    },
-    {
-        "name": "Pro",
-        "price_eur": 49,
-        "pdf_quota_per_month": 10,
-        "overage_eur_per_pdf": 8,
-        "seats": 1,
-        "features": [
-            "F2/F3 export",
-            "Audit trail",
-            "Architect legend opt-in",
-            "Priority queue",
-        ],
-    },
-    {
-        "name": "Studio",
-        "price_eur": 129,
-        "pdf_quota_per_month": 40,
-        "overage_eur_per_pdf": 5,
-        "seats": 3,
-        "features": [
-            "Multi-user (3 seats)",
-            "Sistela kainynų integration (when available)",
-            "Custom unit-price overrides",
-        ],
-    },
-]
+def _public_plans_view() -> list[dict]:
+    """Reshape the canonical billing.plans.PUBLIC_PLANS into the {name,
+    price_eur, pdf_quota_per_month, overage_eur_per_pdf, seats, features} shape
+    the /status frontend/tests consume. PUBLIC_PLANS is the single source of
+    truth (Pro 49/10, Studio 149/35, one-off 12) — no more stale inline table."""
+    return [
+        {
+            "id": p["id"],
+            "name": p["name"],
+            "price_eur": p["price_eur"],
+            "pdf_quota_per_month": p["monthly_quota"],
+            "overage_eur_per_pdf": p.get("overage_eur"),
+            "seats": p.get("seats", 1),
+            "features": p.get("features", []),
+        }
+        for p in PUBLIC_PLANS
+    ]
 
 
 @router.get("/status")
 def billing_status() -> dict:
     return {
         "enabled": os.environ.get("BILLING_ENABLED", "0") == "1",
-        "plans": PLANS,
+        "plans": _public_plans_view(),
         "currency": "EUR",
         "vat_mode": "be_pvm",
         "_note": (
