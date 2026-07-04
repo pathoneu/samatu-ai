@@ -16,14 +16,27 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
+import main  # noqa: E402
 from main import app  # noqa: E402  (must precede `import auth`)
 
 import auth  # noqa: E402
 import db  # noqa: E402
 
 _PW = "passw0rd123"
+
+
+@pytest.fixture(autouse=True)
+def _clean_rate_bucket():
+    """Isolate the shared sliding-window rate-limit bucket (main._RATE_BUCKET is
+    module-level, keyed by client_ip:endpoint — TestClient always uses the same
+    fake IP) so these tests' /api/auth/login calls don't 429 due to login-rate
+    pollution accumulated from other test files earlier in the same session."""
+    main._RATE_BUCKET.clear()
+    yield
+    main._RATE_BUCKET.clear()
 
 
 def _isolate(tmp_path, monkeypatch):

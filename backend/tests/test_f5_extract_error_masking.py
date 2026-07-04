@@ -17,12 +17,29 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from main import app  # noqa: E402
+import db  # noqa: E402
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_db(tmp_path, monkeypatch):
+    """These tests hit /extract, which runs _billable_user → the hourly-extract
+    spend cap (main._check_user_spend_cap) for the dev user (SAMATU_AUTH_DISABLED
+    bypass) against the real persistent backend/data/samatu.db. Repeated local/
+    dev-server runs accumulate reserve:/extract usage_events rows there, which
+    intermittently 429s these tests before they ever reach the validation logic
+    under test — test-DB pollution, not a product bug. Point db._DB_PATH at a
+    fresh temp DB (mirroring test_billing_migration.py / test_f3_vision_ownership.py)
+    so this file always starts with zero usage history."""
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "f5_extract.db")
+    db.init_schema()
+    db._migrate_schema()
 
 
 def _post_extract(content: bytes, filename: str = "bad.pdf"):

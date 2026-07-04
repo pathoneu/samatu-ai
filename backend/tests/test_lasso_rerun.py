@@ -13,10 +13,22 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _dev_owned_proj1():
+def _dev_owned_proj1(tmp_path, monkeypatch):
     """F3 (2026-07-04): lasso-rerun now checks project ownership. Under the dev
     bypass require_billable_user resolves to the dev user; create a dev-owned
-    'proj-1' so these happy-path tests pass the new ownership gate."""
+    'proj-1' so these happy-path tests pass the new ownership gate.
+
+    DB isolation (2026-07-05): this endpoint runs through require_billable_user,
+    which enforces the hourly-extract spend cap (main._check_user_spend_cap) for
+    the dev user against the real persistent backend/data/samatu.db. Repeated
+    local/dev-server runs accumulate reserve:/extract-style usage_events rows for
+    the dev user there, which intermittently trips the cap here — a test-DB
+    pollution flake, not a product bug. Point db._DB_PATH at a fresh temp DB
+    (mirroring the idiom in test_billing_migration.py / test_f3_vision_ownership.py)
+    so this file always starts with zero usage history."""
+    monkeypatch.setattr(_db, "_DB_PATH", tmp_path / "lasso_rerun.db")
+    _db.init_schema()
+    _db._migrate_schema()
     dev = _auth._ensure_dev_user()
     _db.upsert_project("proj-1", {"name": "proj-1", "tipas": "interjeras"}, user_id=dev["id"])
     yield
