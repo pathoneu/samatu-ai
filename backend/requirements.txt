@@ -1,14 +1,22 @@
-fastapi==0.115.6
+# fastapi 0.115.6 capped starlette<0.42, pinning it to 0.41.3 (8+ CVEs) and
+# python-multipart<0.0.31 (6 CVEs). Bumped 2026-07-04 (F8) to open the cap.
+# Explicit starlette/python-multipart pins guarantee the CVE-clean transitive
+# versions resolve (fastapi only sets lower bounds). starlette 1.x major:
+# on_event/SessionMiddleware/TestClient still work — full suite green, no code change.
+fastapi==0.139.0
+starlette==1.3.1
+python-multipart==0.0.31
 uvicorn[standard]==0.32.1
 anthropic>=0.40.0
-pdfplumber==0.11.4
+# pdfplumber hard-pins pdfminer.six==. Bumped 0.11.4 -> 0.11.9 to pull
+# pdfminer.six 20251230 (clears CVE-2025-64512 + CVE-2025-70559, untrusted PDF parse).
+pdfplumber==0.11.9
 pdf2image==1.17.0
 shapely>=2.0.0
 pydantic>=2.10.0
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 openpyxl==3.1.5
 reportlab==4.2.5
-python-multipart==0.0.20
 pytest==8.3.4
 pytest-asyncio==0.25.0
 bcrypt>=5.0
