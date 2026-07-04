@@ -1,11 +1,17 @@
-"""EXPERIMENT Mode 1 — native PDF Pass-1 input (SAMATU_PDF_NATIVE=1).
+"""Native PDF Pass-1 input — production DEFAULT since the 2026-07-04 B-3
+lock-in (SAMATU_PDF_NATIVE=0 is the raster escape hatch).
 
 All tests run offline ($0): the Anthropic client is a fake that records the
 request and returns a canned JSON response. Covers:
   * pypdf subset splitting (page selection, renumbering note),
   * the >size-limit fallback to image mode,
+  * B-1: API-rejected document → raster retry (shared payload flips),
+  * B-2: text-richness gate + text_median_chars_page provenance,
+  * B-3: default-ON gate, escape hatch, one-line rollback constant,
   * document-block request shape + _meta.experiment provenance,
-  * default-OFF regression (no env → image blocks, no experiment key).
+  * raster-path regression (no native payload → image blocks, no
+    experiment key) — the suite-wide conftest pin keeps every other test
+    on this raster path.
 """
 from __future__ import annotations
 
@@ -277,13 +283,32 @@ def test_pass1_default_off_unchanged():
     assert "experiment" not in parsed["_meta"]
 
 
-def test_env_gate_default_off(monkeypatch):
+def test_env_gate_default_on_with_escape_hatch(monkeypatch):
+    """B-3 lock-in: native is the default; SAMATU_PDF_NATIVE=0/false is the
+    escape hatch; =1/true forces on."""
     monkeypatch.delenv("SAMATU_PDF_NATIVE", raising=False)
+    assert vc._pdf_native_enabled() is True
+    on, why = vc._pdf_native_mode()
+    assert on is True and "default" in why
+
+    for off in ("0", "false", "no", "off"):
+        monkeypatch.setenv("SAMATU_PDF_NATIVE", off)
+        assert vc._pdf_native_enabled() is False
+    on, why = vc._pdf_native_mode()
+    assert on is False and "env_override" in why
+
+    monkeypatch.setenv("SAMATU_PDF_NATIVE", "1")
+    assert vc._pdf_native_enabled() is True
+
+
+def test_rollback_constant_restores_raster_default(monkeypatch):
+    """The one-line rollback switch: NATIVE_PDF_DEFAULT_ON=False flips the
+    unset-env default back to raster; explicit env still wins."""
+    monkeypatch.delenv("SAMATU_PDF_NATIVE", raising=False)
+    monkeypatch.setattr(vc, "NATIVE_PDF_DEFAULT_ON", False)
     assert vc._pdf_native_enabled() is False
     monkeypatch.setenv("SAMATU_PDF_NATIVE", "1")
     assert vc._pdf_native_enabled() is True
-    monkeypatch.setenv("SAMATU_PDF_NATIVE", "0")
-    assert vc._pdf_native_enabled() is False
 
 
 # ── B-1 lock-in: API-reject boundary → retry as images ────────────────────────

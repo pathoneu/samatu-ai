@@ -27,17 +27,40 @@ from .prompt import (
 from models_config import model_for
 
 _ENV_TRUTHY = {"1", "true", "yes", "on"}
+_ENV_FALSY = {"0", "false", "no", "off"}
 
 
 def _env_flag(name: str) -> bool:
     return (os.getenv(name) or "").strip().lower() in _ENV_TRUTHY
 
 
+# B-3 lock-in (2026-07-04, docs/superpowers/research/2026-07-04-final-config-
+# decision.md): native-PDF Pass-1 input is the PRODUCTION DEFAULT — best
+# accuracy of every config tested (16.2% headline MAE) at raster cost.
+# Rollback is this one line: set False to restore the raster default
+# everywhere (env overrides still win in both directions).
+NATIVE_PDF_DEFAULT_ON = True
+
+
+def _pdf_native_mode() -> tuple[bool, str]:
+    """Effective Pass-1 input mode + why. SAMATU_PDF_NATIVE=0/false is the
+    escape hatch (forces raster images); =1/true forces native; unset/other
+    → NATIVE_PDF_DEFAULT_ON. Returns (native_on, reason)."""
+    raw = (os.getenv("SAMATU_PDF_NATIVE") or "").strip().lower()
+    if raw in _ENV_FALSY:
+        return False, f"env_override (SAMATU_PDF_NATIVE={raw})"
+    if raw in _ENV_TRUTHY:
+        return True, f"env_override (SAMATU_PDF_NATIVE={raw})"
+    return (bool(NATIVE_PDF_DEFAULT_ON),
+            f"default (NATIVE_PDF_DEFAULT_ON={NATIVE_PDF_DEFAULT_ON})")
+
+
 def _pdf_native_enabled() -> bool:
-    """EXPERIMENT gate (SAMATU_PDF_NATIVE=1): send Pass-1 pages as ONE native
-    PDF `document` block (image + extracted text layer per page) instead of
-    pdf2image-rendered image blocks. Default OFF — zero behavior change."""
-    return _env_flag("SAMATU_PDF_NATIVE")
+    """Send Pass-1 pages as ONE native PDF `document` block (image +
+    extracted text layer per page) instead of pdf2image-rendered image
+    blocks. ON by default since the 2026-07-04 lock-in; see
+    _pdf_native_mode for the override semantics."""
+    return _pdf_native_mode()[0]
 
 
 def _zoom_agentic_enabled() -> bool:
@@ -2672,11 +2695,15 @@ def extract_interior(
     _voting_on = bool(_vflags.get("extraction_voting"))
     _emit({"event": "pass1_started", "page_count": len(pages), "voting": _voting_on})
 
-    # EXPERIMENT (SAMATU_PDF_NATIVE=1): build the native-PDF document payload
-    # ONCE (byte-identical across voting rounds → cache-friendly) and forward
-    # it to Pass-1. Default OFF → _native_pdf stays None, zero behavior change.
+    # Native-PDF Pass-1 (default ON since the 2026-07-04 B-3 lock-in): build
+    # the document payload ONCE (byte-identical across voting rounds →
+    # cache-friendly) and forward it to Pass-1. SAMATU_PDF_NATIVE=0 escape
+    # hatch → _native_pdf stays None, raster images exactly as before.
+    _native_on, _native_why = _pdf_native_mode()
+    print(f"[extractor] pass1 input mode: "
+          f"{'native_pdf' if _native_on else 'raster_images'} — {_native_why}")
     _native_pdf = None
-    if _pdf_native_enabled():
+    if _native_on:
         _native_pdf = _prepare_native_pdf(pdf_bytes, pages)
         _emit({"event": "native_pdf_prepared",
                "input": "document" if _native_pdf.get("b64") else "image_fallback",

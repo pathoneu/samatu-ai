@@ -19,12 +19,18 @@ if str(ROOT) not in sys.path:
 @pytest.fixture(autouse=True)
 def _isolate_experiment_envs(monkeypatch):
     """Hermeticity guard (2026-07-04): the accuracy-A/B experiment envs are
-    opt-in behavior switches for the extraction pipeline. If the controller
-    (or a developer shell) has one exported, ambient state would flip
-    pipeline behavior mid-suite and fail default-path assertions. Clear them
-    for every test; experiment tests set them explicitly via monkeypatch."""
-    for env in ("SAMATU_PDF_NATIVE", "SAMATU_ZOOM_AGENTIC",
-                "SAMATU_VOTING_MODELS"):
+    behavior switches for the extraction pipeline. If the controller (or a
+    developer shell) has one exported, ambient state would flip pipeline
+    behavior mid-suite and fail default-path assertions.
+
+    SAMATU_PDF_NATIVE is PINNED OFF (not merely cleared): since the B-3
+    lock-in, native-PDF Pass-1 is the production default, but the suite's
+    raster-path tests encode raster expectations — pinning =0 keeps their
+    intent honest without touching each test. Native-mode tests opt in
+    explicitly (monkeypatch.setenv SAMATU_PDF_NATIVE=1 / delenv for the
+    default-ON gate test). The other experiment envs stay opt-in → cleared."""
+    monkeypatch.setenv("SAMATU_PDF_NATIVE", "0")
+    for env in ("SAMATU_ZOOM_AGENTIC", "SAMATU_VOTING_MODELS"):
         monkeypatch.delenv(env, raising=False)
 
 
