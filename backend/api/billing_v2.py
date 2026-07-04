@@ -60,6 +60,33 @@ def billing_status() -> dict:
     }
 
 
+@router.get("/usage")
+def billing_usage(user: dict = Depends(require_user)) -> dict:
+    """Usage meter + upgrade-nudge source for the current user.
+
+    Flag OFF ⇒ bare {"enabled": false} (the frontend shows no meter and no plan
+    is leaked) — the non-negotiable flag-off invariant. Flag ON ⇒ the
+    entitlements view: {enabled, plan, plan_status, used, quota, remaining,
+    current_period_end}. `used`/`remaining` come from billing.entitlements
+    (period-scoped extract count vs the plan's monthly_quota + one-off credits).
+    """
+    if not billing_enabled():
+        return {"enabled": False}
+    # Lazy import: keeps the module import-light and mirrors the flag-gated
+    # pattern used by main._check_user_quota.
+    from billing.entitlements import projects_used, projects_remaining
+    plan = PLAN_BY_ID.get(user.get("plan") or "free", PLAN_BY_ID["free"])
+    return {
+        "enabled": True,
+        "plan": plan["id"],
+        "plan_status": user.get("plan_status") or "active",
+        "used": projects_used(user),
+        "quota": plan["monthly_quota"],
+        "remaining": projects_remaining(user),
+        "current_period_end": user.get("current_period_end"),
+    }
+
+
 class CheckoutRequest(BaseModel):
     plan: str
 
