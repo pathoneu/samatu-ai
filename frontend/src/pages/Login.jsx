@@ -1,6 +1,11 @@
 /**
  * Login — email + password (Phase 13).
  * On success → redirect to / (or `from` if user came from protected route).
+ *
+ * 2026-07-05 dark graphite rebuild: two-column branded layout (form + a
+ * dark blueprint panel with the detection motif), matching the landing
+ * aesthetic. Orange-on-graphite, Sora headings, JetBrains Mono microcopy.
+ * All auth logic/handlers/validation are unchanged — styling only.
  */
 
 import React, { useState } from 'react';
@@ -12,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Logo from '@/components/layout/Logo';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 
 export default function Login() {
   const { login } = useAuth();
@@ -39,39 +45,51 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Link to="/" title="Į pradžią" className="no-underline">
-            <Logo />
-          </Link>
-        </div>
+    <div className="pathon-landing min-h-screen grid lg:grid-cols-[1.05fr_1fr]">
+      {/* ── Form column ─────────────────────────────────────────────── */}
+      <div className="relative flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
+        <div className="w-full max-w-md mx-auto">
+          <div className="mb-10">
+            <Link to="/" title="Į pradžią" className="no-underline inline-block">
+              <Logo size="lg" showSub={false} />
+            </Link>
+          </div>
 
-        <div className="border border-border bg-card rounded-xl p-6">
-          <h1 className="text-xl font-semibold mb-1">Prisijungti</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            Naudoti Pathon — įveskite savo el. paštą ir slaptažodį.
-          </p>
+          <div className="mb-8">
+            <div className="mono-tick mb-3">01 / PRISIJUNGIMAS</div>
+            <h1 className="font-display text-3xl font-semibold tracking-tight leading-tight">
+              Sveiki sugrįžę
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Įveskite savo el. paštą ir slaptažodį, kad tęstumėte darbą.
+            </p>
+          </div>
 
           {error && (
-            <div className="flex items-start gap-2 p-3 mb-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+            <div className="flex items-start gap-2 p-3 mb-5 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>{error}</div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="email">El. paštas</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                El. paštas
+              </Label>
               <Input id="email" type="email" required autoFocus
+                className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
                 value={email} onChange={e => setEmail(e.target.value)} />
             </div>
-            <div>
-              <Label htmlFor="password">Slaptažodis</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Slaptažodis
+              </Label>
               <Input id="password" type="password" required
+                className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
                 value={password} onChange={e => setPassword(e.target.value)} />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="btn-primary w-full h-11 text-sm" disabled={submitting}>
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Prisijungti
             </Button>
@@ -79,18 +97,25 @@ export default function Login() {
 
           <GoogleSignInButton next={from} />
 
-          <div className="mt-4 text-sm text-muted-foreground text-center">
+          <div className="mt-6 text-sm text-muted-foreground text-center">
             Neturite paskyros?{' '}
-            <Link to="/register" className="text-primary hover:underline">Registruokis</Link>
+            <Link to="/register" className="text-primary font-medium hover:underline">Registruokis</Link>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-border text-xs text-muted-foreground text-center">
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privatumo politika</Link>
+            <span className="mx-2 opacity-40">·</span>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Naudojimo sąlygos</Link>
           </div>
         </div>
-
-        <div className="mt-4 text-xs text-muted-foreground text-center">
-          <Link to="/privacy" className="hover:underline">Privatumo politika</Link>
-          {' · '}
-          <Link to="/terms" className="hover:underline">Naudojimo sąlygos</Link>
-        </div>
       </div>
+
+      {/* ── Brand panel (desktop only) ──────────────────────────────── */}
+      <AuthBrandPanel
+        eyebrow="PATHON — STATYBŲ SĄMATOS"
+        headline={<>Kiekiai iš PDF <span className="h-accent">per minutes</span>, ne per dienas.</>}
+        sub="Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams."
+      />
     </div>
   );
 }
