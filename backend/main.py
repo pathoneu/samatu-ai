@@ -5100,12 +5100,15 @@ async def extract_interior_endpoint(
     # the project-quota ledger — exactly once, only when BILLING_ENABLED (a
     # hard no-op otherwise so today's behavior is byte-for-byte). Reached only
     # on the success path (a failed/refused extraction raises before here), so
-    # failures never consume quota. project_id is None: no project row exists
-    # at extract time (same reason record_usage meters against the user).
+    # failures never consume quota. Draws monthly-slot-first, then a one-off
+    # credit (record_extract_and_maybe_consume_credit): always records
+    # kind="extract"; ALSO records kind="credit_consumed" when this extraction
+    # is beyond the plan's monthly quota and a credit remains. Bookkeeping only
+    # — the try/except guarantees a metering hiccup never breaks extraction.
     try:
         from billing.flag import billing_enabled
         if billing_enabled() and _user and _user.get("id") and isinstance(result, dict):
-            db.record_billing_usage(_user["id"], kind="extract", project_id=None)
+            db.record_extract_and_maybe_consume_credit(_user["id"])
     except Exception as _exc:
         log.warning("record_billing_usage failed (extract-interior): %r", _exc)
 

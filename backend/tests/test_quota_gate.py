@@ -55,13 +55,22 @@ def test_quota_gate_noop_when_no_user_id(monkeypatch, tmp_path):
     main._check_user_quota(None)  # anonymous ⇒ must NOT raise
 
 
-def test_quota_gate_oneoff_never_raises(monkeypatch, tmp_path):
+def test_quota_gate_credit_lets_one_extra_through_then_402(monkeypatch, tmp_path):
+    """A one-off is a CREDIT, not an unlimited plan. A free user (quota 1) with
+    one granted credit passes the gate after spending the monthly slot (a credit
+    remains), then hits 402 once the credit is drawn too. This replaces the old
+    test that (wrongly) asserted plan='oneoff' is never gated — that was the bug
+    that handed one-off buyers unlimited projects."""
     _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("BILLING_ENABLED", "1")
     user = db.create_user(email="g@h.lt", password_hash="x", name="G")
-    uid = user["id"]
-    with db._conn() as c:
-        c.execute("UPDATE users SET plan = 'oneoff' WHERE id = ?", (uid,))
-    for _ in range(5):
-        db.record_billing_usage(uid, kind="extract")
-    main._check_user_quota(uid)  # one-off gated at purchase ⇒ never 402
+    uid = user["id"]  # free, quota 1
+    db.grant_oneoff_credit(uid)
+    db.record_billing_usage(uid, kind="extract")  # monthly slot spent
+    main._check_user_quota(uid)  # credit remains ⇒ must NOT raise
+    # Spend the credit too, then the gate must fire.
+    db.record_billing_usage(uid, kind="extract")
+    db.record_billing_usage(uid, kind="credit_consumed")
+    with pytest.raises(HTTPException) as e:
+        main._check_user_quota(uid)
+    assert e.value.status_code == 402

@@ -153,6 +153,45 @@ def test_flag_off_never_exceeds_even_with_zero_credits(monkeypatch, tmp_path):
     assert ent.quota_exceeded(u) is False           # flag OFF ⇒ never enforced
 
 
+# ── the increment: monthly-slot-first-then-credit bookkeeping ────────────────
+#
+# main.py records a successful billable extraction via
+# db.record_extract_and_maybe_consume_credit(user_id): always +1 extract, and
+# ALSO a credit_consumed IFF the monthly slot was already spent before this one.
+
+def test_increment_within_monthly_quota_consumes_no_credit(monkeypatch, tmp_path):
+    _isolate(tmp_path, monkeypatch)
+    u = db.create_user(email="i1@b.lt", password_hash="x", name="I1")
+    uid = u["id"]                                    # free, quota 1
+    db.grant_oneoff_credit(uid)
+    db.record_extract_and_maybe_consume_credit(uid)  # 1st — fills monthly slot
+    assert ent.projects_used(u) == 1
+    assert db.credits_balance(uid) == 1              # credit untouched
+
+
+def test_increment_beyond_quota_consumes_a_credit(monkeypatch, tmp_path):
+    _isolate(tmp_path, monkeypatch)
+    u = db.create_user(email="i2@b.lt", password_hash="x", name="I2")
+    uid = u["id"]                                    # free, quota 1
+    db.grant_oneoff_credit(uid)
+    db.record_extract_and_maybe_consume_credit(uid)  # 1st — monthly slot
+    db.record_extract_and_maybe_consume_credit(uid)  # 2nd — beyond quota → credit
+    assert ent.projects_used(u) == 2                 # both counted as extract
+    assert db.credits_balance(uid) == 0              # one credit drawn down
+
+
+def test_increment_beyond_quota_without_credit_records_no_negative(monkeypatch, tmp_path):
+    """Beyond quota AND no credit: still records the extract (audit), but does
+    NOT write a credit_consumed (balance must never go negative)."""
+    _isolate(tmp_path, monkeypatch)
+    u = db.create_user(email="i3@b.lt", password_hash="x", name="I3")
+    uid = u["id"]                                    # free, quota 1, 0 credits
+    db.record_extract_and_maybe_consume_credit(uid)  # 1st — monthly slot
+    db.record_extract_and_maybe_consume_credit(uid)  # 2nd — beyond quota, no credit
+    assert ent.projects_used(u) == 2
+    assert db.credits_balance(uid) == 0              # never negative
+
+
 # ── the bug's negative: no code path yields an unlimited "oneoff" plan ───────
 
 def test_oneoff_plan_is_not_a_free_pass(monkeypatch, tmp_path):

@@ -610,6 +610,34 @@ def credits_balance(user_id: str) -> int:
     return int(row["bal"] or 0)
 
 
+def record_extract_and_maybe_consume_credit(user_id: str) -> None:
+    """Record one successful billable extraction, drawing monthly-slot-first,
+    then a one-off credit.
+
+    Always writes kind="extract" (the per-project audit / period counter). If
+    this extraction is beyond the plan's monthly quota AND the user has a credit
+    to spend, ALSO writes kind="credit_consumed" (−1). Balance never goes
+    negative — the credit_consumed is written only when balance > 0.
+
+    Caller guards on billing_enabled(); this is plain bookkeeping (the caller
+    wraps it so a failure here never breaks extraction)."""
+    if not user_id:
+        return
+    from billing.plans import PLAN_BY_ID
+    user = get_user_by_id(user_id)
+    plan_id = (user or {}).get("plan") or "free"
+    plan = PLAN_BY_ID.get(plan_id, PLAN_BY_ID["free"])
+    period_end = (user or {}).get("current_period_end")
+    # used_before: extractions already spent THIS period, computed before we
+    # record the current one.
+    used_before = billing_usage_in_period(
+        user_id, current_period_end=period_end, kind="extract")
+    record_billing_usage(user_id, kind="extract", project_id=None)
+    # Beyond the monthly allotment → draw a credit if one remains.
+    if used_before >= int(plan.get("monthly_quota", 0)) and credits_balance(user_id) > 0:
+        record_billing_usage(user_id, kind="credit_consumed", project_id=None)
+
+
 # ── Corrections (audit log for future learning-loop) ──────────────────────────
 
 def log_correction(project_id: str, field_path: str,
