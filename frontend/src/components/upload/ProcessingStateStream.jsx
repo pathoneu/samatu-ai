@@ -6,22 +6,25 @@
  * grows the patalpos list as Pass-2 zoom finishes each room.
  */
 
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileSearch, Brain, Search, CheckCircle2, AlertCircle, Home,
 } from 'lucide-react';
 
-// User-facing phase labels — no "Pass 1/2", no "Vision", plain Lithuanian.
+// User-facing phase labels — no "Pass 1/2", no "Vision".
+// `labelKey` resolves against i18n at render.
 const PHASES = [
-  { id: 'rendering', icon: FileSearch,   label: 'Skaitome brėžinį…' },
-  { id: 'pass1',     icon: Brain,        label: 'Atpažįstame patalpas…' },
-  { id: 'zoom',      icon: Search,       label: 'Tiksliname matmenys per kambarius…' },
-  { id: 'post',      icon: CheckCircle2, label: 'Sudedame kiekius…' },
+  { id: 'rendering', icon: FileSearch,   labelKey: 'upload.stream.reading' },
+  { id: 'pass1',     icon: Brain,        labelKey: 'upload.stream.recognizing' },
+  { id: 'zoom',      icon: Search,       labelKey: 'upload.stream.refiningRooms' },
+  { id: 'post',      icon: CheckCircle2, labelKey: 'upload.stream.summing' },
 ];
 
 const PHASE_INDEX = Object.fromEntries(PHASES.map((p, i) => [p.id, i]));
 
 export default function ProcessingStateStream({ phase, progress, elapsed, error }) {
+  const { t } = useTranslation();
   const currentStep = PHASE_INDEX[phase] ?? 0;
   const rooms = progress?.rooms || [];
   const zoomDone = progress?.zoomDone || 0;
@@ -36,11 +39,11 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
 
     let detail = null;
     if (step.id === 'rendering' && pageCount && (isActive || isDone)) {
-      detail = `${pageCount} puslapių`;
+      detail = t('upload.stream.pages', { count: pageCount });
     } else if (step.id === 'pass1' && rooms.length > 0) {
-      detail = `${rooms.length} patalpos identifikuotos`;
+      detail = t('upload.stream.roomsIdentified', { count: rooms.length });
     } else if (step.id === 'zoom' && zoomTotal > 0) {
-      detail = `${zoomDone} / ${zoomTotal} kambarių`;
+      detail = t('upload.stream.roomsProgress', { done: zoomDone, total: zoomTotal });
     }
 
     return (
@@ -63,7 +66,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
             isActive ? 'text-foreground font-medium' :
             isDone ? 'text-primary' : 'text-muted-foreground'
           }`}>
-            {step.label}
+            {t(step.labelKey)}
           </div>
           {detail && (
             <div className="text-[11px] text-muted-foreground mt-0.5">{detail}</div>
@@ -108,7 +111,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
           <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Home className="w-3.5 h-3.5" />
-              Aptiktos patalpos
+              {t('upload.stream.detectedRooms')}
             </span>
             <span className="tabular-nums">{rooms.length}</span>
           </div>
@@ -132,7 +135,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
                     {r.plotas_m2 != null
                       ? `${Number(r.plotas_m2).toFixed(1)} m²`
                       : '—'}
-                    {r.refined && <span className="text-primary"> · pataisyta</span>}
+                    {r.refined && <span className="text-primary">{t('upload.stream.corrected')}</span>}
                   </div>
                 </motion.div>
               ))}
@@ -149,7 +152,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
 
       {elapsed != null && !error && (
         <div className="mt-4 text-[11px] text-muted-foreground tabular-nums">
-          {elapsed}s
+          {t('upload.stream.seconds', { count: elapsed })}
         </div>
       )}
     </div>

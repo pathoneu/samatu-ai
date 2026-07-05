@@ -450,6 +450,83 @@
       "toastFileReadFail": "Nepavyko nuskaityti failo"
     }
   },
+  "newProject": {
+    "types": {
+      "interior": { "label": "Interjero projektas", "desc": "Apdailos kiekiai (rekomenduojama)" },
+      "auto": { "label": "Automatinis", "desc": "AI atpažins tipą" },
+      "kz": { "label": "Kiekių žiniaraštis", "desc": "KŽ lentelė (jei jau turi paruoštą)" },
+      "fasadas": { "label": "Fasadai", "desc": "ETICS skaičiai" },
+      "stogas": { "label": "Stogas", "desc": "Stogo kiekiai" },
+      "zeme": { "label": "Žemės darbai", "desc": "Iškasa, tranšėjos" },
+      "betonas": { "label": "Betonas", "desc": "Betono kiekiai" }
+    },
+    "errNoPdf": "Pasirinkite PDF failą",
+    "statusUploading": "Siunčiama...",
+    "statusSaving": "Išsaugoma...",
+    "statusReading": "Skaitome brėžinį... ({{sec}}s)",
+    "statusProcessing": "Apdorojama... ({{sec}}s)",
+    "statusComplex": "Sudėtingas projektas, palaukite ({{sec}}s)...",
+    "errStreamNoResult": "Extraction stream ended without result",
+    "errGeneric": "Klaida",
+    "errServer": "Serverio klaida ({{status}})",
+    "errPipeline": "Pipeline klaida (nežinoma priežastis)",
+    "errUnexpectedFormat": "Netikėtas atsakymo formatas",
+    "errNoRooms": "AI nerado patalpų šiame brėžinyje. Patikrinkite, ar įkėlėte interjero / aukšto planą (ne nuotrauką, ne KŽ lentelę, ne fasadą). Jei tai tikrai planas — pabandykite dar kartą arba pridėkite patalpas rankiniu būdu.",
+    "defaultNameConstruction": "Statybos projektas",
+    "defaultNameInterior": "Interjero projektas",
+    "defaultNameKz": "Naujas projektas",
+    "warnLowConfidence": "Žemas AI tikslumas",
+    "warnMissingUnit": "Trūksta matavimo vieneto",
+    "errAborted": "Užklausa atšaukta arba laiko limitas. Bandykite mažesnį PDF arba pakartokite.",
+    "errNetwork": "Nepavyksta pasiekti serverio. Patikrinkite ryšį.",
+    "errUnknown": "Nežinoma klaida",
+    "abortedByUser": "Atšaukta vartotojo. Bandykite dar kartą.",
+    "cancel": "Atšaukti",
+    "retry": "Bandyti dar kartą",
+    "backToProjects": "Grįžti į projektus",
+    "title": "Naujas projektas",
+    "subtitle": "Įkelkite statybų projekto brėžinį (PDF). Pathon automatiškai atpažins tipą ir išskirs kiekius.",
+    "typeLabel": "Projekto tipas",
+    "hideOtherTypes": "− Paslėpti kitus tipus",
+    "showOtherTypes": "+ Kitas projekto tipas (KŽ, fasadai, stogas, žemės darbai…)",
+    "nameLabel": "Projekto pavadinimas",
+    "namePlaceholder": "Pvz. Gyvenamojo namo statyba",
+    "companyLabel": "Įmonės pavadinimas",
+    "companyPlaceholder": "Pvz. UAB Statyba",
+    "pdfLabel": "Projekto PDF",
+    "uploadLabel": "PDF — statybų projekto brėžinys",
+    "startAnalysis": "Pradėti analizę"
+  },
+  "upload": {
+    "zone": {
+      "defaultLabel": "PDF arba Excel failas",
+      "errNoFile": "Failas nepasirinktas.",
+      "errBadFormat": "Netinkamas formatas. Tinka tik: {{formats}}.",
+      "errTooBig": "Failas per didelis ({{size}} MB). Maksimumas 50 MB.",
+      "aria": "Pasirinkti projekto failą",
+      "dragPrefix": "Vilkite failą čia arba ",
+      "dragChoose": "pasirinkite",
+      "maxSize": "Maks. 50 MB"
+    },
+    "processing": {
+      "reading": "Skaitome brėžinį...",
+      "recognizing": "Atpažįstame patalpas...",
+      "refining": "Tiksliname matmenys...",
+      "summing": "Sudedame kiekius..."
+    },
+    "stream": {
+      "reading": "Skaitome brėžinį…",
+      "recognizing": "Atpažįstame patalpas…",
+      "refiningRooms": "Tiksliname matmenys per kambarius…",
+      "summing": "Sudedame kiekius…",
+      "pages": "{{count}} puslapių",
+      "roomsIdentified": "{{count}} patalpos identifikuotos",
+      "roomsProgress": "{{done}} / {{total}} kambarių",
+      "detectedRooms": "Aptiktos patalpos",
+      "corrected": " · pataisyta",
+      "seconds": "{{count}}s"
+    }
+  },
   "billing": {
     "plans": {
       "free": "Nemokamas bandymas",

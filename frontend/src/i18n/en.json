@@ -447,6 +447,83 @@
       "toastFileReadFail": "Could not read the file"
     }
   },
+  "newProject": {
+    "types": {
+      "interior": { "label": "Interior project", "desc": "Finishing quantities (recommended)" },
+      "auto": { "label": "Automatic", "desc": "AI will detect the type" },
+      "kz": { "label": "Bill of quantities", "desc": "BoQ table (if you already have one)" },
+      "fasadas": { "label": "Facades", "desc": "ETICS figures" },
+      "stogas": { "label": "Roof", "desc": "Roof quantities" },
+      "zeme": { "label": "Earthworks", "desc": "Excavation, trenches" },
+      "betonas": { "label": "Concrete", "desc": "Concrete quantities" }
+    },
+    "errNoPdf": "Select a PDF file",
+    "statusUploading": "Uploading...",
+    "statusSaving": "Saving...",
+    "statusReading": "Reading the drawing... ({{sec}}s)",
+    "statusProcessing": "Processing... ({{sec}}s)",
+    "statusComplex": "Complex project, please wait ({{sec}}s)...",
+    "errStreamNoResult": "Extraction stream ended without result",
+    "errGeneric": "Error",
+    "errServer": "Server error ({{status}})",
+    "errPipeline": "Pipeline error (unknown reason)",
+    "errUnexpectedFormat": "Unexpected response format",
+    "errNoRooms": "The AI found no rooms in this drawing. Check that you uploaded an interior / floor plan (not a photo, not a BoQ table, not a facade). If it really is a plan — try again or add the rooms manually.",
+    "defaultNameConstruction": "Construction project",
+    "defaultNameInterior": "Interior project",
+    "defaultNameKz": "New project",
+    "warnLowConfidence": "Low AI confidence",
+    "warnMissingUnit": "Missing unit of measure",
+    "errAborted": "Request canceled or timed out. Try a smaller PDF or retry.",
+    "errNetwork": "Cannot reach the server. Check your connection.",
+    "errUnknown": "Unknown error",
+    "abortedByUser": "Canceled by user. Try again.",
+    "cancel": "Cancel",
+    "retry": "Try again",
+    "backToProjects": "Back to projects",
+    "title": "New project",
+    "subtitle": "Upload a construction project drawing (PDF). Pathon will automatically detect the type and extract quantities.",
+    "typeLabel": "Project type",
+    "hideOtherTypes": "− Hide other types",
+    "showOtherTypes": "+ Other project type (BoQ, facades, roof, earthworks…)",
+    "nameLabel": "Project name",
+    "namePlaceholder": "e.g. Residential house construction",
+    "companyLabel": "Company name",
+    "companyPlaceholder": "e.g. Statyba Ltd.",
+    "pdfLabel": "Project PDF",
+    "uploadLabel": "PDF — construction project drawing",
+    "startAnalysis": "Start analysis"
+  },
+  "upload": {
+    "zone": {
+      "defaultLabel": "PDF or Excel file",
+      "errNoFile": "No file selected.",
+      "errBadFormat": "Invalid format. Allowed only: {{formats}}.",
+      "errTooBig": "File too large ({{size}} MB). Maximum 50 MB.",
+      "aria": "Select the project file",
+      "dragPrefix": "Drag a file here or ",
+      "dragChoose": "choose",
+      "maxSize": "Max 50 MB"
+    },
+    "processing": {
+      "reading": "Reading the drawing...",
+      "recognizing": "Recognizing rooms...",
+      "refining": "Refining dimensions...",
+      "summing": "Adding up quantities..."
+    },
+    "stream": {
+      "reading": "Reading the drawing…",
+      "recognizing": "Recognizing rooms…",
+      "refiningRooms": "Refining dimensions room by room…",
+      "summing": "Adding up quantities…",
+      "pages": "{{count}} pages",
+      "roomsIdentified": "{{count}} rooms identified",
+      "roomsProgress": "{{done}} / {{total}} rooms",
+      "detectedRooms": "Detected rooms",
+      "corrected": " · corrected",
+      "seconds": "{{count}}s"
+    }
+  },
   "billing": {
     "plans": {
       "free": "Free trial",
