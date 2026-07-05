@@ -1367,6 +1367,35 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     parsed["pozicijos"] = rebuilt
 
 
+def _consolidate_led_niche_pozicijos(parsed: dict) -> None:
+    """Collapse 'LED nišų glaistymas' + 'LED nišų dažymas' into the contractor's
+    single 'LED nišų glaistymas/dažymas' line (Rangovas A samata item 23 — one m
+    rate covering both phases). Same length, display-only, gated by the same flag
+    as paint consolidation. The structural 'Nišų formavimas GKP konstrukcijoje'
+    line is a distinct operation and is left untouched. Phases kept in `_detalus`."""
+    if not _consolidate_paint_enabled():
+        return
+    pozicijos = parsed.get("pozicijos") or []
+    G, D = "LED nišų glaistymas", "LED nišų dažymas"
+    g = next((p for p in pozicijos if (p.get("aprasymas") or "") == G), None)
+    d = next((p for p in pozicijos if (p.get("aprasymas") or "") == D), None)
+    if not (g and d):
+        return
+    combined = {**g, "aprasymas": "LED nišų glaistymas/dažymas", "_detalus": [G, D]}
+    rebuilt: list[dict] = []
+    inserted = False
+    for p in pozicijos:
+        if p is g:
+            if not inserted:
+                rebuilt.append(combined)
+                inserted = True
+        elif p is d:
+            continue  # folded into the combined line
+        else:
+            rebuilt.append(p)
+    parsed["pozicijos"] = rebuilt
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -2298,6 +2327,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # contractor's combined line(s) (flag ENABLE_CONSOLIDATE_PAINT_LINES, default on).
     parsed["pozicijos"] = pozicijos
     _consolidate_paint_pozicijos(parsed)
+    _consolidate_led_niche_pozicijos(parsed)
     pozicijos = parsed["pozicijos"]
 
     # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.

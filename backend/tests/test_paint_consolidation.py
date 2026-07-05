@@ -73,3 +73,37 @@ def test_high_room_gets_iki_and_virs_3m_lines():
           if p["aprasymas"].startswith("Sienų, lubų glaistymas/dažymas")]
     assert any("iki 3m" in l.lower() for l in gd), f"expected an iki-3m line: {gd}"
     assert any("virš 3m" in l.lower() for l in gd), f"expected a virš-3m line: {gd}"
+
+
+def test_led_niche_consolidated_default_on():
+    # 'LED nišų glaistymas' + 'LED nišų dažymas' collapse into the contractor's
+    # single 'LED nišų glaistymas/dažymas' line (Rangovas A samata item 23 — one
+    # m rate for both phases). Same length; the structural GKP framing line stays.
+    os.environ.pop("ENABLE_CONSOLIDATE_PAINT_LINES", None)  # defensive: default ON
+    r = _room()
+    r["nisu_metrai"] = 42.3
+    out = _build_pozicijos_from_rooms(_parsed([r]))
+    labels = [p["aprasymas"] for p in out["pozicijos"]]
+    assert "LED nišų glaistymas/dažymas" in labels, labels
+    assert "LED nišų glaistymas" not in labels, labels
+    assert "LED nišų dažymas" not in labels, labels
+    led = [p for p in out["pozicijos"] if p["aprasymas"] == "LED nišų glaistymas/dažymas"]
+    assert len(led) == 1
+    assert abs(led[0]["kiekis"] - 42.3) < 0.01, led[0]["kiekis"]
+    assert led[0].get("_detalus") == ["LED nišų glaistymas", "LED nišų dažymas"]
+    # the structural GKP framing line is a distinct operation — NOT collapsed
+    assert "Nišų formavimas GKP konstrukcijoje" in labels, labels
+
+
+def test_led_niche_split_when_flag_off():
+    os.environ["ENABLE_CONSOLIDATE_PAINT_LINES"] = "0"
+    try:
+        r = _room()
+        r["nisu_metrai"] = 42.3
+        out = _build_pozicijos_from_rooms(_parsed([r]))
+        labels = [p["aprasymas"] for p in out["pozicijos"]]
+        assert "LED nišų glaistymas" in labels, labels
+        assert "LED nišų dažymas" in labels, labels
+        assert "LED nišų glaistymas/dažymas" not in labels, labels
+    finally:
+        del os.environ["ENABLE_CONSOLIDATE_PAINT_LINES"]
