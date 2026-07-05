@@ -2818,7 +2818,10 @@ def _zone_category(ztype: str) -> str:
 
 
 _Q_RATES = {'Q1': 0.8, 'Q2': 1.0, 'Q3': 1.2, 'Q4': 1.5}
-_Q_THICK = {'Q1': 1.2, 'Q2': 1.25, 'Q3': 1.75, 'Q4': 2.5}
+# CLAUDE.md §1.11: Q4 = 3–5 mm full-surface skim (gloss/lacquer prep). Prior
+# value 2.5 mm under-ordered Q4 putty; set to mid-range 4 mm (2026-07-05).
+# Mirrors frontend/src/lib/interiorCalc.js Q_THICK.
+_Q_THICK = {'Q1': 1.2, 'Q2': 1.25, 'Q3': 1.75, 'Q4': 4}
 
 
 def _calculate_finishing_quantities(

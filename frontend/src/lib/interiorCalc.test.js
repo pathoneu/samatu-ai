@@ -252,8 +252,11 @@ test('gk_lapai: sheets = ceil(paint_wall_area / 3.0 × 1.10)', () => {
 
 // ── 8. GLAISTYMAS (skim coat) — Q-level rates/thickness from CLAUDE.md §1.11 ─
 // node:test has no test.each — loop and register each case individually.
+// Q4 thickness corrected 2.5 → 4 mm (2026-07-05) per CLAUDE.md §1.11
+// (Q4 = 3–5 mm full-surface skim; mid-range 4 mm). Prior 2.5 mm was a
+// characterization pin of an under-estimating value — updated to spec.
 for (const [level, rate, thickness] of [
-  ['Q1', 0.8, 1.2], ['Q2', 1.0, 1.25], ['Q3', 1.2, 1.75], ['Q4', 1.5, 2.5],
+  ['Q1', 0.8, 1.2], ['Q2', 1.0, 1.25], ['Q3', 1.2, 1.75], ['Q4', 1.5, 4],
 ]) {
   test(`glaistas: ${level} uses documented rate ${rate} kg/m²/mm and code thickness ${thickness}mm`, () => {
     const rawData = {
@@ -274,12 +277,11 @@ for (const [level, rate, thickness] of [
 }
 
 // CLAUDE.md §1.11 documents Q1=0.5-1mm, Q2=1-1.5mm, Q3=1.5-2mm, Q4=3-5mm as
-// TYPICAL thickness ranges. FINDING: the code's Q_THICK table (1.2/1.25/1.75/2.5mm)
-// does not match those ranges for Q1 (1.2mm is within 0.5-1mm? no — it's above)
-// or Q4 (2.5mm is well below the documented 3-5mm full-surface-skim range).
-// Flagged as a discrepancy, not fixed (accuracy-locked pending founder review).
-test('glaistas: Q_THICK table values (documented here to make the CLAUDE.md mismatch explicit)', () => {
-  const levels = { Q1: 1.2, Q2: 1.25, Q3: 1.75, Q4: 2.5 };
+// TYPICAL thickness ranges. Q4 corrected 2.5 → 4 mm (2026-07-05) to sit mid-range
+// in the documented 3–5 mm full-surface-skim band (was under-ordering putty).
+// Q1–Q3 left as-is (within/near their bands and unchanged by this pass).
+test('glaistas: Q_THICK table values match CLAUDE.md §1.11 (Q4 = 4 mm mid-range)', () => {
+  const levels = { Q1: 1.2, Q2: 1.25, Q3: 1.75, Q4: 4 };
   for (const [level, mm] of Object.entries(levels)) {
     const rawData = { patalpos: [{ nr: '1', plotas_m2: 10, lubu_aukstis_mm: 2500 }], sekcijos: {}, meta: { doors: [] } };
     const result = calculateInteriorQuantities(rawData, { glaistimo_lygis: level });
