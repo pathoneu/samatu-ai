@@ -4,6 +4,7 @@
  * loading / error / empty states. Dark-graphite identity throughout.
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowUp, ArrowDown, Minus, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -48,13 +49,14 @@ export function Panel({ className, children, tone }) {
  * cost — a rise is "bad"). pct === null (prior 0) renders a neutral "naujas".
  */
 export function DeltaChip({ delta, invert = false, unit = '%' }) {
+  const { t } = useTranslation();
   if (!delta) return null;
   const { pct } = delta;
 
   if (pct === null || pct === undefined) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground tabular-nums">
-        <Minus className="w-3 h-3" /> naujas
+        <Minus className="w-3 h-3" /> {t('admin.delta.new')}
       </span>
     );
   }
@@ -78,7 +80,7 @@ export function DeltaChip({ delta, invert = false, unit = '%' }) {
         'inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums',
         color,
       )}
-      title="Palyginti su ankstesniu laikotarpiu"
+      title={t('admin.delta.vsPrior')}
     >
       <Icon className="w-3 h-3" />
       {Math.abs(pct)}
@@ -106,15 +108,16 @@ export function PlanPill({ plan }) {
 
 /** Status pill — Aktyvus (green) / Išjungtas (red). */
 export function StatusPill({ active }) {
+  const { t } = useTranslation();
   return active ? (
     <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/12 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-      Aktyvus
+      {t('admin.status.active')}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/12 px-2 py-0.5 text-[11px] font-medium text-red-400">
       <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-      Išjungtas
+      {t('admin.status.disabled')}
     </span>
   );
 }

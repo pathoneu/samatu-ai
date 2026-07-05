@@ -6,6 +6,7 @@
  * Uses analytics.series (densified so the x-axis is a continuous calendar).
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
@@ -30,6 +31,7 @@ function MiniTooltip({ active, payload, label, unitLabel }) {
 }
 
 function MiniAreaChart({ data, dataKey, gradId, unitLabel }) {
+  const { t } = useTranslation();
   const total = data.reduce((s, r) => s + (Number(r[dataKey]) || 0), 0);
 
   return (
@@ -45,7 +47,7 @@ function MiniAreaChart({ data, dataKey, gradId, unitLabel }) {
       </div>
       {total === 0 ? (
         <div style={{ height: 140 }} className="flex items-center">
-          <EmptyLine>Nėra duomenų.</EmptyLine>
+          <EmptyLine>{t('admin.analytics.noData')}</EmptyLine>
         </div>
       ) : (
         <div style={{ height: 140 }}>
@@ -95,12 +97,13 @@ function MiniAreaChart({ data, dataKey, gradId, unitLabel }) {
 }
 
 export default function AnalyticsCharts({ analytics, loading, error, days }) {
+  const { t } = useTranslation();
   return (
     <section>
       <SectionHead
-        eyebrow="Analitika"
-        title="Aktyvumas per dieną"
-        hint="Registracijos, projektai ir ekstrakcijos pasirinktu laikotarpiu."
+        eyebrow={t('admin.analytics.eyebrow')}
+        title={t('admin.analytics.title')}
+        hint={t('admin.analytics.hint')}
       />
 
       {error && <ErrorLine message={error} />}
@@ -119,9 +122,9 @@ export default function AnalyticsCharts({ analytics, loading, error, days }) {
             const data = densifySeries(analytics.series, days);
             return (
               <>
-                <MiniAreaChart data={data} dataKey="signups"     gradId="gSignups"  unitLabel="Registracijos" />
-                <MiniAreaChart data={data} dataKey="projects"    gradId="gProjects" unitLabel="Projektai" />
-                <MiniAreaChart data={data} dataKey="extractions" gradId="gExtract"  unitLabel="Ekstrakcijos" />
+                <MiniAreaChart data={data} dataKey="signups"     gradId="gSignups"  unitLabel={t('admin.analytics.signups')} />
+                <MiniAreaChart data={data} dataKey="projects"    gradId="gProjects" unitLabel={t('admin.analytics.projects')} />
+                <MiniAreaChart data={data} dataKey="extractions" gradId="gExtract"  unitLabel={t('admin.analytics.extractions')} />
               </>
             );
           })()}

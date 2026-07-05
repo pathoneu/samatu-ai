@@ -7,33 +7,22 @@
  * error_log_tail is always []; we show the note instead of a broken tail).
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Database, Info, Activity } from 'lucide-react';
 import { SectionHead, Panel, EmptyLine, ErrorLine, BlockSkeleton } from './adminPrimitives';
 import { fmtInt, fmtBytes, fmtRelative, fmtDateTime } from './adminUtils';
 
-const TOTAL_LABELS = {
-  users: 'Vartotojai',
-  projects: 'Projektai',
-  extractions: 'Ekstrakcijos',
-  usage_events: 'Naudojimo įvykiai',
-  invoices: 'Sąskaitos',
-  corrections: 'Korekcijos',
-};
-
-const ACTIVITY_LABELS = {
-  last_signup: 'Pask. registracija',
-  last_project: 'Pask. projektas',
-  last_usage_event: 'Pask. įvykis',
-  last_invoice: 'Pask. sąskaita',
-};
+// Keys of the recent-activity block, in display order. Labels resolve via i18n.
+const ACTIVITY_KEYS = ['last_signup', 'last_project', 'last_usage_event', 'last_invoice'];
 
 export default function HealthPanel({ health, loading, error }) {
+  const { t } = useTranslation();
   return (
     <section>
       <SectionHead
-        eyebrow="Sistema"
-        title="Būklė"
-        hint="Lentelių dydžiai, įvykių apimtis, DB dydis ir paskutinis aktyvumas."
+        eyebrow={t('admin.health.eyebrow')}
+        title={t('admin.health.title')}
+        hint={t('admin.health.hint')}
       />
 
       {error && <ErrorLine message={error} />}
@@ -43,21 +32,21 @@ export default function HealthPanel({ health, loading, error }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Table totals */}
           <Panel className="p-4">
-            <div className="skyrius-header mb-3">Lentelių įrašai</div>
+            <div className="skyrius-header mb-3">{t('admin.health.tableRecords')}</div>
             <ul className="space-y-1.5">
               {Object.entries(health.totals || {}).map(([k, v]) => (
                 <li key={k} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{TOTAL_LABELS[k] || k}</span>
+                  <span className="text-muted-foreground">{t(`admin.health.totals.${k}`, { defaultValue: k })}</span>
                   <span className="font-mono tabular-nums text-foreground">{fmtInt(v)}</span>
                 </li>
               ))}
               {Object.keys(health.totals || {}).length === 0 && (
-                <EmptyLine>Nėra duomenų.</EmptyLine>
+                <EmptyLine>{t('admin.health.noData')}</EmptyLine>
               )}
             </ul>
             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Database className="w-3.5 h-3.5" /> DB dydis
+                <Database className="w-3.5 h-3.5" /> {t('admin.health.dbSize')}
               </span>
               <span className="font-mono tabular-nums text-sm text-foreground">
                 {fmtBytes(health.db_size_bytes)}
@@ -67,9 +56,9 @@ export default function HealthPanel({ health, loading, error }) {
 
           {/* Event kinds (30d) */}
           <Panel className="p-4">
-            <div className="skyrius-header mb-3">Įvykiai pagal tipą (30 d.)</div>
+            <div className="skyrius-header mb-3">{t('admin.health.eventsByKind')}</div>
             {(health.events_by_kind || []).length === 0 ? (
-              <EmptyLine>Įvykių nėra.</EmptyLine>
+              <EmptyLine>{t('admin.health.noEvents')}</EmptyLine>
             ) : (
               <EventKindBars events={health.events_by_kind} />
             )}
@@ -79,14 +68,14 @@ export default function HealthPanel({ health, loading, error }) {
           <div className="space-y-4">
             <Panel className="p-4">
               <div className="flex items-center gap-1.5 skyrius-header mb-3">
-                <Activity className="w-3.5 h-3.5" /> Paskutinis aktyvumas
+                <Activity className="w-3.5 h-3.5" /> {t('admin.health.recentActivity')}
               </div>
               <ul className="space-y-2">
-                {Object.entries(ACTIVITY_LABELS).map(([k, label]) => {
+                {ACTIVITY_KEYS.map((k) => {
                   const ts = health.recent_activity?.[k];
                   return (
                     <li key={k} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{label}</span>
+                      <span className="text-muted-foreground">{t(`admin.health.activity.${k}`)}</span>
                       <span className="text-xs text-foreground tabular-nums" title={ts ? fmtDateTime(ts) : ''}>
                         {fmtRelative(ts)}
                       </span>
@@ -97,7 +86,7 @@ export default function HealthPanel({ health, loading, error }) {
             </Panel>
 
             <Panel className="p-4">
-              <div className="skyrius-header mb-2">Klaidų žurnalas</div>
+              <div className="skyrius-header mb-2">{t('admin.health.errorLog')}</div>
               {(health.error_log_tail || []).length > 0 ? (
                 <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap max-h-40 overflow-auto">
                   {health.error_log_tail.join('\n')}
@@ -105,7 +94,7 @@ export default function HealthPanel({ health, loading, error }) {
               ) : (
                 <div className="flex items-start gap-2 text-xs text-muted-foreground">
                   <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>{health.note || 'Nėra išsaugoto klaidų žurnalo.'}</span>
+                  <span>{health.note || t('admin.health.noErrorLog')}</span>
                 </div>
               )}
             </Panel>

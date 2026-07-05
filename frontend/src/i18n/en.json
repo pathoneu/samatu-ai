@@ -447,6 +447,118 @@
       "toastFileReadFail": "Could not read the file"
     }
   },
+  "admin": {
+    "loading": "Loading…",
+    "dash": {
+      "eyebrow": "PATHON / ADMIN",
+      "title": "Operations dashboard",
+      "subtitle": "Analytics, cost control, users and system health.",
+      "rangeDays": "{{count}} d.",
+      "refresh": "Refresh data",
+      "exportHead": "Export",
+      "exportUsers": "Export users (CSV)",
+      "exportCost": "Export costs (CSV)"
+    },
+    "kpi": {
+      "users": "Users",
+      "projects": "Projects",
+      "extractions": "Extractions",
+      "apiCost": "API costs",
+      "revenue": "Revenue"
+    },
+    "delta": {
+      "new": "new",
+      "vsPrior": "Compared to the previous period"
+    },
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "cost": {
+      "eyebrow": "Cost monitor",
+      "title": "Cost control",
+      "hint": "Real API cost meter (usage_events). Watch the daily limits so you don't exceed the budget.",
+      "expenses": "Costs",
+      "events": "Events",
+      "totalTile": "Total ($ orig.)",
+      "perDays": "over {{count}} d.",
+      "avgTile": "Avg. / extr.",
+      "avgSub": "on average",
+      "dailyCost": "Daily costs (€)",
+      "byModel": "Costs by model",
+      "today": "Today's costs",
+      "budgetSuffix": "budget",
+      "over": "Daily reference limit exceeded",
+      "pctOfBudget": "{{pct}}% of the reference daily budget",
+      "noAlerts": "No alerts",
+      "noAlertsDesc": "No user exceeded the {{threshold}} limit today.",
+      "alerts": "Alerts ({{count}})",
+      "limitPerDay": "limit {{threshold}}/d.",
+      "noCostData": "No cost data for the selected period.",
+      "noModelData": "No per-model cost data."
+    },
+    "analytics": {
+      "eyebrow": "Analytics",
+      "title": "Activity per day",
+      "hint": "Signups, projects and extractions over the selected period.",
+      "noData": "No data.",
+      "signups": "Signups",
+      "projects": "Projects",
+      "extractions": "Extractions"
+    },
+    "health": {
+      "eyebrow": "System",
+      "title": "Health",
+      "hint": "Table sizes, event volume, DB size and last activity.",
+      "totals": {
+        "users": "Users",
+        "projects": "Projects",
+        "extractions": "Extractions",
+        "usage_events": "Usage events",
+        "invoices": "Invoices",
+        "corrections": "Corrections"
+      },
+      "activity": {
+        "last_signup": "Last signup",
+        "last_project": "Last project",
+        "last_usage_event": "Last event",
+        "last_invoice": "Last invoice"
+      },
+      "tableRecords": "Table records",
+      "noData": "No data.",
+      "dbSize": "DB size",
+      "eventsByKind": "Events by kind (30 d.)",
+      "noEvents": "No events.",
+      "recentActivity": "Last activity",
+      "errorLog": "Error log",
+      "noErrorLog": "No stored error log."
+    },
+    "users": {
+      "eyebrow": "User management",
+      "title": "Users",
+      "hint": "Search by email, name or company. Disabling blocks login.",
+      "search": "Search users…",
+      "colEmail": "Email",
+      "colCompany": "Company",
+      "colPlan": "Plan",
+      "colStatus": "Status",
+      "colProjects": "Projects",
+      "colSpend": "Costs",
+      "colRegistered": "Registered",
+      "colLastLogin": "Last login",
+      "colAction": "Action",
+      "notFound": "No users found for „{{search}}“.",
+      "none": "No users.",
+      "never": "never",
+      "disable": "Disable",
+      "enable": "Enable",
+      "pageOf": "of",
+      "confirmTitle": "Disable user?",
+      "confirmDescA": "User ",
+      "confirmDescB": " will no longer be able to log in until you enable them again. Their projects and data are retained.",
+      "cancel": "Cancel"
+    }
+  },
   "newProject": {
     "types": {
       "interior": { "label": "Interior project", "desc": "Finishing quantities (recommended)" },

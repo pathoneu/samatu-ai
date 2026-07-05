@@ -450,6 +450,118 @@
       "toastFileReadFail": "Nepavyko nuskaityti failo"
     }
   },
+  "admin": {
+    "loading": "Kraunama…",
+    "dash": {
+      "eyebrow": "PATHON / ADMIN",
+      "title": "Operacinis pultas",
+      "subtitle": "Analitika, kaštų kontrolė, vartotojai ir sistemos būklė.",
+      "rangeDays": "{{count}} d.",
+      "refresh": "Atnaujinti duomenis",
+      "exportHead": "Eksportas",
+      "exportUsers": "Eksportuoti vartotojus (CSV)",
+      "exportCost": "Eksportuoti sąnaudas (CSV)"
+    },
+    "kpi": {
+      "users": "Vartotojai",
+      "projects": "Projektai",
+      "extractions": "Ekstrakcijos",
+      "apiCost": "API sąnaudos",
+      "revenue": "Pajamos"
+    },
+    "delta": {
+      "new": "naujas",
+      "vsPrior": "Palyginti su ankstesniu laikotarpiu"
+    },
+    "status": {
+      "active": "Aktyvus",
+      "disabled": "Išjungtas"
+    },
+    "cost": {
+      "eyebrow": "Kaštų monitorius",
+      "title": "Sąnaudų kontrolė",
+      "hint": "Realus API kaštų matuoklis (usage_events). Sekite dienos ribas, kad neviršytumėte biudžeto.",
+      "expenses": "Sąnaudos",
+      "events": "Įvykių",
+      "totalTile": "Iš viso ($ lang.)",
+      "perDays": "per {{count}} d.",
+      "avgTile": "Vid. / ekstr.",
+      "avgSub": "vidutiniškai",
+      "dailyCost": "Dienos sąnaudos (€)",
+      "byModel": "Sąnaudos pagal modelį",
+      "today": "Šiandienos sąnaudos",
+      "budgetSuffix": "biudž.",
+      "over": "Viršyta dienos orientacinė riba",
+      "pctOfBudget": "{{pct}}% orientacinio dienos biudžeto",
+      "noAlerts": "Nėra perspėjimų",
+      "noAlertsDesc": "Nė vienas vartotojas šiandien neviršijo {{threshold}} ribos.",
+      "alerts": "Perspėjimai ({{count}})",
+      "limitPerDay": "riba {{threshold}}/d.",
+      "noCostData": "Nėra sąnaudų duomenų pasirinktu laikotarpiu.",
+      "noModelData": "Nėra modelių sąnaudų duomenų."
+    },
+    "analytics": {
+      "eyebrow": "Analitika",
+      "title": "Aktyvumas per dieną",
+      "hint": "Registracijos, projektai ir ekstrakcijos pasirinktu laikotarpiu.",
+      "noData": "Nėra duomenų.",
+      "signups": "Registracijos",
+      "projects": "Projektai",
+      "extractions": "Ekstrakcijos"
+    },
+    "health": {
+      "eyebrow": "Sistema",
+      "title": "Būklė",
+      "hint": "Lentelių dydžiai, įvykių apimtis, DB dydis ir paskutinis aktyvumas.",
+      "totals": {
+        "users": "Vartotojai",
+        "projects": "Projektai",
+        "extractions": "Ekstrakcijos",
+        "usage_events": "Naudojimo įvykiai",
+        "invoices": "Sąskaitos",
+        "corrections": "Korekcijos"
+      },
+      "activity": {
+        "last_signup": "Pask. registracija",
+        "last_project": "Pask. projektas",
+        "last_usage_event": "Pask. įvykis",
+        "last_invoice": "Pask. sąskaita"
+      },
+      "tableRecords": "Lentelių įrašai",
+      "noData": "Nėra duomenų.",
+      "dbSize": "DB dydis",
+      "eventsByKind": "Įvykiai pagal tipą (30 d.)",
+      "noEvents": "Įvykių nėra.",
+      "recentActivity": "Paskutinis aktyvumas",
+      "errorLog": "Klaidų žurnalas",
+      "noErrorLog": "Nėra išsaugoto klaidų žurnalo."
+    },
+    "users": {
+      "eyebrow": "Vartotojų valdymas",
+      "title": "Vartotojai",
+      "hint": "Paieška el. paštu, vardu ar įmone. Išjungimas užblokuoja prisijungimą.",
+      "search": "Ieškoti vartotojų…",
+      "colEmail": "El. paštas",
+      "colCompany": "Įmonė",
+      "colPlan": "Planas",
+      "colStatus": "Būsena",
+      "colProjects": "Projektai",
+      "colSpend": "Sąnaudos",
+      "colRegistered": "Registruota",
+      "colLastLogin": "Pask. prisij.",
+      "colAction": "Veiksmas",
+      "notFound": "Nerasta vartotojų pagal „{{search}}“.",
+      "none": "Vartotojų nėra.",
+      "never": "niekada",
+      "disable": "Išjungti",
+      "enable": "Aktyvuoti",
+      "pageOf": "iš",
+      "confirmTitle": "Išjungti vartotoją?",
+      "confirmDescA": "Vartotojas ",
+      "confirmDescB": " nebegalės prisijungti, kol vėl jį aktyvuosite. Jo projektai ir duomenys išliks.",
+      "cancel": "Atšaukti"
+    }
+  },
   "newProject": {
     "types": {
       "interior": { "label": "Interjero projektas", "desc": "Apdailos kiekiai (rekomenduojama)" },

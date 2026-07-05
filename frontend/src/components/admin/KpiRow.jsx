@@ -9,6 +9,7 @@
  *    delta taken from analytics.deltas.cost_eur (same underlying series).
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, FolderKanban, ScanLine, Wallet, TrendingUp } from 'lucide-react';
 import { DeltaChip, KpiSkeleton } from './adminPrimitives';
 import { fmtInt, fmtEur } from './adminUtils';
@@ -36,21 +37,22 @@ function KpiCard({ icon: Icon, label, value, delta, invert }) {
 }
 
 export default function KpiRow({ analytics, cost, loading }) {
+  const { t } = useTranslation();
   if (loading || !analytics) return <KpiSkeleton />;
 
-  const t = analytics.totals || {};
+  const tot = analytics.totals || {};
   const d = analytics.deltas || {};
   // Prefer the accurate cost meter from cost-monitor; fall back to analytics
   // totals if cost-monitor errored independently.
-  const totalCost = cost?.total_cost_eur ?? t.cost_eur ?? 0;
+  const totalCost = cost?.total_cost_eur ?? tot.cost_eur ?? 0;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      <KpiCard icon={Users}        label="Vartotojai"   value={fmtInt(t.signups)}     delta={d.signups} />
-      <KpiCard icon={FolderKanban} label="Projektai"    value={fmtInt(t.projects)}    delta={d.projects} />
-      <KpiCard icon={ScanLine}     label="Ekstrakcijos" value={fmtInt(t.extractions)} delta={d.extractions} />
-      <KpiCard icon={Wallet}       label="API sąnaudos" value={fmtEur(totalCost)}     delta={d.cost_eur} invert />
-      <KpiCard icon={TrendingUp}   label="Pajamos"      value={fmtEur(t.revenue_eur)} delta={d.revenue_eur} />
+      <KpiCard icon={Users}        label={t('admin.kpi.users')}       value={fmtInt(tot.signups)}     delta={d.signups} />
+      <KpiCard icon={FolderKanban} label={t('admin.kpi.projects')}    value={fmtInt(tot.projects)}    delta={d.projects} />
+      <KpiCard icon={ScanLine}     label={t('admin.kpi.extractions')} value={fmtInt(tot.extractions)} delta={d.extractions} />
+      <KpiCard icon={Wallet}       label={t('admin.kpi.apiCost')}     value={fmtEur(totalCost)}       delta={d.cost_eur} invert />
+      <KpiCard icon={TrendingUp}   label={t('admin.kpi.revenue')}     value={fmtEur(tot.revenue_eur)} delta={d.revenue_eur} />
     </div>
   );
 }

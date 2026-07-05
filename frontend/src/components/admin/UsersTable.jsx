@@ -11,6 +11,7 @@
  * last_login_at, project_count, total_spend_eur.
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, ShieldAlert, UserX, UserCheck, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import { fetchAdmin, postAdmin, fmtEur, fmtInt, fmtDate } from './adminUtils';
 const LIMIT = 25;
 
 export default function UsersTable() {
+  const { t } = useTranslation();
   const [search, setSearch] = React.useState('');
   const [debounced, setDebounced] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -40,11 +42,11 @@ export default function UsersTable() {
 
   // Debounce the search box → refetch.
   React.useEffect(() => {
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       setDebounced(search.trim());
       setPage(1);
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [search]);
 
   const load = React.useCallback(() => {
@@ -91,16 +93,16 @@ export default function UsersTable() {
   return (
     <section>
       <SectionHead
-        eyebrow="Vartotojų valdymas"
-        title="Vartotojai"
-        hint="Paieška el. paštu, vardu ar įmone. Išjungimas užblokuoja prisijungimą."
+        eyebrow={t('admin.users.eyebrow')}
+        title={t('admin.users.title')}
+        hint={t('admin.users.hint')}
         right={
           <div className="relative w-64 max-w-[60vw]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ieškoti vartotojų…"
+              placeholder={t('admin.users.search')}
               className="pl-8 h-9 bg-secondary/50 border-border"
             />
           </div>
@@ -123,15 +125,15 @@ export default function UsersTable() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-border bg-secondary/30">
-                  <Th>El. paštas</Th>
-                  <Th>Įmonė</Th>
-                  <Th>Planas</Th>
-                  <Th>Būsena</Th>
-                  <Th align="right">Projektai</Th>
-                  <Th align="right">Sąnaudos</Th>
-                  <Th>Registruota</Th>
-                  <Th>Pask. prisij.</Th>
-                  <Th align="right">Veiksmas</Th>
+                  <Th>{t('admin.users.colEmail')}</Th>
+                  <Th>{t('admin.users.colCompany')}</Th>
+                  <Th>{t('admin.users.colPlan')}</Th>
+                  <Th>{t('admin.users.colStatus')}</Th>
+                  <Th align="right">{t('admin.users.colProjects')}</Th>
+                  <Th align="right">{t('admin.users.colSpend')}</Th>
+                  <Th>{t('admin.users.colRegistered')}</Th>
+                  <Th>{t('admin.users.colLastLogin')}</Th>
+                  <Th align="right">{t('admin.users.colAction')}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -149,8 +151,8 @@ export default function UsersTable() {
                     <td colSpan={9}>
                       <EmptyLine>
                         {debounced
-                          ? `Nerasta vartotojų pagal „${debounced}“.`
-                          : 'Vartotojų nėra.'}
+                          ? t('admin.users.notFound', { search: debounced })
+                          : t('admin.users.none')}
                       </EmptyLine>
                     </td>
                   </tr>
@@ -197,7 +199,7 @@ export default function UsersTable() {
                       {fmtDate(u.created_at)}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground tabular-nums">
-                      {u.last_login_at ? fmtDate(u.last_login_at) : 'niekada'}
+                      {u.last_login_at ? fmtDate(u.last_login_at) : t('admin.users.never')}
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       {u.is_admin ? (
@@ -215,7 +217,7 @@ export default function UsersTable() {
                           ) : (
                             <UserX className="w-3.5 h-3.5" />
                           )}
-                          Išjungti
+                          {t('admin.users.disable')}
                         </Button>
                       ) : (
                         <Button
@@ -230,7 +232,7 @@ export default function UsersTable() {
                           ) : (
                             <UserCheck className="w-3.5 h-3.5" />
                           )}
-                          Aktyvuoti
+                          {t('admin.users.enable')}
                         </Button>
                       )}
                     </td>
@@ -245,7 +247,7 @@ export default function UsersTable() {
         {!error && total > 0 && (
           <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-border bg-secondary/20">
             <span className="text-xs text-muted-foreground tabular-nums">
-              {fmtInt(from)}–{fmtInt(to)} iš {fmtInt(total)}
+              {fmtInt(from)}–{fmtInt(to)} {t('admin.users.pageOf')} {fmtInt(total)}
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -278,16 +280,15 @@ export default function UsersTable() {
       <AlertDialog open={!!confirmUser} onOpenChange={(open) => !open && setConfirmUser(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Išjungti vartotoją?</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.users.confirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Vartotojas{' '}
-              <span className="font-mono text-foreground">{confirmUser?.email}</span>{' '}
-              nebegalės prisijungti, kol vėl jį aktyvuosite. Jo projektai ir duomenys
-              išliks.
+              {t('admin.users.confirmDescA')}
+              <span className="font-mono text-foreground">{confirmUser?.email}</span>
+              {t('admin.users.confirmDescB')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Atšaukti</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.users.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={(e) => {
@@ -298,7 +299,7 @@ export default function UsersTable() {
               {busyId === confirmUser?.id ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                'Išjungti'
+                t('admin.users.disable')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

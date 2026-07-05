@@ -16,6 +16,7 @@
  */
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Download, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ import { fetchAdmin, downloadCsv } from '@/components/admin/adminUtils';
 const RANGES = [7, 30, 90];
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const { user, isAdmin, isLoading } = useAuth();
   const [days, setDays] = React.useState(30);
 
@@ -86,7 +88,7 @@ export default function AdminDashboard() {
     setRefreshing(false);
   }
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Kraunama…</div>;
+  if (isLoading) return <div className="p-8 text-muted-foreground">{t('admin.loading')}</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
@@ -96,15 +98,15 @@ export default function AdminDashboard() {
         {/* ── Header + controls ── */}
         <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <div className="mono-tick mb-1">PATHON / ADMIN</div>
+            <div className="mono-tick mb-1">{t('admin.dash.eyebrow')}</div>
             <h1
               className="text-foreground"
               style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}
             >
-              Operacinis pultas
+              {t('admin.dash.title')}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Analitika, kaštų kontrolė, vartotojai ir sistemos būklė.
+              {t('admin.dash.subtitle')}
             </p>
           </div>
 
@@ -121,7 +123,7 @@ export default function AdminDashboard() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {r} d.
+                  {t('admin.dash.rangeDays', { count: r })}
                 </button>
               ))}
             </div>
@@ -131,7 +133,7 @@ export default function AdminDashboard() {
               className="h-9"
               onClick={refreshAll}
               disabled={refreshing}
-              title="Atnaujinti duomenis"
+              title={t('admin.dash.refresh')}
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
@@ -166,14 +168,14 @@ export default function AdminDashboard() {
 
         {/* ── 7. Export ── */}
         <section>
-          <div className="skyrius-header mb-3">Eksportas</div>
+          <div className="skyrius-header mb-3">{t('admin.dash.exportHead')}</div>
           <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"
               onClick={() => downloadCsv('/api/admin/v2/export/users.csv', 'pathon-users.csv')}
             >
               <Download className="w-4 h-4" />
-              Eksportuoti vartotojus (CSV)
+              {t('admin.dash.exportUsers')}
             </Button>
             <Button
               variant="outline"
@@ -182,7 +184,7 @@ export default function AdminDashboard() {
               }
             >
               <Download className="w-4 h-4" />
-              Eksportuoti sąnaudas (CSV)
+              {t('admin.dash.exportCost')}
             </Button>
           </div>
         </section>

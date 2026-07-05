@@ -14,6 +14,7 @@
  *   alerts[{user_id, email, spend_today_eur}].
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
@@ -34,12 +35,13 @@ function softDailyBudget(alertThreshold) {
 }
 
 function CostTooltip({ active, payload, label }) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-xs shadow-xl">
       <div className="font-medium text-foreground mb-1">{label}</div>
       <div className="flex items-center justify-between gap-4 tabular-nums">
-        <span className="text-muted-foreground">Sąnaudos</span>
+        <span className="text-muted-foreground">{t('admin.cost.expenses')}</span>
         <span className="font-mono text-primary">{fmtEur(payload[0].value)}</span>
       </div>
     </div>
@@ -47,17 +49,18 @@ function CostTooltip({ active, payload, label }) {
 }
 
 function ModelTooltip({ active, payload }) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
     <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-xs shadow-xl">
       <div className="font-mono text-foreground mb-1 break-all max-w-[220px]">{p.model}</div>
       <div className="flex items-center justify-between gap-4 tabular-nums">
-        <span className="text-muted-foreground">Sąnaudos</span>
+        <span className="text-muted-foreground">{t('admin.cost.expenses')}</span>
         <span className="font-mono text-primary">{fmtEur(p.cost_eur)}</span>
       </div>
       <div className="flex items-center justify-between gap-4 tabular-nums">
-        <span className="text-muted-foreground">Įvykių</span>
+        <span className="text-muted-foreground">{t('admin.cost.events')}</span>
         <span className="font-mono text-foreground">{fmtInt(p.event_count)}</span>
       </div>
     </div>
@@ -83,12 +86,13 @@ function StatTile({ icon: Icon, label, value, sub }) {
 }
 
 export default function CostMonitor({ cost, analytics, loading, error, days }) {
+  const { t } = useTranslation();
   return (
     <section>
       <SectionHead
-        eyebrow="Kaštų monitorius"
-        title="Sąnaudų kontrolė"
-        hint="Realus API kaštų matuoklis (usage_events). Sekite dienos ribas, kad neviršytumėte biudžeto."
+        eyebrow={t('admin.cost.eyebrow')}
+        title={t('admin.cost.title')}
+        hint={t('admin.cost.hint')}
       />
 
       {error && <ErrorLine message={error} />}
@@ -103,15 +107,15 @@ export default function CostMonitor({ cost, analytics, loading, error, days }) {
             <div className="grid grid-cols-2 gap-3">
               <StatTile
                 icon={Wallet}
-                label="Iš viso ($ lang.)"
+                label={t('admin.cost.totalTile')}
                 value={fmtEur(cost.total_cost_eur)}
-                sub={`per ${days} d.`}
+                sub={t('admin.cost.perDays', { count: days })}
               />
               <StatTile
                 icon={Gauge}
-                label="Vid. / ekstr."
+                label={t('admin.cost.avgTile')}
                 value={fmtEurPrecise(cost.avg_cost_per_extraction_eur)}
-                sub="vidutiniškai"
+                sub={t('admin.cost.avgSub')}
               />
             </div>
             <AlertsList cost={cost} />
@@ -120,11 +124,11 @@ export default function CostMonitor({ cost, analytics, loading, error, days }) {
           {/* ── Right: cost chart + per-model bars ── */}
           <div className="lg:col-span-2 space-y-4">
             <Panel className="p-4">
-              <div className="skyrius-header mb-3">Dienos sąnaudos (€)</div>
+              <div className="skyrius-header mb-3">{t('admin.cost.dailyCost')}</div>
               <CostAreaChart analytics={analytics} days={days} />
             </Panel>
             <Panel className="p-4">
-              <div className="skyrius-header mb-3">Sąnaudos pagal modelį</div>
+              <div className="skyrius-header mb-3">{t('admin.cost.byModel')}</div>
               <ModelBars byModel={cost.by_model} />
             </Panel>
           </div>
@@ -135,6 +139,7 @@ export default function CostMonitor({ cost, analytics, loading, error, days }) {
 }
 
 function TodayVsBudget({ cost }) {
+  const { t } = useTranslation();
   const today = Number(cost.today_cost_eur) || 0;
   const budget = softDailyBudget(cost.alert_threshold_eur);
   const pct = Math.min(100, (today / budget) * 100);
@@ -147,7 +152,7 @@ function TodayVsBudget({ cost }) {
 
   return (
     <Panel className="p-4" tone={over ? 'warning' : undefined}>
-      <div className="skyrius-header mb-1.5">Šiandienos sąnaudos</div>
+      <div className="skyrius-header mb-1.5">{t('admin.cost.today')}</div>
       <div className="flex items-baseline gap-2">
         <span
           className="tabular-nums text-foreground"
@@ -156,7 +161,7 @@ function TodayVsBudget({ cost }) {
           {fmtEur(today)}
         </span>
         <span className="text-xs text-muted-foreground tabular-nums">
-          / {fmtEur(budget)} biudž.
+          / {fmtEur(budget)} {t('admin.cost.budgetSuffix')}
         </span>
       </div>
       <div className="mt-3 h-2 w-full rounded-full bg-secondary overflow-hidden">
@@ -167,14 +172,15 @@ function TodayVsBudget({ cost }) {
       </div>
       <div className="mt-1.5 text-[11px] text-muted-foreground">
         {over
-          ? 'Viršyta dienos orientacinė riba'
-          : `${Math.round(pct)}% orientacinio dienos biudžeto`}
+          ? t('admin.cost.over')
+          : t('admin.cost.pctOfBudget', { pct: Math.round(pct) })}
       </div>
     </Panel>
   );
 }
 
 function AlertsList({ cost }) {
+  const { t } = useTranslation();
   const alerts = cost.alerts || [];
   const threshold = cost.alert_threshold_eur;
 
@@ -183,10 +189,10 @@ function AlertsList({ cost }) {
       <Panel className="p-4">
         <div className="flex items-center gap-2 text-emerald-400">
           <ShieldCheck className="w-4 h-4" />
-          <span className="text-sm font-medium">Nėra perspėjimų</span>
+          <span className="text-sm font-medium">{t('admin.cost.noAlerts')}</span>
         </div>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Nė vienas vartotojas šiandien neviršijo {fmtEur(threshold)} ribos.
+          {t('admin.cost.noAlertsDesc', { threshold: fmtEur(threshold) })}
         </p>
       </Panel>
     );
@@ -197,10 +203,10 @@ function AlertsList({ cost }) {
       <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 border-b border-primary/25">
         <AlertTriangle className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold text-foreground">
-          Perspėjimai ({alerts.length})
+          {t('admin.cost.alerts', { count: alerts.length })}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
-          riba {fmtEur(threshold)}/d.
+          {t('admin.cost.limitPerDay', { threshold: fmtEur(threshold) })}
         </span>
       </div>
       <ul className="divide-y divide-border/60">
@@ -220,6 +226,7 @@ function AlertsList({ cost }) {
 }
 
 function CostAreaChart({ analytics, days }) {
+  const { t } = useTranslation();
   const series = densifySeries(analytics?.series, days).map((r) => ({
     date: r.date,
     cost_eur: Number(r.cost_eur) || 0,
@@ -227,7 +234,7 @@ function CostAreaChart({ analytics, days }) {
   const hasData = series.some((r) => r.cost_eur > 0);
 
   if (!hasData) {
-    return <EmptyLine>Nėra sąnaudų duomenų pasirinktu laikotarpiu.</EmptyLine>;
+    return <EmptyLine>{t('admin.cost.noCostData')}</EmptyLine>;
   }
 
   return (
@@ -273,12 +280,13 @@ function CostAreaChart({ analytics, days }) {
 }
 
 function ModelBars({ byModel }) {
+  const { t } = useTranslation();
   const data = (byModel || [])
     .map((m) => ({ ...m, cost_eur: Number(m.cost_eur) || 0 }))
     .filter((m) => m.cost_eur > 0);
 
   if (data.length === 0) {
-    return <EmptyLine>Nėra modelių sąnaudų duomenų.</EmptyLine>;
+    return <EmptyLine>{t('admin.cost.noModelData')}</EmptyLine>;
   }
 
   // Short label for the axis (strip vendor prefixes / date suffixes visually).
