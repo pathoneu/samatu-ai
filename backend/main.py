@@ -3044,7 +3044,9 @@ def _calculate_finishing_quantities(
             for d in (meta.get("doors") or [])
             if nr in (d.get("between") or [])
         )
-        grindjuostes_m += max(0.0, perim_m - door_widths)
+        # CLAUDE.md §1.4: baseboard = perimeter − Σ(door_widths) + 10% waste.
+        # Mirrors frontend interiorCalc.js; applied once (2026-07-05).
+        grindjuostes_m += max(0.0, perim_m - door_widths) * 1.10
 
     # ── 7. ANGOKRAŠČIŲ PLOTAS (sienos_storis) ────────────────────────────────
     angokrasciai_area_m2 = round(angokrasciai_m * sienos_storis_m, 2)

@@ -136,12 +136,12 @@ test('angokrasciai: custom_windows override replaces section-derived windows', (
 
 // ── 4. GRINDJUOSTĖS (baseboards) ────────────────────────────────────────────
 // CLAUDE.md §1.4: baseboard = room_perimeter − Σ(door_widths) + 10% waste.
-// FINDING: current code does perimeter − door_widths with NO +10% waste
-// factor applied at this layer (waste is applied later, e.g. WASTE_FACTORS
-// UI table lists Grindjuostės at 10%, but interiorCalc itself returns the
-// pre-waste net length). This test pins the CURRENT (pre-waste) behavior;
-// see report for the discrepancy flag — not fixed here (accuracy-locked).
-test('grindjuostes: sectioned room = perimeter − door width (no waste factor applied here)', () => {
+// FIXED 2026-07-05: the +10% waste is now applied here, exactly once. Trace
+// confirmed the WASTE_FACTORS UI table (ltLibrary.js Grindjuostės 10%) is
+// display-only and the ExportModal reads grindjuostes.viso_m verbatim, so the
+// waste was previously applied ZERO times end-to-end. lubu_perimetras stays
+// net (§1.4: ceiling cornice gets +5%, tracked separately, not baseboard).
+test('grindjuostes: sectioned room = (perimeter − door width) × 1.10 waste (§1.4)', () => {
   const rawData = {
     patalpos: [{ nr: '201', plotas_m2: 12, lubu_aukstis_mm: 2500 }],
     sekcijos: {
@@ -153,8 +153,9 @@ test('grindjuostes: sectioned room = perimeter − door width (no waste factor a
     meta: { doors: [{ width_mm: 900, height_mm: 2100, between: ['201'] }] },
   };
   const result = calculateInteriorQuantities(rawData, {});
-  // perimeter = 4000+3000+4000+3000 = 14000mm = 14m; minus door 0.9m => 13.1m
-  assert.equal(result.grindjuostes.viso_m, 13.1);
+  // perimeter = 4000+3000+4000+3000 = 14000mm = 14m; minus door 0.9m => 13.1m net
+  // grindjuostės = 13.1 × 1.10 (§1.4 waste) = 14.41 → round1 = 14.4m
+  assert.equal(result.grindjuostes.viso_m, 14.4);
   assert.equal(result.lubu_perimetras.viso_m, 14);
 });
 
