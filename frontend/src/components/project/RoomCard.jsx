@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Edit2, Check, X, AlertCircle, Eye, BookOpen, Palette, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { getPdfBlob } from '@/lib/pdfStore';
 import ConfidenceBadge from './ConfidenceBadge';
@@ -22,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 // ── Confidence dot (žalia/geltona/raudona) ────────────────────────────────────
 
 function ConfidenceDot({ level, hint }) {
+  const { t } = useTranslation();
   if (!level) return null;
   const colors = {
     high:   'bg-green-500',
@@ -30,9 +32,9 @@ function ConfidenceDot({ level, hint }) {
   };
   const emojis = { high: '🟢', medium: '🟡', low: '🔴' };
   const titles = {
-    high:   'Nuskaityta tiesiai iš brėžinio',
-    medium: 'Apskaičiuota su prielaida',
-    low:    'Numatytoji reikšmė — patikrinkite',
+    high:   t('project.roomCard.confHigh'),
+    medium: t('project.roomCard.confMedium'),
+    low:    t('project.roomCard.confLow'),
   };
   return (
     <Tooltip>
@@ -98,29 +100,25 @@ function getFieldConfidence(room, field) {
   return 'medium';
 }
 
-const PASKIRTIS_OPTIONS = [
-  { value: 'gyvenamoji', label: 'Gyvenamoji' },
-  { value: 'miegamoji', label: 'Miegamoji' },
-  { value: 'virtuve', label: 'Virtuvė' },
-  { value: 'valgomasis', label: 'Valgomasis' },
-  { value: 'vonia', label: 'Vonia' },
-  { value: 'wc', label: 'WC' },
-  { value: 'koridorius', label: 'Koridorius' },
-  { value: 'holas', label: 'Holas' },
-  { value: 'drabuzine', label: 'Drabužinė' },
-  { value: 'sandeliukas', label: 'Sandėliukas' },
-  { value: 'tambūras', label: 'Tambūras' },
-  { value: 'garazas', label: 'Garažas' },
-  { value: 'katiline', label: 'Katilinė' },
-  { value: 'skalbykla', label: 'Skalbykla' },
+// Room-purpose options. `label` resolves against i18n at render
+// (project.roomCard.paskirtis.<value>).
+const PASKIRTIS_VALUES = [
+  'gyvenamoji', 'miegamoji', 'virtuve', 'valgomasis', 'vonia', 'wc',
+  'koridorius', 'holas', 'drabuzine', 'sandeliukas', 'tambūras',
+  'garazas', 'katiline', 'skalbykla',
 ];
 
-function getPaskirtisInfo(paskirtis) {
-  return PASKIRTIS_OPTIONS.find(o => o.value === paskirtis)
-    || { value: paskirtis, label: paskirtis };
+// Resolve the display label for a room purpose via i18n; unknown values pass
+// through unchanged (matches the previous getPaskirtisInfo fallback).
+function paskirtisLabel(t, paskirtis) {
+  if (PASKIRTIS_VALUES.includes(paskirtis)) {
+    return t(`project.roomCard.paskirtis.${paskirtis}`);
+  }
+  return paskirtis;
 }
 
 export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, project, onJumpToPage }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     pavadinimas: room.pavadinimas || '',
@@ -130,7 +128,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
     lubu_aukstis_m: room.lubu_aukstis_m || 2.82,
   });
 
-  const info = getPaskirtisInfo(room.paskirtis);
+  const info = { value: room.paskirtis, label: paskirtisLabel(t, room.paskirtis) };
 
   const handleSave = () => {
     onChange?.({
@@ -214,7 +212,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
               {onShowOnPdf && room.puslapio_nr && (
                 <button onClick={() => onShowOnPdf(room.puslapio_nr, room)}
                   className="p-1.5 hover:bg-blue-500/10 text-blue-400 rounded"
-                  title={`Rodyti brėžinyje (psl. ${room.puslapio_nr})`}>
+                  title={t('project.roomCard.showOnDrawingTitle', { page: room.puslapio_nr })}>
                   <Eye className="w-4 h-4" />
                 </button>
               )}
@@ -237,7 +235,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
       <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
         <div>
           <div className="text-muted-foreground mb-0.5 flex items-center">
-            Plotas
+            {t('project.roomCard.area')}
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'plotas_m2')} />}
           </div>
           {editing ? (
@@ -255,7 +253,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    🟢 Plotas paimtas iš eksplikacijos lentelės (nuskaityta tiesiai iš brėžinio)
+                    {t('project.roomCard.areaSourceTooltip')}
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -264,7 +262,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
         </div>
         <div>
           <div className="text-muted-foreground mb-0.5 flex items-center">
-            Perimetras
+            {t('project.roomCard.perimeter')}
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'perimetras_m')} />}
           </div>
           {editing ? (
@@ -277,7 +275,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
         </div>
         <div>
           <div className="text-muted-foreground mb-0.5 flex items-center">
-            Lubos H
+            {t('project.roomCard.ceilingH')}
             {!editing && <ConfidenceDot level={getFieldConfidence(room, 'lubu_aukstis_m')} />}
           </div>
           {editing ? (
@@ -292,12 +290,12 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 
       {editing && (
         <div className="mb-3">
-          <div className="text-xs text-muted-foreground mb-1">Paskirtis</div>
+          <div className="text-xs text-muted-foreground mb-1">{t('project.roomCard.purpose')}</div>
           <select value={draft.paskirtis}
             onChange={e => setDraft({ ...draft, paskirtis: e.target.value })}
             className="w-full border border-input rounded px-2 py-1.5 text-sm">
-            {PASKIRTIS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            {PASKIRTIS_VALUES.map(v => (
+              <option key={v} value={v}>{t(`project.roomCard.paskirtis.${v}`)}</option>
             ))}
           </select>
         </div>
@@ -308,50 +306,50 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
         <div className="border-t border-border pt-3 space-y-1.5 text-sm">
           {dazymo > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Dažomas plotas</span>
+              <span className="text-muted-foreground">{t('project.roomCard.paintArea')}</span>
               <span className="font-medium text-foreground">{dazymo.toFixed(2)} m²</span>
             </div>
           )}
           {sienos > 0 && (
             <div className="flex justify-between text-xs pl-3">
-              <span className="text-muted-foreground">└ Sienos (neto)</span>
+              <span className="text-muted-foreground">{t('project.roomCard.wallsNet')}</span>
               <span className="text-muted-foreground">{sienos.toFixed(2)} m²</span>
             </div>
           )}
           {lubos > 0 && (
             <div className="flex justify-between text-xs pl-3">
-              <span className="text-muted-foreground">└ Lubos {isHigh ? '(virš 3m)' : ''}</span>
+              <span className="text-muted-foreground">{t('project.roomCard.ceiling')}{isHigh ? t('project.roomCard.over3m') : ''}</span>
               <span className="text-muted-foreground">{lubos.toFixed(2)} m²</span>
             </div>
           )}
           {kampai > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Dažymo kampai</span>
+              <span className="text-muted-foreground">{t('project.roomCard.paintCorners')}</span>
               <span className="font-medium text-foreground">{kampai.toFixed(2)} m</span>
             </div>
           )}
           {plytSienos > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Plytelės sienose</span>
+              <span className="text-muted-foreground">{t('project.roomCard.wallTiles')}</span>
               <span className="font-medium text-foreground">{plytSienos.toFixed(2)} m²</span>
             </div>
           )}
           {plytGrindys > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Plytelės grindyse</span>
+              <span className="text-muted-foreground">{t('project.roomCard.floorTiles')}</span>
               <span className="font-medium text-foreground">{plytGrindys.toFixed(2)} m²</span>
             </div>
           )}
           {grindjuostes > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Grindjuostės</span>
+              <span className="text-muted-foreground">{t('project.roomCard.baseboards')}</span>
               <span className="font-medium text-foreground">{grindjuostes.toFixed(2)} m</span>
             </div>
           )}
           {angokrasciaiM2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground" title="Langų ir durų angokraščiai (apdailai)">
-                Angokraščiai
+              <span className="text-muted-foreground" title={t('project.roomCard.revealsTitle')}>
+                {t('project.roomCard.reveals')}
               </span>
               <span className="font-medium text-foreground">
                 {angokrasciaiM2.toFixed(2)} m² <span className="text-muted-foreground/70 text-xs">({angokrasciaiLm.toFixed(2)} m)</span>
@@ -360,11 +358,11 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
           )}
           {pasleptosKompl > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground" title="Paslėptos durys (be matomos staktos)">
-                Paslėptos durys
+              <span className="text-muted-foreground" title={t('project.roomCard.hiddenDoorsTitle')}>
+                {t('project.roomCard.hiddenDoors')}
               </span>
               <span className="font-medium text-foreground">
-                {pasleptosKompl} kompl. <span className="text-muted-foreground/70 text-xs">({pasleptosStaktosM.toFixed(2)} m staktų)</span>
+                {pasleptosKompl}{t('project.roomCard.kompl')}<span className="text-muted-foreground/70 text-xs">({pasleptosStaktosM.toFixed(2)}{t('project.roomCard.framesM')})</span>
               </span>
             </div>
           )}
@@ -375,14 +373,14 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
       {!editing && (room.paskirtis === 'garazas' || room.paskirtis === 'tambūras') && (
         <div className="mt-3 flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-300">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <span>{info.label} — pagal industries standartą NEDAŽOMA. Pakeiskite paskirtį, jei norite įtraukti.</span>
+          <span>{t('project.roomCard.notPaintedWarn', { label: info.label })}</span>
         </div>
       )}
 
       {/* High ceiling badge */}
       {!editing && isHigh && (
         <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/30">
-          Virš 3m — atskira pozicija
+          {t('project.roomCard.highCeilingBadge')}
         </div>
       )}
 
@@ -395,13 +393,13 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
       {!editing && room.eksplikacija_row_idx != null && (
         <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-[11px] rounded-full border border-emerald-200 dark:border-emerald-800">
           <BookOpen className="w-3 h-3" />
-          <span>Iš eksplikacijos eil. #{room.eksplikacija_row_idx}</span>
+          <span>{t('project.roomCard.eksRowPrefix', { idx: room.eksplikacija_row_idx })}</span>
           {project?._eksplikacija?.eksplikacija_source_page && onJumpToPage && (
             <button
               onClick={(e) => { e.stopPropagation(); onJumpToPage(project._eksplikacija.eksplikacija_source_page); }}
               className="ml-1 underline hover:text-emerald-600"
             >
-              psl. {project._eksplikacija.eksplikacija_source_page}
+              {t('project.roomCard.eksPage', { page: project._eksplikacija.eksplikacija_source_page })}
             </button>
           )}
         </div>
@@ -414,13 +412,15 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
         <details className="mt-2 text-xs">
           <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
             {room._zoom_changes?.length > 0
-              ? `Patikslinti ${room._zoom_changes.length} matmuo${room._zoom_changes.length === 1 ? '' : 's'} pagal brėžinį`
-              : 'Skaičiavimo paaiškinimas'}
+              ? (room._zoom_changes.length === 1
+                  ? t('project.roomCard.refinedSingular', { count: room._zoom_changes.length })
+                  : t('project.roomCard.refinedPlural', { count: room._zoom_changes.length }))
+              : t('project.roomCard.calcExplanation')}
           </summary>
           <div className="mt-2 p-2 bg-muted/30 rounded space-y-1.5">
             {room._zoom_changes?.length > 0 && (
               <div>
-                <div className="font-medium text-foreground/80 mb-1">Pataisymai pagal brėžinį:</div>
+                <div className="font-medium text-foreground/80 mb-1">{t('project.roomCard.adjustments')}</div>
                 <ul className="list-disc pl-4 space-y-0.5">
                   {room._zoom_changes.map((c, i) => (
                     <li key={i} className="text-muted-foreground">{c}</li>
@@ -430,7 +430,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
             )}
             {room.calculation_trace && (
               <div>
-                <div className="font-medium text-foreground/80 mb-1">Skaičiavimas:</div>
+                <div className="font-medium text-foreground/80 mb-1">{t('project.roomCard.calculation')}</div>
                 <code className="block text-[11px] text-muted-foreground whitespace-pre-wrap">
                   {room.calculation_trace}
                 </code>
@@ -438,7 +438,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
             )}
             {room._zoom?.matmenys_perskaityti?.length > 0 && (
               <div>
-                <div className="font-medium text-foreground/80 mb-1">Iš brėžinio perskaityti matmenys (mm):</div>
+                <div className="font-medium text-foreground/80 mb-1">{t('project.roomCard.readDimensions')}</div>
                 <div className="text-muted-foreground">
                   {room._zoom.matmenys_perskaityti.join(', ')}
                 </div>
@@ -458,6 +458,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 // flooring spec for THIS room → cached on project. Second click is free.
 
 function DesignerMaterialSpecs({ room, project }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -474,7 +475,7 @@ function DesignerMaterialSpecs({ room, project }) {
     setError(null);
     try {
       const blob = await getPdfBlob(project.id);
-      if (!blob) throw new Error('PDF nepasiekiamas (nesaugotas)');
+      if (!blob) throw new Error(t('project.roomCard.pdfUnavailable'));
       const fd = new FormData();
       fd.append('files', blob, 'project.pdf');
       fd.append('room_nr', room.nr);
@@ -491,7 +492,7 @@ function DesignerMaterialSpecs({ room, project }) {
       setSpecs(data);
       setOpen(true);
     } catch (e) {
-      setError(e.message || 'Klaida');
+      setError(e.message || t('project.roomCard.error'));
     } finally {
       setLoading(false);
     }
@@ -508,12 +509,12 @@ function DesignerMaterialSpecs({ room, project }) {
         onClick={handleFetch}
         disabled={loading}
         className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 text-[11px] rounded-full border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-950/50 transition-colors disabled:opacity-50"
-        title="Ištraukti dizainerio specifikuotas medžiagas (~$0.20)"
+        title={t('project.roomCard.designerMaterialsTitle')}
       >
         {loading
           ? <Loader2 className="w-3 h-3 animate-spin" />
           : <Palette className="w-3 h-3" />}
-        <span>Dizainerio medžiagos</span>
+        <span>{t('project.roomCard.designerMaterials')}</span>
         {specs && (open
           ? <ChevronUp className="w-3 h-3" />
           : <ChevronDown className="w-3 h-3" />)}
@@ -527,13 +528,12 @@ function DesignerMaterialSpecs({ room, project }) {
         <div className="mt-2 p-2 bg-violet-50/50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-800/50 rounded text-[11px] space-y-1.5">
           {!hasAny && (
             <div className="text-muted-foreground italic">
-              Dizainerio specifikacijų puslapyje nerasta — projekte gali nebūti
-              dedicated „spalvos" lapo šiai patalpai.
+              {t('project.roomCard.noDesignerSpecs')}
             </div>
           )}
           {specs.paint && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">Dažai</div>
+              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specPaint')}</div>
               <div className="text-violet-800 dark:text-violet-300">
                 {[specs.paint.brand, specs.paint.code, specs.paint.name]
                   .filter(Boolean).join(' — ')}
@@ -545,7 +545,7 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.sienos_plyteles && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">Sienų plytelės</div>
+              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specWallTiles')}</div>
               <div className="text-violet-800 dark:text-violet-300">
                 {[specs.sienos_plyteles.brand, specs.sienos_plyteles.model]
                   .filter(Boolean).join(' ')}
@@ -560,7 +560,7 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.grindys_plyteles && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">Grindų plytelės</div>
+              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specFloorTiles')}</div>
               <div className="text-violet-800 dark:text-violet-300">
                 {[specs.grindys_plyteles.brand, specs.grindys_plyteles.model]
                   .filter(Boolean).join(' ')}
@@ -575,19 +575,19 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.grindys_medines && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">Grindys (parketas / laminatas)</div>
+              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specWoodFloor')}</div>
               <div className="text-violet-800 dark:text-violet-300">
                 {[specs.grindys_medines.brand, specs.grindys_medines.model]
                   .filter(Boolean).join(' ')}
                 {specs.grindys_medines.supplier && (
-                  <span className="text-muted-foreground"> · gamintojas: {specs.grindys_medines.supplier}</span>
+                  <span className="text-muted-foreground">{t('project.roomCard.specSupplier', { supplier: specs.grindys_medines.supplier })}</span>
                 )}
               </div>
             </div>
           )}
           {specs._meta?.pages_inspected && (
             <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-violet-200/50 dark:border-violet-800/50">
-              Šaltinis: psl. {specs._meta.pages_inspected.join(', ')}{specs._cached && ' · cache'}
+              {t('project.roomCard.specSource', { pages: specs._meta.pages_inspected.join(', ') })}{specs._cached && t('project.roomCard.specCache')}
             </div>
           )}
         </div>
