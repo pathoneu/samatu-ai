@@ -34,13 +34,13 @@ def _val(value, source, confidence="green", notes=None):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 1 — Bacevičiaus g., Kaunas (5-page pasiūlymas, 65-page TP)
+# Nr. 1 — Objektas B, Kaunas (5-page pasiūlymas, 65-page TP)
 # ─────────────────────────────────────────────────────────────────────
 BACEVICIAUS = {
     "$schema_version": 1,
-    "project_id": "bacveviciaus",
-    "name": "Bacevičiaus g. (Gytis ir Simona)",
-    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Gytis ir Simona_2025naujausias.pdf",
+    "project_id": "objektas_b",
+    "name": "Objektas B (Objektas B)",
+    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf",
         "contractor": "Rangovas A (Rangovas A)",

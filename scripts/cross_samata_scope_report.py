@@ -149,7 +149,7 @@ def main() -> int:
     n_angok = sum(1 for v in angok.values() if v is not None)
     obs.append(f"- **Angokraščiai** (`angokrasciu_m`) present in {n_angok}/6. rangovas uses "
                f"two distinct line items in some projects: 'Angokraščių apdirbimas GKP' "
-               f"AND 'Durų angų paruošimas' — these aren't always merged (see Bacevičiaus "
+               f"AND 'Durų angų paruošimas' — these aren't always merged (see Objektas B "
                f"and Lazūnų).")
 
     # LED coverage

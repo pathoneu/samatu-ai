@@ -2,7 +2,7 @@
  * RoomZoneLayer — the AI Takeoff Viewer's first visible layer (Phase 1).
  *
  * Draws the app's ALREADY-COMPUTED rooms onto the PDF page as translucent SVG
- * zones. Declutter contract (Togal pattern, 2026-07-02): at rest a zone is a
+ * zones. Declutter contract (declutter pattern, 2026-07-02): at rest a zone is a
  * quiet fill-only polygon — NO label chip. The chip (name + area + confidence
  * dot) appears only on hover, and stays pinned while the room is focused.
  * Synthesized/bbox geometry gets a DASHED border + "apytikslė" so the viewer

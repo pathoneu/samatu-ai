@@ -1,5 +1,5 @@
 /**
- * InteriorWorkspace — Togal-stiliaus split-screen interjero takeoff workflow.
+ * InteriorWorkspace — auto-count stiliaus split-screen interjero takeoff workflow.
  *
  * Layout:
  *   ┌───────────────────────────────────────────────────────┐
@@ -308,7 +308,7 @@ export default function InteriorWorkspace({
     <div className="flex flex-col md:flex-row h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
       {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
       <OnboardingTooltips />
-      {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (Togal-style) */}
+      {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (auto-count-style) */}
       <div
         className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
         style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}

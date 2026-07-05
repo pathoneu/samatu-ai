@@ -41,7 +41,7 @@
     "rerolled_to": "ground_truth/berzas/ai_extract_with_niches.json"
   },
   {
-    "slug": "bacveviciaus",
+    "slug": "objektas_b",
     "status": "ok",
     "pages_scanned": [
       5,
@@ -79,7 +79,7 @@
     "before_pct": -51.6,
     "after_pct": -51.6,
     "improvement_pp": 0.0,
-    "rerolled_to": "ground_truth/bacveviciaus/ai_extract_with_niches.json"
+    "rerolled_to": "ground_truth/objektas_b/ai_extract_with_niches.json"
   },
   {
     "slug": "ciurliu",

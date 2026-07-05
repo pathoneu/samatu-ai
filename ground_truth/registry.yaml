@@ -23,10 +23,10 @@ projects:
     has_cached_extract: true
     notes: "N=1 originator; only project with full gt_dimensions."
 
-  - slug: bacveviciaus
-    name: "Bacevičiaus g. (Gytis ir Simona)"
-    truth_path: ground_truth/bacveviciaus/truth.json
-    project_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Gytis ir Simona_2025naujausias.pdf
+  - slug: objektas_b
+    name: "Objektas B (Objektas B)"
+    truth_path: ground_truth/objektas_b/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf
     samata_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf
     contractor: "Rangovas A"
     has_gt_dimensions: false

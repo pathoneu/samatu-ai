@@ -17,7 +17,7 @@
 import { computeAreaConfidence } from './areaConfidence.js';
 import { getPolygonPctPoints } from './planOverlayGeometry.js';
 
-// paskirtis → hex. Moved verbatim from AiRoomOverlay (Kreo per-category hues)
+// paskirtis → hex. Moved verbatim from AiRoomOverlay (industry takeoff tools per-category hues)
 // so a glance reveals functional zones without reading labels.
 export const ROOM_ZONE_COLORS = {
   gyvenamoji: '#10b981', svetaine: '#10b981',

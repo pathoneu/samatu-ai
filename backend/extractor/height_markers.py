@@ -157,7 +157,7 @@ def salvage_heights_from_warnings(
         key=lambda n: -len(n),
     )
 
-    # 2026-07-04 fix (Bacevičiaus GKP height-split): compound room names like
+    # 2026-07-04 fix (Rangovas B GKP height-split): compound room names like
     # "Svetainė/valgomasis/virtuvė" never substring-matched warnings that name
     # only one component ("… svetainė ~3000mm iš vizualizacijos"), so the
     # narrated height was silently dropped and the room kept the 2.82 default —

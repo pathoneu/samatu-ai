@@ -12,7 +12,7 @@ mm-per-pixel scale factor for free (no Vision spend).
 | Project | Page | Arcs detected | Median scale (mm/px) |
 |---|---:|---:|---:|
 | berzas | 2 | **790** | 16.20 |
-| bacveviciaus | 1 | **1381** | 11.88 |
+| objektas_b | 1 | **1381** | 11.88 |
 | ciurliu | 1 | **536** | 20.23 |
 | lazunu | 1 | **235** | 39.13 |
 

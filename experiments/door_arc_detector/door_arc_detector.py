@@ -88,7 +88,7 @@ def page_to_np(pdf_path: Path, page_idx: int) -> np.ndarray | None:
 def main() -> int:
     projects = [
         ("berzas", "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf", 2),
-        ("bacveviciaus", "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Gytis ir Simona_2025naujausias.pdf", 1),
+        ("objektas_b", "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf", 1),
         ("ciurliu", "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf", 1),
         ("lazunu", "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf", 1),
     ]

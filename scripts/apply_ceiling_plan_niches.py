@@ -12,7 +12,7 @@ Budget: ~$0.10 per ceiling page × ~3 projects (lazunu has no ceiling
 plan in its bundle; sernu blocked) = ≤ $0.50.
 
 Per-project quirks:
-  • bacveviciaus: 65-page TP — ceiling plan should exist somewhere
+  • objektas_b: 65-page TP — ceiling plan should exist somewhere
   • ciurliu:      3-page A3 — single floor plan, likely no separate
                   ceiling plan; AI already found 4 niches totaling
                   12m on the floor plan
@@ -48,7 +48,7 @@ CEILING_KEYWORDS = [
 
 # Projects where the LED fix is most impactful (from analyze_systematic_errors)
 TARGETS = {
-    "bacveviciaus",  # -78.17%, biggest gap
+    "objektas_b",  # -78.17%, biggest gap
     "ciurliu",       # -28.74%, second
     # "lazunu" omitted: lubų plan is in a different PDF not in registry
     # "berzas" omitted: already at -5.44%, within range

@@ -2,7 +2,7 @@
   "_comment": "Real material consumption ratios derived from 5 Lithuanian interior renovation projects (2024). Ground truth = contractor pasiūlymas quantities.",
   "_version": "1.0",
   "_projects": {
-    "P1": {"location": "Bacevičiaus g., Kaunas", "area_m2": 108, "note": "molio tinkas – kampai outlier"},
+    "P1": {"location": "Objektas B, Kaunas", "area_m2": 108, "note": "molio tinkas – kampai outlier"},
     "P2": {"location": "unknown", "area_m2": 90, "note": "standard plaster"},
     "P3": {"location": "Romainiuose, Kaunas", "area_m2": 95, "note": "Rotband plaster"},
     "P4": {"location": "unknown", "area_m2": 132, "note": "Rotband plaster"},

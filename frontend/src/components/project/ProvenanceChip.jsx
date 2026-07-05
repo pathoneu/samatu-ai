@@ -12,7 +12,7 @@
  *
  * Phase C-4-bis: AI-adjacent sources (eksplikacija auto-reader, Vision)
  * also render a small ✨ AI badge so the user perceives the tool's
- * intelligence, à la Kreo's takeoff UI.
+ * intelligence, à la modern takeoff UIs.
  *
  * No "bbox" or "polygon" jargon in any visible string.
  */

@@ -15,7 +15,7 @@
        Orange-on-graphite. A serious, technical construction-AI product:
        deep graphite surfaces, molten-orange accent, blueprint hairlines,
        JetBrains Mono numerals as the estimator-precision signature.
-       Reference bar: Togal.ai + Kreo (dark, product-led) — distinct via
+       Reference bar: dark product-led takeoff SaaS (dark, product-led) — distinct via
        orange, not their green/blue. The whole app shell is dark by default.
        ────────────────────────────────────────────────────────────────────── */
 
@@ -93,7 +93,7 @@
     --surface-3: 220 15% 19%;            /* selected/deep hover */
     --border-strong: 218 14% 26%;        /* #3A414D stronger input/button border */
 
-    /* ──── Viewer chrome (PDF viewer ONLY — Kreo-style dark navy with cyan
+    /* ──── Viewer chrome (PDF viewer ONLY — hierarchical dark navy with cyan
             accents). Drawing area stays white; the surrounding chrome
             (toolbar / tool rail / thumbs / status bar / drawing-area frame)
             uses these tokens. ──── */
@@ -227,7 +227,7 @@
    Orange-on-graphite. Serious, technical, premium construction-AI.
    Deep graphite surfaces, blueprint hairlines on dark, orange radial
    glow, top-lit panel borders. Sora display, JetBrains Mono numerals.
-   Reference bar: Togal.ai + Kreo (dark, product-led) — distinct via orange.
+   Reference bar: dark product-led takeoff SaaS (dark, product-led) — distinct via orange.
    ══════════════════════════════════════════════════════════════════════ */
 
 /* Root wrapper for the landing — establishes the dark base. A subtle

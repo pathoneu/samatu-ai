@@ -4,7 +4,7 @@
  * Surfaces low/medium confidence rooms + positions that need user review.
  * KEY DIFFERENTIATOR: rooms/items with eksplikacija_row_bbox or table-source
  * (saltinis ∈ {eksplikacija, specifikacija, isklotines}) get a 🟢 lock badge
- * = "patvirtinta eksplikacijoje" — Togal/Kreo can't do this because they only
+ * = "patvirtinta eksplikacijoje" — grid-based takeoff tools can't do this because they only
  * OCR-guess room names; we read from a structured pdfplumber table.
  *
  * Layout: collapsible section at top of WorkspacePanel scroll area.

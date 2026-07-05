@@ -156,9 +156,9 @@ def calc_paint_liters(
 def is_high_ceiling(h_m) -> bool:
     """LT "virš 3 m" billing bucket — boundary-INCLUSIVE (H ≥ 3.00 m).
 
-    2026-07-04 fix (Bacevičiaus GKP height-split): drawings annotate nominal
+    2026-07-04 fix (Rangovas B GKP height-split): drawings annotate nominal
     heights (+3.000 → 3.00 m) and the contractor bills a 3.00 m ceiling in the
-    premium bucket — Bacevičiaus pasiūlymas item 2 puts the svetainė zone
+    premium bucket — Rangovas B pasiūlymas item 2 puts the svetainė zone
     (Vision-read at exactly 3.0 m) under "GKP ant lubų virš 3m" (68.28 m²),
     and ceiling/upper-wall work at 3.0 m already needs staging. The previous
     strict ``>`` silently dropped exactly-3.0 rooms into the standard bucket,
@@ -216,7 +216,7 @@ _LARGE_LIVING_M2 = 25.0      # a living room big enough to be the tall zone
 def apply_height_plausibility_gate(rooms: list) -> list:
     """Deterministically correct mis-attributed ceiling heights, in place.
 
-    Measured failure (2026-06-11 Bacevičiaus): Vision assigned 3.5 m to a 6.8 m²
+    Measured failure (2026-06-11 Rangovas B): Vision assigned 3.5 m to a 6.8 m²
     wet room + 2.9 m² WC while the 62 m² svetainė got the section-average default
     — inverting the iki/virš-3m paint/GKP split. Ceiling heights above 3 m belong
     to large open-plan living spaces, never to small wet/service rooms.
@@ -318,10 +318,10 @@ ROOM_TYPE_RULES = {
     # 2026-07-04: tile_floor flipped False → True. Both contractor-validated
     # fixtures tile the garage floor: Beržų bills 10.10 m² (notes p105
     # grindys; GT previously needed a per-room tile_floor_override to hit
-    # truth) and Bacevičiaus bills garage tiling explicitly (pasiūlymas items
+    # truth) and Rangovas B bills garage tiling explicitly (pasiūlymas items
     # 40-43: laiptų garaže įrengimas, plytelių pripjovimas prie trapo garaže,
     # aliuminio kampas ant plytelių garaže, garažo plytelės). ``floor`` stays
-    # "concrete" deliberately — no screed (Bacevičiaus screed 182.62 m² truth
+    # "concrete" deliberately — no screed (Rangovas B screed 182.62 m² truth
     # excludes the garage slab), no baseboards, no soft covering. Per-room
     # tile_floor_override still wins for genuinely raw-slab garages.
     "garazas":     {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": True},
@@ -868,7 +868,7 @@ def calc_room_quantities(room: dict,
                 walls_paint_factor = float(walls_paint_factor_override)
             elif (str(room.get("_apdailos_confidence")) == "low"
                   and rt_rules.get("walls_paint") == 0.0):
-                # 2026-06-11 (Bacevičiaus experiment): a LOW-CONFIDENCE apdailos
+                # 2026-06-11 (Rangovas B experiment): a LOW-CONFIDENCE apdailos
                 # guess ("garažas — dažytos sienos, spėjimas pagal paskirtį")
                 # must NOT override a structural no-paint default (garažas /
                 # tambūras). Vision guessing finishes from absence-of-data painted
@@ -878,7 +878,7 @@ def calc_room_quantities(room: dict,
             else:
                 walls_paint_factor = 1.0
             walls_paintable = walls_paintable_gross * walls_paint_factor
-        # 2026-06-11 (Bacevičiaus experiment): molio tinkas / decor-coated walls
+        # 2026-06-11 (Rangovas B experiment): molio tinkas / decor-coated walls
         # are a SEPARATE finish — the contractor bills them as their own m² line
         # ("Sienų dekoravimas molio tinku", prep included) and EXCLUDES them from
         # glaistymas/dažymas. Before this split, 160 m² of clay-plastered walls
@@ -1188,9 +1188,9 @@ def calc_room_quantities(room: dict,
         # median across projects where the AI extract caught the wet rooms:
         #   berzas       truth 50.14 / wet_perim 23.00 = 2.18
         #   ciurliu      truth 38.15 / wet_perim 16.50 = 2.31
-        #   bacveviciaus truth 128.97 / wet_perim 34.40 = 3.75 (outlier;
+        #   objektas_b truth 128.97 / wet_perim 34.40 = 3.75 (outlier;
         #     likely more fixture seams than typical, calibrator-territory)
-        # At 2.3: berzas +5.5%, ciurliu -0.1%, bacveviciaus -38%, lazunu -100%
+        # At 2.3: berzas +5.5%, ciurliu -0.1%, objektas_b -38%, lazunu -100%
         #   (lazunu extract found no wet rooms — root cause separate).
         # Per-project tuning beyond ±15% is calibrator territory (use the
         # /calibrate endpoint), not a single-multiplier fix.

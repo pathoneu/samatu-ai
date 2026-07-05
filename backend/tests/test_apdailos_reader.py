@@ -58,7 +58,7 @@ def test_build_user_text_lists_rooms_and_schema():
 
 
 def test_find_apdailos_page_skips_vizualizacija(monkeypatch):
-    # Bacevičiaus regression: the reader classified finishes from RENDERS.
+    # Objektas B regression: the reader classified finishes from RENDERS.
     import extractor.apdailos_reader as ar
 
     class _Page:

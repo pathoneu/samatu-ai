@@ -24,7 +24,7 @@ SAFETY:
   • REFUSES to run unless the backup dir exists (see BACKUP_DIR below). The
     cached extracts are the contractor-validated baseline; back them up first:
         mkdir -p eval_runs/cached_baseline_backup_2026-06-09
-        for s in berzas bacveviciaus ciurliu lazunu romainiai sernu; do
+        for s in berzas objektas_b ciurliu lazunu romainiai sernu; do
           mkdir -p eval_runs/cached_baseline_backup_2026-06-09/$s
           cp -p ground_truth/$s/*.json eval_runs/cached_baseline_backup_2026-06-09/$s/
         done

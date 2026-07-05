@@ -205,7 +205,7 @@ METRICS: dict[str, dict[str, Any]] = {
     "pvc_grindys_m2": {
         # Engine bucket = non-tile finished floor covering (rt_rules floor ==
         # "parquet" family: PVC / parketas / laminatas). Truth wires the
-        # project's covering line (ciurliu/lazunu: PVC; bacveviciaus: parketas).
+        # project's covering line (ciurliu/lazunu: PVC; objektas_b: parketas).
         "label": "Grindų danga (PVC/parketas)",
         "accessor": lambda p: _santrauka_get(p, "pvc_grindys_m2_total"),
         "unit": "m²",

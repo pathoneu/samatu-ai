@@ -7,7 +7,7 @@
 #   project        rooms  flagged
 #   ─────────────────────────────
 #   berzas         11     0
-#   bacveviciaus   15     0
+#   objektas_b   15     0
 #   ciurliu         7     0
 #   romainiai      20     0
 #   lazunu          3     0

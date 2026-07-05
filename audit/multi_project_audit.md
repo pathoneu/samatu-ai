@@ -16,7 +16,7 @@ and the root cause is one line in `backend/extractor/vision/page_dispatch.py`.
 | Project | Combined paint | Walls | Ceiling | LED niches | MAE |
 |---|---:|---:|---:|---:|---:|
 | **berzas** | -4.75% | -4.18% | +0.02% | **-5.44%** | 2.88% |
-| **bacveviciaus** | -0.80% | (n/e) | (n/e) | **-54.75%** | **27.77%** |
+| **objektas_b** | -0.80% | (n/e) | (n/e) | **-54.75%** | **27.77%** |
 | **ciurliu** | -20.33% | (n/e) | (n/e) | **-28.74%** | **24.53%** |
 | romainiai | excluded (scope mismatch) | | | | |
 | sernu | excluded (no architectural plan) | | | | |
@@ -33,7 +33,7 @@ registry and produces `ground_truth/<slug>/contractor_samata_parsed.json`:
 | Project | Line items | With qty | Sections |
 |---|---:|---:|---:|
 | berzas | 58 | 53 | 5 |
-| bacveviciaus | 121 | 111 | 8 |
+| objektas_b | 121 | 111 | 8 |
 | ciurliu | 44 | 36 | 7 |
 | romainiai | 16 | 15 | 1 |
 | sernu | 32 | 28 | 3 |
@@ -47,7 +47,7 @@ Bacveviciaus #4+#27+#29, etc.), all with units `m` or `b/m`.
 ```
 project         LED truth  AI extract     diff   diff %
 berzas              42.30      40.00       -2.30   -5.44%
-bacveviciaus        54.98      24.88      -30.10  -54.75%
+objektas_b        54.98      24.88      -30.10  -54.75%
 ciurliu             16.84      12.00       -4.84  -28.74%
 ```
 
@@ -55,7 +55,7 @@ ciurliu             16.84      12.00       -4.84  -28.74%
 through the pipeline.** Sign is always negative. Magnitude scales with
 project size: small project (ciurliu) misses 30%, medium (berzas)
 misses 5% (helped by prior manual niche-locator fold), large
-(bacveviciaus) misses 55%.
+(objektas_b) misses 55%.
 
 ## Phase 5 (recommended): one-line fix
 
@@ -70,14 +70,14 @@ Root cause is **explicitly documented in the code** at
 > ...For now it's import-and-test-only — `extract_interior` is
 > unchanged. **Wiring it into prod is a config-flag flip away.**"
 
-We now have N=4 (berzas, bacveviciaus, ciurliu, lazunu). The
+We now have N=4 (berzas, objektas_b, ciurliu, lazunu). The
 constraint in the comment is satisfied. **Wiring
 `dispatch_secondary_passes(...)` with `ceiling_plan → niche_locator`
 into `extract_interior` is the actionable fix.**
 
 Expected impact:
 - berzas: -5.44% → ~-1.66% (the prior session's manual fold achieved this)
-- bacveviciaus: -54.75% → likely below -10% (the niche_locator finds
+- objektas_b: -54.75% → likely below -10% (the niche_locator finds
   niches missed by the main pass; bigger gain on bigger projects)
 - ciurliu: -28.74% → likely below -10%
 - Cost: $0.30-0.50 per ceiling_plan page × ~1-2 pages per project =
@@ -110,8 +110,8 @@ floor on N=1 truth."** Not the same as the LED-niches systemic bug.
 - **Phase 3 line-by-line tables for every project**: started but not
   completed. The 4-project LED comparison above is the most actionable
   cross-project pattern; the remaining categories (tiles, GKP, corners)
-  on bacveviciaus/ciurliu would require running the same systematic
-  comparison with bacveviciaus's 121-item + ciurliu's 44-item samatas
+  on objektas_b/ciurliu would require running the same systematic
+  comparison with objektas_b's 121-item + ciurliu's 44-item samatas
   against ai_extract.json. ~1-2 hrs of mechanical work.
 - **Phase 5 fix application**: the niche-locator wiring needs careful
   code + tests; not committing without explicit OK.

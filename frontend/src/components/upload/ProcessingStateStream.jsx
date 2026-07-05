@@ -105,7 +105,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
         {PHASES.map((_, i) => renderPhase(i))}
       </div>
 
-      {/* Per-room reveal — Togal-style "watch it work" effect */}
+      {/* Per-room reveal — auto-count-style "watch it work" effect */}
       {rooms.length > 0 && (
         <div className="w-full max-w-md mt-2">
           <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center justify-between">

@@ -16,7 +16,7 @@ import os
 import re
 from collections import defaultdict
 
-PROJECTS = ["berzas", "bacveviciaus", "ciurliu", "lazunu"]
+PROJECTS = ["berzas", "objektas_b", "ciurliu", "lazunu"]
 
 
 def latest_results(config_dir, project):

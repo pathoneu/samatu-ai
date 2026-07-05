@@ -29,7 +29,7 @@ so downstream consumers can distinguish them from extractor output.
 
 Validated impact (benchmark eval, verified 2026-06-05):
   berzas       no change (all 0-LED rooms have ratio=0; LED -0.99%)
-  bacveviciaus 26.61m → 44.97m (truth 54.98; -52% → -18.2%)
+  objektas_b 26.61m → 44.97m (truth 54.98; -52% → -18.2%)
   ciurliu      14.50m → 18.95m (truth 16.84; -13.9% → +12.5% — over-bills)
 
 The ciurliu case shows the risk: when a 0-LED room ACTUALLY has 0
@@ -37,8 +37,8 @@ LED (not just "Vision missed it"), this fallback over-bills. Here it
 fires on exactly 2 'san' wet rooms (perim × 0.27 = +4.45m) the
 contractor never billed, flipping -13.9% UNDER → +12.5% OVER. The
 ratios cannot simply be lowered to fix it: the same san=0.27 HELPS
-bacveviciaus (+6.26m), and dropping san/vonia/wc regresses
-bacveviciaus to -29.6% (verified). The clean asymmetric fix is to
+objektas_b (+6.26m), and dropping san/vonia/wc regresses
+objektas_b to -29.6% (verified). The clean asymmetric fix is to
 gate inference on per-room locator coverage (suppress only when the
 locator demonstrably imaged the room's ceiling plan and found 0),
 which needs a coverage map not yet persisted in the extract. Until

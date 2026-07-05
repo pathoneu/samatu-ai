@@ -2,7 +2,7 @@
 
 Evidence: both contractor-validated fixtures tile the garage floor —
 Beržų bills 10.10 m² (notes p105 grindys; the GT file previously needed
-tile_floor_override=True to hit truth) and Bacevičiaus bills garage
+tile_floor_override=True to hit truth) and Objektas B bills garage
 tiling explicitly (pasiūlymas items 40-43). The old default (tile_floor
 False) made every vision run report 0 m² garage floor tile, which was
 the single biggest slice of the -20.0% plytelės-grindys error that both

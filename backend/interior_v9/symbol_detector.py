@@ -1,5 +1,5 @@
 """
-Symbol detection — Togal-style "Image Search" arba count-by-template.
+Symbol detection — auto-count-style "Image Search" arba count-by-template.
 
 Du režimai:
 1. detect_symbols(pdf, type) — Vision'as suranda visus tipą (durys/langai/rozetės)
@@ -9,7 +9,7 @@ Du režimai:
    simbolio brėžinyje, sistema suranda visus panašius. Naudoja CLIP embedding
    similarity (jei galimas) arba Vision pattern matching.
 
-Šaltinis: skill A.2 (SoM) + Togal Image Search docs.
+Šaltinis: skill A.2 (SoM) + template image-search docs.
 """
 from __future__ import annotations
 import io

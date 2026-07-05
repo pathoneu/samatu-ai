@@ -1512,7 +1512,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         ])
 
     # Molio tinkas / decor-coated walls — separate finish, EXCLUDED from the
-    # glaistymas/dažymas lines above (2026-06-11 Bacevičiaus experiment: 160 m²
+    # glaistymas/dažymas lines above (2026-06-11 Rangovas B experiment: 160 m²
     # of clay plaster was silently billed as paint, +62.8% combined error).
     molio_total = _sum("molio_tinko_m2")
     if molio_total > 0:
@@ -3194,7 +3194,7 @@ def extract_interior(
     rooms = parsed.get("patalpos") or rooms
 
     # 2026-06-11: deterministic height-plausibility gate. Vision sometimes puts
-    # the tall ceiling on small wet rooms (Bacevičiaus: 3.5 m on a 6.8 m² vonia)
+    # the tall ceiling on small wet rooms (Rangovas B: 3.5 m on a 6.8 m² vonia)
     # while the large svetainė gets the default — inverting the iki/virš-3m split.
     try:
         from .universal_rules import apply_height_plausibility_gate
@@ -3612,7 +3612,7 @@ def extract_interior(
     # paskirtis empirically has LED (corridor 0.55, wet rooms 0.27,
     # etc.), inject a fallback estimate based on perim × ratio.
     # See backend/extractor/niche_inference.py for the per-paskirtis
-    # table and the validated impact on bacveviciaus (-52% → -18%).
+    # table and the validated impact on objektas_b (-52% → -18%).
     try:
         from .niche_inference import infer_missing_niches
         n_inferred = infer_missing_niches(parsed.get("patalpos") or [])

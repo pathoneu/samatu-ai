@@ -104,7 +104,7 @@ def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
 
     Returns 1-based page index, or None if no such page found.
 
-    2026-06-11 hardening (Bacevičiaus experiment): pages titled VIZUALIZACIJA
+    2026-06-11 hardening (Rangovas B experiment): pages titled VIZUALIZACIJA
     (renders) are EXCLUDED — the reader was classifying finishes from renders
     and self-reporting "low confidence" on half the rooms. Among the remaining
     candidates, a page whose title mentions IŠKLOTIN wins over a generic
@@ -113,7 +113,7 @@ def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
     return pages[0] if pages else None
 
 
-# Cap on pages sent in one finish-reading call. Bacevičiaus probe: 11 išklotinių
+# Cap on pages sent in one finish-reading call. Rangovas B probe: 11 išklotinių
 # pages = ~25k input tokens, confident reads for 8/15 rooms (vs 1/15 single-page).
 MAX_APDAILOS_PAGES = 12
 
@@ -121,7 +121,7 @@ MAX_APDAILOS_PAGES = 12
 def _find_apdailos_pages(pdf_bytes: bytes) -> list[int]:
     """ALL candidate finish pages (1-based), best-priority first.
 
-    Large TPs carry per-room sienų išklotinės across MANY sheets (Bacevičiaus:
+    Large TPs carry per-room sienų išklotinės across MANY sheets (Rangovas B:
     pages 12-22, 1-2 rooms each) — a single page structurally cannot describe
     every room's finish, which is why the single-page read self-reported "low
     confidence" on 14/15 rooms. Multi-page reading restored confident reads."""
@@ -256,7 +256,7 @@ def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
             room["plyteliu_aukstis_m"] = p.get("plyteliu_aukstis_m")
         if p.get("pastabos"):
             room["_apdailos_pastabos"] = p.get("pastabos")
-            # 2026-06-11 (Bacevičiaus experiment): the reader SELF-REPORTS when
+            # 2026-06-11 (Rangovas B experiment): the reader SELF-REPORTS when
             # it is guessing ("low confidence; spėjimas pagal paskirtį" on 8/15
             # rooms) — and that signal was ignored while the guessed finishes
             # flowed into 🟢 paint quantities. Propagate it so the confidence

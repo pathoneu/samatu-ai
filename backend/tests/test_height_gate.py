@@ -1,4 +1,4 @@
-"""Height plausibility gate (2026-06-11 Bacevičiaus experiment).
+"""Height plausibility gate (2026-06-11 Objektas B experiment).
 
 Vision mis-attributed the tall ceiling: 3.5 m on a 6.8 m² wet room + 2.9 m² WC,
 while the 62 m² svetainė got the 2.82 default → inverted the iki/virš-3m split

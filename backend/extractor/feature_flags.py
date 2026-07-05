@@ -31,7 +31,7 @@ _FLAG_DEFINITIONS = {
     # 2026-06-05: floor SYNTHETIC square perimeters (perim ≈ 4·√area) on plans
     # with NO eksplikacija table, for the wall-paint path only. Gated on
     # plotas_saltinis so eksplikacija/inline_label rooms are NEVER touched →
-    # zero regression on read-from-table projects (verified: berzas, bacveviciaus,
+    # zero regression on read-from-table projects (verified: berzas, objektas_b,
     # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: ciurliu
     # -20.3%→-13.5%, lazunu -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
     "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", True),

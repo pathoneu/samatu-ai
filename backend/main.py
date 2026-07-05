@@ -5609,7 +5609,7 @@ async def v9_symbols_count_by_template(
     template_size_pct: float = Form(0.05),
     page_nr: int = Form(1),
 ):
-    """Togal-style "click on symbol → count similar".
+    """auto-count-style "click on symbol → count similar".
 
     Vartotojas paspauskite ant simbolio brėžinyje, sistema suranda visus panašius.
     """

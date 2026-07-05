@@ -1,6 +1,6 @@
 """GKP / paint "virš 3 m" height-split regression tests (2026-07-04).
 
-Root cause chain fixed here (Bacevičiaus benchmark: truth 74.91 m² iki +
+Root cause chain fixed here (Objektas B benchmark: truth 74.91 m² iki +
 68.28 m² virš 3 m, extraction emitted 180 m² iki + 0 virš):
 
 1. ``is_high_ceiling`` was boundary-EXCLUSIVE (H > 3.0), so a room whose
@@ -92,7 +92,7 @@ def test_calc_totals_fallback_splits_at_3m_inclusive():
 # ── warning-salvage compound-name matching ──────────────────────────────────
 
 def test_salvage_matches_compound_room_name_component():
-    # Verbatim warning from the 2026-07-03 Opus Bacevičiaus benchmark run —
+    # Verbatim warning from the 2026-07-03 Opus Objektas B benchmark run —
     # this exact string produced NO salvage before the fix.
     warnings = [{
         "code": None,

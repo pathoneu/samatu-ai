@@ -5,7 +5,7 @@
  * redirected to /dashboard via the wrapper in App.jsx.
  *
  * Design language: DARK, TECHNICAL, PREMIUM construction-AI. Orange
- * (#F76B1C) on graphite (#15181E). Reference bar: Togal.ai + Kreo (dark,
+ * (#F76B1C) on graphite (#15181E). Reference bar: dark product-led takeoff SaaS (dark,
  * serious, product-led) — distinct via orange, not their green/blue.
  * Sora display, Hanken Grotesk body, JetBrains Mono for every quantity /
  * price / technical label. Editorial asymmetry, mono coordinate ticks

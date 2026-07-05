@@ -1,7 +1,7 @@
 // pageTypes — central registry for the `puslapiai[]` enum emitted by the
 // extractor (see backend/extractor/prompt.py OUTPUT_SCHEMA).
 //
-// Used by the PdfViewer thumbnail sidebar (Phase 14 / QW02 togal-style page
+// Used by the PdfViewer thumbnail sidebar (Phase 14 / QW02 auto-count-style page
 // classification) and by the Brėžinio struktūra card.
 
 import {

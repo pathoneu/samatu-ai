@@ -108,7 +108,7 @@ def main():
             ("p105_plyteles_grindys", room_calc("105", "plyteles_grindys_m2"), 10.1, False),
             ("p107_plyteles_grindys", room_calc("107", "plyteles_grindys_m2"), 6.52, False),
         ]
-    else:  # bacveviciaus
+    else:  # objektas_b
         gkp_std = round(sum(float(calc_room_quantities(r).get("gkp_lubu_standart_m2") or 0) for r in rooms), 2)
         gkp_hi = round(sum(float(calc_room_quantities(r).get("gkp_lubu_virs_3m_m2") or 0) for r in rooms), 2)
         Q = [

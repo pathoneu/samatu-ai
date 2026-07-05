@@ -31,7 +31,7 @@ ZOOM_PADDING_PCT = 0.05   # 5% padding around bbox so dimension chains are visib
 
 
 # =============================================================================
-# OUTPUT JSON SCHEMA — Kreo-style hierarchical with calculation_trace
+# OUTPUT JSON SCHEMA — hierarchical hierarchical with calculation_trace
 # =============================================================================
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -49,7 +49,7 @@ OUTPUT_SCHEMA = {
         "eksplikacija_source_page": {"type": ["integer", "null"]},
         "puslapiai": {
             "type": "array",
-            "description": "Klasifikuoti puslapiai (Phase 14 / QW02 togal-style page sidebar)",
+            "description": "Klasifikuoti puslapiai (Phase 14 / QW02 auto-count-style page sidebar)",
             "items": {
                 "type": "object",
                 "additionalProperties": False,

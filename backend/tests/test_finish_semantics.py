@@ -1,6 +1,6 @@
 """Finish-semantics lane (2026-06-11 experiments follow-up).
 
-Measured root cause on bacveviciaus: 160 m² of molio tinkas (clay-plaster decor)
+Measured root cause on objektas_b: 160 m² of molio tinkas (clay-plaster decor)
 was counted as PAINT because the apdailos vocabulary had no such category →
 combined paint +62.8%. These tests pin the fix: molio share splits OUT of
 walls_paintable into molio_tinko_m2 and emits its own pozicija.

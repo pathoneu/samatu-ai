@@ -95,7 +95,7 @@ def build_quantities(extract: dict, slug: str) -> list[dict]:
             Q.append(dict(name=name, app=app, truth=truth,
                           inputs=[(r.get("pavadinimas"), "perimetras_m"),
                                   (r.get("pavadinimas"), "lubu_aukstis_m")]))
-    elif slug == "bacveviciaus":
+    elif slug == "objektas_b":
         Q = [
             dict(name="gkp_lubu_iki3m", app=gkp_std, truth=74.91, inputs=all_h),
             dict(name="gkp_lubu_virs3m", app=gkp_hi, truth=68.28, inputs=all_h),
