@@ -21,6 +21,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
@@ -65,10 +66,10 @@ function fmtEur(val) {
 
 // ── Group darbų sąrašą pagal skyrius ─────────────────────────────────────────
 
-function groupByCategory(darbu_sarasas) {
+function groupByCategory(darbu_sarasas, otherLabel) {
   const groups = {};
   (darbu_sarasas || []).forEach(item => {
-    const cat = item.skyrius || item.kategorija || 'Kiti darbai';
+    const cat = item.skyrius || item.kategorija || otherLabel;
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(item);
   });
@@ -78,6 +79,7 @@ function groupByCategory(darbu_sarasas) {
 // ── Vienas darbo eilutės redaktorius (inline) ────────────────────────────────
 
 function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
   const [draftQty, setDraftQty] = useState('');
@@ -224,7 +226,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
                 type="button"
                 onClick={e => { e.stopPropagation(); adjustQty(-1); }}
                 className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-red-400 hover:text-red-400 transition-all"
-                title="Atimti 1"
+                title={t('project.mainView.subtract1')}
               >
                 −
               </button>
@@ -233,12 +235,12 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
               type="button"
               onClick={beginQtyEdit}
               className="inline-flex items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-primary/10 hover:text-primary transition-colors"
-              title="Spausk pataisyti kiekį"
+              title={t('project.mainView.editQty')}
             >
               <span>{fmt(item.kiekis)}</span>
               {isManualQty && (
                 <span className="text-[9px] uppercase font-semibold text-emerald-500 border border-emerald-500/30 rounded px-1">
-                  rank.
+                  {t('project.mainView.manualShort')}
                 </span>
               )}
             </button>
@@ -247,7 +249,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
                 type="button"
                 onClick={e => { e.stopPropagation(); adjustQty(1); }}
                 className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-emerald-400 hover:text-emerald-400 transition-all"
-                title="Pridėti 1"
+                title={t('project.mainView.add1')}
               >
                 +
               </button>
@@ -256,14 +258,14 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
         )}
         {isManualQty && item.ai_kiekis_original != null && (
           <div className="text-[10px] text-muted-foreground leading-tight">
-            AI: {fmt(item.ai_kiekis_original)}
+            {t('project.mainView.aiOriginal', { value: fmt(item.ai_kiekis_original) })}
           </div>
         )}
       </td>
       <td className="px-3 py-2 text-sm text-right tabular-nums">
         {item.kaina
           ? fmtEur(item.kaina)
-          : <span className="text-muted-foreground italic">įvesk</span>}
+          : <span className="text-muted-foreground italic">{t('project.mainView.enterPrice')}</span>}
       </td>
       <td className="px-3 py-2 text-sm font-semibold text-right tabular-nums">
         {item.kaina ? fmtEur(itemSuma) : '—'}
@@ -271,17 +273,17 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
       <td className="px-3 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
         {onJumpToSource && targetPage && (
           <button onClick={() => onJumpToSource(targetPage, item)}
-            className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1" title={`Atidaryti šaltinį psl. ${targetPage}`}>
+            className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1" title={t('project.mainView.openSourceTitle', { page: targetPage })}>
             <Eye className="w-3.5 h-3.5" />
           </button>
         )}
         <button onClick={() => setEditing(true)}
-          className="p-1 hover:bg-muted rounded text-muted-foreground" title="Redaguoti">
+          className="p-1 hover:bg-muted rounded text-muted-foreground" title={t('project.mainView.edit')}>
           <Edit2 className="w-3.5 h-3.5" />
         </button>
         {onRemove && (
           <button onClick={() => onRemove(item)}
-            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1" title="Šalinti">
+            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1" title={t('project.mainView.remove')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
@@ -293,6 +295,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
 // ── Pagrindinis komponentas ──────────────────────────────────────────────────
 
 export default function ProjectMainView({ project, onProjectChange, onShowDrawing, onJumpToPage }) {
+  const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
 
@@ -318,7 +321,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     query: takeoffQuery,
     mode: takeoffMode,
   }), [darbai, takeoffQuery, takeoffMode]);
-  const grouped = useMemo(() => groupByCategory(visibleDarbai), [visibleDarbai]);
+  const grouped = useMemo(() => groupByCategory(visibleDarbai, t('project.mainView.otherWorks')), [visibleDarbai, t]);
   const categories = Object.keys(grouped);
   const workflowSummary = useMemo(() => summarizeTakeoffWorkflow(project, {
     hasPdf: !!onShowDrawing,
@@ -388,11 +391,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   const handleAddRow = () => {
     const next = {
       eil_nr: darbai.length + 1,
-      aprasymas: 'Nauja eilutė',
+      aprasymas: t('project.mainView.newRow'),
       mato_vnt: 'm2',
       kiekis: 0,
       kaina: 0,
-      skyrius: 'Kiti darbai',
+      skyrius: t('project.mainView.otherWorks'),
     };
     const updated = [...darbai, next];
     setDarbai(updated);
@@ -403,10 +406,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   const reviewTargetPage = currentReview ? getRowTargetPage(currentReview, project) : null;
 
   const filterButtons = [
-    { mode: TAKEOFF_FILTER_MODES.all, label: 'Visos', count: darbai.length },
-    { mode: TAKEOFF_FILTER_MODES.review, label: 'Patikra', count: workflowSummary.reviewRows },
-    { mode: TAKEOFF_FILTER_MODES.missing_price, label: 'Be kainos', count: workflowSummary.missingPrices },
-    { mode: TAKEOFF_FILTER_MODES.manual, label: 'Rankinės', count: workflowSummary.manualOverrides },
+    { mode: TAKEOFF_FILTER_MODES.all, label: t('project.mainView.filterAll'), count: darbai.length },
+    { mode: TAKEOFF_FILTER_MODES.review, label: t('project.mainView.filterReview'), count: workflowSummary.reviewRows },
+    { mode: TAKEOFF_FILTER_MODES.missing_price, label: t('project.mainView.filterMissingPrice'), count: workflowSummary.missingPrices },
+    { mode: TAKEOFF_FILTER_MODES.manual, label: t('project.mainView.filterManual'), count: workflowSummary.manualOverrides },
   ];
 
   return (
@@ -420,26 +423,26 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             {/* Left: totals — Be PVM (compact) | Su PVM (emphasized) */}
             <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-baseline gap-2">
-                <span className="skyrius-header" style={{ fontSize: 10 }}>Be PVM</span>
+                <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.mainView.beVat')}</span>
                 <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
                   {fmtEur(totals.viso)}
                 </span>
               </div>
               <div className="flex items-baseline gap-2 border-l border-border pl-6">
                 <span className="skyrius-header" style={{ fontSize: 10 }}>
-                  {reverseVat ? 'VISO (be PVM)' : `Su PVM (${vatPct}%)`}
+                  {reverseVat ? t('project.mainView.totalReverse') : t('project.mainView.withVat', { pct: vatPct })}
                 </span>
                 <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
                   {fmtEur(totals.viso * (1 + vatPct / 100))}
                 </span>
               </div>
               <div className="border-l border-border pl-6 flex items-center gap-4 text-xs text-muted-foreground">
-                <span><span className="tabular font-medium text-foreground">{(project.v8_rooms || project.patalpos || []).length}</span> patalpų</span>
+                <span><span className="tabular font-medium text-foreground">{(project.v8_rooms || project.patalpos || []).length}</span> {t('project.mainView.rooms')}</span>
                 <span><span className="tabular font-medium text-foreground">{fmt(totalArea)}</span> m²</span>
-                <span><span className="tabular font-medium text-foreground">{totals.count}</span> pozicijų</span>
+                <span><span className="tabular font-medium text-foreground">{totals.count}</span> {t('project.mainView.positions')}</span>
                 {projectHidroM2 > 0 && (
-                  <span title="Hidroizoliacijos plotas (visi šlapieji kambariai sumoje)">
-                    <span className="tabular font-medium text-foreground">{fmt(projectHidroM2)}</span> m² hidroiz.
+                  <span title={t('project.mainView.hidroTitle')}>
+                    <span className="tabular font-medium text-foreground">{fmt(projectHidroM2)}</span> {t('project.mainView.hidroUnit')}
                   </span>
                 )}
               </div>
@@ -458,8 +461,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <div>
-                <strong>Kainos neįvestos.</strong> Spauskite "Taikyti kainyną" jeigu turite įkeltą
-                kainynę, arba ant kainos stulpelio bet kurioje eilutėje ir įveskite €/vnt rankomis.
+                <strong>{t('project.mainView.pricesMissingStrong')}</strong>{t('project.mainView.pricesMissingRest')}
               </div>
             </div>
           )}
@@ -489,9 +491,9 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               <Target className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-foreground">Takeoff kontrolė</div>
+              <div className="text-sm font-semibold text-foreground">{t('project.mainView.takeoffControl')}</div>
               <div className="text-xs text-muted-foreground">
-                {workflowSummary.totalRows} pozicijų · {workflowSummary.totalRooms} patalpų · {fmt(workflowSummary.totalArea)} m²
+                {t('project.mainView.takeoffSummary', { positions: workflowSummary.totalRows, rooms: workflowSummary.totalRooms, area: fmt(workflowSummary.totalArea) })}
               </div>
             </div>
           </div>
@@ -500,9 +502,9 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               kept; gives user a sense of what AI inferred vs read directly. */}
           {(workflowSummary.aiSymbolRows > 0 || workflowSummary.assumptionRows > 0) && (
             <div className="text-[11px] text-muted-foreground">
-              AI ženklai: <span className="mono tabular text-foreground">{workflowSummary.aiSymbolRows}</span>
+              {t('project.mainView.aiSymbols')}<span className="mono tabular text-foreground">{workflowSummary.aiSymbolRows}</span>
               <span className="mx-1.5">·</span>
-              Prielaidos: <span className="mono tabular text-foreground">{workflowSummary.assumptionRows}</span>
+              {t('project.mainView.assumptionsCounter')}<span className="mono tabular text-foreground">{workflowSummary.assumptionRows}</span>
             </div>
           )}
         </div>
@@ -516,7 +518,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ClipboardCheck className="w-3.5 h-3.5" />
-                Patikrai
+                {t('project.mainView.cardReview')}
               </div>
               <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.reviewRows}</div>
             </button>
@@ -527,7 +529,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleDollarSign className="w-3.5 h-3.5" />
-                Be kainos
+                {t('project.mainView.cardMissingPrice')}
               </div>
               <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.missingPrices}</div>
             </button>
@@ -538,7 +540,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <PencilRuler className="w-3.5 h-3.5" />
-                Rankiniai
+                {t('project.mainView.cardManual')}
               </div>
               <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.manualOverrides}</div>
             </button>
@@ -550,10 +552,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Eye className="w-3.5 h-3.5" />
-                Brėžinys
+                {t('project.mainView.cardDrawing')}
               </div>
               <div className="mt-1 text-sm font-semibold text-foreground">
-                {workflowSummary.hasPdf ? `${workflowSummary.totalPages || 'PDF'} psl.` : 'prisegti PDF'}
+                {workflowSummary.hasPdf ? (workflowSummary.totalPages ? t('project.mainView.pdfPages', { count: workflowSummary.totalPages }) : t('project.mainView.pdfFallback')) : t('project.mainView.attachPdf')}
               </div>
             </button>
           </div>
@@ -564,7 +566,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               <input
                 value={takeoffQuery}
                 onChange={e => setTakeoffQuery(e.target.value)}
-                placeholder="Ieškoti pozicijų..."
+                placeholder={t('project.mainView.searchPositions')}
                 className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none focus:border-primary"
               />
             </div>
@@ -593,12 +595,12 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
           <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300 font-semibold">
-              Patikros režimas · liko {reviewRows.length}
+              {t('project.mainView.reviewMode', { count: reviewRows.length })}
             </div>
             <div className="text-sm text-foreground truncate">
               {currentReview.eil_nr}. {currentReview.aprasymas}
               <span className="text-muted-foreground ml-2">
-                {getQuantitySourceLabel(currentReview)}: {fmt(currentReview.kiekis)} {currentReview.mato_vnt || ''}
+                {t('project.mainView.reviewLabel', { label: getQuantitySourceLabel(currentReview), qty: fmt(currentReview.kiekis), unit: currentReview.mato_vnt || '' })}
               </span>
             </div>
             {currentReview.review_reason && (
@@ -619,7 +621,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               }
             }}
             className="w-24 h-8 px-2 border border-border bg-background rounded text-sm text-right tabular-nums"
-            title="Pataisytas kiekis"
+            title={t('project.mainView.fixQtyTitle')}
           />
           <Button
             variant="outline"
@@ -632,13 +634,13 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               }
             }}
           >
-            Pataisyti
+            {t('project.mainView.fix')}
           </Button>
           <Button
             size="sm"
             onClick={() => updateRowsById(acceptPositionQuantity, currentReview)}
           >
-            Patvirtinti
+            {t('project.mainView.confirm')}
           </Button>
           {onJumpToPage && reviewTargetPage && (
             <Button
@@ -647,13 +649,13 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               className="border-border"
               onClick={() => onJumpToPage(reviewTargetPage, currentReview)}
             >
-              Šaltinis
+              {t('project.mainView.source')}
             </Button>
           )}
         </div>
       ) : (
         <div className="border border-emerald-500/25 bg-emerald-50 dark:bg-emerald-950/15 rounded-lg px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300">
-          Visi žemo / vidutinio pasitikėjimo kiekiai patikrinti.
+          {t('project.mainView.allReviewed')}
         </div>
       )}
 
@@ -662,7 +664,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
       {isAdmin && project._meta && (
         <details className="text-xs text-muted-foreground -mt-2 group">
           <summary className="cursor-pointer hover:text-foreground select-none inline-flex items-center gap-2">
-            <span>Analizės detalės (admin)</span>
+            <span>{t('project.mainView.analysisDetails')}</span>
             {project._meta.elapsed_s && (
               <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
                 {Math.round(project._meta.elapsed_s)}s
@@ -670,20 +672,20 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             )}
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 p-3 bg-muted/30 rounded text-[11px] tabular-nums">
-            {project._meta.elapsed_s != null && <><span>Trukmė:</span><span>{project._meta.elapsed_s}s</span></>}
-            {project._meta.input_tokens != null && <><span>Input token'ai:</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
-            {project._meta.output_tokens != null && <><span>Output token'ai:</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
+            {project._meta.elapsed_s != null && <><span>{t('project.mainView.duration')}</span><span>{project._meta.elapsed_s}s</span></>}
+            {project._meta.input_tokens != null && <><span>{t('project.mainView.inputTokens')}</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
+            {project._meta.output_tokens != null && <><span>{t('project.mainView.outputTokens')}</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
             {project._meta.cache_read_tokens != null && project._meta.cache_read_tokens > 0 && (
-              <><span>Cache hit:</span><span>{project._meta.cache_read_tokens.toLocaleString()} ({(project._meta.cache_read_tokens / (project._meta.input_tokens || 1) * 100).toFixed(0)}%)</span></>
+              <><span>{t('project.mainView.cacheHit')}</span><span>{project._meta.cache_read_tokens.toLocaleString()} ({(project._meta.cache_read_tokens / (project._meta.input_tokens || 1) * 100).toFixed(0)}%)</span></>
             )}
-            {project._meta.zoom_attempted != null && <><span>Patikslinimai:</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
-            {project._meta.zoom_elapsed_s != null && <><span>Patikslinimo trukmė:</span><span>{project._meta.zoom_elapsed_s}s</span></>}
-            {project._meta.pages_sent != null && <><span>Puslapiai:</span><span>{project._meta.pages_sent}</span></>}
-            {project._meta.model && <><span>Modelis:</span><span>{project._meta.model}</span></>}
+            {project._meta.zoom_attempted != null && <><span>{t('project.mainView.refinements')}</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
+            {project._meta.zoom_elapsed_s != null && <><span>{t('project.mainView.refinementDuration')}</span><span>{project._meta.zoom_elapsed_s}s</span></>}
+            {project._meta.pages_sent != null && <><span>{t('project.mainView.pages')}</span><span>{project._meta.pages_sent}</span></>}
+            {project._meta.model && <><span>{t('project.mainView.model')}</span><span>{project._meta.model}</span></>}
             {project._meta.input_tokens != null && (() => {
               // Sprint §AUDIT (2026-04-29): use shared pricing module
               const cost = calcClaudeCostUSD(project._meta);
-              return <><span>~Kaina:</span><span>${cost.toFixed(2)}</span></>;
+              return <><span>{t('project.mainView.cost')}</span><span>${cost.toFixed(2)}</span></>;
             })()}
           </div>
         </details>
@@ -700,23 +702,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                       : null);
         if (!sym || Object.keys(sym).length === 0) return null;
 
-        const SYM_LABELS = {
-          rozetes: 'Rozetės',
-          jungikliai: 'Jungikliai',
-          sviestuvai: 'Šviestuvai',
-          pakabinami_sviestuvai: 'Pakabinami šviestuvai',
-          led_juostos: 'LED juostos (m)',
-          difuzoriai: 'Difūzoriai',
-          klozetai: 'Klozetai',
-          praustuvai: 'Praustuvai',
-          vonios: 'Vonios',
-          trapai: 'Trapai',
-          maisytuvai: 'Maišytuvai',
-          gyvatukai: 'Gyvatukai',
-          skalbimo_masinos: 'Skalbimo mašinos',
-          radiatoriai: 'Radiatoriai',
-          durys: 'Durys',
-          langai: 'Langai',
+        const symLabel = (k) => {
+          const key = `project.mainView.symbols.${k}`;
+          const translated = t(key);
+          return translated === key ? k : translated;
         };
 
         return (
@@ -724,10 +713,10 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <div className="flex items-center gap-2 mb-3">
               <Search className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold text-foreground">
-                AI brėžinyje rasti simboliai
+                {t('project.mainView.aiSymbolsFound')}
               </h3>
               <Badge variant="secondary" className="text-[10px] font-normal">
-                {Object.values(sym).reduce((a, b) => a + (b || 0), 0)} viso
+                {Object.values(sym).reduce((a, b) => a + (b || 0), 0)} {t('project.mainView.totalSuffix')}
               </Badge>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-2 text-xs">
@@ -736,7 +725,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 .sort(([, a], [, b]) => b - a)
                 .map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between border-b border-border/40 pb-1">
-                    <span className="text-muted-foreground truncate pr-2">{SYM_LABELS[k] || k}</span>
+                    <span className="text-muted-foreground truncate pr-2">{symLabel(k)}</span>
                     <strong className="text-foreground tabular-nums">{v}</strong>
                   </div>
                 ))}
@@ -753,9 +742,9 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
         >
           <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Home className="w-4 h-4 text-muted-foreground" />
-            Patalpų suvestinė
+            {t('project.mainView.roomsSummary')}
             <Badge variant="secondary" className="text-xs font-normal">
-              {(project.v8_rooms || project.patalpos || []).length} patalpų · {fmt(totalArea)} m²
+              {t('project.mainView.roomsBadge', { count: (project.v8_rooms || project.patalpos || []).length, area: fmt(totalArea) })}
             </Badge>
           </span>
           {patalposExpanded
@@ -769,12 +758,12 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase text-muted-foreground border-b border-border">
                   <tr>
-                    <th className="px-2 py-1.5 text-left font-medium">Nr</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Pavadinimas</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Paskirtis</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Plotas m²</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Perim. m</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Lubos m</th>
+                    <th className="px-2 py-1.5 text-left font-medium">{t('project.mainView.colNr')}</th>
+                    <th className="px-2 py-1.5 text-left font-medium">{t('project.mainView.colName')}</th>
+                    <th className="px-2 py-1.5 text-left font-medium">{t('project.mainView.colPurpose')}</th>
+                    <th className="px-2 py-1.5 text-right font-medium">{t('project.mainView.colAreaM2')}</th>
+                    <th className="px-2 py-1.5 text-right font-medium">{t('project.mainView.colPerimM')}</th>
+                    <th className="px-2 py-1.5 text-right font-medium">{t('project.mainView.colCeilingM')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -796,8 +785,8 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                         }`}
                         title={canJump
                           ? (r.eksplikacija_row_bbox
-                              ? `Atidaryti eksplikaciją (psl. ${eksPage}) ir paryškinti šią eilutę`
-                              : `Atidaryti psl. ${targetPage} brėžinyje`)
+                              ? t('project.mainView.openEksTitle', { page: eksPage })
+                              : t('project.mainView.openPageTitle', { page: targetPage }))
                           : undefined}
                       >
                         <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums">{r.nr}</td>
@@ -828,36 +817,36 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
-            Darbų ir medžiagų sąrašas
+            {t('project.mainView.worksList')}
             <Badge variant="secondary" className="text-xs font-normal">
-              {darbai.length} pozicijų
+              {t('project.mainView.worksBadge', { count: darbai.length })}
             </Badge>
           </h2>
           <Button variant="outline" size="sm" onClick={handleAddRow} className="gap-1.5 h-8 text-xs">
             <Plus className="w-3.5 h-3.5" />
-            Pridėti eilutę
+            {t('project.mainView.addRow')}
           </Button>
         </div>
 
         {darbai.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground text-sm">
-            Darbų sąrašas tuščias. Spauskite „Pridėti eilutę".
+            {t('project.mainView.emptyList')}
           </div>
         ) : visibleDarbai.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground text-sm">
-            Pagal pasirinktą filtrą pozicijų nėra.
+            {t('project.mainView.noFilterMatch')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase text-muted-foreground border-b border-border bg-muted/20">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium w-12">Nr</th>
-                  <th className="px-3 py-2 text-left font-medium">Aprašymas</th>
-                  <th className="px-3 py-2 text-left font-medium w-20">Vnt</th>
-                  <th className="px-3 py-2 text-right font-medium w-24">Kiekis</th>
-                  <th className="px-3 py-2 text-right font-medium w-24">€/vnt</th>
-                  <th className="px-3 py-2 text-right font-medium w-28">Suma €</th>
+                  <th className="px-3 py-2 text-left font-medium w-12">{t('project.mainView.colNr')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('project.mainView.colDescription')}</th>
+                  <th className="px-3 py-2 text-left font-medium w-20">{t('project.mainView.colUnit')}</th>
+                  <th className="px-3 py-2 text-right font-medium w-24">{t('project.mainView.colQty')}</th>
+                  <th className="px-3 py-2 text-right font-medium w-24">{t('project.mainView.colPricePerUnit')}</th>
+                  <th className="px-3 py-2 text-right font-medium w-28">{t('project.mainView.colTotal')}</th>
                   <th className="w-16" />
                 </tr>
               </thead>
@@ -898,7 +887,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               <tfoot className="border-t-2 border-border bg-muted/20">
                 <tr>
                   <td colSpan={5} className="px-3 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    VISO be PVM:
+                    {t('project.mainView.totalNoVat')}
                   </td>
                   <td className="px-3 py-2.5 text-right text-base font-bold tabular-nums text-foreground">
                     {fmtEur(totals.viso)}
@@ -916,11 +905,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
         {onShowDrawing && (
           <Button variant="outline" onClick={onShowDrawing} className="gap-2">
             <Eye className="w-4 h-4" />
-            Žiūrėti brėžinį
+            {t('project.mainView.viewDrawing')}
           </Button>
         )}
         <p className="text-xs text-muted-foreground">
-          AI tikslumas ~85–95%. Patikrink ir pataisyk reikšmes prieš eksportuodamas.
+          {t('project.mainView.accuracyNote')}
         </p>
       </div>
     </div>
@@ -934,6 +923,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
 // unless user holds Shift while picking.
 
 function ApplyPriceListButton({ project, onProjectChange }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [priceLists, setPriceLists] = useState([]);
   const ref = useRef(null);
@@ -966,15 +956,12 @@ function ApplyPriceListButton({ project, onProjectChange }) {
       if (!primary) primary = result;
     }
     if (!primary || primary.applied === 0) {
-      toast.error(
-        `Iš kainyno „${priceList.name}" nepavyko pritaikyti nė vienos eilutės. ` +
-        `Patikrinkite ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).`,
-      );
+      toast.error(t('project.mainView.toastApplyFail', { name: priceList.name }));
       return;
     }
     updated._last_applied_pricelist = { id: priceList.id, name: priceList.name, applied_at: new Date().toISOString() };
     onProjectChange?.(updated);
-    toast.success(`Pritaikyta: ${primary.applied} eilučių iš kainyno „${priceList.name}". Praleista: ${primary.skipped}.`);
+    toast.success(t('project.mainView.toastApplied', { applied: primary.applied, name: priceList.name, skipped: primary.skipped }));
   };
 
   if (priceLists.length === 0) {
@@ -983,10 +970,10 @@ function ApplyPriceListButton({ project, onProjectChange }) {
         variant="outline"
         size="sm"
         disabled
-        title="Kainynas dar neįkeltas. Spauskite Kainynai šoninėje juostoje."
+        title={t('project.mainView.priceListNotLoaded')}
       >
         <Sliders className="w-3.5 h-3.5 mr-1.5" />
-        Taikyti kainyną
+        {t('project.mainView.applyPriceList')}
       </Button>
     );
   }
@@ -997,10 +984,10 @@ function ApplyPriceListButton({ project, onProjectChange }) {
         variant="outline"
         size="sm"
         onClick={() => setOpen(v => !v)}
-        title="Pritaikyti įkeltą kainyną pozicijoms (fuzzy match pagal aprašymą)"
+        title={t('project.mainView.applyPriceListTitle')}
       >
         <Sliders className="w-3.5 h-3.5 mr-1.5" />
-        Taikyti kainyną
+        {t('project.mainView.applyPriceList')}
         <ChevronDown className="w-3 h-3 ml-1" />
       </Button>
       {open && (
@@ -1014,13 +1001,12 @@ function ApplyPriceListButton({ project, onProjectChange }) {
             >
               <span className="truncate">{pl.name}</span>
               <span className="text-xs text-muted-foreground tabular shrink-0">
-                {(pl.items || []).length} eil.
+                {t('project.mainView.priceListRows', { count: (pl.items || []).length })}
               </span>
             </button>
           ))}
           <div className="px-3 pt-1.5 pb-1 text-[10px] text-muted-foreground border-t border-border mt-1">
-            Rankomis įvestos kainos lieka nepakeistos. Žemo pasitikėjimo
-            atitikmenys praleidžiami.
+            {t('project.mainView.manualPricesKept')}
           </div>
         </div>
       )}
