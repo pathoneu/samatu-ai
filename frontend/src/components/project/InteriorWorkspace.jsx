@@ -22,6 +22,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
@@ -108,6 +109,7 @@ export default function InteriorWorkspace({
   onJumpToPage = null,
   onProjectChange = null,
 }) {
+  const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfBlob, setPdfBlob] = useState(null);  // Diena 6: V9 click-to-count'ui
   // Sprint H7 (2026-04-29): default 70/30 — PDF gets more central space.
@@ -314,7 +316,7 @@ export default function InteriorWorkspace({
         {detecting && (
           <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 text-xs text-blue-300">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            Aptinkamos tikslios patalpų zonos…
+            {t('project.interiorWorkspace.detecting')}
           </div>
         )}
         {pdfUrl ? (
@@ -362,8 +364,12 @@ export default function InteriorWorkspace({
             onSymbolCountResult={(symbolType, result) => {
               // Pridedam į projekto darbų sąrašą kaip naują eilutę.
               // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
-              const aprasymas = SYMBOL_LABELS[symbolType] || `Simbolių skaičius (${symbolType})`;
-              const skyrius = SYMBOL_CATEGORIES[symbolType] || 'Kiti darbai';
+              const aprasymas = SYMBOL_LABELS[symbolType]
+                ? t(`project.interiorWorkspace.symbols.${symbolType}`)
+                : t('project.interiorWorkspace.symbolCountFallback', { type: symbolType });
+              const skyrius = SYMBOL_CATEGORIES[symbolType]
+                ? t(`project.interiorWorkspace.categories.${symbolType}`)
+                : t('project.interiorWorkspace.otherWorks');
               const kiekis = result?.count || (result?.matches?.length ?? 0);
               if (!kiekis) return;
               const darbai = [...(project.darbu_sarasas || [])];
@@ -400,16 +406,15 @@ export default function InteriorWorkspace({
         ) : pdfMissing ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
             <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-foreground font-medium mb-1">Brėžinys nepasiekiamas</p>
+            <p className="text-sm text-foreground font-medium mb-1">{t('project.interiorWorkspace.pdfUnavailable')}</p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              Šis projektas sukurtas anksčiau ir PDF nebuvo išsaugotas. Sukurkite
-              naują projektą, kad galėtumėte naudoti brėžinio matavimo įrankius.
+              {t('project.interiorWorkspace.pdfUnavailableDesc')}
             </p>
             <label
               className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
             >
               <Upload className="w-4 h-4" />
-              {attachingPdf ? 'Prisegama…' : 'Prisegti PDF prie projekto'}
+              {attachingPdf ? t('project.interiorWorkspace.attaching') : t('project.interiorWorkspace.attachPdf')}
               <input
                 type="file"
                 accept="application/pdf,.pdf"
@@ -436,7 +441,7 @@ export default function InteriorWorkspace({
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            Krauname brėžinį…
+            {t('project.interiorWorkspace.loadingDrawing')}
           </div>
         )}
       </div>
