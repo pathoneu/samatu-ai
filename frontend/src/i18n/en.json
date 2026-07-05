@@ -487,6 +487,59 @@
       "sumNoVat": "Total excl. VAT",
       "vat": "VAT {{rate}}%",
       "totalWithVat": "TOTAL incl. VAT"
+    },
+    "scaleBanner": {
+      "srcText": "text marker",
+      "srcDimensions": "dimension annotations",
+      "srcTextDimensions": "text + dimensions",
+      "srcSanity": "logic check",
+      "srcFallback": "default (1:50)",
+      "confHigh": "High confidence",
+      "confMedium": "Medium confidence",
+      "confLow": "Low confidence",
+      "scale": "Drawing scale: 1:{{ratio}}",
+      "confSource": "({{conf}} — {{source}})",
+      "moreWarnings": "+ {{count}} more warnings",
+      "tipLabel": "Tip:",
+      "tipBody": " The areas look the wrong size ({{pct}}% of rooms outside the norm). Possible scale correction: ×{{multiplier}}. Check the drawing or mark the areas manually in the Drawing tab."
+    },
+    "mobileBanner": {
+      "text": "Best used on a computer. Mobile mode — view only.",
+      "ok": "Got it"
+    },
+    "traceBanner": {
+      "tracing": "📐 Tracing room",
+      "points_one": "{{count}} point",
+      "points_other": "{{count}} points",
+      "hint": "Enter to finish  ·  Esc to cancel",
+      "orthoOff": "ortho OFF (F8)"
+    },
+    "polygonHint": {
+      "title": "Trace the room by clicking the corners",
+      "finish": "or double-click — finish",
+      "cancel": "— cancel",
+      "removeLast": "— remove the last point",
+      "freeDir": "— free direction",
+      "tempSnapOff": "— temporarily disable snapping"
+    },
+    "provenance": {
+      "eksplikacijaLabel": "from schedule",
+      "eksplikacijaTitle": "The number is taken from the room schedule table. Click → see the row.",
+      "manualLabel": "manual",
+      "manualTitle": "The number is from your traced polygon.",
+      "visionLabel": "from AI",
+      "visionTitle": "The number is from AI recognition. Check before using.",
+      "dimensionLabel": "from dimension",
+      "dimensionTitle": "The number is from a drawing dimension."
+    },
+    "eksplikacijaPopover": {
+      "head": "from the room schedule table",
+      "roomFallback": "Room {{nr}}",
+      "nr": "no. {{nr}}",
+      "area": "Area",
+      "purpose": "Purpose",
+      "sourcePrefix": "Source: pdfplumber table, p. {{page}}",
+      "sourceSuffix": " · deterministic (no AI)"
     }
   },
   "shared": {

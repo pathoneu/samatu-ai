@@ -4,10 +4,12 @@
 // localStorage so the banner only nags once per device.
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const STORAGE_KEY = 'samatu_mobile_banner_dismissed';
 
 export default function MobileViewOnlyBanner() {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -32,9 +34,9 @@ export default function MobileViewOnlyBanner() {
         background: 'rgba(15,23,42,0.95)', color: '#fef3c7',
         padding: '10px 16px', borderRadius: 8, fontSize: 12,
       }}>
-      Geriausia naudoti kompiuteryje. Mobilus režimas — peržiūros tik.
+      {t('project.mobileBanner.text')}
       <button onClick={dismiss} className="ml-3 underline">
-        Aišku
+        {t('project.mobileBanner.ok')}
       </button>
     </div>
   );

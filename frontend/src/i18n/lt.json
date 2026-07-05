@@ -490,6 +490,60 @@
       "sumNoVat": "Suma be PVM",
       "vat": "PVM {{rate}}%",
       "totalWithVat": "VISO su PVM"
+    },
+    "scaleBanner": {
+      "srcText": "tekstinis žymeklis",
+      "srcDimensions": "dimensijų užrašai",
+      "srcTextDimensions": "tekstas + dimensijos",
+      "srcSanity": "logikos patikrinimas",
+      "srcFallback": "numatytasis (1:50)",
+      "confHigh": "Aukšto patikimumo",
+      "confMedium": "Vidutinio patikimumo",
+      "confLow": "Žemo patikimumo",
+      "scale": "Brėžinio mastelis: 1:{{ratio}}",
+      "confSource": "({{conf}} — {{source}})",
+      "moreWarnings": "+ dar {{count}} perspėjimai",
+      "tipLabel": "Patarimas:",
+      "tipBody": " Plotai atrodo netinkamo dydžio ({{pct}}% patalpų už normos ribų). Galimas mastelio koregavimas: ×{{multiplier}}. Patikrinkite brėžinį arba pažymėkite plotus rankiniu būdu Brėžinio tab'e."
+    },
+    "mobileBanner": {
+      "text": "Geriausia naudoti kompiuteryje. Mobilus režimas — peržiūros tik.",
+      "ok": "Aišku"
+    },
+    "traceBanner": {
+      "tracing": "📐 Apvedinėjamas kambarys",
+      "points_one": "{{count}} taškas",
+      "points_few": "{{count}} taškai",
+      "points_other": "{{count}} taškų",
+      "hint": "Enter užbaigti  ·  Esc atšaukti",
+      "orthoOff": "ortho IŠJUNGTA (F8)"
+    },
+    "polygonHint": {
+      "title": "Apveskite kambarį spustelėdami kampus",
+      "finish": "arba dvigubas paspaudimas — užbaigti",
+      "cancel": "— atšaukti",
+      "removeLast": "— pašalinti paskutinį tašką",
+      "freeDir": "— laisva kryptis",
+      "tempSnapOff": "— laikinas snap'o išjungimas"
+    },
+    "provenance": {
+      "eksplikacijaLabel": "iš eksplikacijos",
+      "eksplikacijaTitle": "Skaičius paimtas iš eksplikacijos lentelės. Spausk → matysi eilutę.",
+      "manualLabel": "manualu",
+      "manualTitle": "Skaičius iš tavo apvesto polygono.",
+      "visionLabel": "iš AI",
+      "visionTitle": "Skaičius iš AI atpažinimo. Patikrink prieš naudodamas.",
+      "dimensionLabel": "iš dimensijos",
+      "dimensionTitle": "Skaičius iš brėžinio dimensijos."
+    },
+    "eksplikacijaPopover": {
+      "head": "iš eksplikacijos lentelės",
+      "roomFallback": "Patalpa {{nr}}",
+      "nr": "nr {{nr}}",
+      "area": "Plotas",
+      "purpose": "Paskirtis",
+      "sourcePrefix": "Šaltinis: pdfplumber lentelė, psl. {{page}}",
+      "sourceSuffix": " · deterministinis (be AI)"
     }
   },
   "shared": {

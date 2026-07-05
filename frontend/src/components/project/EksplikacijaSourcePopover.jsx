@@ -14,8 +14,10 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function EksplikacijaSourcePopover({ room, anchorRect, onClose }) {
+  const { t } = useTranslation();
   const ref = useRef(null);
 
   useEffect(() => {
@@ -55,28 +57,27 @@ export default function EksplikacijaSourcePopover({ room, anchorRect, onClose })
       data-testid="eksplikacija-popover"
     >
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">
-        iš eksplikacijos lentelės
+        {t('project.eksplikacijaPopover.head')}
       </div>
       <div className="flex items-baseline justify-between mb-1">
-        <span className="font-semibold">{room.pavadinimas || `Patalpa ${room.nr}`}</span>
-        <span className="mono tabular text-muted-foreground text-[10px]">nr {room.nr}</span>
+        <span className="font-semibold">{room.pavadinimas || t('project.eksplikacijaPopover.roomFallback', { nr: room.nr })}</span>
+        <span className="mono tabular text-muted-foreground text-[10px]">{t('project.eksplikacijaPopover.nr', { nr: room.nr })}</span>
       </div>
       <div className="flex items-baseline justify-between">
-        <span className="text-muted-foreground">Plotas</span>
+        <span className="text-muted-foreground">{t('project.eksplikacijaPopover.area')}</span>
         <span className="mono tabular font-semibold">
           {room.plotas_m2?.toFixed?.(2) ?? '—'} m²
         </span>
       </div>
       {room.paskirtis && (
         <div className="flex items-baseline justify-between mt-0.5">
-          <span className="text-muted-foreground">Paskirtis</span>
+          <span className="text-muted-foreground">{t('project.eksplikacijaPopover.purpose')}</span>
           <span className="text-foreground/80 capitalize">{room.paskirtis}</span>
         </div>
       )}
       <div className="border-t border-border/60 mt-2 pt-2 text-[10px] text-muted-foreground">
-        Šaltinis: pdfplumber lentelė, psl.{' '}
-        {room.eksplikacija_source_page ?? room.page_nr ?? '?'}
-        {' · '}deterministinis (be AI)
+        {t('project.eksplikacijaPopover.sourcePrefix', { page: room.eksplikacija_source_page ?? room.page_nr ?? '?' })}
+        {t('project.eksplikacijaPopover.sourceSuffix')}
       </div>
     </div>
   );
