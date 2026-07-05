@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
 
@@ -9,6 +10,7 @@ import Sidebar from './Sidebar';
  * hamburger toggle slides it in as overlay. Content uses full width on mobile.
  */
 export default function AppLayout() {
+  const { t } = useTranslation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
@@ -28,8 +30,8 @@ export default function AppLayout() {
           color: 'hsl(var(--foreground))',
           boxShadow: mobileSidebarOpen ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
         }}
-        title={mobileSidebarOpen ? 'Užverti meniu' : 'Atverti meniu'}
-        aria-label={mobileSidebarOpen ? 'Užverti meniu' : 'Atverti meniu'}
+        title={mobileSidebarOpen ? t('layout.closeMenu') : t('layout.openMenu')}
+        aria-label={mobileSidebarOpen ? t('layout.closeMenu') : t('layout.openMenu')}
       >
         {mobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
       </button>

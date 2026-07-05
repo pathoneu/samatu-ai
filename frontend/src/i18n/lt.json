@@ -280,6 +280,83 @@
     "manage": "Tvarkyti",
     "ariaLabel": "Slapukų sutikimas"
   },
+  "layout": {
+    "logoHome": "Pathon — į pradžią",
+    "closeMenu": "Užverti meniu",
+    "openMenu": "Atverti meniu",
+    "nav": {
+      "projektai": "Projektai",
+      "aktyvusProjektas": "Aktyvus projektas",
+      "naujasProjektas": "Naujas projektas",
+      "kainynai": "Kainynai",
+      "administravimas": "Administravimas",
+      "planai": "Planai",
+      "nustatymai": "Nustatymai",
+      "atsijungti": "Atsijungti"
+    }
+  },
+  "dashboard": {
+    "eyebrow": "00 / Projektai",
+    "title": "Projektai",
+    "subtitle": "Statybų sąmatų valdymas",
+    "settingsBtn": "Nustatymai",
+    "settingsTitle": "Pradiniai nustatymai",
+    "newProject": "Naujas projektas",
+    "searchPlaceholder": "Ieškoti projektų...",
+    "noFilterResultsA": "Nieko nerasta pagal filtrą „",
+    "noFilterResultsB": "\".",
+    "empty": {
+      "title": "Dar nėra projektų",
+      "body": "Įkelkite statybų projekto brėžinį (PDF) — Pathon nuskaitys ir apskaičiuos kiekius bei paruoš sąmatą. Arba pirma apžiūrėkite pavyzdinį projektą.",
+      "newProject": "Naujas projektas",
+      "viewDemo": "Peržiūrėti pavyzdinį projektą",
+      "feat1Title": "AI analizė",
+      "feat1Desc": "Automatinis KŽ eilučių atpažinimas",
+      "feat2Title": "Sutaupykite laiką",
+      "feat2Desc": "1-2 savaitės darbo per kelias minutes",
+      "feat3Title": "Tiksli sąmata",
+      "feat3Desc": "Realiu laiku skaičiavimai ir eksportas"
+    },
+    "stats": {
+      "activeProjects": "Aktyvūs projektai",
+      "activeProjectsSubReady": "visi paruošti",
+      "activeProjectsSubEmpty": "pradėk pirmąjį",
+      "totalWithVat": "Bendra suma su PVM",
+      "totalWithVatSubReady": "visi paruošti",
+      "totalWithVatSubEmpty": "kainos dar nesuvestos",
+      "totalArea": "Visas plotas",
+      "totalAreaSub": "patalpų suma per visus",
+      "avgPositions": "Vid. pozicijų sk.",
+      "avgPositionsSub": "eilutės per projektą",
+      "last30d": "Per 30 d.",
+      "last30dSub": "naujų projektų",
+      "last30dSubEmpty": "nėra naujų"
+    },
+    "card": {
+      "untitled": "Be pavadinimo",
+      "statusReady": "Paruošta",
+      "statusProcessing": "Apdoroja",
+      "statusError": "Klaida",
+      "processingPdf": "Apdorojama PDF…",
+      "noPrices": "Kainos dar nesuvestos",
+      "rows": "{{count}} eilučių"
+    }
+  },
+  "usageMeter": {
+    "projectsThisMonth": "projektų šį mėnesį",
+    "renews": "atsinaujina {{date}}",
+    "nearLimitOne": "Liko {{count}} projektas šį mėnesį. ",
+    "nearLimitMany": "Liko {{count}} projektai šį mėnesį. ",
+    "upgradePlan": "Padidinti planą",
+    "lightNudgePrefix": "Naudojate mažai — apsvarstykite ",
+    "lightNudgeLink": "vienkartinį planą",
+    "plans": {
+      "free": "Nemokamas bandymas",
+      "pro": "Pro",
+      "studio": "Studio",
+      "oneoff": "Vienkartinis"
+    }
+  },
   "legal": {
     "backHome": "Grįžti į pradžią",
     "updated": "Atnaujinta:",

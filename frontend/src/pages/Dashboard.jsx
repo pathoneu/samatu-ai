@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { FolderPlus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import SetupWizard from '@/components/project/SetupWizard';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [search, setSearch] = React.useState('');
   // Sprint 1 (Q3): atsisakom forced Setup Wizard. Vartotojas tiesiog
   // pamatys Dashboard ir spauskite "Nustatymai" mygtuką jei nori konfigūruoti.
@@ -81,24 +83,24 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
-            00 / Projektai
+            {t('dashboard.eyebrow')}
           </div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Projektai</h1>
-          <p className="text-sm text-muted-foreground mt-1">Statybų sąmatų valdymas</p>
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">{t('dashboard.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             onClick={() => setShowWizard(true)}
-            title="Pradiniai nustatymai"
+            title={t('dashboard.settingsTitle')}
           >
             <Settings className="w-4 h-4 mr-2" />
-            Nustatymai
+            {t('dashboard.settingsBtn')}
           </Button>
           <Link to="/new-project" className="flex-1 sm:flex-none">
             <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
               <FolderPlus className="w-4 h-4 mr-2" />
-              Naujas projektas
+              {t('dashboard.newProject')}
             </Button>
           </Link>
         </div>
@@ -116,7 +118,7 @@ export default function Dashboard() {
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Ieškoti projektų..."
+                placeholder={t('dashboard.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 bg-card border-border"
@@ -140,7 +142,7 @@ export default function Dashboard() {
                 borderRadius: 6,
               }}
             >
-              Nieko nerasta pagal filtrą „<span style={{ color: 'hsl(var(--foreground) / 0.85)' }}>{search}</span>".
+              {t('dashboard.noFilterResultsA')}<span style={{ color: 'hsl(var(--foreground) / 0.85)' }}>{search}</span>{t('dashboard.noFilterResultsB')}
             </div>
           )}
         </>

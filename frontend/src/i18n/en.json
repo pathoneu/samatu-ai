@@ -280,6 +280,83 @@
     "manage": "Manage",
     "ariaLabel": "Cookie consent"
   },
+  "layout": {
+    "logoHome": "Pathon — home",
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu",
+    "nav": {
+      "projektai": "Projects",
+      "aktyvusProjektas": "Active project",
+      "naujasProjektas": "New project",
+      "kainynai": "Price lists",
+      "administravimas": "Administration",
+      "planai": "Plans",
+      "nustatymai": "Settings",
+      "atsijungti": "Log out"
+    }
+  },
+  "dashboard": {
+    "eyebrow": "00 / Projects",
+    "title": "Projects",
+    "subtitle": "Construction estimate management",
+    "settingsBtn": "Settings",
+    "settingsTitle": "Initial settings",
+    "newProject": "New project",
+    "searchPlaceholder": "Search projects...",
+    "noFilterResultsA": "Nothing found for filter „",
+    "noFilterResultsB": "\".",
+    "empty": {
+      "title": "No projects yet",
+      "body": "Upload a construction project drawing (PDF) — Pathon will read it, calculate quantities and prepare an estimate. Or take a look at the sample project first.",
+      "newProject": "New project",
+      "viewDemo": "View sample project",
+      "feat1Title": "AI analysis",
+      "feat1Desc": "Automatic recognition of BoQ rows",
+      "feat2Title": "Save time",
+      "feat2Desc": "1-2 weeks of work in a few minutes",
+      "feat3Title": "Accurate estimate",
+      "feat3Desc": "Real-time calculations and export"
+    },
+    "stats": {
+      "activeProjects": "Active projects",
+      "activeProjectsSubReady": "all ready",
+      "activeProjectsSubEmpty": "start your first",
+      "totalWithVat": "Total incl. VAT",
+      "totalWithVatSubReady": "all ready",
+      "totalWithVatSubEmpty": "prices not entered yet",
+      "totalArea": "Total area",
+      "totalAreaSub": "sum of rooms across all",
+      "avgPositions": "Avg. items",
+      "avgPositionsSub": "rows per project",
+      "last30d": "Last 30 days",
+      "last30dSub": "new projects",
+      "last30dSubEmpty": "no new ones"
+    },
+    "card": {
+      "untitled": "Untitled",
+      "statusReady": "Ready",
+      "statusProcessing": "Processing",
+      "statusError": "Error",
+      "processingPdf": "Processing PDF…",
+      "noPrices": "Prices not entered yet",
+      "rows": "{{count}} rows"
+    }
+  },
+  "usageMeter": {
+    "projectsThisMonth": "projects this month",
+    "renews": "renews {{date}}",
+    "nearLimitOne": "{{count}} project left this month. ",
+    "nearLimitMany": "{{count}} projects left this month. ",
+    "upgradePlan": "Upgrade plan",
+    "lightNudgePrefix": "You're using little — consider the ",
+    "lightNudgeLink": "one-off plan",
+    "plans": {
+      "free": "Free trial",
+      "pro": "Pro",
+      "studio": "Studio",
+      "oneoff": "One-off"
+    }
+  },
   "legal": {
     "backHome": "Back to home",
     "updated": "Updated:",

@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard,
 } from 'lucide-react';
@@ -21,11 +22,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 // 2026-05-06: removed '/exports' — route never existed (404). Eksportai
 // are accessible from each project's top-bar 'Eksportuoti' button instead.
+// `labelKey` resolves against i18n at render time so nav labels/tooltips
+// follow the active language (LT default).
 const NAV_ITEMS = [
-  { path: '/', icon: Home, label: 'Projektai' },
-  { path: '/active-project', icon: FileText, label: 'Aktyvus projektas', requiresProject: true },
-  { path: '/new-project', icon: Plus, label: 'Naujas projektas' },
-  { path: '/price-lists', icon: Sliders, label: 'Kainynai' },
+  { path: '/', icon: Home, labelKey: 'layout.nav.projektai' },
+  { path: '/active-project', icon: FileText, labelKey: 'layout.nav.aktyvusProjektas', requiresProject: true },
+  { path: '/new-project', icon: Plus, labelKey: 'layout.nav.naujasProjektas' },
+  { path: '/price-lists', icon: Sliders, labelKey: 'layout.nav.kainynai' },
 ];
 
 function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
@@ -88,6 +91,7 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
 }
 
 export default function Sidebar({ onNavigate = null }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
@@ -122,7 +126,7 @@ export default function Sidebar({ onNavigate = null }) {
       {/* North arrow logo — matches landing + brėžinių stilius */}
       <Link
         to="/"
-        title="Pathon — į pradžią"
+        title={t('layout.logoHome')}
         className="mx-auto mb-4 flex items-center justify-center"
         style={{
           width: 32, height: 32,
@@ -148,10 +152,10 @@ export default function Sidebar({ onNavigate = null }) {
             : location.pathname.startsWith(it.path);
           return (
             <NavBtn
-              key={it.label}
+              key={it.labelKey}
               to={it.path}
               icon={Icon}
-              label={it.label}
+              label={t(it.labelKey)}
               isActive={isActive}
               disabled={it.requiresProject && !isActiveProjectRoute}
               onClick={onNavigate}
@@ -162,7 +166,7 @@ export default function Sidebar({ onNavigate = null }) {
           <NavBtn
             to="/admin"
             icon={ShieldCheck}
-            label="Administravimas"
+            label={t('layout.nav.administravimas')}
             isActive={location.pathname.startsWith('/admin')}
             onClick={onNavigate}
           />
@@ -175,7 +179,7 @@ export default function Sidebar({ onNavigate = null }) {
           <NavBtn
             to="/pricing"
             icon={CreditCard}
-            label="Planai"
+            label={t('layout.nav.planai')}
             isActive={location.pathname.startsWith('/pricing')}
             onClick={onNavigate}
           />
@@ -183,13 +187,13 @@ export default function Sidebar({ onNavigate = null }) {
         <NavBtn
           to="/settings"
           icon={Settings}
-          label="Nustatymai"
+          label={t('layout.nav.nustatymai')}
           isActive={location.pathname.startsWith('/settings')}
           onClick={onNavigate}
         />
         <NavBtn
           icon={LogOut}
-          label="Atsijungti"
+          label={t('layout.nav.atsijungti')}
           onClick={handleLogout}
         />
         {user && (
