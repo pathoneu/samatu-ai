@@ -4,6 +4,7 @@ import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initErrorTracker } from '@/lib/errorTracker'
 import { API_BASE } from '@/lib/apiBase'
+import '@/i18n' // side-effect: initialise react-i18next (LT default, EN additive)
 import '@/index.css'
 
 // Sprint §24 (2026-04-29): localStorage error log so users can export

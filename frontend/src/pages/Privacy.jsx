@@ -12,14 +12,16 @@ import LegalLayout, {
   Section, SubHead, P, Term, UL, LI, Callout, Todo,
 } from '@/components/legal/LegalLayout';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function Privacy() {
+  const { t } = useTranslation();
   return (
     <LegalLayout
-      eyebrow="Teisė / Privatumas"
+      eyebrow={t('legal.privacy.eyebrow')}
       index="LEX-01"
-      title="Privatumo politika"
-      intro="Kaip Pathon renka, naudoja, saugo ir apsaugo jūsų asmens duomenis pagal Bendrąjį duomenų apsaugos reglamentą (BDAR) ir Lietuvos Respublikos teisės aktus."
+      title={t('legal.privacy.title')}
+      intro={t('legal.privacy.intro')}
       updated="2026-07-05"
       effective="2026-07-05"
     >

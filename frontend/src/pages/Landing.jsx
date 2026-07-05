@@ -23,6 +23,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   motion,
   useReducedMotion,
@@ -31,11 +32,15 @@ import {
 } from 'framer-motion';
 import { PathonMark } from '@/components/layout/Logo';
 import { openCookieSettings } from '@/components/CookieBanner';
+import LanguageToggle from '@/components/LanguageToggle';
 
-// ─── Number formatting (LT convention: comma decimals) ──────────────
+// ─── Number formatting (locale-aware: lt-LT comma / en decimals) ─────
+// Keeps EUR and metric units; only the decimal/grouping convention flips.
 
-const fmt = (n, d = 1) =>
-  n.toLocaleString('lt-LT', { minimumFractionDigits: d, maximumFractionDigits: d });
+const localeFor = (lng) => (lng && lng.startsWith('en') ? 'en' : 'lt-LT');
+
+const fmt = (n, d = 1, lng = 'lt') =>
+  n.toLocaleString(localeFor(lng), { minimumFractionDigits: d, maximumFractionDigits: d });
 
 // ─── Reveal — scroll-triggered fade+rise, reduced-motion aware ───────
 
@@ -65,6 +70,7 @@ function Reveal({ children, delay = 0, y = 16, className = '', as = 'div' }) {
 
 function CountUp({ to, decimals = 0, suffix = '', prefix = '', duration = 1.4 }) {
   const reduce = useReducedMotion();
+  const { i18n } = useTranslation();
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, amount: 0.5 });
   const [val, setVal] = useState(reduce ? to : 0);
@@ -82,7 +88,7 @@ function CountUp({ to, decimals = 0, suffix = '', prefix = '', duration = 1.4 })
   return (
     <span ref={ref} className="tabular">
       {prefix}
-      {fmt(val, decimals)}
+      {fmt(val, decimals, i18n.language)}
       {suffix}
     </span>
   );
@@ -115,47 +121,29 @@ const CheckIcon = ({ size = 15, className = '' }) => (
 
 // ─── Marketing constants ─────────────────────────────────────────────
 
+// Nav links carry a stable i18n key + the anchor href; label resolved at render.
 const NAV_LINKS = [
-  { href: '#galimybes', label: 'Galimybės' },
-  { href: '#eiga', label: 'Kaip veikia' },
-  { href: '#kainos', label: 'Kainos' },
+  { href: '#galimybes', key: 'galimybes' },
+  { href: '#eiga', key: 'kaipVeikia' },
+  { href: '#kainos', key: 'kainos' },
 ];
 
-const TRUST_PILLS = ['NRM2', 'DIN standartai', 'LT sąmata', '21% PVM', 'Excel & PDF'];
+// Trust pills — stable keys (values like "NRM2" are identical across locales).
+const TRUST_PILL_KEYS = ['nrm2', 'din', 'ltSamata', 'pvm', 'excelPdf'];
 
-const OUTCOMES = [
-  { big: 'kelios min.', small: 'vietoj valandų rankinio matavimo' },
-  { big: 'bet kuris brėžinys', small: 'PDF, be CAD' },
-  { big: 'LT sąmata · 21% PVM', small: 'paruoštas formatas' },
-  { big: 'Excel + PDF', small: 'vienu paspaudimu' },
-];
+// Outcomes / steps / trades keep only structural data; text via t() by key.
+const OUTCOME_KEYS = ['0', '1', '2', '3'];
 
-const STEPS = [
-  {
-    n: 1,
-    t: 'Įkelk brėžinį',
-    d: 'Bet koks statybų PDF: planai, pjūviai, išklotinės, fasadai.',
-  },
-  {
-    n: 2,
-    t: 'Pathon aptinka ir matuoja',
-    d: 'Elementai, plotai, ilgiai, kiekiai. Kiekviena reikšmė su šaltinio žyma.',
-  },
-  {
-    n: 3,
-    t: 'Peržiūrėk ir eksportuok',
-    d: 'Pakoreguok, įrašyk kainas, eksportuok į Excel ar PDF su PVM.',
-  },
-];
+const STEP_KEYS = [1, 2, 3];
 
-// GENERAL multi-trade grid (the KEY change) ─────────────────────────
+// GENERAL multi-trade grid (the KEY change) — icon kind is structural.
 const TRADES = [
-  { t: 'Interjero apdaila', d: 'Dažomi plotai, plytelės, grindys, gipskartonis.', icon: 'interior' },
-  { t: 'Fasadai', d: 'ETICS plotai, tinkas, šiltinimas, angos.', icon: 'facade' },
-  { t: 'Stogai', d: 'Dangos plotai su nuolydžiu, latakai, kraigas.', icon: 'roof' },
-  { t: 'Konstrukcijos', d: 'Betonas, armatūra, klotinės (m³, kg).', icon: 'structure' },
-  { t: 'Žemės darbai', d: 'Iškasos, pylimai, tūriai.', icon: 'earth' },
-  { t: 'Mūras', d: 'Sienų plotai, blokai, mūro kiekiai.', icon: 'masonry' },
+  { key: 'interior', icon: 'interior' },
+  { key: 'facade', icon: 'facade' },
+  { key: 'roof', icon: 'roof' },
+  { key: 'structure', icon: 'structure' },
+  { key: 'earth', icon: 'earth' },
+  { key: 'masonry', icon: 'masonry' },
 ];
 
 const TradeIcon = ({ kind, size = 18 }) => {
@@ -182,34 +170,32 @@ const TradeIcon = ({ kind, size = 18 }) => {
   }
 };
 
-const AUDIENCES = [
-  { t: 'Rangovams', d: 'Greiti, tikslūs pasiūlymai. Laimėk daugiau objektų.' },
-  { t: 'Sąmatininkams', d: 'Rankinį matavimą palik Pathon’ui — tikrink, o ne skaičiuok iš naujo.' },
-  { t: 'Statybos įmonėms', d: 'Vienas įrankis visų tipų kiekiams — nuo pamatų iki apdailos.' },
-];
+const AUDIENCE_KEYS = ['0', '1', '2'];
 
+// Pricing tiers — price/unit/labels via t(); `primary` is structural.
 const TIERS = [
-  { name: 'Vienkartinis', price: '12 €', unit: '/ projektas', desc: 'Vienas objektas, be prenumeratos.', feats: ['1 projektas', 'Visi trade tipai', 'Excel + PDF eksportas'], cta: 'Išbandyti', primary: false },
-  { name: 'Pro', price: '49 €', unit: '/ mėn.', desc: 'Nuolat dirbančiam sąmatininkui.', feats: ['Neriboti projektai', 'Savo kainynas', 'Korekcijų įrankis', 'Prioritetinis palaikymas'], cta: 'Pradėti', primary: true },
-  { name: 'Studio', price: '149 €', unit: '/ mėn.', desc: 'Komandai ir įmonei.', feats: ['Viskas iš Pro', 'Komandos paskyros', 'Bendri kainynai', 'API prieiga (netrukus)'], cta: 'Susisiekti', primary: false },
+  { key: 'vienkartinis', primary: false },
+  { key: 'pro', primary: true },
+  { key: 'studio', primary: false },
 ];
 
-// Hero panel: detected rooms + trade tabs ────────────────────────────
+// Hero panel: detected rooms + trade tabs. Room NAME via t() by key; the
+// quantity string (`p`) stays literal so LT renders byte-identically.
 const HERO_ROOMS = [
-  { k: 'Svetainė', p: '28,4 m²' },
-  { k: 'Miegamasis', p: '14,2 m²' },
-  { k: 'Vaiko k.', p: '11,8 m²' },
-  { k: 'Koridorius', p: '10,9 m²' },
-  { k: 'Vonia', p: '4,6 m²' },
+  { key: 'svetaine', p: '28,4 m²' },
+  { key: 'miegamasis', p: '14,2 m²' },
+  { key: 'vaikoK', p: '11,8 m²' },
+  { key: 'koridorius', p: '10,9 m²' },
+  { key: 'vonia', p: '4,6 m²' },
 ];
 
 const HERO_TABS = [
-  { l: 'Interjeras', active: true },
-  { l: 'Fasadai', active: true },
-  { l: 'Stogai', active: true },
-  { l: 'Konstrukcijos', active: false },
-  { l: 'Žemės darbai', active: false },
-  { l: 'Mūras', active: false },
+  { key: 'interjeras', active: true },
+  { key: 'fasadai', active: true },
+  { key: 'stogai', active: true },
+  { key: 'konstrukcijos', active: false },
+  { key: 'zemesDarbai', active: false },
+  { key: 'muras', active: false },
 ];
 
 // ─── Hero centerpiece: detection panel SVG ───────────────────────────
@@ -217,13 +203,15 @@ const HERO_TABS = [
 // down, and orange detection boxes (with corner brackets) snapping onto
 // each detected room one-by-one. Base state (no `.play`) = fully detected.
 
+// SVG detection boxes. `roomKey` → localised label; `val` (quantity) stays
+// literal so the LT floor-plan renders byte-identically to the approved copy.
 const HERO_BOXES = [
-  { cls: 'd1', x: 4, y: 4, w: 128, h: 126, label: 'Svetainė', val: '28,4 m²', lx: 68, ly: 62 },
-  { cls: 'd2', x: 136, y: 4, w: 98, h: 126, label: 'Miegamasis', val: '14,2 m²', lx: 185, ly: 62 },
-  { cls: 'd3', x: 238, y: 4, w: 128, h: 126, label: 'Vaiko k.', val: '11,8 m²', lx: 302, ly: 62 },
-  { cls: 'd4', x: 4, y: 134, w: 172, h: 92, label: 'Koridorius', val: '10,9 m²', lx: 90, ly: 184 },
-  { cls: 'd5', x: 180, y: 134, w: 98, h: 92, label: 'Vonia', val: '4,6 m²', lx: 229, ly: 184 },
-  { cls: 'd6', x: 282, y: 134, w: 84, h: 92, label: 'WC', val: '2,1 m²', lx: 324, ly: 184 },
+  { cls: 'd1', x: 4, y: 4, w: 128, h: 126, roomKey: 'svetaine', val: '28,4 m²', lx: 68, ly: 62 },
+  { cls: 'd2', x: 136, y: 4, w: 98, h: 126, roomKey: 'miegamasis', val: '14,2 m²', lx: 185, ly: 62 },
+  { cls: 'd3', x: 238, y: 4, w: 128, h: 126, roomKey: 'vaikoK', val: '11,8 m²', lx: 302, ly: 62 },
+  { cls: 'd4', x: 4, y: 134, w: 172, h: 92, roomKey: 'koridorius', val: '10,9 m²', lx: 90, ly: 184 },
+  { cls: 'd5', x: 180, y: 134, w: 98, h: 92, roomKey: 'vonia', val: '4,6 m²', lx: 229, ly: 184 },
+  { cls: 'd6', x: 282, y: 134, w: 84, h: 92, roomKey: 'wc', val: '2,1 m²', lx: 324, ly: 184 },
 ];
 
 // Corner brackets for a detection box (drawn at each corner)
@@ -240,7 +228,7 @@ function Brackets({ x, y, w, h }) {
   );
 }
 
-function HeroPlanSVG({ play }) {
+function HeroPlanSVG({ play, t }) {
   return (
     <svg
       viewBox="0 0 390 268"
@@ -249,7 +237,7 @@ function HeroPlanSVG({ play }) {
       aria-labelledby="hero-plan-title"
     >
       <title id="hero-plan-title">
-        Pathon aptinka patalpas ir kiekius aukšto plane: 6 patalpos, 72 m²
+        {t('landing.heroPlan.title')}
       </title>
       <g transform="translate(12, 14)">
         {/* Faint floor-plan hairlines (blueprint on graphite) */}
@@ -283,7 +271,7 @@ function HeroPlanSVG({ play }) {
             <g className={`det-label ${b.cls}`} fontFamily="JetBrains Mono, monospace">
               <text x={b.lx} y={b.ly} textAnchor="middle" fontSize="8.5"
                 fill="hsl(var(--foreground))" letterSpacing="0.02em">
-                {b.label.toUpperCase()}
+                {t(`landing.heroRooms.${b.roomKey}`).toUpperCase()}
               </text>
               <text x={b.lx} y={b.ly + 13} textAnchor="middle" fontSize="8"
                 fill="hsl(var(--primary))">{b.val}</text>
@@ -311,10 +299,10 @@ function HeroPlanSVG({ play }) {
           <rect x="0" y="0" width="140" height="26" fill="hsl(var(--surface-2))"
             stroke="hsl(var(--border-strong))" strokeWidth="0.7" />
           <line x1="70" y1="0" x2="70" y2="26" stroke="hsl(var(--border-strong))" strokeWidth="0.6" />
-          <text x="6" y="11" fontSize="7" fill="hsl(var(--foreground))">M 1:50</text>
-          <text x="76" y="11" fontSize="7" fill="hsl(var(--foreground))">72,0 m²</text>
-          <text x="6" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">SA-01</text>
-          <text x="76" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">6 patalpos</text>
+          <text x="6" y="11" fontSize="7" fill="hsl(var(--foreground))">{t('landing.heroPlan.scale')}</text>
+          <text x="76" y="11" fontSize="7" fill="hsl(var(--foreground))">{t('landing.heroPlan.totalArea')}</text>
+          <text x="6" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">{t('landing.heroPlan.sheetCode')}</text>
+          <text x="76" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">{t('landing.heroPlan.roomsCount')}</text>
         </g>
       </g>
     </svg>
@@ -324,6 +312,7 @@ function HeroPlanSVG({ play }) {
 // ─── Hero product frame — plan (left) + extracted quantities (right) ──
 
 function HeroProductFrame() {
+  const { t } = useTranslation();
   const reduce = useReducedMotion();
   const ref = useRef(null);
   const inView = useInView(ref, { once: false, amount: 0.35 });
@@ -350,46 +339,46 @@ function HeroProductFrame() {
         <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
         <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
         <span className="ml-3 font-mono text-[11px] text-muted-foreground truncate">
-          projektas_A3.pdf — aptikta 6 patalpų
+          {t('landing.heroFrame.fileLabel')}
         </span>
-        <span className="ml-auto font-mono text-[10px] text-primary hidden sm:inline">● aptikta</span>
+        <span className="ml-auto font-mono text-[10px] text-primary hidden sm:inline">{t('landing.heroFrame.detected')}</span>
       </div>
       <div className="grid sm:grid-cols-[1.18fr_1fr]" key={key}>
         {/* plan */}
         <div className="relative blueprint-grid p-4 border-b sm:border-b-0 sm:border-r border-border bg-background">
-          <HeroPlanSVG play={play} />
+          <HeroPlanSVG play={play} t={t} />
         </div>
         {/* extracted quantities */}
         <div className="p-4 sm:p-5 bg-card">
           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-3">
-            Ištraukti kiekiai
+            {t('landing.heroFrame.extractedTitle')}
           </div>
           <div className={`qty-table ${play ? 'play' : ''}`}>
             {HERO_ROOMS.map((r, i) => (
               <div
-                key={r.k}
+                key={r.key}
                 className="qty-row flex items-baseline justify-between py-[7px] border-b border-border/70 text-[12.5px]"
                 style={play ? { animationDelay: `${1000 + i * 130}ms` } : undefined}
               >
-                <span className="text-foreground/80 truncate pr-2">{r.k}</span>
+                <span className="text-foreground/80 truncate pr-2">{t(`landing.heroRooms.${r.key}`)}</span>
                 <span className="font-mono tabular text-foreground whitespace-nowrap">{r.p}</span>
               </div>
             ))}
             <div className="flex items-baseline justify-between pt-3 mt-1">
-              <span className="text-[12px] font-medium text-foreground">Sienų plotas</span>
+              <span className="text-[12px] font-medium text-foreground">{t('landing.heroFrame.wallArea')}</span>
               <span className="font-mono tabular text-[15px] font-semibold text-primary">
                 <CountUp to={213} decimals={1} suffix=" m²" duration={1.3} />
               </span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-y-2 font-mono text-[11px]">
-            <div className="text-muted-foreground">Grindys</div>
+            <div className="text-muted-foreground">{t('landing.heroFrame.floors')}</div>
             <div className="tabular text-right text-foreground">
               <CountUp to={72} decimals={1} suffix=" m²" duration={1.3} />
             </div>
-            <div className="text-muted-foreground">Grindjuostės</div>
-            <div className="tabular text-right text-foreground">73 m</div>
-            <div className="text-foreground font-medium pt-2 border-t border-border/70">Sąmata su PVM</div>
+            <div className="text-muted-foreground">{t('landing.heroFrame.baseboards')}</div>
+            <div className="tabular text-right text-foreground">{t('landing.heroFrame.baseboardsVal')}</div>
+            <div className="text-foreground font-medium pt-2 border-t border-border/70">{t('landing.heroFrame.estimateWithVat')}</div>
             <div className="tabular text-right font-semibold text-primary pt-2 border-t border-border/70">
               <CountUp to={8017} decimals={0} suffix=" €" duration={1.7} />
             </div>
@@ -399,16 +388,16 @@ function HeroProductFrame() {
 
       {/* Trade tabs — active ones highlighted orange */}
       <div className="flex flex-wrap items-center gap-1.5 px-4 py-3 border-t border-border bg-surface-2">
-        {HERO_TABS.map((t) => (
+        {HERO_TABS.map((tab) => (
           <span
-            key={t.l}
+            key={tab.key}
             className={`trade-tab font-mono text-[10.5px] px-2.5 py-1 rounded-md border ${
-              t.active
+              tab.active
                 ? 'text-primary border-primary/40 bg-primary/[0.08]'
                 : 'text-muted-foreground/70 border-border bg-transparent'
             }`}
           >
-            {t.l}
+            {t(`landing.heroTabs.${tab.key}`)}
           </span>
         ))}
       </div>
@@ -419,6 +408,7 @@ function HeroProductFrame() {
 // ─── Sticky top nav ──────────────────────────────────────────────────
 
 function LandingNav() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -443,21 +433,22 @@ function LandingNav() {
 
         <nav className="hidden md:flex items-center gap-8 text-[14px] text-muted-foreground">
           {NAV_LINKS.map((l) => (
-            <a key={l.href} href={l.href} className="link-draw">{l.label}</a>
+            <a key={l.href} href={l.href} className="link-draw">{t(`nav.${l.key}`)}</a>
           ))}
-          <Link to="/login" className="link-draw">Prisijungti</Link>
+          <Link to="/login" className="link-draw">{t('nav.prisijungti')}</Link>
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
+          <LanguageToggle />
           <Link to="/register" className="btn-primary text-[14px] px-4 py-2">
-            Išbandyti nemokamai
+            {t('nav.isbandytiNemokamai')}
           </Link>
         </div>
 
         {/* Mobile hamburger */}
         <button
           className="md:hidden inline-flex items-center justify-center w-10 h-10 -mr-2 text-foreground"
-          aria-label="Meniu" aria-expanded={open}
+          aria-label={t('nav.meniu')} aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
@@ -472,12 +463,15 @@ function LandingNav() {
           <div className="px-5 py-4 flex flex-col gap-1 text-[15px]">
             {NAV_LINKS.map((l) => (
               <a key={l.href} href={l.href} onClick={() => setOpen(false)}
-                className="py-2.5 text-foreground/85 hover:text-foreground">{l.label}</a>
+                className="py-2.5 text-foreground/85 hover:text-foreground">{t(`nav.${l.key}`)}</a>
             ))}
-            <Link to="/login" onClick={() => setOpen(false)} className="py-2.5 text-foreground/85 hover:text-foreground">Prisijungti</Link>
+            <Link to="/login" onClick={() => setOpen(false)} className="py-2.5 text-foreground/85 hover:text-foreground">{t('nav.prisijungti')}</Link>
             <Link to="/register" onClick={() => setOpen(false)} className="btn-primary mt-2 justify-center py-2.5">
-              Išbandyti nemokamai
+              {t('nav.isbandytiNemokamai')}
             </Link>
+            <div className="pt-3 mt-1 border-t border-border/70">
+              <LanguageToggle />
+            </div>
           </div>
         </div>
       )}
@@ -488,6 +482,7 @@ function LandingNav() {
 // ─── Hero ────────────────────────────────────────────────────────────
 
 function Hero() {
+  const { t } = useTranslation();
   const reduce = useReducedMotion();
   return (
     <section className="relative border-b border-border overflow-hidden">
@@ -505,40 +500,38 @@ function Hero() {
         <div className="grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-16 items-center">
           <div>
             <Reveal>
-              <Eyebrow index="01 / HERO">Statybų AI · Kiekiai iš brėžinių</Eyebrow>
+              <Eyebrow index="01 / HERO">{t('landing.hero.eyebrow')}</Eyebrow>
             </Reveal>
             <Reveal delay={70} as="h1"
               className="mt-6 font-display font-bold text-foreground tracking-[-0.03em]
                          leading-[0.98] text-[44px] sm:text-[60px] lg:text-[74px]">
-              Bet koks brėžinys —{' '}
+              {t('landing.hero.titleA')}{' '}
               <br className="hidden sm:block" />
-              <span className="h-accent">tikslūs kiekiai.</span>
+              <span className="h-accent">{t('landing.hero.titleAccent')}</span>
             </Reveal>
             <Reveal delay={140} as="p"
               className="mt-7 max-w-[560px] text-[17px] sm:text-[18.5px] text-ink-2 leading-[1.6]">
-              Pathon skaito interjero, fasadų, stogų ir konstrukcijų brėžinius,
-              išmatuoja kiekius ir paruošia sąmatą — automatiškai, Lietuvos
-              formatu.
+              {t('landing.hero.sub')}
             </Reveal>
             <Reveal delay={210} className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Link to="/register" className="btn-primary justify-center px-5 py-3 text-[15px]">
-                Išbandyti nemokamai
+                {t('landing.hero.ctaPrimary')}
                 <ArrowIcon />
               </Link>
               <a href="#eiga" className="btn-ghost justify-center px-5 py-3 text-[15px]">
-                Žiūrėti demo
+                {t('landing.hero.ctaDemo')}
               </a>
             </Reveal>
             <Reveal delay={280} as="p" className="mt-6 font-mono text-[12px] text-muted-foreground">
-              Pirmas projektas — nemokamai. Be įsipareigojimų.
+              {t('landing.hero.note')}
             </Reveal>
 
             {/* Trust pills */}
             <Reveal delay={340} className="mt-8 flex flex-wrap gap-x-4 gap-y-2 items-center">
-              {TRUST_PILLS.map((p, i) => (
-                <React.Fragment key={p}>
+              {TRUST_PILL_KEYS.map((k, i) => (
+                <React.Fragment key={k}>
                   {i > 0 && <span className="text-border-strong hidden sm:inline">·</span>}
-                  <span className="font-mono text-[11px] tracking-[0.04em] text-muted-foreground">{p}</span>
+                  <span className="font-mono text-[11px] tracking-[0.04em] text-muted-foreground">{t(`landing.trustPills.${k}`)}</span>
                 </React.Fragment>
               ))}
             </Reveal>
@@ -561,16 +554,17 @@ function Hero() {
 // ─── Outcome strip (4 mono facts) ────────────────────────────────────
 
 function OutcomeStrip() {
+  const { t } = useTranslation();
   return (
     <section className="border-b border-border bg-card">
       <div className="max-w-[1200px] mx-auto px-5 lg:px-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-x divide-border [&>*]:border-border">
-          {OUTCOMES.map((o, i) => (
-            <Reveal key={i} delay={i * 70} className="p-6 lg:p-8">
+          {OUTCOME_KEYS.map((k, i) => (
+            <Reveal key={k} delay={i * 70} className="p-6 lg:p-8">
               <div className="font-mono font-medium text-[16px] lg:text-[18px] text-foreground tracking-[-0.01em]">
-                «{o.big}»
+                «{t(`landing.outcomes.${k}.big`)}»
               </div>
-              <div className="mt-2 text-[13px] text-muted-foreground leading-snug">{o.small}</div>
+              <div className="mt-2 text-[13px] text-muted-foreground leading-snug">{t(`landing.outcomes.${k}.small`)}</div>
             </Reveal>
           ))}
         </div>
@@ -603,28 +597,29 @@ function SectionHead({ eyebrow, index, title, sub, align = 'left', className = '
 // ─── Kaip tai veikia (3 steps, editorial numbered cards) ─────────────
 
 function Eiga() {
+  const { t } = useTranslation();
   return (
     <section id="eiga" className="border-b border-border scroll-mt-20 relative overflow-hidden">
       <div className="absolute inset-0 blueprint-grid opacity-50 pointer-events-none" aria-hidden />
       <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
         <SectionHead
-          eyebrow="Kaip tai veikia"
+          eyebrow={t('landing.eiga.eyebrow')}
           index="02"
-          title={<>Nuo PDF iki sąmatos — <span className="h-accent">trys žingsniai</span></>}
-          sub="Jokio CAD, jokio rankinio matavimo. Tu tik peržiūri ir patvirtini."
+          title={<>{t('landing.eiga.titleA')}<span className="h-accent">{t('landing.eiga.titleAccent')}</span></>}
+          sub={t('landing.eiga.sub')}
         />
         <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {STEPS.map((s, i) => (
-            <Reveal key={s.n} delay={i * 100}
+          {STEP_KEYS.map((n, i) => (
+            <Reveal key={n} delay={i * 100}
               className="card-lift relative bg-card border border-border rounded-xl p-7 overflow-hidden">
-              <div className="ghost-numeral" aria-hidden>{s.n}</div>
+              <div className="ghost-numeral" aria-hidden>{n}</div>
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg
                                 border border-primary/30 bg-primary/[0.10] font-mono text-[14px] text-primary font-semibold">
-                  0{s.n}
+                  0{n}
                 </div>
-                <div className="mt-6 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{s.t}</div>
-                <p className="mt-2.5 text-[14.5px] text-ink-2 leading-[1.55]">{s.d}</p>
+                <div className="mt-6 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{t(`landing.steps.${n}.t`)}</div>
+                <p className="mt-2.5 text-[14.5px] text-ink-2 leading-[1.55]">{t(`landing.steps.${n}.d`)}</p>
               </div>
             </Reveal>
           ))}
@@ -637,25 +632,26 @@ function Eiga() {
 // ─── Ką Pathon skaito (GENERAL trades grid — 6) ──────────────────────
 
 function Trades() {
+  const { t } = useTranslation();
   return (
     <section id="galimybes" className="border-b border-border bg-card scroll-mt-20">
       <div className="max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
         <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 lg:gap-16 items-end">
           <SectionHead
-            eyebrow="Ką Pathon skaito"
+            eyebrow={t('landing.trades.eyebrow')}
             index="03"
-            title={<>Visi statybų tipai — <span className="h-accent">viena sistema</span></>}
-            sub="Pathon atpažįsta LT statybų brėžinių lapus ir ištraukia kiekius pagal tarptautines matavimo taisykles — nuo pamatų iki apdailos."
+            title={<>{t('landing.trades.titleA')}<span className="h-accent">{t('landing.trades.titleAccent')}</span></>}
+            sub={t('landing.trades.sub')}
           />
           <Reveal delay={120} className="hidden lg:block font-mono text-[11px] text-muted-foreground leading-relaxed text-right">
-            <div>NRM2 · DIN 18363</div>
-            <div>Kiekviena eilutė su šaltinio žyma</div>
-            <div className="text-primary mt-1">6 trade tipai → 1 sąmata</div>
+            <div>{t('landing.trades.sideA')}</div>
+            <div>{t('landing.trades.sideB')}</div>
+            <div className="text-primary mt-1">{t('landing.trades.sideC')}</div>
           </Reveal>
         </div>
         <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border border border-border rounded-xl overflow-hidden">
           {TRADES.map((e, i) => (
-            <Reveal key={e.t} delay={(i % 3) * 80}
+            <Reveal key={e.key} delay={(i % 3) * 80}
               className="card-lift bg-card p-6 lg:p-7 group relative">
               <span className="absolute top-6 right-6 font-mono text-[10px] text-muted-foreground/60">
                 {String(i + 1).padStart(2, '0')}
@@ -664,9 +660,9 @@ function Trades() {
                 <span className="w-9 h-9 rounded-lg border border-primary/25 bg-primary/[0.09] flex items-center justify-center shrink-0">
                   <TradeIcon kind={e.icon} />
                 </span>
-                <span className="font-display font-semibold text-[16px] text-foreground">{e.t}</span>
+                <span className="font-display font-semibold text-[16px] text-foreground">{t(`landing.trades.${e.key}.t`)}</span>
               </div>
-              <p className="mt-3.5 text-[14px] text-ink-2 leading-[1.55]">{e.d}</p>
+              <p className="mt-3.5 text-[14px] text-ink-2 leading-[1.55]">{t(`landing.trades.${e.key}.d`)}</p>
             </Reveal>
           ))}
         </div>
@@ -678,24 +674,25 @@ function Trades() {
 // ─── Kam skirta (3) ──────────────────────────────────────────────────
 
 function Audience() {
+  const { t } = useTranslation();
   return (
     <section className="border-b border-border scroll-mt-20 relative overflow-hidden">
       <div className="absolute inset-0 blueprint-grid opacity-50 pointer-events-none" aria-hidden />
       <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
         <SectionHead
-          eyebrow="Kam skirta"
+          eyebrow={t('landing.audience.eyebrow')}
           index="04"
-          title={<>Vienas įrankis, <span className="h-accent">visai komandai</span></>}
+          title={<>{t('landing.audience.titleA')}<span className="h-accent">{t('landing.audience.titleAccent')}</span></>}
         />
         <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {AUDIENCES.map((a, i) => (
-            <Reveal key={a.t} delay={i * 100}
+          {AUDIENCE_KEYS.map((k, i) => (
+            <Reveal key={k} delay={i * 100}
               className="card-lift bg-card border border-border rounded-xl p-7">
               <div className="font-mono text-[11px] text-primary tracking-[0.14em]">
                 {String(i + 1).padStart(2, '0')}
               </div>
-              <div className="mt-4 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{a.t}</div>
-              <p className="mt-3 text-[14.5px] text-ink-2 leading-[1.55]">{a.d}</p>
+              <div className="mt-4 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{t(`landing.audiences.${k}.t`)}</div>
+              <p className="mt-3 text-[14.5px] text-ink-2 leading-[1.55]">{t(`landing.audiences.${k}.d`)}</p>
             </Reveal>
           ))}
         </div>
@@ -707,37 +704,40 @@ function Audience() {
 // ─── Pricing teaser (3 compact cards → /pricing) ─────────────────────
 
 function Pricing() {
+  const { t } = useTranslation();
   return (
     <section id="kainos" className="border-b border-border bg-card scroll-mt-20">
       <div className="max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
         <SectionHead
-          eyebrow="Kainos"
+          eyebrow={t('landing.pricing.eyebrow')}
           index="05"
-          title={<>Skaidru, be paslėptų <span className="h-accent">mokesčių</span></>}
-          sub="Pradėk nemokamai. Mokėk tik tada, kai matai vertę savo objektuose."
+          title={<>{t('landing.pricing.titleA')}<span className="h-accent">{t('landing.pricing.titleAccent')}</span></>}
+          sub={t('landing.pricing.sub')}
         />
         <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {TIERS.map((t, i) => (
-            <Reveal key={t.name} delay={i * 90}
+          {TIERS.map((tier, i) => {
+            const feats = t(`landing.tiers.${tier.key}.feats`, { returnObjects: true });
+            return (
+            <Reveal key={tier.key} delay={i * 90}
               className={`card-lift relative rounded-2xl p-7 flex flex-col ${
-                t.primary
+                tier.primary
                   ? 'bg-card border-2 border-primary shadow-[0_18px_50px_-20px_hsl(var(--primary)/0.4)]'
                   : 'bg-card border border-border'
               }`}>
-              {t.primary && (
+              {tier.primary && (
                 <span className="absolute -top-3 left-7 font-mono text-[10px] uppercase tracking-[0.12em]
                                  bg-primary text-primary-foreground px-2.5 py-1 rounded-full">
-                  Populiariausias
+                  {t('landing.pricing.popular')}
                 </span>
               )}
-              <div className="font-display font-semibold text-[17px] text-foreground">{t.name}</div>
+              <div className="font-display font-semibold text-[17px] text-foreground">{t(`landing.tiers.${tier.key}.name`)}</div>
               <div className="mt-3 flex items-baseline gap-1.5">
-                <span className="font-mono font-semibold text-[38px] text-foreground tracking-[-0.02em] tabular">{t.price}</span>
-                <span className="text-[13px] text-muted-foreground">{t.unit}</span>
+                <span className="font-mono font-semibold text-[38px] text-foreground tracking-[-0.02em] tabular">{t(`landing.tiers.${tier.key}.price`)}</span>
+                <span className="text-[13px] text-muted-foreground">{t(`landing.tiers.${tier.key}.unit`)}</span>
               </div>
-              <p className="mt-2 text-[13.5px] text-muted-foreground">{t.desc}</p>
+              <p className="mt-2 text-[13.5px] text-muted-foreground">{t(`landing.tiers.${tier.key}.desc`)}</p>
               <ul className="mt-6 space-y-2.5 flex-1">
-                {t.feats.map((f) => (
+                {(Array.isArray(feats) ? feats : []).map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-[14px] text-foreground/85">
                     <CheckIcon className="mt-[3px] shrink-0" />
                     <span>{f}</span>
@@ -745,14 +745,14 @@ function Pricing() {
                 ))}
               </ul>
               <Link to="/pricing"
-                className={`mt-7 justify-center py-2.5 text-[14px] ${t.primary ? 'btn-primary' : 'btn-ghost'}`}>
-                {t.cta}
+                className={`mt-7 justify-center py-2.5 text-[14px] ${tier.primary ? 'btn-primary' : 'btn-ghost'}`}>
+                {t(`landing.tiers.${tier.key}.cta`)}
               </Link>
             </Reveal>
-          ))}
+          );})}
         </div>
         <Reveal delay={120} as="p" className="mt-6 font-mono text-[12px] text-muted-foreground">
-          Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas.
+          {t('landing.pricing.vatNote')}
         </Reveal>
       </div>
     </section>
@@ -762,6 +762,7 @@ function Pricing() {
 // ─── Closing band ────────────────────────────────────────────────────
 
 function Closing() {
+  const { t } = useTranslation();
   return (
     <section className="border-b border-border relative overflow-hidden">
       <div className="absolute inset-0 blueprint-grid-major opacity-70 pointer-events-none" aria-hidden />
@@ -772,25 +773,24 @@ function Closing() {
       />
       <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-24 lg:py-32">
         <div className="max-w-[820px]">
-          <Reveal><Eyebrow index="06">Kodėl Pathon</Eyebrow></Reveal>
+          <Reveal><Eyebrow index="06">{t('landing.closing.eyebrow')}</Eyebrow></Reveal>
           <Reveal delay={80} as="h2"
             className="mt-6 font-display font-semibold text-foreground tracking-[-0.025em]
                        leading-[1.02] text-[36px] sm:text-[54px]">
-            Matavimus atlieka Pathon.{' '}
-            <span className="h-accent">Sprendimus priimi tu.</span>
+            {t('landing.closing.titleA')}
+            <span className="h-accent">{t('landing.closing.titleAccent')}</span>
           </Reveal>
           <Reveal delay={150} as="p" className="mt-6 max-w-[600px] text-[17px] sm:text-[18px] text-ink-2 leading-[1.6]">
-            Tavo kainos, tavo objektas, tavo pasiūlymas — Pathon tik greitai ir
-            tiksliai išmatuoja.
+            {t('landing.closing.sub')}
           </Reveal>
           <Reveal delay={210} className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <Link to="/register" className="btn-primary justify-center px-6 py-3 text-[15px]">
-              Išbandyti nemokamai
+              {t('landing.closing.ctaPrimary')}
               <ArrowIcon />
             </Link>
             <a href="mailto:solutions@pathon.eu?subject=Pathon%20%E2%80%94%20u%C5%BEklausa"
               className="btn-ghost justify-center px-6 py-3 text-[15px]">
-              Susisiekti
+              {t('landing.closing.ctaContact')}
             </a>
           </Reveal>
         </div>
@@ -802,20 +802,21 @@ function Closing() {
 // ─── Footer ──────────────────────────────────────────────────────────
 
 function LandingFooter() {
+  const { t } = useTranslation();
   const cols = [
     {
-      h: 'Produktas',
+      h: t('landing.footer.colProduktas'),
       links: [
-        { l: 'Galimybės', href: '#galimybes' },
-        { l: 'Kaip veikia', href: '#eiga' },
-        { l: 'Kainos', href: '#kainos' },
+        { l: t('landing.footer.galimybes'), href: '#galimybes' },
+        { l: t('landing.footer.kaipVeikia'), href: '#eiga' },
+        { l: t('landing.footer.kainos'), href: '#kainos' },
       ],
     },
     {
-      h: 'Paskyra',
+      h: t('landing.footer.colPaskyra'),
       links: [
-        { l: 'Prisijungti', to: '/login' },
-        { l: 'Registruotis', to: '/register' },
+        { l: t('landing.footer.prisijungti'), to: '/login' },
+        { l: t('landing.footer.registruotis'), to: '/register' },
       ],
     },
   ];
@@ -829,12 +830,15 @@ function LandingFooter() {
               <span className="font-display font-bold tracking-tight text-[18px]">Pathon</span>
             </div>
             <p className="mt-3 text-[13.5px] text-muted-foreground max-w-[280px] leading-relaxed">
-              Statybų kiekiai iš brėžinių.
+              {t('landing.footer.tagline')}
             </p>
             <a href="mailto:solutions@pathon.eu"
               className="mt-4 inline-block font-mono text-[12.5px] text-muted-foreground hover:text-foreground transition-colors">
               solutions@pathon.eu
             </a>
+            <div className="mt-5">
+              <LanguageToggle />
+            </div>
           </div>
           {cols.map((c) => (
             <div key={c.h}>
@@ -856,17 +860,17 @@ function LandingFooter() {
 
         <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-start
                         sm:items-center justify-between gap-4 text-[12.5px] text-muted-foreground">
-          <div>© 2026 Pathon</div>
+          <div>{t('landing.footer.copyright')}</div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link to="/privacy" className="hover:text-foreground transition-colors">Privatumas</Link>
-            <Link to="/cookies" className="hover:text-foreground transition-colors">Slapukai</Link>
-            <Link to="/terms" className="hover:text-foreground transition-colors">Sąlygos</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">{t('landing.footer.privatumas')}</Link>
+            <Link to="/cookies" className="hover:text-foreground transition-colors">{t('landing.footer.slapukai')}</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">{t('landing.footer.salygos')}</Link>
             <button
               type="button"
               onClick={openCookieSettings}
               className="hover:text-foreground transition-colors"
             >
-              Slapukų nustatymai
+              {t('landing.footer.slapukuNustatymai')}
             </button>
           </div>
         </div>

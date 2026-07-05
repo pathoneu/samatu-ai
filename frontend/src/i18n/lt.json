@@ -1,0 +1,310 @@
+{
+  "nav": {
+    "galimybes": "Galimybės",
+    "kaipVeikia": "Kaip veikia",
+    "kainos": "Kainos",
+    "prisijungti": "Prisijungti",
+    "isbandytiNemokamai": "Išbandyti nemokamai",
+    "meniu": "Meniu"
+  },
+  "lang": {
+    "label": "Kalba",
+    "lt": "LT",
+    "en": "EN"
+  },
+  "landing": {
+    "trustPills": {
+      "nrm2": "NRM2",
+      "din": "DIN standartai",
+      "ltSamata": "LT sąmata",
+      "pvm": "21% PVM",
+      "excelPdf": "Excel & PDF"
+    },
+    "outcomes": {
+      "0": { "big": "kelios min.", "small": "vietoj valandų rankinio matavimo" },
+      "1": { "big": "bet kuris brėžinys", "small": "PDF, be CAD" },
+      "2": { "big": "LT sąmata · 21% PVM", "small": "paruoštas formatas" },
+      "3": { "big": "Excel + PDF", "small": "vienu paspaudimu" }
+    },
+    "steps": {
+      "1": { "t": "Įkelk brėžinį", "d": "Bet koks statybų PDF: planai, pjūviai, išklotinės, fasadai." },
+      "2": { "t": "Pathon aptinka ir matuoja", "d": "Elementai, plotai, ilgiai, kiekiai. Kiekviena reikšmė su šaltinio žyma." },
+      "3": { "t": "Peržiūrėk ir eksportuok", "d": "Pakoreguok, įrašyk kainas, eksportuok į Excel ar PDF su PVM." }
+    },
+    "trades": {
+      "interior": { "t": "Interjero apdaila", "d": "Dažomi plotai, plytelės, grindys, gipskartonis." },
+      "facade": { "t": "Fasadai", "d": "ETICS plotai, tinkas, šiltinimas, angos." },
+      "roof": { "t": "Stogai", "d": "Dangos plotai su nuolydžiu, latakai, kraigas." },
+      "structure": { "t": "Konstrukcijos", "d": "Betonas, armatūra, klotinės (m³, kg)." },
+      "earth": { "t": "Žemės darbai", "d": "Iškasos, pylimai, tūriai." },
+      "masonry": { "t": "Mūras", "d": "Sienų plotai, blokai, mūro kiekiai." }
+    },
+    "audiences": {
+      "0": { "t": "Rangovams", "d": "Greiti, tikslūs pasiūlymai. Laimėk daugiau objektų." },
+      "1": { "t": "Sąmatininkams", "d": "Rankinį matavimą palik Pathon’ui — tikrink, o ne skaičiuok iš naujo." },
+      "2": { "t": "Statybos įmonėms", "d": "Vienas įrankis visų tipų kiekiams — nuo pamatų iki apdailos." }
+    },
+    "tiers": {
+      "vienkartinis": {
+        "name": "Vienkartinis",
+        "price": "12 €",
+        "unit": "/ projektas",
+        "desc": "Vienas objektas, be prenumeratos.",
+        "feats": ["1 projektas", "Visi trade tipai", "Excel + PDF eksportas"],
+        "cta": "Išbandyti"
+      },
+      "pro": {
+        "name": "Pro",
+        "price": "49 €",
+        "unit": "/ mėn.",
+        "desc": "Nuolat dirbančiam sąmatininkui.",
+        "feats": ["Neriboti projektai", "Savo kainynas", "Korekcijų įrankis", "Prioritetinis palaikymas"],
+        "cta": "Pradėti"
+      },
+      "studio": {
+        "name": "Studio",
+        "price": "149 €",
+        "unit": "/ mėn.",
+        "desc": "Komandai ir įmonei.",
+        "feats": ["Viskas iš Pro", "Komandos paskyros", "Bendri kainynai", "API prieiga (netrukus)"],
+        "cta": "Susisiekti"
+      }
+    },
+    "heroTabs": {
+      "interjeras": "Interjeras",
+      "fasadai": "Fasadai",
+      "stogai": "Stogai",
+      "konstrukcijos": "Konstrukcijos",
+      "zemesDarbai": "Žemės darbai",
+      "muras": "Mūras"
+    },
+    "heroRooms": {
+      "svetaine": "Svetainė",
+      "miegamasis": "Miegamasis",
+      "vaikoK": "Vaiko k.",
+      "koridorius": "Koridorius",
+      "vonia": "Vonia",
+      "wc": "WC"
+    },
+    "hero": {
+      "eyebrow": "Statybų AI · Kiekiai iš brėžinių",
+      "titleA": "Bet koks brėžinys —",
+      "titleAccent": "tikslūs kiekiai.",
+      "sub": "Pathon skaito interjero, fasadų, stogų ir konstrukcijų brėžinius, išmatuoja kiekius ir paruošia sąmatą — automatiškai, Lietuvos formatu.",
+      "ctaPrimary": "Išbandyti nemokamai",
+      "ctaDemo": "Žiūrėti demo",
+      "note": "Pirmas projektas — nemokamai. Be įsipareigojimų."
+    },
+    "heroFrame": {
+      "fileLabel": "projektas_A3.pdf — aptikta 6 patalpų",
+      "detected": "● aptikta",
+      "extractedTitle": "Ištraukti kiekiai",
+      "wallArea": "Sienų plotas",
+      "floors": "Grindys",
+      "baseboards": "Grindjuostės",
+      "baseboardsVal": "73 m",
+      "estimateWithVat": "Sąmata su PVM"
+    },
+    "heroPlan": {
+      "title": "Pathon aptinka patalpas ir kiekius aukšto plane: 6 patalpos, 72 m²",
+      "scale": "M 1:50",
+      "totalArea": "72,0 m²",
+      "sheetCode": "SA-01",
+      "roomsCount": "6 patalpos"
+    },
+    "eiga": {
+      "eyebrow": "Kaip tai veikia",
+      "titleA": "Nuo PDF iki sąmatos — ",
+      "titleAccent": "trys žingsniai",
+      "sub": "Jokio CAD, jokio rankinio matavimo. Tu tik peržiūri ir patvirtini."
+    },
+    "trades": {
+      "eyebrow": "Ką Pathon skaito",
+      "titleA": "Visi statybų tipai — ",
+      "titleAccent": "viena sistema",
+      "sub": "Pathon atpažįsta LT statybų brėžinių lapus ir ištraukia kiekius pagal tarptautines matavimo taisykles — nuo pamatų iki apdailos.",
+      "sideA": "NRM2 · DIN 18363",
+      "sideB": "Kiekviena eilutė su šaltinio žyma",
+      "sideC": "6 trade tipai → 1 sąmata"
+    },
+    "audience": {
+      "eyebrow": "Kam skirta",
+      "titleA": "Vienas įrankis, ",
+      "titleAccent": "visai komandai"
+    },
+    "pricing": {
+      "eyebrow": "Kainos",
+      "titleA": "Skaidru, be paslėptų ",
+      "titleAccent": "mokesčių",
+      "sub": "Pradėk nemokamai. Mokėk tik tada, kai matai vertę savo objektuose.",
+      "popular": "Populiariausias",
+      "vatNote": "Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas."
+    },
+    "closing": {
+      "eyebrow": "Kodėl Pathon",
+      "titleA": "Matavimus atlieka Pathon. ",
+      "titleAccent": "Sprendimus priimi tu.",
+      "sub": "Tavo kainos, tavo objektas, tavo pasiūlymas — Pathon tik greitai ir tiksliai išmatuoja.",
+      "ctaPrimary": "Išbandyti nemokamai",
+      "ctaContact": "Susisiekti"
+    },
+    "footer": {
+      "tagline": "Statybų kiekiai iš brėžinių.",
+      "colProduktas": "Produktas",
+      "colPaskyra": "Paskyra",
+      "galimybes": "Galimybės",
+      "kaipVeikia": "Kaip veikia",
+      "kainos": "Kainos",
+      "prisijungti": "Prisijungti",
+      "registruotis": "Registruotis",
+      "copyright": "© 2026 Pathon",
+      "privatumas": "Privatumas",
+      "slapukai": "Slapukai",
+      "salygos": "Sąlygos",
+      "slapukuNustatymai": "Slapukų nustatymai"
+    }
+  },
+  "pricing": {
+    "back": "Grįžti į projektus",
+    "eyebrow": "Planai",
+    "title": "Pasirinkite planą",
+    "sub": "Mokėkite tik už tai, ką naudojate. Bet kada galite keisti planą.",
+    "loading": "Kraunama…",
+    "freeTrialTitle": "Nemokamas bandymas",
+    "freeTrialDesc": "Išbandykite su vienu projektu nemokamai. Reikalingas įmonės kodas — verslo klientams.",
+    "popular": "Populiariausias",
+    "select": "Pasirinkti",
+    "redirecting": "Nukreipiama…",
+    "checkoutError": "Nepavyko atidaryti apmokėjimo",
+    "vatNote": "Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas.",
+    "plans": {
+      "pro": {
+        "label": "Pro",
+        "tagline": "Nuolatiniam darbui",
+        "period": "/mėn",
+        "features": [
+          "Iki 10 projektų per mėnesį",
+          "Statybų kiekiai (visų tipų)",
+          "PDF ir Excel eksportas",
+          "Kiekių koregavimo įrankiai"
+        ]
+      },
+      "studio": {
+        "label": "Studio",
+        "tagline": "Komandoms ir biurams",
+        "period": "/mėn",
+        "features": [
+          "Iki 35 projektų per mėnesį",
+          "Visos Pro funkcijos",
+          "Prioritetinis apdorojimas",
+          "Papildomi projektai už mažesnę kainą"
+        ]
+      },
+      "oneoff": {
+        "label": "Vienkartinis",
+        "tagline": "Vienam projektui",
+        "period": "/projektas",
+        "features": [
+          "Vienas projektas",
+          "Be prenumeratos",
+          "Pilnas kiekių skaičiavimas",
+          "PDF ir Excel eksportas"
+        ]
+      }
+    }
+  },
+  "login": {
+    "backHome": "Į pradžią",
+    "tick": "01 / PRISIJUNGIMAS",
+    "title": "Sveiki sugrįžę",
+    "sub": "Įveskite savo el. paštą ir slaptažodį, kad tęstumėte darbą.",
+    "email": "El. paštas",
+    "password": "Slaptažodis",
+    "submit": "Prisijungti",
+    "noAccount": "Neturite paskyros?",
+    "registerLink": "Registruokis",
+    "privacyPolicy": "Privatumo politika",
+    "termsOfUse": "Naudojimo sąlygos",
+    "brandEyebrow": "PATHON — STATYBŲ SĄMATOS",
+    "brandHeadlineA": "Kiekiai iš PDF ",
+    "brandHeadlineAccent": "per minutes",
+    "brandHeadlineB": ", ne per dienas.",
+    "brandSub": "Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams."
+  },
+  "register": {
+    "backHome": "Į pradžią",
+    "tick": "01 / REGISTRACIJA",
+    "title": "Sukurti paskyrą",
+    "sub": "Vienas vartotojas — savo projektai. Duomenys saugomi LT/EU serveryje.",
+    "email": "El. paštas *",
+    "name": "Vardas",
+    "company": "Įmonė",
+    "password": "Slaptažodis *",
+    "passwordHint": "(min 8 simb.)",
+    "password2": "Pakartoti slaptažodį *",
+    "agreePrefix": "Sutinku su",
+    "agreeTerms": "naudojimo sąlygomis",
+    "agreeAnd": "ir",
+    "agreePrivacy": "privatumo politika",
+    "submit": "Sukurti paskyrą",
+    "googleLabel": "Registruotis su Google",
+    "haveAccount": "Jau turite paskyrą?",
+    "loginLink": "Prisijungti",
+    "errPasswordsMismatch": "Slaptažodžiai nesutampa",
+    "errPasswordShort": "Slaptažodis turi būti ne trumpesnis nei 8 simboliai",
+    "errMustAgree": "Privalote sutikti su naudojimo sąlygomis ir privatumo politika",
+    "firstAdminTitle": "Sveiki, administratoriau!",
+    "firstAdminDesc": "Esate pirmasis vartotojas — gausite admin teises.",
+    "firstAdminRedirect": "Nukreipiame į pulpitą…",
+    "brandEyebrow": "PATHON — STATYBŲ SĄMATOS",
+    "brandHeadlineA": "Nustok matuoti ranka. ",
+    "brandHeadlineAccent": "Tikrink, ne skaičiuok.",
+    "brandSub": "Pathon perskaito brėžinį, aptinka kambarius ir kiekius — tu tik patvirtini."
+  },
+  "cookie": {
+    "eyebrow": "Slapukai",
+    "body": "Naudojame būtinuosius slapukus, kad paslauga veiktų. Su jūsų sutikimu — ir analitinius bei rinkodaros. Pasirinkite, ką leidžiate. Daugiau —",
+    "bodyCookiesLink": "Slapukų politikoje",
+    "bodyAnd": "ir",
+    "bodyPrivacyLink": "Privatumo politikoje",
+    "catNecessaryTitle": "Būtinieji",
+    "catNecessaryBadge": "Visada",
+    "catNecessaryDesc": "Prisijungimas, sesija, saugumas ir jūsų slapukų pasirinkimas. Be jų paslauga neveiktų.",
+    "catAnalyticsTitle": "Analitiniai",
+    "catAnalyticsDesc": "Apibendrinta naudojimo statistika, padedanti tobulinti paslaugą.",
+    "catMarketingTitle": "Rinkodaros",
+    "catMarketingDesc": "Aktualesnio turinio rodymas ir rinkodaros veiklos vertinimas.",
+    "saveSelection": "Įrašyti pasirinkimą",
+    "acceptAll": "Sutikti su visais",
+    "onlyNecessary": "Tik būtinieji",
+    "manage": "Tvarkyti",
+    "ariaLabel": "Slapukų sutikimas"
+  },
+  "legal": {
+    "backHome": "Grįžti į pradžią",
+    "updated": "Atnaujinta:",
+    "effective": "Įsigalioja:",
+    "draftNotice": "Ši politika — projektas, kurį prieš publikavimą turi peržiūrėti teisininkas.",
+    "docsLabel": "Teisiniai dokumentai",
+    "privacyLink": "Privatumo politika",
+    "cookiesLink": "Slapukų politika",
+    "termsLink": "Naudojimo sąlygos",
+    "footerCopy": "© 2026 Pathon, MB ·",
+    "enSummaryNotice": "Šis dokumentas šiuo metu pateikiamas tik lietuvių kalba. Oficialaus vertimo į anglų kalbą rengiamas — teisinį tekstą turi peržiūrėti teisininkas.",
+    "privacy": {
+      "eyebrow": "Teisė / Privatumas",
+      "title": "Privatumo politika",
+      "intro": "Kaip Pathon renka, naudoja, saugo ir apsaugo jūsų asmens duomenis pagal Bendrąjį duomenų apsaugos reglamentą (BDAR) ir Lietuvos Respublikos teisės aktus."
+    },
+    "cookies": {
+      "eyebrow": "Teisė / Slapukai",
+      "title": "Slapukų politika",
+      "intro": "Kokius slapukus naudoja Pathon, kokioms kategorijoms jie priklauso ir kaip galite valdyti ar atšaukti savo sutikimą."
+    },
+    "terms": {
+      "eyebrow": "Teisė / Naudojimas",
+      "title": "Naudojimo sąlygos",
+      "intro": "Sąlygos, kuriomis galite naudotis Pathon paslauga. Naudodamiesi paslauga, patvirtinate, kad su jomis susipažinote ir sutinkate."
+    }
+  }
+}

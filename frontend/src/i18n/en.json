@@ -1,0 +1,310 @@
+{
+  "nav": {
+    "galimybes": "Features",
+    "kaipVeikia": "How it works",
+    "kainos": "Pricing",
+    "prisijungti": "Log in",
+    "isbandytiNemokamai": "Try for free",
+    "meniu": "Menu"
+  },
+  "lang": {
+    "label": "Language",
+    "lt": "LT",
+    "en": "EN"
+  },
+  "landing": {
+    "trustPills": {
+      "nrm2": "NRM2",
+      "din": "DIN standards",
+      "ltSamata": "LT estimate",
+      "pvm": "21% VAT",
+      "excelPdf": "Excel & PDF"
+    },
+    "outcomes": {
+      "0": { "big": "minutes", "small": "instead of hours of manual take-off" },
+      "1": { "big": "any drawing", "small": "PDF, no CAD" },
+      "2": { "big": "LT estimate · 21% VAT", "small": "ready-to-use format" },
+      "3": { "big": "Excel + PDF", "small": "in one click" }
+    },
+    "steps": {
+      "1": { "t": "Upload a drawing", "d": "Any construction PDF: plans, sections, wall elevations, facades." },
+      "2": { "t": "Pathon detects and measures", "d": "Elements, areas, lengths, quantities. Every value with a source tag." },
+      "3": { "t": "Review and export", "d": "Adjust, enter prices, export to Excel or PDF with VAT." }
+    },
+    "trades": {
+      "interior": { "t": "Interior finishing", "d": "Paintable areas, tiles, flooring, drywall." },
+      "facade": { "t": "Facades", "d": "ETICS areas, render, insulation, openings." },
+      "roof": { "t": "Roofing", "d": "Covering areas with slope, gutters, ridge." },
+      "structure": { "t": "Structures", "d": "Concrete, rebar, slabs (m³, kg)." },
+      "earth": { "t": "Earthworks", "d": "Excavation, fill, volumes." },
+      "masonry": { "t": "Masonry", "d": "Wall areas, blocks, masonry quantities." }
+    },
+    "audiences": {
+      "0": { "t": "For contractors", "d": "Fast, accurate bids. Win more projects." },
+      "1": { "t": "For estimators", "d": "Leave the manual take-off to Pathon — verify instead of measuring from scratch." },
+      "2": { "t": "For construction companies", "d": "One tool for all quantity types — from foundations to finishing." }
+    },
+    "tiers": {
+      "vienkartinis": {
+        "name": "One-off",
+        "price": "€12",
+        "unit": "/ project",
+        "desc": "One project, no subscription.",
+        "feats": ["1 project", "All trade types", "Excel + PDF export"],
+        "cta": "Try it"
+      },
+      "pro": {
+        "name": "Pro",
+        "price": "€49",
+        "unit": "/ mo.",
+        "desc": "For the estimator working day to day.",
+        "feats": ["Unlimited projects", "Your own price list", "Correction tools", "Priority support"],
+        "cta": "Get started"
+      },
+      "studio": {
+        "name": "Studio",
+        "price": "€149",
+        "unit": "/ mo.",
+        "desc": "For teams and companies.",
+        "feats": ["Everything in Pro", "Team accounts", "Shared price lists", "API access (soon)"],
+        "cta": "Contact us"
+      }
+    },
+    "heroTabs": {
+      "interjeras": "Interior",
+      "fasadai": "Facades",
+      "stogai": "Roofing",
+      "konstrukcijos": "Structures",
+      "zemesDarbai": "Earthworks",
+      "muras": "Masonry"
+    },
+    "heroRooms": {
+      "svetaine": "Living room",
+      "miegamasis": "Bedroom",
+      "vaikoK": "Kids' room",
+      "koridorius": "Hallway",
+      "vonia": "Bathroom",
+      "wc": "WC"
+    },
+    "hero": {
+      "eyebrow": "Construction AI · Quantities from drawings",
+      "titleA": "Any drawing —",
+      "titleAccent": "accurate quantities.",
+      "sub": "Pathon reads interior, facade, roofing and structural drawings, measures the quantities and prepares an estimate — automatically, in the Lithuanian format.",
+      "ctaPrimary": "Try for free",
+      "ctaDemo": "Watch demo",
+      "note": "First project — free. No commitment."
+    },
+    "heroFrame": {
+      "fileLabel": "project_A3.pdf — 6 rooms detected",
+      "detected": "● detected",
+      "extractedTitle": "Extracted quantities",
+      "wallArea": "Wall area",
+      "floors": "Flooring",
+      "baseboards": "Baseboards",
+      "baseboardsVal": "73 m",
+      "estimateWithVat": "Estimate incl. VAT"
+    },
+    "heroPlan": {
+      "title": "Pathon detects rooms and quantities in a floor plan: 6 rooms, 72 m²",
+      "scale": "S 1:50",
+      "totalArea": "72.0 m²",
+      "sheetCode": "SA-01",
+      "roomsCount": "6 rooms"
+    },
+    "eiga": {
+      "eyebrow": "How it works",
+      "titleA": "From PDF to estimate — ",
+      "titleAccent": "three steps",
+      "sub": "No CAD, no manual take-off. You just review and confirm."
+    },
+    "trades": {
+      "eyebrow": "What Pathon reads",
+      "titleA": "Every construction type — ",
+      "titleAccent": "one system",
+      "sub": "Pathon recognises the sheets of Lithuanian construction drawings and extracts quantities according to international measurement rules — from foundations to finishing.",
+      "sideA": "NRM2 · DIN 18363",
+      "sideB": "Every line with a source tag",
+      "sideC": "6 trade types → 1 estimate"
+    },
+    "audience": {
+      "eyebrow": "Who it's for",
+      "titleA": "One tool, ",
+      "titleAccent": "for the whole team"
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "titleA": "Transparent, with no hidden ",
+      "titleAccent": "fees",
+      "sub": "Start free. Pay only once you see the value on your projects.",
+      "popular": "Most popular",
+      "vatNote": "Prices exclude VAT — business clients are subject to the reverse-charge mechanism."
+    },
+    "closing": {
+      "eyebrow": "Why Pathon",
+      "titleA": "Pathon does the measuring. ",
+      "titleAccent": "You make the decisions.",
+      "sub": "Your prices, your project, your bid — Pathon just measures it quickly and accurately.",
+      "ctaPrimary": "Try for free",
+      "ctaContact": "Contact us"
+    },
+    "footer": {
+      "tagline": "Construction quantities from drawings.",
+      "colProduktas": "Product",
+      "colPaskyra": "Account",
+      "galimybes": "Features",
+      "kaipVeikia": "How it works",
+      "kainos": "Pricing",
+      "prisijungti": "Log in",
+      "registruotis": "Sign up",
+      "copyright": "© 2026 Pathon",
+      "privatumas": "Privacy",
+      "slapukai": "Cookies",
+      "salygos": "Terms",
+      "slapukuNustatymai": "Cookie settings"
+    }
+  },
+  "pricing": {
+    "back": "Back to projects",
+    "eyebrow": "Plans",
+    "title": "Choose a plan",
+    "sub": "Pay only for what you use. Change your plan any time.",
+    "loading": "Loading…",
+    "freeTrialTitle": "Free trial",
+    "freeTrialDesc": "Try it with one project for free. A company code is required — for business clients.",
+    "popular": "Most popular",
+    "select": "Select",
+    "redirecting": "Redirecting…",
+    "checkoutError": "Could not open checkout",
+    "vatNote": "Prices exclude VAT — business clients are subject to the reverse-charge mechanism.",
+    "plans": {
+      "pro": {
+        "label": "Pro",
+        "tagline": "For day-to-day work",
+        "period": "/mo",
+        "features": [
+          "Up to 10 projects per month",
+          "Construction quantities (all types)",
+          "PDF and Excel export",
+          "Quantity correction tools"
+        ]
+      },
+      "studio": {
+        "label": "Studio",
+        "tagline": "For teams and offices",
+        "period": "/mo",
+        "features": [
+          "Up to 35 projects per month",
+          "All Pro features",
+          "Priority processing",
+          "Extra projects at a lower price"
+        ]
+      },
+      "oneoff": {
+        "label": "One-off",
+        "tagline": "For a single project",
+        "period": "/project",
+        "features": [
+          "One project",
+          "No subscription",
+          "Full quantity calculation",
+          "PDF and Excel export"
+        ]
+      }
+    }
+  },
+  "login": {
+    "backHome": "Home",
+    "tick": "01 / LOG IN",
+    "title": "Welcome back",
+    "sub": "Enter your email and password to continue your work.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Log in",
+    "noAccount": "Don't have an account?",
+    "registerLink": "Sign up",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfUse": "Terms of Use",
+    "brandEyebrow": "PATHON — CONSTRUCTION ESTIMATES",
+    "brandHeadlineA": "Quantities from PDF ",
+    "brandHeadlineAccent": "in minutes",
+    "brandHeadlineB": ", not days.",
+    "brandSub": "Interior, facades, roofing, structures — one tool for all quantity types."
+  },
+  "register": {
+    "backHome": "Home",
+    "tick": "01 / SIGN UP",
+    "title": "Create an account",
+    "sub": "One user — your own projects. Data stored on an LT/EU server.",
+    "email": "Email *",
+    "name": "Name",
+    "company": "Company",
+    "password": "Password *",
+    "passwordHint": "(min 8 chars)",
+    "password2": "Repeat password *",
+    "agreePrefix": "I agree to the",
+    "agreeTerms": "Terms of Use",
+    "agreeAnd": "and",
+    "agreePrivacy": "Privacy Policy",
+    "submit": "Create account",
+    "googleLabel": "Sign up with Google",
+    "haveAccount": "Already have an account?",
+    "loginLink": "Log in",
+    "errPasswordsMismatch": "Passwords do not match",
+    "errPasswordShort": "Password must be at least 8 characters",
+    "errMustAgree": "You must agree to the Terms of Use and Privacy Policy",
+    "firstAdminTitle": "Welcome, administrator!",
+    "firstAdminDesc": "You are the first user — you'll get admin rights.",
+    "firstAdminRedirect": "Redirecting to the dashboard…",
+    "brandEyebrow": "PATHON — CONSTRUCTION ESTIMATES",
+    "brandHeadlineA": "Stop measuring by hand. ",
+    "brandHeadlineAccent": "Verify, don't recalculate.",
+    "brandSub": "Pathon reads the drawing, detects rooms and quantities — you just confirm."
+  },
+  "cookie": {
+    "eyebrow": "Cookies",
+    "body": "We use essential cookies to make the service work. With your consent — also analytics and marketing. Choose what you allow. More —",
+    "bodyCookiesLink": "in the Cookie Policy",
+    "bodyAnd": "and",
+    "bodyPrivacyLink": "in the Privacy Policy",
+    "catNecessaryTitle": "Essential",
+    "catNecessaryBadge": "Always",
+    "catNecessaryDesc": "Login, session, security and your cookie choice. The service wouldn't work without them.",
+    "catAnalyticsTitle": "Analytics",
+    "catAnalyticsDesc": "Aggregated usage statistics that help us improve the service.",
+    "catMarketingTitle": "Marketing",
+    "catMarketingDesc": "Showing more relevant content and measuring marketing activity.",
+    "saveSelection": "Save selection",
+    "acceptAll": "Accept all",
+    "onlyNecessary": "Essential only",
+    "manage": "Manage",
+    "ariaLabel": "Cookie consent"
+  },
+  "legal": {
+    "backHome": "Back to home",
+    "updated": "Updated:",
+    "effective": "Effective:",
+    "draftNotice": "This policy is a draft and must be reviewed by a lawyer before publication.",
+    "docsLabel": "Legal documents",
+    "privacyLink": "Privacy Policy",
+    "cookiesLink": "Cookie Policy",
+    "termsLink": "Terms of Use",
+    "footerCopy": "© 2026 Pathon, MB ·",
+    "enSummaryNotice": "This document is currently available in Lithuanian only. An official English translation is in preparation — the legal text must be reviewed by a lawyer.",
+    "privacy": {
+      "eyebrow": "Legal / Privacy",
+      "title": "Privacy Policy",
+      "intro": "How Pathon collects, uses, stores and protects your personal data under the General Data Protection Regulation (GDPR) and the laws of the Republic of Lithuania."
+    },
+    "cookies": {
+      "eyebrow": "Legal / Cookies",
+      "title": "Cookie Policy",
+      "intro": "Which cookies Pathon uses, which categories they belong to, and how you can manage or withdraw your consent."
+    },
+    "terms": {
+      "eyebrow": "Legal / Use",
+      "title": "Terms of Use",
+      "intro": "The terms on which you may use the Pathon service. By using the service, you confirm that you have read and agree to them."
+    }
+  }
+}

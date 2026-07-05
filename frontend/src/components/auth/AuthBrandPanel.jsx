@@ -13,15 +13,19 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { PathonMark } from '@/components/layout/Logo';
 
+// Room NAME localised via i18n key; the quantity string stays literal so the
+// LT panel renders identically to the founder-approved copy.
 const DEMO_ROOMS = [
-  { k: 'Svetainė', v: '28,4 m²' },
-  { k: 'Miegamasis', v: '14,2 m²' },
-  { k: 'Vonia', v: '4,6 m²' },
+  { key: 'svetaine', v: '28,4 m²' },
+  { key: 'miegamasis', v: '14,2 m²' },
+  { key: 'vonia', v: '4,6 m²' },
 ];
 
 export default function AuthBrandPanel({ eyebrow, headline, sub }) {
+  const { t } = useTranslation();
   return (
     <div className="relative hidden lg:flex flex-col justify-between overflow-hidden border-l border-border bg-card p-14">
       {/* blueprint grid + orange glow motif */}
@@ -41,7 +45,7 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
       {/* middle: detection illustration */}
       <div className="relative my-10">
         <div className="product-frame p-4">
-          <svg viewBox="0 0 370 200" className="w-full" role="img" aria-label="AI aptinka kiekius brėžinyje">
+          <svg viewBox="0 0 370 200" className="w-full" role="img" aria-label={t('landing.heroPlan.title')}>
             <defs>
               <pattern id="authGrid" width="24" height="24" patternUnits="userSpaceOnUse">
                 <path d="M24 0H0V24" fill="none" stroke="hsl(var(--foreground) / 0.06)" strokeWidth="1" />
@@ -58,10 +62,10 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
 
             {/* detection boxes */}
             {[
-              { x: 20, y: 20, w: 118, h: 88, label: 'Svetainė', val: '28,4 m²' },
-              { x: 164, y: 20, w: 184, h: 88, label: 'Miegamasis', val: '14,2 m²' },
-              { x: 20, y: 132, w: 222, h: 48, label: 'Koridorius', val: '10,9 m²' },
-              { x: 270, y: 132, w: 78, h: 48, label: 'Vonia', val: '4,6 m²' },
+              { x: 20, y: 20, w: 118, h: 88, roomKey: 'svetaine', val: '28,4 m²' },
+              { x: 164, y: 20, w: 184, h: 88, roomKey: 'miegamasis', val: '14,2 m²' },
+              { x: 20, y: 132, w: 222, h: 48, roomKey: 'koridorius', val: '10,9 m²' },
+              { x: 270, y: 132, w: 78, h: 48, roomKey: 'vonia', val: '4,6 m²' },
             ].map((b, i) => (
               <g key={i}>
                 <rect x={b.x} y={b.y} width={b.w} height={b.h}
@@ -78,7 +82,7 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
                 ))}
                 <text x={b.x + 7} y={b.y + 18}
                   fontFamily="var(--font-mono)" fontSize="9" fontWeight="600"
-                  fill="hsl(var(--foreground))">{b.label}</text>
+                  fill="hsl(var(--foreground))">{t(`landing.heroRooms.${b.roomKey}`)}</text>
                 <text x={b.x + 7} y={b.y + 31}
                   fontFamily="var(--font-mono)" fontSize="9"
                   fill="hsl(var(--primary))">{b.val}</text>
@@ -90,9 +94,9 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
         {/* extracted-quantity ticker under the frame */}
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5">
           {DEMO_ROOMS.map((r) => (
-            <div key={r.k} className="flex items-center gap-1.5 text-xs">
+            <div key={r.key} className="flex items-center gap-1.5 text-xs">
               <span className="dot dot-table" />
-              <span className="text-muted-foreground">{r.k}</span>
+              <span className="text-muted-foreground">{t(`landing.heroRooms.${r.key}`)}</span>
               <span className="mono tabular text-foreground">{r.v}</span>
             </div>
           ))}

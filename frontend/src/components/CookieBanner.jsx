@@ -21,6 +21,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export const STORAGE_KEY = 'pathon_cookie_consent';
 const OPEN_EVENT = 'pathon:open-cookie-settings';
@@ -108,6 +109,7 @@ function CategoryRow({ title, desc, checked, disabled, badge, onChange }) {
 // ─── Banner ──────────────────────────────────────────────────────────
 
 export default function CookieBanner() {
+  const { t } = useTranslation();
   const [show, setShow] = useState(false);
   const [manage, setManage] = useState(false);
   const [cats, setCats] = useState(DEFAULT_CATEGORIES);
@@ -161,7 +163,7 @@ export default function CookieBanner() {
       className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-3 sm:px-5 sm:pb-5 pointer-events-none"
       role="dialog"
       aria-modal="false"
-      aria-label="Slapukų sutikimas"
+      aria-label={t('cookie.ariaLabel')}
     >
       <div
         className="pointer-events-auto mx-auto max-w-[720px] rounded-2xl border border-border-strong bg-card/95 backdrop-blur-md
@@ -171,38 +173,37 @@ export default function CookieBanner() {
           <div className="flex items-center gap-2.5">
             <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
             <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-primary">
-              Slapukai
+              {t('cookie.eyebrow')}
             </span>
           </div>
 
           <p className="mt-3 text-[13.5px] text-ink-2 leading-[1.6]">
-            Naudojame būtinuosius slapukus, kad paslauga veiktų. Su jūsų sutikimu —
-            ir analitinius bei rinkodaros. Pasirinkite, ką leidžiate. Daugiau —{' '}
-            <Link to="/cookies" className="text-primary hover:underline">Slapukų politikoje</Link>{' '}
-            ir{' '}
-            <Link to="/privacy" className="text-primary hover:underline">Privatumo politikoje</Link>.
+            {t('cookie.body')}{' '}
+            <Link to="/cookies" className="text-primary hover:underline">{t('cookie.bodyCookiesLink')}</Link>{' '}
+            {t('cookie.bodyAnd')}{' '}
+            <Link to="/privacy" className="text-primary hover:underline">{t('cookie.bodyPrivacyLink')}</Link>.
           </p>
 
           {/* Category toggles — shown when "Tvarkyti" is expanded */}
           {manage && (
             <div className="mt-4 rounded-xl border border-border bg-surface-2/60 px-4">
               <CategoryRow
-                title="Būtinieji"
-                badge="Visada"
-                desc="Prisijungimas, sesija, saugumas ir jūsų slapukų pasirinkimas. Be jų paslauga neveiktų."
+                title={t('cookie.catNecessaryTitle')}
+                badge={t('cookie.catNecessaryBadge')}
+                desc={t('cookie.catNecessaryDesc')}
                 checked
                 disabled
                 onChange={() => {}}
               />
               <CategoryRow
-                title="Analitiniai"
-                desc="Apibendrinta naudojimo statistika, padedanti tobulinti paslaugą."
+                title={t('cookie.catAnalyticsTitle')}
+                desc={t('cookie.catAnalyticsDesc')}
                 checked={cats.analytics}
                 onChange={(v) => setCats((c) => ({ ...c, analytics: v }))}
               />
               <CategoryRow
-                title="Rinkodaros"
-                desc="Aktualesnio turinio rodymas ir rinkodaros veiklos vertinimas."
+                title={t('cookie.catMarketingTitle')}
+                desc={t('cookie.catMarketingDesc')}
                 checked={cats.marketing}
                 onChange={(v) => setCats((c) => ({ ...c, marketing: v }))}
               />
@@ -216,28 +217,28 @@ export default function CookieBanner() {
                 onClick={saveSelection}
                 className="btn-primary justify-center px-4 py-2.5 text-[13.5px]"
               >
-                Įrašyti pasirinkimą
+                {t('cookie.saveSelection')}
               </button>
             ) : (
               <button
                 onClick={acceptAll}
                 className="btn-primary justify-center px-4 py-2.5 text-[13.5px]"
               >
-                Sutikti su visais
+                {t('cookie.acceptAll')}
               </button>
             )}
             <button
               onClick={rejectNonEssential}
               className="btn-ghost justify-center px-4 py-2.5 text-[13.5px]"
             >
-              Tik būtinieji
+              {t('cookie.onlyNecessary')}
             </button>
             {!manage && (
               <button
                 onClick={() => setManage(true)}
                 className="justify-center px-4 py-2.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors font-medium"
               >
-                Tvarkyti
+                {t('cookie.manage')}
               </button>
             )}
           </div>

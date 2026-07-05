@@ -11,51 +11,20 @@
 
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Check, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBilling } from '@/hooks/useBilling';
 import { startCheckout } from '@/lib/billingApi';
 
-// Presentation order + copy. Prices/quotas are read from the backend plan by
-// `name`; the values here are only labels/marketing, not the source of truth.
+// Presentation order + structural flags. All copy (labels/taglines/features/
+// period) is resolved via i18n by plan id under `pricing.plans.<id>`.
+// Prices/quotas still come from the backend plan — the source of truth.
 const PLAN_META = {
-  pro: {
-    label: 'Pro',
-    tagline: 'Nuolatiniam darbui',
-    highlight: true,
-    features: [
-      'Iki 10 projektų per mėnesį',
-      'Statybų kiekiai (visų tipų)',
-      'PDF ir Excel eksportas',
-      'Kiekių koregavimo įrankiai',
-    ],
-    period: '/mėn',
-  },
-  studio: {
-    label: 'Studio',
-    tagline: 'Komandoms ir biurams',
-    highlight: false,
-    features: [
-      'Iki 35 projektų per mėnesį',
-      'Visos Pro funkcijos',
-      'Prioritetinis apdorojimas',
-      'Papildomi projektai už mažesnę kainą',
-    ],
-    period: '/mėn',
-  },
-  oneoff: {
-    label: 'Vienkartinis',
-    tagline: 'Vienam projektui',
-    highlight: false,
-    features: [
-      'Vienas projektas',
-      'Be prenumeratos',
-      'Pilnas kiekių skaičiavimas',
-      'PDF ir Excel eksportas',
-    ],
-    period: '/projektas',
-  },
+  pro: { highlight: true },
+  studio: { highlight: false },
+  oneoff: { highlight: false },
 };
 
 const ORDER = ['pro', 'studio', 'oneoff'];
@@ -63,6 +32,7 @@ const ORDER = ['pro', 'studio', 'oneoff'];
 const eur = (n) => `${Number(n).toFixed(0)} €`;
 
 export default function Pricing() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { enabled, plans, isLoading } = useBilling();
   const [checkingOut, setCheckingOut] = useState(null);
@@ -70,7 +40,7 @@ export default function Pricing() {
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground text-sm">
-        Kraunama…
+        {t('pricing.loading')}
       </div>
     );
   }
@@ -89,7 +59,7 @@ export default function Pricing() {
     try {
       await startCheckout(name); // redirects on success
     } catch (e) {
-      toast.error(e.message || 'Nepavyko atidaryti apmokėjimo');
+      toast.error(e.message || t('pricing.checkoutError'));
       setCheckingOut(null);
     }
   };
@@ -101,16 +71,16 @@ export default function Pricing() {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Grįžti į projektus
+        {t('pricing.back')}
       </button>
 
       <div className="mb-8">
         <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
-          Planai
+          {t('pricing.eyebrow')}
         </div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Pasirinkite planą</h1>
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">{t('pricing.title')}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Mokėkite tik už tai, ką naudojate. Bet kada galite keisti planą.
+          {t('pricing.sub')}
         </p>
       </div>
 
@@ -120,9 +90,9 @@ export default function Pricing() {
           <Check className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Nemokamas bandymas</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('pricing.freeTrialTitle')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Išbandykite su vienu projektu nemokamai. Reikalingas įmonės kodas — verslo klientams.
+            {t('pricing.freeTrialDesc')}
           </p>
         </div>
       </div>
@@ -137,27 +107,30 @@ export default function Pricing() {
           >
             {meta.highlight && (
               <span className="absolute -top-2.5 left-6 text-[10px] uppercase tracking-wide font-medium px-2 py-0.5 rounded bg-primary text-primary-foreground">
-                Populiariausias
+                {t('pricing.popular')}
               </span>
             )}
 
-            <h3 className="text-base font-semibold text-foreground">{meta.label}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{meta.tagline}</p>
+            <h3 className="text-base font-semibold text-foreground">{t(`pricing.plans.${name}.label`)}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{t(`pricing.plans.${name}.tagline`)}</p>
 
             <div className="mt-4 flex items-baseline gap-1">
               <span className="text-3xl font-semibold text-foreground tracking-tight">
                 {eur(plan.price_eur)}
               </span>
-              <span className="text-sm text-muted-foreground">{meta.period}</span>
+              <span className="text-sm text-muted-foreground">{t(`pricing.plans.${name}.period`)}</span>
             </div>
 
             <ul className="mt-5 space-y-2 flex-1">
-              {meta.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-foreground/85">
-                  <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <span>{f}</span>
-                </li>
-              ))}
+              {(() => {
+                const features = t(`pricing.plans.${name}.features`, { returnObjects: true });
+                return (Array.isArray(features) ? features : []).map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-foreground/85">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ));
+              })()}
             </ul>
 
             <Button
@@ -170,14 +143,14 @@ export default function Pricing() {
               }`}
               variant={meta.highlight ? 'default' : 'outline'}
             >
-              {checkingOut === name ? 'Nukreipiama…' : 'Pasirinkti'}
+              {checkingOut === name ? t('pricing.redirecting') : t('pricing.select')}
             </Button>
           </div>
         ))}
       </div>
 
       <p className="text-xs text-muted-foreground text-center mt-6">
-        Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas.
+        {t('pricing.vatNote')}
       </p>
     </div>
   );

@@ -15,15 +15,17 @@ import LegalLayout, {
   Section, P, Term, UL, LI, Callout, Code, DefTable,
 } from '@/components/legal/LegalLayout';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { openCookieSettings } from '@/components/CookieBanner';
 
 export default function Cookies() {
+  const { t } = useTranslation();
   return (
     <LegalLayout
-      eyebrow="Teisė / Slapukai"
+      eyebrow={t('legal.cookies.eyebrow')}
       index="LEX-02"
-      title="Slapukų politika"
-      intro="Kokius slapukus naudoja Pathon, kokioms kategorijoms jie priklauso ir kaip galite valdyti ar atšaukti savo sutikimą."
+      title={t('legal.cookies.title')}
+      intro={t('legal.cookies.intro')}
       updated="2026-07-05"
       effective="2026-07-05"
     >

@@ -14,14 +14,16 @@ import LegalLayout, {
   Section, P, Term, UL, LI, Callout,
 } from '@/components/legal/LegalLayout';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function Terms() {
+  const { t } = useTranslation();
   return (
     <LegalLayout
-      eyebrow="Teisė / Naudojimas"
+      eyebrow={t('legal.terms.eyebrow')}
       index="LEX-03"
-      title="Naudojimo sąlygos"
-      intro="Sąlygos, kuriomis galite naudotis Pathon paslauga. Naudodamiesi paslauga, patvirtinate, kad su jomis susipažinote ir sutinkate."
+      title={t('legal.terms.title')}
+      intro={t('legal.terms.intro')}
       updated="2026-07-05"
       effective="2026-07-05"
     >

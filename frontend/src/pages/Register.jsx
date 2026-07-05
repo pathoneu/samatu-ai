@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/authContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +18,10 @@ import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import Logo from '@/components/layout/Logo';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
+import LanguageToggle from '@/components/LanguageToggle';
 
 export default function Register() {
+  const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -36,15 +39,15 @@ export default function Register() {
     e.preventDefault();
     setError(null);
     if (password !== password2) {
-      setError('Slaptažodžiai nesutampa');
+      setError(t('register.errPasswordsMismatch'));
       return;
     }
     if (password.length < 8) {
-      setError('Slaptažodis turi būti ne trumpesnis nei 8 simboliai');
+      setError(t('register.errPasswordShort'));
       return;
     }
     if (!agreed) {
-      setError('Privalote sutikti su naudojimo sąlygomis ir privatumo politika');
+      setError(t('register.errMustAgree'));
       return;
     }
     setSubmitting(true);
@@ -68,9 +71,9 @@ export default function Register() {
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 border border-primary/30">
             <ShieldCheck className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight mb-2">Sveiki, administratoriau!</h1>
-          <p className="text-muted-foreground">Esate pirmasis vartotojas — gausite admin teises.</p>
-          <p className="text-sm text-muted-foreground mt-4 font-mono">Nukreipiame į pulpitą…</p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight mb-2">{t('register.firstAdminTitle')}</h1>
+          <p className="text-muted-foreground">{t('register.firstAdminDesc')}</p>
+          <p className="text-sm text-muted-foreground mt-4 font-mono">{t('register.firstAdminRedirect')}</p>
         </div>
       </div>
     );
@@ -81,19 +84,20 @@ export default function Register() {
       {/* ── Form column ─────────────────────────────────────────────── */}
       <div className="relative flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
         <div className="w-full max-w-md mx-auto">
-          <div className="mb-10">
-            <Link to="/" title="Į pradžią" className="no-underline inline-block">
+          <div className="mb-10 flex items-center justify-between gap-3">
+            <Link to="/" title={t('register.backHome')} className="no-underline inline-block">
               <Logo size="lg" showSub={false} />
             </Link>
+            <LanguageToggle />
           </div>
 
           <div className="mb-8">
-            <div className="mono-tick mb-3">01 / REGISTRACIJA</div>
+            <div className="mono-tick mb-3">{t('register.tick')}</div>
             <h1 className="font-display text-3xl font-semibold tracking-tight leading-tight">
-              Sukurti paskyrą
+              {t('register.title')}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Vienas vartotojas — savo projektai. Duomenys saugomi LT/EU serveryje.
+              {t('register.sub')}
             </p>
           </div>
 
@@ -107,7 +111,7 @@ export default function Register() {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                El. paštas *
+                {t('register.email')}
               </Label>
               <Input id="email" type="email" required autoFocus
                 className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -116,7 +120,7 @@ export default function Register() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  Vardas
+                  {t('register.name')}
                 </Label>
                 <Input id="name"
                   className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -124,7 +128,7 @@ export default function Register() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="company" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  Įmonė
+                  {t('register.company')}
                 </Label>
                 <Input id="company"
                   className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -133,7 +137,7 @@ export default function Register() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Slaptažodis * <span className="normal-case tracking-normal opacity-70">(min 8 simb.)</span>
+                {t('register.password')} <span className="normal-case tracking-normal opacity-70">{t('register.passwordHint')}</span>
               </Label>
               <Input id="password" type="password" required minLength={8}
                 className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -141,7 +145,7 @@ export default function Register() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password2" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Pakartoti slaptažodį *
+                {t('register.password2')}
               </Label>
               <Input id="password2" type="password" required
                 className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -156,33 +160,33 @@ export default function Register() {
                 onChange={e => setAgreed(e.target.checked)}
               />
               <span className="text-muted-foreground">
-                Sutinku su{' '}
-                <Link to="/terms" className="text-primary hover:underline" target="_blank">naudojimo sąlygomis</Link>
-                {' '}ir{' '}
-                <Link to="/privacy" className="text-primary hover:underline" target="_blank">privatumo politika</Link>
+                {t('register.agreePrefix')}{' '}
+                <Link to="/terms" className="text-primary hover:underline" target="_blank">{t('register.agreeTerms')}</Link>
+                {' '}{t('register.agreeAnd')}{' '}
+                <Link to="/privacy" className="text-primary hover:underline" target="_blank">{t('register.agreePrivacy')}</Link>
               </span>
             </label>
 
             <Button type="submit" className="btn-primary w-full h-11 text-sm" disabled={submitting || !agreed}>
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Sukurti paskyrą
+              {t('register.submit')}
             </Button>
           </form>
 
-          <GoogleSignInButton next="/" label="Registruotis su Google" />
+          <GoogleSignInButton next="/" label={t('register.googleLabel')} />
 
           <div className="mt-6 text-sm text-muted-foreground text-center">
-            Jau turite paskyrą?{' '}
-            <Link to="/login" className="text-primary font-medium hover:underline">Prisijungti</Link>
+            {t('register.haveAccount')}{' '}
+            <Link to="/login" className="text-primary font-medium hover:underline">{t('register.loginLink')}</Link>
           </div>
         </div>
       </div>
 
       {/* ── Brand panel (desktop only) ──────────────────────────────── */}
       <AuthBrandPanel
-        eyebrow="PATHON — STATYBŲ SĄMATOS"
-        headline={<>Nustok matuoti ranka. <span className="h-accent">Tikrink, ne skaičiuok.</span></>}
-        sub="Pathon perskaito brėžinį, aptinka kambarius ir kiekius — tu tik patvirtini."
+        eyebrow={t('register.brandEyebrow')}
+        headline={<>{t('register.brandHeadlineA')}<span className="h-accent">{t('register.brandHeadlineAccent')}</span></>}
+        sub={t('register.brandSub')}
       />
     </div>
   );

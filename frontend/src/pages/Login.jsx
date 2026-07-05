@@ -10,6 +10,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/authContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +19,10 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Logo from '@/components/layout/Logo';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
+import LanguageToggle from '@/components/LanguageToggle';
 
 export default function Login() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,19 +52,20 @@ export default function Login() {
       {/* ── Form column ─────────────────────────────────────────────── */}
       <div className="relative flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
         <div className="w-full max-w-md mx-auto">
-          <div className="mb-10">
-            <Link to="/" title="Į pradžią" className="no-underline inline-block">
+          <div className="mb-10 flex items-center justify-between gap-3">
+            <Link to="/" title={t('login.backHome')} className="no-underline inline-block">
               <Logo size="lg" showSub={false} />
             </Link>
+            <LanguageToggle />
           </div>
 
           <div className="mb-8">
-            <div className="mono-tick mb-3">01 / PRISIJUNGIMAS</div>
+            <div className="mono-tick mb-3">{t('login.tick')}</div>
             <h1 className="font-display text-3xl font-semibold tracking-tight leading-tight">
-              Sveiki sugrįžę
+              {t('login.title')}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Įveskite savo el. paštą ir slaptažodį, kad tęstumėte darbą.
+              {t('login.sub')}
             </p>
           </div>
 
@@ -75,7 +79,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                El. paštas
+                {t('login.email')}
               </Label>
               <Input id="email" type="email" required autoFocus
                 className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -83,7 +87,7 @@ export default function Login() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Slaptažodis
+                {t('login.password')}
               </Label>
               <Input id="password" type="password" required
                 className="h-11 bg-card border-border-strong focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -91,30 +95,30 @@ export default function Login() {
             </div>
             <Button type="submit" className="btn-primary w-full h-11 text-sm" disabled={submitting}>
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Prisijungti
+              {t('login.submit')}
             </Button>
           </form>
 
           <GoogleSignInButton next={from} />
 
           <div className="mt-6 text-sm text-muted-foreground text-center">
-            Neturite paskyros?{' '}
-            <Link to="/register" className="text-primary font-medium hover:underline">Registruokis</Link>
+            {t('login.noAccount')}{' '}
+            <Link to="/register" className="text-primary font-medium hover:underline">{t('login.registerLink')}</Link>
           </div>
 
           <div className="mt-8 pt-6 border-t border-border text-xs text-muted-foreground text-center">
-            <Link to="/privacy" className="hover:text-foreground transition-colors">Privatumo politika</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">{t('login.privacyPolicy')}</Link>
             <span className="mx-2 opacity-40">·</span>
-            <Link to="/terms" className="hover:text-foreground transition-colors">Naudojimo sąlygos</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">{t('login.termsOfUse')}</Link>
           </div>
         </div>
       </div>
 
       {/* ── Brand panel (desktop only) ──────────────────────────────── */}
       <AuthBrandPanel
-        eyebrow="PATHON — STATYBŲ SĄMATOS"
-        headline={<>Kiekiai iš PDF <span className="h-accent">per minutes</span>, ne per dienas.</>}
-        sub="Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams."
+        eyebrow={t('login.brandEyebrow')}
+        headline={<>{t('login.brandHeadlineA')}<span className="h-accent">{t('login.brandHeadlineAccent')}</span>{t('login.brandHeadlineB')}</>}
+        sub={t('login.brandSub')}
       />
     </div>
   );

@@ -14,8 +14,10 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { PathonMark } from '@/components/layout/Logo';
+import LanguageToggle from '@/components/LanguageToggle';
 
 // ─── Page shell ──────────────────────────────────────────────────────
 
@@ -28,6 +30,11 @@ export default function LegalLayout({
   effective,     // effective date string (optional)
   children,      // page body — <Section>…</Section> blocks
 }) {
+  const { t, i18n } = useTranslation();
+  // Dense legal body stays LT-only for now (an EN legal translation genuinely
+  // needs a lawyer). When the UI is in English, surface a clear notice above
+  // the LT body rather than silently showing Lithuanian.
+  const showEnBodyNotice = i18n.language && i18n.language.startsWith('en');
   return (
     <div className="pathon-landing min-h-screen bg-background text-foreground antialiased">
       {/* Lite header — logo home + back link, matches landing nav rhythm */}
@@ -37,12 +44,15 @@ export default function LegalLayout({
             <PathonMark icon={26} />
             <span className="font-display font-bold tracking-tight text-[19px]">Pathon</span>
           </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Grįžti į pradžią
-          </Link>
+          <div className="flex items-center gap-4">
+            <LanguageToggle />
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> {t('legal.backHome')}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -71,11 +81,11 @@ export default function LegalLayout({
               </p>
             )}
             <div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[11.5px] text-muted-foreground">
-              {updated && <span>Atnaujinta: {updated}</span>}
+              {updated && <span>{t('legal.updated')} {updated}</span>}
               {effective && (
                 <>
                   <span className="text-border-strong hidden sm:inline">·</span>
-                  <span>Įsigalioja: {effective}</span>
+                  <span>{t('legal.effective')} {effective}</span>
                 </>
               )}
             </div>
@@ -87,8 +97,7 @@ export default function LegalLayout({
                 aria-hidden
               />
               <p className="text-[13.5px] text-ink-2 leading-[1.55]">
-                Ši politika — projektas, kurį prieš publikavimą turi peržiūrėti
-                teisininkas.
+                {t('legal.draftNotice')}
               </p>
             </div>
           </div>
@@ -97,26 +106,36 @@ export default function LegalLayout({
 
       {/* Prose column — capped at readable measure */}
       <main className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-16 lg:py-20">
+        {/* EN-body notice: dense legal text is LT-only until a lawyer signs off */}
+        {showEnBodyNotice && (
+          <div className="max-w-[68ch] mb-10 flex items-start gap-3 rounded-xl border border-border bg-surface-2/60 px-4 py-3.5">
+            <span className="mt-[3px] shrink-0 w-2 h-2 rounded-full bg-muted-foreground" aria-hidden />
+            <p className="text-[13.5px] text-ink-2 leading-[1.55]">
+              {t('legal.enSummaryNotice')}
+            </p>
+          </div>
+        )}
+
         <article className="legal-prose max-w-[68ch]">{children}</article>
 
         {/* Footer nav between the three legal pages */}
         <nav className="max-w-[68ch] mt-16 pt-8 border-t border-border flex flex-wrap items-center gap-x-6 gap-y-3 text-[13.5px]">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Teisiniai dokumentai
+            {t('legal.docsLabel')}
           </span>
           <Link to="/privacy" className="text-foreground/75 hover:text-foreground transition-colors link-draw">
-            Privatumo politika
+            {t('legal.privacyLink')}
           </Link>
           <Link to="/cookies" className="text-foreground/75 hover:text-foreground transition-colors link-draw">
-            Slapukų politika
+            {t('legal.cookiesLink')}
           </Link>
           <Link to="/terms" className="text-foreground/75 hover:text-foreground transition-colors link-draw">
-            Naudojimo sąlygos
+            {t('legal.termsLink')}
           </Link>
         </nav>
 
         <p className="max-w-[68ch] mt-8 text-[12.5px] text-muted-foreground leading-[1.6]">
-          © 2026 Pathon, MB · <a href="mailto:solutions@pathon.eu" className="hover:text-foreground transition-colors">solutions@pathon.eu</a>
+          {t('legal.footerCopy')} <a href="mailto:solutions@pathon.eu" className="hover:text-foreground transition-colors">solutions@pathon.eu</a>
         </p>
       </main>
     </div>
