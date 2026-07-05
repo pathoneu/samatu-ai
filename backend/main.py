@@ -3053,7 +3053,9 @@ def _calculate_finishing_quantities(
 
     # ── 8. DAŽŲ KIEKIS (litrais) ─────────────────────────────────────────────
     dazymas_viso_m2  = paint_walls_m2 + lubos_m2
-    dazai_sienoms_l  = round(paint_walls_m2 * 2 / 9, 1)
+    # CLAUDE.md §1.10: for 2 coats multiply by 1.8× (not 2.0×) — first coat
+    # absorbs more, so two coats ≠ double the paint. Changed 2 → 1.8 (2026-07-05).
+    dazai_sienoms_l  = round(paint_walls_m2 * 1.8 / 9, 1)
     dazai_luboms_l   = round(lubos_m2 * 2 / 10, 1)
     gruntas_l        = round(dazymas_viso_m2 * 0.15, 1)
 
