@@ -7,12 +7,15 @@
  *
  * Spec §5.6 Suvestinė tab.
  */
+import { useTranslation } from 'react-i18next';
+
 export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
+  const { t } = useTranslation();
   // Compute breakdown by skyrius
   const byCategory = new Map();
   let total = 0;
   for (const p of pozicijos) {
-    const k = p.skyrius_label || p.skyrius || 'Kita';
+    const k = p.skyrius_label || p.skyrius || t('workspace.suvestine.other');
     const v = Number(p.kiekis_x_kaina) || 0;
     byCategory.set(k, (byCategory.get(k) || 0) + v);
     total += v;
@@ -30,18 +33,18 @@ export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
         padding: 14, marginBottom: 16,
       }}>
         <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'hsl(var(--muted-foreground))' }}>
-          Suvestinė
+          {t('workspace.suvestine.title')}
         </div>
         <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
           {fmt(grand)}
         </div>
         <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
-          Σ neto: <strong>{fmt(total)}</strong> &nbsp;·&nbsp; PVM 21%: {fmt(pvm)}
+          {t('workspace.suvestine.netVat')}<strong>{fmt(total)}</strong> &nbsp;·&nbsp;{t('workspace.suvestine.vatLabel', { pvm: fmt(pvm) })}
         </div>
       </div>
 
       <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'hsl(var(--muted-foreground))', marginBottom: 8 }}>
-        Pagal skyrius
+        {t('workspace.suvestine.byCategory')}
       </div>
       {sorted.map(([cat, value]) => {
         const pct = total > 0 ? (value / total) * 100 : 0;
@@ -59,7 +62,7 @@ export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
       })}
       {sorted.length === 0 && (
         <div style={{ padding: '20px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
-          Nėra duomenų.
+          {t('workspace.suvestine.noData')}
         </div>
       )}
 
@@ -67,11 +70,11 @@ export function SuvestinePanel({ rooms = [], pozicijos = [] }) {
         <button style={{
           flex: 1, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary))', color: 'hsl(var(--primary-foreground))',
           padding: '8px 12px', borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-        }}>Eksportuoti Excel</button>
+        }}>{t('workspace.suvestine.exportExcel')}</button>
         <button style={{
           flex: 1, background: 'hsl(var(--card))', border: '1px solid hsl(var(--border-strong))', color: 'hsl(var(--foreground))',
           padding: '8px 12px', borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-        }}>PDF</button>
+        }}>{t('workspace.suvestine.exportPdf')}</button>
       </div>
     </div>
   );

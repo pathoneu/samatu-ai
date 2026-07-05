@@ -12,6 +12,7 @@
  *
  * Spec §5.4 top-bar behaviors.
  */
+import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { viewerStore } from '../../lib/viewerStore';
 
@@ -29,6 +30,7 @@ export function TopBar({
   onAiRun,
   onMore,
 }) {
+  const { t } = useTranslation();
   const scale = useStore(viewerStore, (s) => s.scale);
   const currentPage = useStore(viewerStore, (s) => s.currentPage);
   const zoomPct = Math.round(scale * 100);
@@ -75,13 +77,13 @@ export function TopBar({
       <button onClick={onSearch} style={{
         background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border-strong))', color: 'hsl(var(--foreground))',
         padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-      }}>🔍 Ieškoti</button>
+      }}>{t('workspace.search')}</button>
       <button onClick={onAiRun} style={{
         background: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary))', color: 'hsl(var(--primary-foreground))',
         padding: '6px 14px', borderRadius: 5, fontSize: 12, fontWeight: 600,
         display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
         boxShadow: '0 1px 3px hsl(var(--primary) / 0.3)',
-      }}>✨ Pathon</button>
+      }}>{t('workspace.aiRun')}</button>
       <button onClick={onMore} style={{
         background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border-strong))', color: 'hsl(var(--foreground))',
         padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',

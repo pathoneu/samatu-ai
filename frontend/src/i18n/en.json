@@ -447,6 +447,61 @@
       "toastFileReadFail": "Could not read the file"
     }
   },
+  "shared": {
+    "loading": "Loading...",
+    "invalidLink": "Invalid link",
+    "invalidLinkHint": "It may have been revoked by the owner, or you entered the wrong one.",
+    "readOnly": "View mode",
+    "readOnlyNote": "— a read-only copy. Editing is not possible.",
+    "defaultName": "Project",
+    "statRooms": "Rooms",
+    "statArea": "Area",
+    "statPositions": "Items",
+    "statSumNoVat": "Total (excl. VAT)",
+    "statSumWithVat": "Total incl. VAT",
+    "roomsTitle": "Rooms",
+    "colNr": "No.",
+    "colName": "Name",
+    "colPurpose": "Purpose",
+    "colArea": "Area",
+    "colCeiling": "Ceiling",
+    "kzTitle": "Bill of quantities",
+    "positionsSum": "{{count}} items · {{sum}}",
+    "colDescription": "Description",
+    "colQty": "Quantity",
+    "colUnit": "Unit",
+    "colPrice": "Price",
+    "colTotal": "Total",
+    "otherWorks": "Other works",
+    "sumNoVat": "Total excl. VAT",
+    "vat": "VAT ({{rate}}%)",
+    "grandTotalReverse": "TOTAL (excl. VAT)",
+    "grandTotal": "Total",
+    "reverseVatNote": "Reverse-charge VAT (renovation): VAT is calculated and paid by the buyer (Law on VAT, Art. 96).",
+    "emptyList": "This project's quantity list is still empty."
+  },
+  "workspace": {
+    "search": "🔍 Search",
+    "aiRun": "✨ Pathon",
+    "ai": {
+      "running": "⏳ AI working…",
+      "run": "✨ Run Pathon",
+      "desc": "The AI will scan all pages and fill in the BoQ items. Existing 🔒 locked items stay unchanged.",
+      "recentRuns": "Recent runs",
+      "noRuns": "No AI runs yet.",
+      "runInfo": "{{pages}} p. · {{model}}"
+    },
+    "suvestine": {
+      "title": "Summary",
+      "netVat": "Σ net: ",
+      "vatLabel": " VAT 21%: {{pvm}}",
+      "byCategory": "By category",
+      "other": "Other",
+      "noData": "No data.",
+      "exportExcel": "Export Excel",
+      "exportPdf": "PDF"
+    }
+  },
   "admin": {
     "loading": "Loading…",
     "dash": {

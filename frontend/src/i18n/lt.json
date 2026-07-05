@@ -450,6 +450,61 @@
       "toastFileReadFail": "Nepavyko nuskaityti failo"
     }
   },
+  "shared": {
+    "loading": "Kraunama...",
+    "invalidLink": "Nuoroda netinkama",
+    "invalidLinkHint": "Galbūt ji buvo atšaukta savininko arba jūs įvedėte ne tą.",
+    "readOnly": "Peržiūros režimas",
+    "readOnlyNote": "— skaitoma kopija. Negalima redaguoti.",
+    "defaultName": "Projektas",
+    "statRooms": "Patalpos",
+    "statArea": "Plotas",
+    "statPositions": "Pozicijos",
+    "statSumNoVat": "Suma (be PVM)",
+    "statSumWithVat": "Suma su PVM",
+    "roomsTitle": "Patalpos",
+    "colNr": "Nr.",
+    "colName": "Pavadinimas",
+    "colPurpose": "Paskirtis",
+    "colArea": "Plotas",
+    "colCeiling": "Lubos",
+    "kzTitle": "Kiekių žiniaraštis",
+    "positionsSum": "{{count}} pozicijos · {{sum}}",
+    "colDescription": "Aprašymas",
+    "colQty": "Kiekis",
+    "colUnit": "Vnt.",
+    "colPrice": "Kaina",
+    "colTotal": "Suma",
+    "otherWorks": "Kiti darbai",
+    "sumNoVat": "Suma be PVM",
+    "vat": "PVM ({{rate}}%)",
+    "grandTotalReverse": "VISO (be PVM)",
+    "grandTotal": "Iš viso",
+    "reverseVatNote": "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas (PVMĮ 96 str.).",
+    "emptyList": "Šio projekto kiekių sąrašas dar tuščias."
+  },
+  "workspace": {
+    "search": "🔍 Ieškoti",
+    "aiRun": "✨ Pathon",
+    "ai": {
+      "running": "⏳ AI dirba…",
+      "run": "✨ Paleisti Pathon",
+      "desc": "AI peržvelgs visus puslapius ir užpildys KŽ pozicijas. Esamos 🔒 užfiksuotos pozicijos liks nepakitę.",
+      "recentRuns": "Paskutiniai paleidimai",
+      "noRuns": "Dar nebuvo AI paleidimų.",
+      "runInfo": "{{pages}} psl. · {{model}}"
+    },
+    "suvestine": {
+      "title": "Suvestinė",
+      "netVat": "Σ neto: ",
+      "vatLabel": " PVM 21%: {{pvm}}",
+      "byCategory": "Pagal skyrius",
+      "other": "Kita",
+      "noData": "Nėra duomenų.",
+      "exportExcel": "Eksportuoti Excel",
+      "exportPdf": "PDF"
+    }
+  },
   "admin": {
     "loading": "Kraunama…",
     "dash": {
