@@ -17,6 +17,26 @@ if str(ROOT) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Hermeticity: main._RATE_BUCKET is a module-global 60s sliding-window rate
+    limiter keyed by client IP. Under TestClient every request comes from the same
+    IP ("testclient"), so logins/registrations/log-error POSTs accumulate across
+    tests and can trip the 30/min cap in a LATER test — an order-dependent 429
+    flake (surfaced 2026-07-05 when the login-heavy admin-v2 suite pushed
+    test_f2_session_invalidation over the edge). Clearing the bucket before each
+    test makes every test start from an empty window. Rate-limit tests that need a
+    FULL bucket fill it within their own body (range(N) POSTs), so a pre-test
+    clear never weakens them — several already call this exact clear manually
+    (test_f7_log_error_hardening, test_log_error_body_cap)."""
+    try:
+        import main
+        main._RATE_BUCKET.clear()
+    except Exception:
+        pass  # main not importable in a pure-unit context → nothing to reset
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_experiment_envs(monkeypatch):
     """Hermeticity guard (2026-07-04): the accuracy-A/B experiment envs are
     behavior switches for the extraction pipeline. If the controller (or a
