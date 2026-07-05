@@ -53,6 +53,11 @@ _ASSUMPTION_FIELDS = {
     "plyteliu_aukstis", "kampu_skaicius",
     "lubu_auksciai", "glaistimo_lygis", "sienos_storis_m",
     "custom_windows", "custom_doors",
+    # 2026-07-05: per-room finishing override (Beržų garage: contractors finish
+    # some garages/tambūrai — painted walls — that default to raw. Keyed by
+    # patalpa.nr → 0.0 (raw) / 1.0 (painted). Flips walls_paint in the room's
+    # rules and recomputes the paint fields, same live path as ceiling height.
+    "walls_paint_override",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -72,6 +77,7 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
     absorption = float(UNIVERSAL_RULES["first_coat_factor"])
     per_room_h = assumptions.get("lubu_auksciai") or {}
+    per_room_paint = assumptions.get("walls_paint_override") or {}
     default_h = float(assumptions.get("lubu_aukstis") or 2.82)
 
     out = []
@@ -113,6 +119,30 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                         )
                     except Exception:
                         pass
+            except (ValueError, TypeError):
+                pass
+        # Per-room finishing override (2026-07-05): flip walls_paint (raw↔painted)
+        # and recompute the paint geometry. Runs AFTER the height block so a room
+        # with BOTH overrides gets the combined result (calc reads the already-set
+        # lubu_aukstis_m). Same carry-forward set as the height path.
+        if isinstance(per_room_paint, dict) and nr in per_room_paint:
+            try:
+                wp = 1.0 if float(per_room_paint[nr]) >= 0.5 else 0.0
+                from extractor.universal_rules import (
+                    calc_room_quantities, ROOM_TYPE_RULES, normalize_paskirtis,
+                )
+                pask = normalize_paskirtis(room.get("paskirtis") or "")
+                rt = dict(ROOM_TYPE_RULES.get(pask) or ROOM_TYPE_RULES["gyvenamoji"])
+                rt["walls_paint"] = wp
+                room["_walls_paint_override"] = wp
+                recalc = calc_room_quantities(room, rules={pask: rt})
+                for k in ("walls_gross_m2", "walls_paintable_m2",
+                          "ceiling_paintable_m2", "dazymo_plotas_m2",
+                          "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                          "glaistas_kg", "gruntas_l",
+                          "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2"):
+                    if k in recalc:
+                        room[k] = recalc[k]
             except (ValueError, TypeError):
                 pass
         walls = float(room.get("dazomas_plotas_m2", 0) or room.get("walls_paintable_m2", 0) or 0)

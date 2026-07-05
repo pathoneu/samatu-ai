@@ -114,6 +114,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   const sienos_storis_m = safeAssumptions.sienos_storis_m;
   const glaistimo_lygis = safeAssumptions.glaistimo_lygis;
   const lubu_auksciai = safeAssumptions.lubu_auksciai || {};
+  const walls_paint_override = safeAssumptions.walls_paint_override || {};
   const custom_windows = safeAssumptions.custom_windows;
   const custom_doors = safeAssumptions.custom_doors;
   const isFallback = prielaidos?.langai_fallback;
@@ -175,6 +176,23 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     const next = { ...safeAssumptions, lubu_auksciai: next_lubu };
     onChange(next);
     handleRecompute('lubu_auksciai', next_lubu);
+  };
+
+  // Per-room finishing override (2026-07-05). Some rooms (garažas, tambūras)
+  // default to raw/unpainted walls; when a contractor finishes them the user
+  // flips this and the paint quantities recalc live (same path as ceiling height).
+  const setWallsPaint = (roomNr, painted) => {
+    const next = {
+      ...safeAssumptions,
+      walls_paint_override: { ...walls_paint_override, [roomNr]: painted ? 1 : 0 },
+    };
+    onChange(next);
+    handleRecompute('walls_paint_override', next.walls_paint_override);
+  };
+  const isWallsPainted = (room) => {
+    const ov = walls_paint_override[room.nr];
+    if (ov != null) return Number(ov) >= 0.5;
+    return Number(room.walls_paintable_m2 || 0) > 0;
   };
 
   const rooms = rawData?.patalpos || [];
@@ -313,6 +331,42 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     <span className="text-xs text-muted-foreground">m</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sienų apdaila per kambarį — dažomos vs nedažomos (2026-07-05).
+              Garažas/tambūras pagal nutylėjimą nedažomi; užbaigtiems projektams
+              vartotojas perjungia ir kiekiai persiskaičiuoja gyvai. */}
+          {rooms.length > 0 && (
+            <div className="py-2">
+              <p className="text-sm text-foreground mb-1">
+                {t('project.assumptions.wallsPaintLabel')}
+              </p>
+              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                {t('project.assumptions.wallsPaintNote')}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {rooms.map(room => {
+                  const painted = isWallsPainted(room);
+                  return (
+                    <button
+                      key={room.nr}
+                      onClick={() => setWallsPaint(room.nr, !painted)}
+                      title={room.pavadinimas}
+                      className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${
+                        painted
+                          ? 'bg-primary/10 border-primary/40 text-foreground'
+                          : 'bg-card border-border text-muted-foreground hover:border-foreground/30'
+                      }`}
+                    >
+                      <span className="truncate">{room.pavadinimas || room.nr}</span>
+                      <span className={`shrink-0 text-[10px] font-medium ${painted ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {painted ? t('project.assumptions.wallsPaintOn') : t('project.assumptions.wallsPaintOff')}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -235,3 +235,43 @@ def test_recompute_invalid_field_returns_400():
     r = client.post("/api/recompute-quantities", json=payload)
     assert r.status_code == 400
     assert "definitely_not_a_field" in r.json()["detail"]
+
+
+# ── Per-room finishing override (walls_paint) — 2026-07-05 ────────────────────
+# Beржų garage: some garages/tambūrai are finished (painted walls) though they
+# default to raw. The AssumptionsPanel toggle flips walls_paint per room and
+# recomputes the paint geometry through the same live path as ceiling height.
+
+def test_walls_paint_override_paints_raw_garage():
+    from api.recompute_quantities import _apply_assumption_edits
+    room = {"nr": "105", "pavadinimas": "Garažas", "paskirtis": "garazas",
+            "plotas_m2": 10.67, "perimetras_m": 13.5, "lubu_aukstis_m": 3.4,
+            "walls_paintable_m2": 0.0}
+    out = _apply_assumption_edits([dict(room)], {"walls_paint_override": {"105": 1.0}})[0]
+    assert out.get("walls_paintable_m2", 0) > 20, out.get("walls_paintable_m2")
+    assert out.get("_walls_paint_override") == 1.0
+
+
+def test_walls_paint_override_unpaints_living_room():
+    from api.recompute_quantities import _apply_assumption_edits
+    room = {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+            "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+            "walls_paintable_m2": 45.0}
+    out = _apply_assumption_edits([dict(room)], {"walls_paint_override": {"1": 0.0}})[0]
+    assert out.get("walls_paintable_m2", 99) == 0.0, out.get("walls_paintable_m2")
+    assert out.get("_walls_paint_override") == 0.0
+
+
+def test_walls_paint_override_absent_leaves_room_untouched():
+    from api.recompute_quantities import _apply_assumption_edits
+    room = {"nr": "1", "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
+            "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "walls_paintable_m2": 45.0}
+    out = _apply_assumption_edits([dict(room)], {})[0]
+    assert out.get("walls_paintable_m2") == 45.0
+    assert "_walls_paint_override" not in out
+
+
+def test_walls_paint_override_valid_field():
+    from api.recompute_quantities import _ASSUMPTION_FIELDS, _VALID_FIELDS
+    assert "walls_paint_override" in _ASSUMPTION_FIELDS
+    assert "walls_paint_override" in _VALID_FIELDS
