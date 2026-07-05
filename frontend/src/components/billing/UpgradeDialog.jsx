@@ -13,6 +13,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -34,6 +35,7 @@ const eur = (n) => `${Number(n).toFixed(0)} €`;
  * @param {()=>void=} props.onRetry  called after company code saved (re-run the blocked action)
  */
 export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
+  const { t } = useTranslation();
   const { plans, refresh } = useBilling();
   const [companyCode, setCompanyCode] = useState('');
   const [pvmCode, setPvmCode] = useState('');
@@ -50,7 +52,7 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
 
   const handleSaveCode = async () => {
     if (!companyCode.trim()) {
-      toast.error('Įveskite įmonės kodą');
+      toast.error(t('billing.upgrade.toastEnterCode'));
       return;
     }
     setSaving(true);
@@ -60,11 +62,11 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
         pvm_code: pvmCode.trim() || undefined,
       });
       refresh();
-      toast.success('Įmonės kodas išsaugotas');
+      toast.success(t('billing.upgrade.toastCodeSaved'));
       onClose();
       onRetry?.();
     } catch (e) {
-      toast.error(e.message || 'Nepavyko išsaugoti');
+      toast.error(e.message || t('billing.upgrade.toastSaveFail'));
     } finally {
       setSaving(false);
     }
@@ -75,7 +77,7 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
     try {
       await startCheckout(planName); // redirects on success
     } catch (e) {
-      toast.error(e.message || 'Nepavyko atidaryti apmokėjimo');
+      toast.error(e.message || t('billing.upgrade.toastCheckoutFail'));
       setCheckingOut(null);
     }
   };
@@ -89,17 +91,16 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
                 <Building2 className="w-5 h-5 text-primary" />
               </div>
-              <DialogTitle>Reikalingas įmonės kodas</DialogTitle>
+              <DialogTitle>{t('billing.upgrade.companyCodeTitle')}</DialogTitle>
               <DialogDescription>
-                {message ||
-                  'Nemokamas bandymas skirtas verslo klientams. Įveskite įmonės kodą, kad galėtumėte tęsti.'}
+                {message || t('billing.upgrade.companyCodeDesc')}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-1">
               <div>
                 <Label htmlFor="upgrade-company-code" className="text-sm text-muted-foreground">
-                  Įmonės kodas
+                  {t('billing.upgrade.companyCode')}
                 </Label>
                 <Input
                   id="upgrade-company-code"
@@ -112,7 +113,7 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
               </div>
               <div>
                 <Label htmlFor="upgrade-pvm-code" className="text-sm text-muted-foreground">
-                  PVM mokėtojo kodas <span className="opacity-60">(nebūtina)</span>
+                  {t('billing.upgrade.pvmCode')} <span className="opacity-60">{t('billing.upgrade.optional')}</span>
                 </Label>
                 <Input
                   id="upgrade-pvm-code"
@@ -126,14 +127,14 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose} disabled={saving}>
-                Atšaukti
+                {t('billing.upgrade.cancel')}
               </Button>
               <Button
                 onClick={handleSaveCode}
                 disabled={saving}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                {saving ? 'Saugoma...' : 'Išsaugoti ir tęsti'}
+                {saving ? t('billing.upgrade.saving') : t('billing.upgrade.saveAndContinue')}
               </Button>
             </DialogFooter>
           </>
@@ -144,22 +145,22 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <DialogTitle>
-                {reason === 'trial_used' ? 'Nemokamas bandymas panaudotas' : 'Pasiektas projektų limitas'}
+                {reason === 'trial_used' ? t('billing.upgrade.trialUsedTitle') : t('billing.upgrade.quotaTitle')}
               </DialogTitle>
               <DialogDescription>
                 {message ||
                   (reason === 'trial_used'
-                    ? 'Jūs jau panaudojote nemokamą bandymą. Pasirinkite planą, kad tęstumėte.'
-                    : 'Šį mėnesį išnaudojote savo projektų limitą. Atnaujinkite planą arba pirkite vienkartinį projektą.')}
+                    ? t('billing.upgrade.trialUsedDesc')
+                    : t('billing.upgrade.quotaDesc'))}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2.5 py-1">
               {pro && (
                 <PlanRow
-                  title="Pro"
-                  price={`${eur(pro.price_eur)}/mėn`}
-                  sub={`${pro.pdf_quota_per_month} projektai per mėnesį`}
+                  title={t('billing.plans.pro')}
+                  price={`${eur(pro.price_eur)}/${t('billing.upgrade.perMonth')}`}
+                  sub={t('billing.upgrade.projectsPerMonth', { count: pro.pdf_quota_per_month })}
                   busy={checkingOut === 'pro'}
                   onClick={() => handleCheckout('pro')}
                   highlight
@@ -167,18 +168,18 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
               )}
               {studio && (
                 <PlanRow
-                  title="Studio"
-                  price={`${eur(studio.price_eur)}/mėn`}
-                  sub={`${studio.pdf_quota_per_month} projektai per mėnesį`}
+                  title={t('billing.plans.studio')}
+                  price={`${eur(studio.price_eur)}/${t('billing.upgrade.perMonth')}`}
+                  sub={t('billing.upgrade.projectsPerMonth', { count: studio.pdf_quota_per_month })}
                   busy={checkingOut === 'studio'}
                   onClick={() => handleCheckout('studio')}
                 />
               )}
               {oneoff && (
                 <PlanRow
-                  title="Vienkartinis"
+                  title={t('billing.plans.oneoff')}
                   price={`${eur(oneoff.price_eur)}`}
-                  sub="vienas projektas, be prenumeratos"
+                  sub={t('billing.upgrade.oneoffSub')}
                   busy={checkingOut === 'oneoff'}
                   onClick={() => handleCheckout('oneoff')}
                 />
@@ -186,12 +187,12 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
             </div>
 
             <p className="text-[11px] text-muted-foreground text-center">
-              Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas.
+              {t('billing.upgrade.vatNote')}
             </p>
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose} disabled={!!checkingOut}>
-                Vėliau
+                {t('billing.upgrade.later')}
               </Button>
             </DialogFooter>
           </>
@@ -202,6 +203,7 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
 }
 
 function PlanRow({ title, price, sub, onClick, busy, highlight }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -218,7 +220,7 @@ function PlanRow({ title, price, sub, onClick, busy, highlight }) {
           <span className="text-sm font-semibold text-foreground">{title}</span>
           {highlight && (
             <span className="text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary">
-              Populiariausias
+              {t('billing.upgrade.popular')}
             </span>
           )}
         </div>

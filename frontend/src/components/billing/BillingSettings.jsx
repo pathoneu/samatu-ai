@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -20,22 +21,23 @@ import { useAuth } from '@/lib/authContext';
 import { useBilling } from '@/hooks/useBilling';
 import { getInvoices, invoiceDownloadUrl, saveCompanyCode } from '@/lib/billingApi';
 
-const PLAN_LABELS = {
-  free: 'Nemokamas bandymas',
-  pro: 'Pro',
-  studio: 'Studio',
-  oneoff: 'Vienkartinis',
+const PLAN_LABEL_KEYS = {
+  free: 'billing.plans.free',
+  pro: 'billing.plans.pro',
+  studio: 'billing.plans.studio',
+  oneoff: 'billing.plans.oneoff',
 };
 
-const STATUS_LABELS = {
-  active: 'Aktyvus',
-  trialing: 'Bandomasis',
-  past_due: 'Vėluojantis mokėjimas',
-  canceled: 'Atšauktas',
-  incomplete: 'Nebaigtas',
+const STATUS_LABEL_KEYS = {
+  active: 'billing.status.active',
+  trialing: 'billing.status.trialing',
+  past_due: 'billing.status.past_due',
+  canceled: 'billing.status.canceled',
+  incomplete: 'billing.status.incomplete',
 };
 
 export default function BillingSettings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { enabled, usage } = useBilling();
 
@@ -68,15 +70,15 @@ export default function BillingSettings() {
   // Flag-off invariant: no section at all when billing is disabled.
   if (!enabled) return null;
 
-  const planLabel = PLAN_LABELS[usage?.plan] || usage?.plan || '—';
+  const planLabel = PLAN_LABEL_KEYS[usage?.plan] ? t(PLAN_LABEL_KEYS[usage.plan]) : (usage?.plan || '—');
   const statusLabel = usage?.plan_status
-    ? (STATUS_LABELS[usage.plan_status] || usage.plan_status)
+    ? (STATUS_LABEL_KEYS[usage.plan_status] ? t(STATUS_LABEL_KEYS[usage.plan_status]) : usage.plan_status)
     : null;
   const periodEnd = formatDate(usage?.current_period_end);
 
   const handleSaveCode = async () => {
     if (!companyCode.trim()) {
-      toast.error('Įveskite įmonės kodą');
+      toast.error(t('billing.settings.toastEnterCode'));
       return;
     }
     setSaving(true);
@@ -85,9 +87,9 @@ export default function BillingSettings() {
         company_code: companyCode.trim(),
         pvm_code: pvmCode.trim() || undefined,
       });
-      toast.success('Atsiskaitymo duomenys išsaugoti');
+      toast.success(t('billing.settings.toastSaved'));
     } catch (e) {
-      toast.error(e.message || 'Nepavyko išsaugoti');
+      toast.error(e.message || t('billing.settings.toastSaveFail'));
     } finally {
       setSaving(false);
     }
@@ -95,7 +97,7 @@ export default function BillingSettings() {
 
   const handleManage = () => {
     // STUB — Stripe Billing Portal not wired yet. Point users to plans for now.
-    toast.info('Prenumeratos tvarkymas bus prieinamas netrukus.');
+    toast.info(t('billing.settings.toastManageSoon'));
   };
 
   return (
@@ -105,8 +107,8 @@ export default function BillingSettings() {
           <CreditCard className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="font-semibold text-foreground">Atsiskaitymas</h2>
-          <p className="text-xs text-muted-foreground">Planas, įmonės duomenys ir sąskaitos</p>
+          <h2 className="font-semibold text-foreground">{t('billing.settings.heading')}</h2>
+          <p className="text-xs text-muted-foreground">{t('billing.settings.sub')}</p>
         </div>
       </div>
 
@@ -118,13 +120,13 @@ export default function BillingSettings() {
             <div className="text-xs text-muted-foreground mt-0.5">
               {statusLabel && <span>{statusLabel}</span>}
               {statusLabel && periodEnd && <span> · </span>}
-              {periodEnd && <span>galioja iki {periodEnd}</span>}
-              {!statusLabel && !periodEnd && <span>Planas nenustatytas</span>}
+              {periodEnd && <span>{t('billing.settings.validUntil', { date: periodEnd })}</span>}
+              {!statusLabel && !periodEnd && <span>{t('billing.settings.planNotSet')}</span>}
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleManage}>
             <ExternalLink className="w-4 h-4 mr-2" />
-            Tvarkyti prenumeratą
+            {t('billing.settings.managePlan')}
           </Button>
         </div>
       </div>
@@ -133,7 +135,7 @@ export default function BillingSettings() {
       <div className="space-y-4 mb-5">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="text-sm text-muted-foreground">Įmonės kodas</Label>
+            <Label className="text-sm text-muted-foreground">{t('billing.settings.companyCode')}</Label>
             <Input
               value={companyCode}
               onChange={(e) => setCompanyCode(e.target.value)}
@@ -142,7 +144,7 @@ export default function BillingSettings() {
             />
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">PVM mokėtojo kodas</Label>
+            <Label className="text-sm text-muted-foreground">{t('billing.settings.pvmCode')}</Label>
             <Input
               value={pvmCode}
               onChange={(e) => setPvmCode(e.target.value)}
@@ -152,22 +154,21 @@ export default function BillingSettings() {
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Įmonės kodas reikalingas nemokamam bandymui ir sąskaitoms. Kainos be PVM —
-          verslo klientams taikomas atvirkštinis apmokestinimas.
+          {t('billing.settings.codeHint')}
         </p>
         <Button onClick={handleSaveCode} disabled={saving} variant="outline">
           <Save className="w-4 h-4 mr-2" />
-          {saving ? 'Saugoma...' : 'Išsaugoti duomenis'}
+          {saving ? t('billing.settings.saving') : t('billing.settings.saveData')}
         </Button>
       </div>
 
       {/* Invoices */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-2">Sąskaitos</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-2">{t('billing.settings.invoices')}</h3>
         {invLoading ? (
-          <p className="text-xs text-muted-foreground italic">Kraunama…</p>
+          <p className="text-xs text-muted-foreground italic">{t('billing.settings.loading')}</p>
         ) : invoices.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">Sąskaitų dar nėra.</p>
+          <p className="text-xs text-muted-foreground italic">{t('billing.settings.noInvoices')}</p>
         ) : (
           <div className="space-y-2">
             {invoices.map((inv) => (
@@ -177,12 +178,12 @@ export default function BillingSettings() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">
-                    {inv.number || `Sąskaita ${inv.id}`}
+                    {inv.number || t('billing.settings.invoiceFallback', { id: inv.id })}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     {formatDate(inv.created_at) || '—'}
                     {inv.total_eur != null && <span> · {Number(inv.total_eur).toFixed(2)} €</span>}
-                    {inv.vat_mode === 'be_pvm' && <span> · be PVM</span>}
+                    {inv.vat_mode === 'be_pvm' && <span> · {t('billing.settings.noVat')}</span>}
                   </div>
                 </div>
                 <a
@@ -192,7 +193,7 @@ export default function BillingSettings() {
                   className="inline-flex items-center px-2.5 py-1.5 text-xs rounded border border-border bg-card hover:bg-muted/40"
                 >
                   <Download className="w-3.5 h-3.5 mr-1.5" />
-                  Atsisiųsti
+                  {t('billing.settings.download')}
                 </a>
               </div>
             ))}
