@@ -8,7 +8,7 @@ import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
+  Map as MapIcon, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -180,7 +180,7 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
 function TabBar({ tab, setTab, hasPdf }) {
   const { t } = useTranslation();
   const tabs = [
-    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), Icon: Map }] : []),
+    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), Icon: MapIcon }] : []),
     { id: 'main',     label: t('project.interior.tabKiekiai'),   Icon: ListChecks },
     { id: 'aichat',   label: t('project.interior.tabAiChat'),   Icon: MessageSquare },
   ];
