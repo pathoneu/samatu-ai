@@ -226,7 +226,7 @@ export default function InteriorWorkspace({
         setDetecting(false);
       }
     })();
-  }, [pdfBlob, project.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pdfBlob, project.id]);   
 
   // Manual fix: persist a click-to-fill polygon as the focused room's accurate
   // contour (polygon_source 'corrected'). Clears the manual_needed flag.

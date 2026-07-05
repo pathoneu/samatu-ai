@@ -10,7 +10,7 @@ import EmptyState from '@/components/dashboard/EmptyState';
 import UsageMeter from '@/components/billing/UsageMeter';
 import { getProjects, pullProjectsFromBackend } from '@/lib/projectStore';
 import { useQueryClient } from '@tanstack/react-query';
-import SetupWizard, { loadPrefs } from '@/components/project/SetupWizard';
+import SetupWizard from '@/components/project/SetupWizard';
 
 export default function Dashboard() {
   const [search, setSearch] = React.useState('');

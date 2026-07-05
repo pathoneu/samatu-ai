@@ -76,7 +76,7 @@ export default function CountReviewPanel({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [focus, candidates, klass]);
 
   const acceptedCount = Object.entries(decisions)

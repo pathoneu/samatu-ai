@@ -11,7 +11,7 @@
  * full contract this file implements.
  */
 import React, {
-  forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState,
+  forwardRef, useEffect, useImperativeHandle, useRef, useState,
 } from 'react';
 import { toast } from 'sonner';
 

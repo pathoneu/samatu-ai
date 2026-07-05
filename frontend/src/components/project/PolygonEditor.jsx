@@ -21,7 +21,7 @@ const GHOST_R = 4;
 export default function PolygonEditor({
   polygon,             // {id, points, ...} — the currently selected polygon
   allPolygons,         // {id, points}[] for snap targets
-  pageNumber,          // eslint-disable-line no-unused-vars
+  pageNumber,           
   selectedVertexIndices = [],
   onVerticesUpdate,    // (newPoints, opLog) => void
   onVertexInsert,      // (index, vertex) => void

@@ -11,7 +11,7 @@
 import { useState, useMemo } from 'react';
 import {
   X, Search, ChevronDown, ChevronRight, Home, FileText,
-  Edit2, Check,
+  Check,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';

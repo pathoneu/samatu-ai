@@ -48,16 +48,17 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState(null);
 
-  if (!sanity || !sanity.warnings || sanity.warnings.length === 0) return null;
+  const warnings = sanity?.warnings || [];
+  const summary = sanity?.summary || {};
 
-  const warnings = sanity.warnings;
-  const summary = sanity.summary || {};
-
-  // Filter dismissed
+  // Filter dismissed. Hook must run unconditionally (rules-of-hooks) —
+  // the "no warnings" early return happens after, not before, this call.
   const active = useMemo(
     () => warnings.filter(w => !dismissed.has(warningKey(w))),
     [warnings, dismissed]
   );
+
+  if (!sanity || warnings.length === 0) return null;
 
   if (active.length === 0) {
     return (
