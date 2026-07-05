@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ function Row({ label, note, children }) {
 // ── Window/Door list editor ───────────────────────────────────────────────────
 
 function OpeningEditor({ items, onChange, label, defaultItem }) {
+  const { t } = useTranslation();
   const handleChange = (i, field, val) => {
     const next = items.map((item, idx) =>
       idx === i ? { ...item, [field]: parseInt(val) || 0 } : item
@@ -67,7 +69,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             value={item.width_mm}
             onChange={e => handleChange(i, 'width_mm', e.target.value)}
             className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
-            placeholder="plotis"
+            placeholder={t('project.assumptions.widthPlaceholder')}
           />
           <span className="text-muted-foreground">×</span>
           <Input
@@ -75,7 +77,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             value={item.height_mm}
             onChange={e => handleChange(i, 'height_mm', e.target.value)}
             className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
-            placeholder="aukštis"
+            placeholder={t('project.assumptions.heightPlaceholder')}
           />
           <span className="text-muted-foreground">mm</span>
           {item.suggested && (
@@ -90,7 +92,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
         onClick={handleAdd}
         className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-1"
       >
-        <Plus className="w-3 h-3" /> Pridėti {label.toLowerCase()}
+        <Plus className="w-3 h-3" /> {t('project.assumptions.add', { label: label.toLowerCase() })}
       </button>
     </div>
   );
@@ -98,7 +100,9 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed, defaultOpen = false, title = 'Prielaidos' }) {
+export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed, defaultOpen = false, title }) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('project.assumptions.defaultTitle');
   const [open, setOpen] = useState(defaultOpen);
   const [windowsExpanded, setWindowsExpanded] = useState(false);
   const [doorsExpanded, setDoorsExpanded] = useState(false);
@@ -149,11 +153,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       onRecomputed(result);
     } catch (err) {
       console.error('Recompute failed:', err);
-      toast.error(`Klaida perskaičiuojant: ${err.message}`);
+      toast.error(t('project.assumptions.toastRecomputeErr', { msg: err.message }));
     } finally {
       setRecomputing(false);
     }
-  }, [rawData?.patalpos, pozicijos, assumptions, onRecomputed]);
+  }, [rawData?.patalpos, pozicijos, assumptions, onRecomputed, t]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
@@ -186,10 +190,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Info className="w-4 h-4 text-muted-foreground" />
-          {title}
+          {resolvedTitle}
           {isFallback && (
             <Badge className="text-xs bg-amber-500/15 text-amber-300 border-amber-500/30 border font-normal">
-              langai — prielaida
+              {t('project.assumptions.windowsFallbackBadge')}
             </Badge>
           )}
         </span>
@@ -203,9 +207,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               right panel (Kiekiai). Without this, users don't know whether
               they need to click a "save / apply" button. */}
           <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-            Kiekvienas pakeitimas šioje skiltyje iš karto perskaičiuoja kiekius dešinėje
-            (sienų dažymas, glaistas, angokraščiai, grindjuostės, plytelės ir t.t.).
-            Mygtuko „Išsaugoti" nereikia.
+            {t('project.assumptions.intro')}
           </p>
 
           {/* Window fallback warning */}
@@ -213,9 +215,9 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300 mb-3">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">Langai nerasti brėžiniuose</p>
+                <p className="font-medium">{t('project.assumptions.windowsNotFound')}</p>
                 <p className="text-xs mt-0.5">
-                  Pateikiami standartiniai pasiūlymai pagal patalpų tipus. Patikrink ir pakoreguok žemiau.
+                  {t('project.assumptions.windowsNotFoundDesc')}
                 </p>
               </div>
             </div>
@@ -223,8 +225,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
           {/* Sienos storis */}
           <Row
-            label="Sienos storis (pertvaros)"
-            note="Naudojama angokraščių (langų / durų rėmo perimetro) ploto skaičiavimui. LT pertvaroms tipiniai 0.075–0.10 m, blokeliams 0.20–0.25 m."
+            label={t('project.assumptions.wallThickness')}
+            note={t('project.assumptions.wallThicknessNote')}
           >
             <NumberInput
               value={sienos_storis_m}
@@ -235,8 +237,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
           {/* Glaistymo lygis */}
           <Row
-            label="Glaistymo lygis"
-            note="Q1 — po sunkiais tapetais (0.8 kg/m²/mm); Q2 — po matiniais dažais (1.0); Q3 — po pusiau blizgiais (1.2); Q4 — po blizgiais/lakuotais, pilnas glaistymas (1.5). Aukštesnis lygis = daugiau glaisto + šlifavimo darbų."
+            label={t('project.assumptions.puttyLevel')}
+            note={t('project.assumptions.puttyLevelNote')}
           >
             <div className="flex gap-1">
               {['Q1','Q2','Q3','Q4'].map(q => (
@@ -259,12 +261,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           {rooms.length > 0 && (
             <div className="py-2">
               <p className="text-sm text-foreground mb-1">
-                Lubų aukštis <span className="text-xs text-muted-foreground">(numatytasis: {avgH.toFixed(2)} m)</span>
+                {t('project.assumptions.ceilingHeightLabel')}<span className="text-xs text-muted-foreground">{t('project.assumptions.ceilingHeightDefault', { avg: avgH.toFixed(2) })}</span>
               </p>
               <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                Tiesiogiai veikia sienų dažomą plotą (perimetras × aukštis) ir GKP lubų lapų kiekį.
-                Jei vienas namas — naudok „Visiems kambariams" lauką žemiau; jei skirtingi aukščiai (pvz. mansarda, garažas) —
-                įvesk per kambarį atskirai.
+                {t('project.assumptions.ceilingHeightNote')}
               </p>
 
               {/* 2026-05-06: bulk override — set all rooms' aukštis at once.
@@ -272,7 +272,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                   height; user can then tweak individual rooms below if needed. */}
               <div className="mb-3 flex items-center gap-2 px-2 py-2 rounded-md bg-muted/40 border border-border/60">
                 <span className="text-xs font-medium text-foreground flex-1">
-                  Visiems kambariams:
+                  {t('project.assumptions.allRooms')}
                 </span>
                 <Input
                   type="number"
@@ -292,7 +292,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     }
                   }}
                   className="h-7 w-20 text-xs bg-card border-border text-right tabular-nums"
-                  title="Įveskite vieną aukštį, paspauskite Enter — bus pritaikytas visiems kambariams"
+                  title={t('project.assumptions.allRoomsTitle')}
                 />
                 <span className="text-xs text-muted-foreground">m</span>
               </div>
@@ -324,10 +324,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               onClick={() => setWindowsExpanded(v => !v)}
             >
               <span className="text-sm text-foreground">
-                Langai
+                {t('project.assumptions.windows')}
                 <span className="text-xs text-muted-foreground ml-2">
-                  ({displayWindows.length} vnt.)
-                  {isFallback && !custom_windows && <span className="text-amber-600 ml-1">prielaida</span>}
+                  {t('project.assumptions.windowsCount', { count: displayWindows.length })}
+                  {isFallback && !custom_windows && <span className="text-amber-600 ml-1">{t('project.assumptions.windowsFallback')}</span>}
                 </span>
               </span>
               {windowsExpanded
@@ -339,7 +339,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               <OpeningEditor
                 items={displayWindows}
                 onChange={wins => { setField('custom_windows', wins); handleRecompute('custom_windows', wins); }}
-                label="langą"
+                label={t('project.assumptions.windowLabel')}
                 defaultItem={{ width_mm: 1200, height_mm: 1500 }}
               />
             )}
@@ -352,8 +352,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               onClick={() => setDoorsExpanded(v => !v)}
             >
               <span className="text-sm text-foreground">
-                Durys
-                <span className="text-xs text-muted-foreground ml-2">({displayDoors.length} vnt.)</span>
+                {t('project.assumptions.doors')}
+                <span className="text-xs text-muted-foreground ml-2">{t('project.assumptions.doorsCount', { count: displayDoors.length })}</span>
               </span>
               {doorsExpanded
                 ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
@@ -364,7 +364,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               <OpeningEditor
                 items={displayDoors}
                 onChange={ds => { setField('custom_doors', ds); handleRecompute('custom_doors', ds); }}
-                label="duris"
+                label={t('project.assumptions.doorLabel')}
                 defaultItem={{ width_mm: 800, height_mm: 2200 }}
               />
             )}
@@ -372,7 +372,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
           {recomputing && (
             <p className="text-xs text-muted-foreground pt-1">
-              Perskaičiuojama...
+              {t('project.assumptions.recomputing')}
             </p>
           )}
         </div>
