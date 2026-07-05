@@ -869,6 +869,7 @@
       "defaultTitle": "Assumptions",
       "windowsFallbackBadge": "windows — assumption",
       "intro": "Every change in this section immediately recalculates the quantities on the right (wall painting, putty, reveals, baseboards, tiles, etc.). No „Save\" button needed.",
+      "demoReadonly": "This is a sample project — view only. Here you can see the assumptions the AI used. Once you upload your own drawing you'll be able to change these values and the quantities will recalculate live.",
       "windowsNotFound": "No windows found in the drawings",
       "windowsNotFoundDesc": "Standard suggestions by room type are provided. Check and adjust below.",
       "wallThickness": "Wall thickness (partitions)",

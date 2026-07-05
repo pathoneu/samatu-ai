@@ -873,6 +873,7 @@
       "defaultTitle": "Prielaidos",
       "windowsFallbackBadge": "langai — prielaida",
       "intro": "Kiekvienas pakeitimas šioje skiltyje iš karto perskaičiuoja kiekius dešinėje (sienų dažymas, glaistas, angokraščiai, grindjuostės, plytelės ir t.t.). Mygtuko „Išsaugoti\" nereikia.",
+      "demoReadonly": "Tai pavyzdinis projektas — tik peržiūrai. Čia matote prielaidas, kuriomis rėmėsi AI. Įkėlę savo brėžinį galėsite šias reikšmes keisti, o kiekiai persiskaičiuos gyvai.",
       "windowsNotFound": "Langai nerasti brėžiniuose",
       "windowsNotFoundDesc": "Pateikiami standartiniai pasiūlymai pagal patalpų tipus. Patikrink ir pakoreguok žemiau.",
       "wallThickness": "Sienos storis (pertvaros)",

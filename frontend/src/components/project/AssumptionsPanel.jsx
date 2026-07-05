@@ -111,6 +111,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   // 2026-05-06: defensive defaults so a fresh project (assumptions={}) doesn't
   // throw when accessing lubu_auksciai[room.nr] etc.
   const safeAssumptions = assumptions || {};
+  // 2026-07-05: the sample/demo project's numbers are hand-authored to look
+  // complete, so they don't derive from its rooms — a recompute can't reproduce
+  // them and any edit would shift the sąmata. Lock it to a pristine, view-only
+  // showcase. Live editing/recompute stays fully functional on real projects.
+  const isDemo = !!(rawData?.is_demo);
   const sienos_storis_m = safeAssumptions.sienos_storis_m;
   const glaistimo_lygis = safeAssumptions.glaistimo_lygis;
   const lubu_auksciai = safeAssumptions.lubu_auksciai || {};
@@ -131,7 +136,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   const setField = (field, val) => onChange({ ...safeAssumptions, [field]: val });
 
   const handleRecompute = useCallback(async (field, newValue) => {
-    if (!onRecomputed) return;  // Skip if parent doesn't accept results
+    if (!onRecomputed || isDemo) return;  // Skip if parent won't accept results, or on the view-only sample
     setRecomputing(true);
     try {
       const result = await recompute({
@@ -219,14 +224,23 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       </button>
 
       {open && (
-        <div className="px-4 pb-4 pt-3 space-y-1">
+        <div className={`px-4 pb-4 pt-3 space-y-1${isDemo ? ' pointer-events-none' : ''}`}>
 
           {/* Intro: explain that edits live-recalculate everything in the
-              right panel (Kiekiai). Without this, users don't know whether
-              they need to click a "save / apply" button. */}
-          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-            {t('project.assumptions.intro')}
-          </p>
+              right panel (Kiekiai). On the view-only sample, explain instead
+              that these are the AI's assumptions and editing is disabled. */}
+          {isDemo ? (
+            <div className="flex items-start gap-2 p-3 bg-primary/10 border border-primary/30 rounded-lg mb-3">
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+              <p className="text-xs text-foreground leading-relaxed">
+                {t('project.assumptions.demoReadonly')}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              {t('project.assumptions.intro')}
+            </p>
+          )}
 
           {/* Window fallback warning */}
           {isFallback && (
