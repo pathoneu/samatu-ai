@@ -4473,7 +4473,9 @@ async def generate_excel(request: Request, data: dict):
         r += 1
 
         data_start = 4
-        data_end   = r - 2  # last data row
+        # Clamp so an empty sąmata (no data rows) can't produce an inverted
+        # range like =SUBTOTAL(9,F4:F3), which Excel rejects. (audit 2026-07-05)
+        data_end   = max(data_start, r - 2)  # last data row
 
         def _tot(sheet_row, label, formula_or_val, lcolor="444444", vcolor="444444",
                  fsize=10, top=False):
@@ -4556,7 +4558,7 @@ async def generate_excel(request: Request, data: dict):
         ws_pr = wb.create_sheet(title="Prielaidos")
         ws_pr.merge_cells("A1:C1")
         t = ws_pr["A1"]
-        t.value     = f"Prielaidos  ·  {projektas}"
+        t.value     = _safe_cell(f"Prielaidos  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor=C_DARK)
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4596,7 +4598,7 @@ async def generate_excel(request: Request, data: dict):
         ws_pat = wb.create_sheet(title="Patalpos")
         ws_pat.merge_cells("A1:D1")
         t = ws_pat["A1"]
-        t.value     = f"Patalpos  ·  {projektas}"
+        t.value     = _safe_cell(f"Patalpos  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor=C_DARK)
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4622,7 +4624,7 @@ async def generate_excel(request: Request, data: dict):
                 room.get("plotas_m2"),
                 h_str,
             ], 1):
-                c = ws_pat.cell(row=ri, column=ci, value=val)
+                c = ws_pat.cell(row=ri, column=ci, value=_safe_cell(val) if isinstance(val, str) else val)
                 c.fill   = fill
                 c.border = border
                 c.font   = Font(size=9)
@@ -4637,7 +4639,7 @@ async def generate_excel(request: Request, data: dict):
         ws_past = wb.create_sheet(title="Pastabos")
         ws_past.merge_cells("A1:C1")
         t = ws_past["A1"]
-        t.value     = f"Nepamirškite patikrinti  ·  {projektas}"
+        t.value     = _safe_cell(f"Nepamirškite patikrinti  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor="B45309")  # amber
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4656,7 +4658,7 @@ async def generate_excel(request: Request, data: dict):
         for ri, w in enumerate(perspejimani, 3):
             fill = PatternFill("solid", fgColor="FFFBEB" if ri % 2 == 1 else "FEF3C7")
             for ci, val in enumerate([ri - 2, w.get("tekstas", ""), w.get("kategorija", "")], 1):
-                c = ws_past.cell(row=ri, column=ci, value=val)
+                c = ws_past.cell(row=ri, column=ci, value=_safe_cell(val) if isinstance(val, str) else val)
                 c.fill   = fill
                 c.border = border
                 c.font   = Font(size=9)
@@ -4760,6 +4762,12 @@ async def generate_pdf(request: Request, data: dict):
     imone        = _esc((data.get("imone") or data.get("company_name") or "").strip())
     doc_date     = _date.today().strftime("%Y-%m-%d")
     eilutes      = data.get("eilutes", [])
+    # Backfill a missing `suma` from kiekis×kaina so the PDF total, the section
+    # subtotals and the printed line amounts all agree — and never diverge from
+    # the Excel export, which always computes kiekis×kaina. (audit 2026-07-05)
+    for _e in eilutes:
+        if _e.get("suma") is None and _e.get("kaina") is not None:
+            _e["suma"] = round((float(_e.get("kiekis") or 0)) * (float(_e.get("kaina") or 0)), 2)
     prielaidos   = data.get("prielaidos") or {}
     perspejimani = data.get("perspejimani") or []
     tipas_pdf    = data.get("tipas", "kz")

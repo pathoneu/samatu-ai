@@ -140,7 +140,9 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
     usage = getattr(resp, "usage", None)
     return {
         "status": "ok", "pages": rendered,
-        "counts": {k: int(parsed.get(f"{k}_count") or 0) for k in _FIXTURE_KEYS},
+        # Coerce defensively: a non-numeric count (e.g. "3+") must not
+        # ValueError-crash the whole read and abort fixture reconciliation. (audit 2026-07-05)
+        "counts": {k: _safe_count(parsed.get(f"{k}_count")) for k in _FIXTURE_KEYS},
         "prietaisai": parsed.get("prietaisai") or [],
         "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
@@ -148,9 +150,17 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
     }
 
 
+def _safe_count(v, default: int = 0) -> int:
+    """Coerce a Vision count to int; non-numeric (e.g. '3+', null) → default."""
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return default
+
+
 def _mode_int(values, default: int = 0) -> int:
     """Mode of integer reads, MEDIAN on a tie (not max — no covert oracle drift)."""
-    vals = [int(v) for v in values if v is not None]
+    vals = [_safe_count(v) for v in values if v is not None]
     if not vals:
         return default
     modes = statistics.multimode(vals)

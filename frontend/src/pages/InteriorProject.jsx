@@ -365,20 +365,30 @@ function RoomCard({ room }) {
 // (drawing symbol-count lines tagged source:'Pažymėjus brėžinyje'). Without this a
 // recompute reverted count corrections to the AI value and dropped symbol-count
 // lines + their prices. (2026-06-19 hunt.)
+const _lc = (s) => (s || '').toLowerCase();
+// Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
+// and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
+// paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Mirrors
+// the backend's _merge_user_edits fallback so frontend/backend agree. (audit 2026-07-05)
+function _normLabel(s) {
+  return _lc(s)
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')           // drop accents
+    .replace(/\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')             // drop 3m tier suffix
+    .replace(/\bq[1-4]\b/g, '')                                   // drop Q-level
+    .replace(/\(\s*\d+\s*sluoksn[^)]*\)/g, '')                    // drop '(N sluoksnis)'
+    .replace(/\s+/g, ' ').trim();
+}
+
 function mergeDarbuSarasasEdits(rebuilt, old) {
   if (!Array.isArray(rebuilt)) return old || [];
   const oldList = old || [];
   const oldByLabel = new Map();
   for (const o of oldList) {
-    const k = (o.aprasymas || '').toLowerCase();
+    const k = _lc(o.aprasymas);
     if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
   }
-  const matched = new Set();
-  const merged = rebuilt.map((newItem) => {
-    const key = (newItem.aprasymas || '').toLowerCase();
-    const oldItem = oldByLabel.get(key);
-    if (!oldItem) return newItem;
-    matched.add(key);
+  const matchedOld = new Set();  // old items already consumed (by object identity)
+  const carry = (newItem, oldItem) => {
     const keepQty = oldItem.manual_override === true
       || oldItem.quantity_source === 'manual_override';
     const kiekis = keepQty ? oldItem.kiekis : newItem.kiekis;
@@ -395,9 +405,40 @@ function mergeDarbuSarasasEdits(rebuilt, old) {
       out.suma = (kiekis || 0) * kaina;
     }
     return out;
+  };
+  // Pass 1 — exact lowercased-label match (unchanged behaviour).
+  const merged = rebuilt.map((newItem) => {
+    const oldItem = oldByLabel.get(_lc(newItem.aprasymas));
+    if (!oldItem) return newItem;
+    matchedOld.add(oldItem);
+    return carry(newItem, oldItem);
   });
+  // Pass 2 — rescue prices for lines whose label changed on rebuild. Match
+  // still-unpriced rebuilt lines to unconsumed old PRICED/edited lines by the
+  // normalized key, applied ONLY when unambiguous (one-to-one) so it can never
+  // mis-assign a price between two co-existing tier lines.
+  const push = (m, k, v) => { const a = m.get(k) || []; a.push(v); m.set(k, a); };
+  const oldByNorm = new Map();
   for (const o of oldList) {
-    if (matched.has((o.aprasymas || '').toLowerCase())) continue;
+    if (matchedOld.has(o)) continue;
+    if (o.kaina == null && o.manual_override !== true) continue;
+    const k = _normLabel(o.aprasymas); if (k) push(oldByNorm, k, o);
+  }
+  const newByNorm = new Map();
+  merged.forEach((m, i) => {
+    if (m.kaina != null) return;
+    const k = _normLabel(m.aprasymas); if (k) push(newByNorm, k, i);
+  });
+  for (const [k, idxs] of newByNorm) {
+    const cands = oldByNorm.get(k) || [];
+    if (idxs.length === 1 && cands.length === 1) {
+      merged[idxs[0]] = carry(merged[idxs[0]], cands[0]);
+      matchedOld.add(cands[0]);
+    }
+  }
+  // Carry forward unmatched old lines the user manually added/edited.
+  for (const o of oldList) {
+    if (matchedOld.has(o)) continue;
     if (o.source === 'Pažymėjus brėžinyje' || o.manual_override === true) merged.push(o);
   }
   return merged;

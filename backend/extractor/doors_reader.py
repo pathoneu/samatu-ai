@@ -243,11 +243,19 @@ def merge_doors_into_rooms(rooms: list[dict], doors_result: dict) -> int:
             target_nr = next((str(x) for x in between if str(x) in by_nr), None)
         if not target_nr or target_nr not in by_nr:
             continue
+        # Coerce Vision-supplied dims defensively: a non-numeric value (e.g.
+        # "large", null) must fall back to the LT default, not ValueError-crash
+        # the whole merge and silently drop EVERY door. (audit 2026-07-05)
+        def _mm(v, dflt):
+            try:
+                return int(float(v))
+            except (TypeError, ValueError):
+                return dflt
         new_door = {
             "tipas": "pasleptos_duris" if tipas == "pasleptos" else "duris",
             "kiekis": 1,
-            "plotis_mm": int(d.get("plotis_mm") or 900),
-            "aukstis_mm": int(d.get("aukstis_mm") or 2100),
+            "plotis_mm": _mm(d.get("plotis_mm"), 900),
+            "aukstis_mm": _mm(d.get("aukstis_mm"), 2100),
             "_exterior": is_exterior,
         }
         by_nr[target_nr].setdefault("elementai", []).append(new_door)
