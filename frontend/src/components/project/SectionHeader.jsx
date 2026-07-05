@@ -1,7 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function SectionHeader({ name, rowCount, subtotal, isCollapsed, onToggle }) {
+  const { t } = useTranslation();
   return (
     <tr
       onClick={onToggle}
@@ -17,7 +19,7 @@ export default function SectionHeader({ name, rowCount, subtotal, isCollapsed, o
             {name}
           </span>
           <span className="text-xs text-muted-foreground font-mono ml-2">
-            ({rowCount} eil.)
+            {t('project.section.rows', { count: rowCount })}
           </span>
         </div>
       </td>

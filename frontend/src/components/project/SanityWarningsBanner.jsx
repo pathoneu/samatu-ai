@@ -10,14 +10,16 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, RefreshCw } from 'lucide-react';
 
 import { revalidateProject } from '../../lib/revalidateApi';
 
+// label resolves against i18n at render (project.sanity.level*).
 const LEVEL_META = {
-  ERROR:   { icon: AlertCircle,   color: 'text-red-300 bg-red-500/10 border-red-500/30',   label: 'Klaidos',     order: 0 },
-  WARNING: { icon: AlertTriangle, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30', label: 'Įspėjimai', order: 1 },
-  INFO:    { icon: Info,          color: 'text-blue-300 bg-blue-500/10 border-blue-500/30',   label: 'Info',       order: 2 },
+  ERROR:   { icon: AlertCircle,   color: 'text-red-300 bg-red-500/10 border-red-500/30',   labelKey: 'project.sanity.levelError',   order: 0 },
+  WARNING: { icon: AlertTriangle, color: 'text-amber-300 bg-amber-500/10 border-amber-500/30', labelKey: 'project.sanity.levelWarning', order: 1 },
+  INFO:    { icon: Info,          color: 'text-blue-300 bg-blue-500/10 border-blue-500/30',   labelKey: 'project.sanity.levelInfo',    order: 2 },
 };
 
 const DISMISSED_KEY = 'samatu_sanity_dismissed';
@@ -43,6 +45,7 @@ function warningKey(w) {
 }
 
 export default function SanityWarningsBanner({ sanity, projectId, onRevalidated }) {
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(loadDismissed);
   const [expandedGroups, setExpandedGroups] = useState({ ERROR: true, WARNING: true, INFO: false });
   const [revalidating, setRevalidating] = useState(false);
@@ -64,12 +67,12 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
     return (
       <div className="text-xs text-muted-foreground flex items-center gap-2 py-2">
         <Eye className="w-3 h-3" />
-        Visi {warnings.length} įspėjimai paslėpti.
+        {t('project.sanity.allHiddenA')}{warnings.length}{t('project.sanity.allHiddenB')}
         <button
           onClick={() => { setDismissed(new Set()); saveDismissed(new Set()); }}
           className="underline hover:text-foreground"
         >
-          Atstatyti
+          {t('project.sanity.reset')}
         </button>
       </div>
     );
@@ -118,7 +121,7 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
       const fresh = await revalidateProject(projectId);
       onRevalidated?.(fresh);
     } catch (err) {
-      setRevalidateError(err.message || 'Nepavyko atnaujinti');
+      setRevalidateError(err.message || t('project.sanity.revalidateFail'));
     } finally {
       setRevalidating(false);
     }
@@ -127,18 +130,18 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>AI patikrinimas: <strong className="text-foreground">{active.length}</strong> aktyvūs įspėjimai</span>
+        <span>{t('project.sanity.aiCheckA')}<strong className="text-foreground">{active.length}</strong>{t('project.sanity.aiCheckB')}</span>
         <span>·</span>
-        <span>{summary.rooms_count} patalpų, {summary.total_area_m2} m²</span>
+        <span>{t('project.sanity.summary', { rooms: summary.rooms_count, area: summary.total_area_m2 })}</span>
         {projectId && (
           <button
             onClick={handleRevalidate}
             disabled={revalidating}
             className="ml-auto inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 underline disabled:opacity-50 disabled:no-underline"
-            title="Iš naujo paleisti AI patikrinimus su naujausia validatoriaus versija"
+            title={t('project.sanity.revalidateTitle')}
           >
             <RefreshCw className={`w-3 h-3 ${revalidating ? 'animate-spin' : ''}`} />
-            {revalidating ? 'Atnaujinama…' : 'Atnaujinti AI patikrinimus'}
+            {revalidating ? t('project.sanity.revalidating') : t('project.sanity.revalidate')}
           </button>
         )}
       </div>
@@ -162,7 +165,7 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="text-sm font-semibold">
-                {meta.label} ({items.length})
+                {t('project.sanity.groupHead', { label: t(meta.labelKey), count: items.length })}
               </span>
               <span className="ml-auto flex items-center gap-2">
                 <span
@@ -171,9 +174,9 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
                   onClick={(e) => { e.stopPropagation(); dismissAllInGroup(level); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); dismissAllInGroup(level); } }}
                   className="text-xs opacity-70 hover:opacity-100 underline cursor-pointer"
-                  title="Paslėpti visus šios kategorijos įspėjimus"
+                  title={t('project.sanity.hideAllTitle')}
                 >
-                  paslėpti visus
+                  {t('project.sanity.hideAll')}
                 </span>
                 {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </span>
@@ -189,7 +192,7 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
                     </span>
                     <button
                       onClick={() => dismiss(w)}
-                      title="Paslėpti šį įspėjimą"
+                      title={t('project.sanity.hideOneTitle')}
                       className="opacity-0 group-hover:opacity-60 hover:opacity-100 shrink-0"
                     >
                       <X className="w-3 h-3" />

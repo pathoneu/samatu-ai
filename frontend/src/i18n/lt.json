@@ -450,6 +450,48 @@
       "toastFileReadFail": "Nepavyko nuskaityti failo"
     }
   },
+  "project": {
+    "confidence": {
+      "highLabel": "tikslus",
+      "highMeaning": "Nuskaityta tiesiai iš brėžinio — šaltiniai sutampa.",
+      "mediumLabel": "tikrinti",
+      "mediumMeaning": "Apskaičiuota su prielaida — vertėtų patikrinti.",
+      "lowLabel": "neaišku",
+      "lowMeaning": "Numatytoji reikšmė arba šaltiniai nesutampa — patikrinkite.",
+      "verifiedLine": "Patvirtinta: {{date}}",
+      "disagreementLine": "⚠ Šaltiniai nesutampa — patikrinti rankiniu būdu.",
+      "areaLabel": "Plotas: {{area}} m²",
+      "verifyTitle": "Patvirtinti, kad skaičius teisingas",
+      "verify": "patvirtinti"
+    },
+    "sanity": {
+      "levelError": "Klaidos",
+      "levelWarning": "Įspėjimai",
+      "levelInfo": "Info",
+      "revalidateFail": "Nepavyko atnaujinti",
+      "allHiddenA": "Visi ",
+      "allHiddenB": " įspėjimai paslėpti.",
+      "reset": "Atstatyti",
+      "aiCheckA": "AI patikrinimas: ",
+      "aiCheckB": " aktyvūs įspėjimai",
+      "summary": "{{rooms}} patalpų, {{area}} m²",
+      "revalidateTitle": "Iš naujo paleisti AI patikrinimus su naujausia validatoriaus versija",
+      "revalidating": "Atnaujinama…",
+      "revalidate": "Atnaujinti AI patikrinimus",
+      "groupHead": "{{label}} ({{count}})",
+      "hideAllTitle": "Paslėpti visus šios kategorijos įspėjimus",
+      "hideAll": "paslėpti visus",
+      "hideOneTitle": "Paslėpti šį įspėjimą"
+    },
+    "section": {
+      "rows": "({{count}} eil.)"
+    },
+    "summary": {
+      "sumNoVat": "Suma be PVM",
+      "vat": "PVM {{rate}}%",
+      "totalWithVat": "VISO su PVM"
+    }
+  },
   "shared": {
     "loading": "Kraunama...",
     "invalidLink": "Nuoroda netinkama",

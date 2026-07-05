@@ -447,6 +447,48 @@
       "toastFileReadFail": "Could not read the file"
     }
   },
+  "project": {
+    "confidence": {
+      "highLabel": "accurate",
+      "highMeaning": "Read directly from the drawing — sources agree.",
+      "mediumLabel": "check",
+      "mediumMeaning": "Calculated with an assumption — worth checking.",
+      "lowLabel": "unclear",
+      "lowMeaning": "Default value or sources disagree — please check.",
+      "verifiedLine": "Confirmed: {{date}}",
+      "disagreementLine": "⚠ Sources disagree — verify manually.",
+      "areaLabel": "Area: {{area}} m²",
+      "verifyTitle": "Confirm that the number is correct",
+      "verify": "confirm"
+    },
+    "sanity": {
+      "levelError": "Errors",
+      "levelWarning": "Warnings",
+      "levelInfo": "Info",
+      "revalidateFail": "Could not refresh",
+      "allHiddenA": "All ",
+      "allHiddenB": " warnings hidden.",
+      "reset": "Reset",
+      "aiCheckA": "AI check: ",
+      "aiCheckB": " active warnings",
+      "summary": "{{rooms}} rooms, {{area}} m²",
+      "revalidateTitle": "Re-run the AI checks with the latest validator version",
+      "revalidating": "Refreshing…",
+      "revalidate": "Refresh AI checks",
+      "groupHead": "{{label}} ({{count}})",
+      "hideAllTitle": "Hide all warnings in this category",
+      "hideAll": "hide all",
+      "hideOneTitle": "Hide this warning"
+    },
+    "section": {
+      "rows": "({{count}} rows)"
+    },
+    "summary": {
+      "sumNoVat": "Total excl. VAT",
+      "vat": "VAT {{rate}}%",
+      "totalWithVat": "TOTAL incl. VAT"
+    }
+  },
   "shared": {
     "loading": "Loading...",
     "invalidLink": "Invalid link",
