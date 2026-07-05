@@ -266,6 +266,10 @@ from api.legends import router as legends_router
 # Week 7 (canonical plan): F2/F3 export + billing gate stub
 from api.exports_v2 import router as exports_v2_router
 from api.billing_v2 import router as billing_v2_router
+# Admin Dashboard v2 (2026-07-05): operational cockpit — analytics, cost monitor,
+# user management, system health, CSV export. Owner-authorized (require_admin);
+# ZERO Anthropic calls (pure aggregation over the existing DB).
+from api.admin_v2 import router as admin_v2_router
 # Audit re-run on saved project (2026-05-10): re-run cross_page_validator +
 # apply_lt_sanity without re-uploading the PDF, so post-fix warnings refresh.
 from api.revalidate import router as revalidate_router
@@ -503,6 +507,7 @@ app.include_router(lasso_rerun_router)
 app.include_router(legends_router)
 app.include_router(exports_v2_router)
 app.include_router(billing_v2_router)
+app.include_router(admin_v2_router)
 app.include_router(revalidate_router)
 app.include_router(cv_tools_router)
 app.include_router(annotations_router)
@@ -913,6 +918,14 @@ async def api_google_callback(request: Request, code: str | None = None,
                 email=email, google_sub=google_sub, name=name,
                 avatar_url=avatar, is_admin=is_first,
             )
+    # Admin-disable enforcement (2026-07-05): a deactivated account must not be
+    # able to mint a session via OAuth either. The password /api/auth/login path
+    # already rejects `is_active=0`, and get_current_user re-checks it on every
+    # request — but refuse here too so a disabled user is bounced at the login
+    # boundary (defense in depth) rather than getting a live-but-useless cookie.
+    if not user.get("is_active"):
+        return RedirectResponse(url="/login?oauth_error=account_disabled",
+                                status_code=302)
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])

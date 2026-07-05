@@ -1070,6 +1070,349 @@ def get_project_by_share_token(token: str) -> dict | None:
         return d
 
 
+# ── Admin Dashboard v2 (operational cockpit) ─────────────────────────────────
+#
+# Read-only aggregate accessors for the /api/admin/v2 router. Two hard rules:
+#   1. ALL € cost/spend comes from usage_events.cost_eur — the COMPLETE per-call
+#      meter (incl. sub-readers after the 2026-07-04 fix). extractions.cost_eur
+#      is PASS-1-ONLY and must never be summed for money figures.
+#   2. Any caller-supplied value (search, ids) is bound as a SQL parameter —
+#      never string-interpolated.
+# Day bucketing keys off substr(created_at, 1, 10): created_at is written by
+# _now_iso() as "YYYY-MM-DDTHH:MM:SSZ", so the first 10 chars are the UTC date.
+
+def _window_cutoff_date(days: int) -> str:
+    """Return the inclusive lower-bound date ("YYYY-MM-DD") for a `days`-wide
+    window ending today (UTC). days<=0 is clamped to 1."""
+    from datetime import datetime, timedelta, timezone
+    days = max(1, int(days or 1))
+    start = datetime.now(timezone.utc) - timedelta(days=days - 1)
+    return start.strftime("%Y-%m-%d")
+
+
+def admin_daily_series(days: int = 30) -> list[dict]:
+    """Per-day operational time series over the last `days` (UTC), one row per
+    day that has ANY activity. Each row:
+      {date, signups, projects, extractions, cost_eur, revenue_eur}
+    - signups   ← users.created_at
+    - projects  ← projects.created_at
+    - extractions ← COUNT(usage_events WHERE kind LIKE '%extract%')
+    - cost_eur  ← SUM(usage_events.cost_eur)  (ALL kinds — the true spend)
+    - revenue_eur ← SUM(invoices.total_eur)
+    Days with no activity are omitted (the router fills gaps if it wants a dense
+    calendar). Sorted ascending by date."""
+    cutoff = _window_cutoff_date(days)
+    buckets: dict[str, dict] = {}
+
+    def _bucket(day: str) -> dict:
+        return buckets.setdefault(day, {
+            "date": day, "signups": 0, "projects": 0,
+            "extractions": 0, "cost_eur": 0.0, "revenue_eur": 0.0,
+        })
+
+    with _conn() as c:
+        for r in c.execute(
+            """SELECT substr(created_at,1,10) AS d, COUNT(*) AS n
+                 FROM users WHERE substr(created_at,1,10) >= ?
+                GROUP BY d""", (cutoff,)).fetchall():
+            _bucket(r["d"])["signups"] = int(r["n"])
+        for r in c.execute(
+            """SELECT substr(created_at,1,10) AS d, COUNT(*) AS n
+                 FROM projects WHERE substr(created_at,1,10) >= ?
+                GROUP BY d""", (cutoff,)).fetchall():
+            _bucket(r["d"])["projects"] = int(r["n"])
+        for r in c.execute(
+            """SELECT substr(created_at,1,10) AS d,
+                      SUM(cost_eur) AS cost,
+                      SUM(CASE WHEN kind LIKE '%extract%' THEN 1 ELSE 0 END) AS extr
+                 FROM usage_events WHERE substr(created_at,1,10) >= ?
+                GROUP BY d""", (cutoff,)).fetchall():
+            b = _bucket(r["d"])
+            b["cost_eur"] = round(float(r["cost"] or 0), 4)
+            b["extractions"] = int(r["extr"] or 0)
+        for r in c.execute(
+            """SELECT substr(created_at,1,10) AS d, SUM(total_eur) AS rev
+                 FROM invoices WHERE substr(created_at,1,10) >= ?
+                GROUP BY d""", (cutoff,)).fetchall():
+            _bucket(r["d"])["revenue_eur"] = round(float(r["rev"] or 0), 2)
+
+    return [buckets[d] for d in sorted(buckets)]
+
+
+def admin_window_totals(days: int = 30) -> dict:
+    """Aggregate totals for a `days` window (UTC), reading cost from
+    usage_events (never extractions). Shape:
+      {signups, projects, extractions, cost_eur, revenue_eur}"""
+    cutoff = _window_cutoff_date(days)
+    with _conn() as c:
+        signups = c.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE substr(created_at,1,10) >= ?",
+            (cutoff,)).fetchone()["n"]
+        projects = c.execute(
+            "SELECT COUNT(*) AS n FROM projects WHERE substr(created_at,1,10) >= ?",
+            (cutoff,)).fetchone()["n"]
+        urow = c.execute(
+            """SELECT COALESCE(SUM(cost_eur),0) AS cost,
+                      COALESCE(SUM(CASE WHEN kind LIKE '%extract%' THEN 1 ELSE 0 END),0) AS extr
+                 FROM usage_events WHERE substr(created_at,1,10) >= ?""",
+            (cutoff,)).fetchone()
+        revenue = c.execute(
+            "SELECT COALESCE(SUM(total_eur),0) AS rev FROM invoices WHERE substr(created_at,1,10) >= ?",
+            (cutoff,)).fetchone()["rev"]
+    return {
+        "signups": int(signups or 0),
+        "projects": int(projects or 0),
+        "extractions": int(urow["extr"] or 0),
+        "cost_eur": round(float(urow["cost"] or 0), 4),
+        "revenue_eur": round(float(revenue or 0), 2),
+    }
+
+
+def admin_prior_window_totals(days: int = 30) -> dict:
+    """Totals for the window IMMEDIATELY BEFORE the current one (same width),
+    for delta computation. Uses the same usage_events cost rule."""
+    from datetime import datetime, timedelta, timezone
+    days = max(1, int(days or 1))
+    now = datetime.now(timezone.utc)
+    cur_start = (now - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    prior_start = (now - timedelta(days=2 * days - 1)).strftime("%Y-%m-%d")
+    with _conn() as c:
+        def _between(sql: str) -> float:
+            return c.execute(sql, (prior_start, cur_start)).fetchone()["v"]
+        signups = _between(
+            "SELECT COUNT(*) AS v FROM users "
+            "WHERE substr(created_at,1,10) >= ? AND substr(created_at,1,10) < ?")
+        projects = _between(
+            "SELECT COUNT(*) AS v FROM projects "
+            "WHERE substr(created_at,1,10) >= ? AND substr(created_at,1,10) < ?")
+        urow = c.execute(
+            """SELECT COALESCE(SUM(cost_eur),0) AS cost,
+                      COALESCE(SUM(CASE WHEN kind LIKE '%extract%' THEN 1 ELSE 0 END),0) AS extr
+                 FROM usage_events
+                WHERE substr(created_at,1,10) >= ? AND substr(created_at,1,10) < ?""",
+            (prior_start, cur_start)).fetchone()
+        revenue = _between(
+            "SELECT COALESCE(SUM(total_eur),0) AS v FROM invoices "
+            "WHERE substr(created_at,1,10) >= ? AND substr(created_at,1,10) < ?")
+    return {
+        "signups": int(signups or 0),
+        "projects": int(projects or 0),
+        "extractions": int(urow["extr"] or 0),
+        "cost_eur": round(float(urow["cost"] or 0), 4),
+        "revenue_eur": round(float(revenue or 0), 2),
+    }
+
+
+def admin_cost_total_eur(days: int | None = None, today_only: bool = False) -> float:
+    """SUM(usage_events.cost_eur) over a window. `today_only` restricts to the
+    current UTC date; otherwise a `days` window (None = all-time)."""
+    with _conn() as c:
+        if today_only:
+            from datetime import datetime, timezone
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            row = c.execute(
+                "SELECT COALESCE(SUM(cost_eur),0) AS v FROM usage_events "
+                "WHERE substr(created_at,1,10) = ?", (today,)).fetchone()
+        elif days is not None:
+            row = c.execute(
+                "SELECT COALESCE(SUM(cost_eur),0) AS v FROM usage_events "
+                "WHERE substr(created_at,1,10) >= ?", (_window_cutoff_date(days),)).fetchone()
+        else:
+            row = c.execute("SELECT COALESCE(SUM(cost_eur),0) AS v FROM usage_events").fetchone()
+    return round(float(row["v"] or 0), 4)
+
+
+def admin_top_users_by_spend(days: int = 30, limit: int = 10) -> list[dict]:
+    """Top-N users by usage_events spend within the window. Each row:
+      {user_id, email, spend_eur, extraction_count}.
+    extraction_count = usage_events rows with kind LIKE '%extract%'."""
+    cutoff = _window_cutoff_date(days)
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT ue.user_id AS user_id,
+                      u.email AS email,
+                      COALESCE(SUM(ue.cost_eur),0) AS spend,
+                      COALESCE(SUM(CASE WHEN ue.kind LIKE '%extract%' THEN 1 ELSE 0 END),0) AS extr
+                 FROM usage_events ue
+                 LEFT JOIN users u ON u.id = ue.user_id
+                WHERE substr(ue.created_at,1,10) >= ?
+                GROUP BY ue.user_id
+                ORDER BY spend DESC
+                LIMIT ?""", (cutoff, int(limit))).fetchall()
+    return [
+        {"user_id": r["user_id"], "email": r["email"],
+         "spend_eur": round(float(r["spend"] or 0), 4),
+         "extraction_count": int(r["extr"] or 0)}
+        for r in rows
+    ]
+
+
+def admin_cost_by_model(days: int = 30) -> list[dict]:
+    """Per-model cost breakdown within the window: [{model, cost_eur, event_count}]."""
+    cutoff = _window_cutoff_date(days)
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT COALESCE(model,'unknown') AS model,
+                      COALESCE(SUM(cost_eur),0) AS cost,
+                      COUNT(*) AS n
+                 FROM usage_events
+                WHERE substr(created_at,1,10) >= ?
+                GROUP BY COALESCE(model,'unknown')
+                ORDER BY cost DESC""", (cutoff,)).fetchall()
+    return [
+        {"model": r["model"], "cost_eur": round(float(r["cost"] or 0), 4),
+         "event_count": int(r["n"])}
+        for r in rows
+    ]
+
+
+def admin_users_over_today_threshold(threshold_eur: float) -> list[dict]:
+    """Users whose usage_events spend for the current UTC date exceeds
+    `threshold_eur`. Each row: {user_id, email, spend_today_eur}."""
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT ue.user_id AS user_id, u.email AS email,
+                      COALESCE(SUM(ue.cost_eur),0) AS spend
+                 FROM usage_events ue
+                 LEFT JOIN users u ON u.id = ue.user_id
+                WHERE substr(ue.created_at,1,10) = ?
+                GROUP BY ue.user_id
+               HAVING spend > ?
+                ORDER BY spend DESC""", (today, float(threshold_eur))).fetchall()
+    return [
+        {"user_id": r["user_id"], "email": r["email"],
+         "spend_today_eur": round(float(r["spend"] or 0), 4)}
+        for r in rows
+    ]
+
+
+def admin_avg_cost_per_extraction_eur(days: int = 30) -> float:
+    """Window SUM(usage_events.cost_eur) / COUNT(extract-kind events). 0 when
+    there are no extraction events (avoid divide-by-zero)."""
+    cutoff = _window_cutoff_date(days)
+    with _conn() as c:
+        row = c.execute(
+            """SELECT COALESCE(SUM(cost_eur),0) AS cost,
+                      COALESCE(SUM(CASE WHEN kind LIKE '%extract%' THEN 1 ELSE 0 END),0) AS extr
+                 FROM usage_events WHERE substr(created_at,1,10) >= ?""",
+            (cutoff,)).fetchone()
+    n = int(row["extr"] or 0)
+    return round(float(row["cost"] or 0) / n, 4) if n else 0.0
+
+
+def admin_list_users_paginated(search: str | None = None, page: int = 1,
+                               limit: int = 25) -> dict:
+    """Paginated + searchable user directory for admin management. Returns
+    {rows, total, page, limit}. Each row includes project_count and
+    total_spend_eur (SUM usage_events for that user — the true spend).
+
+    `search` (when set) matches email / name / company_name via a PARAMETERIZED
+    LIKE (case-insensitive) — the pattern is bound, never interpolated."""
+    page = max(1, int(page or 1))
+    limit = max(1, min(int(limit or 25), 200))
+    offset = (page - 1) * limit
+    where = ""
+    params: list = []
+    if search:
+        where = ("WHERE (LOWER(u.email) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ? "
+                 "OR LOWER(COALESCE(u.company_name,'')) LIKE ?)")
+        pat = f"%{search.lower()}%"
+        params = [pat, pat, pat]
+    with _conn() as c:
+        total = c.execute(
+            f"SELECT COUNT(*) AS n FROM users u {where}", params).fetchone()["n"]
+        rows = c.execute(
+            f"""SELECT u.id, u.email, u.name, u.company_name, u.company_code,
+                       u.plan, u.plan_status, u.is_admin, u.is_active,
+                       u.created_at, u.last_login_at,
+                       (SELECT COUNT(*) FROM projects p WHERE p.user_id = u.id) AS project_count,
+                       (SELECT COALESCE(SUM(ue.cost_eur),0) FROM usage_events ue
+                          WHERE ue.user_id = u.id) AS total_spend_eur
+                  FROM users u
+                  {where}
+              ORDER BY u.created_at DESC
+                 LIMIT ? OFFSET ?""",
+            params + [limit, offset]).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["total_spend_eur"] = round(float(d.get("total_spend_eur") or 0), 4)
+        d["project_count"] = int(d.get("project_count") or 0)
+        out.append(d)
+    return {"rows": out, "total": int(total or 0), "page": page, "limit": limit}
+
+
+def set_user_active(user_id: str, active: bool) -> bool:
+    """Set users.is_active (0/1). Returns False if the user doesn't exist.
+    Guardrails (self / other-admin) are enforced in the router, not here."""
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE users SET is_active = ? WHERE id = ?",
+            (1 if active else 0, user_id))
+        return cur.rowcount > 0
+
+
+def admin_events_by_kind(days: int = 30) -> list[dict]:
+    """usage_events counts grouped by kind within the window — the extraction
+    success/volume signal. [{kind, count, cost_eur}]."""
+    cutoff = _window_cutoff_date(days)
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT COALESCE(kind,'?') AS kind, COUNT(*) AS n,
+                      COALESCE(SUM(cost_eur),0) AS cost
+                 FROM usage_events WHERE substr(created_at,1,10) >= ?
+                GROUP BY COALESCE(kind,'?')
+                ORDER BY n DESC""", (cutoff,)).fetchall()
+    return [
+        {"kind": r["kind"], "count": int(r["n"]),
+         "cost_eur": round(float(r["cost"] or 0), 4)}
+        for r in rows
+    ]
+
+
+def admin_health_totals() -> dict:
+    """Whole-table counts for the health screen: users, projects, extractions,
+    usage_events, invoices, corrections."""
+    with _conn() as c:
+        def _count(tbl: str) -> int:
+            return int(c.execute(f"SELECT COUNT(*) AS n FROM {tbl}").fetchone()["n"])
+        return {
+            "users": _count("users"),
+            "projects": _count("projects"),
+            "extractions": _count("extractions"),
+            "usage_events": _count("usage_events"),
+            "invoices": _count("invoices"),
+            "corrections": _count("corrections"),
+        }
+
+
+def admin_recent_activity() -> dict:
+    """Most-recent timestamps across the app (defensive — missing/empty → None):
+    last_signup, last_project, last_usage_event, last_invoice."""
+    with _conn() as c:
+        def _max(sql: str):
+            try:
+                return c.execute(sql).fetchone()["v"]
+            except Exception:
+                return None
+        return {
+            "last_signup": _max("SELECT MAX(created_at) AS v FROM users"),
+            "last_project": _max("SELECT MAX(created_at) AS v FROM projects"),
+            "last_usage_event": _max("SELECT MAX(created_at) AS v FROM usage_events"),
+            "last_invoice": _max("SELECT MAX(created_at) AS v FROM invoices"),
+        }
+
+
+def admin_db_size_bytes() -> int:
+    """On-disk size of the SQLite DB file (0 if not yet materialised)."""
+    try:
+        return int(_DB_PATH.stat().st_size)
+    except OSError:
+        return 0
+
+
 def _backfill_orphan_project_owners() -> int:
     """Assign owner-less (NULL user_id) projects — left over from the pre-auth
     single-tenant era — to the bootstrap admin (the first registered admin), so
