@@ -15,6 +15,7 @@ No auth yet — single-tenant. When auth lands, add user_id to projects.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -22,6 +23,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger("pathon.db")
 
 # DB file lives outside repo root (gitignored). Override via env if needed.
 _DB_PATH = Path(os.environ.get("SAMATU_DB_PATH",
@@ -283,10 +286,20 @@ def get_project(project_id: str, user_id: str | None = None) -> dict | None:
         if not row:
             return None
         d = dict(row)
+        raw = d.pop("data", None)
         try:
-            data = json.loads(d.pop("data") or "{}")
-        except Exception:
-            data = {}
+            data = json.loads(raw or "{}")
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            # A corrupt/truncated data blob must NOT silently return an empty
+            # project — that reads as success while the user's rooms, pozicijos
+            # and corrections vanish with no trace. Log loudly (so ops can
+            # restore from the R2 DB backup) and return a corruption MARKER so
+            # the caller can tell "corrupt" apart from "genuinely empty".
+            # (audit 2026-07-06: previously `except Exception: data = {}`.)
+            log.error("project %s has a corrupt/undecodable data blob (%s); "
+                      "returning a corruption marker, NOT a silent empty project",
+                      project_id, exc)
+            data = {"_data_corrupt": True, "_raw_len": len(raw or "")}
         return {**data, **{k: v for k, v in d.items() if v is not None}}
 
 
@@ -610,6 +623,31 @@ def credits_balance(user_id: str) -> int:
     return int(row["bal"] or 0)
 
 
+def _consume_oneoff_credit_if_available(user_id: str) -> bool:
+    """Atomically consume one one-off credit iff the balance is > 0. Returns True
+    if a credit was consumed.
+
+    This is a SINGLE conditional INSERT ... SELECT so the balance-check and the
+    consume are one atomic statement — closing the check-then-act race where two
+    concurrent extractions both read balance==1 and both write credit_consumed,
+    driving the balance to −1 (one free extraction). The WHERE subquery re-reads
+    the ledger balance inside the same statement; SQLite serializes writers, so
+    the second caller sees balance==0 and inserts nothing. (audit 2026-07-06)"""
+    if not user_id:
+        return False
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO billing_usage (user_id, kind, project_id, created_at) "
+            "SELECT ?, 'credit_consumed', NULL, ? "
+            "WHERE (SELECT COALESCE(SUM(CASE WHEN kind = 'credit_granted' THEN 1 "
+            "                                WHEN kind = 'credit_consumed' THEN -1 "
+            "                                ELSE 0 END), 0) "
+            "       FROM billing_usage WHERE user_id = ?) > 0",
+            (user_id, _now_iso(), user_id),
+        )
+        return cur.rowcount > 0
+
+
 def record_extract_and_maybe_consume_credit(user_id: str) -> None:
     """Record one successful billable extraction, drawing monthly-slot-first,
     then a one-off credit.
@@ -617,7 +655,7 @@ def record_extract_and_maybe_consume_credit(user_id: str) -> None:
     Always writes kind="extract" (the per-project audit / period counter). If
     this extraction is beyond the plan's monthly quota AND the user has a credit
     to spend, ALSO writes kind="credit_consumed" (−1). Balance never goes
-    negative — the credit_consumed is written only when balance > 0.
+    negative — the credit_consumed is written atomically only when balance > 0.
 
     Caller guards on billing_enabled(); this is plain bookkeeping (the caller
     wraps it so a failure here never breaks extraction)."""
@@ -633,9 +671,9 @@ def record_extract_and_maybe_consume_credit(user_id: str) -> None:
     used_before = billing_usage_in_period(
         user_id, current_period_end=period_end, kind="extract")
     record_billing_usage(user_id, kind="extract", project_id=None)
-    # Beyond the monthly allotment → draw a credit if one remains.
-    if used_before >= int(plan.get("monthly_quota", 0)) and credits_balance(user_id) > 0:
-        record_billing_usage(user_id, kind="credit_consumed", project_id=None)
+    # Beyond the monthly allotment → draw a credit if one remains (atomic).
+    if used_before >= int(plan.get("monthly_quota", 0)):
+        _consume_oneoff_credit_if_available(user_id)
 
 
 # ── Free-trial anti-abuse (company-code gated, survives account deletion) ─────
@@ -883,6 +921,20 @@ def seen_webhook(event_id: str) -> bool:
         return False
     except sqlite3.IntegrityError:
         return True
+
+
+def forget_webhook(event_id: str) -> None:
+    """Release a webhook idempotency claim recorded by seen_webhook().
+
+    Called when the handler FAILED: the event id was already claimed (so the
+    effect is NOT marked applied), and Stripe's retry should re-claim and
+    re-dispatch it. Without this, a handler crash after seen_webhook() claimed
+    the id would let the webhook return 200 and permanently lose the state
+    update (subscription active in Stripe, free in Pathon). (audit 2026-07-06)"""
+    if not event_id:
+        return
+    with _conn() as c:
+        c.execute("DELETE FROM webhook_events WHERE event_id = ?", (event_id,))
 
 
 def get_user_by_stripe_customer_id(customer_id: str) -> dict | None:
@@ -1321,6 +1373,9 @@ def admin_list_users_paginated(search: str | None = None, page: int = 1,
         pat = f"%{search.lower()}%"
         params = [pat, pat, pat]
     with _conn() as c:
+        # SAFE: {where} is a hardcoded literal template (only `?` placeholders,
+        # never user input); every value flows through the bound `params` list.
+        # DO NOT ever interpolate a search value into {where} — bind it. (audit)
         total = c.execute(
             f"SELECT COUNT(*) AS n FROM users u {where}", params).fetchone()["n"]
         rows = c.execute(

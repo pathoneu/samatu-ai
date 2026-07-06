@@ -8,7 +8,61 @@ confidence flag — never silently overwriting. Council 5/5 + research.
 """
 from extractor.door_type_reader import (
     reconcile_frameless, _find_door_pages, build_user_text,
+    _safe_count, _mode_int, read_door_types,
 )
+
+
+# ── safe coercion: a non-numeric Vision count must not crash the read ─────
+# (audit 2026-07-06: door_type_reader was the one reader missing the
+#  _safe_count wrapper that sanitary_fixture_reader/doors_reader already had.)
+def test_safe_count_coerces_or_defaults():
+    assert _safe_count(3) == 3
+    assert _safe_count("3") == 3
+    assert _safe_count("3+") == 0          # non-numeric → default, no ValueError
+    assert _safe_count("3 durys") == 0
+    assert _safe_count(None) == 0
+    assert _safe_count(2.9) == 2
+    assert _safe_count("nėra", default=1) == 1
+
+
+def test_mode_int_survives_non_numeric_reads():
+    # a hallucinated "3+" among numeric reads is dropped, not crash-inducing
+    assert _mode_int([3, 3, "3+"]) == 3
+
+
+def test_read_door_types_survives_non_numeric_vision_count(monkeypatch):
+    """The exact crash the audit flagged: Vision returns beapvadines_count='3+'.
+    Before the fix, int('3+') raised ValueError and aborted the whole read."""
+    import extractor.door_type_reader as m
+
+    class _Block:
+        text = ('{"doors": [], "beapvadines_count": "3+", '
+                '"standartines_count": 2, "stumdomos_count": null, '
+                '"bendras_tipas": null, "pastabos": "x"}')
+
+    class _Usage:
+        input_tokens = 10
+        output_tokens = 5
+
+    class _Resp:
+        content = [_Block()]
+        usage = _Usage()
+
+    class _Client:
+        class messages:
+            @staticmethod
+            def create(**_k):
+                return _Resp()
+
+    monkeypatch.setattr(m, "_find_door_pages", lambda *_a, **_k: [2])
+    monkeypatch.setattr(m, "_render_page_b64", lambda *_a, **_k: "b64stub")
+    monkeypatch.setattr(m, "model_for", lambda *_a, **_k: "test-model")
+
+    out = read_door_types(b"pdf", [{"nr": "1", "pavadinimas": "Koridorius"}],
+                          client=_Client())
+    assert out["status"] == "ok"
+    assert out["beapvadines_count"] == 0     # '3+' safely coerced to default
+    assert out["standartines_count"] == 2    # numeric value preserved
 
 
 # ── reconcile-and-surface (the merge discipline) ─────────────────────────

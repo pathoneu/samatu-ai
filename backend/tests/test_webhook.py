@@ -156,3 +156,42 @@ def test_malformed_but_signed_event_returns_200(tmp_path, monkeypatch):
     with patch("api.billing_v2.stripe_client.construct_event", return_value=evt):
         r = _post(c)
     assert r.status_code == 200, r.text
+
+
+# ── handler CRASH → release the claim + 500 so Stripe retries (audit 2026-07-06)
+# A handler exception must NOT 200-and-forget: seen_webhook already claimed the
+# id, so a 200 would mark it processed forever and Stripe would stop retrying,
+# permanently losing the subscription/credit. The endpoint must release the claim
+# and 500 so the retry re-applies the effect.
+
+def test_handler_crash_releases_claim_and_500s_then_retry_applies(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    user = db.create_user("flaky@x.lt", "!x", name="Flaky")
+    c = TestClient(app)
+
+    # Keep the test fast + focused: the one-off invoice emission is best-effort.
+    monkeypatch.setattr("api.billing_v2._emit_invoice", lambda *a, **k: None)
+
+    # grant_oneoff_credit fails on the FIRST delivery, succeeds on the retry.
+    real_grant = db.grant_oneoff_credit
+    calls = {"n": 0}
+
+    def flaky_grant(uid):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("transient DB error")
+        return real_grant(uid)
+
+    monkeypatch.setattr(db, "grant_oneoff_credit", flaky_grant)
+
+    with patch("api.billing_v2.stripe_client.construct_event",
+               return_value=_oneoff_event("evt_flaky", user["id"])):
+        r1 = _post(c)                       # handler crashes
+        assert r1.status_code == 500, r1.text
+        assert db.credits_balance(user["id"]) == 0   # effect NOT applied
+
+        r2 = _post(c)                       # Stripe retries the same event id
+        assert r2.status_code == 200, r2.text
+        assert db.credits_balance(user["id"]) == 1   # retry applied it exactly once
+
+    assert calls["n"] == 2                    # proves the claim was released (not a no-op)

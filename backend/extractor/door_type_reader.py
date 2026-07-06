@@ -43,6 +43,17 @@ MAX_DOOR_PAGES = 6
 _TAG_RE = re.compile(r"\b(?:LD|D)-?\d\b", re.IGNORECASE)
 _PREMIUM = {"premium"}
 
+
+def _safe_count(v, default: int = 0) -> int:
+    """Coerce a Vision count to int; non-numeric (e.g. '3+', '3 durys', null) →
+    default. A hallucinated non-numeric count must NOT ValueError-crash the whole
+    door-type read and abort extraction (audit 2026-07-06 — sanitary_fixture_reader
+    and doors_reader already had this; door_type_reader was the missed reader)."""
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return default
+
 SYSTEM_PROMPT = """Tu skaitai LT vidaus apdailos brėžinio DURŲ ŽYMĖJIMUS ir ANOTACIJAS — NE durų grafinį simbolį (lanką).
 
 SVARBU: durų TIPO (beapvadinės vs standartinės) NEGALIMA nustatyti iš durų simbolio — jis abiem atvejais vienodas. Tipą skaityk TIK iš TEKSTO: durų žymių (pvz. LD-1, D-2), anotacijų (pvz. „Durų anga iki lubų, skirta beapvadinėms durims"), legendos ir pastabų (pvz. „18. Stumdomos durys").
@@ -170,9 +181,9 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
     return {
         "status": "ok", "pages": rendered,
         "doors": parsed.get("doors") or [],
-        "beapvadines_count": int(parsed.get("beapvadines_count") or 0),
-        "standartines_count": int(parsed.get("standartines_count") or 0),
-        "stumdomos_count": int(parsed.get("stumdomos_count") or 0),
+        "beapvadines_count": _safe_count(parsed.get("beapvadines_count")),
+        "standartines_count": _safe_count(parsed.get("standartines_count")),
+        "stumdomos_count": _safe_count(parsed.get("stumdomos_count")),
         "bendras_tipas": parsed.get("bendras_tipas"),
         "pastabos": parsed.get("pastabos"),
         "_elapsed_s": round(time.time() - t0, 2),
@@ -184,7 +195,7 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
 def _mode_int(values, default: int = 0) -> int:
     """Mode of integer reads, MEDIAN on a tie. NOT max — max would covertly
     drift the count up toward the oracle (the thing the culture forbids)."""
-    vals = [int(v) for v in values if v is not None]
+    vals = [_safe_count(v) for v in values if v is not None]
     if not vals:
         return default
     modes = statistics.multimode(vals)

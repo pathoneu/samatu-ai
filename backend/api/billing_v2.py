@@ -151,8 +151,10 @@ def create_checkout(body: CheckoutRequest, user: dict = Depends(require_user)):
 #   2. The signature is computed over the RAW request bytes — read them with
 #      `await request.body()` and DO NOT parse/re-serialize before verifying.
 #   3. Bad signature (ValueError) or unconfigured secret (RuntimeError) → 400.
-#      Everything else that verified → 200, even unhandled types / unknown
-#      prices / malformed payloads (log + skip) so Stripe does not retry forever.
+#      A verified event with an unhandled TYPE / unknown price / malformed
+#      payload → 200 (log + skip) so Stripe does not retry forever. But a
+#      handler that RAISES → release the idempotency claim + 500 so Stripe
+#      retries (else the claimed-but-unapplied event is lost permanently).
 #   4. Idempotent: de-dup on event.id via db.seen_webhook so a re-delivery is a
 #      200 no-op and the effect is applied exactly once.
 #   5. State-mirroring runs regardless of BILLING_ENABLED. The flag gates
@@ -193,10 +195,20 @@ async def stripe_webhook(request: Request):
 
     try:
         _dispatch_webhook(event_type, event)
-    except Exception:  # noqa: BLE001 — never let a handler bug 500 the webhook.
-        log.exception("Webhook handler crashed for %s (%s)", event_id, event_type)
-    # Always 200 for a verified event, even on an unhandled type / handler error,
-    # so Stripe stops retrying (we have already recorded it as seen).
+    except Exception as exc:  # noqa: BLE001
+        # A handler crash must NOT 200 the webhook — seen_webhook() already
+        # claimed this event id, so a 200 here would mark it processed forever
+        # and Stripe would stop retrying, permanently losing the state update
+        # (subscription active in Stripe, free in Pathon). Release the claim so
+        # Stripe's retry re-dispatches, and signal the retry with a 500.
+        # (An unhandled event TYPE returns normally above — that path still 200s
+        # and is not retried, which is correct.) (audit 2026-07-06)
+        log.exception("Webhook handler crashed for %s (%s) — releasing "
+                      "idempotency claim so Stripe retries", event_id, event_type)
+        db.forget_webhook(event_id)
+        raise HTTPException(status_code=500,
+                            detail="Webhook handler failed; Stripe will retry") from exc
+    # A verified, successfully-handled event (or an unhandled type) → 200.
     return {"received": True}
 
 

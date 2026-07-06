@@ -21,6 +21,7 @@ Production hardening (TODO):
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any
@@ -29,6 +30,8 @@ import bcrypt
 from fastapi import HTTPException, Request
 
 import db
+
+log = logging.getLogger("pathon.auth")
 
 
 # Read secret from env (production) OR generate a stable fallback for dev.
@@ -205,7 +208,14 @@ def require_billable_user(request: Request) -> dict:
     except HTTPException:
         raise  # the 429 spend-cap rejection must propagate
     except Exception:
-        pass   # never block a request on a cap-machinery hiccup
+        # Deliberately fail-OPEN: a cap-machinery hiccup (DB timeout, import
+        # error) must never 500 a user's request. But it must NOT be silent —
+        # a swallowed failure here means the billable event went unrecorded and
+        # the spend cap was not enforced, so LOG it loudly for aggregation.
+        # (audit 2026-07-06: previously `except Exception: pass`.)
+        log.exception("spend-cap machinery failed for user %s on %s — failing "
+                      "open (request allowed, usage NOT recorded)",
+                      user.get("id"), request.url.path)
     return user
 
 

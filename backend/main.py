@@ -2547,65 +2547,6 @@ def _extract_floor_materials(text: str) -> list[str]:
     return materials
 
 
-def _extract_interior_text(pdf_bytes: bytes) -> dict:
-    """
-    First pass: pdfplumber text extraction.
-    Returns: projektas, patalpos (room list), ceiling_heights,
-             floor_materials, page_types, pages_text, page_classifications.
-    """
-    result: dict = {
-        "projektas": "",
-        "patalpos": [],
-        "page_types": {},
-        "ceiling_heights": {},
-        "floor_materials": [],
-        "pages_text": {},
-        "page_classifications": [],  # Task 1: full classification list
-    }
-
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for i, page in enumerate(pdf.pages):
-            text = page.extract_text() or ""
-            pno = i + 1
-            result["pages_text"][pno] = text
-
-            pt, conf = _classify_page_with_confidence(text)
-            result["page_types"][pno] = pt
-            result["page_classifications"].append({
-                "page_number": pno,
-                "page_type":   pt,
-                "label_lt":    _PAGE_TYPE_LABELS_LT.get(pt, "Kita"),
-                "confidence":  conf,
-            })
-
-            # Project name from cover/first pages
-            if pno <= 3 and not result["projektas"]:
-                for line in text.splitlines():
-                    line = line.strip()
-                    if re.search(r'g\.\s*\d+|al\.\s*\d+|interjero\s+projektas', line, re.I):
-                        if 5 < len(line) < 80:
-                            result["projektas"] = line
-                            break
-
-            # Room list — try every page until found
-            if not result["patalpos"]:
-                rooms = _extract_eksplikacija(text)
-                if len(rooms) >= 3:   # need at least 3 rooms to trust extraction
-                    result["patalpos"] = rooms
-
-            # Ceiling heights
-            if pt == "lubų":
-                result["ceiling_heights"].update(_extract_ceiling_heights(text))
-
-            # Floor materials
-            if pt == "grindų":
-                mats = _extract_floor_materials(text)
-                if mats:
-                    result["floor_materials"] = mats
-
-    return result
-
-
 def _pdf_to_images(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
     """
     Convert each PDF page to a base64 JPEG string.
@@ -4534,11 +4475,11 @@ async def generate_excel(request: Request, data: dict):
     # "Glaistymas dazymas", etc.) collapse into one canonical sheet.
     # ─────────────────────────────────────────────────────────────────────────
     from collections import OrderedDict
-    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION
+    # (SKYRIUS_LEGACY_MIGRATION already imported above as _SKYRIUS_MIG.)
     sections: dict[str, list] = OrderedDict()
     for e in eilutes:
         sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        sec = SKYRIUS_LEGACY_MIGRATION.get(sec_raw, sec_raw)
+        sec = _SKYRIUS_MIG.get(sec_raw, sec_raw)
         # Mutate the row's skyrius to canonical so the section header in
         # _write_rows shows the normalized name too.
         e["skyrius"] = sec
@@ -5298,7 +5239,23 @@ async def extract_interior_stream_endpoint(
         # would drop the stream mid-extraction. Comments don't trigger event
         # listeners on the client, so they're a free keep-alive signal.
         sentinel = object()
-        while True:
+        future = None
+        # 2026-07-06 (audit): guarantee the sync generator is CLOSED on every
+        # exit path — including a client disconnect, where Starlette throws
+        # CancelledError/GeneratorExit into this async generator. Without this,
+        # `gen` was never closed: its cleanup (finally blocks) never ran and the
+        # in-flight worker thread kept the extraction alive with nobody consuming
+        # it. NB: never close a generator while a worker thread is still running
+        # next(gen) — that raises "generator already executing" — so if a step is
+        # in flight, defer the close to a done-callback on that future.
+        def _close_gen(_f=None):
+            try:
+                gen.close()
+            except Exception:  # noqa: BLE001 — generator cleanup is best-effort
+                log.warning("extract-interior-stream: generator close failed",
+                            exc_info=True)
+        try:
+          while True:
             future = loop.run_in_executor(None, lambda: next(gen, sentinel))
             try:
                 while True:
@@ -5341,6 +5298,15 @@ async def extract_interior_stream_endpoint(
                     log.warning("record_usage failed (stream): %r", _exc)
 
             yield _format_sse(ev)
+        finally:
+            # Close the sync generator on every exit path (normal end, error,
+            # or client disconnect). If a worker thread is still executing
+            # next(gen), defer the close until it finishes — closing a running
+            # generator raises "generator already executing". Otherwise close now.
+            if future is not None and not future.done():
+                future.add_done_callback(_close_gen)
+            else:
+                _close_gen()
 
     return StreamingResponse(
         event_source(),
@@ -5440,7 +5406,8 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
         try:
             recalc = calc_room_quantities(room, rules=single_rules)
         except Exception as exc:  # noqa: BLE001
-            print(f"[recompute-interior] room {room.get('nr')} calc failed: {exc}")
+            log.warning("[recompute-interior] room %s calc failed: %s",
+                        room.get('nr'), exc)
             recalc = {}
 
         merged = {**room, **recalc, **preserved}
@@ -5454,7 +5421,7 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
             if normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
         ),
         "patalpos": out_rooms,
-        "pozicijos": [],  # rebuilt below by emit_v8_compat? No — pozicijos come from Vision narrative
+        "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
     }
 
@@ -5507,7 +5474,7 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
     except Exception as exc:
-        print(f"[recompute-interior] pozicijos build failed: {exc}")
+        log.warning("[recompute-interior] pozicijos build failed: %s", exc)
         parsed["pozicijos"] = parsed.get("pozicijos") or []
     parsed = _emit_v8_compat_fields(parsed)
     parsed["status"] = "ok"
