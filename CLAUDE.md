@@ -4,6 +4,8 @@
 
 **Stack:** Python FastAPI backend + React/Vite/Tailwind/shadcn frontend. Anthropic Claude for vision + extraction. PDF→PNG via pdfplumber/pdf2image. Run `ls backend/`, `ls frontend/src/`, or `git log` to discover current code layout — don't trust a stale file tree here.
 
+**Start-here manuals** (read before touching code): [`docs/DEVELOPING.md`](docs/DEVELOPING.md) — how to run/test/debug/ship + the gotchas that waste an hour (no-`--reload` backend, auth-on testing, which test runner). [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — real data flow + the **CANONICAL-vs-stale file map** (the LT formula engine is `backend/extractor/universal_rules.py`; `frontend/src/lib/interiorCalc.js` is a stale FE copy — backend is source of truth) + known fragilities + accuracy reality. [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — production launch/DNS/hosting.
+
 ---
 
 ## How to work with me
