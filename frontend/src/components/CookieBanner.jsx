@@ -60,6 +60,15 @@ function persist(categories) {
   } catch {
     /* storage unavailable — banner will simply reappear next visit */
   }
+  // Same-tab listeners (consent-gated analytics loader) need a signal —
+  // the `storage` event only fires in OTHER tabs.
+  try {
+    window.dispatchEvent(
+      new CustomEvent('pathon:cookie-consent-changed', { detail: categories })
+    );
+  } catch {
+    /* no-op */
+  }
 }
 
 // ─── Small toggle switch (dark, orange when on) ──────────────────────

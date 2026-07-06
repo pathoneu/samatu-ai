@@ -28,6 +28,7 @@ const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const Landing = lazy(() => import('@/pages/Landing'));
+const Duk = lazy(() => import('@/pages/Duk'));
 // Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
 const Annotator = lazy(() => import('@/pages/Annotator'));
 // Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
@@ -96,6 +97,7 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/duk" element={<Duk />} />
               <Route path="/share/:token" element={<SharedProject />} />
 
               {/* Protected — wrapped in AppLayout (sidebar) */}

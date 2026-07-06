@@ -862,6 +862,7 @@ function LandingFooter() {
                         sm:items-center justify-between gap-4 text-[12.5px] text-muted-foreground">
           <div>{t('landing.footer.copyright')}</div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link to="/duk" className="hover:text-foreground transition-colors">{t('landing.footer.duk')}</Link>
             <Link to="/privacy" className="hover:text-foreground transition-colors">{t('landing.footer.privatumas')}</Link>
             <Link to="/cookies" className="hover:text-foreground transition-colors">{t('landing.footer.slapukai')}</Link>
             <Link to="/terms" className="hover:text-foreground transition-colors">{t('landing.footer.salygos')}</Link>
