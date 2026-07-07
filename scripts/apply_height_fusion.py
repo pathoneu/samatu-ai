@@ -1,17 +1,22 @@
 """End-to-end height fusion per project.
 
 For each project's existing ai_extract.json:
-  1. Try the explicit height extractor on every plausible page until
-     it returns a value (title block / eksplikacija / section / ceiling
-     plan). Skip pages that already returned no hit.
-  2. Compute door-lintel signal from existing elementai (zero cost).
-  3. Fuse signals via height_fusion.fuse().
-  4. Apply fused height to rooms that don't already have an explicit
-     source set.
-  5. Re-run calculator + santrauka.
+  1. Run the explicit height extractor over a CLASSIFICATION-AWARE page
+     sample (sections → ceiling plan → eksplikacija → wall-elevation
+     spread → title/floor-plan fallbacks; see
+     extractor.height_fusion.height_scan_pages). Every sampled page is
+     scanned — no first-hit early exit — so a double-height room drawn
+     only on an išklotinė still gets a structured per-room read.
+  2. Merge the multi-page payloads (first non-low primary wins;
+     per_room union across pages).
+  3. Apply per-room readings directly (double-height band up to 6.5 m).
+  4. Compute door-lintel signal from existing elementai (zero cost).
+  5. Fuse project-level signals via height_fusion.fuse() and apply to
+     rooms without an explicit source.
+  6. Re-run calculator + santrauka.
 
-Budget: 1-3 Vision calls per project depending on how many pages we
-need to scan before finding the annotation. Cap at $0.30/project.
+Budget: up to --max-pages (default 6) Vision calls per project,
+~$0.07/page on Opus → ≈$0.45/project worst case.
 """
 
 from __future__ import annotations
@@ -31,48 +36,20 @@ OPUS_INPUT_PER_M = 15.0
 OPUS_OUTPUT_PER_M = 75.0
 
 
-# Page-role search order — first page that yields a height wins.
-# DELIBERATELY EXCLUDES wall_elevation: those pages show fixture and
-# tile-zone heights (e.g. cabinet 2.45m, mirror 1.80m) that the Vision
-# model is prone to misread as ceiling height. Wall elevations are
-# valuable for tile zones, NOT for ceiling height.
-HEIGHT_PAGE_PRIORITY = [
-    "section", "cross_section", "detail",
-    "ceiling_plan",  # often has +2700 elevation labels
-    "title_page",
-    "floor_plan",    # title block on floor plan
-]
-
-
 def _resolve_pdf(slug: str, entry: dict) -> Path:
     if slug == "berzas":
         return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
     return REPO_ROOT / entry["project_pdf"]
 
 
-def _height_search_pages(ai: dict) -> list[int]:
-    """Ordered list of pages to try for the explicit annotation."""
-    pages = ai.get("puslapiai") or []
-    by_tipas: dict[str, list[int]] = {}
-    for p in pages:
-        nr = int(p.get("nr") or 0)
-        if nr <= 0:
-            continue
-        by_tipas.setdefault((p.get("tipas") or "").lower(), []).append(nr)
-    order: list[int] = []
-    for tipas in HEIGHT_PAGE_PRIORITY:
-        for nr in by_tipas.get(tipas, []):
-            if nr not in order:
-                order.append(nr)
-    return order[:5]  # cap at 5 pages to bound cost
-
-
-def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dict:
+def process_project(slug: str, max_pages: int = 6, dry_run: bool = False,
+                    ai_path: Path | None = None) -> dict:
     reg = yaml.safe_load((REPO_ROOT / "ground_truth/registry.yaml").read_text())
     entry = next((p for p in (reg.get("projects") or []) if p["slug"] == slug), None)
     if not entry:
         return {"slug": slug, "status": "unknown"}
-    ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
+    if ai_path is None:
+        ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
     if not ai_path.exists():
         return {"slug": slug, "status": "no_ai_extract"}
     ai = json.loads(ai_path.read_text(encoding="utf-8"))
@@ -81,28 +58,32 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
     if not pdf_path.exists():
         return {"slug": slug, "status": "no_pdf"}
 
-    pages_to_try = _height_search_pages(ai)[:max_pages]
+    from extractor.height_fusion import height_scan_pages
+    pages_to_try = height_scan_pages(ai, max_pages=max_pages)
     print(f"\n══ {slug} ══")
-    print(f"  Height-search pages (ordered): {pages_to_try}")
+    print(f"  Height-search pages (classification-aware): {pages_to_try}")
 
     if dry_run:
         return {"slug": slug, "status": "dry_run", "pages": pages_to_try}
 
     from extractor.vision_call import pdf_to_b64_images
     from extractor.vision.height_extractor import (
-        extract_ceiling_height, HeightPayload,
+        extract_ceiling_height, apply_height_to_rooms, parse_height_payload,
     )
     from extractor.height_fusion import (
         signal_from_door_heights, signal_from_explicit_reading,
-        fuse, apply_fused_height_to_rooms,
+        fuse, apply_fused_height_to_rooms, merge_explicit_payloads,
     )
 
     pdf_bytes = pdf_path.read_bytes()
     pages = pdf_to_b64_images(pdf_bytes)
     by_idx = {p["page_index"]: p["image_b64"] for p in pages}
 
-    # Signal 1: explicit annotation across multiple pages
-    explicit_payload: dict | None = None
+    # Signal 1: explicit annotation. Scan EVERY sampled page — a section
+    # page answering the project-wide question must not stop us from
+    # reading a double-height room off an išklotinė further down.
+    payloads: list[dict] = []
+    per_page: list[dict] = []
     cost = 0.0
     for pg in pages_to_try:
         if pg not in by_idx:
@@ -114,15 +95,29 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
                           + (out_t / 1e6) * OPUS_OUTPUT_PER_M, 4)
         cost += page_cost
         print(f"  page {pg}: heights={h.ceiling_heights_m} primary={h.primary_value_m} "
-              f"confidence={h.confidence}  ${page_cost} (cache={h._meta.get('cache')})")
-        if h.primary_value_m is not None and h.confidence != "low":
-            explicit_payload = h.to_dict()
-            break
+              f"confidence={h.confidence} per_room={h.per_room}  "
+              f"${page_cost} (cache={h._meta.get('cache')})")
+        payloads.append(h.to_dict())
+        per_page.append({"page": pg, "primary_value_m": h.primary_value_m,
+                         "confidence": h.confidence, "per_room": h.per_room})
 
-    sig_explicit = signal_from_explicit_reading(explicit_payload)
+    merged = merge_explicit_payloads(payloads)
+    rooms = ai.get("patalpos") or []
+
+    # Per-room readings apply directly (band up to 6.5 m for named rooms).
+    # Done BEFORE the project-level fusion so matched rooms carry the
+    # explicit source and the fused value skips them.
+    per_room_summary = {"n_rooms_updated": 0, "from_to": [], "skipped_implausible": []}
+    if merged and merged.get("per_room"):
+        per_room_only = parse_height_payload({**merged, "primary_value_m": None})
+        per_room_summary = apply_height_to_rooms(rooms, per_room_only)
+        print(f"  Per-room applied: {per_room_summary['n_rooms_updated']} rooms")
+        for ft in per_room_summary["from_to"]:
+            print(f"    nr={ft['nr']}: {ft['from']}m → {ft['to']}m")
+
+    sig_explicit = signal_from_explicit_reading(merged)
 
     # Signal 2: door+lintel from elementai (zero Vision cost)
-    rooms = ai.get("patalpos") or []
     sig_door = signal_from_door_heights(rooms)
 
     fusion = fuse([sig_explicit, sig_door])
@@ -138,7 +133,7 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
         print(f"    nr={ft['nr']}: {ft['from']}m → {ft['to']}m")
 
     # Re-run calculator
-    if summary["n_updated"] > 0:
+    if summary["n_updated"] > 0 or per_room_summary["n_rooms_updated"] > 0:
         from extractor.vision_call import _recompute_per_room_via_python, _recompute_santrauka
         ai = _recompute_per_room_via_python(ai, rules_override=None)
         ai = _recompute_santrauka(ai)
@@ -146,6 +141,8 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
     ai["_height_fusion"] = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "pages_searched": pages_to_try,
+        "per_page": per_page,
+        "per_room_summary": per_room_summary,
         "result": fusion.to_dict(),
         "rooms_summary": summary,
         "cost_usd": cost,
@@ -153,6 +150,7 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
     ai_path.write_text(json.dumps(ai, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"slug": slug, "status": "ok", "cost_usd": cost,
             "rooms_updated": summary["n_updated"],
+            "per_room_updated": per_room_summary["n_rooms_updated"],
             "fused_height": fusion.primary_m,
             "fused_source": fusion.chosen_source}
 
@@ -160,10 +158,16 @@ def process_project(slug: str, max_pages: int = 3, dry_run: bool = False) -> dic
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
-    ap.add_argument("--max-pages", type=int, default=3)
-    ap.add_argument("--max-cost", type=float, default=2.0)
+    ap.add_argument("--max-pages", type=int, default=6)
+    ap.add_argument("--max-cost", type=float, default=3.0)
+    ap.add_argument("--ai-path", default=None,
+                    help="Run against this extract JSON instead of "
+                         "ground_truth/<slug>/ai_extract.json (requires --only)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
+
+    if args.ai_path and not args.only:
+        ap.error("--ai-path requires --only")
 
     reg = yaml.safe_load((REPO_ROOT / "ground_truth/registry.yaml").read_text())
     targets = ([args.only] if args.only
@@ -175,7 +179,8 @@ def main(argv=None) -> int:
         if total >= args.max_cost:
             print(f"  budget cap; skipping {slug}")
             continue
-        r = process_project(slug, max_pages=args.max_pages, dry_run=args.dry_run)
+        r = process_project(slug, max_pages=args.max_pages, dry_run=args.dry_run,
+                            ai_path=Path(args.ai_path) if args.ai_path else None)
         if r.get("cost_usd"):
             total += r["cost_usd"]
     print(f"\nTotal: ${total:.4f}")

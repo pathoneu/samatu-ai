@@ -5,10 +5,28 @@ similar) annotation and return the numeric value(s) in METRES.
 
 Where to look:
   • Title block / general notes ("Bendros nuorodos")
-  • Section drawings ("Pjūvis")
+  • Section drawings ("Pjūvis", "Lubų mazgai")
   • Eksplikacija table (sometimes has a height column)
   • Annotations like "A=2.70", "h = 2.82 m", "patalpų aukštis 2.70 m",
     "švarios lubos +2700"
+  • Wall elevations ("Sienų išklotinė"): the CEILING height is the
+    overall vertical dimension of the drawn wall — the dimension that
+    spans from the floor line to the ceiling line (usually the outermost
+    number in the vertical dimension chain). If the išklotinė names its
+    room (e.g. "Svetainė", "Vonia"), report that value in per_room under
+    the room name exactly as printed.
+
+WALL-ELEVATION TRAPS — never report these as ceiling height:
+  • furniture/cabinet heights (~2.45 m), mirror or door heights
+  • tile-zone boundaries (2.0–2.4 m)
+  • shelf/LED-niche elevations
+  If you cannot confidently identify the full floor-to-ceiling dimension,
+  return "confidence": "low" instead of guessing.
+
+Double-height spaces are real: a svetainė with antresolė/dvišviesė can
+reach 5–6 m. When the drawing clearly dimensions such a wall, report the
+value as drawn (in per_room for that room) — do not clamp it to a
+"typical" range.
 
 OUTPUT — return one JSON object, no prose, no fences:
 

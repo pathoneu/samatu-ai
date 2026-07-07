@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
@@ -132,15 +133,68 @@ def extract_ceiling_height(
     return out
 
 
+# Plausibility bands. A PROJECT-WIDE primary above 4.0 m is a misread
+# (no LT interior has every ceiling that tall). A NAMED per-room reading
+# may legitimately reach a double-height interior (objektas_b svetainė
+# ≈5.7 m) — same 6.5 m ceiling the warnings[] narration salvage accepts.
+PRIMARY_PLAUSIBLE_M = (2.4, 4.0)
+PER_ROOM_PLAUSIBLE_M = (2.4, 6.5)  # keep in sync with height_markers.MAX_NARRATED_CEILING_M
+
+_COMPOUND_SPLIT_RE = re.compile(r"[/,+]")
+
+
+def _norm_nr(raw: Any) -> str:
+    s = str(raw or "").strip()
+    if s.isdigit():
+        return s.lstrip("0") or "0"
+    return s.lower()
+
+
+_NR_PREFIX_RE = re.compile(r"^(\d+)\s+(.+)$")
+
+
+def _per_room_lookup(room: dict[str, Any],
+                     per_room: dict[str, float]) -> float | None:
+    """Match a room against per_room keys: by nr ('2' matches '02'), by
+    full name (case-insensitive), by nr-prefixed key ('101 Tambūras' —
+    the format Vision actually emits off eksplikacija tables), or by
+    compound-name component — the eksplikacija says
+    'Svetainė/valgomasis/virtuvė' while Vision names just 'Svetainė'
+    (same aliasing the warnings salvage needs)."""
+    nr = _norm_nr(room.get("nr"))
+    name = str(room.get("pavadinimas") or "").strip().lower()
+    name_parts = {p.strip() for p in _COMPOUND_SPLIT_RE.split(name)
+                  if len(p.strip()) >= 5}
+    for k, v in per_room.items():
+        key = str(k).strip()
+        key_lc = key.lower()
+        # 'nr name' concatenated keys: match the nr part alone.
+        m = _NR_PREFIX_RE.match(key)
+        key_nr = _norm_nr(m.group(1)) if m else _norm_nr(key)
+        if m:
+            key_lc = m.group(2).strip().lower()
+        if nr and key_nr == nr:
+            return v
+        if name and key_lc == name:
+            return v
+        key_parts = {p.strip() for p in _COMPOUND_SPLIT_RE.split(key_lc)
+                     if len(p.strip()) >= 5}
+        if name_parts & ({key_lc} | key_parts) or (name and name in key_parts):
+            return v
+    return None
+
+
 def apply_height_to_rooms(rooms: list[dict[str, Any]],
                           height: HeightPayload) -> dict[str, Any]:
     """Apply the extracted ceiling height to rooms.
 
     Strategy:
-      • If ``per_room`` map is populated, use it where matches by nr.
+      • If ``per_room`` map is populated, use it where it matches by nr,
+        name, or compound-name component. Per-room values are plausible
+        up to 6.5 m (double-height interiors are real).
       • Else if ``primary_value_m`` is set, replace every room's
         ``lubu_aukstis_m`` ONLY when it differs by >5cm AND the new
-        value is within plausible range (2.4–4.0m).
+        value is within the project-wide plausible range (2.4–4.0 m).
       • Track which rooms were updated for the audit trail.
     """
     summary = {"n_rooms_updated": 0, "from_to": [], "skipped_implausible": []}
@@ -149,13 +203,16 @@ def apply_height_to_rooms(rooms: list[dict[str, Any]],
     for r in rooms:
         nr = str(r.get("nr") or "")
         new_h: float | None = None
-        if nr and nr in height.per_room:
-            new_h = height.per_room[nr]
+        per_room_hit = _per_room_lookup(r, height.per_room) if height.per_room else None
+        if per_room_hit is not None:
+            new_h = per_room_hit
+            lo, hi = PER_ROOM_PLAUSIBLE_M
         elif height.primary_value_m is not None:
             new_h = height.primary_value_m
+            lo, hi = PRIMARY_PLAUSIBLE_M
         if new_h is None:
             continue
-        if not (2.4 <= new_h <= 4.0):
+        if not (lo <= new_h <= hi):
             summary["skipped_implausible"].append({"nr": nr, "value": new_h})
             continue
         old_h = float(r.get("lubu_aukstis_m") or 0)

@@ -63,6 +63,140 @@ class HeightFusion:
         }
 
 
+# ── Classification-aware page sampling for the height Vision pass ──────────
+#
+# 2026-07-07 (objektas_b): the height lanes used to look at page 1 and a
+# 3-page priority list that deliberately excluded wall elevations, so a
+# 65-page project whose only height evidence lives on sienų išklotinės
+# (pages 12–22) never got a structured read — the double-height svetainė
+# survived only via the warnings[] narration salvage. Sample by the
+# extract's own page classification instead: sections first (they draw
+# heights), ceiling plans (+2700 labels), the eksplikacija page (height
+# column), then a SPREAD of wall elevations (išklotinės can be 10+ pages —
+# first/middle/last, capped) and title/floor-plan fallbacks.
+#
+# wall_elevation stays LAST among drawing types on purpose: those pages
+# also show fixture/tile heights the model can misread as ceilings. The
+# fusion gate (high-confidence-only primary) and the per-room plausibility
+# band keep a misread from going project-wide.
+
+HEIGHT_SECTION_TIPAI = ("section", "cross_section", "detail")
+MAX_WALL_ELEVATION_SAMPLES = 3
+DEFAULT_MAX_HEIGHT_PAGES = 6
+
+
+def spread_sample(items: list, k: int) -> list:
+    """Pick up to ``k`` evenly spaced items, always including the first and
+    last — a spread across a long išklotinių block beats the first N."""
+    if k <= 0:
+        return []
+    if len(items) <= k:
+        return list(items)
+    if k == 1:
+        return [items[0]]
+    out: list = []
+    for i in range(k):
+        item = items[round(i * (len(items) - 1) / (k - 1))]
+        if item not in out:
+            out.append(item)
+    return out
+
+
+def height_scan_pages(ai: dict, max_pages: int = DEFAULT_MAX_HEIGHT_PAGES) -> list[int]:
+    """Ordered page list for the ceiling-height Vision pass, driven by the
+    extract's own ``puslapiai[]`` classification. Falls back to [1] when
+    the extract carries no classification at all."""
+    by_tipas: dict[str, list[int]] = {}
+    for p in (ai.get("puslapiai") or []):
+        try:
+            nr = int(p.get("nr") or 0)
+        except (TypeError, ValueError):
+            continue
+        if nr <= 0:
+            continue
+        by_tipas.setdefault((p.get("tipas") or "").lower(), []).append(nr)
+
+    order: list[int] = []
+
+    def add(nr) -> None:
+        try:
+            nr = int(nr)
+        except (TypeError, ValueError):
+            return
+        if nr > 0 and nr not in order:
+            order.append(nr)
+
+    for tipas in HEIGHT_SECTION_TIPAI:
+        for nr in by_tipas.get(tipas, []):
+            add(nr)
+    for nr in by_tipas.get("ceiling_plan", []):
+        add(nr)
+    if ai.get("eksplikacija_source_page"):
+        add(ai["eksplikacija_source_page"])
+    for nr in spread_sample(sorted(by_tipas.get("wall_elevation", [])),
+                            MAX_WALL_ELEVATION_SAMPLES):
+        add(nr)
+    for nr in by_tipas.get("title_page", []):
+        add(nr)
+    if ai.get("scale_source_page"):
+        add(ai["scale_source_page"])
+    for nr in by_tipas.get("floor_plan", [])[:1]:  # title block lives on p1
+        add(nr)
+
+    if not order:
+        return [1]
+    return order[:max_pages]
+
+
+def merge_explicit_payloads(payloads: list[dict]) -> dict | None:
+    """Merge ceiling-height payloads from a multi-page scan into one.
+
+    ``primary_value_m`` comes from the FIRST payload (scan order = page
+    priority order) with a value at non-low confidence — same semantics
+    as the old first-hit-wins loop. ``per_room`` is the union across every
+    scanned page (first page naming a room wins, case-insensitive), so a
+    double-height room read off an išklotinė survives even when a section
+    page already answered the project-wide question.
+
+    Returns None when no page produced any signal.
+    """
+    best: dict | None = None
+    per_room: dict[str, float] = {}
+    seen_keys: set[str] = set()
+    heights: list[float] = []
+    for p in payloads or []:
+        if not isinstance(p, dict):
+            continue
+        for k, v in (p.get("per_room") or {}).items():
+            kk = str(k).strip()
+            if not kk or kk.lower() in seen_keys:
+                continue
+            try:
+                per_room[kk] = float(v)
+                seen_keys.add(kk.lower())
+            except (TypeError, ValueError):
+                continue
+        for v in (p.get("ceiling_heights_m") or []):
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                continue
+            if fv not in heights:
+                heights.append(fv)
+        if (best is None and p.get("primary_value_m") is not None
+                and str(p.get("confidence") or "low") != "low"):
+            best = p
+    if best is None and not per_room:
+        return None
+    return {
+        "ceiling_heights_m": heights,
+        "primary_value_m": best.get("primary_value_m") if best else None,
+        "confidence": str(best.get("confidence")) if best else "low",
+        "source_quote": str(best.get("source_quote") or "") if best else "",
+        "per_room": per_room,
+    }
+
+
 def signal_from_door_heights(rooms: list[dict]) -> HeightSignal:
     """Derive ceiling height from the most common door height in elementai.
 
