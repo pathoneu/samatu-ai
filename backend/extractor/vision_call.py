@@ -1396,6 +1396,34 @@ def _consolidate_led_niche_pozicijos(parsed: dict) -> None:
     parsed["pozicijos"] = rebuilt
 
 
+def _room_virs_3m_paint(room: dict) -> float:
+    """m² of a room's paint (walls + ceiling) that belongs above 3 m.
+
+    Same class as the 2026-07-05 audit bug 4 (paint iki/virš-3m split): a room
+    whose NOMINAL height is <3 m can still carry explicit above-3m surfaces —
+    a feature/soffit wall (extra_walls_virs_3m_m2) or a raised ceiling coffer
+    (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
+    ceiling above 3 m over a 2.8 m room). Judging by room height alone drops
+    those surfaces from every height-gated billed quantity (paint split,
+    pastoliai). A genuinely high room (≥3 m) contributes all its paint.
+
+    Vision-direct rooms (no recompute pass) may carry only dazymo_plotas_m2;
+    for those the room total falls back to it so a nominal-high room still
+    contributes exactly what it did before this helper existed."""
+    from .universal_rules import is_high_ceiling as _is_high
+    w = float(room.get("walls_paintable_m2") or 0)
+    c = float(room.get("ceiling_paintable_m2") or 0)
+    total = w + c
+    if total <= 0:
+        total = float(room.get("dazymo_plotas_m2") or 0)
+    if _is_high(room.get("lubu_aukstis_m")):
+        return total
+    xw = float(room.get("extra_walls_virs_3m_m2") or 0)
+    hc = min(float(room.get("high_ceiling_area_m2") or 0), c)
+    # never allocate more to virš-3m than the room actually paints
+    return min(xw + hc, total)
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -2287,12 +2315,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # PRIDĖTINIAI ELEMENTAI (~4-5 lines)
     # ════════════════════════════════════════════════════════════════════════
 
-    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4)
-    from .universal_rules import is_high_ceiling as _is_high
-    high_ceiling_dazymo = round(sum(
-        float(r.get("dazymo_plotas_m2") or 0) for r in rooms
-        if _is_high(r.get("lubu_aukstis_m"))
-    ), 2)
+    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4).
+    # Per-room basis mirrors the paint iki/virš-3m split: nominal-high rooms
+    # contribute all their paint, partial-high rooms (<3 m nominal but with
+    # explicit above-3m surfaces) contribute their >3m slice.
+    high_ceiling_dazymo = round(sum(_room_virs_3m_paint(r) for r in rooms), 2)
     if high_ceiling_dazymo > 0:
         # ~1 d.d. per ~50 m² didelio aukščio dažomo ploto
         pastoliu_dd = max(1, round(high_ceiling_dazymo / 50))
