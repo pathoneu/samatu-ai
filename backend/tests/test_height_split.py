@@ -124,3 +124,45 @@ def test_salvage_short_components_do_not_alias():
     # Matched (if at all) only via the wc paskirtis-phrase fallback, never via
     # a 2-char name-component alias; assert no crash and dict-typed result.
     assert isinstance(salvaged, dict)
+
+
+# ── double-height narration above the scanner plausibility cap ──────────────
+
+def test_salvage_double_height_narration_above_scanner_cap():
+    # Verbatim warning from the saved objektas_b extract (2026-06-01 run).
+    # The narrated 5.7 m double-height ceiling was rejected by the page-marker
+    # scanner band (MAX_CEILING_M = 4.5), zeroing the virš-3m split and the
+    # pastoliai line while the contractor bills 68.28 m² of >3m ceiling +
+    # 90 d.d. tall-scaffold rental.
+    warnings = [{
+        "level": "INFO",
+        "message": (
+            "Svetainė/valgomasis/virtuvė turi dvigubo aukščio lubas "
+            "(~5.7m pagal vizualizacijas ir lubų planą)"
+        ),
+        "patalpa_nr": "02",
+    }]
+    rooms = [
+        {"pavadinimas": "Svetainė/valgomasis/virtuvė", "paskirtis": "gyvenamoji"},
+        {"pavadinimas": "Koridorius", "paskirtis": "koridorius"},
+    ]
+    assert salvage_heights_from_warnings(warnings, rooms) == {
+        "Svetainė/valgomasis/virtuvė": 5.7,
+    }
+
+
+def test_salvage_extended_band_requires_ceiling_context():
+    # A wall-length narration ("5.2m ilgio") must NOT become a 5.2 m ceiling:
+    # values above the scanner band are accepted only when the warning talks
+    # about lubos/aukštis.
+    warnings = [{"message": "Koridorius siena 5.2m ilgio be angų"}]
+    rooms = [{"pavadinimas": "Koridorius", "paskirtis": "koridorius"}]
+    assert salvage_heights_from_warnings(warnings, rooms) == {}
+
+
+def test_salvage_extended_band_still_caps_building_heights():
+    # Even with ceiling context, values above any plausible interior ceiling
+    # (building height, ridge) stay rejected.
+    warnings = [{"message": "Koridorius zonoje pastato aukštis 8.5m"}]
+    rooms = [{"pavadinimas": "Koridorius", "paskirtis": "koridorius"}]
+    assert salvage_heights_from_warnings(warnings, rooms) == {}
