@@ -23,6 +23,30 @@ _FLAG_DEFINITIONS = {
     "sonnet_pass1":          ("ENABLE_SONNET_PASS1", False),             # Sprint 4
     "grid_overlay":          ("ENABLE_GRID_OVERLAY", False),             # Sprint 3
     "proxy_gt":              ("ENABLE_PROXY_GT", False),                 # Sprint 4
+    # 2026-06-06: collapse the per-coat glaistymas/dažymas split (Q1/Q2/sluoksnis,
+    # walls+ceilings) into the contractor's combined "Sienų, lubų glaistymas/
+    # dažymas (iki/virš 3m)" line (Rangovas A samata items 16/17). Display-only;
+    # santrauka totals unchanged. Disable: ENABLE_CONSOLIDATE_PAINT_LINES=0
+    "consolidate_paint_lines": ("ENABLE_CONSOLIDATE_PAINT_LINES", True),
+    # 2026-06-05: floor SYNTHETIC square perimeters (perim ≈ 4·√area) on plans
+    # with NO eksplikacija table, for the wall-paint path only. Gated on
+    # plotas_saltinis so eksplikacija/inline_label rooms are NEVER touched →
+    # zero regression on read-from-table projects (verified: berzas, objektas_b,
+    # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: ciurliu
+    # -20.3%→-13.5%, lazunu -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
+    "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", True),
+    # 2026-06-09: run the high-variance Pass-1 (+ adjacency) N times and
+    # median-vote into one consensus extraction. Stabilises kampai (the
+    # pusiniai term survives a single adjacency-bail run) and wires the
+    # adjacency pass into production so n_partition_walls is populated on
+    # real uploads (not just the offline benchmark).
+    # → DEFAULT ON after the live A/B on berzas (2026-06-09): voted vs single-pass
+    #   moved combined paint −5.4%→+2.3%, kampai −32%→−10.6%, recovered per-room
+    #   ceiling heights [2.8,3.0,3.4] and n_partition_walls 0→34, at only +13%
+    #   wall-clock (once-only downstream passes dominate; consensus already carried
+    #   heights so zoom skipped). Disable: ENABLE_EXTRACTION_VOTING=0.
+    #   Rounds: VOTING_N (default 3, 2-5).
+    "extraction_voting": ("ENABLE_EXTRACTION_VOTING", True),
 }
 
 
@@ -51,3 +75,16 @@ def get_flags() -> dict[str, bool]:
 
 # Back-compat alias for any old code reading _FLAG_ENV_NAMES
 _FLAG_ENV_NAMES = {name: env for name, (env, _default) in _FLAG_DEFINITIONS.items()}
+
+
+def voting_n(default: int = 3) -> int:
+    """Number of Pass-1 rounds to run when extraction_voting is on.
+
+    Read from VOTING_N; clamped to [2, 5] (1 defeats the purpose, >5 burns
+    budget with diminishing returns). Invalid/unset → default (3).
+    """
+    try:
+        n = int(os.environ.get("VOTING_N", "").strip() or default)
+    except (ValueError, TypeError):
+        n = default
+    return max(2, min(5, n))

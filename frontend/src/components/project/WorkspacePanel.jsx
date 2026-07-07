@@ -7,7 +7,7 @@
  * Replaces previous rooms-only table layout with positions-aware unified panel.
  */
 
-import { useState, useMemo, useEffect, useCallback, memo } from 'react';
+import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff,
 } from 'lucide-react';
@@ -19,6 +19,7 @@ import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
 
 function fmt(v, d = 2) {
@@ -84,7 +85,21 @@ function useTakeoff(projectId) {
 // ── Wet-room paskirtis check (for "drėgna" pill) ──────────────────────────
 const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla']);
 
-export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenance, onProjectChange }) {
+export default function WorkspacePanel({
+  project,
+  onJumpToPage,
+  onJumpToProvenance,
+  onProjectChange,
+  focusedRoomNr = null,
+  // Phase 1 declutter (2026-07-02): panel is the source of truth for which
+  // zones are drawn on the canvas. All null-safe — panel works standalone.
+  hiddenRoomNrs = null,
+  onToggleRoomVisibility = null,
+  onIsolateRoom = null,
+  onShowAllRooms = null,
+  onRoomRowHover = null,
+}) {
+  const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
   // Provenance dots OFF by default — too noisy when most rows are computed.
@@ -96,8 +111,12 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
   // unreliable PDF coords.
   const [popoverState, setPopoverState] = useState(null);  // {room, anchorRect} | null
 
-  const handleRemovePolygon = (id) => {
-    if (!window.confirm('Ištrinti pažymėjimą?')) return;
+  const handleRemovePolygon = async (id) => {
+    if (!(await confirm({
+      title: 'Ištrinti pažymėjimą?',
+      confirmText: 'Ištrinti',
+      destructive: true,
+    }))) return;
     setTakeoff(t => removePolygon(t, id));
   };
 
@@ -123,6 +142,16 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
   }, [project.v8_rooms, project.patalpos, takeoff.polygons]);
 
   const totalArea = allRooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
+
+  // Canvas visibility: nr may be number or string in data — compare as String.
+  const hiddenRoomSet = useMemo(
+    () => new Set(Array.from(hiddenRoomNrs || []).map(String)),
+    [hiddenRoomNrs],
+  );
+  const hiddenCount = useMemo(
+    () => allRooms.filter(r => hiddenRoomSet.has(String(r.nr))).length,
+    [allRooms, hiddenRoomSet],
+  );
 
   // Positions grouped by skyrius (preserve server-side order)
   const positionGroups = useMemo(() => {
@@ -198,6 +227,13 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
     if (r && onJumpToPage) onJumpToPage(r.puslapio_nr, r);
   }, [project.v8_rooms, project.patalpos, onJumpToPage]);
 
+  const focusedRowRef = useRef(null);
+  useEffect(() => {
+    if (focusedRoomNr != null && focusedRowRef.current) {
+      focusedRowRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [focusedRoomNr]);
+
   return (
     <div
       className="flex flex-col h-full overflow-hidden"
@@ -270,20 +306,47 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
           collapsed={collapsed.rooms}
           onToggle={() => toggleSection('rooms')}
           top={0}
+          action={hiddenCount > 0 && onShowAllRooms ? (
+            // span, not button — SectionHeader itself is a <button>, and nested
+            // interactive elements are invalid HTML. stopPropagation keeps the
+            // click from also toggling the section.
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onShowAllRooms(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onShowAllRooms(); }
+              }}
+              className="rounded border px-1.5 whitespace-nowrap transition-colors text-primary border-primary/30 hover:bg-primary/10"
+              style={{
+                fontSize: 10, lineHeight: '16px',
+              }}
+              title="Rodyti visas paslėptas zonas plane"
+            >
+              Rodyti visas ({hiddenCount} paslėpta)
+            </span>
+          ) : null}
         />
         {!collapsed.rooms && filteredRooms.map((r, i) => {
           const targetPage = r.puslapio_nr ?? r.page_nr;
           const canJump = !!(onJumpToPage && targetPage);
           const isWet = WET_PASKIRTYS.has((r.paskirtis || '').toLowerCase());
+          const isFocused = focusedRoomNr != null && String(r.nr) === String(focusedRoomNr);
+          const isHidden = hiddenRoomSet.has(String(r.nr));
           return (
             <div
               key={`${r.nr}-${i}`}
+              ref={isFocused ? focusedRowRef : undefined}
               onClick={canJump ? () => onJumpToPage(targetPage, r) : undefined}
-              className="row-hover-halo grid items-center cursor-pointer transition-colors"
+              onMouseEnter={onRoomRowHover ? () => onRoomRowHover(r.nr) : undefined}
+              onMouseLeave={onRoomRowHover ? () => onRoomRowHover(null) : undefined}
+              className={`row-hover-halo grid items-center cursor-pointer transition-colors${isHidden ? ' opacity-50' : ''}`}
               style={{
-                gridTemplateColumns: '24px 1fr auto',
+                gridTemplateColumns: onToggleRoomVisibility ? '24px 1fr auto 20px' : '24px 1fr auto',
                 gap: 8, padding: '6px 12px', fontSize: 12,
                 borderBottom: '1px solid hsl(var(--border) / 0.5)',
+                background: isFocused ? 'hsl(var(--primary) / 0.10)' : undefined,
+                boxShadow: isFocused ? 'inset 3px 0 0 hsl(var(--primary))' : undefined,
               }}
               title={canJump ? `Atidaryti psl. ${targetPage}` : undefined}
             >
@@ -342,6 +405,21 @@ export default function WorkspacePanel({ project, onJumpToPage, onJumpToProvenan
                   ) : null;
                 })()}
               </span>
+              {onToggleRoomVisibility && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if ((e.ctrlKey || e.metaKey) && onIsolateRoom) onIsolateRoom(r.nr);
+                    else onToggleRoomVisibility(r.nr);
+                  }}
+                  className="flex items-center justify-center justify-self-end text-muted-foreground hover:text-foreground transition-colors"
+                  style={{ width: 16, height: 16 }}
+                  title="Rodyti/slėpti zoną plane · Ctrl+spustelėjimas — rodyti tik šią"
+                >
+                  {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
             </div>
           );
         })}
@@ -501,7 +579,7 @@ function PlyteliuSpecsSection({ specs }) {
 }
 
 // ── Section header (sticky) ──────────────────────────────────────────────
-function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle, top = 0 }) {
+function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle, top = 0, action = null }) {
   const isToggleable = !!onToggle;
   return (
     <button
@@ -529,8 +607,11 @@ function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle,
           {count}
         </span>
       </div>
-      <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
-        {summary}
+      <span className="flex items-center gap-2">
+        {action}
+        <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
+          {summary}
+        </span>
       </span>
     </button>
   );

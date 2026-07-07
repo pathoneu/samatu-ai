@@ -7,6 +7,8 @@ import {
   getTextLabelRect,
   getPolygonPdfPoints,
   getPolygonPdfRect,
+  getPolygonPctPoints,
+  getPolygonPctRect,
   pickOverlayRect,
 } from './planOverlayGeometry.js';
 
@@ -92,6 +94,52 @@ test('getPolygonPdfPoints: maps precise polygon points from PDF space', () => {
     }),
     [[50, 25], [150, 75], [50, 75]]
   );
+});
+
+// ── polygon_pct path (room-graph rooms carry fractional coords, not PDF points) ──
+// This is the fix for the wrong-room-halo bug: getFocusedRoomRect only checked
+// polygon_pdf (absent on room-graph rooms) and fell through to coarse fallbacks.
+
+test('getPolygonPctPoints: maps fractional points to rendered pixels, no Y-flip', () => {
+  const poly = [{ x_pct: 0.1, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.6 }];
+  assert.deepEqual(
+    getPolygonPctPoints(poly, { renderedWidth: 1000, renderedHeight: 800 }),
+    [[100, 160], [500, 160], [500, 480]],
+  );
+});
+
+test('getPolygonPctPoints: accepts [x,y] pair shape too', () => {
+  assert.deepEqual(
+    getPolygonPctPoints([[0.1, 0.2], [0.5, 0.2], [0.5, 0.6]], { renderedWidth: 1000, renderedHeight: 800 }),
+    [[100, 160], [500, 160], [500, 480]],
+  );
+});
+
+test('getPolygonPctPoints: returns null for <3 points, bad numbers, or zero render size', () => {
+  assert.equal(getPolygonPctPoints([{ x_pct: 0.1, y_pct: 0.2 }], { renderedWidth: 1000, renderedHeight: 800 }), null);
+  assert.equal(getPolygonPctPoints([{ x_pct: NaN, y_pct: 0 }, {}, {}], { renderedWidth: 1000, renderedHeight: 800 }), null);
+  assert.equal(getPolygonPctPoints([{ x_pct: 0.1, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.6 }], { renderedWidth: 0, renderedHeight: 800 }), null);
+});
+
+test('getPolygonPctRect: returns the bbox of the mapped points', () => {
+  const poly = [{ x_pct: 0.1, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.6 }];
+  assert.deepEqual(
+    getPolygonPctRect(poly, { renderedWidth: 1000, renderedHeight: 800 }),
+    { left: 100, top: 160, width: 400, height: 320 },
+  );
+});
+
+test('getFocusedRoomRect: prefers polygon_pct over absent polygon_pdf and lands a room rect', () => {
+  const room = { puslapio_nr: 2, polygon_pct: [{ x_pct: 0.1, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.6 }] };
+  assert.deepEqual(
+    getFocusedRoomRect({ room, page: 2, renderedSize: { width: 1000, height: 800 }, pdfSize: { width: 600, height: 480 } }),
+    { type: 'room', left: 100, top: 160, width: 400, height: 320 },
+  );
+});
+
+test('getFocusedRoomRect: polygon_pct only fires on the room’s own page', () => {
+  const room = { puslapio_nr: 5, polygon_pct: [{ x_pct: 0.1, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.2 }, { x_pct: 0.5, y_pct: 0.6 }] };
+  assert.equal(getFocusedRoomRect({ room, page: 2, renderedSize: { width: 1000, height: 800 } }), null);
 });
 
 test('getTextLabelRect: pads a PDF text item so room-number clicks have a visible target', () => {

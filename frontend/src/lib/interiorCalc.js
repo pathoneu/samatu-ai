@@ -7,7 +7,9 @@ const ROOM_LETTER_MAP = {
 };
 
 const Q_RATES = { Q1: 0.8, Q2: 1.0, Q3: 1.2, Q4: 1.5 };
-const Q_THICK = { Q1: 1.2, Q2: 1.25, Q3: 1.75, Q4: 2.5 };
+// CLAUDE.md §1.11: Q4 = 3–5 mm full-surface skim (gloss/lacquer prep). Prior
+// value 2.5 mm under-ordered Q4 putty; set to mid-range 4 mm (2026-07-05).
+const Q_THICK = { Q1: 1.2, Q2: 1.25, Q3: 1.75, Q4: 4 };
 
 function zoneCategory(ztype) {
   const t = (ztype || '').toLowerCase();
@@ -179,7 +181,12 @@ export function calculateInteriorQuantities(rawData, assumptions = {}) {
     const doorWidths = doors
       .filter(d => (d.between || []).includes(nr))
       .reduce((s, d) => s + (d.width_mm || 900) / 1000, 0);
-    grindjustesM += Math.max(0, perimM - doorWidths);
+    // CLAUDE.md §1.4: baseboard = perimeter − Σ(door_widths) + 10% waste.
+    // The WASTE_FACTORS UI table (ltLibrary.js: Grindjuostės 10%) is display-only
+    // (rendered in RulesOverridePanel, never multiplied), and the ExportModal
+    // reads grindjuostes.viso_m verbatim — so the +10% must be applied HERE, once.
+    // (Trace verified 2026-07-05: previously applied ZERO times in this flow.)
+    grindjustesM += Math.max(0, perimM - doorWidths) * 1.10;
   }
 
   // Additional metrics

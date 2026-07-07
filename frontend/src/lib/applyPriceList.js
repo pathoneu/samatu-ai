@@ -43,7 +43,12 @@ function jaccard(setA, setB) {
 }
 
 function unitsCompatible(a, b) {
-  const norm = (u) => String(u || '').toLowerCase().replace(/[\s.²³]/g, '').replace('m2', 'm2').replace('m3', 'm3');
+  // Map superscripts to their ASCII token so area / volume / length stay DISTINCT:
+  // 'm²'→'m2', 'm³'→'m3', 'm'→'m'. (2026-06-19 hunt: the old code stripped ²³
+  // FIRST, collapsing 'm²' and 'm³' to 'm', so a €/m linear price could be matched
+  // onto an m² area line — silently mis-pricing the sąmata.)
+  const norm = (u) => String(u || '').toLowerCase()
+    .replace(/²/g, '2').replace(/³/g, '3').replace(/[\s.]/g, '');
   const ua = norm(a);
   const ub = norm(b);
   if (!ua || !ub) return true;  // benefit-of-the-doubt when unspecified

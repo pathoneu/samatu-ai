@@ -24,6 +24,32 @@ from main import app  # noqa: E402
 
 client = TestClient(app)
 
+
+@pytest.fixture(autouse=True)
+def _own_cv_projects(tmp_path, monkeypatch):
+    """N6 (pass 2): the /api/cv/* routes now require the caller to OWN the
+    project_id. These tests run under the dev auth bypass (.env
+    SAMATU_AUTH_DISABLED=1), so seed every project_id they use as dev-owned;
+    otherwise the ownership gate 404s before the behaviour under test. The
+    intentionally-missing 'no-such-project-id-12345' is deliberately left
+    unseeded so its 404/409 assertion still holds.
+
+    Also isolate the DB + reset the in-process rate bucket so neither the
+    per-user hourly-extract cap (usage table) nor the per-IP limiter — both
+    shared, process-global state that accumulates across the suite — 429s these
+    same-IP dev-user calls."""
+    import auth as _auth
+    import db as _db
+    import main as _main
+    monkeypatch.setattr(_db, "_DB_PATH", tmp_path / "cv_tools.db")
+    _db.init_schema()
+    _db._migrate_schema()
+    dev = _auth._ensure_dev_user()
+    for pid in ("test-cv", "upload-test", "bad"):
+        _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])
+    _main._RATE_BUCKET.clear()
+    yield
+
 # Search order: env var override → ~/Desktop/test_pdfs → legacy in-repo path.
 _ENV_PDF = os.environ.get("SAMATU_TEST_PDF", "").strip()
 _TEST_PDF_CANDIDATES = [

@@ -1,0 +1,44 @@
+# Pathon — robots.txt
+# Classic crawlers: everything public is welcome.
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /project/
+Disallow: /settings
+Disallow: /admin
+Disallow: /price-lists
+Disallow: /billing/
+
+# AI assistants & their crawlers — explicitly welcome. We WANT Pathon to be
+# retrievable and citable by AI answer engines (ChatGPT, Claude, Perplexity,
+# Gemini, Copilot). Retrieval visibility > training paranoia for a B2B SaaS.
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+User-agent: meta-externalagent
+Allow: /
+User-agent: Amazonbot
+Allow: /
+User-agent: cohere-ai
+Allow: /
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://pathon.eu/sitemap.xml

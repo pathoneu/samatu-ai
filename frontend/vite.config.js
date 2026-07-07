@@ -11,7 +11,13 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.mjs',
+          // pdfjs-dist 4.8.69 is installed at the top level (no nested copy
+          // under react-pdf). The legacy path 'node_modules/react-pdf/node_modules/...'
+          // does not exist; correct it to the actual install location so
+          // viteStaticCopy can find the PDF worker. Without this, every PDF
+          // load fails with "Nepavyko atidaryti PDF" because react-pdf can't
+          // fetch /pdf.worker.mjs.
+          src: 'node_modules/pdfjs-dist/build/pdf.worker.mjs',
           dest: '.',
           rename: 'pdf.worker.mjs',
         },

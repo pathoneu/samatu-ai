@@ -8,9 +8,16 @@ from __future__ import annotations
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-MODEL = "claude-opus-4-7"
+# Model resolved per-call via models_config.model_for("vision_pass1"/"vision_pass2")
+# — the old module-level MODEL constant was removed (W1.1, 2026-07-03) so
+# MODEL_OVERRIDE / SAMATU_MODEL_* env changes apply without re-imports.
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
 DPI = 200
+# Provider's max image long-edge before it silently downscales. Opus 4.7 raised
+# this to 2576 and 4.8 inherits it (was 1568 on 4.6). The tag/glyph readers MUST
+# use this — capping at 1568 on 4.8 throws away ~2.7x the pixels on the exact
+# small-symbol reads that drive door/fixture recall variance.
+PROVIDER_MAX_IMG_PX = 2576
 MAX_PAGES = 100  # Opus 4.7 API hard max — full coverage for any realistic LT project.
                  # User decision (2026-04-27): accuracy > latency; 50k+ € projects
                  # justify multi-minute waits. Cost scales linearly (~$0.025/image).
@@ -24,7 +31,7 @@ ZOOM_PADDING_PCT = 0.05   # 5% padding around bbox so dimension chains are visib
 
 
 # =============================================================================
-# OUTPUT JSON SCHEMA — Kreo-style hierarchical with calculation_trace
+# OUTPUT JSON SCHEMA — hierarchical hierarchical with calculation_trace
 # =============================================================================
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -42,7 +49,7 @@ OUTPUT_SCHEMA = {
         "eksplikacija_source_page": {"type": ["integer", "null"]},
         "puslapiai": {
             "type": "array",
-            "description": "Klasifikuoti puslapiai (Phase 14 / QW02 togal-style page sidebar)",
+            "description": "Klasifikuoti puslapiai (Phase 14 / QW02 auto-count-style page sidebar)",
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -938,6 +945,21 @@ def build_zoom_user_content(cropped_image_b64: str, room: dict) -> list[dict]:
     ]
 
 
+def _final_instruction_text(n: int) -> str:
+    """The Pass-1 closing instruction. Shared between the image path
+    (build_user_content) and the EXPERIMENTAL native-PDF path
+    (build_user_content_pdf_native) so both send byte-identical prompts."""
+    return (
+        f"Iš {n} puslapių aukščiau ištrauk visus kambarius, jų matmenis, sutartinius "
+        f"ženklus, ir suskaičiuok kiekius pagal pateiktą schemą. "
+        f"PRIVALOMA: užpildyk `detected_symbols_summary` lauką — suskaičiuok rozetes, "
+        f"jungiklius, šviestuvus, difuzorius, klozetus, ir kitus sutartinius ženklus "
+        f"(žr. <symbol_recognition> sekciją). Šitas sumarinis count'as pildo elektros "
+        f"ir santechnikos pozicijas, todėl jo trūkumas reiškia spragas vartotojo sąmatoj. "
+        f"Grąžink VIENĄ JSON objektą."
+    )
+
+
 def build_user_content(pages: list[dict]) -> list[dict]:
     """Build user message: page label + image interleaved (image-first order)."""
     n = len(pages)
@@ -951,16 +973,48 @@ def build_user_content(pages: list[dict]) -> list[dict]:
             "type": "image",
             "source": {"type": "base64", "media_type": "image/jpeg", "data": p["image_b64"]},
         })
+    # Cache the whole image prefix: N-pass voting (_run_pass1_voted) re-sends the
+    # byte-identical images on every round, so a single ephemeral breakpoint on
+    # the last image block lets rounds 2..N read them at ~0.1x instead of full
+    # price. Zero accuracy change; rounds must stay sequential to hit the cache.
+    if content and content[-1].get("type") == "image":
+        content[-1]["cache_control"] = {"type": "ephemeral"}
     content.append({
         "type": "text",
-        "text": (
-            f"Iš {n} puslapių aukščiau ištrauk visus kambarius, jų matmenis, sutartinius "
-            f"ženklus, ir suskaičiuok kiekius pagal pateiktą schemą. "
-            f"PRIVALOMA: užpildyk `detected_symbols_summary` lauką — suskaičiuok rozetes, "
-            f"jungiklius, šviestuvus, difuzorius, klozetus, ir kitus sutartinius ženklus "
-            f"(žr. <symbol_recognition> sekciją). Šitas sumarinis count'as pildo elektros "
-            f"ir santechnikos pozicijas, todėl jo trūkumas reiškia spragas vartotojo sąmatoj. "
-            f"Grąžink VIENĄ JSON objektą."
-        ),
+        "text": _final_instruction_text(n),
+    })
+    return content
+
+
+def build_user_content_pdf_native(pdf_b64: str, n_pages: int,
+                                  page_map_note: str | None = None) -> list[dict]:
+    """EXPERIMENTAL (SAMATU_PDF_NATIVE=1): Pass-1 user message with a single
+    PDF `document` block instead of pdf2image-rendered image blocks. The API
+    then feeds the model BOTH the rendered page image AND the extracted text
+    layer per page (official base64-document behavior, no beta header).
+
+    Block ordering mirrors build_user_content's caching layout exactly:
+    stable heavy payload first (here: the document block, cache_control on it —
+    the counterpart of the last image block), volatile closing instruction
+    after the breakpoint. N-pass voting re-sends the byte-identical document,
+    so rounds 2..N read it from cache.
+
+    page_map_note is only set when the page subset renumbers pages (vendor
+    pages dropped) — it maps document page → original brėžinio page so the
+    model's `puslapio_nr` output stays in ORIGINAL numbering (downstream
+    zoom crops render from the original PDF).
+    """
+    content: list[dict] = []
+    if page_map_note:
+        # Stable per-run (identical across voting rounds) → cache-safe prefix.
+        content.append({"type": "text", "text": page_map_note})
+    content.append({
+        "type": "document",
+        "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64},
+        "cache_control": {"type": "ephemeral"},
+    })
+    content.append({
+        "type": "text",
+        "text": _final_instruction_text(n_pages),
     })
     return content

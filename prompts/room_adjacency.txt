@@ -1,0 +1,55 @@
+You are looking at a floor plan of a Lithuanian residential building.
+Your task is to describe how each room is connected to other rooms.
+
+INPUT
+A single architectural floor plan page (or cropped portion of one).
+Room labels in Lithuanian (e.g. Miegamasis, Svetainė, Koridorius, Vonia).
+
+TASK
+For every visible interior room, output one JSON object describing:
+  - room_name: exact room name from the plan
+  - room_nr:   eksplikacija number if visible (e.g. "01", "102")
+  - adjacent_rooms: list of immediately-adjacent rooms (sharing ≥1 wall)
+  - exterior_wall_count: number of walls that face the outside
+
+OUTPUT — return exactly one JSON object, no prose, no fences:
+
+{
+  "rooms": [
+    {
+      "room_name": "Miegamasis",
+      "room_nr": "101",
+      "adjacent_rooms": [
+        {"to_room": "Koridorius", "to_room_nr": "105", "shared_wall_count": 1, "wall_types": ["interior_partition"]},
+        {"to_room": "Vonia",      "to_room_nr": "106", "shared_wall_count": 1, "wall_types": ["interior_partition"]}
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "high",
+      "evidence": "Bedroom in the north corner; west and north walls face outside, south borders Koridorius, east borders Vonia"
+    }
+  ]
+}
+
+RULES
+1. A "shared wall" separates two heated interior rooms within the same dwelling.
+2. An "exterior wall" faces the outside, a balcony, a staircase, a garage
+   not part of the apartment, or any unheated space.
+3. If a room has no adjacent rooms (e.g. detached annex), adjacent_rooms = [].
+4. If you cannot determine a wall's type, mark wall_types as ["unknown"].
+5. Each adjacency must be reciprocal — if room A says it shares 1 wall with
+   room B, room B must say it shares 1 wall with room A. Verify before
+   emitting.
+6. Skip terraces, balconies, common corridors UNLESS they share a wall
+   with a heated interior room.
+7. shared_wall_count is usually 1; only count >1 when two rooms share
+   multiple distinct wall segments (e.g. an L-shaped partition).
+8. exterior_wall_count is the count of distinct WALLS facing outside, not
+   the count of windows or doors.
+
+CONFIDENCE
+- "high":   layout is clear; room labels and walls are unambiguous
+- "medium": room labels visible but wall ownership requires inference
+- "low":    rooms unlabeled or wall boundaries ambiguous
+
+If you cannot extract any rooms (page is not a floor plan, or quality is
+too low), return {"rooms": []}.

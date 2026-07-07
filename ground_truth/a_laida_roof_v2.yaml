@@ -1,0 +1,67 @@
+project_id: a_laida
+source_pdf: backend/tests/fixtures/stogai/a_laida.pdf
+roof_type: keturslaitis
+
+roof_input:
+  axis_to_axis_length_m: 12.88
+  axis_to_axis_width_m: 8.70
+  eaves_overhang_from_axis_m: 1.05
+  wall_thickness_m: 0.25
+  slope_angles_deg: [25, 22]
+  chimney_count: 0
+  rooflight_count: 0
+  windows_count: 0
+
+pages:
+  - page_num: 9
+    page_class: section
+    fields:
+      slope_angles_deg: [25]
+      ridge_height_m: 5.80
+      eaves_height_m: 3.20
+
+  - page_num: 10
+    page_class: stogo_planas
+    fields:
+      roof_type: keturslaitis
+      axis_to_axis_length_m: 12.88
+      axis_to_axis_width_m: 8.70
+      eaves_overhang_from_axis_m: 1.05
+      visible_slope_angles_deg: [25, 22]
+      chimney_count: 0
+      rooflight_count: 0
+      windows_count: 0
+      sub_dimensions_m:
+        axis_to_axis_length_m: [5.33, 7.55]
+        axis_to_axis_width_m: [3.80, 4.90]
+
+  - page_num: 16
+    page_class: section
+    fields:
+      slope_angles_deg: [22]
+
+roofer_samata:
+  source: owner_friend_roofer_quoted_2026-05-12
+  pvm_included: false
+  line_items:
+    - position: perdanga
+      qty: 117
+      unit: m2
+      eur_per_unit: 10.00
+      sum_eur: 1170.00
+    - position: stogas
+      qty: 185
+      unit: m2
+      eur_per_unit: 20.00
+      sum_eur: 3700.00
+    - position: latakai
+      qty: 52
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 624.00
+    - position: kraigai
+      qty: 36
+      unit: m
+      eur_per_unit: 6.00
+      sum_eur: 216.00
+  total_eur_no_vat: 5710.00

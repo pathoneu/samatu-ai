@@ -1,0 +1,149 @@
+{
+  "$schema_version": 1,
+  "project_id": "objektas_b",
+  "name": "Objektas B (Objektas B)",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2026-04-13"
+  },
+  "notes_for_evaluator": "gt_dimensions intentionally empty — per-room data not extracted yet. Totals derived from pasiūlymas 2026-04-13. Largest of the 5 batch projects (65-page TP).",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "gkp_lubu_iki_3m_m2": {
+      "value": 74.91,
+      "confidence": "green",
+      "source": "pasiūlymas item 1 'GKP ant lubų'"
+    },
+    "gkp_lubu_virs_3m_m2": {
+      "value": 68.28,
+      "confidence": "green",
+      "source": "pasiūlymas item 2 'GKP ant lubų virš 3m'"
+    },
+    "gkp_laidu_apsiuvimas_garaze_m2": {
+      "value": 26.57,
+      "confidence": "green",
+      "source": "pasiūlymas item 3"
+    },
+    "led_nisos_m": {
+      "value": 54.98,
+      "confidence": "green",
+      "source": "pasiūlymas item 4 'Nišų formavimas iš GKP'"
+    },
+    "angokrasciu_m": {
+      "value": 94.02,
+      "confidence": "green",
+      "source": "pasiūlymas item 14 'Angokraščių apdirbimas GKP'"
+    },
+    "rotband_lyginimas_m2": {
+      "value": 138.69,
+      "confidence": "green",
+      "source": "pasiūlymas item 15"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 493.03,
+      "confidence": "green",
+      "source": "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Beržų convention"
+    },
+    "dazymo_iki_3m_m2": {
+      "value": 424.75,
+      "confidence": "green",
+      "source": "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"
+    },
+    "dazymo_lubu_virs_3m_m2": {
+      "value": 68.28,
+      "confidence": "green",
+      "source": "pasiūlymas item 17"
+    },
+    "sienu_molio_tinkas_m2": {
+      "value": 160.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 18 'Sienų dekoravimas molio tinku'",
+      "notes": "Clay plaster — not in default formula scope but contractor-billed"
+    },
+    "doors_atkosai_m": {
+      "value": 55.52,
+      "confidence": "green",
+      "source": "pasiūlymas item 19 'Durų angų paruošimas beapvasdinėms durims'"
+    },
+    "kampu_metrai_m": {
+      "value": 580.54,
+      "confidence": "green",
+      "source": "pasiūlymas item 20 'Dažymo kampų montavimas'"
+    },
+    "plyteles_sienos_grindys_1200x1200_m2": {
+      "value": 157.34,
+      "confidence": "green",
+      "source": "pasiūlymas item 28"
+    },
+    "plyteles_sienos_grindys_1200x600_m2": {
+      "value": 52.59,
+      "confidence": "green",
+      "source": "pasiūlymas item 30"
+    },
+    "plyteles_didzformaciai_m2": {
+      "value": 7.52,
+      "confidence": "green",
+      "source": "pasiūlymas item 31"
+    },
+    "parketas_45_eglute_m2": {
+      "value": 108.08,
+      "confidence": "green",
+      "source": "pasiūlymas item 101"
+    },
+    "ilyginamasis_grindys_m2": {
+      "value": 143.19,
+      "confidence": "green",
+      "source": "pasiūlymas item 102"
+    },
+    "grindjuostes_isleistos_m": {
+      "value": 63.0,
+      "confidence": "green",
+      "source": "pasiūlymas item 103"
+    },
+    "grindjuostes_paprastos_m": {
+      "value": 30.8,
+      "confidence": "green",
+      "source": "pasiūlymas item 104"
+    },
+    "plyteles_sienos_grindys_combined_m2": {
+      "value": 217.45,
+      "confidence": "green",
+      "source": "pasiūlymas items 28+30+31 (157.34 + 52.59 + 7.52) — all m² tile-laying lines",
+      "notes": "Aggregation of the three per-format tile lines already recorded above (plyteles_sienos_grindys_1200x1200/1200x600/didzformaciai). Excludes linear item 29 (b/m nišos angokraščiai) and item 32 (10.49 m² didžformačių nišos angokraščiai — reveal tiling our room model does not produce)."
+    },
+    "isliginamasis_grindys_m2": {
+      "value": 182.62,
+      "confidence": "green",
+      "source": "pasiūlymas items 39 (Išlyginamojo pylimas 39.43, plytelių skyrius) + 102 (Išlyginamojo sluoksnio įrengimas 143.19, grindų skyrius)",
+      "notes": "Contractor bills floor screed in two trade sections; the engine's isliginamasis_m2_total covers ALL non-concrete floors, so the semantically matching truth is the sum. The original ilyginamasis_grindys_m2 entry (143.19, item 102 only) is kept for provenance but is scope-incomplete for this comparison."
+    },
+    "grindjuostes_total_m": {
+      "value": 93.8,
+      "confidence": "green",
+      "source": "pasiūlymas items 103 (į sieną įleistos 63.0) + 104 (paprastos 30.8)",
+      "notes": "Engine emits one combined baseboard total (grindjuosciu_m_total); truth is the sum of both baseboard type lines."
+    },
+    "pvc_grindys_m2": {
+      "value": 108.08,
+      "confidence": "green",
+      "source": "pasiūlymas item 101 (Parketlenčių klijavimas 45° eglutė)",
+      "notes": "Key name follows the engine bucket pvc_grindys_m2_total = non-tile finished floor covering (PVC/parketas/laminatas). This project's covering is parquet; garage rubber mat (item 108, 10.8 m², Papildomi darbai) is out of scope for this bucket."
+    },
+    "walls_paint_total_m2": {
+      "value": 349.84,
+      "confidence": "derived",
+      "source": "derived: dazymo_walls_plus_ceilings_combined 493.03 − billed GKP ceilings (74.91 + 68.28 = 143.19)",
+      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity holds exactly on Beržų: GKP 102.78+62.82 = 165.60 = contractor ceiling paint; and here item 17 dažymo virš 3m = 68.28 = GKP virš 3m exactly). Clay-plastered walls (item 18, 160 m²) are billed separately and are NOT in this paint figure."
+    },
+    "ceiling_paint_total_m2": {
+      "value": 143.19,
+      "confidence": "derived",
+      "source": "derived: billed GKP ceilings 74.91 + 68.28 (items 1+2); item 17 (lubų dažymas virš 3m) = 68.28 confirms the convention",
+      "notes": "See walls_paint_total_m2 derivation note."
+    }
+  }
+}

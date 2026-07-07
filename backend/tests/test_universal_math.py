@@ -304,3 +304,77 @@ def test_gkp_sheets_zero_area_zero_sheets():
     from extractor.universal_rules import calc_gkp_sheets
     assert calc_gkp_sheets(0.0) == 0
     assert calc_gkp_sheets(-5.0) == 0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Perimeter floor for SYNTHETIC (non-eksplikacija) geometry — 2026-06-05
+#
+# Root cause (diagnosed across berzas/objektas_b/ciurliu/lazunu): on plans
+# with no eksplikacija table Vision emits a minimum-SQUARE perimeter
+# (perim ≈ 4·√area), under-reading wall paint. The floor lifts ONLY the
+# wall-path perimeter, gated on plotas_saltinis so trusted-table rooms are
+# never inflated (this gate is the zero-regression guarantee).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_perimeter_floor_skips_eksplikacija_rooms():
+    """GATE: a room whose area came from an eksplikacija table is NEVER inflated.
+    This is what keeps the read-from-table projects at zero regression."""
+    room = {
+        "paskirtis": "gyvenamoji",
+        "plotas_m2": 16.0,
+        "perimetras_m": 16.0,          # 4·√16 — square, but TRUSTED source
+        "plotas_saltinis": "eksplikacija",
+        "lubu_aukstis_m": 2.8,
+    }
+    out = calc_room_quantities(room)
+    assert out["_perimetras_floor_applied"] is False
+    assert out["_walls_perimetras_m"] == pytest.approx(16.0, abs=0.01)
+    assert out["walls_gross_m2"] == pytest.approx(16.0 * 2.8, abs=0.01)
+
+
+def test_perimeter_floor_lifts_synthetic_square_room():
+    """A synthetic square perimeter (no eksplikacija) is floored toward an
+    elongated rectangle for the WALL path; measured perimetras_m is untouched."""
+    room = {
+        "paskirtis": "gyvenamoji",
+        "plotas_m2": 16.0,
+        "perimetras_m": 16.0,          # 4·√16 — square synthesis
+        "plotas_saltinis": "wall_dim_calc",
+        "lubu_aukstis_m": 2.8,
+    }
+    out = calc_room_quantities(room)
+    expected = 4.69 * 4.0              # 4.69·√16 = 18.76
+    assert out["_perimetras_floor_applied"] is True
+    assert out["_walls_perimetras_m"] == pytest.approx(expected, abs=0.01)
+    assert out["walls_gross_m2"] == pytest.approx(expected * 2.8, abs=0.01)
+    assert out["perimetras_m"] == pytest.approx(16.0, abs=0.01)  # measured stays
+
+
+def test_perimeter_floor_keeps_already_elongated_perimeter():
+    """If the synthetic perimeter already exceeds the floor, don't lower it."""
+    room = {
+        "paskirtis": "gyvenamoji",
+        "plotas_m2": 16.0,
+        "perimetras_m": 22.0,          # already > 4.69·√16 = 18.76
+        "plotas_saltinis": "default_fallback",
+        "lubu_aukstis_m": 2.8,
+    }
+    out = calc_room_quantities(room)
+    assert out["_perimetras_floor_applied"] is False
+    assert out["walls_gross_m2"] == pytest.approx(22.0 * 2.8, abs=0.01)
+
+
+def test_perimeter_floor_does_not_touch_silikonavimas():
+    """SCOPING: the floor is wall-path only. Wet-room corner sealant stays on the
+    MEASURED perimeter so the calibrated ×2.3 multiplier is preserved."""
+    room = {
+        "paskirtis": "vonia",
+        "plotas_m2": 4.0,
+        "perimetras_m": 8.0,           # synthetic square
+        "plotas_saltinis": "wall_dim_calc",
+        "lubu_aukstis_m": 2.8,
+    }
+    out = calc_room_quantities(room)
+    assert out["_perimetras_floor_applied"] is True
+    assert out["silikonavimas_m"] == pytest.approx(8.0 * 2.3, abs=0.01)  # measured perim

@@ -1,14 +1,20 @@
 /**
- * pdfStore — IndexedDB storage'as PDF failams.
+ * pdfStore — PDF failų saugykla.
  *
- * localStorage neegzistuoja didelius PDF failus (>5MB ribota), todėl
- * naudojam IndexedDB. Per projekto ID saugom Blob, atveriam per blob URL.
+ * IndexedDB veikia kaip GREITAS lokalus kešas, o tikroji DURABLI kopija laikoma
+ * backende (object storage / R2). Todėl išvalius naršyklės kešą, persijungus į
+ * kitą įrenginį ar atidarius bendrinimo nuorodą brėžinys nebepradingsta —
+ * getPdfBlob automatiškai parsisiunčia jį iš backendo ir vėl įkešuoja.
+ * (2026-06-21 durability track.)
  *
  * API:
- *   await savePdf(projectId, file)         // file: File | Blob
- *   const url = await getPdfUrl(projectId) // grąžina blob: URL (sukuriamas runtime)
+ *   await savePdf(projectId, file)             // IndexedDB kešas
+ *   await uploadPdfToBackend(projectId, file)  // durabli kopija (fire-and-forget)
+ *   const url = await getPdfUrl(projectId)     // kešas → backend fallback → blob URL
  *   await deletePdf(projectId)
  */
+
+import { API_BASE } from './apiBase';
 
 const DB_NAME = 'samatu_pdfs';
 const STORE = 'pdfs';
@@ -39,7 +45,7 @@ export async function savePdf(projectId, file) {
   });
 }
 
-export async function getPdfBlob(projectId) {
+async function getPdfFromIdb(projectId) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
@@ -47,6 +53,45 @@ export async function getPdfBlob(projectId) {
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
+}
+
+/** POST the PDF to the backend so it survives a cache clear / device switch.
+ *  Fire-and-forget — best effort; never blocks the upload flow. */
+export async function uploadPdfToBackend(projectId, file) {
+  if (!projectId || !file) return false;
+  try {
+    const fd = new FormData();
+    fd.append('pdf_file', file, 'drawing.pdf');
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/pdf`, {
+      method: 'POST', credentials: 'include', body: fd,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchPdfFromBackend(projectId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/pdf`, { credentials: 'include' });
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
+  }
+}
+
+export async function getPdfBlob(projectId) {
+  // 1) fast browser cache
+  const cached = await getPdfFromIdb(projectId);
+  if (cached) return cached;
+  // 2) durable backend fallback (cache cleared, new device, share link)
+  const remote = await fetchPdfFromBackend(projectId);
+  if (remote) {
+    try { await savePdf(projectId, remote); } catch { /* re-cache best-effort */ }
+    return remote;
+  }
+  return null;
 }
 
 export async function getPdfUrl(projectId) {

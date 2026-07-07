@@ -19,11 +19,19 @@ export async function postSse(url, body, { onEvent, signal } = {}) {
 
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
+    let errBody = null;
     try {
-      const errBody = await res.json();
-      if (errBody?.detail) detail = errBody.detail;
+      errBody = await res.json();
+      // Prefer a paywall `message`, then FastAPI `detail`.
+      if (errBody?.message) detail = errBody.message;
+      else if (errBody?.detail) detail = errBody.detail;
     } catch { /* ignore */ }
-    throw new Error(detail);
+    // Preserve status + parsed body so callers can branch on paywall codes
+    // (402 quota_exceeded/trial_used, 403 company_code_required).
+    const err = new Error(detail);
+    err.status = res.status;
+    err.body = errBody;
+    throw err;
   }
   if (!res.body) throw new Error('No response body — SSE not supported by server');
 

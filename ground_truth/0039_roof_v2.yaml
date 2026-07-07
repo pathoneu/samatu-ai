@@ -1,0 +1,82 @@
+project_id: 0039
+source_pdf: backend/tests/fixtures/stogai/0039.pdf
+roof_type: dvislaitis
+
+roof_input:
+  axis_to_axis_length_m: 25.34
+  axis_to_axis_width_m: 7.12
+  eaves_overhang_from_axis_m: 0.0
+  wall_thickness_m: 0.30
+  slope_angles_deg: [30]
+  chimney_count: 1
+  rooflight_count: 0
+  windows_count: 0
+
+pages:
+  - page_num: 46
+    page_class: floor_plan
+    fields:
+      axis_to_axis_length_m: 25.59
+      axis_to_axis_width_m: 7.12
+
+  - page_num: 48
+    page_class: stogo_planas
+    fields:
+      roof_type: dvislaitis
+      axis_to_axis_length_m: 25.34
+      axis_to_axis_width_m: 4.61    # PARTIAL — system MUST drop (not authoritative)
+      visible_slope_angles_deg: [35]   # WRONG — system MUST prefer section's 30°
+      chimney_count: 1
+
+  - page_num: 49
+    page_class: section
+    fields:
+      slope_angles_deg: [30]
+      ridge_height_m: 8.45
+      eaves_height_m: 5.5    # +5.50 eaves height marker on pjūvis
+
+roofer_samata:
+  source: 0039_roofer_samata
+  pvm_included: false
+  line_items:
+    - position: stogas
+      qty: 231
+      unit: m2
+      eur_per_unit: 40.00
+      sum_eur: 9240.00
+    - position: sienos
+      qty: 135
+      unit: m2
+      eur_per_unit: 50.00
+      sum_eur: 6750.00
+    - position: vejalentes
+      qty: 18
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 216.00
+    - position: kraigai
+      qty: 26
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 312.00
+    - position: latakai
+      qty: 51
+      unit: m
+      eur_per_unit: 20.00
+      sum_eur: 1020.00
+    - position: kaminelis
+      qty: 1
+      unit: vnt
+      eur_per_unit: 70.00
+      sum_eur: 70.00
+    - position: apsaugine_tvorele
+      qty: 51
+      unit: m
+      eur_per_unit: 20.00
+      sum_eur: 1020.00
+    - position: langu_apdirbimas
+      qty: 12
+      unit: vnt
+      eur_per_unit: 150.00
+      sum_eur: 1800.00
+  total_eur_no_vat: 20458.00

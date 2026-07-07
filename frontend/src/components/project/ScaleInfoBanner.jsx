@@ -8,9 +8,11 @@
  * - Perspėjimai jei sanity rodė anomalijas
  */
 
+import { useTranslation } from 'react-i18next';
 import { Ruler, AlertTriangle, CheckCircle2, AlertOctagon } from 'lucide-react';
 
 export default function ScaleInfoBanner({ scaleInfo }) {
+  const { t } = useTranslation();
   if (!scaleInfo) return null;
 
   const conf = scaleInfo.confidence || 'low';
@@ -30,17 +32,17 @@ export default function ScaleInfoBanner({ scaleInfo }) {
   const iconColor = isWarning ? 'text-amber-600' : 'text-muted-foreground';
 
   const sourceLabel = {
-    text: 'tekstinis žymeklis',
-    dimensions: 'dimensijų užrašai',
-    'text+dimensions': 'tekstas + dimensijos',
-    sanity: 'logikos patikrinimas',
-    fallback: 'numatytasis (1:50)',
+    text: t('project.scaleBanner.srcText'),
+    dimensions: t('project.scaleBanner.srcDimensions'),
+    'text+dimensions': t('project.scaleBanner.srcTextDimensions'),
+    sanity: t('project.scaleBanner.srcSanity'),
+    fallback: t('project.scaleBanner.srcFallback'),
   }[source] || source;
 
   const confLabel = {
-    high: 'Aukšto patikimumo',
-    medium: 'Vidutinio patikimumo',
-    low: 'Žemo patikimumo',
+    high: t('project.scaleBanner.confHigh'),
+    medium: t('project.scaleBanner.confMedium'),
+    low: t('project.scaleBanner.confLow'),
   }[conf];
 
   return (
@@ -48,9 +50,9 @@ export default function ScaleInfoBanner({ scaleInfo }) {
       <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${iconColor}`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold">Brėžinio mastelis: 1:{ratio}</span>
+          <span className="font-semibold">{t('project.scaleBanner.scale', { ratio })}</span>
           <span className="text-xs opacity-75">
-            ({confLabel} — {sourceLabel})
+            {t('project.scaleBanner.confSource', { conf: confLabel, source: sourceLabel })}
           </span>
         </div>
 
@@ -67,18 +69,15 @@ export default function ScaleInfoBanner({ scaleInfo }) {
             })}
             {warnings.length > 5 && (
               <li className="text-xs opacity-60">
-                + dar {warnings.length - 5} perspėjimai
+                {t('project.scaleBanner.moreWarnings', { count: warnings.length - 5 })}
               </li>
             )}
           </ul>
         )}
 
         {sanity && sanity.suggested_scale_multiplier && (
-          <div className="mt-2 text-xs bg-white/50 rounded px-2 py-1.5 border border-current/20">
-            <strong>Patarimas:</strong> Plotai atrodo netinkamo dydžio
-            ({sanity.anomaly_pct}% patalpų už normos ribų). Galimas mastelio
-            koregavimas: ×{sanity.suggested_scale_multiplier.toFixed(2)}.
-            Patikrinkite brėžinį arba pažymėkite plotus rankiniu būdu Brėžinio tab'e.
+          <div className="mt-2 text-xs bg-background/40 rounded px-2 py-1.5 border border-current/20">
+            <strong>{t('project.scaleBanner.tipLabel')}</strong>{t('project.scaleBanner.tipBody', { pct: sanity.anomaly_pct, multiplier: sanity.suggested_scale_multiplier.toFixed(2) })}
           </div>
         )}
       </div>

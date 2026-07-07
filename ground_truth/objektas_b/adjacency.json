@@ -1,0 +1,631 @@
+{
+  "rooms": [
+    {
+      "room_name": "Tambūras",
+      "room_nr": "01",
+      "adjacent_rooms": [
+        {
+          "to_room": "Svetainė/valgomasis/virtuvė",
+          "to_room_nr": "02",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Garažas",
+          "to_room_nr": "15",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Entry vestibule at east end; faces exterior on east and south, borders living area west and garage north",
+      "n_partition_walls": 2
+    },
+    {
+      "room_name": "Svetainė/valgomasis/virtuvė",
+      "room_nr": "02",
+      "adjacent_rooms": [
+        {
+          "to_room": "Tambūras",
+          "to_room_nr": "01",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tech. patalpa/skalbykla",
+          "to_room_nr": "13",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Pagrindinė namo drabužinė",
+          "to_room_nr": "14",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Large open living/kitchen room across south side; faces exterior south and partly east",
+      "n_partition_walls": 4
+    },
+    {
+      "room_name": "Koridorius",
+      "room_nr": "03",
+      "adjacent_rooms": [
+        {
+          "to_room": "Svetainė/valgomasis/virtuvė",
+          "to_room_nr": "02",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "04",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario drabužinė",
+          "to_room_nr": "05",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys 2",
+          "to_room_nr": "06",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario 2 drabužinė",
+          "to_room_nr": "07",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vaikų vonia",
+          "to_room_nr": "08",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "09",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo vonia",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svečių wc",
+          "to_room_nr": "12",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tech. patalpa/skalbykla",
+          "to_room_nr": "13",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "medium",
+      "evidence": "Central hallway distributing to all rooms",
+      "n_partition_walls": 10
+    },
+    {
+      "room_name": "Kambarys",
+      "room_nr": "04",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario drabužinė",
+          "to_room_nr": "05",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys 2",
+          "to_room_nr": "06",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Bedroom in west corner facing west and south exterior",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambario drabužinė",
+      "room_nr": "05",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "04",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario 2 drabužinė",
+          "to_room_nr": "07",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "medium",
+      "evidence": "Closet adjacent to bedroom 04 and corridor",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambarys 2",
+      "room_nr": "06",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "04",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario 2 drabužinė",
+          "to_room_nr": "07",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Vaikų vonia",
+          "to_room_nr": "08",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Second child bedroom on north side; faces exterior north and west",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambario 2 drabužinė",
+      "room_nr": "07",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys 2",
+          "to_room_nr": "06",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambario drabužinė",
+          "to_room_nr": "05",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Closet attached to bedroom 06; faces west exterior",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Vaikų vonia",
+      "room_nr": "08",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys 2",
+          "to_room_nr": "06",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "09",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Children's bathroom along north wall",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Miegamasis",
+      "room_nr": "09",
+      "adjacent_rooms": [
+        {
+          "to_room": "Vaikų vonia",
+          "to_room_nr": "08",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo vonia",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo drabužinė",
+          "to_room_nr": "11",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svečių wc",
+          "to_room_nr": "12",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Master bedroom along north facade",
+      "n_partition_walls": 5
+    },
+    {
+      "room_name": "Miegamojo vonia",
+      "room_nr": "10",
+      "adjacent_rooms": [
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "09",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo drabužinė",
+          "to_room_nr": "11",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svečių wc",
+          "to_room_nr": "12",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tech. patalpa/skalbykla",
+          "to_room_nr": "13",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "low",
+      "evidence": "Master bathroom in interior cluster between bedroom, closet and tech room",
+      "n_partition_walls": 5
+    },
+    {
+      "room_name": "Miegamojo drabužinė",
+      "room_nr": "11",
+      "adjacent_rooms": [
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "09",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo vonia",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svečių wc",
+          "to_room_nr": "12",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "low",
+      "evidence": "Master closet between bedroom 09 and bathroom 10",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Svečių wc",
+      "room_nr": "12",
+      "adjacent_rooms": [
+        {
+          "to_room": "Miegamojo drabužinė",
+          "to_room_nr": "11",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo vonia",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamasis",
+          "to_room_nr": "09",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "low",
+      "evidence": "Small guest WC in inner cluster",
+      "n_partition_walls": 4
+    },
+    {
+      "room_name": "Tech. patalpa/skalbykla",
+      "room_nr": "13",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "03",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Miegamojo vonia",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė/valgomasis/virtuvė",
+          "to_room_nr": "02",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Pagrindinė namo drabužinė",
+          "to_room_nr": "14",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Garažas",
+          "to_room_nr": "15",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "low",
+      "evidence": "Technical/laundry room east of corridor, between main spaces and garage",
+      "n_partition_walls": 5
+    },
+    {
+      "room_name": "Pagrindinė namo drabužinė",
+      "room_nr": "14",
+      "adjacent_rooms": [
+        {
+          "to_room": "Svetainė/valgomasis/virtuvė",
+          "to_room_nr": "02",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tech. patalpa/skalbykla",
+          "to_room_nr": "13",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Garažas",
+          "to_room_nr": "15",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "low",
+      "evidence": "Main closet adjacent to garage and living area",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Garažas",
+      "room_nr": "15",
+      "adjacent_rooms": [
+        {
+          "to_room": "Tambūras",
+          "to_room_nr": "01",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Tech. patalpa/skalbykla",
+          "to_room_nr": "13",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Pagrindinė namo drabužinė",
+          "to_room_nr": "14",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 3,
+      "confidence": "medium",
+      "evidence": "Garage at far east of the plan, exterior on north, east, south",
+      "n_partition_walls": 3
+    }
+  ],
+  "_meta": {
+    "cache": "hit",
+    "key": "bfd3ddd5a9c6504dcdc31d73dfd37af0a297f4069108d3f6978ccd3745b9ab87",
+    "model": "claude-opus-4-7"
+  }
+}

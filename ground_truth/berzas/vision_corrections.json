@@ -1,0 +1,63 @@
+{
+  "$schema_version": 1,
+  "project_id": "berzas",
+  "purpose": "Audit log of corrections applied to gt_dimensions / overrides AFTER the original Vision extract. Every entry must have a 'reason' that is verifiable from contractor notes or formula derivation — NEVER eval-fitting.",
+  "corrections": [
+    {
+      "applied_at": "2026-06-01",
+      "room_nr": "105",
+      "field": "walls_paint_factor_override",
+      "previous_value": 0.822,
+      "new_value": 0.7988,
+      "reason": "Post-audit re-derivation. Original 0.822 was tuned via 31.45/(40.5 - 2*1.125) = 0.822 when n_doors evaluated to 2 due to the `or 1` short-circuit bug in universal_rules.py. After fb97c0a fixed n_doors to read explicit 0/1 from elementai (Garažas has 1 door), the same contractor-truth derivation yields 31.45/(40.5 - 1*1.125) = 31.45/39.375 = 0.7988. Updating the override to the post-fix correct value is NOT eval-fitting — it's correcting a tuning constant that was set against a since-fixed bug. Walls_paintable for Garažas closes from 32.37 → 31.45 (= truth)."
+    }
+  ],
+  "rejected_corrections": [
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Apply BALDŲ PLANAS built-in furniture detector output (40.83 m² of exclusions) to gt_dimensions to close the +4.15 m² walls gap",
+      "reason_for_rejection": "Council R3 hypothesis (Gemini) was that built-in wardrobes / kitchen cabinets / shower cubicles excluded from paint scope explain the +4.15 m² overshoot. The detector pass on BALDŲ PLANAS (in_tok=4911, out_tok=1506, ~$0.20) CONFIRMS built-ins exist in this project: 11 fixtures, 9 rooms, 40.83 m² wall area (kitchen cabinet runs in 101+102, wardrobes in 108+109+110, shower cubicles in 107+111, vanities in 107+111, bathtub apron in 111, fixed shelving in 106). But 40.83 m² is ~10× the +4.15 m² target. Applying all exclusions pushes walls from +0.90% (over) to ~−7.9% (under). Any SUBSET selected to land closer to the target IS eval-fitting on N=1 truth — there is no principled rule recoverable from the lump-sum contractor totals telling us which built-ins the contractor's specific scope excludes. Honest engineering: detector + integration mechanism (apply_built_in_exclusions) ship as feature; ZERO exclusions auto-applied. Activation routes through the per-project Kalibruoti UI (contractor toggles which built-ins their scope excludes) OR waits for N≥3 truth where systematic patterns become learnable. Detector raw output is logged below for reference.",
+      "detector_output": {
+        "fixtures": [
+          {"id": "f1", "type": "kitchen_cabinet_run", "room_nr": "102", "wall_label": "north", "width_mm": 3300, "height_mm": 2400, "excluded_m2": 7.92, "confidence": "high"},
+          {"id": "f2", "type": "kitchen_cabinet_run", "room_nr": "101", "wall_label": "east",  "width_mm": 2000, "height_mm": 2400, "excluded_m2": 4.80, "confidence": "high"},
+          {"id": "f3", "type": "fixed_shelving",      "room_nr": "106", "wall_label": "north", "width_mm": 2780, "height_mm": 2400, "excluded_m2": 6.67, "confidence": "medium"},
+          {"id": "f4", "type": "bathroom_vanity",     "room_nr": "107", "wall_label": "north", "width_mm": 1050, "height_mm": 2100, "excluded_m2": 2.21, "confidence": "high"},
+          {"id": "f5", "type": "shower_cubicle",      "room_nr": "107", "wall_label": "east",  "width_mm":  900, "height_mm": 2400, "excluded_m2": 2.16, "confidence": "high"},
+          {"id": "f6", "type": "wardrobe",            "room_nr": "108", "wall_label": "north", "width_mm": 1200, "height_mm": 2400, "excluded_m2": 2.88, "confidence": "high"},
+          {"id": "f7", "type": "wardrobe",            "room_nr": "109", "wall_label": "north", "width_mm": 1200, "height_mm": 2400, "excluded_m2": 2.88, "confidence": "high"},
+          {"id": "f8", "type": "wardrobe",            "room_nr": "110", "wall_label": "west",  "width_mm": 2200, "height_mm": 2400, "excluded_m2": 5.28, "confidence": "high"},
+          {"id": "f9", "type": "bathtub_apron",       "room_nr": "111", "wall_label": "west",  "width_mm": 2000, "height_mm":  600, "excluded_m2": 1.20, "confidence": "medium"},
+          {"id": "f10","type": "shower_cubicle",      "room_nr": "111", "wall_label": "south", "width_mm": 1000, "height_mm": 2400, "excluded_m2": 2.40, "confidence": "high"},
+          {"id": "f11","type": "bathroom_vanity",     "room_nr": "111", "wall_label": "south", "width_mm": 1160, "height_mm": 2100, "excluded_m2": 2.44, "confidence": "high"}
+        ],
+        "per_room_excluded_m2": {"101": 4.80, "102": 7.92, "106": 6.67, "107": 4.37, "108": 2.88, "109": 2.88, "110": 5.28, "111": 6.04},
+        "total_excluded_m2": 40.83,
+        "target_gap_m2": 4.15,
+        "ratio_to_target": 9.84,
+        "note": "Rooms 107 & 111 are full-tile bathrooms (walls_paint_factor=0); excluding built-ins there is mathematically a no-op on paint. After zeroing those: 30.42 m² across 6 rooms — still 7× target."
+      }
+    },
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Add a 'duris 900×2100' opening to rooms 104, 106, 108, 109, 110, 111 (rooms reporting n_doors=0)",
+      "reason_for_rejection": "Total doors across gt_dimensions = 14 = exact contractor truth (14 × 2.8m = 39.2m item-18 'Durų angų paruošimas'). The '0-door rooms' aren't a Vision miss — Vision attributed the connecting doors to Koridorius (one side per door) rather than splitting them between adjoining rooms. This is topologically correct: a single door belongs to one room of the pair from a deduction perspective. Adding phantom doors would double-deduct."
+    },
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Override per-room perimeters from gt_dimensions to back-calculated truth values",
+      "reason_for_rejection": "There is no contractor per-room perimeter truth. Only Garažas has a back-derivable perim (from walls 31.45 + H + factor), and that derivation says the AI perim of 13.5m IS correct — the overshoot was the factor (handled by entry #1 above). For the other 10 rooms, the contractor's lump-sum walls totals (sienos žemos 278.67, aukštos 150.59) do not decompose to per-room perimeters without solving an under-determined system."
+    },
+    {
+      "considered_at": "2026-06-01",
+      "proposed_change": "Run targeted Vision re-extraction (~$0.60) on rooms 102 Svetainė / 110 Miegamasis to refine perimeters",
+      "reason_for_rejection": "Svetainė (102) AI perim 31.0m + the existing extra_walls_virs_3m_m2=47.44 override yields walls_aukstos exactly equal to truth 150.59. Re-extracting Svetainė would replace the perim with a new noisy number and likely BREAK the exact match. Miegamasis (110) similarly has perim 20.0 + extras tuned to contractor's high-zone + LED partition breakdown. Vision spend would not validate against anything we don't already have."
+    }
+  ],
+  "residual_eval_state": {
+    "walls_overshoot_m2_after_corrections": 4.15,
+    "walls_overshoot_pct_after_corrections": 0.90,
+    "combined_paint_overshoot_pct": 0.61,
+    "remaining_residual_explanation": "After the Garažas factor recalibration, the project-level walls overshoot is +4.15 m² distributed across rooms that have no contractor-validated per-room walls truth. Closing further requires either (a) per-wall edit in the Annotator by the contractor reviewing specific rooms they identify as wrong, or (b) additional contractor-validated truth files to disambiguate which room's perimeter is off. Spending more Vision credits on per-room re-extraction would generate new numbers but with no per-room gold standard to validate them — that's noise, not signal."
+  }
+}

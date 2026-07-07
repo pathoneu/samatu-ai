@@ -1,5 +1,5 @@
 """
-Symbol detection — Togal-style "Image Search" arba count-by-template.
+Symbol detection — auto-count-style "Image Search" arba count-by-template.
 
 Du režimai:
 1. detect_symbols(pdf, type) — Vision'as suranda visus tipą (durys/langai/rozetės)
@@ -9,7 +9,7 @@ Du režimai:
    simbolio brėžinyje, sistema suranda visus panašius. Naudoja CLIP embedding
    similarity (jei galimas) arba Vision pattern matching.
 
-Šaltinis: skill A.2 (SoM) + Togal Image Search docs.
+Šaltinis: skill A.2 (SoM) + template image-search docs.
 """
 from __future__ import annotations
 import io
@@ -20,8 +20,7 @@ from typing import Any
 
 import anthropic
 
-
-VISION_MODEL = "claude-opus-4-7"
+from models_config import model_for  # role: "symbols" — resolved at call time
 
 
 def _parse_vision_json(text: str) -> dict:
@@ -303,7 +302,7 @@ Output JSON:
 
     try:
         resp = client.messages.create(
-            model=VISION_MODEL,
+            model=model_for("symbols"),
             max_tokens=4096,
             messages=[{
                 "role": "user",
@@ -409,7 +408,7 @@ Output JSON (TIK JSON, be markdown):
 
     try:
         resp = client.messages.create(
-            model=VISION_MODEL,
+            model=model_for("symbols"),
             max_tokens=8192,
             messages=[{
                 "role": "user",
@@ -634,7 +633,7 @@ Output JSON:
 
     try:
         resp = client.messages.create(
-            model=VISION_MODEL,
+            model=model_for("symbols"),
             max_tokens=4096,
             messages=[{
                 "role": "user",

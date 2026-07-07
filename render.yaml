@@ -12,8 +12,13 @@ services:
     region: frankfurt
     plan: starter
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
+    # --proxy-headers + --forwarded-allow-ips='*' so request.client.host reflects
+    # the REAL client IP behind Render's proxy (the per-IP login/register rate
+    # limiter keyed on the proxy IP otherwise — one abuser DoSes everyone's auth;
+    # 2026-06-19 security hunt). '*' is safe here: the service is only reachable
+    # via Render's edge, never directly.
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: ENV

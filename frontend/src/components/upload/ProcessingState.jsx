@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileSearch, Brain, Search, CheckCircle2 } from 'lucide-react';
 
 // User-facing labels — no technical jargon (no "Pass", "Vision", "AI" tier).
+// `labelKey` resolves against i18n at render.
 const steps = [
-  { icon: FileSearch,   label: 'Skaitome brėžinį...',                minSec: 0 },
-  { icon: Brain,        label: 'Atpažįstame patalpas...',            minSec: 15 },
-  { icon: Search,       label: 'Tiksliname matmenys...',             minSec: 90 },
-  { icon: CheckCircle2, label: 'Sudedame kiekius...',                minSec: 300 },
+  { icon: FileSearch,   labelKey: 'upload.processing.reading',     minSec: 0 },
+  { icon: Brain,        labelKey: 'upload.processing.recognizing', minSec: 15 },
+  { icon: Search,       labelKey: 'upload.processing.refining',    minSec: 90 },
+  { icon: CheckCircle2, labelKey: 'upload.processing.summing',     minSec: 300 },
 ];
 
 
 export default function ProcessingState() {
+  const { t } = useTranslation();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function ProcessingState() {
               i === currentStep ? 'text-foreground font-medium' :
               i < currentStep ? 'text-primary' : 'text-muted-foreground'
             }`}>
-              {step.label}
+              {t(step.labelKey)}
             </span>
           </motion.div>
         ))}

@@ -23,7 +23,7 @@ from typing import Any
 
 import anthropic
 
-from .prompt import MODEL
+from models_config import model_for  # call-time model resolution
 from .vision_call import pdf_to_b64_images
 
 __all__ = ["extract_room_material_specs"]
@@ -191,10 +191,11 @@ def extract_room_material_specs(
     # Call with retry
     parsed_specs: dict | None = None
     last_err: Exception | None = None
+    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
     for attempt in range(2):
         try:
             with client.messages.stream(
-                model=MODEL,
+                model=model,
                 max_tokens=2048,
                 system=system,
                 messages=[{"role": "user", "content": user_content}],

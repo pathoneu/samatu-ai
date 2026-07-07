@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { lt } from 'date-fns/locale';
@@ -28,6 +29,7 @@ function fmtSum(net, vatRate = 21) {
 }
 
 export default function ProjectCard({ project }) {
+  const { t } = useTranslation();
   const [hover, setHover] = useState(false);
   // Sprint §FIX (2026-04-29): backend's /extract-interior emits status="ok",
   // recompute-interior also emits "ok", and legacy projects have undefined.
@@ -65,7 +67,7 @@ export default function ProjectCard({ project }) {
             className="font-semibold text-foreground truncate"
             style={{ fontSize: 13, letterSpacing: '-0.005em' }}
           >
-            {project.name || 'Be pavadinimo'}
+            {project.name || t('dashboard.card.untitled')}
           </div>
           {project.company_name && (
             <div className="text-muted-foreground truncate mt-0.5" style={{ fontSize: 11 }}>
@@ -84,7 +86,7 @@ export default function ProjectCard({ project }) {
             background: 'hsl(var(--card))',
           }}
         >
-          {isReady ? 'Paruošta' : isProcessing ? 'Apdoroja' : 'Klaida'}
+          {isReady ? t('dashboard.card.statusReady') : isProcessing ? t('dashboard.card.statusProcessing') : t('dashboard.card.statusError')}
         </span>
       </div>
 
@@ -102,12 +104,12 @@ export default function ProjectCard({ project }) {
         <div className="flex items-center gap-2" style={{ height: 32 }}>
           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
           <span className="text-muted-foreground" style={{ fontSize: 11 }}>
-            Apdorojama PDF…
+            {t('dashboard.card.processingPdf')}
           </span>
         </div>
       ) : (
         <div className="text-muted-foreground" style={{ fontSize: 11, height: 32, lineHeight: '32px' }}>
-          Kainos dar nesuvestos
+          {t('dashboard.card.noPrices')}
         </div>
       )}
 
@@ -118,7 +120,7 @@ export default function ProjectCard({ project }) {
           borderTop: '1px solid hsl(var(--border) / 0.6)',
         }}
       >
-        <span className="tabular">{rowCount} eilučių</span>
+        <span className="tabular">{t('dashboard.card.rows', { count: rowCount })}</span>
         <span className="tabular">{dateStr}</span>
       </div>
     </div>

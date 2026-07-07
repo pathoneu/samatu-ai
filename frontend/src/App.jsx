@@ -1,4 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from 'sonner'
+import { ConfirmProvider } from '@/components/ui/confirm-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
@@ -19,11 +22,18 @@ const PriceLists = lazy(() => import('@/pages/PriceLists'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Register = lazy(() => import('@/pages/Register'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
+const Cookies = lazy(() => import('@/pages/Cookies'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const Landing = lazy(() => import('@/pages/Landing'));
+const Duk = lazy(() => import('@/pages/Duk'));
+// Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
+const Annotator = lazy(() => import('@/pages/Annotator'));
+// Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
+const Pricing = lazy(() => import('@/pages/Pricing'));
+const BillingResult = lazy(() => import('@/pages/BillingResult'));
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -74,6 +84,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <AuthProvider>
+        <ConfirmProvider>
+        <TooltipProvider delayDuration={200}>
         <Router>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
@@ -83,7 +95,9 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/cookies" element={<Cookies />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/duk" element={<Duk />} />
               <Route path="/share/:token" element={<SharedProject />} />
 
               {/* Protected — wrapped in AppLayout (sidebar) */}
@@ -91,7 +105,14 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
+              <Route path="/project/:id/annotator" element={<Annotator />} />
                 <Route path="/price-lists" element={<PriceLists />} />
+                {/* Phase 7 billing — pages self-gate via useBilling(): when the
+                    flag is off, /pricing redirects to /dashboard and result
+                    pages simply bounce back. No billing UI leaks when disabled. */}
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/billing/success" element={<BillingResult variant="success" />} />
+                <Route path="/billing/cancel" element={<BillingResult variant="cancel" />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Route>
@@ -103,6 +124,9 @@ function App() {
           </Suspense>
         </Router>
         <Toaster />
+        <SonnerToaster position="top-right" richColors closeButton />
+        </TooltipProvider>
+        </ConfirmProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

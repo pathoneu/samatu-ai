@@ -3,13 +3,19 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initErrorTracker } from '@/lib/errorTracker'
+import { initAnalytics } from '@/lib/analytics'
 import { API_BASE } from '@/lib/apiBase'
+import '@/i18n' // side-effect: initialise react-i18next (LT default, EN additive)
 import '@/index.css'
 
 // Sprint §24 (2026-04-29): localStorage error log so users can export
 // their last 100 errors via Settings → "Eksportuoti klaidų žurnalą".
 // Complementary to the backend /api/log-error post below.
 initErrorTracker();
+
+// Consent-gated GA4 (no-op until VITE_GA4_ID is set AND the visitor grants
+// the "analytics" cookie category — see src/lib/analytics.js).
+initAnalytics();
 
 // Capture unhandled promise rejections + window errors → backend log endpoint.
 // Lightweight; production should swap for Sentry SDK.

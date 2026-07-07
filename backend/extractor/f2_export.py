@@ -131,6 +131,8 @@ def export_to_csv(export: F2Export) -> str:
     import io
     import csv
 
+    from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe
+
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([
@@ -140,14 +142,18 @@ def export_to_csv(export: F2Export) -> str:
         "Audito istorija", "Pastabos",
     ])
     for r in export.rows:
+        # F6 (2026-07-04 pentest): neutralise formula injection on the user/AI
+        # string cells (code / label / unit / audit / notes). F2/F3 are shared
+        # with third parties, so a crafted label like =HYPERLINK(...) must NOT be
+        # evaluated when they open the CSV. Numeric cells stay numeric.
         writer.writerow([
-            r.eil_nr, r.code, r.label_lt, r.unit, r.quantity,
+            r.eil_nr, _safe(r.code), _safe(r.label_lt), _safe(r.unit), r.quantity,
             r.unit_price_eur_be_pvm if r.unit_price_eur_be_pvm is not None else "",
             r.total_eur_be_pvm if r.total_eur_be_pvm is not None else "",
             r.confidence, r.source,
             ";".join(str(p) for p in r.source_pages),
-            " | ".join(r.audit_history),
-            r.notes or "",
+            _safe(" | ".join(r.audit_history)),
+            _safe(r.notes or ""),
         ])
     writer.writerow([])
     writer.writerow(["", "", "", "", "Iš viso be PVM", "", export.grand_total_eur_be_pvm])

@@ -1,0 +1,432 @@
+{
+  "slug": "romainiai",
+  "pdf_path": "/Users/ignasgaldikas/samatu-ai/docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Deividas Norakitis INTERJERAS 4.1-5.1 punktas.pdf",
+  "pdf_size_bytes": 14759390,
+  "status": "pending",
+  "error": null,
+  "input_tokens": 110803,
+  "output_tokens": 9550,
+  "cost_usd": 2.3783,
+  "seconds": 276.61044692993164,
+  "n_rooms": 20,
+  "n_pages": null,
+  "metas": [
+    {
+      "event": "rendering_pdf"
+    },
+    {
+      "event": "started",
+      "page_count": 30,
+      "vendor_pages_skipped": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32
+      ]
+    },
+    {
+      "event": "eksplikacija_started"
+    },
+    {
+      "event": "eksplikacija_completed",
+      "rooms_in_table": 11,
+      "doors_in_table": 0,
+      "windows_in_table": 0
+    },
+    {
+      "event": "pass1_started",
+      "page_count": 30
+    },
+    {
+      "event": "pass1_completed",
+      "rooms_count": 20,
+      "patalpos": [
+        {
+          "nr": "1",
+          "pavadinimas": "Holas",
+          "paskirtis": "holas",
+          "plotas_m2": 11.55,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "2",
+          "pavadinimas": "Katilinė",
+          "paskirtis": "katiline",
+          "plotas_m2": 5.9,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "3",
+          "pavadinimas": "Koridorius",
+          "paskirtis": "koridorius",
+          "plotas_m2": 12.05,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "4",
+          "pavadinimas": "San. mazgas",
+          "paskirtis": "san",
+          "plotas_m2": 4.1,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "5",
+          "pavadinimas": "Kambarys (miegamasis)",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 15.4,
+          "puslapio_nr": 5,
+          "confidence": "medium"
+        },
+        {
+          "nr": "6",
+          "pavadinimas": "Sandėliukas",
+          "paskirtis": "sandeliukas",
+          "plotas_m2": 5.76,
+          "puslapio_nr": 5,
+          "confidence": "medium"
+        },
+        {
+          "nr": "7",
+          "pavadinimas": "Kambarys",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 12.32,
+          "puslapio_nr": 5,
+          "confidence": "medium"
+        },
+        {
+          "nr": "8",
+          "pavadinimas": "Virtuvė",
+          "paskirtis": "virtuve",
+          "plotas_m2": 24.03,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "9",
+          "pavadinimas": "Valgomasis",
+          "paskirtis": "valgomasis",
+          "plotas_m2": 11.18,
+          "puslapio_nr": 5,
+          "confidence": "medium"
+        },
+        {
+          "nr": "10",
+          "pavadinimas": "Svetainė",
+          "paskirtis": "gyvenamoji",
+          "plotas_m2": 32.44,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "11",
+          "pavadinimas": "Garažas",
+          "paskirtis": "garazas",
+          "plotas_m2": 35.94,
+          "puslapio_nr": 5,
+          "confidence": "high"
+        },
+        {
+          "nr": "1.2",
+          "pavadinimas": "Holas (2 aukštas)",
+          "paskirtis": "holas",
+          "plotas_m2": 14.76,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "2.2",
+          "pavadinimas": "Skalbykla",
+          "paskirtis": "skalbykla",
+          "plotas_m2": 7.7,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "3.2",
+          "pavadinimas": "Kambarys (vaikų miegamasis)",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 12.9,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "4.2",
+          "pavadinimas": "Kambarys (vaikų miegamasis)",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 12.85,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "5.2",
+          "pavadinimas": "Kambarys (vaikų miegamasis)",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 12.9,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "6.2",
+          "pavadinimas": "San. mazgas (vaikų)",
+          "paskirtis": "san",
+          "plotas_m2": 4.63,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "7.2",
+          "pavadinimas": "San. mazgas (tėvų)",
+          "paskirtis": "san",
+          "plotas_m2": 4.57,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "8.2",
+          "pavadinimas": "Miegamasis (tėvų)",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 20.72,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        },
+        {
+          "nr": "9.2",
+          "pavadinimas": "Drabužinė",
+          "paskirtis": "drabuzine",
+          "plotas_m2": 6.01,
+          "puslapio_nr": 6,
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "event": "eksplikacija_merged",
+      "merged_rooms": 10,
+      "total_rows": 11
+    },
+    {
+      "event": "schedule_anchored",
+      "anchored_elements": 0,
+      "langai_match": "14/0",
+      "durys_match": "14/0"
+    },
+    {
+      "event": "polygon_prepass_applied",
+      "rooms_with_adjacency": 0
+    },
+    {
+      "event": "ceiling_height_from_marker",
+      "value_m": 3.706,
+      "raw": "+3706",
+      "page": 1,
+      "previous": null
+    },
+    {
+      "event": "per_room_ceiling_applied",
+      "rooms_with_per_room": 0,
+      "source_count_by_nr": 0,
+      "source_count_by_name": 0
+    },
+    {
+      "event": "zoom_started",
+      "total": 10,
+      "skipped_via_eksplikacija": 10
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 1,
+      "total": 10,
+      "room_nr": "5",
+      "pavadinimas": "Kambarys (miegamasis)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 1,
+      "total": 10,
+      "room_nr": "5",
+      "applied": true,
+      "plotas_m2": 15.4
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 2,
+      "total": 10,
+      "room_nr": "1.2",
+      "pavadinimas": "Holas (2 aukštas)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 2,
+      "total": 10,
+      "room_nr": "1.2",
+      "applied": false,
+      "plotas_m2": 14.76
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 3,
+      "total": 10,
+      "room_nr": "2.2",
+      "pavadinimas": "Skalbykla"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 3,
+      "total": 10,
+      "room_nr": "2.2",
+      "applied": false,
+      "plotas_m2": 7.7
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 4,
+      "total": 10,
+      "room_nr": "3.2",
+      "pavadinimas": "Kambarys (vaikų miegamasis)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 4,
+      "total": 10,
+      "room_nr": "3.2",
+      "applied": false,
+      "plotas_m2": 12.9
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 5,
+      "total": 10,
+      "room_nr": "4.2",
+      "pavadinimas": "Kambarys (vaikų miegamasis)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 5,
+      "total": 10,
+      "room_nr": "4.2",
+      "applied": false,
+      "plotas_m2": 12.85
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 6,
+      "total": 10,
+      "room_nr": "5.2",
+      "pavadinimas": "Kambarys (vaikų miegamasis)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 6,
+      "total": 10,
+      "room_nr": "5.2",
+      "applied": false,
+      "plotas_m2": 12.9
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 7,
+      "total": 10,
+      "room_nr": "6.2",
+      "pavadinimas": "San. mazgas (vaikų)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 7,
+      "total": 10,
+      "room_nr": "6.2",
+      "applied": false,
+      "plotas_m2": 4.63
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 8,
+      "total": 10,
+      "room_nr": "7.2",
+      "pavadinimas": "San. mazgas (tėvų)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 8,
+      "total": 10,
+      "room_nr": "7.2",
+      "applied": true,
+      "plotas_m2": 4.57
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 9,
+      "total": 10,
+      "room_nr": "8.2",
+      "pavadinimas": "Miegamasis (tėvų)"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 9,
+      "total": 10,
+      "room_nr": "8.2",
+      "applied": false,
+      "plotas_m2": 20.72
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 10,
+      "total": 10,
+      "room_nr": "9.2",
+      "pavadinimas": "Drabužinė"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 10,
+      "total": 10,
+      "room_nr": "9.2",
+      "applied": false,
+      "plotas_m2": 6.01
+    },
+    {
+      "event": "zoom_completed",
+      "attempted": 10,
+      "applied": 2,
+      "skipped_via_eksplikacija": 10,
+      "elapsed_s": 100.0
+    },
+    {
+      "event": "apdailos_started"
+    },
+    {
+      "event": "apdailos_skipped",
+      "reason": "no IŠKLOTINIŲ/APDAILŲ page found in PDF"
+    },
+    {
+      "event": "doors_started"
+    },
+    {
+      "event": "doors_completed",
+      "page": 5,
+      "total": 11,
+      "interior": 7,
+      "exterior": 4
+    },
+    {
+      "event": "post_processing"
+    },
+    {
+      "event": "python_math_completed",
+      "rooms_computed": 20
+    }
+  ]
+}

@@ -19,11 +19,279 @@ import anthropic
 from pdf2image import convert_from_bytes
 
 from .prompt import (
-    SYSTEM_TEXT, build_user_content,
+    SYSTEM_TEXT, build_user_content, build_user_content_pdf_native,
     ZOOM_SYSTEM_TEXT, build_zoom_user_content,
-    MODEL, MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
+    MAX_OUTPUT_TOKENS, DPI, MAX_PAGES, IMG_MAX_DIM,
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
+from models_config import model_for
+
+_ENV_TRUTHY = {"1", "true", "yes", "on"}
+_ENV_FALSY = {"0", "false", "no", "off"}
+
+
+def _env_flag(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in _ENV_TRUTHY
+
+
+# B-3 lock-in (2026-07-04, docs/superpowers/research/2026-07-04-final-config-
+# decision.md): native-PDF Pass-1 input is the PRODUCTION DEFAULT — best
+# accuracy of every config tested (16.2% headline MAE) at raster cost.
+# Rollback is this one line: set False to restore the raster default
+# everywhere (env overrides still win in both directions).
+NATIVE_PDF_DEFAULT_ON = True
+
+
+def _pdf_native_mode() -> tuple[bool, str]:
+    """Effective Pass-1 input mode + why. SAMATU_PDF_NATIVE=0/false is the
+    escape hatch (forces raster images); =1/true forces native; unset/other
+    → NATIVE_PDF_DEFAULT_ON. Returns (native_on, reason)."""
+    raw = (os.getenv("SAMATU_PDF_NATIVE") or "").strip().lower()
+    if raw in _ENV_FALSY:
+        return False, f"env_override (SAMATU_PDF_NATIVE={raw})"
+    if raw in _ENV_TRUTHY:
+        return True, f"env_override (SAMATU_PDF_NATIVE={raw})"
+    return (bool(NATIVE_PDF_DEFAULT_ON),
+            f"default (NATIVE_PDF_DEFAULT_ON={NATIVE_PDF_DEFAULT_ON})")
+
+
+def _pdf_native_enabled() -> bool:
+    """Send Pass-1 pages as ONE native PDF `document` block (image +
+    extracted text layer per page) instead of pdf2image-rendered image
+    blocks. ON by default since the 2026-07-04 lock-in; see
+    _pdf_native_mode for the override semantics."""
+    return _pdf_native_mode()[0]
+
+
+def _zoom_agentic_enabled() -> bool:
+    """EXPERIMENT gate (SAMATU_ZOOM_AGENTIC=1): route the Pass-2 zoom re-read
+    through the model-driven crop loop (extractor.agentic_crop) instead of
+    the fixed-bbox crop. Default OFF — zero behavior change."""
+    return _env_flag("SAMATU_ZOOM_AGENTIC")
+
+
+def _mixed_voting_models() -> list[str] | None:
+    """EXPERIMENT gate (SAMATU_VOTING_MODELS="m1,m2,m3"): one model PER voting
+    round (list length = number of rounds). Unset/empty → None (default OFF)."""
+    raw = (os.getenv("SAMATU_VOTING_MODELS") or "").strip()
+    if not raw:
+        return None
+    models = [m.strip() for m in raw.split(",") if m.strip()]
+    return models or None
+
+
+def _group_rounds_by_model(models: list[str]) -> list[str]:
+    """Stable-group round models so same-model rounds run consecutively —
+    prompt cache is per-model, so grouping maximizes cache hits (each model
+    pays one cache write, its later rounds read). First-appearance order of
+    distinct models is preserved."""
+    order: list[str] = []
+    for m in models:
+        if m not in order:
+            order.append(m)
+    return [m for o in order for m in models if m == o]
+
+
+def _append_extra_call(parsed: dict, reader_meta: dict | None,
+                       reader: str | None = None) -> None:
+    """Roll one sub-Vision call's tokens into ``parsed["_meta"]["extra_calls"]``
+    so the SINGLE per-extraction usage_event prices the WHOLE pipeline, not
+    just Pass-1 (2026-07-04 sub-call metering fix).
+
+    ``reader_meta`` is a sub-reader's own ``_meta`` block (apdailos, doors, one
+    door_type round, eksplikacija Vision fallback, a zoom call, an agentic-zoom
+    room, sanitary fixtures …). Priced later by pricing.calc_meta_cost_usd,
+    each entry at ITS OWN model's rate.
+
+    ``reader`` is an optional attribution label (apdailos / doors / door_type /
+    fixtures / zoom / eksplikacija / niche) stored on the entry for cost
+    breakdowns. It is IGNORED by pricing (calc_meta_cost_usd reads only the
+    token/model keys), so tagging never changes the billed amount.
+
+    Purely additive token/cost CAPTURE — never touches extraction output. No-op
+    (nothing appended) when the call was free or didn't happen:
+      * ``reader_meta`` falsy, or
+      * no ``model`` (e.g. the pdfplumber eksplikacija path: source-only, $0), or
+      * all token counts zero/None (reader errored before the API call).
+    None token values (readers use ``getattr(usage, ..., None)``) coerce to 0.
+    """
+    if not reader_meta:
+        return
+    model = reader_meta.get("model")
+    if not model:
+        return  # free/deterministic path (no Anthropic call) — nothing to price
+    in_t = int(reader_meta.get("input_tokens") or 0)
+    out_t = int(reader_meta.get("output_tokens") or 0)
+    cr_t = int(reader_meta.get("cache_read_tokens") or 0)
+    cw_t = int(reader_meta.get("cache_write_tokens") or 0)
+    if in_t == 0 and out_t == 0 and cr_t == 0 and cw_t == 0:
+        return  # nothing billable
+    entry = {
+        "model": model,
+        "input_tokens": in_t,
+        "output_tokens": out_t,
+        "cache_read_tokens": cr_t,
+        "cache_write_tokens": cw_t,
+    }
+    if reader:
+        entry["reader"] = reader
+    parsed.setdefault("_meta", {}).setdefault("extra_calls", []).append(entry)
+
+
+def _reader_call_metas(result: dict | None) -> list[dict]:
+    """Normalize a sub-reader result into a list of per-call ``_meta`` blocks.
+
+    Voted readers (read_door_types_voted / read_fixtures_voted) made N Anthropic
+    calls and expose every OK round under ``_round_metas`` — return all of them.
+    Single-pass readers expose their one call under ``_meta``. An errored reader
+    (no tokens billed) yields ``[]``. The caller appends each via
+    _append_extra_call so every billed round is metered exactly once.
+    """
+    if not result:
+        return []
+    rounds = result.get("_round_metas")
+    if rounds:
+        return list(rounds)
+    m = result.get("_meta")
+    return [m] if m else []
+
+
+def _meter_niche_call(parsed: dict, nl: Any) -> None:
+    """Roll ONE niche_locator.extract_niches call's tokens into
+    ``parsed["_meta"]["extra_calls"]`` (2026-07-04 — the last unmetered paid
+    sub-call). ``nl`` is the returned ``NicheList``; its ``_meta`` carries
+    ``{model, input_tokens, output_tokens, ...}`` on a cache MISS, or
+    ``{model, cache:"hit"}`` (no tokens) on a HIT.
+
+    Delegates to _append_extra_call, so a cache HIT (model present, tokens
+    absent) contributes €0 and never raises. Pure token CAPTURE — niche
+    detection output is untouched."""
+    if nl is None:
+        return
+    _append_extra_call(parsed, getattr(nl, "_meta", None), reader="niche")
+
+
+# Anthropic hard request limit is 32 MB; leave headroom for system prompt +
+# instruction text + JSON envelope. Above this the native-PDF experiment
+# falls back to the image path for that extraction (recorded in _meta).
+_PDF_NATIVE_MAX_B64_BYTES = 25 * 1024 * 1024
+
+# B-2 lock-in condition (2026-07-04): text-richness gate. Native mode's edge
+# over raster is the extracted text layer; Anthropic's internal PDF rendering
+# is ~45% of our raster pixel budget, so a text-FREE native document is
+# plausibly WORSE than our own raster images — and ungated evidence for that
+# case doesn't exist (the one "text-free native ≈ raster" datapoint fell back
+# via the size cap and never tested true native). Below this median we send
+# raster images and record fallback_reason="text_free_pdf".
+_PDF_NATIVE_MIN_MEDIAN_CHARS = 10
+
+
+def _median_chars_per_page(pdf_bytes: bytes, page_indices: list[int]) -> float | None:
+    """Median extractable-text length (chars) across the SELECTED 1-based
+    pages, via pdfplumber (same text source page_filter.py uses; zero API
+    cost). None → text layer unmeasurable (broken/unopenable PDF) — the
+    caller proceeds and lets the pypdf subset build decide the fallback."""
+    try:
+        import statistics
+        import pdfplumber
+        counts: list[int] = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            n_src = len(pdf.pages)
+            for idx in page_indices:
+                if 1 <= int(idx) <= n_src:
+                    try:
+                        text = pdf.pages[int(idx) - 1].extract_text() or ""
+                    except Exception:
+                        text = ""
+                    counts.append(len(text.strip()))
+        if not counts:
+            return None
+        return round(float(statistics.median(counts)), 1)
+    except Exception as exc:
+        print(f"[experiment:native_pdf] text-richness scan failed "
+              f"(gate skipped): {exc}")
+        return None
+
+
+def build_pdf_subset_b64(pdf_bytes: bytes, page_indices: list[int]) -> dict:
+    """Split the source PDF to the given 1-based pages via pypdf and base64
+    the subset. Returns {"b64", "n_pages", "page_indices", "b64_bytes"} on
+    success or {"error": "..."} on failure (caller falls back to images)."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+        n_src = len(reader.pages)
+        used: list[int] = []
+        for idx in page_indices:
+            if 1 <= int(idx) <= n_src:
+                writer.add_page(reader.pages[int(idx) - 1])
+                used.append(int(idx))
+        if not used:
+            return {"error": "no_valid_pages"}
+        buf = io.BytesIO()
+        writer.write(buf)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return {"b64": b64, "n_pages": len(used), "page_indices": used,
+                "b64_bytes": len(b64)}
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
+    """Build the native-PDF payload for Pass-1 (SAMATU_PDF_NATIVE=1).
+
+    Returns either {"b64", "n_pages", "page_indices", "b64_bytes",
+    "page_map_note", "text_median_chars_page"} (send as document block) or
+    {"fallback_reason": ..., "text_median_chars_page": ...} (send image
+    blocks; fallback recorded in _meta.experiment).
+
+    text_median_chars_page is recorded on EVERY native-considered run
+    (document or fallback) — it is the production segmentation metric for
+    native-vs-raster accuracy analysis."""
+    indices = [int(p["page_index"]) for p in pages]
+    # B-2: text-richness gate BEFORE building the document payload.
+    median_chars = _median_chars_per_page(pdf_bytes, indices)
+    if median_chars is not None and median_chars < _PDF_NATIVE_MIN_MEDIAN_CHARS:
+        print(f"[experiment:native_pdf] text-free PDF (median "
+              f"{median_chars} chars/page < {_PDF_NATIVE_MIN_MEDIAN_CHARS}) "
+              f"→ raster image mode")
+        return {"fallback_reason": "text_free_pdf",
+                "text_median_chars_page": median_chars}
+    subset = build_pdf_subset_b64(pdf_bytes, indices)
+    if subset.get("error"):
+        print(f"[experiment:native_pdf] subset build failed → image fallback: "
+              f"{subset['error']}")
+        return {"fallback_reason": subset["error"],
+                "text_median_chars_page": median_chars}
+    if subset["b64_bytes"] > _PDF_NATIVE_MAX_B64_BYTES:
+        print(f"[experiment:native_pdf] WARNING: subset b64 is "
+              f"{subset['b64_bytes'] / 1e6:.1f} MB > "
+              f"{_PDF_NATIVE_MAX_B64_BYTES / 1e6:.0f} MB — falling back to "
+              f"image mode for this call")
+        return {"fallback_reason": "subset_exceeds_size_limit",
+                "b64_bytes": subset["b64_bytes"],
+                "text_median_chars_page": median_chars}
+    # When the subset renumbers pages (vendor pages dropped mid-document),
+    # tell the model the document→original mapping so puslapio_nr stays in
+    # ORIGINAL numbering (zoom crops render from the original PDF).
+    note = None
+    if subset["page_indices"] != list(range(1, subset["n_pages"] + 1)):
+        pairs = ", ".join(
+            f"{doc_nr}={orig_nr}"
+            for doc_nr, orig_nr in enumerate(subset["page_indices"], start=1)
+        )
+        note = (
+            "Puslapių numeracija: šio dokumento puslapiai atitinka originalaus "
+            f"brėžinių PDF puslapius taip (dokumento=originalus): {pairs}. "
+            "Visuose `puslapio_nr` laukuose naudok ORIGINALŲ puslapio numerį."
+        )
+    return {**subset, "page_map_note": note,
+            "text_median_chars_page": median_chars}
+
+# Heavy vision turns on Fable 5 can run many minutes — per-call timeout
+# override on the pass-1 stream (do NOT change the global client).
+VISION_TIMEOUT_S = 600.0
 
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
 # parents[1] = backend/ (extractor/vision_call.py → extractor/ → backend/)
@@ -121,34 +389,55 @@ def _vision_zoom_room(
     client: anthropic.Anthropic,
     cropped_b64: str,
     room: dict,
-) -> dict | None:
-    """Pass-2 zoom Vision call for one room. Returns ZoomResult dict or None."""
+) -> tuple[dict | None, dict]:
+    """Pass-2 zoom Vision call for one room.
+
+    Returns ``(zoom_result_or_None, zoom_meta)``. The zoom_result dict is the
+    ZoomResult schema, UNCHANGED (no token keys injected — it is stored verbatim
+    in ``room["_zoom"]`` for the UI, so mutating it would change extraction
+    output). ``zoom_meta`` carries this call's token usage + model so the caller
+    can roll it into ``_meta.extra_calls`` — before 2026-07-04 ``resp.usage``
+    was discarded and every zoom call went unmetered.
+    """
+    model = model_for("vision_pass2")
+    zoom_meta: dict = {"model": model, "input_tokens": 0, "output_tokens": 0,
+                       "cache_read_tokens": 0, "cache_write_tokens": 0}
     system = [
         {"type": "text", "text": ZOOM_SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
     ]
     try:
         with client.messages.stream(
-            model=MODEL,
+            model=model,
             max_tokens=4096,  # zoom output is small per room
             system=system,
             messages=[{"role": "user", "content": build_zoom_user_content(cropped_b64, room)}],
-            output_config={"effort": "high"},
+            # Zoom is a dimension RE-READ (perception), not reasoning — medium is
+            # the Opus 4.8 sweet spot here and cuts the ~96s-for-1-applied cost.
+            # (Watch: if any perimeter/ceiling moves vs effort=high, revert.)
+            output_config={"effort": "medium"},
         ) as stream:
             resp = stream.get_final_message()
 
+        usage = getattr(resp, "usage", None)
+        if usage is not None:
+            zoom_meta["input_tokens"] = int(getattr(usage, "input_tokens", 0) or 0)
+            zoom_meta["output_tokens"] = int(getattr(usage, "output_tokens", 0) or 0)
+            zoom_meta["cache_read_tokens"] = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+            zoom_meta["cache_write_tokens"] = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+
         if resp.stop_reason in ("refusal", "max_tokens"):
-            return None
+            return None, zoom_meta
         text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
         try:
-            return json.loads(text)
+            return json.loads(text), zoom_meta
         except json.JSONDecodeError:
             try:
-                return json.loads(_repair_json(text))
+                return json.loads(_repair_json(text)), zoom_meta
             except json.JSONDecodeError:
-                return None
+                return None, zoom_meta
     except Exception as exc:
         print(f"[extractor] zoom call failed for room {room.get('nr')}: {exc}")
-        return None
+        return None, zoom_meta
 
 
 def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
@@ -368,6 +657,11 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
         prior = r.get("plyteles_sienos_m2")
         r["plyteles_sienos_m2"] = round(total_tile_m2, 2)
         r["_plyteles_sienos_m2_source"] = "wall_elevation_mm"
+        # 2026-06-01: also expose as `_tile_area_from_elevation_m2` so
+        # universal_rules.py can compute walls_paintable = walls_gross
+        # - openings - tile_area without going through walls_paint_factor.
+        # This is the bridge that lets paint-above-tile work per-room.
+        r["_tile_area_from_elevation_m2"] = round(total_tile_m2, 2)
         if prior is not None and prior != r["plyteles_sienos_m2"]:
             r["_plyteles_sienos_m2_prior"] = round(prior, 2)
         updated += 1
@@ -413,6 +707,12 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "medziagos_aprasymas": p.get("medziagos_aprasymas"),
             "medziagos_kiekis": p.get("medziagos_kiekis"),
             "medziagos_vnt": p.get("medziagos_vnt"),
+            # 2026-06-14: carry per-line confidence (zalia/geltona/raudona) + its
+            # Lithuanian reason into the V8-compat shape so the UI can surface
+            # which quantities to double-check, regardless of whether it renders
+            # `pozicijos` or `darbu_sarasas`.
+            "confidence": p.get("confidence"),
+            "_confidence_reason": p.get("_confidence_reason"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
@@ -450,6 +750,7 @@ def _elementai_to_counts(elementai: list) -> dict:
              "n_niches", "niche_lengths_m"}
     """
     n_doors, n_windows, n_niches = 0, 0, 0
+    n_exterior_doors, n_exterior_windows = 0, 0
     door_areas, window_areas, niche_lengths = [], [], []
     for el in (elementai or []):
         tipas = (el.get("tipas") or "").lower()
@@ -457,14 +758,19 @@ def _elementai_to_counts(elementai: list) -> dict:
         plotis_mm = el.get("plotis_mm") or 0
         aukstis_mm = el.get("aukstis_mm") or 0
         ilgis_m = el.get("ilgis_m") or 0
+        is_exterior = bool(el.get("_exterior"))
         area_m2 = (plotis_mm * aukstis_mm / 1_000_000) if (plotis_mm and aukstis_mm) else 0
 
         if tipas in ("duris", "pasleptos_duris"):
             n_doors += kiekis
+            if is_exterior:
+                n_exterior_doors += kiekis
             if area_m2 > 0:
                 door_areas.extend([area_m2] * kiekis)
         elif tipas in ("langas", "stoglangis"):
             n_windows += kiekis
+            if is_exterior:
+                n_exterior_windows += kiekis
             if area_m2 > 0:
                 window_areas.extend([area_m2] * kiekis)
         elif tipas == "nisa_led":  # `.lower()` was applied above
@@ -475,6 +781,8 @@ def _elementai_to_counts(elementai: list) -> dict:
     return {
         "n_doors": n_doors,
         "n_windows": n_windows,
+        "n_exterior_doors": n_exterior_doors,
+        "n_exterior_windows": n_exterior_windows,
         # Use mean per-element area when present so calc_room_quantities can scale
         # by n. If absent, calc_room_quantities falls back to UNIVERSAL_RULES defaults.
         "door_area_m2": (sum(door_areas) / len(door_areas)) if door_areas else None,
@@ -604,18 +912,22 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "") -> float:
 def _calc_nisu_metrai_m(elementai: list) -> float:
     """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
 
-    Niche length per element = lango_plotis + 2 × 0.20 m (overhang each side).
-    Suma per visus elementai su tipas == 'nisa_LED'.
+    ilgis_m = TOTAL niche length in this room across all segments.
+    kiekis is NOT used as a multiplier for nisa_LED (semantics were
+    ambiguous and Vision occasionally returned kiekis=3, ilgis_m=15
+    meaning "3 segments totaling 15 m" — which got multiplied to 45 m).
+
+    Fallback path (no ilgis_m, only plotis_mm) keeps kiekis as a multiplier
+    because plotis_mm is per-window and naturally pairs with a count.
     """
     total = 0.0
     for el in (elementai or []):
         if (el.get("tipas") or "").lower() == "nisa_led":
-            kiekis = int(el.get("kiekis") or 1)
             ilgis = float(el.get("ilgis_m") or 0)
             if ilgis > 0:
-                total += ilgis * kiekis
+                total += ilgis  # ilgis_m is total per room — do NOT multiply by kiekis
             else:
-                # Fallback if ilgis_m not provided: use lango_plotis + 0.40
+                kiekis = int(el.get("kiekis") or 1)
                 plotis_mm = float(el.get("plotis_mm") or 0)
                 if plotis_mm > 0:
                     total += (plotis_mm / 1000 + 0.40) * kiekis
@@ -686,6 +998,22 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "eksplikacija_page_width_pdf",
             "eksplikacija_page_height_pdf",
             "_zoom", "_zoom_changes",
+            # Per-room calculator overrides (Phase-3 calculator scope fixes,
+            # 2026-05-31). These are sourced from contractor truth files or
+            # downstream Vision passes (elevation/schedule); preserve them
+            # through the merger so calc_room_quantities can read them on
+            # subsequent recomputes (gestures, calibration, etc.).
+            "walls_paint_factor_override", "tile_floor_override",
+            "extra_walls_m2", "extra_walls_virs_3m_m2",
+            "high_ceiling_area_m2",
+            "plyteles_grindys_m2_override",
+            "gkp_extra_area_m2",
+            "n_exterior_doors", "n_exterior_windows",
+            "count_partition_corners",
+            # 2026-06-01 paint-above-tile systemic fix
+            "_bathroom_paint_above_tile_m",
+            "_tile_area_from_elevation_m2",
+            "_plyteles_sienos_m2_source",
         }
         for k, v in computed.items():
             if k not in PRIMITIVE_KEYS:
@@ -923,6 +1251,179 @@ def _validate_room_bboxes(vision_result: dict) -> dict:
     return {**vision_result, "warnings": warnings_list}
 
 
+# 2026-06-06: glaistymas/dažymas pozicijų konsolidacija. The generator emits a
+# per-coat split (Q1/Q2/šlifavimas/gruntavimas/dažymas-sluoksniai, walls+ceilings)
+# but contractors bill ONE m² rate for "Sienų, lubų glaistymas/dažymas" split only
+# by height zone (Rangovas A samata items 16/17). This collapses those member
+# lines into the combined line(s). Rotband / kampai / angokraščiai stay separate.
+# Combined paintable area is unchanged — display-only.
+_PAINT_SPLIT_PREFIXES = (
+    "Sienų pirminis glaistymas", "Sienų antrinis glaistymas", "Sienų šlifavimas",
+    "Sienų gruntavimas", "Sienų dažymas",
+    "Lubų pirminis glaistymas", "Lubų antrinis glaistymas", "Lubų šlifavimas",
+    "Lubų gruntavimas", "Lubų dažymas",
+    "Lubų glaistymas/dažymas (virš",
+)
+
+
+def _consolidate_paint_enabled() -> bool:
+    """Feature-flag gate for paint-line consolidation (default ON)."""
+    try:
+        from .feature_flags import get_flags
+        return bool(get_flags().get("consolidate_paint_lines", True))
+    except Exception:
+        return True
+
+
+def _consolidate_paint_pozicijos(parsed: dict) -> None:
+    """Collapse the per-coat glaistymas/dažymas split into the contractor's
+    combined line(s). Mutates parsed['pozicijos'] in place; preserves order and
+    keeps Rotband/kampai/angokraščiai. Materials kept in `_medziagos`, the
+    original split labels in `_detalus`. Combined area unchanged."""
+    if not _consolidate_paint_enabled():
+        return
+    pozicijos = parsed.get("pozicijos") or []
+    rooms = parsed.get("patalpos") or []
+    SK_GD = "Sienų lubų glaistymas dažymas"
+    SAL = "skaiciuota_is_brezinio"
+
+    def _is_split(p: dict) -> bool:
+        if (p.get("skyrius") or "") != SK_GD:
+            return False
+        a = p.get("aprasymas") or ""
+        return any(a.startswith(pre) for pre in _PAINT_SPLIT_PREFIXES)
+
+    members = [p for p in pozicijos if _is_split(p)]
+    if not members:
+        return
+
+    walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
+    dazymo_total = round(walls_paint + lubos_paint, 2)
+    if dazymo_total <= 0:
+        parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
+        return
+
+    from .universal_rules import is_high_ceiling as _is_high
+    virs_3m = round(sum(
+        (float(r.get("walls_paintable_m2") or 0) + float(r.get("ceiling_paintable_m2") or 0))
+        for r in rooms if _is_high(r.get("lubu_aukstis_m"))
+    ), 2)
+    virs_3m = min(max(virs_3m, 0.0), dazymo_total)
+    iki_3m = round(dazymo_total - virs_3m, 2)
+
+    medziagos = [
+        {"aprasymas": "Glaistas (pradinis + baigiamasis)",
+         "kiekis": round(sum(float(r.get("glaistas_kg") or 0) for r in rooms), 2), "vnt": "kg"},
+        {"aprasymas": "Gruntas",
+         "kiekis": round(sum(float(r.get("gruntas_l") or 0) for r in rooms), 2), "vnt": "l"},
+        {"aprasymas": "Dažai (2 sluoksniai)",
+         "kiekis": round(sum(float(r.get("dazai_l") or 0) for r in rooms), 2), "vnt": "l"},
+    ]
+    detalus = [p.get("aprasymas") for p in members]
+    is_q4 = any((p.get("_q_lygis") == "Q4") for p in members)
+
+    # Surface label reflects which surfaces actually carry paint (e.g. a bare
+    # garažas paints only the ceiling → "Lubų glaistymas/dažymas").
+    if walls_paint > 0 and lubos_paint > 0:
+        surf = "Sienų, lubų"
+    elif walls_paint > 0:
+        surf = "Sienų"
+    else:
+        surf = "Lubų"
+
+    new_lines: list[dict] = []
+    base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
+            "_medziagos": medziagos, "_detalus": detalus}
+    if virs_3m <= 0.01:
+        # no high-ceiling rooms — single line, no height suffix
+        new_lines.append({**base, "kiekis": dazymo_total,
+                          "aprasymas": f"{surf} glaistymas/dažymas"})
+    elif iki_3m <= 0.01:
+        # every painted room is >3m — single virš-3m line
+        new_lines.append({**base, "kiekis": virs_3m, "_height_zone": ">3m",
+                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+    else:
+        new_lines.append({**base, "kiekis": iki_3m,
+                          "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"})
+        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": virs_3m,
+                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)",
+                          "_height_zone": ">3m", "confidence": "medium"})
+    if is_q4:
+        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": dazymo_total,
+                          "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
+                          "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"})
+
+    # Rebuild preserving order: replace the first member-run with the new lines.
+    rebuilt: list[dict] = []
+    inserted = False
+    for p in pozicijos:
+        if _is_split(p):
+            if not inserted:
+                rebuilt.extend(new_lines)
+                inserted = True
+        else:
+            rebuilt.append(p)
+    parsed["pozicijos"] = rebuilt
+
+
+def _consolidate_led_niche_pozicijos(parsed: dict) -> None:
+    """Collapse 'LED nišų glaistymas' + 'LED nišų dažymas' into the contractor's
+    single 'LED nišų glaistymas/dažymas' line (Rangovas A samata item 23 — one m
+    rate covering both phases). Same length, display-only, gated by the same flag
+    as paint consolidation. The structural 'Nišų formavimas GKP konstrukcijoje'
+    line is a distinct operation and is left untouched. Phases kept in `_detalus`."""
+    if not _consolidate_paint_enabled():
+        return
+    pozicijos = parsed.get("pozicijos") or []
+    G, D = "LED nišų glaistymas", "LED nišų dažymas"
+    g = next((p for p in pozicijos if (p.get("aprasymas") or "") == G), None)
+    d = next((p for p in pozicijos if (p.get("aprasymas") or "") == D), None)
+    if not (g and d):
+        return
+    combined = {**g, "aprasymas": "LED nišų glaistymas/dažymas", "_detalus": [G, D]}
+    rebuilt: list[dict] = []
+    inserted = False
+    for p in pozicijos:
+        if p is g:
+            if not inserted:
+                rebuilt.append(combined)
+                inserted = True
+        elif p is d:
+            continue  # folded into the combined line
+        else:
+            rebuilt.append(p)
+    parsed["pozicijos"] = rebuilt
+
+
+def _room_virs_3m_paint(room: dict) -> float:
+    """m² of a room's paint (walls + ceiling) that belongs above 3 m.
+
+    Same class as the 2026-07-05 audit bug 4 (paint iki/virš-3m split): a room
+    whose NOMINAL height is <3 m can still carry explicit above-3m surfaces —
+    a feature/soffit wall (extra_walls_virs_3m_m2) or a raised ceiling coffer
+    (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
+    ceiling above 3 m over a 2.8 m room). Judging by room height alone drops
+    those surfaces from every height-gated billed quantity (paint split,
+    pastoliai). A genuinely high room (≥3 m) contributes all its paint.
+
+    Vision-direct rooms (no recompute pass) may carry only dazymo_plotas_m2;
+    for those the room total falls back to it so a nominal-high room still
+    contributes exactly what it did before this helper existed."""
+    from .universal_rules import is_high_ceiling as _is_high
+    w = float(room.get("walls_paintable_m2") or 0)
+    c = float(room.get("ceiling_paintable_m2") or 0)
+    total = w + c
+    if total <= 0:
+        total = float(room.get("dazymo_plotas_m2") or 0)
+    if _is_high(room.get("lubu_aukstis_m")):
+        return total
+    xw = float(room.get("extra_walls_virs_3m_m2") or 0)
+    hc = min(float(room.get("high_ceiling_area_m2") or 0), c)
+    # never allocate more to virš-3m than the room actually paints
+    return min(xw + hc, total)
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -986,14 +1487,29 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     if walls_paint > 0:
         # Sienų lyginimas Rotband — pradinis storas sluoksnis (5-10mm) ant
-        # pliko bloko/betono prieš glaistymą. rangovas šitą turi 5/5 projektų.
-        # 1 maišas (25kg) ~2.5 m² pridengti 1cm storiu, ~5 m² pridengti 5mm.
+        # pliko bloko/betono prieš glaistymą. NEAPPLIKUOJASI ant GKP pertvarų
+        # (jos jau lygios).
+        #
+        # 2026-06-09 re-calibration (Berzas fixture, contractor-verified):
+        # kontraktoriaus samata = 138,69 m² Rotband ant 460,71 m² visų sienų
+        # ploto = 30,1%. Ankstesnis 50% default'as buvo kalibruotas prieš KLAIDINGĄ
+        # walls_paint=277,33 (nuo to laiko ištaisyta į ~448 m² — GT walls_paint
+        # 460,71, −2,8%). Rotband užvalg. TIK ant pliko bloko/betono (ne ant GKP
+        # pertvarų), o tai ~30% vidaus sienų ploto LT naujos statybos name.
+        # User gali override per `rotband_share` (0.0-1.0).
+        rotband_share = (parsed.get("_overrides") or {}).get("rotband_share", 0.30)
+        try:
+            rotband_share = max(0.0, min(1.0, float(rotband_share)))
+        except (ValueError, TypeError):
+            rotband_share = 0.30
+        rotband_m2 = round(walls_paint * rotband_share, 2)
         pozicijos.append({
             "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
-            "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
+            "vnt": "m2", "kiekis": rotband_m2, "saltinis": SAL,
             "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
-            "medziagos_kiekis": round(walls_paint * 10.0, 2),
+            "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
             "medziagos_vnt": "kg",
+            "_assumption": f"{int(rotband_share*100)}% sienų ploto (mūro/betono sienos, ne GKP pertvaros). Užvalg. tik prieš glaistant ant pliko bloko/betono.",
         })
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
@@ -1022,6 +1538,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_kiekis": round(dazai_total * walls_share, 2),
              "medziagos_vnt": "l"},
         ])
+
+    # Molio tinkas / decor-coated walls — separate finish, EXCLUDED from the
+    # glaistymas/dažymas lines above (2026-06-11 Rangovas B experiment: 160 m²
+    # of clay plaster was silently billed as paint, +62.8% combined error).
+    molio_total = _sum("molio_tinko_m2")
+    if molio_total > 0:
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Sienų dekoravimas molio tinku",
+            "vnt": "m2", "kiekis": molio_total, "saltinis": SAL,
+            "_assumption": "Plotas iš apdailos plano (molio/kalkinio tinko ar kitos dangos zona). Paruošimas įskaičiuotas į dekoravimo darbą — atskiros glaistymo eilutės šiam plotui nėra.",
+        })
 
     if lubos_paint > 0:
         pozicijos.extend([
@@ -1055,9 +1582,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # dvigubas count, o kaip subset HIGHLIGHT — premium aukšto darbas.
         # rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
         # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
+        from .universal_rules import is_high_ceiling as _is_high
         lubos_virs_3m = round(sum(
             float(r.get("ceiling_paintable_m2") or 0) for r in rooms
-            if float(r.get("lubu_aukstis_m") or 0) > 3.0
+            if _is_high(r.get("lubu_aukstis_m"))
         ), 2)
         if lubos_virs_3m > 0:
             pozicijos.append({
@@ -1072,58 +1600,54 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Approx: ~70% vidiniai, ~30% išoriniai (LT typical)
     kampai_total = _sum("kampu_metrai")
     if kampai_total > 0:
-        kampai_vidiniai = round(kampai_total * 0.7, 2)
-        kampai_isoriniai = round(kampai_total * 0.3, 2)
-        pozicijos.extend([
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai vidiniai",
-             "vnt": "m", "kiekis": kampai_vidiniai, "saltinis": SAL},
-            {"skyrius": SK_GD, "aprasymas": "Glaistymo kampai išoriniai",
-             "vnt": "m", "kiekis": kampai_isoriniai, "saltinis": SAL,
-             "medziagos_aprasymas": "PVC kampuotės",
-             "medziagos_kiekis": kampai_isoriniai, "medziagos_vnt": "m"},
-            # rangovas audit 2026-04-29: separate labor line for corner installation.
-            # 5/5 his projects itemize this (~308 m avg). Materials above already
-            # include kampuotės; this line covers mounting/glaistymas labor only.
-            {"skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
-             "vnt": "m", "kiekis": kampai_total, "saltinis": SAL},
-        ])
+        # 2026-06-06 (RC8): ONE corner line (= contractor item 19 "Dažymo kampų
+        # montavimas"). Previously the same metrai were ALSO emitted as
+        # vidiniai+išoriniai → the corner length billed ~2×. Outer-corner
+        # kampuotės (~30%) carried as the material sub-field.
+        pozicijos.append({
+            "skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
+            "vnt": "m", "kiekis": kampai_total, "saltinis": SAL,
+            "medziagos_aprasymas": "PVC kampuotės (išoriniai kampai)",
+            "medziagos_kiekis": round(kampai_total * 0.3, 2), "medziagos_vnt": "m",
+        })
 
-    # Angokraščių apdailos (per anga: 2H+W metrai) + paslėptų durų stakta.
-    # Sprint §2A.1: gate reveals by deduction standard (NRM2: only > 3 m², LT: always).
-    from extractor.universal_rules import _opening_adds_reveal, _resolve_deduction_standard
-    # Read user prefs from parsed["_overrides"] (set by caller). Fallback to LT default.
-    deduction_standard = _resolve_deduction_standard(parsed.get("_overrides"))
-    angokrasciai_m = 0
-    pasleptu_duru_staktu_m = 0
+    # Angokraščių apdailos (reveal length around openings) + paslėptų durų stakta.
+    # 2026-06-06 (RC3): use the calibrated per-room `angokrasciu_gkp_m` field from
+    # calc_room_quantities (doors=W+2H, interior windows=W+2H, EXTERIOR windows=0
+    # via is_exterior) instead of recomputing Σ(2H+W) inline. The inline version had
+    # NO is_exterior check and over-quoted +54.8% on BOTH the SK_GD glaistymas and
+    # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Beržų; contractor 89.39).
+    angokrasciai_m = _sum("angokrasciu_gkp_m")
+    pasleptu_duru_staktu_m = 0.0
+    n_pasleptu_tagged = 0
+    reveal_sum = 0.0  # sum of (2H+W) over the glyph-tagged frameless doors
     for r in rooms:
-        elementai = r.get("elementai") or []
-        for el in elementai:
-            tipas = (el.get("tipas") or "").lower()
-            kiekis = int(el.get("kiekis") or 1)
-            W = (el.get("plotis_mm") or 0) / 1000
-            H = (el.get("aukstis_mm") or 0) / 1000
-            opening_area = W * H if (W > 0 and H > 0) else 0
-            if tipas in ("langas", "duris", "pasleptos_duris", "stoglangis"):
-                if opening_area > 0 and _opening_adds_reveal(opening_area, deduction_standard):
-                    # 3-sided for ALL openings: top + 2 šonai → 2H + W.
-                    # Doors don't have a bottom reveal (slenkstis = the
-                    # threshold/floor). Windows DO have a bottom but in LT
-                    # samatininkų convention it's priced separately as
-                    # palangė (window sill line item) — so the bundle
-                    # angokraščiai_glaistymas-dažymas line stays 3-sided.
-                    # Reverted from 2026-05-06's 4-sided window formula
-                    # after benchmark P1+P2 showed +115% / +60% over-count
-                    # against samatininkų pasiūlymai (€4.4k aggregate
-                    # corpus EUR impact). See reports/benchmark/findings_
-                    # 2026-05-10.md issue #2.
-                    angokrasciai_m += (2 * H + W) * kiekis
-            if tipas == "pasleptos_duris" and W > 0 and H > 0:
-                # Paslėptų durų stakta — beapvadinės durys reikalauja stakto
-                # paruošimo nepriklausomai nuo size threshold (LT-specific
-                # premium hardware item, ne klasikinis NRM2 reveal).
-                pasleptu_duru_staktu_m += (2 * H + W) * kiekis
-    angokrasciai_m = round(angokrasciai_m, 2)
+        for el in (r.get("elementai") or []):
+            if (el.get("tipas") or "").lower() == "pasleptos_duris":
+                W = (el.get("plotis_mm") or 0) / 1000
+                H = (el.get("aukstis_mm") or 0) / 1000
+                if W > 0 and H > 0:
+                    k = int(el.get("kiekis") or 1)
+                    pasleptu_duru_staktu_m += (2 * H + W) * k
+                    n_pasleptu_tagged += k
+                    reveal_sum += (2 * H + W) * k
     pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
+
+    # 2026-06-14: frameless-door RECONCILIATION (council 5/5 + research). The
+    # glyph pass under-tags frameless doors (Beržų 2 of ~8) because frame type
+    # is NOT in the door symbol — it's in the drawing TEXT. door_type_reader reads
+    # the tags/annotations ("skirta beapvadinėms durims"); _door_types carries the
+    # reconciled count + a confidence flag. When the text count exceeds the tagged
+    # count, scale the reveal meters up to it (avg reveal per tagged door, default
+    # 5.1 m for a 900×2400 frameless), and flag the line so the user verifies.
+    _dt = parsed.get("_door_types") or {}
+    _door_conf = None
+    _door_reason = None
+    if _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged:
+        avg_reveal = (reveal_sum / n_pasleptu_tagged) if n_pasleptu_tagged > 0 else 5.1
+        pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
+        _door_conf = _dt.get("confidence")
+        _door_reason = _dt.get("reason")
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
         pozicijos.append({
@@ -1140,10 +1664,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         })
     if pasleptu_duru_staktu_m > 0.5:
         # P5 fix: paslėptų durų staktų pozicija (4/5 freq, ~400 EUR/proj)
-        pozicijos.append({
+        _door_line = {
             "skyrius": SK_GD, "aprasymas": "Durų angų paruošimas beapvadinėms durims",
             "vnt": "m", "kiekis": pasleptu_duru_staktu_m, "saltinis": SAL,
-        })
+        }
+        if _door_conf:  # text-reconciled — carry the flag + reason
+            _door_line["confidence"] = _door_conf
+            if _door_reason:
+                _door_line["_confidence_reason"] = _door_reason
+        pozicijos.append(_door_line)
 
     # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over rangovas).
     # Per-room (perim − Σdurys) × 1.10 double-counts interior walls (each
@@ -1374,6 +1903,19 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if pl_total > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
                               if (r.get("paskirtis") or "").lower() in WET), 2)
+        # 2026-06-11: silikonavimas seals ALL tiled zones, not only paskirtis-wet
+        # rooms — skalbyklos, and any room the apdailos reader marks substantially
+        # tiled, are sealed too. Counting only vonia/wc/san under-counted on both
+        # anchors (berzas −39%, bacv −68%); adding tiled non-wet rooms recovers the
+        # defensible part (berzas −10%, bacv −55%) with the unchanged ×1.4
+        # coefficient. (45°-pjovimas keeps WET-only perim — it didn't under-count.)
+        def _is_tiled(r: dict) -> bool:
+            if (r.get("paskirtis") or "").lower() in WET:
+                return True
+            bd = r.get("sienu_apdailos_breakdown") or {}
+            return float(bd.get("plyteles_share") or 0) >= 0.6
+        tiled_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+                                if _is_tiled(r)), 2)
         if wet_perim > 0:
             # Plytelių 45° pjovimas — outer corners × tile_height (vonia
             # default 2 outer corners). Floor: wet_perim × 0.4.
@@ -1408,8 +1950,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # Empirical splits across his 5 projects:
             #   Sanitaryware silikonas ≈ wet_perim × 0.8 (around bath/sink/WC)
             #   Plytelių kampų silikonas ≈ wet_perim × 0.6 (inside corners)
-            silikon_san_m = round(wet_perim * 0.8, 2)
-            silikon_kampai_m = round(wet_perim * 0.6, 2)
+            silikon_san_m = round(tiled_perim * 0.8, 2)
+            silikon_kampai_m = round(tiled_perim * 0.6, 2)
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
@@ -1464,16 +2006,25 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Nuolydžio formavimas dušo zonoje",
                 "vnt": "vnt", "kiekis": n_showers, "saltinis": SAL,
             })
-        # P3 NEW: Lentynėliai iš plytelių dušo kabinoje — default 1 per vonia
-        # (rangovas P1 has 3 — premium projects more; default 1 is safe baseline).
+        # Lentynėliai iš plytelių dušo kabinoje — default 2 per vonia.
+        # 2026-05-27 fix (Berzas fixture): truth=5 vnt for 2 bathrooms (=2,5
+        # per vonia). Anksčiau default 1 per vonia → 2 vnt (under by -60%).
+        # User gali override per `lentyneliu_per_vonia`.
         n_full_vonia = sum(1 for r in rooms
                            if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
         if n_full_vonia > 0:
+            per_vonia = (parsed.get("_overrides") or {}).get("lentyneliu_per_vonia", 2)
+            try:
+                per_vonia = max(0, int(per_vonia))
+            except (ValueError, TypeError):
+                per_vonia = 2
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
-                "vnt": "vnt", "kiekis": n_full_vonia, "saltinis": "paskirtis_default",
+                "vnt": "vnt", "kiekis": n_full_vonia * per_vonia,
+                "saltinis": "paskirtis_default",
                 "confidence": "low",
+                "_assumption": f"{per_vonia} lentynėlės per vonią × {n_full_vonia} voniose.",
             })
 
     # P3 NEW: Dėžučių iš GKP formavimas WC mechanizmams paslėpti — count of
@@ -1571,6 +2122,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     n_wet_with_klozetas = n_vonia + n_wc + n_san
     # Vonios — turi dušą + gyvatuką + dušo maišytuvą + lataką
     n_full_bathroom = n_vonia + n_san
+    # 2026-06-06 (RC1): basins are NOT 1-per-wet-room — decouple from toilet count;
+    # use the detected praustuvė symbol count when higher (Beržų: 3 vs 2).
+    n_praustuves = max(n_wet_with_klozetas,
+                       int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
 
     if n_wet_with_klozetas > 0 or n_virtuve > 0 or n_skalbykla > 0:
         # WC rėmas + Klozetas
@@ -1583,9 +2138,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_SAN, "aprasymas": "Klozeto montavimas",
                  "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Praustuvės maišytuvo montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
             ])
         # Pilna vonia — dušas + gyvatukas + linijinis latakas
         if n_full_bathroom > 0:
@@ -1610,6 +2165,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         if n_skalbimo_sifonas > 0:
             pozicijos.append({
                 "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos sifono įrengimas",
+                "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
+            })
+            # 2026-05-27 fix (Berzas fixture): truth has Skalbimo mašinos
+            # montavimas (=fizinis pajungimas + paruošimas), atskira nuo
+            # sifono. App anksčiau visiškai praleisdavo.
+            pozicijos.append({
+                "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos montavimas",
                 "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
             })
         # Santechnikos taškų koregavimas — visada baseline 1 vnt projektui
@@ -1753,11 +2315,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # PRIDĖTINIAI ELEMENTAI (~4-5 lines)
     # ════════════════════════════════════════════════════════════════════════
 
-    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4)
-    high_ceiling_dazymo = round(sum(
-        float(r.get("dazymo_plotas_m2") or 0) for r in rooms
-        if float(r.get("lubu_aukstis_m") or 0) > 3.0
-    ), 2)
+    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4).
+    # Per-room basis mirrors the paint iki/virš-3m split: nominal-high rooms
+    # contribute all their paint, partial-high rooms (<3 m nominal but with
+    # explicit above-3m surfaces) contribute their >3m slice.
+    high_ceiling_dazymo = round(sum(_room_virs_3m_paint(r) for r in rooms), 2)
     if high_ceiling_dazymo > 0:
         # ~1 d.d. per ~50 m² didelio aukščio dažomo ploto
         pastoliu_dd = max(1, round(high_ceiling_dazymo / 50))
@@ -1771,8 +2333,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if bendras_plotas > 0:
         # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
-        # Empirical ratio ~0.06 m³/m² for full vidaus apdaila.
-        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.06, 1))
+        # Empirical ratio ~0.075 m³/m² for full vidaus apdaila.
+        # 2026-05-27 calibration (Berzas fixture): 12 m³ / 165,61 m² = 0,0725.
+        # Anksčiau 0,06 davė 9,9 m³ (under by -17%).
+        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.075, 1))
         pozicijos.extend([
             {"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
              "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio",
@@ -1785,6 +2349,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
              "medziagos_kiekis": round(bendras_plotas, 2), "medziagos_vnt": "m2"},
         ])
+
+    # 2026-06-06: collapse the per-coat glaistymas/dažymas split into the
+    # contractor's combined line(s) (flag ENABLE_CONSOLIDATE_PAINT_LINES, default on).
+    parsed["pozicijos"] = pozicijos
+    _consolidate_paint_pozicijos(parsed)
+    _consolidate_led_niche_pozicijos(parsed)
+    pozicijos = parsed["pozicijos"]
 
     # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.
     # lines stay grouped even when generator interleaves emit order.
@@ -1806,6 +2377,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
     parsed["pozicijos"] = pozicijos
+
+    # 2026-06-11: per-pozicija confidence (class calibration + apdailos
+    # self-reported confidence + voting flags). Measured false-green rate was
+    # 50-60% before this pass — see docs/superpowers/research/
+    # 2026-06-11-experiments-results.md.
+    from .confidence import apply_confidence
+    apply_confidence(parsed)
     return parsed
 
 
@@ -1824,6 +2402,14 @@ def _recompute_santrauka(parsed: dict) -> dict:
     # Map Vision room fields to calc_totals expected fields
     mapped_rooms: list[dict] = []
     for r in rooms:
+        # The two GKP-ceiling fields are produced by calc_room_quantities and
+        # already account for partial high-ceiling zones (high_ceiling_area_m2
+        # override). When they're present we use them directly and skip the
+        # plotas-based fallback in calc_totals (that fallback assumes the
+        # entire room is at a single height). The neutral sentinel — None
+        # rather than 0 — preserves backwards-compat with paths that
+        # legitimately want the fallback (eg. Vision-direct rooms without a
+        # recompute pass).
         mapped_rooms.append({
             "plotas_m2": r.get("plotas_m2", 0),
             "dazymo_plotas_m2": r.get("dazymo_plotas_m2", 0),
@@ -1836,17 +2422,31 @@ def _recompute_santrauka(parsed: dict) -> dict:
             "plyteles_sienos_m2": r.get("plyteles_sienos_m2", 0),
             "isliginamasis_m2": r.get("isliginamasis_m2", 0),
             "grindjuosciu_m": r.get("grindjuosciu_m", 0),
+            "silikonavimas_m": r.get("silikonavimas_m", 0),
             "hidroizoliacija_m2": r.get("hidroizoliacija_m2", 0),
             "lubu_tipas": r.get("lubu_tipas", "gkp"),
             "lubu_aukstis_m": r.get("lubu_aukstis_m", 2.82),
             "paskirtis": r.get("paskirtis", "gyvenamoji"),
+            "gkp_lubu_standart_m2": r.get("gkp_lubu_standart_m2"),
+            "gkp_lubu_virs_3m_m2": r.get("gkp_lubu_virs_3m_m2"),
         })
 
     totals = calc_totals(mapped_rooms)
 
+    # Items 16+17 in LT samata billing structure combine sienų+lubų paint for
+    # non-garažas rooms only — garažas paint is billed as separate items with
+    # different unit prices. Emit a santrauka field that mirrors that slice so
+    # the contractor-truth comparison in the eval harness is apples-to-apples.
+    house_paint_total = sum(
+        float(r.get("dazymo_plotas_m2") or 0)
+        for r in rooms
+        if (r.get("paskirtis") or "").lower() != "garazas"
+    )
+
     # Build santrauka in Vision schema format
     parsed["santrauka"] = {
         "dazymo_plotas_total_m2": totals.get("dazymo_plotas_total_m2", 0),
+        "dazymo_excl_garazas_total_m2": round(house_paint_total, 2),
         "kampai_m_total": totals.get("kampai_m_total", 0),
         "angokrasciu_gkp_m_total": totals.get("angokrasciu_gkp_m_total", 0),
         "pasleptu_duru_staktu_m_total": totals.get("pasleptu_duru_staktu_m_total", 0),
@@ -1858,9 +2458,298 @@ def _recompute_santrauka(parsed: dict) -> dict:
         "plyteles_sienos_m2_total": totals.get("plyteles_sienos_m2_total", 0),
         "isliginamasis_m2_total": totals.get("isliginamasis_m2_total", 0),
         "grindjuosciu_m_total": totals.get("grindjuosciu_m_total", 0),
+        "silikonavimas_m_total": totals.get("silikonavimas_m_total", 0),
         "hidroizoliacijos_vnt": totals.get("hidroizoliacijos_vnt", 0),
     }
     return parsed
+
+
+def _run_pass1_once(client, system, pages, *,
+                    native_pdf: dict | None = None,
+                    model: str | None = None) -> dict:
+    """One Pass-1 extraction (≤3 retries). Returns the parsed dict (with
+    `_meta`) on success, or an error dict `{"status":"error", ...}` on failure
+    — same error shapes the old inline loop returned.
+
+    native_pdf: payload from _prepare_native_pdf. With "b64" → the page
+    subset goes as ONE document block (image + text layer per page); with
+    "fallback_reason" → image blocks as usual, fallback recorded in
+    _meta.experiment. None → default image blocks.
+
+    B-1 lock-in condition (2026-07-04): if the API rejects the document
+    payload (anthropic.BadRequestError) — or the same document payload fails
+    twice for any reason — this round rebuilds its content as raster images
+    and retries. The shared native_pdf dict is flipped in place, so the
+    REMAINING voting rounds also go raster (no per-round re-tripping).
+    Recorded as fallback_reason="api_rejected_document".
+
+    model (EXPERIMENT SAMATU_VOTING_MODELS): per-round model override for
+    mixed-model voting. None → model_for("vision_pass1") as always.
+    """
+    last_err: Exception | None = None
+    model = model or model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+
+    experiment_meta: dict | None = None
+    using_document = False
+    if native_pdf and native_pdf.get("b64"):
+        user_content = build_user_content_pdf_native(
+            native_pdf["b64"], native_pdf["n_pages"],
+            native_pdf.get("page_map_note"),
+        )
+        using_document = True
+        experiment_meta = {"native_pdf": {
+            "input": "document",
+            "pdf_pages": native_pdf["n_pages"],
+            "pdf_b64_bytes": native_pdf["b64_bytes"],
+            "page_map_note_sent": bool(native_pdf.get("page_map_note")),
+        }}
+    elif native_pdf and native_pdf.get("fallback_reason"):
+        user_content = build_user_content(pages)
+        experiment_meta = {"native_pdf": {
+            "input": "image_fallback",
+            "fallback_reason": native_pdf["fallback_reason"],
+        }}
+    else:
+        user_content = build_user_content(pages)
+    # B-2: the text-richness median is the production segmentation metric —
+    # record it on every native-considered run, document mode or fallback.
+    if experiment_meta and native_pdf and "text_median_chars_page" in native_pdf:
+        experiment_meta["native_pdf"]["text_median_chars_page"] = \
+            native_pdf["text_median_chars_page"]
+
+    def _flip_to_image_fallback(reason: str) -> None:
+        """B-1: rebuild this round as raster images AND flip the shared
+        native_pdf payload so subsequent voting rounds skip the document
+        path entirely (payload is shared across rounds by design)."""
+        nonlocal user_content, experiment_meta, using_document
+        native_pdf.pop("b64", None)
+        native_pdf["fallback_reason"] = reason
+        user_content = build_user_content(pages)
+        experiment_meta = {"native_pdf": {
+            "input": "image_fallback",
+            "fallback_reason": reason,
+        }}
+        if "text_median_chars_page" in native_pdf:
+            experiment_meta["native_pdf"]["text_median_chars_page"] = \
+                native_pdf["text_median_chars_page"]
+        using_document = False
+
+    max_attempts = 3
+    attempt = 0
+    doc_failures = 0
+    while attempt < max_attempts:
+        try:
+            with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
+                model=model,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                system=system,
+                messages=[{"role": "user", "content": user_content}],
+                output_config={"effort": "high"},
+            ) as stream:
+                resp = stream.get_final_message()
+
+            if resp.stop_reason == "refusal":
+                return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal"}
+            if resp.stop_reason == "max_tokens":
+                return {"status": "error", "_error": "output_truncated", "_stop_reason": "max_tokens"}
+
+            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                try:
+                    parsed = json.loads(_repair_json(text))
+                    parsed["_repaired"] = True
+                except json.JSONDecodeError as je:
+                    return {"status": "error", "_error": "json_decode_failure",
+                            "_raw_text": text[:4000], "_je": str(je)}
+
+            usage = resp.usage
+            parsed["_meta"] = {
+                "input_tokens": getattr(usage, "input_tokens", None),
+                "output_tokens": getattr(usage, "output_tokens", None),
+                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
+                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
+                "stop_reason": resp.stop_reason,
+                "attempt": attempt + 1,
+                "pages_sent": len(pages),
+                "model": model,
+            }
+            if experiment_meta:
+                parsed["_meta"]["experiment"] = experiment_meta
+            return parsed
+        except Exception as exc:
+            last_err = exc
+            print(f"[extractor] attempt {attempt + 1} failed: {exc}")
+            if using_document:
+                doc_failures += 1
+                if isinstance(exc, anthropic.BadRequestError) or doc_failures >= 2:
+                    print("[experiment:native_pdf] API rejected the document "
+                          f"payload ({type(exc).__name__}) → retrying this and "
+                          "all remaining rounds as raster images")
+                    _flip_to_image_fallback("api_rejected_document")
+                    attempt = 0  # fresh retry budget for the image path
+                    continue
+            attempt += 1
+            if attempt >= max_attempts:
+                return {"status": "error", "_error": f"vision_call_failed: {exc}"}
+            time.sleep(1.5 ** (attempt - 1))
+    return {"status": "error", "_error": str(last_err or "Unknown error")}
+
+
+def _resolve_floor_b64(pages, runs):
+    """Pick the floor-plan page image for the adjacency pass.
+
+    The rooms live on a specific page (Vision reports it as scale_source_page,
+    or the rooms' modal puslapio_nr). pages[0] is often a title/site sheet, so
+    blindly using it makes the adjacency pass read a page with no rooms → 0
+    matches → n_partition_walls never set. Resolve the real floor page.
+    """
+    idx = None
+    for r in runs:
+        if r.get("scale_source_page"):
+            idx = int(r["scale_source_page"])
+            break
+    if idx is None:  # modal puslapio_nr across rooms
+        from collections import Counter
+        c = Counter(int(rm["puslapio_nr"]) for r in runs
+                    for rm in (r.get("patalpos") or []) if rm.get("puslapio_nr"))
+        if c:
+            idx = c.most_common(1)[0][0]
+    if idx is not None:
+        for p in pages:
+            if int(p.get("page_index") or -1) == idx:
+                return p["image_b64"], idx
+    return (pages[0]["image_b64"], pages[0].get("page_index")) if pages else (None, None)
+
+
+def _run_pass1_voted(client, system, pages, n, _emit, *,
+                     native_pdf: dict | None = None) -> dict:
+    """Run Pass-1 ``n`` times (+ one shared adjacency pass) and median-vote into
+    a single consensus parsed dict.
+
+    The adjacency pass wires ``n_partition_walls`` (and the _exterior window
+    flags) into production — these were only ever computed by the offline
+    benchmark script before. Median voting means a single adjacency-bail or
+    perimeter-jitter run can't tank the consensus. Degrades gracefully: 0 good
+    runs → error; 1 good run → that run (adjacency still applied).
+
+    native_pdf: EXPERIMENT payload forwarded to every round (see
+    _run_pass1_once). Byte-identical across rounds → cache-friendly.
+
+    EXPERIMENT (SAMATU_VOTING_MODELS="m1,m2,m3"): mixed-model voting — the
+    env lists the model PER round (its length overrides ``n``); rounds are
+    grouped so same-model rounds run consecutively (prompt cache is
+    per-model). Aggregation (vote_extraction) is untouched; per-round
+    models + tokens + cost land in _meta.voting_models.
+    """
+    from .vision.extraction_voter import vote_extraction
+
+    mixed_models = _mixed_voting_models()
+    if mixed_models:
+        round_models: list[str | None] = list(_group_rounds_by_model(mixed_models))
+        n = len(round_models)
+        print(f"[voting] mixed-model experiment: rounds → {round_models}")
+    else:
+        round_models = [None] * n
+
+    def _round_cost_usd(meta: dict) -> float | None:
+        """Price one round at ITS model's rates (best-effort — unknown model
+        rates must not fail the extraction)."""
+        try:
+            from pricing import calc_claude_cost_usd
+            return round(calc_claude_cost_usd(
+                input_tokens=int(meta.get("input_tokens") or 0),
+                output_tokens=int(meta.get("output_tokens") or 0),
+                cache_read_tokens=int(meta.get("cache_read_tokens") or 0),
+                cache_write_tokens=int(meta.get("cache_write_tokens") or 0),
+                model=meta.get("model") or "",
+            ), 4)
+        except Exception:
+            return None
+
+    # Run all Pass-1 rounds FIRST so we know which page the rooms are on.
+    runs: list[dict] = []
+    per_round_meta: list[dict] = []
+    for i in range(n):
+        _emit({"event": "voting_round_started", "round": i + 1, "of": n,
+               "model": round_models[i]})
+        p = _run_pass1_once(client, system, pages, native_pdf=native_pdf,
+                            model=round_models[i])
+        if p.get("status") == "error":
+            print(f"[voting] round {i + 1} failed: {p.get('_error')}")
+            _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
+            if mixed_models:
+                per_round_meta.append({"round": i + 1, "model": round_models[i],
+                                       "error": p.get("_error")})
+            continue
+        runs.append(p)
+        if mixed_models:
+            _rm = p.get("_meta") or {}
+            per_round_meta.append({
+                "round": i + 1,
+                "model": _rm.get("model") or round_models[i],
+                "input_tokens": int(_rm.get("input_tokens") or 0),
+                "output_tokens": int(_rm.get("output_tokens") or 0),
+                "cache_read_tokens": int(_rm.get("cache_read_tokens") or 0),
+                "cache_write_tokens": int(_rm.get("cache_write_tokens") or 0),
+                "cost_usd": _round_cost_usd(_rm),
+            })
+        _emit({"event": "voting_round_completed", "round": i + 1,
+               "rooms": len(p.get("patalpos") or [])})
+
+    if not runs:
+        return {"status": "error", "_error": "all_voting_runs_failed"}
+
+    # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
+    # hash), applied to every run's rooms. Best-effort — failure leaves
+    # n_partition_walls unset, exactly the pre-voting production behaviour.
+    floor_b64, floor_idx = _resolve_floor_b64(pages, runs)
+    adj = None
+    if floor_b64:
+        try:
+            from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
+            adj = extract_adjacency(image_b64=floor_b64, client=client)
+            n_set = 0
+            for p in runs:
+                summary = apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
+                n_set += (summary or {}).get("n_rooms_matched", 0)
+            print(f"[voting] adjacency on page {floor_idx}: matched rooms across runs={n_set}")
+            _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
+        except Exception as exc:
+            print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
+
+    def _attach_mixed_vote_meta(meta: dict) -> None:
+        """Record mixed-model provenance: per-round model/tokens/cost split
+        (each round priced at ITS OWN model's rates — pricing per-model caches
+        and rates differ) + the run order. Consumed by
+        pricing.calc_meta_cost_usd so cost aggregation stays correct."""
+        if not mixed_models:
+            return
+        meta["voting_models"] = per_round_meta
+        costs = [r["cost_usd"] for r in per_round_meta if r.get("cost_usd") is not None]
+        meta["voting_cost_usd"] = round(sum(costs), 4) if costs else None
+        meta.setdefault("experiment", {})["mixed_vote"] = {
+            "models_requested": mixed_models,
+            "models_run_order": [m for m in round_models],
+        }
+
+    if len(runs) == 1:
+        runs[0]["_voting"] = {"n_runs": 1, "degraded": True,
+                              "note": "only 1 of N runs succeeded — unvoted"}
+        _attach_mixed_vote_meta(runs[0].setdefault("_meta", {}))
+        return runs[0]
+
+    voted = vote_extraction(runs, min_votes=2)
+    # Cost metering (2026-06-19): a voted extraction made N Pass-1 Vision calls,
+    # so SUM the token usage across all runs — keeping only runs[0] would make the
+    # per-user spend ledger undercount by ~N×. Other _meta keys come from runs[0].
+    _tok_sum = {}
+    for _k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
+        _tok_sum[_k] = sum(int((r.get("_meta") or {}).get(_k) or 0) for r in runs)
+    voted["_meta"] = {**runs[0].get("_meta", {}), **_tok_sum, "voting_runs": len(runs)}
+    _attach_mixed_vote_meta(voted["_meta"])
+    return voted
 
 
 def extract_interior(
@@ -1951,82 +2840,51 @@ def extract_interior(
         "windows_in_table": len(eks.get("schedule_tables", {}).get("langai", [])),
     })
 
-    # Step 2: Vision call with retry (max 3 attempts)
-    _emit({"event": "pass1_started", "page_count": len(pages)})
-    last_err: Exception | None = None
-    parsed: dict | None = None
+    # Step 2: Vision call — single pass, or N-pass median voting (flag-gated).
+    # Voting stabilises the high-variance Pass-1 (perimeters, ceiling heights,
+    # symbol counts) and wires the adjacency pass into production so the kampai
+    # pusiniai term is populated on real uploads, not just the benchmark.
+    from .feature_flags import get_flags as _get_flags, voting_n as _voting_n
+    _vflags = _get_flags()
+    _voting_on = bool(_vflags.get("extraction_voting"))
+    _emit({"event": "pass1_started", "page_count": len(pages), "voting": _voting_on})
 
-    for attempt in range(3):
-        try:
-            with client.messages.stream(
-                model=MODEL,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                system=system,
-                messages=[{"role": "user", "content": build_user_content(pages)}],
-                output_config={"effort": "high"},
-            ) as stream:
-                resp = stream.get_final_message()
+    # Native-PDF Pass-1 (default ON since the 2026-07-04 B-3 lock-in): build
+    # the document payload ONCE (byte-identical across voting rounds →
+    # cache-friendly) and forward it to Pass-1. SAMATU_PDF_NATIVE=0 escape
+    # hatch → _native_pdf stays None, raster images exactly as before.
+    _native_on, _native_why = _pdf_native_mode()
+    print(f"[extractor] pass1 input mode: "
+          f"{'native_pdf' if _native_on else 'raster_images'} — {_native_why}")
+    _native_pdf = None
+    if _native_on:
+        _native_pdf = _prepare_native_pdf(pdf_bytes, pages)
+        _emit({"event": "native_pdf_prepared",
+               "input": "document" if _native_pdf.get("b64") else "image_fallback",
+               "fallback_reason": _native_pdf.get("fallback_reason"),
+               "pdf_pages": _native_pdf.get("n_pages"),
+               "pdf_b64_bytes": _native_pdf.get("b64_bytes"),
+               "text_median_chars_page": _native_pdf.get("text_median_chars_page")})
 
-            if resp.stop_reason == "refusal":
-                return {
-                    "status": "error",
-                    "_error": "model_refused",
-                    "_stop_reason": "refusal",
-                }
-            if resp.stop_reason == "max_tokens":
-                return {
-                    "status": "error",
-                    "_error": "output_truncated",
-                    "_stop_reason": "max_tokens",
-                }
+    if _voting_on:
+        parsed = _run_pass1_voted(client, system, pages, _voting_n(), _emit,
+                                  native_pdf=_native_pdf)
+    else:
+        parsed = _run_pass1_once(client, system, pages, native_pdf=_native_pdf)
 
-            text = "".join(
-                b.text for b in resp.content if getattr(b, "type", None) == "text"
-            )
+    if not parsed or parsed.get("status") == "error":
+        # Error shapes (model_refused, output_truncated, json_decode_failure,
+        # vision_call_failed, all_voting_runs_failed) are returned verbatim so
+        # callers see the same payloads as before.
+        err = (parsed or {}).get("_error", "Unknown error")
+        _emit({"event": "error", "message": str(err)})
+        return parsed or {"status": "error", "_error": "Unknown error"}
 
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError:
-                try:
-                    parsed = json.loads(_repair_json(text))
-                    parsed["_repaired"] = True
-                except json.JSONDecodeError as je:
-                    return {
-                        "status": "error",
-                        "_error": "json_decode_failure",
-                        "_raw_text": text[:4000],
-                        "_je": str(je),
-                    }
-
-            usage = resp.usage
-            parsed["_meta"] = {
-                "input_tokens": getattr(usage, "input_tokens", None),
-                "output_tokens": getattr(usage, "output_tokens", None),
-                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
-                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
-                "stop_reason": resp.stop_reason,
-                "attempt": attempt + 1,
-                "pages_sent": len(pages),
-                "model": MODEL,
-            }
-            break  # success
-
-        except Exception as exc:
-            last_err = exc
-            print(f"[extractor] attempt {attempt + 1} failed: {exc}")
-            if attempt == 2:
-                return {
-                    "status": "error",
-                    "_error": f"vision_call_failed: {exc}",
-                }
-            time.sleep(1.5 ** attempt)
-
-    if parsed is None:
-        _emit({"event": "error", "message": str(last_err or "Unknown error")})
-        return {
-            "status": "error",
-            "_error": str(last_err or "Unknown error"),
-        }
+    # Roll the eksplikacija PRE-pass Vision-fallback tokens into extra_calls now
+    # that `parsed` (and its Pass-1 _meta) exists. No-op on the pdfplumber path
+    # (source-only _meta, no model → free, not billed). The pre-pass ran before
+    # Pass-1 above, so it couldn't attach to `parsed` at its own call site.
+    _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
 
     _pass1_rooms = parsed.get("patalpos") or []
     _emit({
@@ -2355,6 +3213,25 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] per-room ceiling height apply failed: {exc}")
 
+    # Re-bind `rooms` to the persisted list so the Pass-2 zoom loop below mutates
+    # the SAME room dicts that live in parsed["patalpos"]. _apply_per_room_heights
+    # reassigns parsed["patalpos"] to a new list; without this rebind the zoom
+    # loop wrote per-room ceiling heights onto a stale earlier binding and the
+    # recovery was silently lost (every room fell back to the section average).
+    rooms = parsed.get("patalpos") or rooms
+
+    # 2026-06-11: deterministic height-plausibility gate. Vision sometimes puts
+    # the tall ceiling on small wet rooms (Rangovas B: 3.5 m on a 6.8 m² vonia)
+    # while the large svetainė gets the default — inverting the iki/virš-3m split.
+    try:
+        from .universal_rules import apply_height_plausibility_gate
+        _hc = apply_height_plausibility_gate(rooms)
+        if _hc:
+            parsed.setdefault("_meta", {})["height_gate_corrections"] = _hc
+            _emit({"event": "height_gate_applied", "corrections": _hc})
+    except Exception as exc:
+        print(f"[extractor] height plausibility gate failed: {exc}")
+
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
     # crop the page region at 300 DPI / 2576px max, send to Vision with room
@@ -2383,13 +3260,29 @@ def extract_interior(
         # Confidence guard: only skip if Vision considered this room "high"
         if (r.get("confidence") or "") == "low":
             return False
+        # Ceiling height is NOT an eksplikacija primitive — the table carries only
+        # plotas/perimetras. If this room's height wasn't individually resolved
+        # (saltinis != "per_room"), the zoom pass is the ONLY recovery path; don't
+        # skip it, else the room keeps the section-average height and the
+        # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
+        # zoom-once regression where 10/11 berzas rooms got a uniform 2.82 m.)
+        if (r.get("lubu_aukstis_saltinis") or "section_average") != "per_room":
+            return False
         return True
+
+    # EXPERIMENT (SAMATU_ZOOM_AGENTIC=1): route zoom through the model-driven
+    # crop loop instead of the fixed-bbox re-read. Same inputs (room dict) and
+    # same ZoomResult output schema → _apply_zoom_refinements untouched.
+    _zoom_agentic_on = _zoom_agentic_enabled()
+    _agentic_render_cache: dict = {}   # (page, dpi) → PIL image, shared across rooms
+    _agentic_rooms_meta: list[dict] = []
 
     _zoomable = [r for r in rooms
                  if r.get("bbox_pct") and r.get("puslapio_nr")
                  and not _can_skip_zoom(r)]
     _emit({"event": "zoom_started", "total": len(_zoomable),
-           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r))})
+           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r)),
+           "agentic": _zoom_agentic_on})
     for idx, room in enumerate(rooms, start=1):
         bbox = room.get("bbox_pct")
         page_nr = room.get("puslapio_nr")
@@ -2399,18 +3292,35 @@ def extract_interior(
         if _can_skip_zoom(room):
             zoom_count_skipped += 1
             continue
-        cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
-        if not cropped:
-            continue
-        zoom_count_attempted += 1
-        _emit({
-            "event": "zoom_room_started",
-            "idx": zoom_count_attempted,
-            "total": len(_zoomable),
-            "room_nr": room.get("nr"),
-            "pavadinimas": room.get("pavadinimas"),
-        })
-        zoom_result = _vision_zoom_room(client, cropped, room)
+        if _zoom_agentic_on:
+            from .agentic_crop import agentic_zoom_room
+            zoom_count_attempted += 1
+            _emit({
+                "event": "zoom_room_started",
+                "idx": zoom_count_attempted,
+                "total": len(_zoomable),
+                "room_nr": room.get("nr"),
+                "pavadinimas": room.get("pavadinimas"),
+            })
+            zoom_result, _zmeta = agentic_zoom_room(
+                client, pdf_bytes, room, render_cache=_agentic_render_cache)
+            _agentic_rooms_meta.append({"room_nr": room.get("nr"), **_zmeta})
+        else:
+            cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
+            if not cropped:
+                continue
+            zoom_count_attempted += 1
+            _emit({
+                "event": "zoom_room_started",
+                "idx": zoom_count_attempted,
+                "total": len(_zoomable),
+                "room_nr": room.get("nr"),
+                "pavadinimas": room.get("pavadinimas"),
+            })
+            zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
+            # Roll this zoom call's tokens into extra_calls (was discarded before
+            # 2026-07-04) — even a null/parse-fail result still billed tokens.
+            _append_extra_call(parsed, _zmeta, reader="zoom")
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -2443,8 +3353,303 @@ def extract_interior(
     parsed["_meta"]["zoom_skipped_via_eksplikacija"] = zoom_count_skipped
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
+    if _zoom_agentic_on:
+        # Cost metering (2026-07-04): roll every agentic-zoom room's per-turn
+        # tokens into extra_calls so the single per-extraction usage_event prices
+        # them (each room's meta already carries its own model + summed tokens).
+        for _m in _agentic_rooms_meta:
+            _append_extra_call(parsed, _m, reader="zoom")
+        # Provenance for the agentic-zoom experiment: per-room loop stats
+        # (crops, turns, tokens, refusals/aborts) + aggregates.
+        parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
+            "rooms": _agentic_rooms_meta,
+            "crops_served_total": sum(m.get("crops_served", 0)
+                                      for m in _agentic_rooms_meta),
+            "api_turns_total": sum(m.get("api_turns", 0)
+                                   for m in _agentic_rooms_meta),
+            "input_tokens_total": sum(m.get("input_tokens", 0)
+                                      for m in _agentic_rooms_meta),
+            "output_tokens_total": sum(m.get("output_tokens", 0)
+                                       for m in _agentic_rooms_meta),
+            "aborted_rooms": [m["room_nr"] for m in _agentic_rooms_meta
+                              if m.get("outcome") not in ("ok",)],
+        }
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
-          f"{zoom_count_applied} applied, {zoom_elapsed}s")
+          f"{zoom_count_applied} applied, {zoom_elapsed}s"
+          + (" [agentic]" if _zoom_agentic_on else ""))
+
+    # Step 2.85: APDAILOS READER (2026-05-27).
+    # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
+    # page) and override the heuristic walls_paint per-room. This replaces
+    # hardcoded defaults like `tamburas: walls_paint=0` with what the project
+    # actually specifies — per the user directive "imam B iškart" (read from
+    # project, forget paskirtis-based heuristics). Berzas fixture simulation
+    # showed walls accuracy: -11,6% → -4,3% after this step.
+    try:
+        from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
+        _emit({"event": "apdailos_started"})
+        apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
+        _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # roll tokens into cost
+        if apdailos_result.get("status") == "ok":
+            n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
+            parsed.setdefault("_meta", {})["apdailos_page"] = apdailos_result.get("page")
+            parsed["_meta"]["apdailos_rooms_updated"] = n_updated
+            parsed["_meta"]["apdailos_elapsed_s"] = apdailos_result.get("_elapsed_s")
+            _emit({
+                "event": "apdailos_completed",
+                "page": apdailos_result.get("page"),
+                "rooms_updated": n_updated,
+            })
+        else:
+            _emit({
+                "event": "apdailos_skipped",
+                "reason": apdailos_result.get("_error"),
+            })
+    except ImportError as exc:
+        # A missing reader module is a REGRESSION, not a benign runtime miss —
+        # it silently drops per-room wall-finish recovery (walls_paint collapses
+        # to the legacy paskirtis heuristic). Make it LOUD. (2026-06-09: both
+        # reader modules were lost from git and failed silently for weeks.)
+        print(f"[extractor] ⚠️ APDAILOS READER MODULE MISSING — paint recovery DISABLED: {exc}")
+        _emit({"event": "apdailos_error", "message": f"module_missing: {exc}", "severity": "regression"})
+    except Exception as exc:
+        print(f"[extractor] apdailos read failed (non-fatal): {exc}")
+        _emit({"event": "apdailos_error", "message": str(exc)})
+
+    # Step 2.86: DOORS READER (2026-05-27).
+    # Focused Vision pass on floor_plan to count ALL doors including exterior
+    # (front, garage, terrace) and corridor doors that pass-1 systematically
+    # misses. Berzas fixture: pass-1 found 9 doors, truth = 14. With doors_reader
+    # paint area gap closes from -1.2% to ±0.5% (to the dot).
+    try:
+        from .doors_reader import read_doors_from_plan, merge_doors_into_rooms
+        _emit({"event": "doors_started"})
+        doors_result = read_doors_from_plan(
+            pdf_bytes,
+            parsed.get("patalpos") or [],
+            page_classifications=parsed.get("puslapiai") or [],
+        )
+        _append_extra_call(parsed, doors_result.get("_meta"), reader="doors")  # roll tokens into cost
+        if doors_result.get("status") == "ok":
+            n_updated = merge_doors_into_rooms(parsed.get("patalpos") or [], doors_result)
+            parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
+            parsed["_meta"]["doors_total_count"] = doors_result.get("total_count")
+            parsed["_meta"]["doors_interior_count"] = doors_result.get("interior_count")
+            parsed["_meta"]["doors_exterior_count"] = doors_result.get("exterior_count")
+            parsed["_meta"]["doors_rooms_updated"] = n_updated
+            parsed["_meta"]["doors_elapsed_s"] = doors_result.get("_elapsed_s")
+            _emit({
+                "event": "doors_completed",
+                "page": doors_result.get("page"),
+                "total": doors_result.get("total_count"),
+                "interior": doors_result.get("interior_count"),
+                "exterior": doors_result.get("exterior_count"),
+            })
+        else:
+            _emit({
+                "event": "doors_skipped",
+                "reason": doors_result.get("_error"),
+            })
+    except ImportError as exc:
+        print(f"[extractor] ⚠️ DOORS READER MODULE MISSING — door recount DISABLED: {exc}")
+        _emit({"event": "doors_error", "message": f"module_missing: {exc}", "severity": "regression"})
+    except Exception as exc:
+        print(f"[extractor] doors read failed (non-fatal): {exc}")
+        _emit({"event": "doors_error", "message": str(exc)})
+
+    # Step 2.865: DOOR-TYPE READER (2026-06-14, council 5/5 + research).
+    # Frameless ("beapvadinės") door TYPE is structurally NOT in the door glyph —
+    # it's in the drawing TEXT (tags LD-1, annotations "skirta beapvadinėms
+    # durims"). The glyph pass under-tags frameless doors (Beržų 2 of ~8 →
+    # "Durų angų paruošimas" 10.2 m vs contractor 39.2 m). Read the text, reconcile
+    # against the tagged count, RAISE + flag — never silently overwrite.
+    try:
+        from .door_type_reader import (
+            read_door_types, read_door_types_voted, reconcile_frameless)
+        _emit({"event": "door_types_started"})
+        rooms_now = parsed.get("patalpos") or []
+        # Opus 4.8 has no temperature knob — this single-pass recall-critical
+        # reader is the #1 variance source. Vote it (median/mode) when voting is on.
+        dt = (read_door_types_voted(pdf_bytes, rooms_now,
+                                    page_classifications=parsed.get("puslapiai") or [])
+              if _voting_on else
+              read_door_types(pdf_bytes, rooms_now,
+                              page_classifications=parsed.get("puslapiai") or []))
+        # Roll door-type reader tokens into cost. Voted: one extra_call per round
+        # (_round_metas); single-pass: the one _meta. Each round may run a
+        # different model (mixed voting) → priced per-model downstream.
+        for _rm in _reader_call_metas(dt):
+            _append_extra_call(parsed, _rm, reader="door_type")
+        if dt.get("status") == "ok":
+            n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
+                           for el in (r.get("elementai") or [])
+                           if (el.get("tipas") or "").lower() == "pasleptos_duris")
+            _NONINT = {"garazas", "tamburas", "tambūras"}
+            n_interior = sum(int(el.get("kiekis") or 1) for r in rooms_now
+                             for el in (r.get("elementai") or [])
+                             if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
+                             and (r.get("paskirtis") or "").lower() not in _NONINT)
+            rec = reconcile_frameless(
+                plan_frameless=n_tagged, reader_frameless=dt.get("beapvadines_count", 0),
+                bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,
+                archetipas=parsed.get("archetipas") or (parsed.get("santrauka") or {}).get("archetipas"))
+            # If the voted reads disagreed (spread>0), surface it as geltona —
+            # the honest output is "reads varied, verify", not a silent pick.
+            _vote = dt.get("_vote") or {}
+            if _vote.get("spread", 0) > 0:
+                if rec.get("confidence") == "zalia":
+                    rec["confidence"] = "geltona"
+                rec["reason"] = (rec.get("reason") or "") + \
+                    f" (skaitymai svyravo tarp paleidimų: {_vote.get('beapvadines_values')})"
+            parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
+                                     "plan_tagged": n_tagged, "pages": dt.get("pages"),
+                                     "_vote": _vote}
+            parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
+            _emit({"event": "door_types_completed", "frameless": rec.get("count"),
+                   "confidence": rec.get("confidence"), "reader": dt.get("beapvadines_count"),
+                   "tagged": n_tagged})
+        else:
+            _emit({"event": "door_types_skipped", "reason": dt.get("_error")})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] door-type read failed (non-fatal): {exc}")
+        _emit({"event": "door_types_error", "message": str(exc)})
+
+    # Step 2.866: SANITARY FIXTURE READER (2026-06-14, research #3 point-list).
+    # The full-sheet pass under-counts dense sanitary symbols (Beržų praustuvės
+    # 3, truth 5). A focused point-list-then-count read raises recall (3→4 live);
+    # reconcile RAISES detected_symbols_summary to the higher count (the skylių
+    # formula consumes it), never silently lowers. Modest, honest — fixtures have
+    # no clean schedule to read (research-confirmed).
+    try:
+        from .sanitary_fixture_reader import (
+            read_fixtures, read_fixtures_voted, reconcile_fixture_counts)
+        _emit({"event": "fixtures_started"})
+        fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [])
+              if _voting_on else
+              read_fixtures(pdf_bytes, parsed.get("patalpos") or []))
+        # Roll fixture-reader tokens into cost (voted: per-round; single: one).
+        for _rm in _reader_call_metas(fx):
+            _append_extra_call(parsed, _rm, reader="fixtures")
+        if fx.get("status") == "ok":
+            rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
+                                           fx.get("counts") or {})
+            parsed["detected_symbols_summary"] = rec["merged"]
+            parsed.setdefault("_meta", {})["fixtures_raised"] = rec["raised"]
+            parsed["_meta"]["fixtures_elapsed_s"] = fx.get("_elapsed_s")
+            _emit({"event": "fixtures_completed", "raised": rec["raised"],
+                   "counts": fx.get("counts")})
+        else:
+            _emit({"event": "fixtures_skipped", "reason": fx.get("_error")})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] fixture read failed (non-fatal): {exc}")
+        _emit({"event": "fixtures_error", "message": str(exc)})
+
+    # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page
+    # backfill added 2026-06-05 evening).
+    # Targeted Vision pass on the ceiling_plan page + conditional
+    # backfill from secondary pages (lubu mazgai sections, apsvietimo
+    # planas) when the primary's LED-room coverage is sparse.
+    #
+    # Verified Beržų: -5.44% → -0.99% (primary alone). Secondary pages
+    # would over-extract (light-wiring rectangles mis-read as LED), so
+    # the COVERAGE_GATE skips them when primary already covers many
+    # rooms. Bacveviciaus: -54.75% → -51.60% (primary 4 rooms < gate,
+    # backfill kicks in, helps marginally — locator-limited beyond that).
+    try:
+        from .vision.niche_locator import (
+            extract_niches, fold_niches_into_rooms, NicheList,
+        )
+
+        def _is_niche_candidate(p: dict) -> bool:
+            tipas = (p.get("tipas") or "").lower()
+            if tipas == "ceiling_plan":
+                return True
+            title = (p.get("pavadinimas") or "").lower()
+            return ("lub" in title) or ("apšviet" in title) or ("apsviet" in title)
+
+        def _render_one_page(page_nr: int) -> str | None:
+            imgs = convert_from_bytes(
+                pdf_bytes, dpi=200, fmt="jpeg",
+                first_page=page_nr, last_page=page_nr,
+            )
+            if not imgs:
+                return None
+            buf = io.BytesIO()
+            imgs[0].save(buf, format="JPEG", quality=85)
+            return base64.b64encode(buf.getvalue()).decode("ascii")
+
+        page_classifications = parsed.get("puslapiai") or []
+        candidates = [p for p in page_classifications if _is_niche_candidate(p)]
+        # Primary = first ceiling_plan, else first candidate
+        candidates.sort(key=lambda p: (
+            0 if (p.get("tipas") or "").lower() == "ceiling_plan" else 1,
+            int(p.get("nr", 999)),
+        ))
+        page_nrs = [int(p.get("nr")) for p in candidates]
+        if not page_nrs:
+            _emit({"event": "niche_locator_skipped",
+                   "reason": "no candidate page (no ceiling_plan / lub / apšviet)"})
+        else:
+            _emit({"event": "niche_locator_started", "pages": page_nrs})
+            combined = NicheList()
+            covered: set[str] = set()
+            COVERAGE_GATE = 5  # rooms with non-zero LED before backfill skips
+            # Primary pass
+            primary_pg = page_nrs[0]
+            image_b64 = _render_one_page(primary_pg)
+            if image_b64:
+                nl_p = extract_niches(image_b64=image_b64)
+                _meter_niche_call(parsed, nl_p)  # roll primary-page tokens into cost
+                for n in nl_p.niches:
+                    if n.type in ("ceiling_led", "wall_led") and (n.length_mm or 0) > 0:
+                        covered.add(str(n.room_nr))
+                    combined.niches.append(n)
+                # Backfill secondaries only when primary coverage is sparse
+                if len(covered) < COVERAGE_GATE:
+                    for page_nr in page_nrs[1:]:
+                        img = _render_one_page(page_nr)
+                        if not img:
+                            continue
+                        nl_s = extract_niches(image_b64=img)
+                        _meter_niche_call(parsed, nl_s)  # roll secondary-page tokens into cost
+                        for n in nl_s.niches:
+                            is_led = n.type in ("ceiling_led", "wall_led")
+                            if (not is_led) or (str(n.room_nr) not in covered):
+                                combined.niches.append(n)
+                fold_niches_into_rooms(parsed.get("patalpos") or [], combined)
+                parsed.setdefault("_meta", {})["niche_locator_pages"] = page_nrs
+                parsed["_meta"]["niche_locator_primary_covered"] = len(covered)
+                parsed["_meta"]["niche_locator_count"] = len(combined.niches)
+                _emit({
+                    "event": "niche_locator_completed",
+                    "primary_page": primary_pg,
+                    "primary_rooms_covered": len(covered),
+                    "total_niches_kept": len(combined.niches),
+                    "backfill_ran": len(covered) < COVERAGE_GATE,
+                })
+            else:
+                _emit({"event": "niche_locator_skipped",
+                       "reason": f"failed to render primary page {primary_pg}"})
+    except Exception as exc:
+        print(f"[extractor] niche_locator failed (non-fatal): {exc}")
+        _emit({"event": "niche_locator_error", "message": str(exc)})
+
+    # Step 2.88: STATISTICAL NICHE INFERENCE (2026-06-05).
+    # For rooms where the niche_locator returned nothing but the room
+    # paskirtis empirically has LED (corridor 0.55, wet rooms 0.27,
+    # etc.), inject a fallback estimate based on perim × ratio.
+    # See backend/extractor/niche_inference.py for the per-paskirtis
+    # table and the validated impact on objektas_b (-52% → -18%).
+    try:
+        from .niche_inference import infer_missing_niches
+        n_inferred = infer_missing_niches(parsed.get("patalpos") or [])
+        if n_inferred:
+            parsed.setdefault("_meta", {})["niche_inference_rooms"] = n_inferred
+            _emit({"event": "niche_inference_completed",
+                   "rooms_inferred": n_inferred})
+    except Exception as exc:
+        print(f"[extractor] niche inference failed (non-fatal): {exc}")
+        _emit({"event": "niche_inference_error", "message": str(exc)})
 
     _emit({"event": "post_processing"})
 
@@ -2586,6 +3791,59 @@ def extract_interior(
             print(f"[extractor] sanity_checks emitted {len(sanity_warnings)} warnings")
     except Exception as exc:
         print(f"[extractor] sanity_checks failed (non-fatal): {exc}")
+
+    # Step 4.067 (2026-06-01): permanent consistency checker.
+    # Pure-Python audit (room count vs eksplikacija, wall/floor ratio,
+    # height plausibility + uniformity, perim-geometry). Emits a report
+    # under parsed["_consistency_checks"] + warnings on failed checks.
+    try:
+        from .consistency_checker import run_all_checks as _ck_run
+        ck_report = _ck_run(parsed)
+        parsed["_consistency_checks"] = ck_report
+        if ck_report["n_warn"] > 0 or ck_report["n_fail"] > 0:
+            existing = parsed.get("warnings") or []
+            for c in ck_report["checks"]:
+                if c["status"] in ("WARN", "FAIL"):
+                    existing.append({
+                        "level": c["status"], "source": "consistency_checker",
+                        "message": f"{c['name']}: {c['message']}",
+                    })
+            parsed["warnings"] = existing
+            print(f"[extractor] consistency_checker: "
+                  f"{ck_report['n_warn']} warn + {ck_report['n_fail']} fail")
+    except Exception as exc:
+        print(f"[extractor] consistency_checker failed (non-fatal): {exc}")
+
+    # Step 4.066 (2026-06-01): permanent geometric perimeter validation.
+    # Pure-Python check that each room's perimetras_m is consistent with
+    # its plotas_m2 via the isoperimetric bound. Emits structured warnings
+    # for any room with impossible perimeter; downstream code MAY trigger
+    # re-extraction. Today: just surface the report on parsed for audit;
+    # no automated re-extraction (would require the rich dimension_extractor
+    # to be wired into production — separate work item).
+    try:
+        from .vision.perimeter_validator import validate_extract
+        perim_report = validate_extract(parsed)
+        parsed["_perimeter_validation"] = perim_report
+        if perim_report["n_needs_reextraction"] > 0:
+            existing = parsed.get("warnings") or []
+            for fr in perim_report["flagged_rooms"]:
+                existing.append({
+                    "level": "WARN",
+                    "message": (f"Room {fr['room_nr']} ({fr['room_name']}): "
+                                f"perimeter {fr['perim_m']:.1f}m outside geometric "
+                                f"bounds [{fr['lower_bound_m']:.1f}, {fr['upper_bound_m']:.1f}]"
+                                f" for area {fr['area_m2']:.1f}m²"),
+                    "source": "perimeter_validator",
+                })
+            parsed["warnings"] = existing
+            print(f"[extractor] perimeter_validator flagged "
+                  f"{perim_report['n_needs_reextraction']}/{perim_report['n_total']} rooms")
+        else:
+            print(f"[extractor] perimeter_validator: all "
+                  f"{perim_report['n_total']} rooms within bounds")
+    except Exception as exc:
+        print(f"[extractor] perimeter_validator failed (non-fatal): {exc}")
 
     # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
     # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on

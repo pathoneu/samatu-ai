@@ -1,0 +1,81 @@
+# Multi-project ground-truth registry.
+#
+# Each entry maps a project slug → its truth.json + the source PDFs.
+# eval_harness.py + validate_truth_files.py read this to enumerate the
+# contractor-validated benchmark set.
+#
+# Contractor notes: ALL six projects are from Rangovas A (rangovas
+# Rangovas A). This is a single-contractor cross-project benchmark.
+# Cross-contractor calibration needs at least one non-Rangovas A truth
+# file before the calibration_learner's promotion gate has industry-
+# wide signal — until then, factors reflect Rangovas A scope
+# conventions only.
+
+schema_version: 1
+projects:
+  - slug: berzas
+    name: "Beržų g. 24"
+    truth_path: ground_truth/berzas/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf
+    samata_pdf: docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf
+    contractor: "Rangovas A"
+    has_gt_dimensions: true
+    has_cached_extract: true
+    notes: "N=1 originator; only project with full gt_dimensions."
+
+  - slug: objektas_b
+    name: "Objektas B (Objektas B)"
+    truth_path: ground_truth/objektas_b/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf
+    samata_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: false
+    notes: "65-page TP; largest project in the batch."
+
+  - slug: ciurliu
+    name: "Čiurlių g. 10, Bajorai"
+    truth_path: ground_truth/ciurliu/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf"
+    samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf"
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: false
+    notes: "3-page A3 plans; smallest project — fastest Vision ingestion."
+
+  - slug: romainiai
+    name: "Romainiai (Deividas Norkaitis)"
+    truth_path: ground_truth/romainiai/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Deividas Norakitis INTERJERAS 4.1-5.1 punktas.pdf"
+    samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf"
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: false
+    scope_mismatch: true
+    scope_mismatch_reason: |
+      Contractor's pasiūlymas prices the 4.1-5.1 punktas subset of the project; the
+      project_pdf is the full 45-page interior design. AI extracts the whole document,
+      truth covers a subset → totals not directly comparable (AI 978.55 m² combined
+      paint vs truth 250.95 m² = +290%). Exclude from systematic error analysis.
+    notes: "Interior-only scope (no plytelės). Project PDF is 4.1-5.1 punktas subset; totals scoped accordingly."
+
+  - slug: sernu
+    name: "Šernų g. 18B, Kaunas"
+    truth_path: ground_truth/sernu/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf"
+    samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf"
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: false
+    blocked_for_vision_extraction: true
+    blocked_reason: "No architectural floor plan in bundle — only specialty (elektra, plytelės) drawings. Ask user for missing architectural PDF before any Vision spend."
+
+  - slug: lazunu
+    name: "Lazūnų g. 6 (Butas)"
+    truth_path: ground_truth/lazunu/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/lazunu_TP_bundled.pdf"
+    samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf"
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: false
+    notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into lazunu_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."

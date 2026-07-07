@@ -10,8 +10,8 @@
  *    sidebar'e atitinkamas puslapis pulses (handled by parent)
  */
 
-import { useMemo, useEffect, useState } from 'react';
-import { Stage, Layer, Circle, Line, Group, Rect, Text as KonvaText } from 'react-konva';
+import { useEffect, useState } from 'react';
+import { Stage, Layer, Circle, Line, Group, Rect } from 'react-konva';
 
 const COUNTED_COLOR = '#ef4444';   // red — clicked symbols
 const AREA_COLOR    = '#10b981';   // emerald — clicked rooms
@@ -33,7 +33,7 @@ export default function TraceOverlay({
       setPulseT(0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2));
     }, 50);
     return () => clearInterval(id);
-  }, [hoveredRow?._id]);  // eslint-disable-line
+  }, [hoveredRow?._id]);   
 
   const renderLinks = (row, color, opacity = 1) => {
     if (!row || !row.trace_links) return null;

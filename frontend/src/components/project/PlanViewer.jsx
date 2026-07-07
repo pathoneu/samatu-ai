@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -15,7 +15,7 @@ import {
   getPlanFitScale,
   getVisiblePlanPages,
 } from '@/lib/planViewerState';
-import { getFocusedRoomRect, getPolygonPdfPoints, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
+import { getFocusedRoomRect, getTextLabelRect, pickOverlayRect } from '@/lib/planOverlayGeometry';
 import { getAnchoredZoomScroll, nextWheelScale } from '@/lib/viewerViewport';
 import {
   getConfirmableSymbolCounts,
@@ -25,6 +25,7 @@ import {
 } from '@/lib/symbolOverlay';
 import { getPlanSymbolTypes } from '@/lib/planSymbolTypes';
 import { API_BASE } from '@/lib/apiBase';
+import RoomZoneLayer from './RoomZoneLayer';
 
 if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
   console.error(`[PlanViewer] pdfjs version drift detected: API=${pdfjs.version}, expected 4.8.69`);
@@ -100,97 +101,31 @@ function PlanOverlayLayer({ room, page, eksplikacijaPage, renderedSize, pdfSize,
 
   if (!rect) return null;
 
-  const isEksplikacija = rect.type === 'eksplikacija';
-  const isLabel = rect.type === 'label';
-  const polygonPoints = !isEksplikacija && !isLabel && Array.isArray(room?.polygon_pdf)
-    ? getPolygonPdfPoints(room.polygon_pdf, {
-      pageWidthPdf: room.page_width_pdf || room.pdf_page_width || pdfSize?.width,
-      pageHeightPdf: room.page_height_pdf || room.pdf_page_height || pdfSize?.height,
-      renderedWidth: renderedSize.width,
-      renderedHeight: renderedSize.height,
-    })
-    : null;
-  const polygonPath = polygonPoints
-    ? polygonPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ') + ' Z'
-    : null;
+  // Room centre for the clean number marker. Reverted from the flood-fill
+  // polygon (2026-06-17, founder): the auto-traced boundary wasn't accurate
+  // enough, so we mark WHERE the room is (its number), not a wrong outline.
+  // Accurate polygons stay available on demand via "Taisyti zoną".
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 20 }}>
-      {polygonPath ? (
-        <svg
-          width={renderedSize.width}
-          height={renderedSize.height}
-          viewBox={`0 0 ${renderedSize.width} ${renderedSize.height}`}
-          className="absolute inset-0"
-          aria-hidden="true"
-        >
-          <path
-            d={polygonPath}
-            fill="rgba(37, 99, 235, 0.18)"
-            stroke="#2563eb"
-            strokeWidth="3"
-            vectorEffect="non-scaling-stroke"
-            filter="drop-shadow(0 8px 18px rgba(30, 64, 175, 0.28))"
-          />
-        </svg>
-      ) : (
-        <div
-          data-testid="plan-overlay-rect"
-          style={{
-            position: 'absolute',
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            border: isLabel ? '3px solid #ef4444' : (isEksplikacija ? '2px solid #f59e0b' : '2px solid #2563eb'),
-            background: isLabel
-              ? 'rgba(239, 68, 68, 0.12)'
-              : (isEksplikacija ? 'rgba(245, 158, 11, 0.22)' : 'rgba(37, 99, 235, 0.14)'),
-            boxShadow: isLabel
-              ? '0 0 0 7px rgba(239, 68, 68, 0.18), 0 10px 26px rgba(127, 29, 29, 0.32)'
-              : (isEksplikacija
-              ? '0 0 0 4px rgba(245, 158, 11, 0.2), 0 8px 24px rgba(120, 53, 15, 0.28)'
-              : '0 0 0 4px rgba(37, 99, 235, 0.16), 0 8px 24px rgba(30, 64, 175, 0.25)'),
-            borderRadius: isLabel ? 999 : 4,
-          }}
-        />
-      )}
       <div
-        style={{
-          position: 'absolute',
-          left: Math.max(8, rect.left),
-          top: Math.max(8, rect.top - 30),
-          maxWidth: 260,
-        }}
-        className={`rounded-md px-2.5 py-1.5 text-xs shadow border ${
-          isLabel
-            ? 'bg-red-50 border-red-300 text-red-950'
-            : isEksplikacija
-            ? 'bg-amber-50 border-amber-300 text-amber-950'
-            : 'bg-blue-50 border-blue-300 text-blue-950'
-        }`}
+        style={{ position: 'absolute', left: cx, top: cy, transform: 'translate(-50%, -50%)' }}
+        className="flex flex-col items-center"
       >
-        <span className="font-semibold">{room?.nr}</span>
-        {room?.pavadinimas ? <span className="ml-1">{room.pavadinimas}</span> : null}
-        <span className="ml-1 text-current/65">
-          {isLabel ? 'numerio žymė' : isEksplikacija ? 'eksplikacijos eilutė' : 'tiksli zona'}
-        </span>
-      </div>
-      {(isEksplikacija || isLabel) && room?.bbox_pct && !room?.polygon_pdf && (
         <div
-          style={{
-            position: 'absolute',
-            left: Math.max(8, rect.left),
-            top: rect.top + rect.height + 8,
-            maxWidth: 340,
-          }}
-          className={`rounded-md border bg-white/95 px-2.5 py-1.5 text-[11px] leading-snug shadow ${
-            isLabel ? 'border-red-300 text-red-950' : 'border-amber-300 text-amber-950'
-          }`}
+          className="flex items-center justify-center rounded-full font-semibold text-white text-sm tabular-nums ring-2 ring-white"
+          style={{ width: 36, height: 36, background: 'hsl(var(--primary))', boxShadow: '0 4px 16px hsl(var(--primary) / 0.45)' }}
         >
-          Tikslios patalpos zonos nėra. Rodoma patalpos numerio vieta; apytikslis AI langelis paslėptas, nes jis netikslus.
+          {room?.nr}
         </div>
-      )}
+        {room?.pavadinimas ? (
+          <div className="mt-1.5 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-medium text-[#1f2937] shadow-sm whitespace-nowrap">
+            {room.pavadinimas}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -273,11 +208,14 @@ export default function PlanViewer({
   fileUrl,
   pdfFile = null,
   onSymbolCountResult = null,
+  onRoomPolygonFill = null,
   pageMeta = {},
   missingTypes = [],
   focusedPage = null,
   focusedRoom = null,
   eksplikacija_source_page = null,
+  rooms = [],
+  onRoomZoneClick = null,
 }) {
   const viewportRef = useRef(null);
   const [numPages, setNumPages] = useState(null);
@@ -326,7 +264,7 @@ export default function PlanViewer({
     if (focusedRoomKey && focusedRoomKey !== dismissedRoomKey) {
       setDismissedRoomKey(null);
     }
-  }, [focusedRoomKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusedRoomKey]);   
 
   useEffect(() => {
     if (focusedPage && focusedRoomKey !== dismissedRoomKey) setPageNumber(focusedPage);
@@ -369,7 +307,10 @@ export default function PlanViewer({
   const currentType = currentMeta.type || 'unknown';
   const currentLabel = currentMeta.label || pageTypeLabel(currentType);
   const currentSymbolTypes = useMemo(() => getPlanSymbolTypes(currentType), [currentType]);
-  const renderedSize = pageSize
+  // Page-identity guard: pageSize is tagged with the page it was measured on.
+  // During an async page switch the previous page's dims linger for a frame;
+  // scaling a polygon by the wrong page's dims is the navigation-drift bug.
+  const renderedSize = (pageSize && pageSize.pageNumber === pageNumber)
     ? { width: pageSize.width * scale, height: pageSize.height * scale }
     : null;
 
@@ -654,13 +595,13 @@ export default function PlanViewer({
   }
 
   return (
-    <div className="h-full min-h-0 bg-[#f4f2ed] flex flex-col border-0">
-      <div className="h-14 shrink-0 border-b border-[#d8d2c8] bg-[#fbfaf7] flex items-center justify-between px-3 gap-3">
+    <div className="h-full min-h-0 bg-[hsl(var(--viewer-blueprint-bg))] flex flex-col border-0">
+      <div className="h-14 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] flex items-center justify-between px-3 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setRailOpen(v => !v)}
-            className="h-9 w-9 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8] flex items-center justify-center"
+            className="h-9 w-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))] flex items-center justify-center"
             title={railOpen ? 'Slėpti puslapius' : 'Rodyti puslapius'}
           >
             {railOpen ? <SidebarClose className="w-4 h-4" /> : <SidebarOpen className="w-4 h-4" />}
@@ -671,9 +612,9 @@ export default function PlanViewer({
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{ background: pageTypeColor(currentType) }}
               />
-              <div className="text-sm font-semibold text-[#24211d] truncate">{currentLabel}</div>
+              <div className="text-sm font-semibold text-[hsl(var(--viewer-chrome-foreground))] truncate">{currentLabel}</div>
             </div>
-            <div className="text-[11px] text-[#776f63] tabular-nums">
+            <div className="text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] tabular-nums">
               Puslapis {pageNumber} / {numPages || '-'} · {pageTypeLabel(currentType)}
             </div>
           </div>
@@ -684,7 +625,7 @@ export default function PlanViewer({
             type="button"
             onClick={() => setPageNumber(p => getNextPlanPage(p, -1, numPages))}
             disabled={pageNumber <= 1}
-            className="h-9 w-9 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8] disabled:opacity-40"
+            className="h-9 w-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40"
             title="Ankstesnis puslapis"
           >
             <ArrowLeft className="w-4 h-4 mx-auto" />
@@ -693,16 +634,16 @@ export default function PlanViewer({
             type="button"
             onClick={() => setPageNumber(p => getNextPlanPage(p, 1, numPages))}
             disabled={pageNumber >= numPages}
-            className="h-9 w-9 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8] disabled:opacity-40"
+            className="h-9 w-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40"
             title="Kitas puslapis"
           >
             <ArrowRight className="w-4 h-4 mx-auto" />
           </button>
-          <div className="w-px h-8 bg-[#d8d2c8] mx-1" />
+          <div className="w-px h-8 bg-[hsl(var(--viewer-chrome-border))] mx-1" />
           <button
             type="button"
             onClick={() => setScale(s => clampPlanScale(s - 0.15))}
-            className="h-9 w-9 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8]"
+            className="h-9 w-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
             title="Mažinti"
           >
             <Minus className="w-4 h-4 mx-auto" />
@@ -710,7 +651,7 @@ export default function PlanViewer({
           <select
             value={ZOOM_PRESETS.includes(scale) ? String(scale) : 'custom'}
             onChange={e => setScale(clampPlanScale(Number(e.target.value)))}
-            className="h-9 rounded-md border border-[#d8d2c8] bg-white px-2 text-sm tabular-nums outline-none"
+            className="h-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-2 text-sm tabular-nums outline-none"
             title="Mastelis"
           >
             <option value="custom" disabled>{fmtPercent(scale)}</option>
@@ -721,7 +662,7 @@ export default function PlanViewer({
           <button
             type="button"
             onClick={() => setScale(s => clampPlanScale(s + 0.15))}
-            className="h-9 w-9 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8]"
+            className="h-9 w-9 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
             title="Didinti"
           >
             <Plus className="w-4 h-4 mx-auto" />
@@ -729,12 +670,73 @@ export default function PlanViewer({
           <button
             type="button"
             onClick={() => fitPage('width')}
-            className="h-9 px-3 rounded-md border border-[#d8d2c8] bg-white hover:bg-[#f1eee8] text-sm"
+            className="h-9 px-3 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-sm"
             title="Pritaikyti pločiui"
           >
             <Maximize2 className="w-4 h-4 inline mr-1.5" />
             Plotis
           </button>
+          {/* Manual room-contour correction (core): visible when a room is
+              focused. Click inside the room → flood-fill → Išsaugoti persists
+              it as that room's accurate polygon. */}
+          {focusedRoom?.nr && (
+            <button
+              type="button"
+              onClick={() => {
+                setFillMode(v => !v);
+                setFillError(null);
+                setFillResult(null);
+                if (symbolPickMode) setSymbolPickMode(false);
+              }}
+              className={`h-9 px-3 rounded-md border text-sm ${
+                fillMode
+                  ? 'border-violet-500 bg-violet-500/10 text-violet-300'
+                  : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
+              } disabled:opacity-50`}
+              disabled={fillLoading || !pdfFile}
+              title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėk patalpos viduje`}
+            >
+              <Wand2 className="w-4 h-4 inline mr-1.5" />
+              {fillMode ? `Spustelėk patalpos ${focusedRoom.nr} viduje` : 'Taisyti zoną'}
+            </button>
+          )}
+          {fillLoading && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-[hsl(var(--viewer-chrome-foreground)/0.65)]">
+              <Loader2 className="w-4 h-4 animate-spin" /> Užpildoma...
+            </span>
+          )}
+          {fillError && !fillLoading && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-red-500/50 bg-red-500/10 px-2.5 py-1 text-xs text-red-300">
+              {fillError}
+            </span>
+          )}
+          {fillResult && !fillLoading && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/50 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-300">
+              ✓ {fillResult.polygon_pdf.length} taškų · {fillResult.confidence}
+              {focusedRoom?.nr && onRoomPolygonFill && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRoomPolygonFill(focusedRoom.nr, fillResult);
+                    setFillResult(null);
+                    setFillMode(false);
+                  }}
+                  className="ml-1 inline-flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-white hover:bg-violet-700"
+                  title={`Išsaugoti kaip patalpos ${focusedRoom.nr} kontūrą`}
+                >
+                  <Check className="w-3 h-3" /> Išsaugoti
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { setFillResult(null); setFillError(null); }}
+                className="ml-1 hover:text-violet-700"
+                title="Atmesti"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </span>
+          )}
           {/* 2026-05-06: Ženklai toolbar (symbol counting + click-to-fill)
               hidden by default — accuracy isn't production-ready yet.
               Re-enable via DevTools:
@@ -752,8 +754,8 @@ export default function PlanViewer({
               onClick={() => setSymbolToolsOpen(v => !v)}
               className={`h-9 px-3 rounded-md border text-sm ${
                 symbolToolsOpen
-                  ? 'border-red-300 bg-red-50 text-red-950'
-                  : 'border-[#d8d2c8] bg-white hover:bg-[#f1eee8]'
+                  ? 'border-red-500/50 bg-red-500/10 text-red-300'
+                  : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
               }`}
               title="Sutartiniai ženklai (eksperimentinis)"
             >
@@ -765,7 +767,7 @@ export default function PlanViewer({
       </div>
 
       {symbolToolsOpen && (
-        <div className="shrink-0 border-b border-[#d8d2c8] bg-white px-3 py-2">
+        <div className="shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -775,8 +777,8 @@ export default function PlanViewer({
               }}
               className={`h-8 px-3 rounded-md border text-xs font-medium ${
                 symbolPickMode
-                  ? 'border-red-500 bg-red-50 text-red-950'
-                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
+                  ? 'border-red-500 bg-red-500/10 text-red-300'
+                  : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
               }`}
               disabled={symbolLoading || !pdfFile}
               title="Paspauskite ant simbolio brėžinyje, tada AI ieškos panašių"
@@ -787,57 +789,15 @@ export default function PlanViewer({
             <button
               type="button"
               onClick={runPageSymbolDetect}
-              className="h-8 px-3 rounded-md border border-blue-300 bg-blue-50 text-xs font-medium text-blue-950 hover:bg-blue-100 disabled:opacity-50"
+              className="h-8 px-3 rounded-md border border-blue-500/50 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
               disabled={symbolLoading || !pdfFile}
               title="Vienu AI kvietimu rasti visus tikėtinus simbolius šiame puslapyje"
             >
               <Crosshair className="w-3.5 h-3.5 inline mr-1.5" />
               AI nuskaityti puslapį
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFillMode(v => !v);
-                setFillError(null);
-                setFillResult(null);
-                if (symbolPickMode) setSymbolPickMode(false);
-              }}
-              className={`h-8 px-3 rounded-md border text-xs font-medium ${
-                fillMode
-                  ? 'border-violet-500 bg-violet-50 text-violet-950'
-                  : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
-              } disabled:opacity-50`}
-              disabled={fillLoading || !pdfFile}
-              title="Spustelėk patalpos viduje — sistema apves sienas automatiškai (eksperimentinis)"
-            >
-              <Wand2 className="w-3.5 h-3.5 inline mr-1.5" />
-              {fillMode ? 'Spauskite patalpos viduje' : 'Užpildyti polygoną'}
-            </button>
-            {fillLoading && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-[#70685d]">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Užpildoma...
-              </span>
-            )}
-            {fillError && !fillLoading && (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs text-red-950">
-                {fillError}
-              </span>
-            )}
-            {fillResult && !fillLoading && (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950">
-                ✓ {fillResult.polygon_pdf.length} taškų · pasitikėjimas: {fillResult.confidence}
-                <button
-                  type="button"
-                  onClick={() => { setFillResult(null); setFillError(null); }}
-                  className="ml-1 hover:text-violet-700"
-                  title="Atmesti"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            <div className="h-6 w-px bg-[#d8d2c8]" />
+            {/* Fill flow moved to the main toolbar (core manual-correction feature). */}
+            <div className="h-6 w-px bg-[hsl(var(--viewer-chrome-border))]" />
             {currentSymbolTypes.map(item => (
               <button
                 key={item.id}
@@ -846,15 +806,15 @@ export default function PlanViewer({
                 disabled={symbolLoading || !pdfFile}
                 className={`h-8 px-2.5 rounded-md border text-xs ${
                   symbolType === item.id
-                    ? 'border-red-400 bg-red-50 text-red-950'
-                    : 'border-[#d8d2c8] bg-[#fbfaf7] hover:bg-[#f1eee8]'
+                    ? 'border-red-400 bg-red-500/10 text-red-300'
+                    : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
                 } disabled:opacity-50`}
               >
                 {item.label}
               </button>
             ))}
             {symbolLoading && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-[#70685d]">
+              <span className="inline-flex items-center gap-1.5 text-xs text-[hsl(var(--viewer-chrome-foreground)/0.65)]">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 AI ieško ženklų...
               </span>
@@ -863,8 +823,8 @@ export default function PlanViewer({
               <>
                 <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs ${
                   symbolVisibleCount > 0
-                    ? 'border-amber-300 bg-amber-50 text-amber-950'
-                    : 'border-slate-300 bg-slate-50 text-slate-700'
+                    ? 'border-amber-300 bg-amber-500/10 text-amber-300'
+                    : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-[hsl(var(--viewer-chrome-foreground)/0.65)]'
                 }`}>
                   <Crosshair className="w-3.5 h-3.5" />
                   {symbolVisibleCount > 0
@@ -875,7 +835,7 @@ export default function PlanViewer({
                   <button
                     type="button"
                     onClick={confirmSymbolResult}
-                    className="h-8 px-3 rounded-md border border-emerald-300 bg-emerald-50 text-xs font-medium text-emerald-950 hover:bg-emerald-100"
+                    className="h-8 px-3 rounded-md border border-emerald-300 bg-emerald-500/10 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
                     title="Tik po patvirtinimo šie ženklai bus įrašyti į kiekius"
                   >
                     <Check className="w-3.5 h-3.5 inline mr-1.5" />
@@ -885,7 +845,7 @@ export default function PlanViewer({
                 <button
                   type="button"
                   onClick={() => setSymbolResult(null)}
-                  className="h-8 px-2.5 rounded-md border border-[#d8d2c8] bg-[#fbfaf7] text-xs font-medium hover:bg-[#f1eee8]"
+                  className="h-8 px-2.5 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-xs font-medium hover:bg-[hsl(var(--viewer-chrome-hover))]"
                   title="Išvalyti dabartinį AI žymėjimą"
                 >
                   <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
@@ -894,7 +854,7 @@ export default function PlanViewer({
               </>
             )}
             {symbolError && (
-              <span className="text-xs text-red-700">{symbolError}</span>
+              <span className="text-xs text-red-300">{symbolError}</span>
             )}
           </div>
         </div>
@@ -902,19 +862,19 @@ export default function PlanViewer({
 
       <div className="flex-1 min-h-0 flex">
         {railOpen && (
-          <aside className="w-[172px] shrink-0 border-r border-[#d8d2c8] bg-[#fbfaf7] flex flex-col">
-            <div className="p-3 border-b border-[#e2ddd5]">
+          <aside className="w-[172px] shrink-0 border-r border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] flex flex-col">
+            <div className="p-3 border-b border-[hsl(var(--viewer-chrome-border))]">
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8a8174]" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--viewer-chrome-foreground)/0.65)]" />
                 <input
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Puslapiai..."
-                  className="w-full h-8 pl-8 pr-2 rounded-md border border-[#d8d2c8] bg-white text-xs outline-none focus:border-primary"
+                  className="w-full h-8 pl-8 pr-2 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-xs outline-none focus:border-primary"
                 />
               </div>
               {missingTypes.length > 0 && (
-                <div className="mt-2 text-[11px] text-amber-700 leading-tight">
+                <div className="mt-2 text-[11px] text-amber-300 leading-tight">
                   Trūksta: {missingTypes.map(pageTypeLabel).join(', ')}
                 </div>
               )}
@@ -939,7 +899,7 @@ export default function PlanViewer({
         <main className="flex-1 min-w-0 flex flex-col">
           <div
             ref={viewportRef}
-            className={`flex-1 min-h-0 overflow-auto bg-[#e8e4dc] relative ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`flex-1 min-h-0 overflow-auto bg-[hsl(var(--viewer-blueprint-bg))] relative ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
             onMouseDown={(event) => {
               if (symbolPickMode) return;
               if (event.target.closest('button, a, input, select, textarea')) return;
@@ -1005,10 +965,28 @@ export default function PlanViewer({
                     devicePixelRatio={Math.min(3, (window.devicePixelRatio || 1) * 1.6)}
                     renderTextLayer={false}
                     renderAnnotationLayer={false}
-                    onLoadSuccess={(page) => setPageSize({ width: page.width, height: page.height })}
+                    onLoadSuccess={(page) => {
+                      // Use the ROTATION-APPLIED viewport, not page.width/height
+                      // (= unrotated MediaBox view[2]/view[3]). For a /Rotate 90|270
+                      // page the canvas renders landscape while page.width/height
+                      // report portrait — that transposes every overlay. getViewport
+                      // applies page.rotate by default; it's a no-op for unrotated pages.
+                      const vp = page.getViewport ? page.getViewport({ scale: 1 }) : { width: page.width, height: page.height };
+                      setPageSize({ width: vp.width, height: vp.height, pageNumber });
+                    }}
                     loading={<div className="w-[680px] h-[820px] bg-white flex items-center justify-center text-sm text-muted-foreground">Renderiuojamas puslapis...</div>}
                   />
                 </Document>
+
+                {renderedSize && rooms.length > 0 && (
+                  <RoomZoneLayer
+                    rooms={rooms}
+                    page={pageNumber}
+                    renderedSize={renderedSize}
+                    focusedRoomNr={focusedRoom?.nr ?? null}
+                    onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: pageNumber })}
+                  />
+                )}
 
                 {symbolPickMode && (
                   <button
@@ -1064,11 +1042,11 @@ export default function PlanViewer({
                           setDismissedRoomKey(focusedRoomKey);
                           setTextLabelRect(null);
                         }}
-                        className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-md border border-[#d8d2c8] bg-white px-2.5 py-1 text-[11px] text-[#3b3b3b] hover:bg-[#f1eee8] shadow"
+                        className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-2.5 py-1 text-[11px] text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] shadow"
                         title="Pašalinti pažymėjimą (Esc)"
                       >
                         ✕ Atšaukti pažymėjimą
-                        <span className="text-[#9a948a] text-[10px] ml-1">Esc</span>
+                        <span className="text-[hsl(var(--viewer-chrome-foreground)/0.65)] text-[10px] ml-1">Esc</span>
                       </button>
                     )}
                   </>
@@ -1077,7 +1055,7 @@ export default function PlanViewer({
             </div>
           </div>
 
-          <div className="h-9 shrink-0 border-t border-[#d8d2c8] bg-[#fbfaf7] px-3 flex items-center justify-between text-[11px] text-[#70685d]">
+          <div className="h-9 shrink-0 border-t border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center justify-between text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)]">
             <div className="flex items-center gap-2">
               <BookOpen className="w-3.5 h-3.5" />
               <span>Vilkite brėžinį pele · Ctrl/Cmd + ratukas keičia mastelį · [ / ] keičia puslapį</span>

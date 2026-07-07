@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
-  Zap, Droplets, Lightbulb, CornerUpRight, Ruler, Package, Droplet,
+  Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
+  Map as MapIcon, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -19,7 +21,6 @@ import ProjectMainView from '@/components/project/ProjectMainView';
 // flow never shipped to production after 2026-04-26 rollback.
 import ExportDropdown from '@/components/project/ExportDropdown';
 import ShareButton from '@/components/project/ShareButton';
-import RulesOverridePanel from '@/components/project/RulesOverridePanel';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject, getProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
@@ -45,19 +46,24 @@ function heightLabel(mm) {
 // ── Confidence indicator ──────────────────────────────────────────────────────
 
 function ConfidenceDot({ level }) {
+  const { t } = useTranslation();
   if (!level) return null;
   const map = {
-    high:   { color: 'bg-green-500',  title: 'Aukštas: vertė perskaityta tiesiogiai iš matmenų' },
-    medium: { color: 'bg-yellow-400', title: 'Vidutinis: apskaičiuota iš dalinių duomenų' },
-    low:    { color: 'bg-red-500',    title: 'Žemas: spėjama pagal standartus (patikrink!)' },
+    high:   { color: 'bg-green-500',  emoji: '🟢', title: t('project.interior.confHigh') },
+    medium: { color: 'bg-yellow-400', emoji: '🟡', title: t('project.interior.confMedium') },
+    low:    { color: 'bg-red-500',    emoji: '🔴', title: t('project.interior.confLow') },
   };
   const c = map[level];
   if (!c) return null;
   return (
-    <span
-      title={c.title}
-      className={`inline-block w-2.5 h-2.5 rounded-full ${c.color} shrink-0`}
-    />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-block w-2.5 h-2.5 rounded-full ${c.color} shrink-0 cursor-help`}
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top">{c.emoji} {c.title}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -68,15 +74,16 @@ function ConfidenceDot({ level }) {
 // Prielaidos button · Eksportuoti button. Always visible above tab bar.
 
 function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete }) {
+  const { t } = useTranslation();
   return (
     <div
-      className="flex items-center bg-background border-b border-border"
-      style={{ height: 52, padding: '0 16px', gap: 12, flexShrink: 0 }}
+      className="flex items-center flex-wrap bg-background border-b border-border py-2 sm:py-0 gap-y-2"
+      style={{ minHeight: 52, padding: '0 16px', gap: 12, flexShrink: 0 }}
     >
       <Link
         to="/"
-        title="Į projektų sąrašą"
-        className="flex items-center justify-center rounded transition-colors"
+        title={t('project.interior.backToList')}
+        className="flex items-center justify-center rounded transition-colors shrink-0"
         style={{
           width: 28, height: 28, color: 'hsl(var(--muted-foreground))',
         }}
@@ -85,7 +92,7 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
       </Link>
       <div className="flex items-baseline gap-2.5 min-w-0">
         <span className="font-semibold text-foreground truncate" style={{ fontSize: 13 }}>
-          {project.name || 'Be pavadinimo'}
+          {project.name || t('project.interior.untitled')}
         </span>
         {project.company_name && (
           <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: 11 }}>
@@ -101,22 +108,22 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
             background: 'hsl(var(--card))',
           }}
         >
-          Interjeras
+          {t('project.interior.typePill')}
         </span>
       </div>
-      <div className="flex-1" />
+      <div className="flex-1 min-w-0" />
       <div
-        className="flex items-center pr-3"
-        style={{ gap: 24, borderRight: '1px solid hsl(var(--border))', height: 28 }}
+        className="flex items-center pr-3 gap-4 sm:gap-6"
+        style={{ borderRight: '1px solid hsl(var(--border))', height: 28 }}
       >
         <div className="flex items-baseline" style={{ gap: 6 }}>
-          <span className="skyrius-header" style={{ fontSize: 10 }}>Be PVM</span>
+          <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.beVat')}</span>
           <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
             {totalNet.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </span>
         </div>
         <div className="flex items-baseline" style={{ gap: 6 }}>
-          <span className="skyrius-header" style={{ fontSize: 10 }}>Su PVM</span>
+          <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.suVat')}</span>
           <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
             {totalGross.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </span>
@@ -133,7 +140,7 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
           color: 'hsl(var(--foreground) / 0.85)',
         }}
       >
-        <Sliders className="w-3 h-3" /> Prielaidos
+        <Sliders className="w-3 h-3" /> {t('project.interior.prielaidos')}
       </button>
       <button
         onClick={onEksportuoti}
@@ -145,14 +152,14 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
           fontSize: 12, fontWeight: 500,
         }}
       >
-        <Download className="w-3 h-3" /> Eksportuoti
+        <Download className="w-3 h-3" /> {t('project.interior.export')}
       </button>
       {/* Sprint §FIX-4 (2026-04-29): delete button (icon-only) — soft-delete'as
           per §28; projektas nukeliauja į Šiukšliadėžę 30d. retention. */}
       {onDelete && (
         <button
           onClick={onDelete}
-          title="Ištrinti projektą (atšaukiama 30 d.)"
+          title={t('project.interior.deleteTitle')}
           className="flex items-center justify-center rounded transition-colors hover:bg-muted/50"
           style={{
             height: 30, width: 30,
@@ -171,28 +178,29 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
 function TabBar({ tab, setTab, hasPdf }) {
+  const { t } = useTranslation();
   const tabs = [
-    ...(hasPdf ? [{ id: 'brezinys', label: 'Brėžinys', Icon: Map }] : []),
-    { id: 'main',     label: 'Kiekiai',   Icon: ListChecks },
-    { id: 'aichat',   label: 'AI Chat',   Icon: MessageSquare },
+    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), Icon: MapIcon }] : []),
+    { id: 'main',     label: t('project.interior.tabKiekiai'),   Icon: ListChecks },
+    { id: 'aichat',   label: t('project.interior.tabAiChat'),   Icon: MessageSquare },
   ];
   return (
-    <div className="flex items-center gap-0 border-b border-border" style={{ paddingLeft: 16 }}>
-      {tabs.map(t => {
-        const Icon = t.Icon;
-        const isActive = tab === t.id;
+    <div className="flex items-center gap-0 border-b border-border overflow-x-auto" style={{ paddingLeft: 16 }}>
+      {tabs.map(tb => {
+        const Icon = tb.Icon;
+        const isActive = tab === tb.id;
         return (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 ${
+            key={tb.id}
+            onClick={() => setTab(tb.id)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 shrink-0 whitespace-nowrap ${
               isActive
                 ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <Icon className="w-4 h-4" />
-            {t.label}
+            {tb.label}
           </button>
         );
       })}
@@ -350,7 +358,94 @@ function RoomCard({ room }) {
 
 // ── Detalus darbų sąrašas (rangovo-stiliaus sąmatos pozicijos) ───────────────────
 
+// Merge the user's manual edits onto a freshly-rebuilt darbu_sarasas (matched by
+// aprasymas), mirroring the backend _merge_user_edits. Preserves: entered prices
+// (kaina/suma), manual COUNT overrides (manual_override kiekis + markers), and
+// carries forward user-added rows the deterministic rebuild can't reproduce
+// (drawing symbol-count lines tagged source:'Pažymėjus brėžinyje'). Without this a
+// recompute reverted count corrections to the AI value and dropped symbol-count
+// lines + their prices. (2026-06-19 hunt.)
+const _lc = (s) => (s || '').toLowerCase();
+// Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
+// and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
+// paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Mirrors
+// the backend's _merge_user_edits fallback so frontend/backend agree. (audit 2026-07-05)
+function _normLabel(s) {
+  return _lc(s)
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')           // drop accents
+    .replace(/\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')             // drop 3m tier suffix
+    .replace(/\bq[1-4]\b/g, '')                                   // drop Q-level
+    .replace(/\(\s*\d+\s*sluoksn[^)]*\)/g, '')                    // drop '(N sluoksnis)'
+    .replace(/\s+/g, ' ').trim();
+}
+
+function mergeDarbuSarasasEdits(rebuilt, old) {
+  if (!Array.isArray(rebuilt)) return old || [];
+  const oldList = old || [];
+  const oldByLabel = new Map();
+  for (const o of oldList) {
+    const k = _lc(o.aprasymas);
+    if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
+  }
+  const matchedOld = new Set();  // old items already consumed (by object identity)
+  const carry = (newItem, oldItem) => {
+    const keepQty = oldItem.manual_override === true
+      || oldItem.quantity_source === 'manual_override';
+    const kiekis = keepQty ? oldItem.kiekis : newItem.kiekis;
+    const kaina = oldItem.kaina ?? newItem.kaina;
+    const out = { ...newItem };
+    if (keepQty) {
+      out.kiekis = kiekis;
+      out.manual_override = true;
+      out.quantity_source = 'manual_override';
+      if (oldItem.ai_kiekis_original != null) out.ai_kiekis_original = oldItem.ai_kiekis_original;
+    }
+    if (kaina != null) {
+      out.kaina = kaina;
+      out.suma = (kiekis || 0) * kaina;
+    }
+    return out;
+  };
+  // Pass 1 — exact lowercased-label match (unchanged behaviour).
+  const merged = rebuilt.map((newItem) => {
+    const oldItem = oldByLabel.get(_lc(newItem.aprasymas));
+    if (!oldItem) return newItem;
+    matchedOld.add(oldItem);
+    return carry(newItem, oldItem);
+  });
+  // Pass 2 — rescue prices for lines whose label changed on rebuild. Match
+  // still-unpriced rebuilt lines to unconsumed old PRICED/edited lines by the
+  // normalized key, applied ONLY when unambiguous (one-to-one) so it can never
+  // mis-assign a price between two co-existing tier lines.
+  const push = (m, k, v) => { const a = m.get(k) || []; a.push(v); m.set(k, a); };
+  const oldByNorm = new Map();
+  for (const o of oldList) {
+    if (matchedOld.has(o)) continue;
+    if (o.kaina == null && o.manual_override !== true) continue;
+    const k = _normLabel(o.aprasymas); if (k) push(oldByNorm, k, o);
+  }
+  const newByNorm = new Map();
+  merged.forEach((m, i) => {
+    if (m.kaina != null) return;
+    const k = _normLabel(m.aprasymas); if (k) push(newByNorm, k, i);
+  });
+  for (const [k, idxs] of newByNorm) {
+    const cands = oldByNorm.get(k) || [];
+    if (idxs.length === 1 && cands.length === 1) {
+      merged[idxs[0]] = carry(merged[idxs[0]], cands[0]);
+      matchedOld.add(cands[0]);
+    }
+  }
+  // Carry forward unmatched old lines the user manually added/edited.
+  for (const o of oldList) {
+    if (matchedOld.has(o)) continue;
+    if (o.source === 'Pažymėjus brėžinyje' || o.manual_override === true) merged.push(o);
+  }
+  return merged;
+}
+
 function DarbuSarasas({ items }) {
+  const { t } = useTranslation();
   const [expandedReasoning, setExpandedReasoning] = useState(new Set());
   const [feedback, setFeedback] = useState({}); // { [kategorija]: 'ok' | 'bad' }
 
@@ -362,7 +457,7 @@ function DarbuSarasas({ items }) {
   for (const it of items) {
     const key = it.skyrius || 'kita';
     if (!seen.has(key)) {
-      seen.set(key, { skyrius: key, label: it.skyrius_label || 'Kita', items: [] });
+      seen.set(key, { skyrius: key, label: it.skyrius_label || t('project.interior.otherCategory'), items: [] });
       grouped.push(seen.get(key));
     }
     seen.get(key).items.push(it);
@@ -392,14 +487,14 @@ function DarbuSarasas({ items }) {
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold text-foreground">
-              Detalus darbų sąrašas
+              {t('project.interior.listDetailHead')}
             </h2>
             <Badge variant="secondary" className="text-xs font-normal">
-              {totalPositions} pozicijos
+              {t('project.interior.listPositions', { count: totalPositions })}
             </Badge>
           </div>
           <span className="text-xs text-muted-foreground">
-            Pažymėk, ar kiekvienas kiekis atitinka brėžinius
+            {t('project.interior.listMarkHint')}
           </span>
         </div>
       </div>
@@ -433,7 +528,7 @@ function DarbuSarasas({ items }) {
                               onClick={() => toggleReasoning(it.kategorija)}
                               className="text-xs text-muted-foreground hover:text-foreground mt-0.5"
                             >
-                              {expandedReasoning.has(it.kategorija) ? 'Slėpti paaiškinimą' : 'Kodėl?'}
+                              {expandedReasoning.has(it.kategorija) ? t('project.interior.hideReasoning') : t('project.interior.why')}
                             </button>
                           )}
                         </td>
@@ -452,7 +547,7 @@ function DarbuSarasas({ items }) {
                                   ? 'bg-green-500/20 border-green-500 text-green-600 dark:text-green-400'
                                   : 'border-border text-muted-foreground hover:border-green-500/50 hover:text-green-600'
                               }`}
-                              title="Teisingai"
+                              title={t('project.interior.feedbackOk')}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                             </button>
@@ -463,7 +558,7 @@ function DarbuSarasas({ items }) {
                                   ? 'bg-red-500/20 border-red-500 text-red-600 dark:text-red-400'
                                   : 'border-border text-muted-foreground hover:border-red-500/50 hover:text-red-600'
                               }`}
-                              title="Neteisingai / peržiūrėti"
+                              title={t('project.interior.feedbackBad')}
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -493,6 +588,7 @@ function DarbuSarasas({ items }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function InteriorProject({ project: projectProp, onAssumptionsChange, onDelete }) {
+  const { t } = useTranslation();
   // Local mirror of project prop — needed because RulesOverridePanel rewrites
   // big swaths of state via /recompute-interior. Keep prop sync via useEffect
   // so navigation between projects still works.
@@ -636,7 +732,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       }
       const result = await res.json();
       if (result.status !== 'ok') {
-        throw new Error(result._error || 'Recompute klaida');
+        throw new Error(result._error || t('project.interior.recomputeErr'));
       }
       // Merge — preserve user fields (name, kainos, etc.) — overwrite computed.
       const merged = {
@@ -646,30 +742,20 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         name: project.name,
         company_name: project.company_name,
         vat_rate: project.vat_rate,
-        // Preserve kainos in darbu_sarasas if user already set them
-        darbu_sarasas: result.darbu_sarasas
-          ? result.darbu_sarasas.map((newItem) => {
-              const oldItem = (project.darbu_sarasas || []).find(
-                (o) => (o.aprasymas || '').toLowerCase()
-                       === (newItem.aprasymas || '').toLowerCase(),
-              );
-              return oldItem?.kaina
-                ? { ...newItem, kaina: oldItem.kaina,
-                    suma: (newItem.kiekis || 0) * oldItem.kaina }
-                : newItem;
-            })
-          : project.darbu_sarasas,
+        // Carry the user's prices + manual count overrides forward, and keep
+        // drawing symbol-count lines (the rebuild can't reproduce them).
+        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
       };
       updateProject(project.id, merged);
       setProject(merged);
-      toast.success('Kiekiai persiskaičiuoti');
+      toast.success(t('project.interior.toastRecomputed'));
     } catch (e) {
       console.error('Edit cascade failed:', e);
-      toast.error(`Klaida persiskaičiuojant: ${e.message}`);
+      toast.error(t('project.interior.toastRecomputeErr', { msg: e.message }));
     } finally {
       setIsRecomputing(false);
     }
-  }, [project, setProject]);
+  }, [project, setProject, t]);
 
   // Phase C-1 Task 21 (closes review feedback): listen for the
   // samatu:project-recompute event dispatched by projectStore.updateRoomPolygon
@@ -759,7 +845,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         <div className="space-y-4">
           <AssumptionsPanel
             defaultOpen={true}
-            title="Lubų aukštis ir glaistymo lygis"
+            title={t('project.interior.assumptionsTitle')}
             assumptions={project._overrides || {}}
             onChange={(updated) => {
               const nextProject = { ...project, _overrides: updated };
@@ -774,6 +860,12 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 ...project,
                 patalpos: result.rooms || project.patalpos,
                 pozicijos: result.pozicijos || project.pozicijos,
+                // The Kiekiai table, top-bar totals and export all read
+                // darbu_sarasas — keep it in sync with the recomputed quantities,
+                // preserving prices + manual count overrides + drawing symbol
+                // lines. (2026-06-19 hunt: recompute updated pozicijos only and
+                // wiped count overrides / symbol lines.)
+                darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
                 _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
               };
               setProject(nextProject);
@@ -787,10 +879,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       {tab === 'aichat' && (
         <div className="border border-border rounded-xl bg-card p-6">
           <div className="mb-4">
-            <h2 className="text-base font-semibold mb-1">AI klausimai apie projektą</h2>
+            <h2 className="text-base font-semibold mb-1">{t('project.interior.aiTitle')}</h2>
             <p className="text-sm text-muted-foreground">
-              Užduokite bet kokį klausimą apie patalpas, plotus, kambarius arba kiekius.
-              Pvz.: „Kiek bendrai dušo zonų?", „Ar yra patalpų virš 3m aukščio?"
+              {t('project.interior.aiDesc')}
             </p>
           </div>
           <AiChat project={project} inline />
@@ -801,22 +892,21 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       {tab === 'eksport' && (
         <div className="border border-border rounded-xl bg-card p-6 space-y-5">
           <div>
-            <h2 className="text-base font-semibold mb-1">Eksportuoti pasiūlymą</h2>
+            <h2 className="text-base font-semibold mb-1">{t('project.interior.exportTitle')}</h2>
             <p className="text-sm text-muted-foreground">
-              Atsisiųskite užbaigtą pasiūlymą Excel arba PDF formatu.
-              Visi kiekiai ir kainos įtraukiami iš „Kiekiai" tab'o.
+              {t('project.interior.exportDesc')}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <ExportDropdown project={project} />
             <ShareButton project={project} />
             <span className="text-xs text-muted-foreground">
-              {(project.darbu_sarasas || []).length} pozicijų · {(project.v8_rooms || project.patalpos || []).length} patalpų
+              {t('project.interior.exportCount', { positions: (project.darbu_sarasas || []).length, rooms: (project.v8_rooms || project.patalpos || []).length })}
             </span>
           </div>
           <div className="border-t border-border/50 pt-4 text-xs text-muted-foreground space-y-1">
-            <p><strong className="text-foreground">Excel</strong> — pilna sąmata su skyrių grupavimu, formulėmis ir PVM.</p>
-            <p><strong className="text-foreground">PDF</strong> — formattuotas pasiūlymas spausdinimui (su antraštėmis, suvestinėmis, PVM).</p>
+            <p><strong className="text-foreground">{t('project.interior.exportExcelBold')}</strong>{t('project.interior.exportExcelDesc')}</p>
+            <p><strong className="text-foreground">{t('project.interior.exportPdfBold')}</strong>{t('project.interior.exportPdfDesc')}</p>
           </div>
         </div>
       )}
@@ -842,11 +932,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             >
               <Ruler className="w-3.5 h-3.5 shrink-0" />
               <span>
-                Brėžinio mastelis aptiktas automatiškai:{' '}
+                {t('project.interior.scaleAutoPrefix')}
                 <strong className="mono tabular">{project._scale_hint.scale_text}</strong>
                 {project._scale_hint.page && (
                   <span className="text-muted-foreground ml-2">
-                    (puslapis {project._scale_hint.page})
+                    {t('project.interior.scalePage', { page: project._scale_hint.page })}
                   </span>
                 )}
               </span>
@@ -870,24 +960,23 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
           {/* Low-confidence banner */}
           {project.confidence === 'low' && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>
-                Vizualinė analizė nebuvo atlikta — kiekiai apytiksliai.
-                {!meta.poppler_available && ' Įdiekite poppler tikslesniems rezultatams.'}
+                {t('project.interior.lowConf')}
+                {!meta.poppler_available && t('project.interior.lowConfPoppler')}
               </span>
             </div>
           )}
 
           {/* Window fallback warning */}
           {prielaidos.langai_fallback && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">Langai nerasti brėžiniuose</p>
+                <p className="font-medium">{t('project.interior.windowsNotFound')}</p>
                 <p className="text-xs mt-0.5">
-                  Angokraščiams naudojami standartiniai langų dydžiai pagal patalpų tipus.
-                  Patikrink ir pakoreguok skiltyje „Prielaidos".
+                  {t('project.interior.windowsNotFoundDesc')}
                 </p>
               </div>
             </div>
@@ -900,10 +989,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 const text = typeof n === 'string' ? n : (n?.message || JSON.stringify(n));
                 const level = typeof n === 'object' ? (n?.level || 'INFO') : 'INFO';
                 const colorClass = level === 'ERROR'
-                  ? 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
                   : level === 'WARNING'
-                    ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                    : 'bg-blue-50 border-blue-200 text-blue-800';
+                    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                    : 'bg-blue-500/10 border-blue-500/30 text-blue-300';
                 return (
                   <div key={i} className={`flex items-center gap-2 p-2.5 border rounded-lg text-xs ${colorClass}`}>
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -918,10 +1007,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {hasSkaiciai && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground">Apdailos kiekiai</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('project.interior.finishHead')}</h2>
                 {meta.vision_pages > 0 && (
                   <Badge variant="outline" className="text-xs">
-                    Vizualiai analizuota: {meta.vision_pages} psl.
+                    {t('project.interior.visionAnalyzed', { pages: meta.vision_pages })}
                   </Badge>
                 )}
               </div>
@@ -929,54 +1018,54 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
                 <CalcCard
                   color="blue"
-                  title="Dažomas plotas"
+                  title={t('project.interior.cardPaintArea')}
                   mainValue={dp.viso_m2}
                   mainUnit="m²"
                   confidence={dp.confidence}
                   breakdown={[
-                    { label: 'Sienos (neto)', value: dp.sienos_m2, unit: 'm²' },
-                    { label: 'Lubos',         value: dp.lubos_m2,  unit: 'm²' },
+                    { label: t('project.interior.brWallsNet'), value: dp.sienos_m2, unit: 'm²' },
+                    { label: t('project.interior.brCeiling'),  value: dp.lubos_m2,  unit: 'm²' },
                   ]}
                   note={dp.pastaba}
                 />
 
                 <CalcCard
                   color="amber"
-                  title="Glaistymo kampai"
+                  title={t('project.interior.cardCorners')}
                   mainValue={gk.viso_m}
                   mainUnit="m"
                   confidence={gk.confidence}
                   breakdown={[
-                    { label: 'Išorinių kampų',    value: gk.isoriniu_kampu_vnt, unit: 'vnt' },
-                    { label: 'Vid. lubų aukštis',  value: gk.vidutinis_aukstis_m, unit: 'm' },
+                    { label: t('project.interior.brOuterCorners'), value: gk.isoriniu_kampu_vnt, unit: 'vnt' },
+                    { label: t('project.interior.brAvgCeiling'),   value: gk.vidutinis_aukstis_m, unit: 'm' },
                   ]}
                 />
 
                 <CalcCard
                   color="green"
-                  title="Angokraščiai"
+                  title={t('project.interior.cardReveals')}
                   mainValue={angValue}
                   mainUnit="m"
                   confidence={ang.confidence}
                   extra={
                     <div className="mb-2">
                       <Toggle
-                        label="×2 (abi pusės)"
+                        label={t('project.interior.toggleBothSides')}
                         value={doubleSides}
                         onChange={setDoubleSides}
                       />
                     </div>
                   }
                   breakdown={[
-                    { label: 'Langai',     value: ang.langu_vnt, unit: 'vnt' },
-                    { label: 'Durys',      value: ang.duru_vnt,  unit: 'vnt' },
-                    { label: 'Plotas',     value: ang.area_m2,   unit: 'm²'  },
+                    { label: t('project.interior.brWindows'), value: ang.langu_vnt, unit: 'vnt' },
+                    { label: t('project.interior.brDoors'),   value: ang.duru_vnt,  unit: 'vnt' },
+                    { label: t('project.interior.brArea'),    value: ang.area_m2,   unit: 'm²'  },
                   ]}
                 />
 
                 <CalcCard
                   color="purple"
-                  title="Lubų perimetras"
+                  title={t('project.interior.cardCeilingPerim')}
                   mainValue={lp.viso_m}
                   mainUnit="m"
                   confidence={lp.confidence}
@@ -985,12 +1074,12 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
                 <CalcCard
                   color="teal"
-                  title="Užuolaidų nišos"
+                  title={t('project.interior.cardCurtainNiches')}
                   mainValue={un.viso_m || lubuData.uzuolaidu_nisu_m}
                   mainUnit="m"
                   confidence={un.confidence}
                   breakdown={(un.details || []).map((d, i) => ({
-                    label: d.vieta || d.room ? `${d.room || ''} ${d.wall || ''}`.trim() || `Niša ${i + 1}` : `Niša ${i + 1}`,
+                    label: d.vieta || d.room ? `${d.room || ''} ${d.wall || ''}`.trim() || t('project.interior.niche', { n: i + 1 }) : t('project.interior.niche', { n: i + 1 }),
                     value: d.ilgis_mm ? d.ilgis_mm / 1000 : (d.length_mm ? d.length_mm / 1000 : null),
                     unit: 'm',
                   }))}
@@ -998,11 +1087,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
 
                 <CalcCard
                   color="indigo"
-                  title="Grindjuostės"
+                  title={t('project.interior.cardBaseboards')}
                   mainValue={gj.viso_m}
                   mainUnit="m"
                   confidence={gj.confidence}
-                  note="Perimetras atėmus durų plotį"
+                  note={t('project.interior.baseboardNote')}
                 />
 
               </div>
@@ -1012,58 +1101,58 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {/* ── Additional metrics ─────────────────────────────────────────── */}
           {(daz.viso_l != null || gkl.vnt != null || gls.kg != null) && (
             <div>
-              <h2 className="text-sm font-semibold text-foreground mb-3">Medžiagų kiekiai</h2>
+              <h2 className="text-sm font-semibold text-foreground mb-3">{t('project.interior.materialsHead')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
                 <CalcCard
                   color="blue"
-                  title="Dažai ir gruntas"
+                  title={t('project.interior.cardPaintPrimer')}
                   mainValue={daz.viso_l}
                   mainUnit="l"
                   confidence={daz.confidence}
                   breakdown={[
-                    { label: 'Dažai sienoms (×2)',  value: daz.sienos_l, unit: 'l' },
-                    { label: 'Dažai luboms (×2)',   value: daz.lubos_l,  unit: 'l' },
-                    { label: 'Gruntas',             value: daz.gruntas_l, unit: 'l' },
+                    { label: t('project.interior.brWallPaint'),    value: daz.sienos_l, unit: 'l' },
+                    { label: t('project.interior.brCeilingPaint'), value: daz.lubos_l,  unit: 'l' },
+                    { label: t('project.interior.brPrimer'),       value: daz.gruntas_l, unit: 'l' },
                   ]}
-                  note="2 sluoksniai; sienos 9 m²/l, lubos 10 m²/l"
+                  note={t('project.interior.paintNote')}
                 />
 
                 <CalcCard
                   color="green"
-                  title={`GK lapai (${gkl.metodas === 'praktinis' ? 'praktinis' : 'tikslus'})`}
+                  title={t('project.interior.cardGkSheets', { method: gkl.metodas === 'praktinis' ? t('project.interior.gkPraktinis') : t('project.interior.gkTikslus') })}
                   mainValue={gkl.vnt}
                   mainUnit="vnt"
                   confidence={gkl.confidence}
-                  note={gkl.metodas === 'praktinis' ? '1,2×2,5 m = 3 m² · +10% · BE angų atėmimo' : '1,2×2,5 m = 3 m² · +10% atliekos'}
+                  note={gkl.metodas === 'praktinis' ? t('project.interior.gkNotePraktinis') : t('project.interior.gkNoteTikslus')}
                 />
 
                 <CalcCard
                   color="amber"
-                  title={`Glaistas (${gls.lygis || 'Q2'})`}
+                  title={t('project.interior.cardGlaistas', { level: gls.lygis || 'Q2' })}
                   mainValue={gls.kg}
                   mainUnit="kg"
                   confidence={gls.confidence}
                   breakdown={[
-                    { label: 'Maišai 25 kg', value: gls.maisai_25kg, unit: 'vnt' },
+                    { label: t('project.interior.brBags25'), value: gls.maisai_25kg, unit: 'vnt' },
                   ]}
-                  note="Q2: 1.25 mm storis · 1.0 kg/m²/mm"
+                  note={t('project.interior.glaistasNote')}
                 />
 
                 {/* Task 2: Hidroizoliacija card */}
                 {Object.keys(hidroizoliacija).length > 0 && (
                   <CalcCard
                     color="rose"
-                    title="Hidroizoliacija"
+                    title={t('project.interior.cardHidro')}
                     mainValue={hidroizoliacija.grindys_m2}
-                    mainUnit="m² grindų"
+                    mainUnit={t('project.interior.hidroUnit')}
                     confidence="medium"
                     breakdown={[
-                      { label: 'Sienų plotas',    value: hidroizoliacija.sienos_m2,  unit: 'm²' },
-                      { label: 'Sandarinimo juosta', value: hidroizoliacija.juosta_m, unit: 'm' },
-                      { label: 'Membrana (2 sl.)', value: hidroizoliacija.membrana_kg, unit: 'kg' },
+                      { label: t('project.interior.brWallArea'), value: hidroizoliacija.sienos_m2,  unit: 'm²' },
+                      { label: t('project.interior.brSealTape'), value: hidroizoliacija.juosta_m, unit: 'm' },
+                      { label: t('project.interior.brMembrane'), value: hidroizoliacija.membrana_kg, unit: 'kg' },
                     ]}
-                    note={`Drėgnos patalpos: ${(hidroizoliacija.dregnas_patalpos || []).join(', ')}`}
+                    note={t('project.interior.hidroNote', { rooms: (hidroizoliacija.dregnas_patalpos || []).join(', ') })}
                   />
                 )}
 
@@ -1078,20 +1167,18 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Home className="w-4 h-4 text-muted-foreground" />
-                Patalpų sąrašas
+                {t('project.interior.roomsListHead')}
                 <Badge variant="secondary" className="text-xs font-normal">
-                  {(project.v8_rooms || project.patalpos || []).length} patalpų
+                  {t('project.interior.roomsCount', { count: (project.v8_rooms || project.patalpos || []).length })}
                 </Badge>
               </h2>
               <span className="text-xs text-muted-foreground">
-                Galite redaguoti — visi totals atsinaujins automatiškai
+                {t('project.interior.roomsEditHint')}
               </span>
             </div>
             {(!project.v8_rooms || project.v8_rooms.length === 0) && (
               <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
-                AI neaptiko patalpų. Galimos priežastys: rastrinis brėžinys, neaiški antraštinė plokštelė,
-                arba senas projektas (sukurtas prieš atnaujinimus).
-                Spauskite „Pridėti patalpą" žemiau ir įveskite patalpas rankomis.
+                {t('project.interior.noRooms')}
               </div>
             )}
             <RoomsGrid
@@ -1100,7 +1187,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                   ? project.v8_rooms
                   : (project.patalpos || []).map(p => ({
                       nr: p.nr || '01',
-                      pavadinimas: p.pavadinimas || 'Patalpa',
+                      pavadinimas: p.pavadinimas || t('project.interior.roomFallback'),
                       paskirtis: p.paskirtis || 'gyvenamoji',
                       plotas_m2: p.plotas_m2 || 0,
                       perimetras_m: p.perimetras_m || 0,
@@ -1125,7 +1212,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             {isRecomputing && (
               <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Persiskaičiuojam kiekius...
+                {t('project.interior.recomputing')}
               </div>
             )}
           </div>
@@ -1136,14 +1223,14 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {/* ── Additional materials ──────────────────────────────────────── */}
           {Object.values(pk).some(v => v != null) && (
             <div className="bg-card border border-border rounded-xl p-4">
-              <h2 className="text-sm font-semibold text-foreground mb-3">Papildomi kiekiai</h2>
+              <h2 className="text-sm font-semibold text-foreground mb-3">{t('project.interior.additionalHead')}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-0">
-                <QtyRow label="Sienos plytelės" value={pk.plyteles_m2 ?? bk.sienu_plyteles_m2} unit="m²" />
-                <QtyRow label="Parketo grindys" value={pk.parketlentes_m2 ?? bk.grindu_parketlentes_m2} unit="m²" />
-                <QtyRow label="Grindjuostės" value={pk.grindjuostes_m} unit="m" />
-                <QtyRow label="LED juostos" value={pk.led_juostos_m} unit="m" />
-                <QtyRow label="GKP lubos" value={pk.gkp_lubos_m2} unit="m²" />
-                <QtyRow label="LED nišos" value={pk.led_nisos_m} unit="m" />
+                <QtyRow label={t('project.interior.qtyWallTiles')} value={pk.plyteles_m2 ?? bk.sienu_plyteles_m2} unit="m²" />
+                <QtyRow label={t('project.interior.qtyParquet')} value={pk.parketlentes_m2 ?? bk.grindu_parketlentes_m2} unit="m²" />
+                <QtyRow label={t('project.interior.qtyBaseboards')} value={pk.grindjuostes_m} unit="m" />
+                <QtyRow label={t('project.interior.qtyLedStrips')} value={pk.led_juostos_m} unit="m" />
+                <QtyRow label={t('project.interior.qtyGkpCeiling')} value={pk.gkp_lubos_m2} unit="m²" />
+                <QtyRow label={t('project.interior.qtyLedNiches')} value={pk.led_nisos_m} unit="m" />
               </div>
             </div>
           )}
@@ -1151,7 +1238,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           {/* ── Collapsible detail sections ─────────────────────────────── */}
 
           {hasWall && (
-            <Section icon={Paintbrush} title="Sienų apdaila — detaliau" badge={`${Object.keys(sienuApdaila).length} tipai`}>
+            <Section icon={Paintbrush} title={t('project.interior.wallFinishHead')} badge={t('project.interior.wallFinishBadge', { count: Object.keys(sienuApdaila).length })}>
               <div className="space-y-0">
                 {Object.entries(sienuApdaila).map(([tipas, area]) => (
                   <div key={tipas} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
@@ -1166,18 +1253,18 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           )}
 
           {hasLubu && (
-            <Section icon={Layers} title="Lubos">
+            <Section icon={Layers} title={t('project.interior.ceilingHead')}>
               <div>
-                <QtyRow label="GKP lubų plotas"       value={lubuData.gkp_m2}             unit="m²" />
-                <QtyRow label="LED nišų ilgis"        value={lubuData.led_nisu_m}          unit="m" />
-                <QtyRow label="Užuolaidų nišų ilgis"  value={lubuData.uzuolaidu_nisu_m}    unit="m" />
-                <QtyRow label="GKP dėžučių ilgis"     value={lubuData.gkp_dezuciu_m}       unit="m" />
+                <QtyRow label={t('project.interior.qtyGkpArea')}       value={lubuData.gkp_m2}             unit="m²" />
+                <QtyRow label={t('project.interior.qtyLedNicheLen')}   value={lubuData.led_nisu_m}          unit="m" />
+                <QtyRow label={t('project.interior.qtyCurtainNicheLen')} value={lubuData.uzuolaidu_nisu_m}  unit="m" />
+                <QtyRow label={t('project.interior.qtyGkpBoxLen')}     value={lubuData.gkp_dezuciu_m}       unit="m" />
               </div>
             </Section>
           )}
 
           {hasGrindys && (
-            <Section icon={Square} title="Grindys">
+            <Section icon={Square} title={t('project.interior.floorHead')}>
               {(grindys.medžiagos || []).map((z, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                   <div className="min-w-0 mr-4">
@@ -1197,61 +1284,61 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               ))}
               {grindys.grindjuostes_m != null && (
                 <div className="pt-2">
-                  <QtyRow label="Grindjuostės" value={grindys.grindjuostes_m} unit="m" />
+                  <QtyRow label={t('project.interior.qtyBaseboards')} value={grindys.grindjuostes_m} unit="m" />
                 </div>
               )}
             </Section>
           )}
 
           {hasElektra && (
-            <Section icon={Zap} title="Elektra">
+            <Section icon={Zap} title={t('project.interior.electricHead')}>
               <div>
-                <QtyRow label="Rozetės"               value={elektra.rozetes_vnt}                unit="vnt" />
-                <QtyRow label="Jungikliai"             value={elektra.jungikliai_vnt}             unit="vnt" />
-                <QtyRow label="Interneto rozetės"      value={elektra.interneto_rozetes_vnt}      unit="vnt" />
-                <QtyRow label="Antenos"                value={elektra.antenos_vnt}                unit="vnt" />
-                <QtyRow label="USB-C"                  value={elektra.usb_c_vnt}                  unit="vnt" />
-                <QtyRow label="Termostatai"            value={elektra.termostatai_vnt}            unit="vnt" />
-                <QtyRow label="Prietaisų pajungimai"   value={elektra.prietaisu_pajungimai_vnt}   unit="vnt" />
-                <QtyRow label="Vartų valdymas"         value={elektra.vartai_vnt}                 unit="vnt" />
+                <QtyRow label={t('project.interior.qtyOutlets')}         value={elektra.rozetes_vnt}                unit="vnt" />
+                <QtyRow label={t('project.interior.qtySwitches')}        value={elektra.jungikliai_vnt}             unit="vnt" />
+                <QtyRow label={t('project.interior.qtyInternetOutlets')} value={elektra.interneto_rozetes_vnt}      unit="vnt" />
+                <QtyRow label={t('project.interior.qtyAntennas')}        value={elektra.antenos_vnt}                unit="vnt" />
+                <QtyRow label={t('project.interior.qtyUsbC')}            value={elektra.usb_c_vnt}                  unit="vnt" />
+                <QtyRow label={t('project.interior.qtyThermostats')}     value={elektra.termostatai_vnt}            unit="vnt" />
+                <QtyRow label={t('project.interior.qtyApplianceConn')}   value={elektra.prietaisu_pajungimai_vnt}   unit="vnt" />
+                <QtyRow label={t('project.interior.qtyGateControl')}     value={elektra.vartai_vnt}                 unit="vnt" />
               </div>
             </Section>
           )}
 
           {hasSantech && (
-            <Section icon={Droplets} title="Santechnika">
+            <Section icon={Droplets} title={t('project.interior.plumbingHead')}>
               <div>
-                <QtyRow label="WC rėmai"           value={santechnika.wc_remai_vnt}           unit="vnt" />
-                <QtyRow label="Dušo sistemos"       value={santechnika.duso_sistemos_vnt}      unit="vnt" />
-                <QtyRow label="Praustuvės"          value={santechnika.praustuves_vnt}         unit="vnt" />
-                <QtyRow label="Vonios maišytuvai"   value={santechnika.vonios_maistuvai_vnt}   unit="vnt" />
-                <QtyRow label="Skalbimo mašinos"    value={santechnika.skalbimo_masinos_vnt}   unit="vnt" />
-                <QtyRow label="Trapai"              value={santechnika.trapai_vnt}             unit="vnt" />
-                <QtyRow label="Kondicionieriai"     value={santechnika.kondicionieriai_vnt}    unit="vnt" />
-                <QtyRow label="Maišytuvai"          value={santechnika.maistuvai_vnt}          unit="vnt" />
+                <QtyRow label={t('project.interior.qtyWcFrames')}      value={santechnika.wc_remai_vnt}           unit="vnt" />
+                <QtyRow label={t('project.interior.qtyShowerSystems')} value={santechnika.duso_sistemos_vnt}      unit="vnt" />
+                <QtyRow label={t('project.interior.qtyWashbasins')}    value={santechnika.praustuves_vnt}         unit="vnt" />
+                <QtyRow label={t('project.interior.qtyBathFaucets')}   value={santechnika.vonios_maistuvai_vnt}   unit="vnt" />
+                <QtyRow label={t('project.interior.qtyWashers')}       value={santechnika.skalbimo_masinos_vnt}   unit="vnt" />
+                <QtyRow label={t('project.interior.qtyDrains')}        value={santechnika.trapai_vnt}             unit="vnt" />
+                <QtyRow label={t('project.interior.qtyAircon')}        value={santechnika.kondicionieriai_vnt}    unit="vnt" />
+                <QtyRow label={t('project.interior.qtyFaucets')}       value={santechnika.maistuvai_vnt}          unit="vnt" />
               </div>
             </Section>
           )}
 
           {hasApsviet && (
-            <Section icon={Lightbulb} title="Apšvietimas">
+            <Section icon={Lightbulb} title={t('project.interior.lightingHead')}>
               <div>
-                <QtyRow label="Įleidžiami sviestuvai"  value={apsvietimas.ileidziami_sviestuvai_vnt}  unit="vnt" />
-                <QtyRow label="Pakabinami sviestuvai"   value={apsvietimas.pakabinami_sviestuvai_vnt}  unit="vnt" />
-                <QtyRow label="Sieniniai sviestuvai"    value={apsvietimas.sieniniai_sviestuvai_vnt}   unit="vnt" />
-                <QtyRow label="Paviršiniai sviestuvai"  value={apsvietimas.pavirsiniai_sviestuvai_vnt} unit="vnt" />
-                <QtyRow label="LED juostos"             value={apsvietimas.led_juostos_m}              unit="m" />
-                <QtyRow label="Judesio davikliai"       value={apsvietimas.judesio_davikliai_vnt}      unit="vnt" />
-                <QtyRow label="Gaisro davikliai"        value={apsvietimas.gaisro_davikliai_vnt}       unit="vnt" />
-                <QtyRow label="Garso kolonėlės"         value={apsvietimas.garso_koloneles_vnt}        unit="vnt" />
-                <QtyRow label="Elektrinės užuolaidos"   value={apsvietimas.elektrines_uzuolaidos_vnt}  unit="vnt" />
+                <QtyRow label={t('project.interior.qtyRecessed')}         value={apsvietimas.ileidziami_sviestuvai_vnt}  unit="vnt" />
+                <QtyRow label={t('project.interior.qtyPendant')}          value={apsvietimas.pakabinami_sviestuvai_vnt}  unit="vnt" />
+                <QtyRow label={t('project.interior.qtyWallLights')}       value={apsvietimas.sieniniai_sviestuvai_vnt}   unit="vnt" />
+                <QtyRow label={t('project.interior.qtySurface')}          value={apsvietimas.pavirsiniai_sviestuvai_vnt} unit="vnt" />
+                <QtyRow label={t('project.interior.qtyLedStrips')}        value={apsvietimas.led_juostos_m}              unit="m" />
+                <QtyRow label={t('project.interior.qtyMotionSensors')}    value={apsvietimas.judesio_davikliai_vnt}      unit="vnt" />
+                <QtyRow label={t('project.interior.qtyFireDetectors')}    value={apsvietimas.gaisro_davikliai_vnt}       unit="vnt" />
+                <QtyRow label={t('project.interior.qtySpeakers')}         value={apsvietimas.garso_koloneles_vnt}        unit="vnt" />
+                <QtyRow label={t('project.interior.qtyElectricCurtains')} value={apsvietimas.elektrines_uzuolaidos_vnt}  unit="vnt" />
               </div>
             </Section>
           )}
 
           {/* Angokraščiai detail */}
           {ang.details?.length > 0 && (
-            <Section icon={CornerUpRight} title="Angokraščiai — detaliau" badge={`${ang.details.length} angos`}>
+            <Section icon={CornerUpRight} title={t('project.interior.revealsDetailHead')} badge={t('project.interior.revealsBadge', { count: ang.details.length })}>
               <div className="space-y-0">
                 {ang.details.map((d, i) => (
                   <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
@@ -1259,7 +1346,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {fmt(d.plotis_m)} × {fmt(d.aukstis_m)} m →{' '}
                       <span className="font-medium text-foreground">{fmt(d.perimetras_m)} m</span>
-                      {doubleSides && <span className="text-muted-foreground"> (×2: {fmt(d.perimetras_m * 2)} m)</span>}
+                      {doubleSides && <span className="text-muted-foreground">{t('project.interior.revealX2', { value: fmt(d.perimetras_m * 2) })}</span>}
                     </span>
                   </div>
                 ))}
@@ -1268,7 +1355,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           )}
 
           {/* Rooms */}
-          <Section icon={Home} title="Patalpos" badge={rooms.length} defaultOpen={rooms.length <= 12}>
+          <Section icon={Home} title={t('project.interior.roomsSectionHead')} badge={rooms.length} defaultOpen={rooms.length <= 12}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {rooms.map(room => (
                 <RoomCard
@@ -1284,7 +1371,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           </Section>
 
           {notes.length > 0 && (
-            <Section icon={AlertCircle} title="Pastabos">
+            <Section icon={AlertCircle} title={t('project.interior.notesHead')}>
               <ul className="space-y-1">
                 {notes.map((n, i) => (
                   <li key={i} className="text-xs text-muted-foreground">• {n}</li>
@@ -1298,7 +1385,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">Nepamirškite patikrinti:</span>
+                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t('project.interior.checkReminder')}</span>
               </div>
               <div className="space-y-2">
                 {perspejimani
@@ -1322,7 +1409,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                       <button
                         onClick={() => setDismissedWarnings(prev => new Set([...prev, w.id]))}
                         className="shrink-0 text-amber-400 hover:text-amber-600 dark:hover:text-amber-200"
-                        title="Uždaryti"
+                        title={t('project.interior.close')}
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
