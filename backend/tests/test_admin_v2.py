@@ -91,6 +91,7 @@ _ENDPOINTS = [
     "/api/admin/v2/system-health",
     "/api/admin/v2/export/users.csv",
     "/api/admin/v2/export/cost.csv",
+    "/api/admin/v2/audit-log",
 ]
 
 
@@ -383,3 +384,86 @@ def test_export_users_csv_sanitizes_injection(tmp_path, monkeypatch):
     # spreadsheet renders it as literal text instead of evaluating the formula.
     assert name.startswith("'="), name
     assert company.startswith("'+"), company
+
+
+# ── admin audit log ──────────────────────────────────────────────────────────
+
+def test_disable_writes_audit_row(tmp_path, monkeypatch):
+    """The whole point of the audit trail: disabling a user records WHO did it,
+    to WHOM, and WHAT action — none of which was captured before."""
+    _isolate(tmp_path, monkeypatch)
+    admin = _mk_admin()
+    victim = _mk_user("victim@x.lt")
+    c = _logged_in("admin@x.lt")
+    assert c.post(f"/api/admin/v2/users/{victim['id']}/disable").status_code == 200
+    actions = db.list_admin_actions()
+    assert len(actions) == 1
+    row = actions[0]
+    assert row["action"] == "user.disable"
+    assert row["actor_user_id"] == admin["id"]
+    assert row["target_user_id"] == victim["id"]
+    assert row["created_at"]
+
+
+def test_enable_writes_audit_row_newest_first(tmp_path, monkeypatch):
+    """Enable also logs; list returns newest action first even when both land in
+    the same wall-clock second (ordering must tie-break on insertion order)."""
+    _isolate(tmp_path, monkeypatch)
+    admin = _mk_admin()
+    victim = _mk_user("victim@x.lt")
+    c = _logged_in("admin@x.lt")
+    c.post(f"/api/admin/v2/users/{victim['id']}/disable")
+    c.post(f"/api/admin/v2/users/{victim['id']}/enable")
+    actions = db.list_admin_actions()
+    assert [a["action"] for a in actions] == ["user.enable", "user.disable"]
+    assert actions[0]["actor_user_id"] == admin["id"]
+    assert actions[0]["target_user_id"] == victim["id"]
+
+
+def test_blocked_action_writes_no_audit_row(tmp_path, monkeypatch):
+    """A guardrail-rejected action (disabling yourself / another admin) changes
+    nothing, so it must leave NO audit row — the log records performed actions,
+    not attempts."""
+    _isolate(tmp_path, monkeypatch)
+    admin1 = _mk_admin("admin1@x.lt")
+    admin2 = _mk_admin("admin2@x.lt")
+    c = _logged_in("admin1@x.lt")
+    assert c.post(f"/api/admin/v2/users/{admin1['id']}/disable").status_code == 400
+    assert c.post(f"/api/admin/v2/users/{admin2['id']}/disable").status_code == 400
+    assert db.list_admin_actions() == []
+
+
+def test_record_and_list_admin_actions_helper(tmp_path, monkeypatch):
+    """DB-level contract for the helpers: record persists actor/action/target/
+    detail; list is newest-first and honours `limit`."""
+    _isolate(tmp_path, monkeypatch)
+    admin = _mk_admin()
+    target = _mk_user("t@x.lt")
+    db.record_admin_action(admin["id"], "user.disable", target["id"], detail="t@x.lt")
+    db.record_admin_action(admin["id"], "user.enable", target["id"])
+    limited = db.list_admin_actions(limit=1)
+    assert len(limited) == 1                       # limit honoured
+    assert limited[0]["action"] == "user.enable"   # newest first
+    rows = db.list_admin_actions()
+    disable_row = next(r for r in rows if r["action"] == "user.disable")
+    assert disable_row["actor_user_id"] == admin["id"]
+    assert disable_row["target_user_id"] == target["id"]
+    assert disable_row["detail"] == "t@x.lt"
+
+
+def test_audit_log_endpoint_returns_enriched_rows(tmp_path, monkeypatch):
+    """GET /audit-log surfaces the trail read-only, newest first, and joins in
+    actor/target emails for a human-readable dashboard."""
+    _isolate(tmp_path, monkeypatch)
+    _mk_admin()
+    victim = _mk_user("victim@x.lt")
+    c = _logged_in("admin@x.lt")
+    c.post(f"/api/admin/v2/users/{victim['id']}/disable")
+    r = c.get("/api/admin/v2/audit-log")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert isinstance(body.get("rows"), list) and body["rows"]
+    top = body["rows"][0]
+    assert top["action"] == "user.disable"
+    assert top["actor_email"] == "admin@x.lt"
+    assert top["target_email"] == "victim@x.lt"

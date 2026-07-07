@@ -119,6 +119,16 @@ def _toggle_active(request: Request, user_id: str, active: bool) -> dict:
             raise HTTPException(
                 status_code=400, detail="Negalima išjungti kito administratoriaus")
     db.set_user_active(user_id, active)
+    # Audit trail: record WHO disabled/enabled WHOM, and WHEN. Written only after
+    # the mutation succeeds (a guardrail-rejected call raises above and logs
+    # nothing). target["email"] is preserved in `detail` so the row stays
+    # readable even if that user is later deleted.
+    db.record_admin_action(
+        caller["id"],
+        "user.disable" if not active else "user.enable",
+        target_id=user_id,
+        detail=target.get("email"),
+    )
     return {"status": "ok", "user_id": user_id, "is_active": 1 if active else 0}
 
 
@@ -130,6 +140,17 @@ def disable_user(request: Request, user_id: str) -> dict:
 @router.post("/users/{user_id}/enable")
 def enable_user(request: Request, user_id: str) -> dict:
     return _toggle_active(request, user_id, active=True)
+
+
+# ── 3b. Admin audit log (read-only) ──────────────────────────────────────────
+
+@router.get("/audit-log")
+def audit_log(request: Request, limit: int = 100) -> dict:
+    """Read-only trail of state-changing admin actions, newest first. Each row:
+    {id, actor_user_id, actor_email, action, target_user_id, target_email,
+    detail, created_at}. {rows}."""
+    _auth.require_admin(request)
+    return {"rows": db.list_admin_actions(limit=limit)}
 
 
 # ── 4. System health ─────────────────────────────────────────────────────────
