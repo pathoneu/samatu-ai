@@ -26,7 +26,7 @@ These resolve the 8 open architectural decisions. Each task in this plan encodes
 
 4. **D4 — Legend persistence: project-level by default; architect-level opt-in only after explicit user verification on 2 same-architect projects.** No global auto-learning. Reasoning: ~20 active LT residential firms means architect persistence pays back, but silent global learning would poison future projects. ChatGPT's three-layer model (project → architect opt-in → no global) is the right structure.
 
-5. **D5 — Q-level: keep as advanced toggle, default to rangovas-style bundled `glaistymas + dažymas` line.** Per-Q-level kg/m² coefficients are technically correct but invoice reality is bundled at 13–15 €/m². Don't force users into Q-level UX surface; collapse to bundled in benchmark.
+5. **D5 — Q-level: keep as advanced toggle, default to Rangovas-style bundled `glaistymas + dažymas` line.** Per-Q-level kg/m² coefficients are technically correct but invoice reality is bundled at 13–15 €/m². Don't force users into Q-level UX surface; collapse to bundled in benchmark.
 
 6. **D6 — Repeating Groups (master-unit takeoff): defer to 2026 H2.** Useful for daugiabučių modernizavimas but not in 8-week critical path. Accuracy + corrections + export matter more.
 
@@ -110,7 +110,7 @@ backend/
     data/
       email_templates/
         beta_disclosure_lt.md                  # Week 1 email body
-      lt_unit_prices.json                      # Default LT prices (rangovas mid-market Kaunas)
+      lt_unit_prices.json                      # Default LT prices (Rangovas mid-market Kaunas)
   tests/
     api/
       test_recalculate_interior.py
@@ -2566,7 +2566,7 @@ git commit -m "week3: cutover — delete interiorCalc.js, frontend uses /api/int
 
 ## Week 4 — Tile microworks, Q-level bundling, color sampling, EUR benchmark scaffold
 
-Goal: Add the remaining LT-specific quantity lines (tile mikrodarbai, Q4 sanding); collapse Q-level into rangovas-style bundled invoice line as default UX; replace LLM color naming with OpenCV LAB/HSV sampling; ship the EUR-weighted benchmark scaffold so by end of week we can run a `predicted vs ground_truth` report (even with placeholder GT data still being collected).
+Goal: Add the remaining LT-specific quantity lines (tile mikrodarbai, Q4 sanding); collapse Q-level into Rangovas-style bundled invoice line as default UX; replace LLM color naming with OpenCV LAB/HSV sampling; ship the EUR-weighted benchmark scaffold so by end of week we can run a `predicted vs ground_truth` report (even with placeholder GT data still being collected).
 
 ### Task 4.1: Tile microworks (silikonas, 45° suleidimas, profiliai)
 
@@ -2736,7 +2736,7 @@ def test_default_collapses_glaistymas_dazymas_into_one_line():
     out = collapse_to_bundled(raw, mode="default_bundled")
     bundle = next(l for l in out["lines"] if l["code"] == "glaistymas_dazymas_bundle")
     assert bundle["quantity"] == 280  # area = walls 200 + ceiling 80
-    assert bundle["unit_price_eur_be_pvm"] == 14  # rangovas mid-market bundled rate
+    assert bundle["unit_price_eur_be_pvm"] == 14  # Rangovas mid-market bundled rate
 
 
 def test_advanced_mode_keeps_q_level_split():
@@ -2765,14 +2765,14 @@ def test_q4_advanced_adds_sanding_premium():
 """LT invoice bundling rules (D5).
 
 Default mode: collapse glaistymas + dažymas + gruntavimas into a single
-"glaistymas_dazymas_bundle" line at ~14 €/m² (rangovas mid-market Kaunas).
+"glaistymas_dazymas_bundle" line at ~14 €/m² (Rangovas mid-market Kaunas).
 
 Advanced mode: keep Q-level kg/m² breakdown for engineers who want it.
 """
 from copy import deepcopy
 
 BUNDLE_GLAISTYMAS_DAZYMAS = "glaistymas_dazymas_bundle"
-DEFAULT_BUNDLED_PRICE_EUR = 14.0  # R4 rangovas P2-P5 bundled rate
+DEFAULT_BUNDLED_PRICE_EUR = 14.0  # R4 Rangovas P2-P5 bundled rate
 
 BUNDLE_MEMBERS = {
     BUNDLE_GLAISTYMAS_DAZYMAS: {
@@ -2883,7 +2883,7 @@ git add backend/app/services/calc/bundling.py \
         backend/app/api/interior.py \
         backend/tests/calc/test_q_level_bundling.py \
         frontend/src/components/QuantitySettings.tsx
-git commit -m "week4: Q-level default bundled (rangovas-style 14€/m²); advanced toggle"
+git commit -m "week4: Q-level default bundled (Rangovas-style 14€/m²); advanced toggle"
 ```
 
 **Exit criteria:**
@@ -3212,7 +3212,7 @@ git commit -m "week4: EUR-weighted benchmark scaffold + LT unit prices fixture"
 
 **Exit criteria:**
 - `eur_weighted_error(pred, gt)` returns `0.0..1.0` ratio.
-- LT unit prices in checked-in JSON (be-PVM, rangovas mid-market).
+- LT unit prices in checked-in JSON (be-PVM, Rangovas mid-market).
 - CLI reads GT + predictions, writes Markdown report.
 
 ---

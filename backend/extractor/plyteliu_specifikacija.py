@@ -1,7 +1,7 @@
 """extractor.plyteliu_specifikacija — DETERMINISTIC tile specification reader.
 
 Why this exists (Sprint accuracy P4):
-    rangovas P1 splits 230 m² of tiles across 5 size-specific lines (1200×1200×6 mm,
+    Rangovas P1 splits 230 m² of tiles across 5 size-specific lines (1200×1200×6 mm,
     1200×600 mm, didžiaformatės, nišų angokraščiai 1200×1200, etc.) with each
     format priced 5-15 €/m² differently. We collapse all tiles into one bucket
     per zone (vonia/virtuvė/kita), under-pricing premium projects by

@@ -17,7 +17,7 @@ Padaryti, kad **kiekvieną darbų sąrašo eilutę** būtų galima atsekti į ko
 
 ## Audience
 
-Pagrindinis vartotojas — LT statybos sąmatininkas (rangovas-tipo profilis). Antrinis — rangovas, peržiūrintis pasiūlymą prieš pradedant darbus. Trečias — klientas, vertinantis pasiūlymo kokybę.
+Pagrindinis vartotojas — LT statybos sąmatininkas (Rangovas-tipo profilis). Antrinis — rangovas, peržiūrintis pasiūlymą prieš pradedant darbus. Trečias — klientas, vertinantis pasiūlymo kokybę.
 
 ## Architecture
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-05
 **Plan:** `docs/superpowers/plans/2026-05-05-sprint-4-accuracy.md`
-**Anchor:** Pure LT-industry math + drawing-as-ground-truth. NO rangovas comparison.
+**Anchor:** Pure LT-industry math + drawing-as-ground-truth. NO Rangovas comparison.
 
 ---
 
@@ -61,7 +61,7 @@ Commit: `ffb3326`
 - P5: 5 warnings (smaller project, fewer rooms)
 - P1: not re-tested (Vision API was hung during baseline run; isolated math test passed instead)
 
-**Pure math, no rangovas reference:** every check derives from CLAUDE.md or LT industry constants.
+**Pure math, no Rangovas reference:** every check derives from CLAUDE.md or LT industry constants.
 
 ---
 

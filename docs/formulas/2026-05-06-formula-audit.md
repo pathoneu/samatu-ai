@@ -209,7 +209,7 @@ Skip baseboard entirely when:
 **Sources:**
 1. **RICS NRM2** §27.5 "Skirtings, edgings, etc.": measured net of openings, in linear metres along the line of skirting. — formula match: **exact**.
 2. **DIN 18365:2019** §4.4: linear meter measurement, openings deducted. — formula match: **exact**.
-3. **LT industry practice** (rangovas audits, `2026-04-28-rangovas-p1-audit.md`): door width ~0.85 m default deducted per door. — formula match: **paraphrase**.
+3. **LT industry practice** (Rangovas audits, `2026-04-28-rangovas-p1-audit.md`): door width ~0.85 m default deducted per door. — formula match: **paraphrase**.
 
 **LT-EU divergence:** None.
 

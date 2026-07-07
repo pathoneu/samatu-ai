@@ -87,7 +87,7 @@
 
 1. **Wire `vision_call_v2` into `/extract-interior`** — replace legacy
    `vision_call.py` once a small canary projection confirms behaviour
-   parity on rangovas P1-P5 fixtures.
+   parity on Rangovas P1-P5 fixtures.
 2. **Page classifier rollout** — start with 1 PDF/day routed through
    the classifier; scale to 100% over a week.
 3. **Architect opt-in onboarding pipeline** — manual outreach to ~10

@@ -1,7 +1,7 @@
 # Rangovas A (Rangovas A) — žodiniai skaičiavimo notes
 Date: 2026-05-26/27
 PDF: `project.pdf` (Beržų g. 24, MAK Group A1675, vienos šeimos namas)
-Author: rangovas (rangovas), perduota Ignui
+Author: rangovas (Rangovas), perduota Ignui
 
 Šitie yra rangovo žodiniai skaičiavimai, kuriais jis paaiškino, kaip iš to PDF gauti teisingus kiekius. Cross-reference su `samata-truth.pdf`.
 

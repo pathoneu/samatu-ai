@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Reduce interior pipeline complexity (currently V7/V8/V9, ~6,500 LOC) **WITHOUT losing accuracy on P1–P5 vs. rangovo's `_pasiulymas.pdf` ground truth**. Simplification is conditional — if a single Vision call cannot match the current V8 accuracy bar, we KEEP V8's complexity (multi-pass, self-validation, eksplikacija fallback, aggregation) and only delete code that is provably orphaned.
+**Goal:** Reduce interior pipeline complexity (currently V7/V8/V9, ~6,500 LOC) **WITHOUT losing accuracy on P1–P5 vs. Rangovo's `_pasiulymas.pdf` ground truth**. Simplification is conditional — if a single Vision call cannot match the current V8 accuracy bar, we KEEP V8's complexity (multi-pass, self-validation, eksplikacija fallback, aggregation) and only delete code that is provably orphaned.
 
 **Hard rule 1 (accuracy):** *"main thing is accuracy, design and everything comes after."* — Never trade accuracy for cleaner code. The bar is **V8's measured accuracy on P1–P5**, not the brief's nominal "≥85%". If V8 hits 92% and the new pipeline hits 85%, that is an ABORT — not a "good enough refactor."
 
-**Hard rule 2 (universalumas):** *"rangovas yra tik vienas rangovas o rangovų yra labai daug... mums reikia universalumo ir tikslumo, personalizacija po to."* — rangovo `_pasiulymas.pdf` yra **reference**, ne ground truth. Sąmatų AI turi būti universalus: tikslumo šaltiniai yra (1) brėžinio matematika — eksplikacija, mm matmenys, perimetrai, (2) LT industry formulės — CLAUDE.md NRM2/STR/RICS, (3) sutartiniai ženklai brėžiniuose, (4) sutartinės spalvos, (5) bet kas tiesiogiai brėžinyje parašyta. rangovo skaičiai gali būti orientyras "kokias pozicijas paprastai įtraukia rangovas", bet ne tikslumo gate.
+**Hard rule 2 (universalumas):** *"rangovas yra tik vienas rangovas o rangovų yra labai daug... mums reikia universalumo ir tikslumo, personalizacija po to."* — Rangovo `_pasiulymas.pdf` yra **reference**, ne ground truth. Sąmatų AI turi būti universalus: tikslumo šaltiniai yra (1) brėžinio matematika — eksplikacija, mm matmenys, perimetrai, (2) LT industry formulės — CLAUDE.md NRM2/STR/RICS, (3) sutartiniai ženklai brėžiniuose, (4) sutartinės spalvos, (5) bet kas tiesiogiai brėžinyje parašyta. Rangovo skaičiai gali būti orientyras "kokias pozicijas paprastai įtraukia rangovas", bet ne tikslumo gate.
 
 **Hard rule 3 (kokybė):** *"visada naudok geriausius įrankius, geriausius promptus ir logiką ir visada testuok."* — Default to Opus-class Vision; comprehensive prompts with embedded formulas + few-shot examples; research subagents when uncertain; test + stress-test at edges (small rooms, open-plan, mansardos, multi-floor, mixed-language drawings, corrupted PDFs).
 
@@ -141,7 +141,7 @@ Expected: `git tag` lists `pre-simplification`.
 
 ### Task 0.2: Capture CURRENT V8 accuracy on P1-P5 (THE BAR)
 
-**Goal:** Before we touch anything, record exactly how well the existing V8 pipeline does on P1-P5 vs. rangovo's `_pasiulymas.pdf` ground truth. This is the threshold the new pipeline must match or exceed in Phase 3.
+**Goal:** Before we touch anything, record exactly how well the existing V8 pipeline does on P1-P5 vs. Rangovo's `_pasiulymas.pdf` ground truth. This is the threshold the new pipeline must match or exceed in Phase 3.
 
 **Files:**
 - Create: `backend/scripts/run_v8_baseline.py`
@@ -229,9 +229,9 @@ def main():
         "## Manual review needed",
         "",
         "For each project, open `training-data/projektas_N/projektas_N_pasiulymas.pdf` ",
-        "(rangovo proposal) and record under each row:",
-        "- rangovo's room count, bendras plotas, dažymo plotas",
-        "- Δ% per metric (V8 vs rangovo)",
+        "(Rangovo proposal) and record under each row:",
+        "- Rangovo's room count, bendras plotas, dažymo plotas",
+        "- Δ% per metric (V8 vs Rangovo)",
         "- Glaring misses (rooms not detected, areas off >20%)",
         "",
         "These deltas become the threshold the new pipeline must match.",
@@ -256,13 +256,13 @@ Open the route handler at the matched line. Note exactly which function it calls
 Run: `cd backend && python scripts/run_v8_baseline.py`
 Expected: 5 JSON files + V8_BASELINE.md. Each project takes 30–120s with multi-pass enabled.
 
-- [ ] **Step 4: Manually fill in rangovo ground truth**
+- [ ] **Step 4: Manually fill in Rangovo ground truth**
 
 Open each `training-data/projektas_N/projektas_N_pasiulymas.pdf` and record in `V8_BASELINE.md`:
-- rangovo room count
-- rangovo bendras plotas (usually on first 1–2 pages)
-- rangovo dažymo plotas (sum of dažymo positions if itemized, or total)
-- rangovo plytelės sienos
+- Rangovo room count
+- Rangovo bendras plotas (usually on first 1–2 pages)
+- Rangovo dažymo plotas (sum of dažymo positions if itemized, or total)
+- Rangovo plytelės sienos
 - Compute Δ% per metric
 
 This file becomes the contract: in Phase 3, new pipeline metrics must match V8's deltas (or do better).
@@ -284,10 +284,10 @@ git commit -m "test: capture V8 baseline accuracy on P1-P5 (THE BAR)"
 
 The new pipeline (extractor/) is accepted ONLY if, on each of P1–P5:
 
-1. Room count delta vs rangovo ≤ V8's room count delta vs rangovo
-2. Bendras plotas Δ% vs rangovo ≤ V8's Δ% (within +2pp tolerance)
-3. Dažymo plotas Δ% vs rangovo ≤ V8's Δ% (within +3pp tolerance)
-4. Plytelės sienos Δ% vs rangovo ≤ V8's Δ% (within +5pp tolerance)
+1. Room count delta vs Rangovo ≤ V8's room count delta vs Rangovo
+2. Bendras plotas Δ% vs Rangovo ≤ V8's Δ% (within +2pp tolerance)
+3. Dažymo plotas Δ% vs Rangovo ≤ V8's Δ% (within +3pp tolerance)
+4. Plytelės sienos Δ% vs Rangovo ≤ V8's Δ% (within +5pp tolerance)
 
 If new fails on >1 project: ABORT simplification. Switch to fallback architecture
 (V8 stays alive, only delete provably-orphaned code in Tasks 5.1, 5.2 and dead
@@ -575,13 +575,13 @@ Expected: 5 lines like `[P1] rooms=N bendras_plotas=X dazymas=Y kampai=Z ...`. E
 
 - [ ] **Step 4: Manual review**
 
-Open each `backend/scripts/baseline_output/PN_baseline.json` and the matching `training-data/projektas_N/projektas_N_pasiulymas.pdf` (rangovo proposal) side-by-side.
+Open each `backend/scripts/baseline_output/PN_baseline.json` and the matching `training-data/projektas_N/projektas_N_pasiulymas.pdf` (Rangovo proposal) side-by-side.
 
 Record per project (write to `backend/scripts/baseline_output/REVIEW.md`):
-- Patalpų count: baseline vs rangovo
-- Bendras plotas: baseline vs rangovo (% delta)
-- Dažymo plotas: baseline vs rangovo (% delta)
-- Plytelės sienos: baseline vs rangovo
+- Patalpų count: baseline vs Rangovo
+- Bendras plotas: baseline vs Rangovo (% delta)
+- Dažymo plotas: baseline vs Rangovo (% delta)
+- Plytelės sienos: baseline vs Rangovo
 - Glaring miscounts (eg. trūksta patalpų, klaidingi matmenys)
 
 Acceptance gate (per CLAUDE.md target): patalpų count 100%, bendras plotas ±5%, dažymo plotas ±10%.
@@ -594,11 +594,11 @@ git add backend/scripts/baseline_output/
 git commit -m "test: capture baseline Vision results on P1-P5"
 ```
 
-### CHECKPOINT 1 — Decision Gate (3-way: Baseline vs V8 vs rangovo)
+### CHECKPOINT 1 — Decision Gate (3-way: Baseline vs V8 vs Rangovo)
 
 **STOP. The user must review `REVIEW.md`, `V8_BASELINE.md`, `ACCURACY_GATE.md`, and the JSON outputs.**
 
-Compare three columns per metric: rangovo (ground truth) | V8 (current bar) | Baseline (single-call hypothesis).
+Compare three columns per metric: Rangovo (ground truth) | V8 (current bar) | Baseline (single-call hypothesis).
 
 - **PROCEED to Phase 2** if Baseline ≥ V8 (within ACCURACY_GATE.md tolerances) on ≥4/5 projects. The single-call hypothesis is validated; we can build the simplified pipeline confident it won't regress accuracy.
 - **ITERATE PROMPT** if Baseline is close but loses on 2–3 projects. Tune `backend/scripts/baseline_vision.py` SYSTEM/USER strings (re-run Step 1.2.3). Up to 3 iterations.
@@ -1155,9 +1155,9 @@ For each project, compare key metrics in `P{n}_baseline.json` (Phase 1 raw call)
 Append to `REVIEW.md`:
 
 ```
-## Phase 3 — New endpoint vs rangovo PDFs
+## Phase 3 — New endpoint vs Rangovo PDFs
 
-| Project | rangovo rooms | New rooms | rangovo plotas | New plotas | Δ% | rangovo dažymo | New dažymo | Δ% |
+| Project | Rangovo rooms | New rooms | Rangovo plotas | New plotas | Δ% | Rangovo dažymo | New dažymo | Δ% |
 |---------|-----------|-----------|-------------|------------|----|-------------|------------|----|
 | P1      | ?         | ?         | ?           | ?          | ?  | ?           | ?          | ?  |
 | P2      | ...       |           |             |            |    |             |            |    |
@@ -1606,7 +1606,7 @@ Do NOT attempt these in this plan. Listed here so they don't get lost.
 
 ### 7.1 Accuracy iteration (if Checkpoint 2 passed but room for improvement)
 
-If new pipeline merged at ≥V8 accuracy but rangovo deltas are still >10% on dažymo plotas: spawn a *new* plan focused on prompt engineering, possibly bringing back targeted fallbacks (eksplikacija text fallback when Vision returns 0 rooms) without restoring the full V7/V8 multi-pass machinery.
+If new pipeline merged at ≥V8 accuracy but Rangovo deltas are still >10% on dažymo plotas: spawn a *new* plan focused on prompt engineering, possibly bringing back targeted fallbacks (eksplikacija text fallback when Vision returns 0 rooms) without restoring the full V7/V8 multi-pass machinery.
 
 ### 7.2 togal.ai-inspired UX iteration
 
@@ -1637,7 +1637,7 @@ These items were not in the original plan but emerged during execution and post-
   3. STR 2.02.09 sanity ranges — flags anomalies
   4. Per-room `calculation_trace` — every value visibly derived
 - New pipeline strictly improves on V8 (P2: 0→8 rooms; P4: crash→3 rooms) — that's an **objective** improvement independent of V8 reference.
-- Going forward, accuracy validation should compare against (1) drawing dimensions directly, (2) STR sanity ranges, (3) rangovo pasiulymai as reference for what positions LT contractors typically include — NOT V8 numbers as gate.
+- Going forward, accuracy validation should compare against (1) drawing dimensions directly, (2) STR sanity ranges, (3) Rangovo pasiulymai as reference for what positions LT contractors typically include — NOT V8 numbers as gate.
 
 ### A2 — MAX_PAGES bumped 20 → 80 → 100 (API hard max)
 
@@ -1662,9 +1662,9 @@ These items were not in the original plan but emerged during execution and post-
 - Aliases `patalpos` to `v8_rooms`
 - Both schemas (canonical + V8-compat) now coexist in response — frontend works without changes
 
-### A4 — rangovo reference comment removed from prompt
+### A4 — Rangovo reference comment removed from prompt
 
-**User direction (2026-04-27):** prompt should be rangovo-agnostic. Original prompt had one comment referencing "rangovo P1 atskirai 68.28 m²" as example for "lubos virš 3m" being a separate position.
+**User direction (2026-04-27):** prompt should be Rangovo-agnostic. Original prompt had one comment referencing "Rangovo P1 atskirai 68.28 m²" as example for "lubos virš 3m" being a separate position.
 
 **Replaced with abstract LT industry rationale:** "Lubos virš 3m yra ATSKIRA pozicija — kitokia kaina (LT industry konvencija: aukšto darbo režimas, papildomi pastoliai)."
 
@@ -1799,7 +1799,7 @@ Closed by default — non-distracting. Demonstrates two-pass zoom value to users
 - **6.5.1 Edge-case PDFs** — synthetic test inputs needed (tiny rooms, open-plan, mansardos, multi-floor, mixed-language, rotated, low-DPI). Crafting these is a separate effort.
 - **6.5.3 Adversarial PDFs** — security-restricted PDFs, ambiguous dimensions, eksplikacija on later pages.
 - **v8_pages page-classifier sidebar** — UI fallback handles its absence; reintroducing would need a lightweight Vision classification call. Nice-to-have.
-- **Kampai personalization** — per-contractor offsets (rangovas counts more outer corners; other contractors differ). Requires a contractor-prefs system.
+- **Kampai personalization** — per-contractor offsets (Rangovas counts more outer corners; other contractors differ). Requires a contractor-prefs system.
 - **togal.ai UX iteration** — separate plan, post-accuracy.
 
 ---

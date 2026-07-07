@@ -1,4 +1,4 @@
-# Gap Analizė — rangovo sąmatos vs V8
+# Gap Analizė — Rangovo sąmatos vs V8
 
 **Šaltinis:** `training-data/parsed_pasiulymai.json` (5 projektai, ~242 eilutės)
 

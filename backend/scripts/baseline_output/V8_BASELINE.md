@@ -17,14 +17,14 @@ Captured: 2026-04-26 21:43:28
 | P4 | ERR | ERR | ERR | ERR | ERR | ERR | 23.8 | KLAIDA |
 | P5 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | vision | 20.5 |  |
 
-## Manual review needed — Ground truth (rangovo's proposals)
+## Manual review needed — Ground truth (Rangovo's proposals)
 
 For each project, open `training-data/projektas_N/projektas_N_pasiulymas.pdf`
-(rangovo's actual proposal) and fill in the ground truth columns below.
-Then compute Δ% = (V8 - rangovo) / rangovo × 100 per metric.
+(Rangovo's actual proposal) and fill in the ground truth columns below.
+Then compute Δ% = (V8 - Rangovo) / Rangovo × 100 per metric.
 The worst-case Δ here becomes the threshold the new pipeline must match.
 
-| P# | rangovo rooms | rangovo bendras m² | rangovo dažymo m² | rangovo plytelės sienos m² | Δ% dažymas | Δ% plytelės |
+| P# | Rangovo rooms | Rangovo bendras m² | Rangovo dažymo m² | Rangovo plytelės sienos m² | Δ% dažymas | Δ% plytelės |
 |----|-----------|-----------------|----------------|------------------------|------------|-------------|
 | P1 | _TODO_    | _TODO_          | _TODO_         | _TODO_                 | _TODO_     | _TODO_      |
 | P2 | _TODO_    | _TODO_          | _TODO_         | _TODO_                 | _TODO_     | _TODO_      |

@@ -363,7 +363,7 @@ export default function InteriorWorkspace({
             onRoomPolygonFill={handleRoomPolygonFill}
             onSymbolCountResult={(symbolType, result) => {
               // Pridedam į projekto darbų sąrašą kaip naują eilutę.
-              // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
+              // Naudoja Rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
               const aprasymas = SYMBOL_LABELS[symbolType]
                 ? t(`project.interiorWorkspace.symbols.${symbolType}`)
                 : t('project.interiorWorkspace.symbolCountFallback', { type: symbolType });

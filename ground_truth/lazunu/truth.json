@@ -5,7 +5,7 @@
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf",
-    "contractor": "Rangovas A (Rangovas A)",
+    "contractor": "Rangovas A",
     "date_collected": "2024-06-26"
   },
   "notes_for_evaluator": "gt_dimensions intentionally empty. APARTMENT (butas) not house — smallest scope. Project drawings split across 10 separate single-page AutoCAD Layout4 PDFs. Vision-extraction path needs PDF bundling logic before it can run.",

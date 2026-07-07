@@ -1549,10 +1549,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_vnt": "l"},
         ])
 
-        # Sprint §FIX-5 (2026-04-29): per rangovas P1 — atskirame eilutę „Lubų
+        # Sprint §FIX-5 (2026-04-29): per Rangovas P1 — atskirame eilutę „Lubų
         # glaistymas/dažymas (virš 3m aukščio)" su tuo pačiu plotu, ne kaip
         # dvigubas count, o kaip subset HIGHLIGHT — premium aukšto darbas.
-        # rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
+        # Rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
         # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
         from .universal_rules import is_high_ceiling as _is_high
         lubos_virs_3m = round(sum(
@@ -1627,7 +1627,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
         })
         # P2 fix: GKP skyriaus eilutė (struktūrinis darbas — angokraščio formavimas).
-        # rangovas P1+P2+P5 4/5 freq. Tas pats kiekis, kita skyrius.
+        # Rangovas P1+P2+P5 4/5 freq. Tas pats kiekis, kita skyrius.
         pozicijos.append({
             "skyrius": SK_GKP, "aprasymas": "Angokraščių apdirbimas GKP (struktūra)",
             "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
@@ -1646,12 +1646,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 _door_line["_confidence_reason"] = _door_reason
         pozicijos.append(_door_line)
 
-    # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over rangovas).
+    # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over Rangovas).
     # Per-room (perim − Σdurys) × 1.10 double-counts interior walls (each
-    # interior wall belongs to 2 rooms). rangovas ratios across P1+P5: 0.50-0.62
+    # interior wall belongs to 2 rooms). Rangovas ratios across P1+P5: 0.50-0.62
     # m of grindjuostė per m² of floor. Cap at 0.65 m/m² to remove the
     # phantom segments. Audit field marks when cap fires for transparency.
-    GRINDJUOSCIU_RATIO_CAP = 0.65  # m grindjuostės per m² floor (rangovas-empirical)
+    GRINDJUOSCIU_RATIO_CAP = 0.65  # m grindjuostės per m² floor (Rangovas-empirical)
     grindjuostes_raw = _sum("grindjuosciu_m")
     bendras_plotas_for_cap = sum(float(r.get("plotas_m2") or 0) for r in rooms)
     grindjuostes_capped = min(grindjuostes_raw, bendras_plotas_for_cap * GRINDJUOSCIU_RATIO_CAP)
@@ -1705,7 +1705,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     nisu_total = _sum("nisu_metrai")
     if nisu_total > 0:
-        # rangovas audit 2026-04-29: separate STRUCTURAL framing line (GKP karkasą
+        # Rangovas audit 2026-04-29: separate STRUCTURAL framing line (GKP karkasą
         # formuoja prieš glaistymą; tai 3/5 jo projektų atskira eilutė).
         pozicijos.extend([
             {"skyrius": SK_GKP, "aprasymas": "Nišų formavimas GKP konstrukcijoje",
@@ -1828,10 +1828,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų")
     _add_tile_lines(SK_PL, pl_grindys_kita, "Kitų grindų")
 
-    # Sprint §41 (2026-04-29): tile format split — per rangovas audit v2 #2 gap.
+    # Sprint §41 (2026-04-29): tile format split — per Rangovas audit v2 #2 gap.
     # Didžiaformatės plytelės (>600×600) reikalauja papildomo darbo: extra
     # klijų sluoksnio, dvigubo padengimo (back-buttering), specialių įrankių.
-    # rangovas premium projektai šitai itemize'ina su 2-3× kainos surcharge.
+    # Rangovas premium projektai šitai itemize'ina su 2-3× kainos surcharge.
     # BUG FIX (Sprint 0): pl_total must be defined BEFORE the didzformat_count
     # check below. Previously it was assigned at line ~1213 (after its first use
     # at line ~1185), causing a NameError that silently bypassed the entire
@@ -1867,7 +1867,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             })
 
     # Tile-specific operations: 45° pjovimas, silikonas, gręžimas, dušo nuolydis
-    # P3 refinement: silikon multiplier × 0.5 → × 1.2 (rangovas P1=129m vs our
+    # P3 refinement: silikon multiplier × 0.5 → × 1.2 (Rangovas P1=129m vs our
     # 0.5×perim suggests we undercount; he counts grindys + lubų pjūvis +
     # dušo kabinos perim). Skylių gręžimas refactored to use symbol counts
     # when available, fallback to opening-count heuristic.
@@ -1901,7 +1901,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Plytelių 45° pjovimas (vidiniai kampai)",
                 "vnt": "m", "kiekis": pjovimas_45, "saltinis": SAL,
             })
-            # rangovas audit 2026-04-29: epoxy variant for premium projects (P1
+            # Rangovas audit 2026-04-29: epoxy variant for premium projects (P1
             # 1/5 freq, but represents premium archetype). Only emit when
             # rules_override or archetypas == "premium". For now: emit as
             # optional add-on when paint_class == 1 (top-tier projects).
@@ -1915,9 +1915,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "medziagos_kiekis": round(pjovimas_45 * 0.05, 2),  # ~0.05 kg/m
                     "medziagos_vnt": "kg",
                 })
-            # Silikonavimas split (rangovas audit 2026-04-29): separate corner
+            # Silikonavimas split (Rangovas audit 2026-04-29): separate corner
             # silicone (between tile zones / floor-wall junctions / outside
-            # corners) from sanitaryware sealing. rangovas itemizes both.
+            # corners) from sanitaryware sealing. Rangovas itemizes both.
             #
             # Empirical splits across his 5 projects:
             #   Sanitaryware silikonas ≈ wet_perim × 0.8 (around bath/sink/WC)
@@ -2000,7 +2000,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             })
 
     # P3 NEW: Dėžučių iš GKP formavimas WC mechanizmams paslėpti — count of
-    # wet rooms with klozetas (rangovas P1=2, P2=2, P5=1; 3+/5 freq). 1 per
+    # wet rooms with klozetas (Rangovas P1=2, P2=2, P5=1; 3+/5 freq). 1 per
     # vonia/wc/san where klozetas exists.
     n_wet_klozetas = sum(1 for r in rooms
                           if (r.get("paskirtis") or "").lower() in {"vonia", "wc", "san", "san_mazgas"})
@@ -2018,7 +2018,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # ════════════════════════════════════════════════════════════════════════
 
     # P6: Hidroizoliacijos įrengimas — VIENA pozicija (LT pro contractor
-    # convention, rangovas pattern). Bundle paruošimas + 2 sluoksniai + juostelė
+    # convention, Rangovas pattern). Bundle paruošimas + 2 sluoksniai + juostelė
     # kampuose į vieną darbą. m² + juostelės m saugojami kaip _detail_*
     # frontend'ui, kad galėtų išskleisti detales jei reikia.
     hidro_m2 = _sum("hidroizoliacija_m2")
@@ -2080,7 +2080,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # ════════════════════════════════════════════════════════════════════════
     # SANTECHNIKOS DARBAI (~7-12 lines)
-    # Per-paskirtis defaults: rangovas P1/P2/P5 stiliumi.
+    # Per-paskirtis defaults: Rangovas P1/P2/P5 stiliumi.
     # Tikslumas — count'ai pagal kambario tipą; vartotojas gali keisti.
     # ════════════════════════════════════════════════════════════════════════
 
@@ -2153,7 +2153,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # ════════════════════════════════════════════════════════════════════════
     # ELEKTROS INSTALIACIJOS DARBAI (placeholders — count po Vision symbol counter)
-    # rangovas P2/P5 stiliumi. Kiekiai pagal sutartinius ženklus brėžinyje.
+    # Rangovas P2/P5 stiliumi. Kiekiai pagal sutartinius ženklus brėžinyje.
     # Šiuo metu placeholder: confidence "low", vartotojas įveda kiekį.
     # Po simbolių extractor'iaus integracijos — automatiškai užpildys.
     # ════════════════════════════════════════════════════════════════════════
@@ -2203,7 +2203,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
     if difuzoriai_n > 0:
-        # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
+        # Rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
         # (priglaistomas + glaistymo darbas — separate trade tasks)
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "Difūzorių montavimas (vėdinimo taškai)",
@@ -2216,7 +2216,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
 
-    # Sprint §40 (2026-04-29): HVAC ortakiai — rangovas audit v2 top gap.
+    # Sprint §40 (2026-04-29): HVAC ortakiai — Rangovas audit v2 top gap.
     # 40% premium projektų turi ortakius (D100/125/160 mm). Vision prompt'as
     # papildytas detect'inti ortakių žymėjimus brėžiniuose; jei rasta — emit
     # per-diameter line items. Heuristic fallback: jei `difuzoriai_n > 0` BET
@@ -2261,7 +2261,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "medziagos_vnt": "m",
         })
     if ortakiai_total > 0:
-        # rangovas paaiškina: ortakių izoliacija + tvirtinimas — atskiros eilutės
+        # Rangovas paaiškina: ortakių izoliacija + tvirtinimas — atskiros eilutės
         pozicijos.append({
             "skyrius": SK_VENT, "aprasymas": "Ortakių izoliacija (akmens vata + AlMg folija)",
             "vnt": "m", "kiekis": round(ortakiai_total * 0.7, 1),  # ~70% (in slabs only)
@@ -2273,7 +2273,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
         })
     if sviestuvai_n > 0:
-        # Same pair pattern for šviestuvai — rangovas lists montavimas separately
+        # Same pair pattern for šviestuvai — Rangovas lists montavimas separately
         # from apdirbimas (gipsiniai). We already emit montavimas + skylės
         # above; add apdirbimas as third line.
         el_lines.append({
@@ -2287,7 +2287,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # PRIDĖTINIAI ELEMENTAI (~4-5 lines)
     # ════════════════════════════════════════════════════════════════════════
 
-    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (rangovas P1/P4)
+    # Pastolių nuoma — kai patalpoje virš 3 m aukščio (Rangovas P1/P4)
     from .universal_rules import is_high_ceiling as _is_high
     high_ceiling_dazymo = round(sum(
         float(r.get("dazymo_plotas_m2") or 0) for r in rooms
@@ -2305,7 +2305,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if bendras_plotas > 0:
-        # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
+        # Šiukšlių išvežimas — Rangovas convention: m³ (volume of waste).
         # Empirical ratio ~0.075 m³/m² for full vidaus apdaila.
         # 2026-05-27 calibration (Berzas fixture): 12 m³ / 165,61 m² = 0,0725.
         # Anksčiau 0,06 davė 9,9 m³ (under by -17%).

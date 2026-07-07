@@ -5,7 +5,7 @@
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
-    "contractor": "Rangovas A (Rangovas A)",
+    "contractor": "Rangovas A",
     "date_collected": "2025-07-16"
   },
   "notes_for_evaluator": "gt_dimensions intentionally empty. ⚠ No general floor plan PDF in the supplied bundle — only electrical + tile specialty drawings. The 'pdf_path' field points at the tile drawing, which is NOT the architectural source for paint/wall extraction. Marked blocked_for_vision_extraction until missing PDFs are supplied.",

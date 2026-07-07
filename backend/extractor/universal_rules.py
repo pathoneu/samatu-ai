@@ -764,7 +764,7 @@ def calc_room_quantities(room: dict,
     #  - Doors are deducted at standard 0.9 × 2.1 = 1.89 m² per opening.
     #  - Windows are NOT deducted from glaistymas (reveals + above-window
     #    header roughly cancel window opening area in glaistymas measurement;
-    #    see CLAUDE.md §1.1 + rangovas conv).
+    #    see CLAUDE.md §1.1 + Rangovas conv).
     #
     # When `sienu_apdailos_breakdown` (from apdailos_reader p10) is present:
     # use the Vision-detected tile_share + tile_h to decide full-tile vs

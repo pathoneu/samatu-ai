@@ -7,7 +7,7 @@ Architektūra:
 3. Matematika atlieka skaičiavimus
 4. Sanity check'ai pranešia anomalijas
 
-NĖRA rangovas overfitting. Industries STANDART.
+NĖRA Rangovas overfitting. Industries STANDART.
 """
 
 from __future__ import annotations
@@ -315,7 +315,7 @@ def calc_room_quantities(room: dict,
     # 3. Angokraščių krašto kampai per kiekvienai durims/langui
     #    Per duris: (W + 2H) — 3 kraštai, kuriuose susitinka angokraštis su siena
     #    Per langą: (W + 2H) — irgi 3 kraštai
-    # Stress-test parodė: be #3 — mūsų kampai 200m vs rangovo 400-580m.
+    # Stress-test parodė: be #3 — mūsų kampai 200m vs Rangovo 400-580m.
     if walls_paint_factor > 0:
         # Bazė: perimetras + 4 vidiniai vert kampai
         kampai = perim + 4 * H

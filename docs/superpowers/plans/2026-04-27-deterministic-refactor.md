@@ -156,7 +156,7 @@ After tests pass, restart backend and run real extract on P1 (when user authoriz
 
 1. **Unit-level (Tier 1):** `pytest backend/tests/test_deterministic.py::test_calc_room_quantities_deterministic`
 2. **Pipeline-level (Tier 2):** mocked-Vision extract 3× → bit-identical
-3. **Integration:** real Vision call on P1 → compare santrauka to ground truth (rangovas, when applicable)
+3. **Integration:** real Vision call on P1 → compare santrauka to ground truth (Rangovas, when applicable)
 4. **No-regression:** existing P1 project re-extracted under new code → spot-check 5 random kambariai's dazymo_plotas. Should differ from old value (because Python now does math) but should be deterministic across runs.
 
 ---

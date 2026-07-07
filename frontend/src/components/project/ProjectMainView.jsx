@@ -855,7 +855,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                     (1) Fragment now React.Fragment with key (was bare `<>` —
                         React warned "missing key" on every render).
                     (2) Precomputed itemIndexMap avoids O(n²) `darbai.indexOf`
-                        per row. ~6,400 iters → ~80 lookups on rangovas-style 80-row
+                        per row. ~6,400 iters → ~80 lookups on Rangovas-style 80-row
                         projects. Each price keystroke was triggering full scan. */}
                 {(() => {
                   const itemIndexMap = new Map(darbai.map((d, i) => [d, i]));

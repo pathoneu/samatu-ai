@@ -66,4 +66,4 @@ Tolerancijos GALI būti sugriežtintos po Phase 3 jei matome, kad Vision yra sta
 
 - Borderline rezultatai (per kraštą) → 3 run'ai, imam medianą.
 - Visi runs SAME PDF input'as (largest variant per project — per `find_breziniai_pdf` script logic).
-- rangovo `_pasiulymas.pdf` ground truth įveda manual'iai į `V8_BASELINE.md` lentelę vėliau (Phase 1 review). Tai naudojama orientyrui, ne automatic gate'ui.
+- Rangovo `_pasiulymas.pdf` ground truth įveda manual'iai į `V8_BASELINE.md` lentelę vėliau (Phase 1 review). Tai naudojama orientyrui, ne automatic gate'ui.
