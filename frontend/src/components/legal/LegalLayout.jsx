@@ -12,12 +12,13 @@
  * the exported <Section>, <P>, <UL>/<LI>, <Callout>, <DefRow> primitives so
  * the typographic scale stays identical across all three.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { PathonMark } from '@/components/layout/Logo';
 import LanguageToggle from '@/components/LanguageToggle';
+import { setPageMeta } from '@/lib/seo';
 
 // ─── Page shell ──────────────────────────────────────────────────────
 
@@ -35,6 +36,14 @@ export default function LegalLayout({
   // needs a lawyer). When the UI is in English, surface a clear notice above
   // the LT body rather than silently showing Lithuanian.
   const showEnBodyNotice = i18n.language && i18n.language.startsWith('en');
+  // Per-route <title>/<meta>: pages on this layout (legal + /duk) get their
+  // tab title from the visible page title and their meta description from the
+  // intro lede. Re-runs on language toggle (props come from i18n). A page that
+  // needs a custom SEO title can still call setPageMeta itself — page effects
+  // run after this child effect and win.
+  useEffect(() => {
+    setPageMeta({ title, description: intro });
+  }, [title, intro]);
   return (
     <div className="pathon-landing min-h-screen bg-background text-foreground antialiased">
       {/* Lite header — logo home + back link, matches landing nav rhythm */}

@@ -21,6 +21,30 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://pathon.eu/samatininko-kaina</loc>
+    <lastmod>2026-07-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://pathon.eu/kiekiai-is-brezinio</loc>
+    <lastmod>2026-07-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://pathon.eu/vidaus-apdailos-samata</loc>
+    <lastmod>2026-07-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://pathon.eu/apva-renovacijos-kiekiai</loc>
+    <lastmod>2026-07-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://pathon.eu/register</loc>
     <lastmod>2026-07-06</lastmod>
     <changefreq>yearly</changefreq>
