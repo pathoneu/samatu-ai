@@ -28,6 +28,11 @@ backend/logs/
 training-data/*/projektas_*_breziniai.pdf
 training-data/*/projektas_*_pasiulymas.pdf
 
+# Fixture source PDFs — never committed (client identity in filenames/content,
+# contractor pricing). Quantities-only ground truth (truth.json, registry.yaml,
+# gap-analysis) lives in git; source PDFs stay on disk / ~/Desktop/projektai.
+docs/superpowers/fixtures/**/*.pdf
+
 # Plan / experiment artifacts
 backend/scripts/baseline_output/*.json
 
