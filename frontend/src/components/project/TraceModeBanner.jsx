@@ -3,9 +3,10 @@
 // hint, and ortho-toggle status. Per UX research §7: "no mode indicator" is
 // the #1 support ticket on every annotation tool, so this banner is mandatory.
 
-import { ltPlural } from '@/lib/ltPlural';
+import { useTranslation } from 'react-i18next';
 
 export default function TraceModeBanner({ visible, polygonDraft, orthoEnabled }) {
+  const { t } = useTranslation();
   if (!visible) return null;
   const vertexCount = polygonDraft?.points?.length || 0;
 
@@ -19,20 +20,20 @@ export default function TraceModeBanner({ visible, polygonDraft, orthoEnabled })
         boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
       }}
     >
-      <span>📐 Apvedinėjamas kambarys</span>
+      <span>{t('project.traceBanner.tracing')}</span>
       <span style={{ opacity: 0.7 }}>·</span>
       <span style={{ opacity: 0.85, fontWeight: 500 }}>
-        {vertexCount} {ltPlural(vertexCount, 'taškas', 'taškai', 'taškų')}
+        {t('project.traceBanner.points', { count: vertexCount })}
       </span>
       <span style={{ opacity: 0.7 }}>·</span>
       <span style={{ opacity: 0.85, fontWeight: 500 }}>
-        Enter užbaigti  ·  Esc atšaukti
+        {t('project.traceBanner.hint')}
       </span>
       {!orthoEnabled && (
         <>
           <span style={{ opacity: 0.7 }}>·</span>
           <span style={{ background: 'rgba(255,255,255,0.4)', padding: '1px 6px', borderRadius: 4, fontSize: 10 }}>
-            ortho IŠJUNGTA (F8)
+            {t('project.traceBanner.orthoOff')}
           </span>
         </>
       )}

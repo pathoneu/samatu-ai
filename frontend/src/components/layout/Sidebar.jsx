@@ -12,18 +12,23 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
-  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut,
+  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
+import { useBilling } from '@/hooks/useBilling';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // 2026-05-06: removed '/exports' — route never existed (404). Eksportai
 // are accessible from each project's top-bar 'Eksportuoti' button instead.
+// `labelKey` resolves against i18n at render time so nav labels/tooltips
+// follow the active language (LT default).
 const NAV_ITEMS = [
-  { path: '/', icon: Home, label: 'Projektai' },
-  { path: '/active-project', icon: FileText, label: 'Aktyvus projektas', requiresProject: true },
-  { path: '/new-project', icon: Plus, label: 'Naujas projektas' },
-  { path: '/price-lists', icon: Sliders, label: 'Kainynai' },
+  { path: '/', icon: Home, labelKey: 'layout.nav.projektai' },
+  { path: '/active-project', icon: FileText, labelKey: 'layout.nav.aktyvusProjektas', requiresProject: true },
+  { path: '/new-project', icon: Plus, labelKey: 'layout.nav.naujasProjektas' },
+  { path: '/price-lists', icon: Sliders, labelKey: 'layout.nav.kainynai' },
 ];
 
 function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
@@ -50,16 +55,16 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
       <Icon style={{ width: 16, height: 16 }} />
     </>
   );
+  let trigger;
   if (disabled) {
-    return (
-      <span title={label} className={className} style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}>
+    trigger = (
+      <span className={className} style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}>
         {inner}
       </span>
     );
-  }
-  if (to) {
-    return (
-      <Link to={to} title={label} className={className} style={isActive ? activeStyle : idleStyle}
+  } else if (to) {
+    trigger = (
+      <Link to={to} aria-label={label} className={className} style={isActive ? activeStyle : idleStyle}
         onClick={onClick}
         onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--surface-2))'; }}
         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
@@ -67,18 +72,31 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
         {inner}
       </Link>
     );
+  } else {
+    trigger = (
+      <button onClick={onClick} aria-label={label} className={className} style={isActive ? activeStyle : idleStyle}>
+        {inner}
+      </button>
+    );
   }
+
+  // shadcn Tooltip on hover (side=right — rail sits on the left edge). The
+  // `label` doubles as the accessible name via aria-label above.
   return (
-    <button onClick={onClick} title={label} className={className} style={isActive ? activeStyle : idleStyle}>
-      {inner}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
 export default function Sidebar({ onNavigate = null }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
+  // Phase 7: the /pricing rail entry appears ONLY when billing is enabled.
+  const { enabled: billingEnabled } = useBilling();
 
   const isActiveProjectRoute = location.pathname.startsWith('/project/');
   const items = NAV_ITEMS.filter(it => !it.requiresProject || isActiveProjectRoute);
@@ -108,7 +126,7 @@ export default function Sidebar({ onNavigate = null }) {
       {/* North arrow logo — matches landing + brėžinių stilius */}
       <Link
         to="/"
-        title="Sąmatų AI — į pradžią"
+        title={t('layout.logoHome')}
         className="mx-auto mb-4 flex items-center justify-center"
         style={{
           width: 32, height: 32,
@@ -134,10 +152,10 @@ export default function Sidebar({ onNavigate = null }) {
             : location.pathname.startsWith(it.path);
           return (
             <NavBtn
-              key={it.label}
+              key={it.labelKey}
               to={it.path}
               icon={Icon}
-              label={it.label}
+              label={t(it.labelKey)}
               isActive={isActive}
               disabled={it.requiresProject && !isActiveProjectRoute}
               onClick={onNavigate}
@@ -148,7 +166,7 @@ export default function Sidebar({ onNavigate = null }) {
           <NavBtn
             to="/admin"
             icon={ShieldCheck}
-            label="Administravimas"
+            label={t('layout.nav.administravimas')}
             isActive={location.pathname.startsWith('/admin')}
             onClick={onNavigate}
           />
@@ -157,16 +175,25 @@ export default function Sidebar({ onNavigate = null }) {
 
       {/* Bottom: settings + avatar */}
       <div className="flex flex-col items-center gap-2 pb-1">
+        {billingEnabled && (
+          <NavBtn
+            to="/pricing"
+            icon={CreditCard}
+            label={t('layout.nav.planai')}
+            isActive={location.pathname.startsWith('/pricing')}
+            onClick={onNavigate}
+          />
+        )}
         <NavBtn
           to="/settings"
           icon={Settings}
-          label="Nustatymai"
+          label={t('layout.nav.nustatymai')}
           isActive={location.pathname.startsWith('/settings')}
           onClick={onNavigate}
         />
         <NavBtn
           icon={LogOut}
-          label="Atsijungti"
+          label={t('layout.nav.atsijungti')}
           onClick={handleLogout}
         />
         {user && (

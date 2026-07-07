@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import anthropic
 
-SONNET_MODEL = "claude-sonnet-4-6"
+from models_config import model_for  # role: "legend" — resolved at call time
 
 
 _LEGEND_SYSTEM = """Extract the symbol legend from this LT construction drawing.
@@ -71,10 +71,12 @@ _SCHEMA = {
 
 
 def extract_legend(legend_image_b64: str, client: anthropic.Anthropic | None = None) -> dict:
-    """Run Sonnet 4.6 over a legend page; return canonical mapping."""
+    """Run the legend-role model over a legend page; return canonical mapping
+    (plus a `_meta` block with model + token usage for cost telemetry)."""
     client = client or anthropic.Anthropic()
+    model = model_for("legend")  # call-time resolution (MODEL_OVERRIDE etc.)
     resp = client.messages.create(
-        model=SONNET_MODEL,
+        model=model,
         max_tokens=2000,
         system=[{
             "type": "text",
@@ -100,7 +102,14 @@ def extract_legend(legend_image_b64: str, client: anthropic.Anthropic | None = N
             "effort": "high",
         },
     )
-    return json.loads(resp.content[0].text)
+    legend = json.loads(resp.content[0].text)
+    usage = getattr(resp, "usage", None)
+    legend["_meta"] = {
+        "model": model,
+        "input_tokens": getattr(usage, "input_tokens", None),
+        "output_tokens": getattr(usage, "output_tokens", None),
+    }
+    return legend
 
 
 def build_legend_block(legend: dict) -> str:

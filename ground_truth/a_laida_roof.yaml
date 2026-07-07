@@ -1,0 +1,64 @@
+# ground_truth/a_laida_roof.yaml
+project_id: a_laida
+source_pdf: "A LAIDA.pdf"
+location: "Užusalių sen., Jonavos r."
+statybos_rusis: nauja_statyba
+statinio_kategorija: neypatingas
+dalys_available: [SA]   # PDF is SA dalis only
+
+roof:
+  type: keturslaitis           # 4-pitch hip
+  asymmetric: true
+  slopes:
+    - side: long
+      angle_deg: 25
+    - side: short
+      angle_deg: 22
+  building_footprint_outer_walls:
+    width_m: 8.95
+    length_m: 13.12
+  roof_footprint_with_eaves:
+    width_m: 10.80
+    length_m: 14.97
+  eaves_overhang_from_axis_m: 1.05      # as shown on STOGO PLANAS
+  eaves_overhang_from_outer_wall_m: 0.925   # = 1.05 - wall_thickness/2
+  wall_thickness_m: 0.25       # blokeliai 25cm per medž. žiniaraštis
+  chimney_count: 0             # not visible in this project
+  rooflight_count: 0
+  windows_count: 0             # NOT confidently known — see "out_of_scope"
+  roof_material: profiliuota_skarda
+  ral: "1035"
+
+roofer_samata:
+  source: "owner_friend_roofer_quoted_2026-05-12"
+  pvm_included: false
+  line_items:
+    - position: perdanga
+      qty: 117
+      unit: m2
+      eur_per_unit: 10.00
+      sum_eur: 1170.00
+    - position: stogas
+      qty: 185
+      unit: m2
+      eur_per_unit: 20.00
+      sum_eur: 3700.00
+    - position: latakai
+      qty: 52
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 624.00
+    - position: kraigai
+      qty: 36
+      unit: m
+      eur_per_unit: 6.00
+      sum_eur: 216.00
+  total_eur_no_vat: 5710.00
+
+# What I expect my extractor to compute, given inputs above:
+expected_extractor_output:
+  perdanga_m2: 117.4     # tolerance ±2%
+  stogas_m2: 185.5       # tolerance ±5% (incl. 5% waste)
+  latakai_m: 51.5        # tolerance ±2%
+  kraigai_m: 37.0        # tolerance ±5%
+  # Vėjalentės, sienos: N/A for keturšlaitis (no gables)

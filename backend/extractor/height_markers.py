@@ -157,6 +157,23 @@ def salvage_heights_from_warnings(
         key=lambda n: -len(n),
     )
 
+    # 2026-07-04 fix (Rangovas B GKP height-split): compound room names like
+    # "Svetainė/valgomasis/virtuvė" never substring-matched warnings that name
+    # only one component ("… svetainė ~3000mm iš vizualizacijos"), so the
+    # narrated height was silently dropped and the room kept the 2.82 default —
+    # zeroing the virš-3m GKP/paint split. Index each "/"-separated component
+    # (≥5 chars, compound-separator split only — NOT whitespace, to avoid
+    # generic-word false positives) as an alias for the canonical name.
+    name_variants: list[tuple[str, str]] = []
+    for name in room_names:
+        lc = name.lower()
+        name_variants.append((lc, name))
+        for part in re.split(r"[/,+]", lc):
+            part = part.strip()
+            if len(part) >= 5 and part != lc:
+                name_variants.append((part, name))
+    name_variants.sort(key=lambda t: -len(t[0]))
+
     for w in warnings:
         if isinstance(w, dict):
             text = " ".join(filter(None, [
@@ -201,9 +218,9 @@ def salvage_heights_from_warnings(
         # try paskirtis-based generic phrases ("vonios", "gyvenamosios").
         text_lc = text.lower()
         matched_rooms: list[str] = []
-        for name in room_names:
-            if name.lower() in text_lc:
-                matched_rooms.append(name)
+        for variant, canonical in name_variants:
+            if variant in text_lc and canonical not in matched_rooms:
+                matched_rooms.append(canonical)
 
         # Paskirtis-based fallback. Generic phrases like "visose voniose"
         # or "gyvenamoms patalpoms" map to all rooms with the matching

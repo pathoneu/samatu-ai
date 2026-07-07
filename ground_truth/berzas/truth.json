@@ -1,0 +1,712 @@
+{
+  "$schema_version": 1,
+  "project_id": "berzas",
+  "name": "Beržų g. 24",
+  "pdf_path": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf",
+  "source": {
+    "notes_md": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/contractor-notes-verbatim.md",
+    "samata_pdf": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf",
+    "contractor": "Rangovas A (Rangovas A)",
+    "date_collected": "2026-05-26"
+  },
+  "notes_for_evaluator": "gt_dimensions are pulled from the latest app extract (app-output-to-the-dot.json). Floor area (plotas_m2) is green: read directly from eksplikacija. Perimeter, ceiling height and elementai are yellow: Vision-derived, not contractor-validated. gt_totals reflect samata-truth.pdf + verbatim notes (green). gt_per_room contains the rooms the contractor described explicitly.",
+  "floor_total_sanity_check_m2": 165.64,
+  "gt_dimensions": [
+    {
+      "nr": "101",
+      "pavadinimas": "Tambūras",
+      "paskirtis": "tamburas",
+      "puslapio_nr": 2,
+      "plotas_m2": 11.01,
+      "perimetras_m": 13.5,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": true
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.75,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.25,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow",
+        "plyteles_grindys_m2_override": "green"
+      },
+      "plyteles_grindys_m2_override": 8.54
+    },
+    {
+      "nr": "102",
+      "pavadinimas": "Svetainė/virtuvė",
+      "paskirtis": "valgomasis",
+      "puslapio_nr": 2,
+      "plotas_m2": 50.54,
+      "perimetras_m": 31.0,
+      "lubu_aukstis_m": 3.4,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 2,
+          "plotis_mm": 2750,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 3300,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 18.0
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 2750,
+          "aukstis_mm": 2100,
+          "_exterior": true
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.85,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.15,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "103",
+      "pavadinimas": "Koridorius",
+      "paskirtis": "koridorius",
+      "puslapio_nr": 2,
+      "plotas_m2": 9.64,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 4.0
+        },
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2400,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2400,
+          "_exterior": false
+        },
+        {
+          "tipas": "pasleptos_duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2400,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 900,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 1.0,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "104",
+      "pavadinimas": "Darbo kambarys",
+      "paskirtis": "kabinetas",
+      "puslapio_nr": 2,
+      "plotas_m2": 13.51,
+      "perimetras_m": 15.0,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 1.5,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2780,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.0
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.7,
+        "plyteles_share": 0.2,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.1,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "105",
+      "pavadinimas": "Garažas",
+      "paskirtis": "garazas",
+      "puslapio_nr": 2,
+      "plotas_m2": 10.67,
+      "perimetras_m": 13.5,
+      "lubu_aukstis_m": 3.0,
+      "lubu_tipas": "betonas",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 2500,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 1.0,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow",
+        "walls_paint_factor_override": "green",
+        "tile_floor_override": "green",
+        "plyteles_grindys_m2_override": "green",
+        "gkp_extra_area_m2": "green"
+      },
+      "walls_paint_factor_override": 0.7988,
+      "tile_floor_override": true,
+      "plyteles_grindys_m2_override": 10.1,
+      "gkp_extra_area_m2": 10.05
+    },
+    {
+      "nr": "106",
+      "pavadinimas": "Skalbykla",
+      "paskirtis": "skalbykla",
+      "puslapio_nr": 2,
+      "plotas_m2": 6.84,
+      "perimetras_m": 10.5,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.8,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 1.6,
+          "_source": "niche_locator_2026_05_31",
+          "_confidence": "medium"
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.3,
+        "plyteles_share": 0.7,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "107",
+      "pavadinimas": "Vaikų san.mazgas",
+      "paskirtis": "san",
+      "puslapio_nr": 2,
+      "plotas_m2": 6.59,
+      "perimetras_m": 11.0,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.8,
+      "elementai": [
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.1,
+        "plyteles_share": 0.9,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "108",
+      "pavadinimas": "Berniuko kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 2,
+      "plotas_m2": 12.71,
+      "perimetras_m": 14.6,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2165,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.7,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.3,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "109",
+      "pavadinimas": "Berniuko kambarys",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 2,
+      "plotas_m2": 12.71,
+      "perimetras_m": 14.6,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2165,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 2.5
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.7,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.3,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    },
+    {
+      "nr": "110",
+      "pavadinimas": "Miegamasis",
+      "paskirtis": "miegamoji",
+      "puslapio_nr": 2,
+      "plotas_m2": 23.97,
+      "perimetras_m": 20.0,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 0,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 2200,
+          "aukstis_mm": 2200,
+          "_exterior": true
+        },
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1160,
+          "aukstis_mm": 2200
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 4.5
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 800,
+          "aukstis_mm": 2100,
+          "_exterior": false
+        },
+        {
+          "tipas": "duris",
+          "kiekis": 1,
+          "plotis_mm": 2200,
+          "aukstis_mm": 2100,
+          "_exterior": true
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.75,
+        "plyteles_share": 0.0,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.25,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow",
+        "high_ceiling_area_m2": "green",
+        "extra_walls_virs_3m_m2": "green",
+        "extra_walls_m2": "green"
+      },
+      "high_ceiling_area_m2": 12.28,
+      "extra_walls_virs_3m_m2": 47.44,
+      "extra_walls_m2": 6.24
+    },
+    {
+      "nr": "111",
+      "pavadinimas": "Tėvų vonia",
+      "paskirtis": "san",
+      "puslapio_nr": 2,
+      "plotas_m2": 7.45,
+      "perimetras_m": 12.0,
+      "lubu_aukstis_m": 2.8,
+      "lubu_tipas": "gkp",
+      "plyteles_sienos_aukstis_m": 2.8,
+      "elementai": [
+        {
+          "tipas": "langas",
+          "kiekis": 1,
+          "plotis_mm": 1500,
+          "aukstis_mm": 2200
+        },
+        {
+          "tipas": "nisa_LED",
+          "kiekis": 1,
+          "ilgis_m": 3.0
+        }
+      ],
+      "sienu_apdailos_breakdown": {
+        "dazymas_share": 0.05,
+        "plyteles_share": 0.95,
+        "tapetai_share": 0.0,
+        "plokste_share": 0.0,
+        "veidrodis_share": 0.0
+      },
+      "_dim_confidence": {
+        "plotas_m2": "green",
+        "perimetras_m": "yellow",
+        "lubu_aukstis_m": "yellow",
+        "elementai": "yellow",
+        "sienu_apdailos_breakdown": "yellow"
+      }
+    }
+  ],
+  "gt_per_room": {
+    "101": {
+      "plyteles_grindys_m2": {
+        "value": 8.54,
+        "confidence": "green",
+        "source": "notes:p101 grindys"
+      },
+      "grindjuostes_m": {
+        "value": 10.32,
+        "confidence": "green",
+        "source": "notes:p101 plintusai"
+      }
+    },
+    "106": {
+      "plyteles_grindys_m2": {
+        "value": 6.89,
+        "confidence": "green",
+        "source": "notes:p106 grindys"
+      },
+      "grindjuostes_m": {
+        "value": 11.8,
+        "confidence": "green",
+        "source": "notes:p106 plintusai"
+      }
+    },
+    "105": {
+      "plyteles_grindys_m2": {
+        "value": 10.1,
+        "confidence": "green",
+        "source": "notes:p105 grindys"
+      },
+      "grindjuostes_m": {
+        "value": 10.92,
+        "confidence": "green",
+        "source": "notes:p105 plintusai"
+      },
+      "walls_paintable_m2": {
+        "value": 31.45,
+        "confidence": "green",
+        "source": "notes:dazymai garažo sienos"
+      }
+    },
+    "107": {
+      "plyteles_grindys_m2": {
+        "value": 6.52,
+        "confidence": "green",
+        "source": "notes:p107 grindys"
+      },
+      "plyteles_sienos_m2": {
+        "value": 32.73,
+        "confidence": "green",
+        "source": "notes:p107 sienos"
+      },
+      "silikonavimas_m": {
+        "value": 23.64,
+        "confidence": "green",
+        "source": "notes:p107 silikonavimas"
+      }
+    },
+    "111": {
+      "plyteles_grindys_m2": {
+        "value": 7.83,
+        "confidence": "green",
+        "source": "notes:p111 grindys"
+      },
+      "plyteles_sienos_m2": {
+        "value": 28.8,
+        "confidence": "green",
+        "source": "notes:p111 sienos 120x60"
+      },
+      "silikonavimas_m": {
+        "value": 31.74,
+        "confidence": "green",
+        "source": "notes:p111 silikonavimas"
+      }
+    }
+  },
+  "gt_totals": {
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 584.81,
+      "confidence": "green",
+      "source": "samata-truth items 16+17 (iki 3m 371.40 + virš 3m 213.41)"
+    },
+    "dazymo_iki_3m_m2": {
+      "value": 371.4,
+      "confidence": "green",
+      "source": "samata-truth item 16 (sienos žemos 278.67 + lubos žemos 92.73)"
+    },
+    "dazymo_virs_3m_m2": {
+      "value": 213.41,
+      "confidence": "green",
+      "source": "samata-truth item 17 (sienos aukštos 150.59 + lubos aukštos 62.82)"
+    },
+    "walls_paint_total_m2": {
+      "value": 460.71,
+      "confidence": "green",
+      "source": "notes:sienos žemos 278.67 + aukštos 150.59 + garažas 31.45"
+    },
+    "ceiling_paint_total_m2": {
+      "value": 165.6,
+      "confidence": "green",
+      "source": "notes:lubos žemos 92.73 + aukštos 62.82 + garažas 10.05"
+    },
+    "led_nisos_m": {
+      "value": 42.3,
+      "confidence": "green",
+      "source": "samata-truth item 23 (Nišų LED glaistymas/dažymas)"
+    },
+    "led_nisos_breakdown": {
+      "value": [
+        23.55,
+        18.75
+      ],
+      "confidence": "green",
+      "source": "notes:du sub-totals (23.55 + 18.75 = 42.30)"
+    },
+    "floor_total_m2": {
+      "value": 165.61,
+      "confidence": "green",
+      "source": "samata bendras_plotas"
+    },
+    "plyteles_grindys_total_m2": {
+      "value": 39.88,
+      "confidence": "green",
+      "source": "notes: 7.83 + 6.52 + 8.54 + 6.89 + 10.10"
+    },
+    "plyteles_sienos_total_m2": {
+      "value": 61.53,
+      "confidence": "incomplete",
+      "source": "notes:vonios sienos 28.80 + 32.73 (only the two main bathrooms documented)",
+      "notes": "Contractor documented only 2 rooms (vonios 107 + 111 = 32.73 + 28.80 = 61.53 m²). App also counts tile in Tambūras splashback, Skalbykla, Garažas etc. which the contractor either bundled into floor tile lines or did not itemise. The +37% delta vs this truth is a documentation gap, not an extraction error. Replace with full per-room contractor data when available (Phase 4 elevation extractor will produce per-room formats)."
+    },
+    "rotband_lyginimas_m2": {
+      "value": 138.69,
+      "confidence": "green",
+      "source": "samata-truth item 15"
+    },
+    "kampu_metrai_m": {
+      "value": 493.35,
+      "confidence": "partial",
+      "source": "samata-truth item 19",
+      "notes": "Truth 493.35 m. Contractor categories documented sum to ~250.53 m (pusiniai 110.28 + durų angos 39.2 + angų kampai 67.2 + statūs 33.85). The remaining 243 m is unaccounted in contractor notes per gap-analysis.md. App emits perim + inner + opening reveals (no pusiniai because n_partition_walls is not yet wired from room adjacency)."
+    },
+    "angokrasciu_m": {
+      "value": 89.39,
+      "confidence": "green",
+      "source": "samata-truth item 13/14 (atkosai)"
+    },
+    "gkp_lubu_iki_3m_m2": {
+      "value": 102.78,
+      "confidence": "green",
+      "source": "samata-truth item 1"
+    },
+    "gkp_lubu_virs_3m_m2": {
+      "value": 62.82,
+      "confidence": "green",
+      "source": "samata-truth item 2"
+    },
+    "rozetes_jungtukai_count": {
+      "value": 113,
+      "confidence": "green",
+      "source": "notes:rozetės + jungtukai combined"
+    },
+    "termoreguliatoriai_count": {
+      "value": 8,
+      "confidence": "green",
+      "source": "notes:termoreguliatoriai 8 vnt"
+    },
+    "sviestuvai_priglaistomi_count": {
+      "value": 38,
+      "confidence": "green",
+      "source": "samata-truth (priglaistomi šviestuvai)"
+    },
+    "difuzoriai_count": {
+      "value": 15,
+      "confidence": "green",
+      "source": "samata-truth item 9 (montavimas)"
+    },
+    "siuksles_m3": {
+      "value": 12.0,
+      "confidence": "green",
+      "source": "samata-truth item 53"
+    }
+  }
+}

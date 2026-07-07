@@ -27,4 +27,6 @@ cmds = [
 ]
 
 [start]
-cmd = ". /opt/venv/bin/activate && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+# --proxy-headers/--forwarded-allow-ips: real client IP behind the platform proxy
+# so the per-IP auth rate limiter works (2026-06-19 security hunt).
+cmd = ". /opt/venv/bin/activate && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"

@@ -1,0 +1,154 @@
+{
+  "slug": "romainiai",
+  "source": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf",
+  "n_line_items": 16,
+  "sections": [
+    "Sienų lubų glaistymas dažymas"
+  ],
+  "line_items": [
+    {
+      "page": 1,
+      "nr": "1",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų lyginimas sausu gipsiniu tinku\n\"Rotband\"",
+      "unit": "m2",
+      "quantity": 95.0,
+      "raw_qty": "95"
+    },
+    {
+      "page": 1,
+      "nr": "2",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Lubų glaistymas/dažymas\n( Benajamin Moore dažai)",
+      "unit": "m2",
+      "quantity": 139.79,
+      "raw_qty": "139,79"
+    },
+    {
+      "page": 1,
+      "nr": "3",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų, lubų glaistymas/dažymas\n( Benajamin Moore dažai)",
+      "unit": "m2",
+      "quantity": 250.95,
+      "raw_qty": "250,95"
+    },
+    {
+      "page": 1,
+      "nr": "4",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Stiklo audinio klijavimas ant vėsinamų lubų",
+      "unit": "m2",
+      "quantity": 134.79,
+      "raw_qty": "134,79"
+    },
+    {
+      "page": 1,
+      "nr": "5",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų, lubų glaistymas/dažymas ( Supreme\nUltimate dažais )",
+      "unit": "m2",
+      "quantity": 29.34,
+      "raw_qty": "29,34"
+    },
+    {
+      "page": 1,
+      "nr": "6",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Durų angų paruošimas beapvadinėms durims",
+      "unit": "b/m",
+      "quantity": 23.92,
+      "raw_qty": "23,92"
+    },
+    {
+      "page": 1,
+      "nr": "7",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Paslėptų durų staktų apdirbimas gipso\nkartonu bei glaistymas dažymas",
+      "unit": "b/m",
+      "quantity": 5.0,
+      "raw_qty": "5"
+    },
+    {
+      "page": 1,
+      "nr": "8",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Durų varčios dažymas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "9",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Angokraščių glaistymas dažymas",
+      "unit": "b/m",
+      "quantity": 23.8,
+      "raw_qty": "23,8"
+    },
+    {
+      "page": 1,
+      "nr": "10",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Moldingų dažymas",
+      "unit": "bv/m",
+      "quantity": 27.1,
+      "raw_qty": "27,1"
+    },
+    {
+      "page": 1,
+      "nr": "11",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Dažymo kampų montavimas",
+      "unit": "m",
+      "quantity": 329.77,
+      "raw_qty": "329,77"
+    },
+    {
+      "page": 1,
+      "nr": "12",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų led ptofilių apdirbimas",
+      "unit": "m",
+      "quantity": 5.5,
+      "raw_qty": "5,5"
+    },
+    {
+      "page": 1,
+      "nr": "13",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų gipsinių šviestuvų apdirbimas",
+      "unit": "vnt",
+      "quantity": 37.0,
+      "raw_qty": "37"
+    },
+    {
+      "page": 1,
+      "nr": "14",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Nišų iš GKP paslėptam led apšvietimui\nglaistymas dažymas",
+      "unit": "m",
+      "quantity": 34.54,
+      "raw_qty": "34,54"
+    },
+    {
+      "page": 1,
+      "nr": "15",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Lubų iš gipso kartono montavimas laiptinėje",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": null,
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Viso už skyrių",
+      "unit": null,
+      "quantity": null,
+      "raw_qty": null
+    }
+  ]
+}

@@ -82,6 +82,37 @@ export function getPolygonPdfRect(polygon, options) {
   return validRect(rect) ? rect : null;
 }
 
+// Fractional page coords (0–1, top-left origin) → rendered pixels.
+// room-graph rooms carry these (polygon_pct), NOT absolute PDF points. Accepts
+// {x_pct,y_pct} or [x,y]. NO Y-flip — Vision emits top-left, the canvas is
+// top-left; the math is the same as the working FillPolygonOverlay.
+export function getPolygonPctPoints(polygon, { renderedWidth, renderedHeight }) {
+  if (!Array.isArray(polygon) || polygon.length < 3 || !renderedWidth || !renderedHeight) {
+    return null;
+  }
+  const points = polygon.map((p) => {
+    const x = Array.isArray(p) ? p[0] : p?.x_pct;
+    const y = Array.isArray(p) ? p[1] : p?.y_pct;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return [x * renderedWidth, y * renderedHeight];
+  });
+  return points.every(Boolean) ? points : null;
+}
+
+export function getPolygonPctRect(polygon, options) {
+  const points = getPolygonPctPoints(polygon, options);
+  if (!points) return null;
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const rect = {
+    left: Math.min(...xs),
+    top: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+  return validRect(rect) ? rect : null;
+}
+
 export function getTextLabelRect(textItem, { roomNr = null, padding = 10 } = {}) {
   if (!textItem) return null;
   const text = String(textItem.str || '').trim();
@@ -107,6 +138,16 @@ export function getFocusedRoomRect({
 }) {
   if (!room || !renderedSize?.width || !renderedSize?.height) return null;
   const roomPage = room.page_nr ?? room.puslapio_nr;
+  // First priority: fractional polygon (room-graph rooms). This is the field
+  // that actually exists on saved patalpos; the polygon_pdf branch below only
+  // fires for click-to-fill responses.
+  if (roomPage === page && Array.isArray(room.polygon_pct) && room.polygon_pct.length >= 3) {
+    const rect = getPolygonPctRect(room.polygon_pct, {
+      renderedWidth: renderedSize.width,
+      renderedHeight: renderedSize.height,
+    });
+    if (rect) return { type: 'room', ...rect };
+  }
   if (roomPage === page && Array.isArray(room.polygon_pdf)) {
     const rect = getPolygonPdfRect(room.polygon_pdf, {
       pageWidthPdf: room.page_width_pdf || room.pdf_page_width || pdfSize?.width,

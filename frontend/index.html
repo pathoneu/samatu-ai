@@ -1,13 +1,89 @@
 <!doctype html>
-<html lang="lt">
+<html lang="lt" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sąmatų AI</title>
+    <meta name="theme-color" content="#15181E" />
+    <title>Pathon — statybų kiekiai iš brėžinių</title>
+    <meta name="description" content="Įkelk bet kokį statybų brėžinį — Pathon skaito interjero, fasadų, stogų ir konstrukcijų PDF, išmatuoja kiekius ir paruošia sąmatą Lietuvos formatu su 21% PVM." />
+    <link rel="canonical" href="https://pathon.eu/" />
+
+    <!-- Open Graph / social share -->
+    <meta property="og:site_name" content="Pathon" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://pathon.eu/" />
+    <meta property="og:title" content="Pathon — statybų kiekiai iš brėžinių" />
+    <meta property="og:description" content="Įkelk statybų PDF brėžinį — Pathon išmatuoja kiekius ir paruošia sąmatą Lietuvos formatu per kelias minutes. Kainas suvedi pats." />
+    <meta property="og:image" content="https://pathon.eu/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="lt_LT" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Pathon — statybų kiekiai iš brėžinių" />
+    <meta name="twitter:description" content="PDF brėžinys → kiekių žiniaraštis ir sąmata Lietuvos formatu per kelias minutes." />
+    <meta name="twitter:image" content="https://pathon.eu/og-image.png" />
+
+    <!-- Structured data: who we are + what the product is. Offers are added
+         only when public pricing goes live (visible-price match rule). -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://pathon.eu/#org",
+          "name": "Pathon",
+          "url": "https://pathon.eu/",
+          "logo": "https://pathon.eu/favicon.svg",
+          "email": "solutions@pathon.eu",
+          "areaServed": "LT",
+          "description": "Statybų kiekių ir sąmatų skaičiavimo platforma iš PDF brėžinių."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://pathon.eu/#website",
+          "url": "https://pathon.eu/",
+          "name": "Pathon",
+          "publisher": { "@id": "https://pathon.eu/#org" },
+          "inLanguage": ["lt", "en"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Pathon",
+          "url": "https://pathon.eu/",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "inLanguage": "lt",
+          "description": "Įkelkite statybos projekto PDF — Pathon atpažįsta patalpas ir elementus, apskaičiuoja kiekius pagal Lietuvos praktiką ir parengia kiekių žiniaraštį bei sąmatą su 21% PVM. Eksportas į Excel ir PDF.",
+          "publisher": { "@id": "https://pathon.eu/#org" },
+          "featureList": [
+            "Kiekių nuskaitymas iš PDF brėžinių",
+            "Deterministinės LT sąmatų formulės",
+            "Pasitikėjimo indikatoriai kiekvienam kiekiui",
+            "Prielaidų keitimas su akimirksniu perskaičiavimu",
+            "Eksportas į Excel ir PDF (LOKALINĖ SĄMATA)",
+            "Interaktyvūs matavimai PDF žiūryklėje"
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:640px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#e8e6e3;background:#15181E">
+        <h1>Pathon — statybų kiekiai iš brėžinių</h1>
+        <p>Įkelkite statybos projekto PDF brėžinį — Pathon atpažįsta patalpas ir
+        elementus, apskaičiuoja kiekius pagal Lietuvos praktiką ir parengia
+        kiekių žiniaraštį bei sąmatą su 21% PVM. Kainas suvedate patys;
+        eksportas į Excel ir PDF.</p>
+        <p>Šiai svetainei reikalingas JavaScript. Susisiekite:
+        <a href="mailto:solutions@pathon.eu" style="color:#F76B1C">solutions@pathon.eu</a></p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

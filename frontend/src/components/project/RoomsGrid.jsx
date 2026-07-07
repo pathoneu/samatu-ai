@@ -140,27 +140,27 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
   return (
     <div className="space-y-4">
       {/* Totals header */}
-      <div className="bg-gradient-to-r from-stone-100 to-stone-50 rounded-xl p-4 border border-stone-200">
+      <div className="bg-gradient-to-r from-muted to-muted/50 rounded-xl p-4 border border-border">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div>
-            <div className="text-stone-500 text-xs">Patalpų</div>
-            <div className="font-bold text-lg text-stone-800">{rooms.length}</div>
+            <div className="text-muted-foreground text-xs">Patalpų</div>
+            <div className="font-bold text-lg text-foreground">{rooms.length}</div>
           </div>
           <div>
-            <div className="text-stone-500 text-xs">Bendras plotas</div>
-            <div className="font-bold text-lg text-stone-800">
+            <div className="text-muted-foreground text-xs">Bendras plotas</div>
+            <div className="font-bold text-lg text-foreground">
               {totals.bendras_plotas_m2.toFixed(2)} m²
             </div>
           </div>
           <div>
-            <div className="text-stone-500 text-xs">Dažomas plotas</div>
-            <div className="font-bold text-lg text-amber-700">
+            <div className="text-muted-foreground text-xs">Dažomas plotas</div>
+            <div className="font-bold text-lg text-amber-400">
               {totals.dazymo_plotas_m2.toFixed(2)} m²
             </div>
           </div>
           <div>
-            <div className="text-stone-500 text-xs">Dažymo kampai</div>
-            <div className="font-bold text-lg text-orange-600">
+            <div className="text-muted-foreground text-xs">Dažymo kampai</div>
+            <div className="font-bold text-lg text-orange-400">
               {totals.kampai_m.toFixed(2)} m
             </div>
           </div>
@@ -182,49 +182,49 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
         ))}
         {/* Add card */}
         <button onClick={handleAdd}
-          className="border-2 border-dashed border-stone-300 rounded-xl p-6 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center justify-center gap-2 text-stone-500 hover:text-stone-700">
+          className="border-2 border-dashed border-border rounded-xl p-6 hover:border-primary/40 hover:bg-muted/60 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground">
           <Plus className="w-8 h-8" />
           <span className="text-sm font-medium">Pridėti patalpą</span>
         </button>
       </div>
 
       {/* Detalūs totals */}
-      <div className="bg-white border border-stone-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-stone-700 mb-3">Sumarinis kiekis</h3>
+      <div className="bg-card border border-border rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Sumarinis kiekis</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm">
           {totals.gkp_lubu_standart_m2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">GKP lubos (standart)</span>
+              <span className="text-muted-foreground">GKP lubos (standart)</span>
               <span className="font-medium">{totals.gkp_lubu_standart_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.gkp_lubu_virs_3m_m2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">GKP lubos (virš 3m)</span>
+              <span className="text-muted-foreground">GKP lubos (virš 3m)</span>
               <span className="font-medium">{totals.gkp_lubu_virs_3m_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.plyteles_sienos_m2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Plytelės sienose</span>
+              <span className="text-muted-foreground">Plytelės sienose</span>
               <span className="font-medium">{totals.plyteles_sienos_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.plyteles_grindys_m2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Plytelės grindyse</span>
+              <span className="text-muted-foreground">Plytelės grindyse</span>
               <span className="font-medium">{totals.plyteles_grindys_m2.toFixed(2)} m²</span>
             </div>
           )}
           {totals.grindjuostes_m > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Grindjuostės</span>
+              <span className="text-muted-foreground">Grindjuostės</span>
               <span className="font-medium">{totals.grindjuostes_m.toFixed(2)} m</span>
             </div>
           )}
           {totals.hidroizoliacijos_vnt > 0 && (
             <div className="flex justify-between">
-              <span className="text-stone-600">Hidroizoliacija</span>
+              <span className="text-muted-foreground">Hidroizoliacija</span>
               <span className="font-medium">{totals.hidroizoliacijos_vnt} vnt</span>
             </div>
           )}

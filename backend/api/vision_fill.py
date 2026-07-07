@@ -15,9 +15,20 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 import auth as _auth
+import db as _db
 
 router = APIRouter(prefix="/api", tags=["vision_fill"])
 log = logging.getLogger(__name__)
+
+
+def _require_project_ownership(user: dict, project_id: str) -> None:
+    """F3 (2026-07-04 pentest): vision-fill was authed but ran Vision against ANY
+    project_id, so a logged-in user could make another tenant's project pay for
+    (and leak crops from) a Vision call. Gate on ownership; admins bypass. A
+    missing/foreign project → 404 (do not leak existence)."""
+    user_filter = None if user.get("is_admin") else user["id"]
+    if _db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
 
 class VisionFillRequest(BaseModel):
@@ -57,8 +68,9 @@ def call_vision_for_polygon(
 @router.post("/vision-fill")
 def vision_fill(
     req: VisionFillRequest,
-    user: dict = Depends(_auth.require_user),
+    user: dict = Depends(_auth.require_billable_user),
 ) -> dict:
+    _require_project_ownership(user, req.project_id)
     try:
         result = call_vision_for_polygon(
             req.project_id, req.page_idx, req.click_xy_pct,

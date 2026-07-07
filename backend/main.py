@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 import logging
 import os
@@ -84,8 +84,12 @@ def _check_user_spend_cap(user_id: str | None) -> None:
     if not user_id:
         return
     try:
-        spend_24h, n_24h = db.user_recent_spend_eur(user_id, hours=24)
-        spend_1h, n_1h = db.user_recent_spend_eur(user_id, hours=1)
+        spend_24h, _ = db.user_usage_since(user_id, hours=24)
+        # Hourly cap counts only EXTRACTION events ('%extract%') — not every
+        # billable reservation (chat/vision_fill/lasso/symbols), which would
+        # otherwise trip an "extracts/hour" limit on light clicks. The EUR cap
+        # (spend_24h) still includes every reservation's pre-charge.
+        _, n_1h = db.user_usage_since(user_id, hours=1, kind_like="%extract%")
     except Exception:
         return  # never block on spend-check failure
     if _USER_DAILY_SPEND_CAP_EUR > 0 and spend_24h >= _USER_DAILY_SPEND_CAP_EUR:
@@ -105,6 +109,70 @@ def _check_user_spend_cap(user_id: str | None) -> None:
                 "Palaukite valandą."
             ),
         )
+
+
+def _check_user_quota(user_id: str | None) -> None:
+    """W3 billing: raise 402 when a logged-in user is over their plan's monthly
+    project quota. HARD no-op when BILLING_ENABLED != '1' (pre-billing
+    behavior) or when there is no user_id. Additive to _check_user_spend_cap —
+    it does not replace the € spend cap, which still runs regardless of flag."""
+    from billing.flag import billing_enabled
+    if not billing_enabled() or not user_id:
+        return
+    from billing.entitlements import quota_exceeded
+    user = db.get_user_by_id(user_id)
+    if user and quota_exceeded(user):
+        raise HTTPException(
+            status_code=402,
+            detail={"error": "quota_exceeded", "plan": user.get("plan"),
+                    "message": "Išnaudotas mėnesio projektų limitas. "
+                               "Atnaujinkite planą."},
+        )
+
+
+def _check_trial_gate(user_id: str | None) -> None:
+    """W3 billing (Phase 5): free-trial company-code anti-abuse gate.
+
+    HARD no-op when BILLING_ENABLED != '1' (pre-billing behavior) or no user_id.
+    Only gates FREE-plan users who are drawing their one-time trial slot:
+      - plan != 'free'        → no-op (trial only bounds the free tier).
+      - credits_balance > 0   → no-op (allowed via the purchased-credit path,
+                                not the trial).
+      - else (free, no credit): the company must be identified AND its trial
+        must still be available:
+          * missing company_code       → 403 company_code_required
+          * company_code but consumed   → 402 trial_used
+          * available                   → allow (do NOT consume here; the trial
+                                          is consumed on a SUCCESSFUL extraction
+                                          in the /extract-interior success path).
+    """
+    from billing.flag import billing_enabled
+    if not billing_enabled() or not user_id:
+        return
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return
+    if (user.get("plan") or "free") != "free":
+        return  # trial only gates free users
+    if db.credits_balance(user_id) > 0:
+        return  # a purchased credit covers this run — not a trial slot
+    company_code = user.get("company_code")
+    if not company_code:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "company_code_required",
+                    "message": "Nurodykite įmonės kodą, kad pradėtumėte "
+                               "nemokamą bandymą."},
+        )
+    from billing.trial import trial_available
+    if not trial_available(company_code):
+        raise HTTPException(
+            status_code=402,
+            detail={"error": "trial_used",
+                    "message": "Nemokamas bandymas jau panaudotas šiai "
+                               "įmonei. Įsigykite planą."},
+        )
+
 
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     """Sliding-window rate limit. Raises 429 on overflow.
@@ -139,6 +207,7 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
                      len(stale_keys), len(_RATE_BUCKET))
 import pdfplumber
 import anthropic
+from models_config import model_for
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4
@@ -150,15 +219,24 @@ from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Register Unicode-capable fonts for Lithuanian characters
-_ARIAL_PATH      = "/System/Library/Fonts/Supplemental/Arial.ttf"
-_ARIAL_BOLD_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+# Register a Unicode-capable font (Lithuanian glyphs ąčęėįšųūž) for PDF export.
+# DejaVu Sans (Bitstream Vera license — free to redistribute in closed-source) is
+# VENDORED in-repo so it works in every deployment. The previous code registered
+# fonts from hardcoded macOS paths (/System/Library/Fonts/...) that don't exist on
+# the Render Linux box, then silently fell back to glyph-less Helvetica — so every
+# production "komercinis pasiūlymas" PDF rendered ąčęėįšųūž as boxes. (2026-06-19)
+import os as _os_font
+_FONT_DIR = _os_font.path.join(_os_font.path.dirname(_os_font.path.abspath(__file__)), "assets", "fonts")
+_ARIAL_PATH      = _os_font.path.join(_FONT_DIR, "DejaVuSans.ttf")
+_ARIAL_BOLD_PATH = _os_font.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf")
 try:
     pdfmetrics.registerFont(TTFont("ArialUni",     _ARIAL_PATH))
     pdfmetrics.registerFont(TTFont("ArialUniBold", _ARIAL_BOLD_PATH))
     _FONT_NORMAL = "ArialUni"
     _FONT_BOLD   = "ArialUniBold"
-except Exception:
+except Exception as _font_exc:
+    print(f"[pdf] WARNING: could not register vendored Unicode font at {_FONT_DIR} "
+          f"({_font_exc!r}); falling back to Helvetica — Lithuanian characters will NOT render correctly")
     _FONT_NORMAL = "Helvetica"
     _FONT_BOLD   = "Helvetica-Bold"
 import json
@@ -183,18 +261,38 @@ from api.recompute_quantities import router as recompute_router
 from api.telemetry import router as telemetry_router
 from api.vision_fill import router as vision_fill_router
 from api.lasso_rerun import router as lasso_rerun_router
-# Week 5 Task 5.1 + 5.4 (canonical plan): per-quantity corrections + legends D4
-from api.corrections_v2 import router as corrections_v2_router
+# Week 5 Task 5.4 (canonical plan): legends D4
 from api.legends import router as legends_router
 # Week 7 (canonical plan): F2/F3 export + billing gate stub
 from api.exports_v2 import router as exports_v2_router
 from api.billing_v2 import router as billing_v2_router
+# Admin Dashboard v2 (2026-07-05): operational cockpit — analytics, cost monitor,
+# user management, system health, CSV export. Owner-authorized (require_admin);
+# ZERO Anthropic calls (pure aggregation over the existing DB).
+from api.admin_v2 import router as admin_v2_router
 # Audit re-run on saved project (2026-05-10): re-run cross_page_validator +
 # apply_lt_sanity without re-uploading the PDF, so post-fix warnings refresh.
 from api.revalidate import router as revalidate_router
 # Drawing analysis tools (W1-3 of 2026-05-10 plan): click-to-count +
 # magic-wand polygon suggestion + accept/reject training-data writer.
 from api.cv_tools import router as cv_tools_router
+# PDF Annotator persistence (Phase 7 prep). File-backed for now; swaps to a
+# real DB when the frontend ships.
+from api.annotations import router as annotations_router
+# Room-graph endpoint — feeds the Annotator's magic-wand polygon overlay.
+from api.room_graph import router as room_graph_router
+# Symbol detection — Vision pass returning point-symbols for the Annotator.
+from api.symbols import router as symbols_router
+# Project calibration — contractor enters known totals, system stores
+# per-project adjustment factors (never modifies the global formula).
+from api.calibrate import router as calibrate_router
+# Per-room recalc — fast pure-math endpoint feeding the Annotator's
+# per-wall edit and verify-all-rooms walkthrough.
+from api.room_recalc import router as room_recalc_router
+# Excel export — Two-sheet KŽ (AI + Patikslinta) via openpyxl.
+from api.export_excel import router as export_excel_router
+# Project stats — dashboard payload (counts, confidence, verification progress).
+from api.project_stats import router as project_stats_router
 
 load_dotenv()
 
@@ -203,11 +301,92 @@ _PDF_CACHE: dict[str, dict] = {}
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
-app = FastAPI()
+app = FastAPI(
+    title="Sąmatų AI Backend",
+    description=(
+        "Lithuanian construction takeoff API. Endpoints accept BOTH the "
+        "unprefixed `/api/...` path (legacy, supported indefinitely for "
+        "backward compatibility) AND the versioned `/api/v1/...` path "
+        "(canonical, used by the viewer rebuild). Both route to the same "
+        "handler — the v1 prefix is a path-rewrite, not a deployment split."
+    ),
+    version="1.0.0",
+)
+
+import backup_scheduler
+
+
+@app.on_event("startup")
+async def _startup_nightly_backup() -> None:
+    # Durable nightly SQLite snapshot → object storage. No-op unless enabled
+    # (prod / SAMATU_NIGHTLY_BACKUP); see backup_scheduler.is_enabled().
+    backup_scheduler.start()
+
+
+@app.on_event("shutdown")
+async def _shutdown_nightly_backup() -> None:
+    await backup_scheduler.stop()
+
 
 from starlette.middleware.sessions import SessionMiddleware
+
+
+# Task 4 (2026-06-01): canonical API versioning via path-rewrite middleware.
+# Every request to /api/v1/<rest> is internally rewritten to /api/<rest>,
+# so existing handlers serve both URLs without per-route changes. This
+# keeps the diff small while giving the viewer rebuild a stable v1
+# contract documented in docs/api_spec.json.
+@app.middleware("http")
+async def _api_v1_rewrite(request, call_next):
+    scope = request.scope
+    path = scope.get("path", "")
+    if path.startswith("/api/v1/"):
+        # Strip the /v1 segment so the unprefixed /api/<rest> handler matches.
+        new_path = "/api/" + path[len("/api/v1/"):]
+        scope["path"] = new_path
+        # Preserve raw_path so middleware downstream sees the rewrite consistently
+        raw = scope.get("raw_path")
+        if raw is not None:
+            scope["raw_path"] = new_path.encode("latin-1")
+    return await call_next(request)
 import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
+
+
+# Conservative per-call reservations (EUR) recorded BEFORE the Claude call so
+# every billable endpoint counts toward the spend cap and concurrent requests
+# can't outrun it (TOCTOU). extract-interior self-reports ACTUAL usage after the
+# call (db.record_usage), so it is excluded here to avoid double-counting.
+# 2026-06-19 bug-hunt: the cap previously only ever saw extract-interior actuals,
+# so it could never fire for /extract, /chat-project, /v9/symbols/*, facade/roof,
+# vision_fill/lasso/symbols — i.e. it was still dead for ~13 of 15 endpoints.
+# 2026-07-04: /chat-project now self-reports its ACTUAL usage after the call
+# (db.record_usage(kind="chat")), so — like /extract-interior — it must skip the
+# conservative pre-charge reservation to avoid double-counting.
+_SELF_METERED_PATHS = ("/extract-interior", "/chat-project")
+_RESERVE_EUR = (
+    ("/chat-project", 0.03),
+    ("/detect-type", 0.10),
+    ("/v9/symbols", 0.10),
+    ("/vision", 0.10),
+    ("/lasso", 0.10),
+    ("/extract", 0.30),   # /extract + facade/roof/earthworks/concrete
+)
+_RESERVE_DEFAULT_EUR = 0.15
+
+
+def _reserve_billable(user_id: str | None, path: str | None) -> None:
+    """Best-effort: record a conservative pre-charge for a billable call so the
+    spend cap covers this endpoint. No-op for anonymous or self-metered paths."""
+    if not user_id or not path:
+        return
+    if any(s in path for s in _SELF_METERED_PATHS):
+        return
+    est = next((eur for prefix, eur in _RESERVE_EUR if prefix in path), _RESERVE_DEFAULT_EUR)
+    try:
+        db.record_reservation(user_id, est, kind=f"reserve:{path}")
+    except Exception:
+        pass
 
 
 def _billable_user(request: Request) -> dict:
@@ -219,8 +398,18 @@ def _billable_user(request: Request) -> dict:
     enforces the cap consistently — call instead of `_auth.require_user`
     everywhere a request triggers a paid Claude call.
     """
+    # TODO(billing): this helper enforces ONLY the € spend cap + reservation. The
+    # project-quota + free-trial gate lives on the project-CREATING extraction
+    # (/extract-interior — the sole endpoint that increments the project counter),
+    # NOT here. When other extract types (/extract KŽ, facade/roof/earthworks/
+    # concrete, detect-type — call sites below) become billable PROJECTS, each
+    # needs the same _check_user_quota + _check_trial_gate gate AND a matching
+    # counter increment (db.record_extract_and_maybe_consume_credit) added
+    # alongside; their quota semantics are undefined for this interior MVP, so
+    # they are intentionally left un-gated for now.
     user = _auth.require_user(request)
     _check_user_spend_cap(user["id"])
+    _reserve_billable(user["id"], request.url.path)
     return user
 
 
@@ -315,12 +504,19 @@ app.include_router(recompute_router)
 app.include_router(telemetry_router)
 app.include_router(vision_fill_router)
 app.include_router(lasso_rerun_router)
-app.include_router(corrections_v2_router)
 app.include_router(legends_router)
 app.include_router(exports_v2_router)
 app.include_router(billing_v2_router)
+app.include_router(admin_v2_router)
 app.include_router(revalidate_router)
 app.include_router(cv_tools_router)
+app.include_router(annotations_router)
+app.include_router(room_graph_router)
+app.include_router(symbols_router)
+app.include_router(calibrate_router)
+app.include_router(room_recalc_router)
+app.include_router(export_excel_router)
+app.include_router(project_stats_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
@@ -332,19 +528,91 @@ class FrontendErrorPayload(BaseModel):
     user_agent: str | None = None
 
 
+# F7 (2026-07-04 pentest): bound the unauthenticated frontend error sink.
+_LOG_ERROR_MSG_CAP = 2 * 1024    # 2 KB
+_LOG_ERROR_STACK_CAP = 8 * 1024  # 8 KB
+# F8 (2026-07-04 pentest follow-up): cap the raw request body BEFORE buffering it.
+# A legit client error report = message (≤2 KB logged) + optional stack (≤8 KB
+# logged) + a few small string fields. 64 KB is generous headroom above any real
+# payload yet rejects the memory-amplification PoC (pentest accepted a 20 MB body
+# because FastAPI buffered + JSON-parsed it into the Pydantic model before our
+# truncation ran). This cap is SCOPED to /api/log-error only — the PDF upload
+# endpoints keep their own 200 MB limit (_validate_pdf_upload); no global cap.
+_LOG_ERROR_BODY_CAP = 64 * 1024  # 64 KB
+
+
+async def _read_body_capped(request: Request, cap: int) -> bytes:
+    """Read the request body but refuse to buffer more than `cap` bytes.
+
+    Rejects with 413 BEFORE the whole body is in memory. Content-Length is
+    checked first (fast path) but not trusted alone — it can be absent on
+    chunked transfers or spoofed, so the actual stream is also bounded: we stop
+    and raise as soon as the accumulated chunks exceed the cap.
+    """
+    # Fast reject on a declared oversize length (don't even start streaming).
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            if int(cl) > cap:
+                raise HTTPException(status_code=413, detail="Užklausa per didelė.")
+        except ValueError:
+            pass  # malformed header — fall through to the stream-level guard
+    # Stream-level guard: covers chunked / absent / spoofed Content-Length.
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > cap:
+            raise HTTPException(status_code=413, detail="Užklausa per didelė.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _strip_control_chars(s: str | None, cap: int) -> str:
+    """F7: neutralise log-injection. Strip CR/LF/other control chars (which let
+    an attacker forge extra log lines) and truncate to `cap` bytes so a single
+    POST can't flood the log file."""
+    if not s:
+        return ""
+    # Drop CR/LF and other C0 control chars except tab; collapse to spaces.
+    cleaned = "".join(" " if (ord(ch) < 32 and ch != "\t") else ch for ch in s)
+    if len(cleaned) > cap:
+        cleaned = cleaned[:cap] + "…[truncated]"
+    return cleaned
+
+
 @app.post("/api/log-error")
-async def log_frontend_error(payload: FrontendErrorPayload, request: Request):
+async def log_frontend_error(request: Request):
     """Frontend ErrorBoundary + manual try/catch can POST here.
     Lightweight error sink — production should swap for Sentry SDK.
+
+    Stays unauthenticated (the frontend must be able to report errors even before
+    login / when auth itself breaks) but is bounded: per-IP rate limit + a 64 KB
+    raw-body cap (F8) + length caps + control-char stripping so it can't be used
+    to flood the log file, inject forged log lines (F7), or amplify memory by
+    forcing us to buffer a huge body (F8, 2026-07-04 pentest follow-up).
+
+    The handler takes the raw Request (not a Pydantic body param) on purpose:
+    binding `payload: FrontendErrorPayload` would make FastAPI buffer + JSON-parse
+    the WHOLE body before our code runs, re-opening the memory-amplification hole.
+    We cap the raw read first, THEN parse.
     """
     client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, "log-error")  # 429 on overflow
+    # F8: reject oversized bodies BEFORE buffering the whole thing.
+    raw = await _read_body_capped(request, _LOG_ERROR_BODY_CAP)  # 413 on overflow
+    try:
+        payload = FrontendErrorPayload.model_validate_json(raw)
+    except Exception:
+        # Malformed JSON / wrong shape — generic 400, no parser detail leaked.
+        raise HTTPException(status_code=400, detail="Neteisingas užklausos formatas.")
     log.error(
         "[FRONTEND] component=%s url=%s ip=%s msg=%s\nstack: %s",
-        payload.component or "?",
-        payload.url or "?",
+        _strip_control_chars(payload.component or "?", 256),
+        _strip_control_chars(payload.url or "?", 512),
         client_ip,
-        payload.message,
-        (payload.stack or "")[:2000],
+        _strip_control_chars(payload.message, _LOG_ERROR_MSG_CAP),
+        _strip_control_chars(payload.stack, _LOG_ERROR_STACK_CAP),
     )
     return {"status": "ok", "logged": True}
 
@@ -399,6 +667,7 @@ async def api_register(payload: RegisterPayload, request: Request):
         is_admin=is_first,
     )
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_first)
     user.pop("password_hash", None)
     return {"user": user, "is_first_admin": is_first}
@@ -411,12 +680,19 @@ async def api_login(payload: LoginPayload, request: Request):
     email = _auth.validate_email(payload.email)
     user = db.get_user_by_email(email)
     if not user or not user.get("is_active"):
+        # N4 (2026-07-04 pentest, pass 2): the no-user path used to return here in
+        # ~1.4ms while the user-exists path spent ~168ms in bcrypt — a ~120×
+        # timing oracle that let an attacker enumerate registered emails. Pay the
+        # same bcrypt cost against a fixed dummy hash so both paths take ~equal
+        # time, then return the identical generic error.
+        _auth.dummy_verify_password(payload.password)
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
     if not _auth.verify_password(payload.password, user.get("password_hash", "")):
         log.warning("failed login: email=%s ip=%s", email,
                     request.client.host if request.client else "?")
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     user.pop("password_hash", None)
     return {"user": user}
@@ -424,6 +700,16 @@ async def api_login(payload: LoginPayload, request: Request):
 
 @app.post("/api/auth/logout")
 async def api_logout(request: Request):
+    # F2 (2026-07-04 pentest): clearing the browser cookie is not enough — the
+    # signed cookie value stays cryptographically valid for 30 days and replays.
+    # Bump the user's session_version so every outstanding cookie for this user
+    # (including one captured before logout) fails the require_user nonce check.
+    uid = request.session.get("user_id")
+    if uid:
+        try:
+            db.bump_session_version(uid)
+        except Exception:
+            log.exception("logout: failed to bump session_version for %s", uid)
     request.session.clear()
     return {"status": "logged_out"}
 
@@ -458,6 +744,13 @@ async def api_change_password(payload: PasswordChangePayload, request: Request):
     new_hash = _auth.hash_password(payload.new_password)
     with db._conn() as c:
         c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
+    # F2 (2026-07-04 pentest): a password change must invalidate every other
+    # outstanding session (e.g. a session on a stolen/old device). Bump the
+    # nonce so all existing cookies fail the require_user check, then re-stamp
+    # THIS request's session with the new version so the acting user stays
+    # logged in rather than being kicked out mid-flow.
+    new_sv = db.bump_session_version(user["id"])
+    request.session["sv"] = new_sv
     log.info("password changed for user_id=%s", user["id"])
     return {"status": "ok"}
 
@@ -465,13 +758,30 @@ async def api_change_password(payload: PasswordChangePayload, request: Request):
 class ProfileUpdatePayload(BaseModel):
     name: str | None = None
     company_name: str | None = None
+    # W3 billing Phase 5: LT įmonės kodas (+ optional PVM kodas). Required before
+    # a free user can consume the trial (the gate reads company_code) and is the
+    # invoice buyer identity. Omitting them leaves today's behavior unchanged.
+    company_code: str | None = None
+    pvm_code: str | None = None
 
 
 @app.put("/api/auth/profile")
 async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
     """Update user's display name + company. Email NOT changeable here
-    (would need verification flow)."""
+    (would need verification flow).
+
+    W3 billing: when a `company_code` is supplied it is validated + normalized
+    via billing.trial.normalize_company_code (400 on an invalid code) and
+    persisted (with the optional `pvm_code`). Omitting `company_code` leaves any
+    existing company_code untouched — it is never wiped by a name-only update."""
     user = _auth.require_user(request)
+    if payload.company_code is not None:
+        from billing.trial import normalize_company_code
+        try:
+            code = normalize_company_code(payload.company_code)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.set_user_company(user["id"], code, pvm_code=payload.pvm_code)
     with db._conn() as c:
         c.execute(
             "UPDATE users SET name = ?, company_name = ? WHERE id = ?",
@@ -499,6 +809,26 @@ async def api_google_oauth_status():
     return {"enabled": GOOGLE_OAUTH_ENABLED}
 
 
+def _safe_next_path(raw: str | None) -> str:
+    """Only allow a same-origin RELATIVE redirect target after OAuth, to block the
+    open-redirect via ?next=https://evil.example (2026-06-19 security hunt). Accept
+    a single-leading-slash path; reject absolute URLs, scheme-relative '//host',
+    backslash tricks, and anything carrying a scheme or netloc."""
+    if not raw or not isinstance(raw, str):
+        return "/"
+    raw = raw.strip()
+    if not raw.startswith("/") or raw.startswith("//") or raw.startswith("/\\") or raw.startswith("/%2f"):
+        return "/"
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(raw)
+        if p.scheme or p.netloc:
+            return "/"
+    except Exception:
+        return "/"
+    return raw
+
+
 @app.get("/api/auth/google")
 async def api_google_login(request: Request):
     """Start Google OAuth flow. Redirects to Google's consent screen."""
@@ -507,8 +837,9 @@ async def api_google_login(request: Request):
     import secrets
     state = secrets.token_urlsafe(24)
     request.session["google_oauth_state"] = state
-    # Capture intended redirect after success (default = "/")
-    next_url = request.query_params.get("next", "/")
+    # Capture intended redirect after success (default = "/"). Sanitize on store
+    # so only a same-origin relative path is ever persisted (open-redirect guard).
+    next_url = _safe_next_path(request.query_params.get("next", "/"))
     request.session["google_oauth_next"] = next_url
     params = {
         "client_id": GOOGLE_CLIENT_ID,
@@ -587,9 +918,19 @@ async def api_google_callback(request: Request, code: str | None = None,
                 email=email, google_sub=google_sub, name=name,
                 avatar_url=avatar, is_admin=is_first,
             )
+    # Admin-disable enforcement (2026-07-05): a deactivated account must not be
+    # able to mint a session via OAuth either. The password /api/auth/login path
+    # already rejects `is_active=0`, and get_current_user re-checks it on every
+    # request — but refuse here too so a disabled user is bounced at the login
+    # boundary (defense in depth) rather than getting a live-but-useless cookie.
+    if not user.get("is_active"):
+        return RedirectResponse(url="/login?oauth_error=account_disabled",
+                                status_code=302)
     request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
-    return RedirectResponse(url=next_url or "/", status_code=302)
+    # Re-sanitize on use (defense in depth) before redirecting.
+    return RedirectResponse(url=_safe_next_path(next_url), status_code=302)
 
 
 # ── Project endpoints (per-user isolation) ──────────────────────────────────
@@ -612,6 +953,49 @@ async def api_get_project(request: Request, project_id: str):
     if not p:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return p
+
+
+# ── Durable source-PDF storage (2026-06-21 durability track) ────────────────
+# The drawing used to live only in the uploader's browser (IndexedDB); a cache
+# clear / device switch / share link lost it. These persist + stream it back from
+# object storage (R2 in prod, local disk in dev). Owner-only.
+
+@app.post("/api/projects/{project_id}/pdf")
+async def api_put_project_pdf(request: Request, project_id: str,
+                              pdf_file: UploadFile = File(...)):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    data = await pdf_file.read()
+    # Light check — these bytes were already validated at extraction; here we only
+    # store them, so a magic + size guard is enough (no pdfplumber/page-count DoS
+    # surface, since nothing parses the file on this path).
+    if not data or not data[:5].startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Netinkamas PDF failas")
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Failas per didelis (max 200 MB)")
+    try:
+        from storage import get_storage, pdf_key
+        get_storage().put(pdf_key(project_id), data, "application/pdf")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pdf persist failed for %s: %r", project_id, exc)
+        raise HTTPException(status_code=502, detail="Nepavyko išsaugoti brėžinio")
+    return {"status": "ok", "size": len(data)}
+
+
+@app.get("/api/projects/{project_id}/pdf")
+async def api_get_project_pdf(request: Request, project_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    from storage import get_storage, pdf_key
+    data = get_storage().get(pdf_key(project_id))
+    if data is None:
+        raise HTTPException(status_code=404, detail="Brėžinys nerastas")
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{project_id}.pdf"'})
 
 
 @app.put("/api/projects/{project_id}")
@@ -824,21 +1208,34 @@ async def api_get_shared(token: str):
         db.increment_share_view(token)
     except Exception as exc:
         log.warning("share view counter bump failed: %s", exc)
-    data = project.get("data") or {}
-    # Strip cost / token-level metadata so viewers can't see API spend.
+    import copy as _copy
+    raw = project.get("data") or {}
+    vat_mode = raw.get("vat_mode") if isinstance(raw, dict) else None
+    # Deep-copy so we never mutate the cached project dict, then strip ALL
+    # owner-internal / debug fields. The old code only popped cost keys from
+    # _meta and returned the raw blob, leaking the owner's user_id (account UUID),
+    # _overrides, extraction internals and per-room traces to any link holder —
+    # contradicting this endpoint's own "strips owner-internal fields" docstring.
+    # (2026-06-19 deliverable hunt.)
+    data = _copy.deepcopy(raw) if isinstance(raw, dict) else {}
     if isinstance(data, dict):
-        meta = data.get("_meta")
-        if isinstance(meta, dict):
-            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
-                       "cache_write_tokens", "cost_eur", "zoom_input_tokens",
-                       "zoom_output_tokens"):
-                meta.pop(k, None)
+        for k in ("user_id", "_overrides", "_meta", "_material_specs",
+                  "_plyteliu_specs", "puslapiai", "_eksplikacija", "_door_types",
+                  "detected_symbols_summary", "v9_meta"):
+            data.pop(k, None)
+        for r in (data.get("patalpos") or []):
+            if isinstance(r, dict):
+                for k in ("calculation_trace", "_zoom", "_zoom_changes", "_vote",
+                          "polygon_pdf", "polygon_pct", "bbox_pct",
+                          "page_width_pdf", "page_height_pdf"):
+                    r.pop(k, None)
     return {
         "id": project["id"],
         "name": project.get("name"),
         "company_name": project.get("company_name"),
         "tipas": project.get("tipas"),
         "archetipas": project.get("archetipas"),
+        "vat_mode": vat_mode,
         "bendras_plotas_m2": project.get("bendras_plotas_m2"),
         "vat_rate": project.get("vat_rate"),
         "created_at": project.get("created_at"),
@@ -1607,15 +2004,15 @@ def _parse_eilutes(raw: str) -> list:
     return items
 
 
-# Model used for the Claude fallback extraction path.
-# Opus delivers the highest accuracy; override with the env var for cost/speed
-# trade-offs (e.g. EXTRACTION_MODEL=claude-haiku-4-5-20251001 for fast/cheap).
-EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "claude-opus-4-7")
+# Model for the Claude fallback extraction path resolves via
+# models_config.model_for("extraction") at CALL time — legacy EXTRACTION_MODEL
+# env still works (it slots into the resolution chain), as do MODEL_OVERRIDE
+# and SAMATU_MODEL_EXTRACTION.
 
 
 def _call_claude(prompt: str) -> str:
     msg = client.messages.create(
-        model=EXTRACTION_MODEL,
+        model=model_for("extraction"),
         max_tokens=8096,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -1667,6 +2064,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
         async with asyncio.timeout(900):  # 15 min – 65-page interior PDFs run ~9-10 min
 
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
 
             # ── Path 1: pdfplumber direct extraction ─────────────────────────
             try:
@@ -1694,8 +2092,20 @@ async def extract(request: Request, file: UploadFile = File(...)):
                 projektas, chunks = await asyncio.to_thread(
                     _pdf_to_chunks, contents
                 )
-            except Exception as e:
-                return {"error": f"PDF nepavyko nuskaityti: {type(e).__name__}: {e}"}
+            except HTTPException:
+                # N5 (2026-07-04 pentest, pass 2): same class as F5, sibling path.
+                # Let a real HTTP status propagate instead of masking it as a 200.
+                raise
+            except Exception:
+                # N5: do NOT echo the internal exception (type(e).__name__: {e}) —
+                # it leaked library internals like "PdfminerException: No /Root
+                # object!" in a 200 body. Log server-side; return a generic LT
+                # message with a proper 4xx (a PDF we can't parse is bad input).
+                log.exception("/extract Path-2 _pdf_to_chunks failed")
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF nepavyko nuskaityti. Patikrinkite, ar failas tinkamas.",
+                )
 
             if not chunks:
                 return {"error": "PDF tekstas nerastas — galbūt skanuotas vaizdas?"}
@@ -1774,21 +2184,32 @@ async def extract(request: Request, file: UploadFile = File(...)):
                     "chunks_processed": len(chunks),
                     "chunks_with_data": chunks_with_data,
                     "extraction_method": "claude",
-                    "extraction_model": EXTRACTION_MODEL,
+                    "extraction_model": model_for("extraction"),
                 },
             }
 
     except asyncio.TimeoutError:
         return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+    except HTTPException:
+        # F5 (2026-07-04 pentest): let the 400/413 raised by _validate_pdf_upload
+        # (invalid PDF, oversized upload) propagate as the real HTTP status
+        # instead of being swallowed by the broad catch below and returned as a
+        # 200 body. Re-raise BEFORE the generic handler.
+        raise
     except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+        # F5: do NOT echo the internal exception (type(e).__name__: {e}) to the
+        # client — it leaks stack/library internals. Log the detail server-side;
+        # return a generic Lithuanian message.
+        log.exception("/extract failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── Interior project extraction ───────────────────────────────────────────────
 
 import base64
 
-VISION_MODEL = os.getenv("VISION_MODEL", "claude-opus-4-7")
+# Vision model resolves via models_config.model_for("vision_pass1") at CALL
+# time — legacy VISION_MODEL env still works via the resolution chain.
 
 _INTERIOR_MARKERS = [
     "INTERJERO PROJEKTAS", "IŠKLOTINĖ", "IŠKLOTINIŲ",
@@ -2126,65 +2547,6 @@ def _extract_floor_materials(text: str) -> list[str]:
     return materials
 
 
-def _extract_interior_text(pdf_bytes: bytes) -> dict:
-    """
-    First pass: pdfplumber text extraction.
-    Returns: projektas, patalpos (room list), ceiling_heights,
-             floor_materials, page_types, pages_text, page_classifications.
-    """
-    result: dict = {
-        "projektas": "",
-        "patalpos": [],
-        "page_types": {},
-        "ceiling_heights": {},
-        "floor_materials": [],
-        "pages_text": {},
-        "page_classifications": [],  # Task 1: full classification list
-    }
-
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for i, page in enumerate(pdf.pages):
-            text = page.extract_text() or ""
-            pno = i + 1
-            result["pages_text"][pno] = text
-
-            pt, conf = _classify_page_with_confidence(text)
-            result["page_types"][pno] = pt
-            result["page_classifications"].append({
-                "page_number": pno,
-                "page_type":   pt,
-                "label_lt":    _PAGE_TYPE_LABELS_LT.get(pt, "Kita"),
-                "confidence":  conf,
-            })
-
-            # Project name from cover/first pages
-            if pno <= 3 and not result["projektas"]:
-                for line in text.splitlines():
-                    line = line.strip()
-                    if re.search(r'g\.\s*\d+|al\.\s*\d+|interjero\s+projektas', line, re.I):
-                        if 5 < len(line) < 80:
-                            result["projektas"] = line
-                            break
-
-            # Room list — try every page until found
-            if not result["patalpos"]:
-                rooms = _extract_eksplikacija(text)
-                if len(rooms) >= 3:   # need at least 3 rooms to trust extraction
-                    result["patalpos"] = rooms
-
-            # Ceiling heights
-            if pt == "lubų":
-                result["ceiling_heights"].update(_extract_ceiling_heights(text))
-
-            # Floor materials
-            if pt == "grindų":
-                mats = _extract_floor_materials(text)
-                if mats:
-                    result["floor_materials"] = mats
-
-    return result
-
-
 def _pdf_to_images(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
     """
     Convert each PDF page to a base64 JPEG string.
@@ -2205,7 +2567,7 @@ def _pdf_to_images(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
 def _call_vision(b64_image: str, prompt: str) -> str:
     """Send a base64 JPEG + prompt to Claude Vision. Returns raw text."""
     msg = client.messages.create(
-        model=VISION_MODEL,
+        model=model_for("vision_pass1"),
         max_tokens=4096,
         messages=[{
             "role": "user",
@@ -2397,7 +2759,10 @@ def _zone_category(ztype: str) -> str:
 
 
 _Q_RATES = {'Q1': 0.8, 'Q2': 1.0, 'Q3': 1.2, 'Q4': 1.5}
-_Q_THICK = {'Q1': 1.2, 'Q2': 1.25, 'Q3': 1.75, 'Q4': 2.5}
+# CLAUDE.md §1.11: Q4 = 3–5 mm full-surface skim (gloss/lacquer prep). Prior
+# value 2.5 mm under-ordered Q4 putty; set to mid-range 4 mm (2026-07-05).
+# Mirrors frontend/src/lib/interiorCalc.js Q_THICK.
+_Q_THICK = {'Q1': 1.2, 'Q2': 1.25, 'Q3': 1.75, 'Q4': 4}
 
 
 def _calculate_finishing_quantities(
@@ -2620,14 +2985,18 @@ def _calculate_finishing_quantities(
             for d in (meta.get("doors") or [])
             if nr in (d.get("between") or [])
         )
-        grindjuostes_m += max(0.0, perim_m - door_widths)
+        # CLAUDE.md §1.4: baseboard = perimeter − Σ(door_widths) + 10% waste.
+        # Mirrors frontend interiorCalc.js; applied once (2026-07-05).
+        grindjuostes_m += max(0.0, perim_m - door_widths) * 1.10
 
     # ── 7. ANGOKRAŠČIŲ PLOTAS (sienos_storis) ────────────────────────────────
     angokrasciai_area_m2 = round(angokrasciai_m * sienos_storis_m, 2)
 
     # ── 8. DAŽŲ KIEKIS (litrais) ─────────────────────────────────────────────
     dazymas_viso_m2  = paint_walls_m2 + lubos_m2
-    dazai_sienoms_l  = round(paint_walls_m2 * 2 / 9, 1)
+    # CLAUDE.md §1.10: for 2 coats multiply by 1.8× (not 2.0×) — first coat
+    # absorbs more, so two coats ≠ double the paint. Changed 2 → 1.8 (2026-07-05).
+    dazai_sienoms_l  = round(paint_walls_m2 * 1.8 / 9, 1)
     dazai_luboms_l   = round(lubos_m2 * 2 / 10, 1)
     gruntas_l        = round(dazymas_viso_m2 * 0.15, 1)
 
@@ -3204,6 +3573,7 @@ async def detect_type(request: Request, file: UploadFile = File(...)):
     """Quick peek — classify PDF as 'kz', 'interior', or 'unknown'."""
     _billable_user(request)
     contents = await file.read()
+    _validate_pdf_upload(contents, file.filename or "")
     proj_type = await asyncio.to_thread(_detect_project_type, contents)
     return {"type": proj_type}
 
@@ -3660,6 +4030,7 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3693,6 +4064,7 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3733,6 +4105,7 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3776,6 +4149,7 @@ async def extract_concrete(request: Request, file: UploadFile = File(...)):
     try:
         async with asyncio.timeout(900):
             contents = await file.read()
+            _validate_pdf_upload(contents, file.filename or "")
             projektas = ""
             with pdfplumber.open(io.BytesIO(contents)) as pdf:
                 projektas = _find_projektas((pdf.pages[0].extract_text() or "") if pdf.pages else "")
@@ -3832,6 +4206,13 @@ async def generate_excel(request: Request, data: dict):
     # to abuse (each call spins up openpyxl + heavy I/O).
     _auth.require_user(request)
     from datetime import date as _date
+    # P3 (2026-07-04 pentest, pass 3): this /generate-excel path writes user/AI
+    # text (imone, projektas, skyrius, nr, aprašymas, mato_vnt) straight into
+    # openpyxl cells. F6 (78041cd) neutralised the sibling api/export_excel.py +
+    # f2_export.py but missed THIS handler, so a leading = + - @ still lands as a
+    # live formula when the recipient opens the .xlsx. Wrap the text/label cells
+    # (never the numeric kiekis/kaina cells) with sanitize_spreadsheet_cell.
+    from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe_cell
 
     C_DARK   = "1F3864"
     C_MID    = "2E4D7B"
@@ -3854,6 +4235,21 @@ async def generate_excel(request: Request, data: dict):
     perspejimani = data.get("perspejimani") or []
     today_str    = _date.today().strftime("%Y-%m-%d")
 
+    # Branding + client fields (2026-06-19). Folded into the banner subtitle so
+    # the existing table layout (data starts row 3) is untouched.
+    _company_bits = [b for b in [
+        f"Įm. k.: {(data.get('imones_kodas') or '').strip()}" if (data.get('imones_kodas') or '').strip() else "",
+        f"PVM: {(data.get('pvm_kodas') or '').strip()}" if (data.get('pvm_kodas') or '').strip() else "",
+        (data.get('adresas') or '').strip(),
+        (data.get('telefonas') or '').strip(),
+        (data.get('el_pastas') or '').strip(),
+        f"IBAN: {(data.get('iban') or '').strip()}" if (data.get('iban') or '').strip() else "",
+    ] if b]
+    _client_bits = [b for b in [
+        f"Užsakovas: {(data.get('uzsakovas') or '').strip()}" if (data.get('uzsakovas') or '').strip() else "",
+        f"Objektas: {(data.get('objektas') or '').strip()}" if (data.get('objektas') or '').strip() else "",
+    ] if b]
+
     wb = openpyxl.Workbook()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -3867,15 +4263,18 @@ async def generate_excel(request: Request, data: dict):
         # 2026-05-06: prepend imone if set so the company appears in the
         # banner: 'UAB Statyba · Pasiūlymas · Projekto pavadinimas'.
         prefix = f"{imone}  ·  " if imone else ""
-        c.value     = f"{prefix}{title}  ·  {projektas}"
+        # P3: imone / projektas are user-supplied and can lead the banner cell —
+        # neutralise formula injection on the composed value.
+        c.value     = _safe_cell(f"{prefix}{title}  ·  {projektas}")
         c.font      = Font(bold=True, size=12, color="FFFFFF")
         c.fill      = PatternFill("solid", fgColor=C_DARK)
         c.alignment = Alignment(horizontal="left", vertical="center", indent=2)
         ws.row_dimensions[1].height = 26
 
-        ws.merge_cells("A2:D2")
-        ws["A2"].value = today_str
+        ws.merge_cells("A2:F2")
+        ws["A2"].value = "  ·  ".join([today_str, *_company_bits, *_client_bits])
         ws["A2"].font  = Font(size=8, color="888888")
+        ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=2)
         ws.row_dimensions[2].height = 14
 
         # Sprint §FIX-3 (2026-04-29): Conf. stulpelis pašalintas iš header'io
@@ -3903,18 +4302,46 @@ async def generate_excel(request: Request, data: dict):
     # Helper: write rows + totals block on a sheet starting at row `r`
     # Returns the next free row.
     # ─────────────────────────────────────────────────────────────────────────
-    def _write_rows(ws, rows: list[dict], start_row: int = 4) -> int:
+    def _write_rows(ws, rows: list[dict], start_row: int = 4,
+                    section_subtotals: bool = False) -> int:
+        # Section subtotals only make sense with >=2 sections, else the one
+        # "Skyriaus suma" just duplicates the grand total. (export step 4.)
+        _emit_sub = section_subtotals and len({
+            (e.get("skyrius") or "").strip()
+            for e in rows if (e.get("skyrius") or "").strip()}) >= 2
+
         current_section = None
+        section_start   = None
         data_row_idx    = 0
         r = start_row
+
+        def _section_subtotal(first, last):
+            nonlocal r
+            ws.merge_cells(f"A{r}:E{r}")
+            lc = ws[f"A{r}"]
+            lc.value     = "Skyriaus suma:"
+            lc.font      = Font(bold=True, size=9, color=C_MID)
+            lc.fill      = PatternFill("solid", fgColor=C_SEC)
+            lc.alignment = Alignment(horizontal="right", vertical="center")
+            lc.border    = border
+            vc = ws.cell(row=r, column=6, value=f"=SUBTOTAL(9,F{first}:F{last})")
+            vc.font      = Font(bold=True, size=9, color=C_MID)
+            vc.fill      = PatternFill("solid", fgColor=C_SEC)
+            vc.alignment = Alignment(horizontal="right", vertical="center")
+            vc.number_format = '#,##0.00 "€"'
+            vc.border    = border
+            ws.row_dimensions[r].height = 16
+            r += 1
 
         for e in rows:
             sec = (e.get("skyrius") or "").strip()
             if sec and sec != current_section:
+                if _emit_sub and section_start is not None and r > section_start:
+                    _section_subtotal(section_start, r - 1)
                 current_section = sec
                 ws.merge_cells(f"A{r}:F{r}")
                 sc = ws[f"A{r}"]
-                sc.value     = sec
+                sc.value     = _safe_cell(sec)  # P3: skyrius is AI/user text
                 sc.font      = Font(bold=True, size=9, color=C_MID)
                 sc.fill      = PatternFill("solid", fgColor=C_SEC)
                 sc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -3926,6 +4353,7 @@ async def generate_excel(request: Request, data: dict):
                 ws.row_dimensions[r].height = 16
                 r += 1
                 data_row_idx = 0
+                section_start = r
 
             bg   = "FFFFFF" if data_row_idx % 2 == 0 else C_GRAY
             fill = PatternFill("solid", fgColor=bg)
@@ -3946,16 +4374,23 @@ async def generate_excel(request: Request, data: dict):
                 (None,                    "right",  False),   # formula placeholder
             ], 1):
                 if col == 6:
-                    # Excel formula: Suma = Kiekis × Kaina
+                    # Excel formula: Suma = ROUND(Kiekis × Kaina, 2). The ROUND
+                    # makes SUM-of-lines equal the PDF total (which sums per-line
+                    # rounded sumas), so the same project's Excel and PDF show the
+                    # identical Suma be PVM / VISO. (2026-06-19 hunt.)
                     fc = ws.cell(row=r, column=6)
-                    fc.value        = f"=D{r}*E{r}"
+                    fc.value        = f"=ROUND(D{r}*E{r},2)"
                     fc.fill         = fill
                     fc.border       = border
                     fc.alignment    = Alignment(horizontal="right", vertical="center")
                     fc.number_format = "#,##0.00"
                     fc.font         = Font(bold=True, color=C_GREEN)
                 else:
-                    c = ws.cell(row=r, column=col, value=val)
+                    # P3: cols 1-3 are user/AI text (nr, aprašymas, mato_vnt) —
+                    # neutralise formula injection; cols 4-5 (kiekis, kaina) stay
+                    # numeric and MUST NOT be quoted.
+                    cell_val = _safe_cell(val) if col in (1, 2, 3) else val
+                    c = ws.cell(row=r, column=col, value=cell_val)
                     c.fill      = fill
                     c.border    = border
                     c.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
@@ -3965,14 +4400,23 @@ async def generate_excel(request: Request, data: dict):
             r += 1
             data_row_idx += 1
 
+        if _emit_sub and section_start is not None and r > section_start:
+            _section_subtotal(section_start, r - 1)
+
         return r
+
+    # Reverse-VAT (renovacija) — no output VAT line; VISO equals the be-PVM sum.
+    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
+                    or str(data.get("archetipas") or "").lower() == "renovacija")
 
     def _write_totals(ws, rows: list[dict], r: int):
         ws.row_dimensions[r].height = 6
         r += 1
 
         data_start = 4
-        data_end   = r - 2  # last data row
+        # Clamp so an empty sąmata (no data rows) can't produce an inverted
+        # range like =SUBTOTAL(9,F4:F3), which Excel rejects. (audit 2026-07-05)
+        data_end   = max(data_start, r - 2)  # last data row
 
         def _tot(sheet_row, label, formula_or_val, lcolor="444444", vcolor="444444",
                  fsize=10, top=False):
@@ -3993,20 +4437,35 @@ async def generate_excel(request: Request, data: dict):
             vc.border       = Border(left=thin, right=thin, top=tb, bottom=thin)
             ws.row_dimensions[sheet_row].height = 20 if fsize <= 10 else 24
 
-        sum_formula = f"=SUM(F{data_start}:F{data_end})"
+        # SUBTOTAL(9) ignores nested SUBTOTAL cells, so the grand total skips the
+        # per-section "Skyriaus suma" rows and never double-counts. (export step 4.)
+        sum_formula = f"=SUBTOTAL(9,F{data_start}:F{data_end})"
 
         _tot(r,     "Suma be PVM:",  sum_formula,                  top=True)
-        _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
-        _tot(r + 2, "VISO su PVM:",  f"=F{r}+F{r+1}",
-             lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
+        if _reverse_vat:
+            _tot(r + 1, "VISO (be PVM):", f"=F{r}",
+                 lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
+        else:
+            _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
+            _tot(r + 2, "VISO su PVM:",  f"=F{r}+F{r+1}",
+                 lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Sheet 1: Sąmata (full combined list)
     # ─────────────────────────────────────────────────────────────────────────
+    # Normalize skyrius to canonical BEFORE writing the combined sheet, so its
+    # section headers match the per-section tab names. (2026-06-19 hunt: the
+    # normalization ran AFTER the main sheet, so legacy projects showed one
+    # section under two different names across the workbook.)
+    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION as _SKYRIUS_MIG
+    for e in eilutes:
+        _sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
+        e["skyrius"] = _SKYRIUS_MIG.get(_sec_raw, _sec_raw)
+
     ws_main = wb.active
     ws_main.title = "Sąmata"
     _write_sheet_header(ws_main, "SĄMATA")
-    last_r = _write_rows(ws_main, eilutes, start_row=4)
+    last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True)
     _write_totals(ws_main, eilutes, last_r)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -4016,11 +4475,11 @@ async def generate_excel(request: Request, data: dict):
     # "Glaistymas dazymas", etc.) collapse into one canonical sheet.
     # ─────────────────────────────────────────────────────────────────────────
     from collections import OrderedDict
-    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION
+    # (SKYRIUS_LEGACY_MIGRATION already imported above as _SKYRIUS_MIG.)
     sections: dict[str, list] = OrderedDict()
     for e in eilutes:
         sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        sec = SKYRIUS_LEGACY_MIGRATION.get(sec_raw, sec_raw)
+        sec = _SKYRIUS_MIG.get(sec_raw, sec_raw)
         # Mutate the row's skyrius to canonical so the section header in
         # _write_rows shows the normalized name too.
         e["skyrius"] = sec
@@ -4040,7 +4499,7 @@ async def generate_excel(request: Request, data: dict):
         ws_pr = wb.create_sheet(title="Prielaidos")
         ws_pr.merge_cells("A1:C1")
         t = ws_pr["A1"]
-        t.value     = f"Prielaidos  ·  {projektas}"
+        t.value     = _safe_cell(f"Prielaidos  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor=C_DARK)
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4080,7 +4539,7 @@ async def generate_excel(request: Request, data: dict):
         ws_pat = wb.create_sheet(title="Patalpos")
         ws_pat.merge_cells("A1:D1")
         t = ws_pat["A1"]
-        t.value     = f"Patalpos  ·  {projektas}"
+        t.value     = _safe_cell(f"Patalpos  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor=C_DARK)
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4106,7 +4565,7 @@ async def generate_excel(request: Request, data: dict):
                 room.get("plotas_m2"),
                 h_str,
             ], 1):
-                c = ws_pat.cell(row=ri, column=ci, value=val)
+                c = ws_pat.cell(row=ri, column=ci, value=_safe_cell(val) if isinstance(val, str) else val)
                 c.fill   = fill
                 c.border = border
                 c.font   = Font(size=9)
@@ -4121,7 +4580,7 @@ async def generate_excel(request: Request, data: dict):
         ws_past = wb.create_sheet(title="Pastabos")
         ws_past.merge_cells("A1:C1")
         t = ws_past["A1"]
-        t.value     = f"Nepamirškite patikrinti  ·  {projektas}"
+        t.value     = _safe_cell(f"Nepamirškite patikrinti  ·  {projektas}")
         t.font      = Font(bold=True, size=11, color="FFFFFF")
         t.fill      = PatternFill("solid", fgColor="B45309")  # amber
         t.alignment = Alignment(horizontal="left", vertical="center", indent=2)
@@ -4140,7 +4599,7 @@ async def generate_excel(request: Request, data: dict):
         for ri, w in enumerate(perspejimani, 3):
             fill = PatternFill("solid", fgColor="FFFBEB" if ri % 2 == 1 else "FEF3C7")
             for ci, val in enumerate([ri - 2, w.get("tekstas", ""), w.get("kategorija", "")], 1):
-                c = ws_past.cell(row=ri, column=ci, value=val)
+                c = ws_past.cell(row=ri, column=ci, value=_safe_cell(val) if isinstance(val, str) else val)
                 c.fill   = fill
                 c.border = border
                 c.font   = Font(size=9)
@@ -4167,15 +4626,17 @@ async def generate_pdf(request: Request, data: dict):
     from reportlab.lib.units import mm
     from reportlab.pdfgen.canvas import Canvas as _RLCanvas
 
-    DARK   = colors.HexColor("#1F3864")
-    MID    = colors.HexColor("#2E4D7B")
-    SEC_BG = colors.HexColor("#D6E4F0")
-    SEC_FG = colors.HexColor("#1F3864")
-    ORANGE = colors.HexColor("#E67E22")
-    LGRAY  = colors.HexColor("#F5F5F5")
-    GREEN  = colors.HexColor("#1A7F37")
-    TOTBG  = colors.HexColor("#FFF8F0")
-    GRID_C = colors.HexColor("#DDDDDD")
+    # Plain greyscale palette — a construction pasiūlymas, not a marketing flyer.
+    # (2026-06-29 redesign: dropped the navy/orange after contractor feedback.)
+    DARK   = colors.HexColor("#333333")
+    MID    = colors.HexColor("#555555")
+    SEC_BG = colors.HexColor("#ECECEC")
+    SEC_FG = colors.HexColor("#222222")
+    ORANGE = colors.HexColor("#222222")
+    LGRAY  = colors.HexColor("#F7F7F7")
+    GREEN  = colors.HexColor("#222222")
+    TOTBG  = colors.HexColor("#F2F2F2")
+    GRID_C = colors.HexColor("#BBBBBB")
 
     PAGE_W = A4[0] - 3 * cm   # usable width
 
@@ -4225,18 +4686,73 @@ async def generate_pdf(request: Request, data: dict):
     b_r = ParagraphStyle("br", fontName=_FONT_BOLD,   fontSize=8,  leading=10, alignment=TA_RIGHT)
     b_c = ParagraphStyle("bc", fontName=_FONT_BOLD,   fontSize=8,  leading=10, alignment=TA_CENTER)
 
+    # N3 (2026-07-04 pentest, pass 2): reportlab Paragraph() parses an XML-ish
+    # mini-markup, so any user/AI-controlled string fed in raw is an injection
+    # vector — `<a href="http://evil">x</a>` becomes a LIVE PDF link (phishing,
+    # and these strings can be AI-extracted from an untrusted drawing), and
+    # malformed markup (`<unclosed & tag`) throws inside doc.build() → HTTP 500.
+    # Escape every user/AI string with xml.sax.saxutils.escape before it reaches
+    # a Paragraph. Escaping at extraction covers both header and table renders.
+    from xml.sax.saxutils import escape as _xml_escape
+
+    def _esc(v) -> str:
+        return _xml_escape(str(v)) if v is not None else ""
+
     from datetime import date as _date
     projektas    = data.get("projektas", "Projektas")
-    imone        = (data.get("imone") or data.get("company_name") or "").strip()
+    imone        = _esc((data.get("imone") or data.get("company_name") or "").strip())
     doc_date     = _date.today().strftime("%Y-%m-%d")
     eilutes      = data.get("eilutes", [])
+    # Backfill a missing `suma` from kiekis×kaina so the PDF total, the section
+    # subtotals and the printed line amounts all agree — and never diverge from
+    # the Excel export, which always computes kiekis×kaina. (audit 2026-07-05)
+    for _e in eilutes:
+        if _e.get("suma") is None and _e.get("kaina") is not None:
+            _e["suma"] = round((float(_e.get("kiekis") or 0)) * (float(_e.get("kaina") or 0)), 2)
     prielaidos   = data.get("prielaidos") or {}
     perspejimani = data.get("perspejimani") or []
     tipas_pdf    = data.get("tipas", "kz")
-    viso_be_pvm  = sum(e.get("suma", 0) for e in eilutes)
-    pvm          = round(viso_be_pvm * 0.21, 2)
-    viso_su_pvm  = round(viso_be_pvm + pvm, 2)
-    doc_title    = "VIDAUS APDAILOS KIEKIAI" if tipas_pdf == "interjeras" else "KIEKIŲ ŽINIARAŠTIS"
+    # Sum the per-line sumas ROUNDED to the cent (each line prints rounded), so
+    # the document total always equals the sum of the printed line amounts — a
+    # contractor adding the rows by hand gets the same number. (2026-06-19 hunt:
+    # summing the raw floats could drift a cent from the visible lines.)
+    viso_be_pvm  = round(sum(round(e.get("suma", 0) or 0, 2) for e in eilutes), 2)
+    # Reverse-VAT (atvirkštinis PVM) for renovation/modernizavimas: the contractor
+    # must NOT add output VAT — the užsakovas self-accounts (PVMĮ 96 str.). Charging
+    # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
+    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
+                    or str(data.get("archetipas") or "").lower() == "renovacija")
+    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
+    viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
+    # A priced export is a LOKALINĖ SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by
+    # definition carries no prices, so that title over Kaina/Suma columns + a VISO
+    # su PVM total is self-contradicting. Title by content. (export step 1.)
+    _has_prices  = any((e.get("kaina") or 0) or (e.get("suma") or 0) for e in eilutes)
+    if _has_prices:
+        doc_title = "LOKALINĖ SĄMATA"
+    elif tipas_pdf == "interjeras":
+        doc_title = "VIDAUS APDAILOS KIEKIAI"
+    else:
+        doc_title = "KIEKIŲ ŽINIARAŠTIS"
+
+    # Branding + business-document fields (2026-06-19). All optional — KŽ exports
+    # without branding render exactly as before (the info block is skipped).
+    # company_logo is a base64 image (decoded, not rendered as markup) — leave
+    # raw. Every other field below is rendered inside a Paragraph → escape (N3).
+    company_logo = (data.get("company_logo") or "").strip()
+    imones_kodas = _esc((data.get("imones_kodas") or "").strip())
+    pvm_kodas    = _esc((data.get("pvm_kodas") or "").strip())
+    adresas      = _esc((data.get("adresas") or "").strip())
+    telefonas    = _esc((data.get("telefonas") or "").strip())
+    el_pastas    = _esc((data.get("el_pastas") or "").strip())
+    iban         = _esc((data.get("iban") or "").strip())
+    uzsakovas    = _esc((data.get("uzsakovas") or "").strip())
+    objektas     = _esc((data.get("objektas") or "").strip())
+    pasiulymo_nr = _esc((data.get("pasiulymo_nr") or "").strip())
+    galioja_iki  = _esc((data.get("galioja_iki") or "").strip())
+    if not galioja_iki:
+        from datetime import timedelta as _timedelta
+        galioja_iki = (_date.today() + _timedelta(days=30)).strftime("%Y-%m-%d")
 
     def _n(v):
         if not isinstance(v, (int, float)):
@@ -4245,73 +4761,101 @@ async def generate_pdf(request: Request, data: dict):
 
     story = []
 
-    # ── Logo + header bar ─────────────────────────────────────────────────────
-    logo_style = ParagraphStyle(
-        "logo_ph", fontName=_FONT_NORMAL, fontSize=8,
-        textColor=colors.HexColor("#888888"), alignment=TA_CENTER,
-    )
-    title_style = ParagraphStyle(
-        "htitle", fontName=_FONT_BOLD, fontSize=18,
-        textColor=colors.white, leading=22,
-    )
-    sub_style = ParagraphStyle(
-        "hsub", fontName=_FONT_NORMAL, fontSize=8,
-        textColor=colors.HexColor("#BBCCDD"), leading=11,
-    )
+    def _logo_flowable(b64, max_w=3.5 * cm, max_h=2.0 * cm):
+        """Decode a base64 (optionally data-URL) logo into a scaled ReportLab
+        Image. Returns None on any failure so the header falls back gracefully."""
+        if not b64:
+            return None
+        try:
+            import base64 as _b64, io as _io
+            from reportlab.platypus import Image as _RLImage
+            from reportlab.lib.utils import ImageReader as _ImageReader
+            raw = b64.split(",", 1)[1] if (b64.strip().lower().startswith("data:") and "," in b64) else b64
+            data_bytes = _b64.b64decode(raw)
+            iw, ih = _ImageReader(_io.BytesIO(data_bytes)).getSize()
+            if not iw or not ih:
+                return None
+            scale = min(max_w / iw, max_h / ih)
+            img = _RLImage(_io.BytesIO(data_bytes), width=iw * scale, height=ih * scale)
+            img.hAlign = "LEFT"
+            return img
+        except Exception:
+            return None
 
-    # Task 8: Cover page title from doc_title
-    # Logo placeholder box
-    logo_box = Table(
-        [[Paragraph("ĮMONĖS\nLOGOTIPAS", logo_style)]],
-        colWidths=[3.5*cm], rowHeights=[2.0*cm],
-    )
-    logo_box.setStyle(TableStyle([
-        ("BOX",         (0,0), (-1,-1), 1, colors.HexColor("#AAAAAA")),
-        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
-        ("BACKGROUND",  (0,0), (-1,-1), colors.HexColor("#F0F0F0")),
-        ("TOPPADDING",  (0,0), (-1,-1), 4),
-        ("BOTTOMPADDING",(0,0),(-1,-1), 4),
-    ]))
+    # ── Simple plain header (no colored banner): company identity left, offer
+    #    metadata right, thin rule under. (2026-06-29 redesign.) ───────────────
+    _co_name  = ParagraphStyle("co_name", fontName=_FONT_BOLD, fontSize=13,
+                               textColor=colors.black, leading=16)
+    _co_small = ParagraphStyle("co_small", fontName=_FONT_NORMAL, fontSize=8,
+                               textColor=colors.HexColor("#555555"), leading=11)
+    _meta_r   = ParagraphStyle("meta_r", fontName=_FONT_NORMAL, fontSize=8.5,
+                               textColor=colors.HexColor("#333333"), leading=13,
+                               alignment=TA_RIGHT)
 
-    # 2026-05-06: surface company name in header sub-line if provided.
-    header_sub = f"{imone} · {projektas} · {doc_date}" if imone else f"{projektas} · Sąmatų AI · {doc_date}"
-    title_block = Table(
-        [[Paragraph(doc_title, title_style)],
-         [Paragraph(header_sub, sub_style)]],
-        colWidths=[PAGE_W - 4*cm],
-    )
-    title_block.setStyle(TableStyle([
-        ("BACKGROUND",   (0,0), (-1,-1), DARK),
-        ("LEFTPADDING",  (0,0), (-1,-1), 14),
-        ("RIGHTPADDING", (0,0), (-1,-1), 14),
-        ("TOPPADDING",   (0,0), (0, 0),  12),
-        ("BOTTOMPADDING",(0,-1),(-1,-1), 12),
-        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
-    ]))
+    _atstovas = _esc((data.get("vadovas") or data.get("atstovas")
+                      or data.get("kontaktinis_asmuo") or "").strip())
+
+    # Left identity cell: logo (if uploaded) -> company name -> person + contacts.
+    _logo_img = _logo_flowable(company_logo)
+    _ident = []
+    if _logo_img is not None:
+        _ident.append(_logo_img)
+    if imone:
+        _ident.append(Paragraph(imone, _co_name))
+    if _atstovas:
+        _ident.append(Paragraph(_atstovas, _co_small))
+    _id_contacts = [b for b in [
+        telefonas, el_pastas,
+        (f"Įm. k. {imones_kodas}" if imones_kodas else ""),
+        (f"PVM {pvm_kodas}" if pvm_kodas else ""),
+    ] if b]
+    if _id_contacts:
+        _ident.append(Paragraph("  ·  ".join(_id_contacts), _co_small))
+    if not _ident:
+        _ident = [Paragraph("", _co_small)]
+
+    # Right metadata cell: small doc-type label + data / nr / galioja iki.
+    _meta_cell = [Paragraph(f"Data: {doc_date}", _meta_r)]
+    if pasiulymo_nr:
+        _meta_cell.append(Paragraph(f"Pasiūlymo nr.: {pasiulymo_nr}", _meta_r))
+    _meta_cell.append(Paragraph(f"Galioja iki: {galioja_iki}", _meta_r))
 
     header_row = Table(
-        [[logo_box, title_block]],
-        colWidths=[3.8*cm, PAGE_W - 3.8*cm],
+        [[_ident, _meta_cell]],
+        colWidths=[PAGE_W * 0.58, PAGE_W * 0.42],
     )
     header_row.setStyle(TableStyle([
-        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+        ("VALIGN",       (0,0), (-1,-1), "TOP"),
         ("LEFTPADDING",  (0,0), (-1,-1), 0),
         ("RIGHTPADDING", (0,0), (-1,-1), 0),
         ("TOPPADDING",   (0,0), (-1,-1), 0),
         ("BOTTOMPADDING",(0,0), (-1,-1), 0),
-        ("BACKGROUND",   (1,0), (1, 0),  DARK),
     ]))
     story.append(header_row)
-    story.append(Spacer(1, 0.5*cm))
+    story.append(Spacer(1, 0.15*cm))
+    story.append(HRFlowable(width="100%", thickness=0.8,
+                            color=colors.HexColor("#999999"),
+                            spaceBefore=2, spaceAfter=2))
+    story.append(Spacer(1, 0.3*cm))
 
-    # ── Project name ──────────────────────────────────────────────────────────
-    story.append(Paragraph(projektas, ParagraphStyle(
-        "pname", fontName=_FONT_BOLD, fontSize=11, textColor=DARK, leading=15,
+    # ── Who it's FOR (contractor identity is now in the top header) ───────────
+    _ival = ParagraphStyle("ival", fontName=_FONT_NORMAL, fontSize=9,
+                           textColor=colors.HexColor("#222222"), leading=13)
+    _for_bits = [b for b in [
+        (f'<font color="#888888">Užsakovas:</font> {uzsakovas}' if uzsakovas else ""),
+    ] if b]
+    if _for_bits:
+        story.append(Paragraph("&nbsp;&nbsp;&nbsp;&nbsp;".join(_for_bits), _ival))
+        story.append(Spacer(1, 0.3*cm))
+
+    # ── Heading ───────────────────────────────────────────────────────────────
+    story.append(Paragraph("Pasiūlymas", ParagraphStyle(
+        "pname", fontName=_FONT_BOLD, fontSize=15, textColor=DARK, leading=19,
     )))
     story.append(Spacer(1, 0.4*cm))
 
     # ── Table ─────────────────────────────────────────────────────────────────
-    COL_W = [1.1*cm, 8.8*cm, 1.5*cm, 1.8*cm, 2.0*cm, 2.2*cm]
+    COL_W = [1.1*cm, 8.3*cm, 1.5*cm, 1.7*cm, 2.0*cm, 2.7*cm]
 
     hdr_l = ParagraphStyle("hl", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white)
     hdr_c = ParagraphStyle("hc", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white, alignment=TA_CENTER)
@@ -4335,18 +4879,49 @@ async def generate_pdf(request: Request, data: dict):
         ("BOTTOMPADDING",(0,0), (-1,0), 6),
     ]
 
+    # Per-section subtotals: only when priced AND there are ≥2 sections, else a
+    # "Skyriaus suma" equals the grand total and just adds noise. (export step 4.)
+    _distinct_sections = len({(e.get("skyrius") or "").strip()
+                              for e in eilutes if (e.get("skyrius") or "").strip()})
+    _show_section_subtotals = _has_prices and _distinct_sections >= 2
+
     current_section = None
     data_idx        = 0   # for alternating rows
+    _section_sum    = 0.0
+    _section_rows   = False
+
+    def _emit_pdf_subtotal():
+        nonlocal _section_sum, _section_rows
+        sri = len(table_data)
+        table_data.append([
+            Paragraph("Skyriaus suma:", b_r),
+            "", "", "", "",
+            Paragraph(_n(round(_section_sum, 2)) + " €", b_r),
+        ])
+        style_cmds.extend([
+            ("SPAN",         (0, sri), (4, sri)),
+            ("BACKGROUND",   (0, sri), (-1, sri), SEC_BG),
+            ("TOPPADDING",   (0, sri), (-1, sri), 4),
+            ("BOTTOMPADDING",(0, sri), (-1, sri), 4),
+            ("LINEABOVE",    (0, sri), (-1, sri), 0.5, MID),
+            ("TEXTCOLOR",    (4, sri), (-1, sri), SEC_FG),
+        ])
+        _section_sum  = 0.0
+        _section_rows = False
 
     for e in eilutes:
         sec = (e.get("skyrius") or "").strip()
-        ri  = len(table_data)
 
         # Section header row
         if sec and sec != current_section:
+            if _show_section_subtotals and current_section is not None and _section_rows:
+                _emit_pdf_subtotal()
+            _section_sum  = 0.0
+            _section_rows = False
             current_section = sec
+            ri = len(table_data)
             table_data.append([
-                Paragraph(sec, ParagraphStyle(
+                Paragraph(_esc(sec), ParagraphStyle(  # N3: section name is user/AI text
                     "sec", fontName=_FONT_BOLD, fontSize=8,
                     textColor=SEC_FG,
                 )),
@@ -4366,9 +4941,9 @@ async def generate_pdf(request: Request, data: dict):
         bg = colors.white if data_idx % 2 == 0 else LGRAY
         suma_val = e.get("suma", 0)
         table_data.append([
-            Paragraph(str(e.get("nr",        "")), n_),
-            Paragraph(str(e.get("aprasymas", "")), n_),
-            Paragraph(str(e.get("mato_vnt",  "")), n_c),
+            Paragraph(_esc(e.get("nr",        "")), n_),   # N3: escape user/AI row text
+            Paragraph(_esc(e.get("aprasymas", "")), n_),
+            Paragraph(_esc(e.get("mato_vnt",  "")), n_c),
             Paragraph(_n(e.get("kiekis", 0)),       n_r),
             Paragraph(_n(e.get("kaina",  0)),       n_r),
             Paragraph(_n(suma_val),
@@ -4382,11 +4957,25 @@ async def generate_pdf(request: Request, data: dict):
         ]
         if isinstance(suma_val, (int, float)) and suma_val > 0:
             style_cmds.append(("TEXTCOLOR", (5, ri), (5, ri), GREEN))
+            _section_sum += suma_val
+        _section_rows = True
         data_idx += 1
+
+    # final section subtotal
+    if _show_section_subtotals and _section_rows:
+        _emit_pdf_subtotal()
 
     n_data_rows = len(table_data)
 
     # ── Totals ────────────────────────────────────────────────────────────────
+    totals_data: list = []
+    totals_style: list = [
+        ("FONTSIZE",     (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+    ]
+
     def tot_row(label, value, bold=False, orange=False):
         ls = ParagraphStyle("tl",
             fontName=_FONT_BOLD, fontSize=9 if not bold else 11,
@@ -4398,21 +4987,24 @@ async def generate_pdf(request: Request, data: dict):
             textColor=ORANGE if orange else colors.HexColor("#333333"),
             alignment=TA_RIGHT,
         )
-        ri = len(table_data)
-        table_data.append(["", "", "", "", Paragraph(label, ls), Paragraph(_n(value) + "\u202f€", vs)])
-        style_cmds.extend([
+        ri = len(totals_data)
+        totals_data.append([Paragraph(label, ls), "", "", "", "", Paragraph(_n(value) + "\u202f€", vs)])
+        totals_style.extend([
             ("BACKGROUND",   (0, ri), (-1, ri), TOTBG),
             ("TOPPADDING",   (0, ri), (-1, ri), 5 if not bold else 7),
             ("BOTTOMPADDING",(0, ri), (-1, ri), 5 if not bold else 7),
-            ("SPAN",         (0, ri), (3,  ri)),
+            ("SPAN",         (0, ri), (4,  ri)),
         ])
         if bold:
-            style_cmds.append(("LINEABOVE", (0, ri), (-1, ri), 1.5, ORANGE))
+            totals_style.append(("LINEABOVE", (0, ri), (-1, ri), 1.5, ORANGE))
 
-    ri_before_totals = len(table_data)
     tot_row("Suma be PVM:",  viso_be_pvm)
-    tot_row("PVM 21%:",      pvm)
-    tot_row("VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
+    if _reverse_vat:
+        # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
+        tot_row("VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
+    else:
+        tot_row("PVM 21%:",      pvm)
+        tot_row("VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
 
     # Global style
     style_cmds += [
@@ -4428,54 +5020,50 @@ async def generate_pdf(request: Request, data: dict):
     tbl.setStyle(TableStyle(style_cmds))
     story.append(tbl)
 
-    # ── Task 8: Assumptions + warnings page at the end ────────────────────────
-    from reportlab.platypus import PageBreak
-    story.append(PageBreak())
+    # Totals + reverse-VAT note + signatures kept together so they never split
+    # across a page break (a VISO stranded from its qualifier reads as an error).
+    totals_tbl = Table(totals_data, colWidths=COL_W)
+    totals_tbl.setStyle(TableStyle(totals_style))
+    _totals_group: list = [totals_tbl]
 
-    sect_style = ParagraphStyle("sect", fontName=_FONT_BOLD, fontSize=10,
-                                textColor=DARK, leading=14, spaceAfter=6)
-    small_style = ParagraphStyle("small", fontName=_FONT_NORMAL, fontSize=8,
-                                 textColor=colors.HexColor("#444444"), leading=11)
+    if _reverse_vat:
+        _totals_group.append(Spacer(1, 0.3*cm))
+        _totals_group.append(Paragraph(
+            "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas "
+            "(PVMĮ 96 str.).",
+            ParagraphStyle("rvat", fontName=_FONT_NORMAL, fontSize=8,
+                           textColor=colors.HexColor("#666666"), leading=11),
+        ))
 
-    if prielaidos:
-        story.append(Paragraph("Skaičiavimo prielaidos", sect_style))
-        pr_rows = [["Parametras", "Reikšmė"]]
-        pr_map = {
-            "lubu_aukstis_m":  ("Lubų aukštis (vid.)", "m"),
-            "sienos_storis_m": ("Sienos storis", "m"),
-            "glaistimo_lygis": ("Glaistymo lygis", ""),
-            "langai_vnt":      ("Langų skaičius", "vnt."),
-            "durys_vnt":       ("Durų skaičius", "vnt."),
-        }
-        for k, (lbl, unit) in pr_map.items():
-            v = prielaidos.get(k)
-            if v is not None:
-                pr_rows.append([lbl, f"{v} {unit}".strip()])
-        pr_tbl = Table(pr_rows, colWidths=[9*cm, 5*cm])
-        pr_tbl.setStyle(TableStyle([
-            ("BACKGROUND",  (0,0), (-1,0), DARK),
-            ("TEXTCOLOR",   (0,0), (-1,0), colors.white),
-            ("FONTNAME",    (0,0), (-1,0), _FONT_BOLD),
-            ("FONTSIZE",    (0,0), (-1,-1), 8),
-            ("GRID",        (0,0), (-1,-1), 0.3, GRID_C),
-            ("LEFTPADDING", (0,0), (-1,-1), 6),
-            ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0,1), (-1,-1), ["FFFFFF", colors.HexColor("#F5F5F5")]),
+    # Signature block — a priced sąmata is a pre-contract offer; end it with
+    # signature lines so it reads as a signable document. (export step 3b.)
+    if _has_prices:
+        _sig_lbl  = ParagraphStyle("sigl", fontName=_FONT_BOLD, fontSize=8.5,
+                                   textColor=DARK, leading=12)
+        _sig_line = ParagraphStyle("sigln", fontName=_FONT_NORMAL, fontSize=7.5,
+                                   textColor=colors.HexColor("#888888"), leading=11)
+        _sig_tbl = Table([
+            [Paragraph("Vykdytojas", _sig_lbl), Paragraph("Užsakovas", _sig_lbl)],
+            [Paragraph("_____________________________<br/>(vardas, pavardė, parašas, data)", _sig_line),
+             Paragraph("_____________________________<br/>(vardas, pavardė, parašas, data)", _sig_line)],
+        ], colWidths=[PAGE_W / 2.0, PAGE_W / 2.0])
+        _sig_tbl.setStyle(TableStyle([
+            ("VALIGN",       (0,0), (-1,-1), "TOP"),
+            ("LEFTPADDING",  (0,0), (0,0), 0),
+            ("LEFTPADDING",  (1,0), (1,0), 10),
+            ("TOPPADDING",   (0,1), (-1,1), 22),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
         ]))
-        story.append(pr_tbl)
-        story.append(Spacer(1, 0.4*cm))
+        _totals_group.append(Spacer(1, 0.9*cm))
+        _totals_group.append(_sig_tbl)
 
-    if perspejimani:
-        story.append(Paragraph("Nepamirškite patikrinti:", sect_style))
-        for w in perspejimani:
-            story.append(Paragraph(f"• {w.get('tekstas', '')}", small_style))
-        story.append(Spacer(1, 0.4*cm))
+    from reportlab.platypus import KeepTogether as _KeepTogether
+    story.append(_KeepTogether(_totals_group))
 
-    story.append(Paragraph(
-        "Pastaba: šie kiekiai sugeneruoti AI ir turi būti patikrinti kvalifikuoto specialisto.",
-        ParagraphStyle("warn", fontName=_FONT_NORMAL, fontSize=7,
-                       textColor=colors.HexColor("#888888"), leading=10, spaceAfter=4)
-    ))
+    # ── Task 8: Assumptions + warnings page at the end ────────────────────────
+    # (2026-06-30: the assumptions / "Nepamirškite patikrinti" / AI-disclaimer
+    #  page was removed per contractor feedback — a client pasiūlymas is just the
+    #  offer, nothing appended after the totals + signatures.)
 
     doc.build(story, canvasmaker=_NumberedCanvas)
     buf.seek(0)
@@ -4502,7 +5090,19 @@ async def extract_interior_endpoint(
     versijavimo, jokių pipeline'ų, jokių Tier-fallback'ų. Gali būti
     used backend'ui ir tiesiogiai (Python import).
     """
-    _billable_user(request)
+    _user = _billable_user(request)
+    # W3 billing (2026-07-04): project-quota + free-trial paywall. This is the
+    # sole endpoint that increments the project counter (see the success-path
+    # db.record_extract_and_maybe_consume_credit below), so the GATE belongs
+    # here — on the project CREATOR, not on the corrections. Order:
+    # _billable_user (auth + € spend cap + reserve) → quota → trial → extract →
+    # (on success) the counter increment. Both calls are HARD no-ops when
+    # BILLING_ENABLED != '1' (today's behavior, byte-for-byte). Placed BEFORE
+    # any extraction work so a blocked request does zero paid work:
+    #   _check_user_quota → 402 quota_exceeded when over the monthly project quota
+    #   _check_trial_gate → 403 company_code_required / 402 trial_used (free tier)
+    _check_user_quota(_user["id"])
+    _check_trial_gate(_user["id"])
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
 
@@ -4539,6 +5139,42 @@ async def extract_interior_endpoint(
             ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
         result["_pdf_page_count"] = validation.get("page_count", 0)
 
+    # Meter Vision cost against the user so the per-user spend cap can fire
+    # (best-effort — never break the extraction on a metering hiccup).
+    try:
+        if _user and isinstance(result, dict):
+            db.record_usage(_user.get("id"), result, kind="extract-interior")
+    except Exception as _exc:
+        log.warning("record_usage failed (extract-interior): %r", _exc)
+
+    # W3 billing (2026-07-04): count this successful billable extraction into
+    # the project-quota ledger — exactly once, only when BILLING_ENABLED (a
+    # hard no-op otherwise so today's behavior is byte-for-byte). Reached only
+    # on the success path (a failed/refused extraction raises before here), so
+    # failures never consume quota. Draws monthly-slot-first, then a one-off
+    # credit (record_extract_and_maybe_consume_credit): always records
+    # kind="extract"; ALSO records kind="credit_consumed" when this extraction
+    # is beyond the plan's monthly quota and a credit remains. Bookkeeping only
+    # — the try/except guarantees a metering hiccup never breaks extraction.
+    try:
+        from billing.flag import billing_enabled
+        if billing_enabled() and _user and _user.get("id") and isinstance(result, dict):
+            db.record_extract_and_maybe_consume_credit(_user["id"])
+            # W3 billing Phase 5: if THIS was a free user's trial-slot extraction
+            # (free plan, no purchased credit) and they've identified their
+            # company, mark the company's trial consumed — so a 2nd free project
+            # (this account OR a re-registered account with the same įmonės
+            # kodas) is blocked by _check_trial_gate. Best-effort; the outer
+            # try/except guarantees it never breaks a successful extraction.
+            _bu = db.get_user_by_id(_user["id"])
+            if (_bu and (_bu.get("plan") or "free") == "free"
+                    and db.credits_balance(_user["id"]) == 0
+                    and _bu.get("company_code")):
+                from billing.trial import consume_trial
+                consume_trial(_bu["company_code"], _user["id"])
+    except Exception as _exc:
+        log.warning("record_billing_usage failed (extract-interior): %r", _exc)
+
     return result
 
 
@@ -4559,7 +5195,7 @@ async def extract_interior_stream_endpoint(
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
 ):
-    _billable_user(request)
+    _user = _billable_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip, "extract-interior")
 
@@ -4603,7 +5239,23 @@ async def extract_interior_stream_endpoint(
         # would drop the stream mid-extraction. Comments don't trigger event
         # listeners on the client, so they're a free keep-alive signal.
         sentinel = object()
-        while True:
+        future = None
+        # 2026-07-06 (audit): guarantee the sync generator is CLOSED on every
+        # exit path — including a client disconnect, where Starlette throws
+        # CancelledError/GeneratorExit into this async generator. Without this,
+        # `gen` was never closed: its cleanup (finally blocks) never ran and the
+        # in-flight worker thread kept the extraction alive with nobody consuming
+        # it. NB: never close a generator while a worker thread is still running
+        # next(gen) — that raises "generator already executing" — so if a step is
+        # in flight, defer the close to a done-callback on that future.
+        def _close_gen(_f=None):
+            try:
+                gen.close()
+            except Exception:  # noqa: BLE001 — generator cleanup is best-effort
+                log.warning("extract-interior-stream: generator close failed",
+                            exc_info=True)
+        try:
+          while True:
             future = loop.run_in_executor(None, lambda: next(gen, sentinel))
             try:
                 while True:
@@ -4637,8 +5289,24 @@ async def extract_interior_stream_endpoint(
                         ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
                         ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
                     result["_pdf_page_count"] = validation.get("page_count", 0)
+                # Meter Vision cost against the user (best-effort) so the spend
+                # cap can fire. Only on a successful extraction with token usage.
+                try:
+                    if _user and result.get("status") != "error":
+                        db.record_usage(_user.get("id"), result, kind="extract-interior-stream")
+                except Exception as _exc:
+                    log.warning("record_usage failed (stream): %r", _exc)
 
             yield _format_sse(ev)
+        finally:
+            # Close the sync generator on every exit path (normal end, error,
+            # or client disconnect). If a worker thread is still executing
+            # next(gen), defer the close until it finishes — closing a running
+            # generator raises "generator already executing". Otherwise close now.
+            if future is not None and not future.done():
+                future.add_done_callback(_close_gen)
+            else:
+                _close_gen()
 
     return StreamingResponse(
         event_source(),
@@ -4685,6 +5353,18 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
 
     out_rooms: list[dict] = []
     for room in payload.patalpos:
+        # Defensively coerce client-supplied numerics (LT comma-decimals like
+        # "12,5", stray strings from corrupted/legacy projects) to floats so one
+        # bad field can't crash the calc OR the downstream plotas sums and 500 the
+        # whole recompute. (2026-06-19 hunt.) Comma-decimal recovers the real
+        # value; anything else degrades to 0.
+        for _k in ("plotas_m2", "perimetras_m", "lubu_aukstis_m"):
+            _v = room.get(_k)
+            if isinstance(_v, str):
+                try:
+                    room[_k] = float(_v.replace(",", ".").strip())
+                except (ValueError, AttributeError):
+                    room[_k] = 0.0
         # Preserve Vision-emitted fields we don't recompute
         preserved = {
             "nr": room.get("nr"),
@@ -4719,7 +5399,16 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
         # Build a single-room rules dict that calc_room_quantities expects
         single_rules = {paskirtis: rt_rules}
 
-        recalc = calc_room_quantities(room, rules=single_rules)
+        # Guard each room like the extraction pipeline does (vision_call.py) — a
+        # single malformed room (e.g. a non-numeric / comma-decimal plotas_m2 from
+        # a corrupted/legacy project) must degrade to the un-recomputed room, NOT
+        # 500 the whole recompute and lose every other room. (2026-06-19 hunt.)
+        try:
+            recalc = calc_room_quantities(room, rules=single_rules)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("[recompute-interior] room %s calc failed: %s",
+                        room.get('nr'), exc)
+            recalc = {}
 
         merged = {**room, **recalc, **preserved}
         out_rooms.append(merged)
@@ -4732,7 +5421,7 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
             if normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
         ),
         "patalpos": out_rooms,
-        "pozicijos": [],  # rebuilt below by emit_v8_compat? No — pozicijos come from Vision narrative
+        "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
     }
 
@@ -4785,7 +5474,7 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
     except Exception as exc:
-        print(f"[recompute-interior] pozicijos build failed: {exc}")
+        log.warning("[recompute-interior] pozicijos build failed: %s", exc)
         parsed["pozicijos"] = parsed.get("pozicijos") or []
     parsed = _emit_v8_compat_fields(parsed)
     parsed["status"] = "ok"
@@ -4895,7 +5584,7 @@ async def v9_symbols_count_by_template(
     template_size_pct: float = Form(0.05),
     page_nr: int = Form(1),
 ):
-    """Togal-style "click on symbol → count similar".
+    """auto-count-style "click on symbol → count similar".
 
     Vartotojas paspauskite ant simbolio brėžinyje, sistema suranda visus panašius.
     """
@@ -5114,8 +5803,17 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     user = _billable_user(request)
     _check_rate_limit(request.client.host if request.client else "unknown", "chat")
 
-    question = (payload.get("question") or "").strip()
-    history = payload.get("messages") or []  # [{role: "user"|"assistant", content: "..."}]
+    # Bound user-supplied input BEFORE building the Claude messages, so a huge
+    # question or hundreds of history turns can't burn far more tokens than the
+    # flat per-call spend reservation accounts for (2026-06-19 hunt: cap evasion).
+    _MAX_Q = 4000          # chars per message
+    _MAX_TURNS = 12        # most recent history turns kept
+    question = (payload.get("question") or "").strip()[:_MAX_Q]
+    history = [
+        {"role": m.get("role"), "content": str(m.get("content") or "")[:_MAX_Q]}
+        for m in (payload.get("messages") or [])[-_MAX_TURNS:]
+        if isinstance(m, dict)
+    ]
     project_id = payload.get("project_id")
     ctx = payload.get("project_context") or {}
 
@@ -5159,7 +5857,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
 
     def _call():
         return client.messages.create(
-            model="claude-opus-4-7",
+            model=model_for("chat"),
             max_tokens=2000,
             system=_CHAT_SYSTEM_PROMPT,
             messages=messages,
@@ -5173,10 +5871,29 @@ async def chat_project(request: Request, payload: dict = Body(...)):
         usage = msg.usage
         log.info("chat-project tokens: in=%s out=%s",
                  getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
+        # Meter the ACTUAL chat cost against the user so the per-user spend cap
+        # covers chat with real tokens (not just the flat pre-charge — which is
+        # now skipped for /chat-project to avoid double-counting). kind="chat"
+        # deliberately does NOT match the hourly-EXTRACT count filter ('%extract%'),
+        # so chat use can't trip the extracts/hour limit. (2026-07-04)
+        try:
+            resp_like = {"_meta": {
+                "input_tokens": getattr(usage, "input_tokens", 0),
+                "output_tokens": getattr(usage, "output_tokens", 0),
+                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
+                "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", 0),
+                "model": model_for("chat"),
+            }}
+            db.record_usage(user.get("id"), resp_like, kind="chat")
+        except Exception as _exc:
+            log.warning("record_usage failed (chat): %r", _exc)
         return {"status": "ok", "answer": text}
-    except Exception as e:
+    except Exception:
+        # Log the detail server-side, but never return the raw exception to the
+        # client — it leaks the provider/model/error internals into the chat
+        # bubble. (2026-06-19 hunt.)
         log.exception("chat-project failed")
-        return {"status": "error", "error": f"AI klaida: {e}"}
+        return {"status": "error", "error": "AI laikinai nepasiekiamas. Bandykite dar kartą."}
 
 
 @app.post("/export/excel")
@@ -5270,6 +5987,15 @@ async def click_to_fill_endpoint(
         request.client.host if request.client else "unknown",
         "click-to-fill",
     )
+    # N6 (2026-07-04 pentest, pass 2 — re-audit): this route shares the same
+    # project-keyed PDF byte cache (page_raster_cache._PDF_CACHE) as the cv_tools
+    # + detect-room-polygons routes and had auth but NO ownership check, so a
+    # logged-in tenant A could prime/POISON or read tenant B's cached PDF under
+    # B's project_id. Gate on ownership BEFORE any store_pdf / get_pdf / render.
+    # Admins bypass the filter; missing/foreign project → 404 (no existence leak).
+    _n6_filter = None if _user.get("is_admin") else _user["id"]
+    if db.get_project(project_id, user_id=_n6_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
     from extractor.cv_polygon import (
         click_to_fill_pipeline, PolygonValidationError,
@@ -5337,8 +6063,166 @@ async def click_to_fill_endpoint(
     }
 
 
+@app.post("/api/projects/{project_id}/detect-room-polygons")
+async def detect_room_polygons_endpoint(
+    request: Request,
+    project_id: str,
+    page_nr: int = Form(...),
+    rooms_json: str = Form(...),
+    pdf_file: UploadFile | None = File(None),
+):
+    """Batch accurate-polygon detection for every room on a floor-plan page.
+
+    Label-seeded flood-fill + area-prior (auto_room_polygon). Returns an
+    accurate polygon for the rooms it can solve and marks the rest
+    'manual_needed' — never ships a leaked/wrong polygon. rooms_json is a JSON
+    list of {nr, plotas_m2}. PDF is taken from pdf_file (cached) or the cache.
+    """
+    _n6_user = _billable_user(request)
+    _check_rate_limit(
+        request.client.host if request.client else "unknown",
+        "detect-room-polygons",
+    )
+    # N6 (2026-07-04 pentest, pass 2): F4 authed this route but added no
+    # ownership check, so tenant A could prime/poison the PDF byte cache under
+    # tenant B's project_id (the cache is keyed purely on project_id) and drive
+    # compute against B. Gate on ownership BEFORE any store_pdf / get_pdf /
+    # render. Admins bypass the filter; missing/foreign project → 404.
+    _n6_filter = None if _n6_user.get("is_admin") else _n6_user["id"]
+    if db.get_project(project_id, user_id=_n6_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    import json as _json
+    from extractor.cv_polygon import auto_room_polygon
+    from extractor.room_seeds import locate_room_seeds, calibrate_page_scale
+    import page_raster_cache as _cache
+    import cv2 as _cv2
+    import numpy as _np
+
+    try:
+        rooms = _json.loads(rooms_json)
+        assert isinstance(rooms, list)
+    except Exception:
+        raise HTTPException(status_code=400, detail="rooms_json must be a JSON list")
+
+    pdf_bytes: bytes | None = None
+    if pdf_file is not None:
+        pdf_bytes = await pdf_file.read()
+        if pdf_bytes:
+            _cache.store_pdf(project_id, pdf_bytes)
+    if pdf_bytes is None:
+        pdf_bytes = _cache.get_pdf(project_id)
+    if pdf_bytes is None:
+        raise HTTPException(status_code=400, detail="PDF byte cache nerasta — pridėkite pdf_file")
+
+    try:
+        raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"page render failed: {e}")
+    h, w = raster.shape[:2]
+    px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
+    page_w_pt, page_h_pt = float(w) * px_to_pt, float(h) * px_to_pt
+
+    from extractor.room_seeds import bbox_centroid_seed
+
+    nrs = [str(r.get("nr")) for r in rooms if r.get("nr") is not None]
+    plotas = {str(r.get("nr")): float(r.get("plotas_m2") or 0) for r in rooms}
+    bbox_by_nr = {str(r.get("nr")): r.get("bbox_pct") for r in rooms if r.get("nr") is not None}
+    label_seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
+
+    # marker_pct = where to put the Tier-2 circled number when the polygon fails.
+    # ONLY the pdfplumber label seed (the actual printed room-number location) is
+    # trustworthy enough to anchor a marker. We deliberately do NOT fall back to
+    # the Vision bbox centroid: on furnished/rotated plans those bboxes are often
+    # garbage, and a marker on a garbage centroid is exactly the "marked random
+    # places" failure. A room with no label seed gets NO marker → it surfaces in
+    # the honest "N patalpų be vietos" chip instead of a misplaced circle.
+    marker_by_nr: dict[str, list[float]] = {
+        nr: [label_seeds[nr][0], label_seeds[nr][1]] for nr in nrs if nr in label_seeds
+    }
+
+    # Per-room seeds: primary = printed label (if found) else bbox centroid;
+    # extra = the other. Same seeding drives BOTH calibration passes (pass-1
+    # label-only left ciurliu/romainiai with no samples → no area prior → unsafe
+    # 'pick largest' fills; seeding pass-1 from bbox centroids too recovers scale).
+    seeds_by_nr: dict[str, tuple[tuple[float, float], list]] = {}
+    for nr in nrs:
+        label = label_seeds.get(nr)
+        bc = bbox_centroid_seed(bbox_by_nr.get(nr))
+        primary = label or bc
+        if primary is None:
+            continue
+        seeds_by_nr[nr] = (primary, [bc] if (label and bc) else [])
+
+    # Two-pass scale calibration: pass-1 = no area prior, collect (area_pct, m²).
+    samples = []
+    for nr, (primary, extra) in seeds_by_nr.items():
+        r0 = auto_room_polygon(raster, primary[0], primary[1], seeds_pct=extra)
+        if r0 is not None and plotas.get(nr):
+            ap = float(_cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(_np.int32))) / (h * w)
+            samples.append((ap, plotas[nr]))
+    scale = calibrate_page_scale(samples)
+
+    results: dict[str, dict] = {}
+    n_auto = n_manual = 0
+    for nr in nrs:
+        marker = marker_by_nr.get(nr)
+        seed = seeds_by_nr.get(nr)
+        if seed is None:  # no label seed AND no bbox → cannot place at all
+            results[nr] = {"polygon_source": "manual_needed", "confidence": "manual"}
+            n_manual += 1
+            continue
+        (primary, extra) = seed
+        r = auto_room_polygon(
+            raster, primary[0], primary[1], seeds_pct=extra,
+            room_plotas_m2=plotas.get(nr) or None, page_scale_m2_per_pct=scale,
+        )
+        if r is None:
+            res = {"polygon_source": "manual_needed", "confidence": "manual"}
+            if marker:
+                res["marker_pct"] = marker
+            results[nr] = res
+            n_manual += 1
+            continue
+        poly_pct = [[float(x) / w, float(y) / h] for x, y in r.polygon_px]
+        poly_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt] for x, y in r.polygon_px]
+        results[nr] = {
+            "polygon_pct": poly_pct,
+            "polygon_pdf": poly_pdf,
+            "page_width_pdf": page_w_pt,
+            "page_height_pdf": page_h_pt,
+            "polygon_source": "auto_floodfill",
+            "confidence": r.confidence,
+            "area_err": r.area_err,
+            "marker_pct": marker,
+        }
+        n_auto += 1
+
+    return {"results": results, "page_nr": page_nr,
+            "stats": {"auto": n_auto, "manual": n_manual, "total": len(nrs),
+                      "page_scale_m2_per_pct": scale}}
+
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
     return {"status": "veikia"}
+
+
+@app.get("/health")
+@app.get("/healthz")
+def health():
+    """Liveness + readiness probe for the load balancer / uptime monitor.
+    Returns 200 with db:ok when a trivial DB query succeeds, 503 otherwise
+    (so a wedged DB takes the instance out of rotation instead of serving
+    errors). No auth — must be hittable by infra. (2026-06-19 ops baseline.)"""
+    db_ok = False
+    try:
+        db.user_usage_since("__healthcheck__", hours=1)  # cheap indexed query
+        db_ok = True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("health check DB probe failed: %r", exc)
+    body = {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "error"}
+    if not db_ok:
+        return JSONResponse(status_code=503, content=body)
+    return body

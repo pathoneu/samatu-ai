@@ -1,0 +1,81 @@
+# Pathon — website SEO playbook (2026-07-06)
+
+## 1. Technical — what shipped today (code, branch viewer-rebuild)
+
+| Item | File | Status |
+|---|---|---|
+| robots.txt (app routes disallowed, AI crawlers explicitly allowed, sitemap ref) | `frontend/public/robots.txt` | ✅ |
+| sitemap.xml (8 public URLs, hand-maintained — add every new page!) | `frontend/public/sitemap.xml` | ✅ |
+| llms.txt (bilingual product card for AI crawlers) | `frontend/public/llms.txt` | ✅ |
+| Canonical + OG + Twitter + theme-color + noscript fallback | `frontend/index.html` | ✅ |
+| JSON-LD: Organization + WebSite + SoftwareApplication | `frontend/index.html` | ✅ |
+| JSON-LD: FAQPage (10 Q&A, single source with visible content) | `frontend/src/pages/Duk.jsx` | ✅ |
+| og-image.png 1200×630 (regen: `frontend/scripts/og-shot.mjs`) | `frontend/public/og-image.png` | ✅ |
+| Per-route `<title>`/meta/canonical helper | `frontend/src/lib/seo.js` | ✅ |
+| /duk FAQ page + footer link + route | `frontend/src/pages/Duk.jsx` | ✅ |
+| GA4 consent-gated (Consent Mode v2; no-op until `VITE_GA4_ID`) | `frontend/src/lib/analytics.js` | ✅ |
+
+### Pending (chipped / next build)
+1. **Prerender public routes** — Googlebot renders JS, but AI crawlers and some
+   scrapers don't. Approach: post-build script (`vite build` → `vite preview` →
+   playwright CLI saves each public route's rendered HTML into `dist/<route>/index.html`).
+   Opt-in npm script `build:seo`, default build untouched. ~half a day.
+2. **4 BoFu pages** (below) + **public /kainos** (today /pricing is behind the
+   auth wall — a marketing bug; pricing must be visible logged-out once billing goes live).
+3. `setPageMeta` on Login/Register (cosmetic); hreflang only if/when EN routes exist.
+4. Legal pages inherit default title — wire `setPageMeta` into `LegalLayout` (10-min task).
+
+## 2. Keyword map [VERIFY volumes via GSC + Keyword Planner after 2 wks of ads]
+
+| Keyword (LT) | Intent | Target page |
+|---|---|---|
+| sąmatų programa / sąmatos programa | buy | `/` + ads |
+| statybos sąmata (pavyzdys, excel) | mixed | BoFu-2 + blog |
+| kiekių žiniaraštis (excel, pavyzdys) | high | BoFu-2 |
+| sąmatininko paslaugos / kaina | steal | BoFu-1 (price-anchor page) |
+| vidaus apdailos sąmata | high | BoFu-3 |
+| kiekiai iš brėžinių / kiekių skaičiavimas | exact-fit | BoFu-2 |
+| APVA / renovacijos sąmata | segment | BoFu-4 |
+| Sistela alternatyva | compare | comparison post (careful: checkbox tone) |
+| kiek dažų reikia kambariui, glaisto sąnaudos, dažymo plotas | question/TOFU | calculators (§4) |
+
+## 3. BoFu pages — build order + outline (800–1500 LT words each, one CTA: registruotis/demo)
+
+1. **/samatininko-kaina** — "Sąmatininko paslaugos: kiek kainuoja 2026 ir kada
+   apsimoka skaičiuoti pačiam". Sections: rinkos kainos €200–500 (šaltiniai),
+   kada verta pirkti žmogų, kada įrankį; savikainos lentelė; honest "ko įrankis
+   nepadaro". Schema: Article + FAQ. *This page sells by naming the price the
+   buyer already pays.*
+2. **/kiekiai-is-brezinio** — "Kiekiai iš PDF brėžinio per kelias minutes" —
+   outcome page mirroring the hero; PDF→XLSX visual; step-by-step su ekrano
+   nuotraukomis; confidence-flag honesty section.
+3. **/vidaus-apdailos-samata** — trade page. Reuse CLAUDE.md §1 formulas as
+   authority content (dažomas plotas, angokraščiai, glaistas pagal Q, GKP) —
+   *no competitor has this depth in LT*. Schema: Article + HowTo.
+4. **/apva-renovacijos-kiekiai** — "APVA renovacijos KŽ per dieną": reverse-VAT
+   note, investicijų plano formatas, kiekių žiniaraščio pavyzdys.
+
+## 4. Content calendar (8 posts max, weeks 5–12; topics locked only after demos)
+
+Draft titles (replace with real demo objections as they come):
+1. "Kiek iš tiesų kainuoja sąmata Lietuvoje 2026 (ir kodėl)"
+2. "10 klaidų, kurias sąmatininkai daro skaičiuodami apdailą" (iš CLAUDE.md §8 — unikalus turinys)
+3. "Kiekių žiniaraštis: pavyzdys + nemokamas šablonas" (lead magnet .xlsx)
+4. "Kiek dažų reikia? Formulė, kurią naudoja profesionalai" (+ skaičiuoklė)
+5. "Q1–Q4 glaistymo lygiai: ką jie reiškia jūsų sąmatai"
+6. "Sąmatų programos Lietuvoje 2026 — sąrašas ir palyginimas" (listicle — AI engines cite lists; be honest, include Sistela)
+7. "Atvirkštinis PVM statybose: kada ir kaip" 
+8. Case study #1 su skaičiais (pilot customer)
+
+**Calculator pages (high-leverage later):** interactive "dažų skaičiuoklė",
+"glaisto skaičiuoklė", "GKP lapų skaičiuoklė" — the formulas already exist in
+`universal_rules.py`; a thin public UI over them is a permanent link/citation
+magnet and the most AI-quotable asset we can build.
+
+## 5. Ops
+
+- GSC: verify domain → submit sitemap → weekly query report (which real queries
+  show impressions → feed keyword map).
+- Every public page ships with: one `<h1>`, title ≤60 chars, description 140–160,
+  internal links to/from at least 2 other pages, lastmod bump in sitemap.
+- LT copy rule: Claude drafts → **founder polishes** → publish. Never skip.

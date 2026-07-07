@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -8,26 +9,30 @@ import UploadZone from '@/components/upload/UploadZone';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { createProject, updateProject } from '@/lib/projectStore';
-import { savePdf } from '@/lib/pdfStore';
+import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 import { API_BASE as API } from '@/lib/apiBase';
+import { useBilling } from '@/hooks/useBilling';
+import UpgradeDialog from '@/components/billing/UpgradeDialog';
+import { detectPaywall } from '@/lib/paywall';
 
 // Pirmoji versija: Interjero projektas yra DEFAULT. Kiti tipai (KŽ, Fasadai,
 // Stogas, Žemės, Betonas) — paslėpti į "Kitas tipas" advanced.
+// Labels/descriptions resolve against i18n at render (see newProject.types.*).
 const PROJECT_TYPES = [
-  { id: 'interior', label: 'Interjero projektas', desc: 'Apdailos kiekiai (rekomenduojama)' },
+  { id: 'interior' },
 ];
 
 // Advanced tipai — paslėpti pagal nutylėjimą, vartotojas atskleidžia spaudžiant.
 const ADVANCED_PROJECT_TYPES = [
-  { id: 'auto',     label: 'Automatinis',         desc: 'AI atpažins tipą' },
-  { id: 'kz',       label: 'Kiekių žiniaraštis',  desc: 'KŽ lentelė (jei jau turi paruoštą)' },
-  { id: 'fasadas',  label: 'Fasadai',             desc: 'ETICS skaičiai' },
-  { id: 'stogas',   label: 'Stogas',              desc: 'Stogo kiekiai' },
-  { id: 'zeme',     label: 'Žemės darbai',        desc: 'Iškasa, tranšėjos' },
-  { id: 'betonas',  label: 'Betonas',             desc: 'Betono kiekiai' },
+  { id: 'auto' },
+  { id: 'kz' },
+  { id: 'fasadas' },
+  { id: 'stogas' },
+  { id: 'zeme' },
+  { id: 'betonas' },
 ];
 
 // Interior sub-type still flows to backend (default 'naujas'). UI selector
@@ -161,8 +166,12 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
 }
 
 export default function NewProject() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { enabled: billingEnabled } = useBilling();
+  // Paywall block dialog: { reason, message } when the backend refuses creation.
+  const [paywall, setPaywall] = useState(null);
   const [projectName, setProjectName]   = useState('');
   const [companyName, setCompanyName]   = useState('');
   const [file, setFile]                 = useState(null);
@@ -183,9 +192,9 @@ export default function NewProject() {
   const elapsedTimerRef = useRef(null);
 
   const handleCreate = async () => {
-    if (!file) { setError('Pasirinkite PDF failą'); return; }
+    if (!file) { setError(t('newProject.errNoPdf')); return; }
     setError(null);
-    setStatus('Siunčiama...');
+    setStatus(t('newProject.statusUploading'));
     setIsProcessing(true);
     setStreamPhase(null);
     setStreamProgress({ rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null });
@@ -211,9 +220,9 @@ export default function NewProject() {
       const statusTimer = (projTypeChoice !== 'interior' && projTypeChoice !== 'auto')
         ? setInterval(() => {
             const sec = Math.floor((Date.now() - elapsedStart) / 1000);
-            if (sec < 15) setStatus(`Skaitome brėžinį... (${sec}s)`);
-            else if (sec < 60) setStatus(`Apdorojama... (${sec}s)`);
-            else setStatus(`Sudėtingas projektas, palaukite (${sec}s)...`);
+            if (sec < 15) setStatus(t('newProject.statusReading', { sec }));
+            else if (sec < 60) setStatus(t('newProject.statusProcessing', { sec }));
+            else setStatus(t('newProject.statusComplex', { sec }));
           }, 1000)
         : null;
 
@@ -250,7 +259,7 @@ export default function NewProject() {
               } else if (ev.event === 'error') {
                 // Surface mid-stream error message; the final 'done' event
                 // still drives the error result branch below.
-                setError(ev.message || 'Klaida');
+                setError(ev.message || t('newProject.errGeneric'));
               }
             },
           ));
@@ -261,7 +270,7 @@ export default function NewProject() {
             { interiorSubtype },
           ));
         }
-        setStatus('Išsaugoma...');
+        setStatus(t('newProject.statusSaving'));
       } finally {
         clearTimeout(timeoutId);
         if (statusTimer) clearInterval(statusTimer);
@@ -273,14 +282,22 @@ export default function NewProject() {
       }
 
       if (!res.ok) {
+        // Paywall (402 quota/trial, 403 company-code) — carry status + body so
+        // the catch can open the UpgradeDialog instead of a generic error.
+        if (res.status === 402 || res.status === 403) {
+          const err = new Error(json?.message || json?.error || `HTTP ${res.status}`);
+          err.status = res.status;
+          err.body = json;
+          throw err;
+        }
         const msg = Array.isArray(json?.detail)
           ? json.detail.map(d => d.msg).join(', ')
-          : json?.detail || `Serverio klaida (${res.status})`;
+          : json?.detail || t('newProject.errServer', { status: res.status });
         throw new Error(msg);
       }
       // Catch backend pipeline errors that return 200 with status="error"
       if (json?.status === 'error' || json?._error) {
-        throw new Error(json._error || json.error || 'Pipeline klaida (nežinoma priežastis)');
+        throw new Error(json._error || json.error || t('newProject.errPipeline'));
       }
       if (json.error) throw new Error(json.error);
 
@@ -288,7 +305,7 @@ export default function NewProject() {
       let project;
       if (CONSTRUCTION_TYPES.includes(projType)) {
         project = createProject({
-          name:         projectName || json.projektas || 'Statybos projektas',
+          name:         projectName || json.projektas || t('newProject.defaultNameConstruction'),
           company_name: companyName,
           tipas:        projType,
           ...json,
@@ -298,10 +315,16 @@ export default function NewProject() {
           status:       'ready',
         });
       } else if (projType === 'interior') {
-        if (!json.patalpos) throw new Error('Netikėtas atsakymo formatas');
+        if (!json.patalpos) throw new Error(t('newProject.errUnexpectedFormat'));
+        // Zero-room result = the most common first-run dead end (wrong PDF type:
+        // a photo, a KŽ table, a facade-only sheet). Surface a recoverable message
+        // instead of silently creating an empty project. (2026-06-19)
+        if (json.patalpos.length === 0) {
+          throw new Error(t('newProject.errNoRooms'));
+        }
         project = createProject({
           ...json,
-          name:            projectName || json.projektas || 'Interjero projektas',
+          name:            projectName || json.projektas || t('newProject.defaultNameInterior'),
           company_name:    companyName,
           tipas:           'interjeras',
           rows:            [],
@@ -310,16 +333,16 @@ export default function NewProject() {
           status:          'ready',
         });
       } else {
-        if (!json.eilutes) throw new Error('Netikėtas atsakymo formatas');
+        if (!json.eilutes) throw new Error(t('newProject.errUnexpectedFormat'));
         const rows = json.eilutes.map(row => ({
           ...row,
           kaina: 0,
           suma:  0,
-          warning: row.confidence === 'low' ? 'Žemas AI tikslumas'
-                 : !row.mato_vnt ? 'Trūksta matavimo vieneto' : '',
+          warning: row.confidence === 'low' ? t('newProject.warnLowConfidence')
+                 : !row.mato_vnt ? t('newProject.warnMissingUnit') : '',
         }));
         project = createProject({
-          name:         projectName || json.projektas || 'Naujas projektas',
+          name:         projectName || json.projektas || t('newProject.defaultNameKz'),
           company_name: companyName,
           tipas:        'kz',
           rows,
@@ -330,14 +353,17 @@ export default function NewProject() {
         });
       }
 
-      // Saugom PDF failą IndexedDB'e — kad Brėžinio tab'as galėtų rodyti
+      // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad
+      // brėžinys išliktų išvalius kešą / persijungus įrenginį. (2026-06-21)
       try {
         await savePdf(project.id, file);
       } catch (pdfErr) {
         console.warn('Nepavyko išsaugoti PDF į IndexedDB:', pdfErr);
-        // Nepavyko PDF saugoti — projektas vis tiek sukurtas, tik Brėžinio
-        // tab'as nebus prieinamas iš naujo.
       }
+      // Fire-and-forget — neblokuojam srauto; backendas yra durabli atsarginė kopija.
+      uploadPdfToBackend(project.id, file).then((ok) => {
+        if (!ok) console.warn('Nepavyko įkelti PDF į backendą (liks tik naršyklėje)');
+      });
 
       // Sprint §G5 (2026-04-29): scale auto-detect from PDF text layer
       // (regex „M 1:50 / 1:100" iš pdfplumber). Fire-and-forget — projektas
@@ -389,15 +415,28 @@ export default function NewProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate(`/project/${project.id}`);
     } catch (e) {
+      // Paywall intercept (Phase 7): a 402/403 from /extract-interior means
+      // billing refused the creation. Open the UpgradeDialog rather than
+      // showing a raw error. Only when billing is enabled — otherwise these
+      // codes can't occur, and we fall through to the generic handler.
+      const pw = billingEnabled ? detectPaywall(e) : null;
+      if (pw) {
+        console.warn('Billing block on project creation:', pw.reason);
+        setPaywall(pw);
+        setIsProcessing(false);
+        setStatus('');
+        setAbortController(null);
+        return;
+      }
       // User-friendly error mapping. Stack only kept in console for debugging.
       console.error('Upload pipeline failed:', e);
       let userMessage;
       if (e.name === 'AbortError') {
-        userMessage = 'Užklausa atšaukta arba laiko limitas. Bandykite mažesnį PDF arba pakartokite.';
+        userMessage = t('newProject.errAborted');
       } else if (/network|fetch/i.test(e.message)) {
-        userMessage = 'Nepavyksta pasiekti serverio. Patikrinkite ryšį.';
+        userMessage = t('newProject.errNetwork');
       } else {
-        userMessage = e.message || 'Nežinoma klaida';
+        userMessage = e.message || t('newProject.errUnknown');
       }
       setError(userMessage);
       setIsProcessing(false);
@@ -429,12 +468,12 @@ export default function NewProject() {
               size="sm"
               onClick={() => {
                 abortController.abort();
-                setError('Atšaukta vartotojo. Bandykite dar kartą.');
+                setError(t('newProject.abortedByUser'));
                 setIsProcessing(false);
                 setAbortController(null);
               }}
             >
-              Atšaukti
+              {t('newProject.cancel')}
             </Button>
           </div>
         )}
@@ -446,7 +485,7 @@ export default function NewProject() {
               className="mt-3"
               onClick={() => { setIsProcessing(false); setError(null); }}
             >
-              Bandyti dar kartą
+              {t('newProject.retry')}
             </Button>
           </div>
         )}
@@ -456,14 +495,23 @@ export default function NewProject() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
+      {/* Phase 7 — paywall block. `paywall` stays null unless billing is on and
+          the backend refused creation, so nothing mounts when the flag is off. */}
+      <UpgradeDialog
+        reason={paywall?.reason || null}
+        message={paywall?.message}
+        onClose={() => setPaywall(null)}
+        onRetry={() => { setPaywall(null); handleCreate(); }}
+      />
+
       <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
         <ArrowLeft className="w-4 h-4" />
-        Grįžti į projektus
+        {t('newProject.backToProjects')}
       </Link>
 
-      <h1 className="text-2xl font-bold text-foreground mb-1">Naujas projektas</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-1">{t('newProject.title')}</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Įkelkite PDF — KŽ arba interjero projektą. AI automatiškai atpažins tipą ir išskirs duomenis.
+        {t('newProject.subtitle')}
       </p>
 
       {error && (
@@ -475,20 +523,20 @@ export default function NewProject() {
       <div className="space-y-6">
         {/* Project type selector */}
         <div>
-          <Label className="text-sm text-muted-foreground mb-2 block">Projekto tipas</Label>
+          <Label className="text-sm text-muted-foreground mb-2 block">{t('newProject.typeLabel')}</Label>
           <div className="grid grid-cols-1 gap-2">
-            {PROJECT_TYPES.map(t => (
+            {PROJECT_TYPES.map(pt => (
               <button
-                key={t.id}
-                onClick={() => setProjType(t.id)}
+                key={pt.id}
+                onClick={() => setProjType(pt.id)}
                 className={`p-3 rounded-lg border text-left transition-colors ${
-                  projTypeChoice === t.id
+                  projTypeChoice === pt.id
                     ? 'border-primary bg-primary/5 text-foreground'
                     : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
                 }`}
               >
-                <p className="text-sm font-semibold">{t.label}</p>
-                <p className="text-xs mt-0.5 opacity-70">{t.desc}</p>
+                <p className="text-sm font-semibold">{t(`newProject.types.${pt.id}.label`)}</p>
+                <p className="text-xs mt-0.5 opacity-70">{t(`newProject.types.${pt.id}.desc`)}</p>
               </button>
             ))}
           </div>
@@ -499,23 +547,23 @@ export default function NewProject() {
             onClick={() => setShowAdvancedTypes(v => !v)}
             className="mt-2 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
           >
-            {showAdvancedTypes ? '− Paslėpti kitus tipus' : '+ Kitas projekto tipas (KŽ, fasadai, stogas, žemės darbai…)'}
+            {showAdvancedTypes ? t('newProject.hideOtherTypes') : t('newProject.showOtherTypes')}
           </button>
 
           {showAdvancedTypes && (
             <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {ADVANCED_PROJECT_TYPES.map(t => (
+              {ADVANCED_PROJECT_TYPES.map(pt => (
                 <button
-                  key={t.id}
-                  onClick={() => setProjType(t.id)}
+                  key={pt.id}
+                  onClick={() => setProjType(pt.id)}
                   className={`p-2.5 rounded-lg border text-left transition-colors ${
-                    projTypeChoice === t.id
+                    projTypeChoice === pt.id
                       ? 'border-primary bg-primary/5 text-foreground'
                       : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
                   }`}
                 >
-                  <p className="text-xs font-semibold">{t.label}</p>
-                  <p className="text-[10px] mt-0.5 opacity-70">{t.desc}</p>
+                  <p className="text-xs font-semibold">{t(`newProject.types.${pt.id}.label`)}</p>
+                  <p className="text-[10px] mt-0.5 opacity-70">{t(`newProject.types.${pt.id}.desc`)}</p>
                 </button>
               ))}
             </div>
@@ -524,20 +572,20 @@ export default function NewProject() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="project-name" className="text-sm text-muted-foreground">Projekto pavadinimas</Label>
+            <Label htmlFor="project-name" className="text-sm text-muted-foreground">{t('newProject.nameLabel')}</Label>
             <Input
               id="project-name"
-              placeholder="Pvz. Gyvenamojo namo statyba"
+              placeholder={t('newProject.namePlaceholder')}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               className="mt-1.5 bg-card border-border"
             />
           </div>
           <div>
-            <Label htmlFor="company-name" className="text-sm text-muted-foreground">Įmonės pavadinimas</Label>
+            <Label htmlFor="company-name" className="text-sm text-muted-foreground">{t('newProject.companyLabel')}</Label>
             <Input
               id="company-name"
-              placeholder="Pvz. UAB Statyba"
+              placeholder={t('newProject.companyPlaceholder')}
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="mt-1.5 bg-card border-border"
@@ -546,8 +594,8 @@ export default function NewProject() {
         </div>
 
         <div>
-          <Label className="text-sm text-muted-foreground mb-1.5 block">Projekto PDF</Label>
-          <UploadZone onFileSelect={setFile} accept=".pdf" label="PDF — KŽ arba interjero projektas" />
+          <Label className="text-sm text-muted-foreground mb-1.5 block">{t('newProject.pdfLabel')}</Label>
+          <UploadZone onFileSelect={setFile} accept=".pdf" label={t('newProject.uploadLabel')} />
         </div>
 
         <Button
@@ -556,7 +604,7 @@ export default function NewProject() {
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12"
         >
           <Rocket className="w-5 h-5 mr-2" />
-          Pradėti analizę
+          {t('newProject.startAnalysis')}
         </Button>
       </div>
     </div>

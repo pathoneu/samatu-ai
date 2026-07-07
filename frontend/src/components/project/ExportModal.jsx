@@ -120,24 +120,30 @@ async function downloadFromBackend(endpoint, project, filename) {
         skyrius: skyrius || '',
       }));
 
-  // 2026-05-06: surface company_name in export. Per-project override wins;
-  // global Settings (Įmonės pavadinimas) is the fallback.
-  let companyName = project.company_name || '';
-  if (!companyName) {
-    try {
-      const s = JSON.parse(localStorage.getItem('samatu_settings') || '{}');
-      companyName = s.company_name || '';
-    } catch { /* ignore */ }
-  }
+  // Pull the contractor's saved identity (Settings → Įmonės informacija) so the
+  // export header renders as a real LT pasiūlymas — company, person, logo, contacts.
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem('samatu_settings') || '{}'); } catch { /* ignore */ }
 
   const payload = {
-    projektas:   project.name,
-    imone:       companyName,
-    eilutes:     rows,
-    prielaidos:  project.prielaidos || {},
-    patalpos:    project.patalpos || [],
+    projektas:    project.name,
+    imone:        project.company_name || s.company_name || '',
+    vadovas:      s.vadovas || '',
+    company_logo: s.company_logo || '',
+    imones_kodas: s.imones_kodas || '',
+    pvm_kodas:    s.pvm_kodas || '',
+    adresas:      s.adresas || '',
+    telefonas:    s.telefonas || '',
+    el_pastas:    s.el_pastas || '',
+    iban:         s.iban || '',
+    uzsakovas:    project.uzsakovas || '',
+    objektas:     project.objektas || '',
+    pasiulymo_nr: project.pasiulymo_nr || '',
+    eilutes:      rows,
+    prielaidos:   project.prielaidos || {},
+    patalpos:     project.patalpos || [],
     perspejimani: project.perspejimani || [],
-    tipas:       project.tipas || project.type || 'kz',
+    tipas:        project.tipas || project.type || 'kz',
   };
 
   const res = await fetch(`${API}/${endpoint}`, {

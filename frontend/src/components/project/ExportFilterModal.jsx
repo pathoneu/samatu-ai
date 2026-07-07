@@ -66,6 +66,11 @@ export default function ExportFilterModal({
     });
   }, [sections]);
 
+  // Per-export client/objektas (2026-06-19) — rendered into the PDF/Excel header
+  // so the deliverable reads as a real pasiūlymas. Defaults from the project.
+  const [uzsakovas, setUzsakovas] = useState(project.uzsakovas || '');
+  const [objektas, setObjektas] = useState(project.objektas || project.name || '');
+
   const allChecked = selected.size === sections.length;
   const noneChecked = selected.size === 0;
 
@@ -83,7 +88,12 @@ export default function ExportFilterModal({
 
   const handleConfirm = () => {
     saveSelection(project.id, selected);
-    onConfirm({ skyriai: selected, format });
+    onConfirm({
+      skyriai: selected,
+      format,
+      uzsakovas: uzsakovas.trim(),
+      objektas: objektas.trim(),
+    });
   };
 
   return (
@@ -102,6 +112,27 @@ export default function ExportFilterModal({
             className="text-muted-foreground hover:text-foreground disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        <div className="px-5 py-3 border-b border-border grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[11px] text-muted-foreground">Užsakovas</label>
+            <input
+              value={uzsakovas}
+              onChange={e => setUzsakovas(e.target.value)}
+              placeholder="UAB Klientas"
+              className="mt-0.5 w-full h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">Objektas</label>
+            <input
+              value={objektas}
+              onChange={e => setObjektas(e.target.value)}
+              placeholder="Objekto pavadinimas / adresas"
+              className="mt-0.5 w-full h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
         </div>
 
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">

@@ -1,0 +1,62 @@
+# Pathon
+
+> Pathon (pathon.eu) is a Lithuanian construction quantity-takeoff and cost-estimation
+> SaaS. A contractor uploads a construction project PDF (floor plans, wall
+> developments, ceiling plans); Pathon reads the drawings, extracts rooms and
+> elements, computes quantities with deterministic Lithuanian-standard formulas,
+> and produces a kiekių žiniaraštis (bill of quantities) and sąmata (estimate)
+> in the Lithuanian format — with 21% PVM, or reverse-charge VAT for renovation
+> projects. Export to Excel (live formulas) and PDF (LOKALINĖ SĄMATA format).
+
+Kalba / language: the product UI and target market are Lithuanian (LT); an
+English UI is available. This file is bilingual where useful.
+
+## Kas yra Pathon (LT)
+
+- Įkeliate statybos projekto PDF brėžinį — Pathon atpažįsta patalpas, sienas,
+  duris, langus, plyteles, LED nišas ir kitus elementus.
+- Kiekiai skaičiuojami deterministinėmis formulėmis pagal Lietuvos praktiką
+  (dažomas plotas, angokraščiai, glaistymo kampai, grindjuostės, GKP lapai,
+  glaistas pagal Q lygį, hidroizoliacija ir kt.).
+- Kiekvienas kiekis turi pasitikėjimo indikatorių: 🟢 nuskaityta iš brėžinio,
+  🟡 apskaičiuota su prielaidomis, 🔴 numatytoji reikšmė — vartotojas mato,
+  ką tikrinti pirmiausia.
+- Prielaidas (lubų aukštį, Q lygį, sienų storį) galima keisti — kiekiai
+  perskaičiuojami iškart, be pakartotinio AI skaitymo.
+- Kainas suveda pats rangovas (produktas neprimeta kainynų); PVM 21 %,
+  renovacijai — atvirkštinis apmokestinimas.
+- Eksportas: Excel su gyvomis formulėmis, PDF (LOKALINĖ SĄMATA), taip pat
+  kiekių žiniaraščio formatai.
+- Interaktyvus PDF žiūryklės režimas: matavimai (atstumas, plotas, perimetras,
+  kiekiai), kalibravimas pagal mastelį, pataisymų įrankiai.
+
+## Who it is for
+
+Lithuanian construction company owners, rangovai (contractors), apdailos
+brigados (finishing crews), and sąmatininkai (estimators) who currently spend
+hours — or pay €200–500 per project — for manual quantity takeoff from PDF
+drawings. Pathon produces the same work in minutes; the user reviews flagged
+items and enters unit prices.
+
+## Honest accuracy statement
+
+Pathon's deterministic formulas match professional estimator output within ~1%
+when inputs are correct. AI *detection* of symbols on drawings (outlets,
+diffusers, windows) is imperfect industry-wide, so every extracted quantity
+carries a confidence flag and the workflow is built around fast human review
+and correction — not blind trust. Extracted quantities are decision-support;
+users must verify before using them in commercial offers.
+
+## Pages
+
+- Pagrindinis / Home: https://pathon.eu/
+- Apie / About: https://pathon.eu/about
+- DUK / FAQ: https://pathon.eu/duk
+- Registracija / Sign up: https://pathon.eu/register
+- Privatumo politika: https://pathon.eu/privacy
+- Naudojimo sąlygos: https://pathon.eu/terms
+
+## Contact
+
+- El. paštas / email: solutions@pathon.eu
+- Company location: Lithuania (EU). Product language: Lithuanian, English.

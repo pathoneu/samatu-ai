@@ -21,6 +21,7 @@ Production hardening (TODO):
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any
@@ -29,6 +30,8 @@ import bcrypt
 from fastapi import HTTPException, Request
 
 import db
+
+log = logging.getLogger("pathon.auth")
 
 
 # Read secret from env (production) OR generate a stable fallback for dev.
@@ -95,6 +98,25 @@ def _ensure_dev_user() -> dict:
     return user
 
 
+# N4 (2026-07-04 pentest, pass 2): a precomputed bcrypt hash (work factor 12) of
+# a fixed throwaway string. The login handler verifies the submitted password
+# against THIS when no user row exists, so the ~168ms bcrypt cost is paid on both
+# the user-exists and no-user paths — closing the ~120× timing oracle that let an
+# attacker enumerate registered emails. It is never a valid credential (no user
+# has this hash; the plaintext is not accepted anywhere).
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(
+    b"n4-timing-equalizer-not-a-real-password", bcrypt.gensalt(rounds=12)
+).decode("utf-8")
+
+
+def dummy_verify_password(plain: str) -> None:
+    """Constant-cost bcrypt verify against a throwaway hash. Return value is
+    intentionally discarded — this exists only to equalize login timing between
+    the user-exists and no-user branches (N4). Call on the no-user path before
+    returning the generic auth error."""
+    verify_password(plain, _DUMMY_PASSWORD_HASH)
+
+
 def hash_password(plain: str) -> str:
     """bcrypt hash with work factor 12 (~250ms on modern CPU)."""
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
@@ -130,11 +152,23 @@ def get_current_user(request: Request) -> dict | None:
     """Returns user dict (sans password_hash) if logged in, else None."""
     if AUTH_DISABLED:
         return _ensure_dev_user()
-    user_id = request.session.get("user_id") if hasattr(request, "session") else None
+    session = request.session if hasattr(request, "session") else {}
+    user_id = session.get("user_id")
     if not user_id:
         return None
     user = db.get_user_by_id(user_id)
     if not user or not user.get("is_active"):
+        return None
+    # F2 (2026-07-04 pentest): reject sessions minted against a stale
+    # session_version. Logout / change-password bump the user row's version, so a
+    # captured pre-logout cookie (cryptographically valid for 30 days) no longer
+    # matches and is refused. A cookie with no "sv" at all is a pre-F2 legacy
+    # session — treat it as stale and force a fresh login.
+    cookie_sv = session.get("sv")
+    current_sv = user.get("session_version")
+    if current_sv is None:
+        current_sv = 1  # rows predating the migration default to 1
+    if cookie_sv != current_sv:
         return None
     user.pop("password_hash", None)
     return user
@@ -150,6 +184,41 @@ def require_user(request: Request) -> dict:
     return user
 
 
+def require_billable_user(request: Request) -> dict:
+    """FastAPI Depends — require_user PLUS the per-user Vision spend cap.
+
+    Use on every endpoint that triggers an Anthropic call. Without it, a paid
+    Vision endpoint authenticated by plain require_user bypasses the spend cap
+    entirely, so a single account can loop it and drain the API key (2026-05-07
+    audit found this on several endpoints; 2026-06-19 closed the api/* routers
+    — vision_fill / lasso_rerun / symbols). The cap helper lives in main.py;
+    it is imported lazily so this module stays free of a circular import."""
+    user = require_user(request)
+    try:
+        from main import _check_user_spend_cap, _reserve_billable
+        _check_user_spend_cap(user["id"])
+        # Project quota/trial is enforced at the project-CREATING extraction
+        # (/extract-interior), NOT on corrections — a correction operates on an
+        # already-created, already-counted project, so it keeps spend-cap
+        # protection but must not re-consume/enforce project quota or the trial.
+        # 2026-06-19 bug-hunt: also record the pre-charge so the cap actually
+        # counts these api/* router calls (vision_fill / lasso_rerun / symbols),
+        # which previously ran the cap check but never wrote any usage.
+        _reserve_billable(user["id"], request.url.path)
+    except HTTPException:
+        raise  # the 429 spend-cap rejection must propagate
+    except Exception:
+        # Deliberately fail-OPEN: a cap-machinery hiccup (DB timeout, import
+        # error) must never 500 a user's request. But it must NOT be silent —
+        # a swallowed failure here means the billable event went unrecorded and
+        # the spend cap was not enforced, so LOG it loudly for aggregation.
+        # (audit 2026-07-06: previously `except Exception: pass`.)
+        log.exception("spend-cap machinery failed for user %s on %s — failing "
+                      "open (request allowed, usage NOT recorded)",
+                      user.get("id"), request.url.path)
+    return user
+
+
 def require_admin(request: Request) -> dict:
     """FastAPI Depends — raises 401 if not logged in, 403 if not admin."""
     if AUTH_DISABLED:
@@ -157,4 +226,34 @@ def require_admin(request: Request) -> dict:
     user = require_user(request)
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Reikia administratoriaus teisių")
+    return user
+
+
+def require_owned_project(request: Request, project_id: str) -> dict:
+    """Canonical auth + ownership gate for any per-project route (pass 3
+    hardening, 2026-07-04).
+
+    Three passes of the pentest found the SAME recurring class: a router-local
+    ``_load_project(project_id, ..., fixture=None)`` helper whose ``fixture``
+    branch RETURNED before ``require_user`` ran, so ``?fixture=<name>`` bypassed
+    auth; the handler then read a ``{URL_project_id}``-keyed per-user store
+    (``data/calibrations/{id}.json``, ``data/annotations/{id}.json``, the PDF
+    byte cache) under the ATTACKER's URL id → unauth cross-tenant read.
+
+    This helper is the single place that gets the order right, so new routers
+    can't reintroduce the bug: it (1) requires a login (401), (2) scopes
+    ``db.get_project`` to the caller (admins see all), (3) returns 404 for a
+    missing/foreign project — never leaking existence. Prefer wiring it as a
+    route-level ``Depends(require_owned_project)`` in the handler SIGNATURE (runs
+    before the body, cannot be short-circuited by a load-helper branch), or —
+    when a ``fixture`` may seed reference data — call it FIRST, before the
+    fixture branch, so no ``{URL_id}``-keyed store is ever read for an
+    unauthenticated/unowned caller.
+
+    Returns the caller's user dict.
+    """
+    user = require_user(request)  # 401 if not logged in
+    user_filter = None if user.get("is_admin") else user["id"]
+    if db.get_project(project_id, user_id=user_filter) is None:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     return user

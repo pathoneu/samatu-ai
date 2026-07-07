@@ -1,11 +1,10 @@
 """Q4 sanding labor uplift tests (Sprint §2A.4 Phase 2).
 
-Verifies that selecting Q4 (gloss/lakuotas paviršius) produces:
-  - Sienų/Lubų šlifavimas line items with " Q4 (80-120 grit, 100% paviršius)" suffix
-  - darbo_norma_h_m2 = 0.30
-  - _q_lygis = "Q4" tag for downstream consumers
-
-Lower Q levels keep the plain "Sienų šlifavimas" / "Lubų šlifavimas" descriptions.
+2026-06-06: paint lines are consolidated (ENABLE_CONSOLIDATE_PAINT_LINES). Q4
+emits ONE combined "Sienų, lubų šlifavimas Q4 (80–120 grit, 100% paviršius)"
+line with darbo_norma_h_m2 = 0.30 and _q_lygis = "Q4". Lower Q levels have NO
+separate šlifavimas line — sanding is folded into the consolidated
+glaistymas/dažymas line (matches the contractor's m² rate).
 """
 
 from extractor.vision_call import _build_pozicijos_from_rooms, _Q4_SANDING_HOURS_PER_M2
@@ -45,7 +44,7 @@ def _find_lines(pozicijos: list, needle: str) -> list:
 def test_q4_walls_sanding_has_uplift():
     parsed = _build_minimal_parsed(q_lygis="Q4")
     out = _build_pozicijos_from_rooms(parsed)
-    matches = _find_lines(out["pozicijos"], "Sienų šlifavimas")
+    matches = _find_lines(out["pozicijos"], "šlifavimas Q4")
     assert len(matches) >= 1
     line = matches[0]
     assert "Q4" in line["aprasymas"]
@@ -64,15 +63,15 @@ def test_q4_lubos_sanding_has_uplift():
     assert line.get("darbo_norma_h_m2") == _Q4_SANDING_HOURS_PER_M2
 
 
-def test_q2_default_no_sanding_uplift():
+def test_q2_default_no_separate_sanding_line():
+    # Q2 (default): sanding is folded into the consolidated glaistymas/dažymas
+    # line — no separate šlifavimas line (matches the contractor). Only Q4 keeps
+    # a standalone šlifavimas line (premium full-surface sanding).
     parsed = _build_minimal_parsed(q_lygis="Q2")
     out = _build_pozicijos_from_rooms(parsed)
     matches = _find_lines(out["pozicijos"], "šlifavimas")
-    assert len(matches) >= 2  # walls + lubos
-    for line in matches:
-        assert "Q4" not in line["aprasymas"]
-        assert "darbo_norma_h_m2" not in line  # plain šlifavimas, contractor prices labor
-        assert "_q_lygis" not in line
+    assert matches == [], \
+        f"Q2 should have no separate sanding line, got {[m['aprasymas'] for m in matches]}"
 
 
 def test_no_overrides_defaults_to_q2():

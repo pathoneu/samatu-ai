@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -11,15 +12,28 @@ import {
   getArchivedProjects, restoreProject, permanentlyDeleteProject,
 } from '@/lib/projectStore';
 import { downloadErrorLog, getErrorLog, clearErrorLog } from '@/lib/errorTracker';
-import { ltPlural } from '@/lib/ltPlural';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { useAuth } from '@/lib/authContext';
 import { API_BASE } from '@/lib/apiBase';
+import BillingSettings from '@/components/billing/BillingSettings';
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [companyName, setCompanyName] = useState('');
   const [vatRate, setVatRate] = useState('21');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Branding / business-document details (2026-06-19) — rendered into export
+  // PDF/Excel headers so the deliverable looks like a real LT pasiūlymas.
+  const [companyLogo, setCompanyLogo] = useState('');
+  const [imonesKodas, setImonesKodas] = useState('');
+  const [pvmKodas, setPvmKodas] = useState('');
+  const [adresas, setAdresas] = useState('');
+  const [telefonas, setTelefonas] = useState('');
+  const [elPastas, setElPastas] = useState('');
+  const [iban, setIban] = useState('');
+  const [vadovas, setVadovas] = useState('');  // person shown under the company name on exports
 
   // Profile fields
   const [profileName, setProfileName] = useState('');
@@ -36,6 +50,14 @@ export default function Settings() {
     const s = getSettings();
     if (s.company_name) setCompanyName(s.company_name);
     if (s.vat_rate) setVatRate(String(s.vat_rate));
+    if (s.company_logo) setCompanyLogo(s.company_logo);
+    if (s.imones_kodas) setImonesKodas(s.imones_kodas);
+    if (s.pvm_kodas) setPvmKodas(s.pvm_kodas);
+    if (s.adresas) setAdresas(s.adresas);
+    if (s.telefonas) setTelefonas(s.telefonas);
+    if (s.el_pastas) setElPastas(s.el_pastas);
+    if (s.iban) setIban(s.iban);
+    if (s.vadovas) setVadovas(s.vadovas);
   }, []);
 
   useEffect(() => {
@@ -45,11 +67,36 @@ export default function Settings() {
     }
   }, [user]);
 
+  const handleLogoFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { toast.error(t('settings.toastLogoImageOnly')); return; }
+    if (file.size > 500 * 1024) { toast.error(t('settings.toastLogoTooBig')); return; }
+    const reader = new FileReader();
+    reader.onload = () => setCompanyLogo(reader.result);
+    reader.onerror = () => toast.error(t('settings.toastFileReadFail'));
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = () => {
     setIsSaving(true);
-    saveSettings({ company_name: companyName, vat_rate: parseInt(vatRate) });
+    // saveSettings REPLACES the whole object — merge with existing so we never
+    // wipe unrelated keys (e.g. price-list prefs stored under the same key).
+    saveSettings({
+      ...getSettings(),
+      company_name: companyName,
+      vat_rate: parseInt(vatRate),
+      company_logo: companyLogo,
+      imones_kodas: imonesKodas,
+      pvm_kodas: pvmKodas,
+      adresas,
+      telefonas,
+      el_pastas: elPastas,
+      iban,
+      vadovas,
+    });
     setIsSaving(false);
-    toast.success('Nustatymai išsaugoti');
+    toast.success(t('settings.toastSettingsSaved'));
   };
 
   const handleProfileSave = async () => {
@@ -65,9 +112,9 @@ export default function Settings() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
-      toast.success('Profilis atnaujintas');
+      toast.success(t('settings.toastProfileUpdated'));
     } catch (e) {
-      toast.error(e.message || 'Klaida');
+      toast.error(e.message || t('settings.toastError'));
     } finally {
       setProfileSaving(false);
     }
@@ -75,11 +122,11 @@ export default function Settings() {
 
   const handlePwChange = async () => {
     if (newPw !== newPw2) {
-      toast.error('Nauji slaptažodžiai nesutampa');
+      toast.error(t('settings.toastPwMismatch'));
       return;
     }
     if (newPw.length < 8) {
-      toast.error('Naujas slaptažodis turi būti ne trumpesnis nei 8 simboliai');
+      toast.error(t('settings.toastPwShort'));
       return;
     }
     setPwSaving(true);
@@ -94,10 +141,10 @@ export default function Settings() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
-      toast.success('Slaptažodis pakeistas');
+      toast.success(t('settings.toastPwChanged'));
       setCurrentPw(''); setNewPw(''); setNewPw2('');
     } catch (e) {
-      toast.error(e.message || 'Klaida');
+      toast.error(e.message || t('settings.toastError'));
     } finally {
       setPwSaving(false);
     }
@@ -105,8 +152,8 @@ export default function Settings() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-foreground mb-1">Nustatymai</h1>
-      <p className="text-sm text-muted-foreground mb-8">Bendri programos nustatymai</p>
+      <h1 className="text-2xl font-bold text-foreground mb-1">{t('settings.title')}</h1>
+      <p className="text-sm text-muted-foreground mb-8">{t('settings.subtitle')}</p>
 
       <div className="space-y-8">
         <div className="bg-card border border-border rounded-xl p-6">
@@ -115,24 +162,35 @@ export default function Settings() {
               <Building2 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-semibold text-foreground">Įmonės informacija</h2>
-              <p className="text-xs text-muted-foreground">Numatytieji duomenys naujiems projektams</p>
+              <h2 className="font-semibold text-foreground">{t('settings.company.heading')}</h2>
+              <p className="text-xs text-muted-foreground">{t('settings.company.sub')}</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
-              <Label className="text-sm text-muted-foreground">Įmonės pavadinimas</Label>
+              <Label className="text-sm text-muted-foreground">{t('settings.company.name')}</Label>
               <Input
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="UAB Statyba"
+                placeholder={t('settings.company.namePlaceholder')}
                 className="mt-1.5 bg-background border-border"
               />
             </div>
 
             <div>
-              <Label className="text-sm text-muted-foreground">PVM tarifas</Label>
+              <Label className="text-sm text-muted-foreground">{t('settings.company.representative')}</Label>
+              <Input
+                value={vadovas}
+                onChange={(e) => setVadovas(e.target.value)}
+                placeholder={t('settings.company.representativePlaceholder')}
+                className="mt-1.5 bg-background border-border"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">{t('settings.company.representativeHint')}</p>
+            </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground">{t('settings.company.vatRate')}</Label>
               <Select value={vatRate} onValueChange={setVatRate}>
                 <SelectTrigger className="mt-1.5 bg-background border-border">
                   <SelectValue />
@@ -144,6 +202,56 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground">{t('settings.company.logo')}</Label>
+              <div className="mt-1.5 flex items-center gap-3">
+                {companyLogo ? (
+                  <img src={companyLogo} alt={t('settings.company.logoAlt')} className="h-12 w-auto max-w-[140px] object-contain rounded border border-border bg-white p-1" />
+                ) : (
+                  <div className="h-12 w-[140px] rounded border border-dashed border-border flex items-center justify-center text-[11px] text-muted-foreground">{t('settings.company.noLogo')}</div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <label className="inline-flex items-center px-3 py-1.5 text-xs rounded border border-border bg-background hover:bg-muted/40 cursor-pointer">
+                    {t('settings.company.upload')}
+                    <input type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
+                  </label>
+                  {companyLogo && (
+                    <button type="button" onClick={() => setCompanyLogo('')} className="text-[11px] text-muted-foreground hover:text-destructive text-left">
+                      {t('settings.company.remove')}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">{t('settings.company.logoHint')}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground">{t('settings.company.companyCode')}</Label>
+                <Input value={imonesKodas} onChange={e => setImonesKodas(e.target.value)} placeholder="123456789" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">{t('settings.company.pvmCode')}</Label>
+                <Input value={pvmKodas} onChange={e => setPvmKodas(e.target.value)} placeholder="LT123456789" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-sm text-muted-foreground">{t('settings.company.address')}</Label>
+                <Input value={adresas} onChange={e => setAdresas(e.target.value)} placeholder={t('settings.company.addressPlaceholder')} className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">{t('settings.company.phone')}</Label>
+                <Input value={telefonas} onChange={e => setTelefonas(e.target.value)} placeholder="+370 600 00000" className="mt-1.5 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">{t('settings.company.email')}</Label>
+                <Input value={elPastas} onChange={e => setElPastas(e.target.value)} placeholder={t('settings.company.emailPlaceholder')} className="mt-1.5 bg-background border-border" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-sm text-muted-foreground">{t('settings.company.iban')}</Label>
+                <Input value={iban} onChange={e => setIban(e.target.value)} placeholder={t('settings.company.ibanPlaceholder')} className="mt-1.5 bg-background border-border" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -153,7 +261,7 @@ export default function Settings() {
           className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
         >
           <Save className="w-4 h-4 mr-2" />
-          {isSaving ? 'Saugoma...' : 'Išsaugoti programos nustatymus'}
+          {isSaving ? t('settings.saving') : t('settings.saveAppSettings')}
         </Button>
 
         {/* Account profile (Phase 13) */}
@@ -164,22 +272,22 @@ export default function Settings() {
                 <User className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="font-semibold text-foreground">Paskyra</h2>
-                <p className="text-xs text-muted-foreground">{user.email}{user.is_admin && ' · administratorius'}</p>
+                <h2 className="font-semibold text-foreground">{t('settings.account.heading')}</h2>
+                <p className="text-xs text-muted-foreground">{user.email}{user.is_admin && ` · ${t('settings.account.admin')}`}</p>
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="profile-name">Vardas</Label>
+                <Label htmlFor="profile-name">{t('settings.account.name')}</Label>
                 <Input id="profile-name" value={profileName} onChange={e => setProfileName(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="profile-company">Įmonė</Label>
+                <Label htmlFor="profile-company">{t('settings.account.company')}</Label>
                 <Input id="profile-company" value={profileCompany} onChange={e => setProfileCompany(e.target.value)} className="mt-1.5" />
               </div>
               <Button onClick={handleProfileSave} disabled={profileSaving} variant="outline">
                 <Save className="w-4 h-4 mr-2" />
-                {profileSaving ? 'Saugoma...' : 'Išsaugoti profilį'}
+                {profileSaving ? t('settings.saving') : t('settings.account.saveProfile')}
               </Button>
             </div>
           </div>
@@ -193,21 +301,21 @@ export default function Settings() {
                 <KeyRound className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="font-semibold text-foreground">Slaptažodis</h2>
-                <p className="text-xs text-muted-foreground">Pakeiskite reguliariai saugumui</p>
+                <h2 className="font-semibold text-foreground">{t('settings.password.heading')}</h2>
+                <p className="text-xs text-muted-foreground">{t('settings.password.sub')}</p>
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="cur-pw">Dabartinis slaptažodis</Label>
+                <Label htmlFor="cur-pw">{t('settings.password.current')}</Label>
                 <Input id="cur-pw" type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="new-pw">Naujas slaptažodis (min 8 simb.)</Label>
+                <Label htmlFor="new-pw">{t('settings.password.new')}</Label>
                 <Input id="new-pw" type="password" minLength={8} value={newPw} onChange={e => setNewPw(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="new-pw2">Pakartoti naują slaptažodį</Label>
+                <Label htmlFor="new-pw2">{t('settings.password.repeat')}</Label>
                 <Input id="new-pw2" type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} className="mt-1.5" />
               </div>
               <Button
@@ -216,11 +324,14 @@ export default function Settings() {
                 variant="outline"
               >
                 <KeyRound className="w-4 h-4 mr-2" />
-                {pwSaving ? 'Keičiama...' : 'Pakeisti slaptažodį'}
+                {pwSaving ? t('settings.password.changing') : t('settings.password.change')}
               </Button>
             </div>
           </div>
         )}
+
+        {/* Phase 7: Atsiskaitymas — renders null unless billing is enabled. */}
+        <BillingSettings />
 
         {/* Sprint §13: Projektų atsarginė kopija (export/import) */}
         <BackupSection />
@@ -236,6 +347,8 @@ export default function Settings() {
 }
 
 function TrashSection() {
+  const { t } = useTranslation();
+  const confirm = useConfirm();
   const [archived, setArchived] = useState(() => getArchivedProjects());
 
   const refresh = () => setArchived(getArchivedProjects());
@@ -243,28 +356,33 @@ function TrashSection() {
   const handleRestore = (id) => {
     restoreProject(id);
     refresh();
-    toast.success('Projektas atstatytas');
+    toast.success(t('settings.trash.toastRestored'));
   };
 
-  const handlePermanent = (id, name) => {
-    if (!window.confirm(`Visam laikui ištrinti „${name}"? Šio veiksmo atšaukti negalėsi.`)) return;
+  const handlePermanent = async (id, name) => {
+    if (!(await confirm({
+      title: t('settings.trash.confirmTitle'),
+      description: `${t('settings.trash.confirmDescA')}${name}${t('settings.trash.confirmDescB')}`,
+      confirmText: t('settings.trash.confirmDelete'),
+      destructive: true,
+    }))) return;
     permanentlyDeleteProject(id);
     refresh();
-    toast.success('Projektas ištrintas visam laikui');
+    toast.success(t('settings.trash.toastDeletedForever'));
   };
 
   const fmtDaysLeft = (archivedAt) => {
     if (!archivedAt) return '—';
     const expires = new Date(archivedAt).getTime() + 30 * 86400 * 1000;
     const days = Math.max(0, Math.round((expires - Date.now()) / 86400 / 1000));
-    return `${days} d.`;
+    return t('settings.trash.days', { count: days });
   };
 
   return (
     <div className="border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Trash2 className="w-4 h-4 text-foreground" />
-        <h3 className="text-sm font-semibold">Šiukšliadėžė</h3>
+        <h3 className="text-sm font-semibold">{t('settings.trash.heading')}</h3>
         {archived.length > 0 && (
           <span
             className="mono tabular text-[10px] uppercase tracking-wide font-medium px-1.5 py-0 rounded"
@@ -278,11 +396,10 @@ function TrashSection() {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Ištrinti projektai laikomi 30 dienų — gali atstatyti, jei netyčia ištrynei.
-        Po šio termino jie ištrinami visam laikui.
+        {t('settings.trash.desc')}
       </p>
       {archived.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">Šiukšliadėžė tuščia.</p>
+        <p className="text-xs text-muted-foreground italic">{t('settings.trash.empty')}</p>
       ) : (
         <div className="space-y-2">
           {archived.map(p => (
@@ -292,10 +409,10 @@ function TrashSection() {
               style={{ background: 'hsl(var(--bg-1))' }}
             >
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-foreground truncate">{p.name || 'Be pavadinimo'}</div>
+                <div className="text-sm font-medium text-foreground truncate">{p.name || t('settings.trash.untitled')}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Ištrinta: {p._archived_at ? new Date(p._archived_at).toISOString().slice(0, 10) : '—'}
-                  {' · '}Liko: {fmtDaysLeft(p._archived_at)}
+                  {t('settings.trash.deletedLabel')} {p._archived_at ? new Date(p._archived_at).toISOString().slice(0, 10) : '—'}
+                  {' · '}{t('settings.trash.leftLabel')} {fmtDaysLeft(p._archived_at)}
                 </div>
               </div>
               <Button
@@ -303,7 +420,7 @@ function TrashSection() {
                 variant="outline"
                 size="sm"
               >
-                Atstatyti
+                {t('settings.trash.restore')}
               </Button>
               <Button
                 onClick={() => handlePermanent(p.id, p.name)}
@@ -311,7 +428,7 @@ function TrashSection() {
                 size="sm"
                 style={{ color: 'hsl(var(--source-ai))' }}
               >
-                Ištrinti dabar
+                {t('settings.trash.deleteNow')}
               </Button>
             </div>
           ))}
@@ -322,45 +439,57 @@ function TrashSection() {
 }
 
 function ErrorLogSection() {
+  const { t } = useTranslation();
+  const confirm = useConfirm();
   const [count, setCount] = useState(getErrorLog().length);
 
   const handleExport = () => {
     const entries = getErrorLog();
     if (entries.length === 0) {
-      toast.info('Klaidų žurnalas tuščias.');
+      toast.info(t('settings.errorLog.toastEmpty'));
       return;
     }
     downloadErrorLog();
-    toast.success(`Eksportuota ${entries.length} klaida${entries.length === 1 ? '' : entries.length < 10 ? 's' : 'ų'}`);
+    // Preserve the original LT form-selection logic verbatim: 1 → singular,
+    // 2-9 → paucal, ≥10 → genitive plural.
+    const n = entries.length;
+    const key = n === 1
+      ? 'settings.errorLog.toastExportedSingular'
+      : n < 10
+        ? 'settings.errorLog.toastExportedPaucal'
+        : 'settings.errorLog.toastExportedPlural';
+    toast.success(t(key, { count: n }));
   };
 
-  const handleClear = () => {
-    if (!window.confirm('Ar tikrai išvalyti klaidų žurnalą?')) return;
+  const handleClear = async () => {
+    if (!(await confirm({
+      title: t('settings.errorLog.confirmTitle'),
+      confirmText: t('settings.errorLog.confirmClear'),
+      destructive: true,
+    }))) return;
     clearErrorLog();
     setCount(0);
-    toast.success('Žurnalas išvalytas');
+    toast.success(t('settings.errorLog.toastCleared'));
   };
 
   return (
     <div className="border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Bug className="w-4 h-4 text-foreground" />
-        <h3 className="text-sm font-semibold">Klaidų žurnalas</h3>
+        <h3 className="text-sm font-semibold">{t('settings.errorLog.heading')}</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Naršyklės atminty saugoma iki 100 paskutinių klaidų. Eksportuok JSON,
-        jei reikia atsiųsti pagalbai. Žurnalas neapima asmeninių duomenų — tik
-        klaidos tekstas, puslapis ir laikas.
+        {t('settings.errorLog.desc')}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           onClick={handleExport}
           variant="outline"
           disabled={count === 0}
-          title={count === 0 ? 'Žurnalas tuščias' : `Eksportuoti ${count} įrašus`}
+          title={count === 0 ? t('settings.errorLog.exportBtnEmptyTitle') : t('settings.errorLog.exportBtnTitle', { count })}
         >
           <Download className="w-4 h-4 mr-2" />
-          Eksportuoti klaidų žurnalą {count > 0 ? `(${count})` : ''}
+          {t('settings.errorLog.exportBtn')} {count > 0 ? `(${count})` : ''}
         </Button>
         <Button
           onClick={handleClear}
@@ -368,7 +497,7 @@ function ErrorLogSection() {
           disabled={count === 0}
         >
           <Trash2 className="w-4 h-4 mr-2" />
-          Išvalyti
+          {t('settings.errorLog.clear')}
         </Button>
       </div>
     </div>
@@ -376,15 +505,16 @@ function ErrorLogSection() {
 }
 
 function BackupSection() {
+  const { t } = useTranslation();
   const [importing, setImporting] = useState(false);
   const projectCount = getProjects().length;
 
   const handleExport = () => {
     try {
       downloadProjectsBackup();
-      toast.success(`Atsarginė kopija atsisiųsta (${projectCount} ${ltPlural(projectCount, 'projektas', 'projektai', 'projektų')})`);
+      toast.success(t('settings.backup.toastExported', { count: projectCount }));
     } catch (e) {
-      toast.error(`Nepavyko eksportuoti: ${e.message}`);
+      toast.error(t('settings.backup.toastExportFail', { error: e.message }));
     }
   };
 
@@ -396,17 +526,20 @@ function BackupSection() {
       try {
         const result = importProjectsBackup(reader.result, { mergeStrategy: 'merge' });
         toast.success(
-          `Importuota: ${result.projects_imported} ${ltPlural(result.projects_imported, 'projektas', 'projektai', 'projektų')}. Iš viso saugykloje: ${result.projects_total}.`
+          t('settings.backup.toastImported', {
+            count: result.projects_imported,
+            total: result.projects_total,
+          })
         );
         setTimeout(() => window.location.reload(), 800);
       } catch (e) {
-        toast.error(e.message || 'Importas nepavyko');
+        toast.error(e.message || t('settings.backup.toastImportFail'));
       } finally {
         setImporting(false);
       }
     };
     reader.onerror = () => {
-      toast.error('Nepavyko nuskaityti failo');
+      toast.error(t('settings.backup.toastFileReadFail'));
       setImporting(false);
     };
     reader.readAsText(file);
@@ -416,11 +549,10 @@ function BackupSection() {
     <div className="border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Download className="w-4 h-4 text-foreground" />
-        <h3 className="text-sm font-semibold">Atsarginė kopija</h3>
+        <h3 className="text-sm font-semibold">{t('settings.backup.heading')}</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Saugykloje šiuo metu: <strong>{projectCount}</strong> projekt{projectCount === 1 ? 'as' : projectCount % 10 >= 2 && projectCount % 10 <= 9 && (projectCount % 100 < 10 || projectCount % 100 >= 20) ? 'ai' : 'ų'}.
-        Eksportuok JSON failą, kad galėtum perkelti projektus į kitą kompiuterį arba atstatyti, jei išvalyta naršyklės istorija.
+        {t('settings.backup.descPrefix')}<strong>{projectCount}</strong>{t('settings.backup.descSuffix', { count: projectCount })}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -429,7 +561,7 @@ function BackupSection() {
           disabled={projectCount === 0}
         >
           <Download className="w-4 h-4 mr-2" />
-          Eksportuoti JSON
+          {t('settings.backup.exportJson')}
         </Button>
         <label className="inline-flex items-center">
           <input
@@ -447,7 +579,7 @@ function BackupSection() {
           >
             <label htmlFor="backup-import-file" className="cursor-pointer">
               <Upload className="w-4 h-4 mr-2" />
-              {importing ? 'Importuojama...' : 'Importuoti JSON'}
+              {importing ? t('settings.backup.importing') : t('settings.backup.importJson')}
             </label>
           </Button>
         </label>
@@ -462,9 +594,7 @@ function BackupSection() {
       >
         <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>
-          Importas <strong>sujungia</strong> projektus pagal ID (naujesni laikai
-          perrašo senesnius). PDF brėžiniai NĖRA atsarginėje kopijoje — jie
-          saugomi atskirai (IndexedDB) ir nepersikelia tarp kompiuterių.
+          <Trans i18nKey="settings.backup.note"><strong>x</strong></Trans>
         </span>
       </div>
     </div>

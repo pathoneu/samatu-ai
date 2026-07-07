@@ -1,0 +1,300 @@
+{
+  "slug": "sernu",
+  "source": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
+  "n_line_items": 32,
+  "sections": [
+    "Sienų lubų glaistymas dažymas",
+    "Plytelių klijavimas",
+    "Statybvietės išlaidos"
+  ],
+  "line_items": [
+    {
+      "page": 1,
+      "nr": "1",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų lyginimas sausu gipsiniu tinku\n\"Rotband\"",
+      "unit": "m2",
+      "quantity": 132.36,
+      "raw_qty": "132,36"
+    },
+    {
+      "page": 1,
+      "nr": "2",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų, lubų glaistymas/dažymas",
+      "unit": "m2; b/m",
+      "quantity": 461.31,
+      "raw_qty": "461,31"
+    },
+    {
+      "page": 1,
+      "nr": "3",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Papildomas sienų glaistymas",
+      "unit": "m2",
+      "quantity": 395.19,
+      "raw_qty": "395,19"
+    },
+    {
+      "page": 1,
+      "nr": "4",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Durų angų paruošimas beapvadinėms durims",
+      "unit": "m",
+      "quantity": 33.97,
+      "raw_qty": "33,97"
+    },
+    {
+      "page": 1,
+      "nr": "5",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Dažymo kampų montavimas",
+      "unit": "m",
+      "quantity": 303.25,
+      "raw_qty": "303,25"
+    },
+    {
+      "page": 1,
+      "nr": "6",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų gipsinių difūzorių apdirbimas\n(apvalių)",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "7",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų difūzorių apdirbimas (pailgų)",
+      "unit": "vnt",
+      "quantity": 9.0,
+      "raw_qty": "9"
+    },
+    {
+      "page": 1,
+      "nr": "7",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų revizinių durelių apdirbimas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "8",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Durų angų siaurinimas žeminimas",
+      "unit": "m",
+      "quantity": 7.88,
+      "raw_qty": "7,88"
+    },
+    {
+      "page": 1,
+      "nr": "9",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Angokraščių apdirbimas gipso kartonu",
+      "unit": "m",
+      "quantity": 85.45,
+      "raw_qty": "85,45"
+    },
+    {
+      "page": 1,
+      "nr": "10",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Stoglangių apdirbimas",
+      "unit": "vnt",
+      "quantity": 6.0,
+      "raw_qty": "6"
+    },
+    {
+      "page": 1,
+      "nr": "11",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Štrabų sienose užtaisymas",
+      "unit": "m",
+      "quantity": 18.0,
+      "raw_qty": "18"
+    },
+    {
+      "page": 1,
+      "nr": "12",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Gipso kartono pjovimas lubose, šešėlinei\nsiūlei įrengti",
+      "unit": "m",
+      "quantity": 19.0,
+      "raw_qty": "19"
+    },
+    {
+      "page": 1,
+      "nr": "13",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Plyšinių difūzorių reguliavimas/ perdarymas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "14",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Gipso kartono klijavimas ant sienos katilinėje\nWC rėmui uždengti",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "15",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Katiliės betono lubų valymas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": null,
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Viso už skyrių",
+      "unit": null,
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "16",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelių klijavimas ant sienų ir grindų (\nstandartinio formato plytelės)",
+      "unit": "m2",
+      "quantity": 101.57,
+      "raw_qty": "101,57"
+    },
+    {
+      "page": 1,
+      "nr": "17",
+      "section": "Plytelių klijavimas",
+      "name": "Angokraščių ir nišų šampunui klijavimas\nplytelėmis",
+      "unit": "b/m",
+      "quantity": 25.74,
+      "raw_qty": "25,74"
+    },
+    {
+      "page": 1,
+      "nr": "18",
+      "section": "Plytelių klijavimas",
+      "name": "Nuolydžio formavimas dušo kabinoje",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "19",
+      "section": "Plytelių klijavimas",
+      "name": "Latako montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "20",
+      "section": "Plytelių klijavimas",
+      "name": "Trapo montavimas katilinėje",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "21",
+      "section": "Plytelių klijavimas",
+      "name": "Hidroizoliacijos įrengimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "22",
+      "section": "Plytelių klijavimas",
+      "name": "Skylių gręžimas plytelėse",
+      "unit": "vnt",
+      "quantity": 49.0,
+      "raw_qty": "49"
+    },
+    {
+      "page": 1,
+      "nr": "23",
+      "section": "Plytelių klijavimas",
+      "name": "Kampų silikonavimas",
+      "unit": "m",
+      "quantity": 60.54,
+      "raw_qty": "60,54"
+    },
+    {
+      "page": 1,
+      "nr": "24",
+      "section": "Plytelių klijavimas",
+      "name": "Plintusų supjovimas ir klijavimas",
+      "unit": "m",
+      "quantity": 8.33,
+      "raw_qty": "8,33"
+    },
+    {
+      "page": 1,
+      "nr": "25",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelių supjovimas 45⁰ kampu",
+      "unit": "m",
+      "quantity": 32.52,
+      "raw_qty": "32,52"
+    },
+    {
+      "page": 1,
+      "nr": null,
+      "section": "Plytelių klijavimas",
+      "name": "Viso už skyrių",
+      "unit": null,
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 2,
+      "nr": "26",
+      "section": "Statybvietės išlaidos",
+      "name": "Šiukšlių išvežimas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 2,
+      "nr": "27",
+      "section": "Statybvietės išlaidos",
+      "name": "Pastolių nuoma (aukštesnių nei 3m)",
+      "unit": "d.d.",
+      "quantity": 25.0,
+      "raw_qty": "25"
+    },
+    {
+      "page": 2,
+      "nr": "28",
+      "section": "Statybvietės išlaidos",
+      "name": "Drėgmės surinkėjo nuoma",
+      "unit": "d.d.",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 2,
+      "nr": null,
+      "section": "Statybvietės išlaidos",
+      "name": "Viso už skyrių",
+      "unit": null,
+      "quantity": null,
+      "raw_qty": null
+    }
+  ]
+}

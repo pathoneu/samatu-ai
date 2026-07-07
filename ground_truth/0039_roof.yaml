@@ -1,0 +1,94 @@
+# ground_truth/0039_roof.yaml
+project_id: 0039_patikslinta
+source_pdf: "0039-01-TDP-SK patikslinta.pdf"
+location: "P. Kriaučiūno g. 13A, Marijampolė"
+statybos_rusis: rekonstrukcija
+statinio_kategorija: ypatingasis
+purpose: socialinė_globos_pastatas
+dalys_available: [SK]        # PDF is SK dalis ONLY — SA missing
+
+roof:
+  type: dvislaitis             # 2-pitch gable
+  asymmetric: false
+  slopes:
+    - side: long
+      angle_deg: 30           # back-solved from roofer's 231 m² + 4.5m rafters
+  building_footprint_outer_walls:
+    # NOTE: derived from SK murloto 48 m / 2 long sides → 24m long
+    width_m: 7.5              # back-solved: half_width/cos(30°) ≈ 4.33m rafter matches spec
+    length_m: 25.34           # from HEA 160 sija L=25340
+  roof_footprint_with_eaves:
+    width_m: 7.5              # SK dalis does not show eaves separately — assumed equal
+    length_m: 25.34
+  eaves_overhang_m: 0.0       # CANNOT confirm without SA dalis; assumed 0 to match roofer
+  wall_thickness_m: 0.30      # rekonstrukcija existing walls, est.
+  chimney_count: 1
+  rooflight_count: 0
+  windows_count: 12           # per roofer sąmata
+  roof_material: unknown      # not in SK dalis (would be in SA)
+
+# Structural inputs (UNIQUE to having SK dalis)
+structural_inputs:
+  gegnes_count: 86
+  gegnes_length_m: 4.5
+  gegnes_section_mm: "50x250"
+  stygos_count: 43
+  stygos_length_m: 5.0
+  murloto_total_length_m: 48      # cross-check: ≈ 2 × building_length_m
+  statramsciai_count: 80
+  statramsciai_length_m: 6.0
+  hea160_beams_total_m: 47.9      # 2 × 25.34 - corner overlap
+
+roofer_samata:
+  source: "owner_friend_roofer_quoted_2026-05-12"
+  pvm_included: false
+  line_items:
+    - position: stogas
+      qty: 231
+      unit: m2
+      eur_per_unit: 40.00
+      sum_eur: 9240.00
+    - position: sienos
+      qty: 135
+      unit: m2
+      eur_per_unit: 50.00
+      sum_eur: 6750.00
+    - position: vejalentes
+      qty: 18
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 216.00
+    - position: kraigai
+      qty: 26
+      unit: m
+      eur_per_unit: 12.00
+      sum_eur: 312.00
+    - position: latakai
+      qty: 51
+      unit: m
+      eur_per_unit: 20.00
+      sum_eur: 1020.00
+    - position: kaminelis
+      qty: 1
+      unit: vnt
+      eur_per_unit: 70.00
+      sum_eur: 70.00
+    - position: apsaugine_tvorele
+      qty: 51
+      unit: m
+      eur_per_unit: 20.00
+      sum_eur: 1020.00
+    - position: langu_apdirbimas
+      qty: 12
+      unit: vnt
+      eur_per_unit: 150.00
+      sum_eur: 1800.00
+  total_eur_no_vat: 20458.00
+
+expected_extractor_output:
+  stogas_m2: 231         # ±5%
+  sienos_m2: 134.7       # ±10% (gablai + soflitas)
+  vejalentes_m: 18.0     # ±5% (= 4 × 4.5m raker)
+  kraigai_m: 37.0        # ±5% — NOTE: my calc gave 37, roofer 26 (close but lower)
+  latakai_m: 51.5        # ±2% (long sides only for dvišlaitis)
+  apsaugine_tvorele_m: 51.5  # = latakai for safety zones

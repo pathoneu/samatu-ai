@@ -8,9 +8,8 @@ import { Check, Pencil, Sparkles } from 'lucide-react';
  *   - user     → pencil icon (blue) — user edited
  *   - verified → check icon (green) — user pressed Patikrinta
  *
- * Pairs with the click-to-correct flow: clicking a CalcCard cell opens the
- * CorrectionPanel; saving with "Patikrinta" upgrades source → 'verified'
- * which triggers the green check here.
+ * Pairs with the correction flow: editing a line marks source → 'user', and
+ * confirming it marks source → 'verified', which triggers the green check here.
  */
 export function VerifiedBadge({ source }) {
   if (source === 'verified') {

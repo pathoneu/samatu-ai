@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1200px; height:630px; overflow:hidden; background:#15181E;
+         font-family:-apple-system,'Helvetica Neue',system-ui,sans-serif; position:relative; }
+  /* blueprint grid */
+  .grid { position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(247,107,28,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(247,107,28,.06) 1px, transparent 1px);
+    background-size:48px 48px; }
+  .glow { position:absolute; right:-180px; top:-180px; width:560px; height:560px;
+    background:radial-gradient(circle, rgba(247,107,28,.16), transparent 65%); }
+  .wrap { position:relative; height:100%; padding:72px 84px; display:flex;
+    flex-direction:column; justify-content:space-between; }
+  .tick { font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:19px;
+    letter-spacing:.22em; color:#F76B1C; font-weight:600; }
+  h1 { font-size:118px; font-weight:800; color:#EDEBE8; letter-spacing:-0.03em; line-height:1; }
+  h1 .dot { color:#F76B1C; }
+  .tag { font-size:41px; color:#B9B5AF; font-weight:500; letter-spacing:-0.01em; margin-top:22px; }
+  .flow { display:flex; align-items:center; gap:26px; font-family:ui-monospace,'SF Mono',Menlo,monospace;
+    font-size:25px; color:#8E8A84; }
+  .chip { border:1.5px solid #3A3F49; border-radius:10px; padding:13px 24px; color:#D9D6D1; background:rgba(255,255,255,.02); }
+  .chip.hot { border-color:#F76B1C; color:#F76B1C; background:rgba(247,107,28,.08); }
+  .arrow { color:#F76B1C; font-size:30px; }
+  /* dimension line motif */
+  .dim { position:absolute; left:84px; right:84px; bottom:196px; height:1px; background:#3A3F49; }
+  .dim:before, .dim:after { content:''; position:absolute; top:-7px; width:1px; height:15px; background:#3A3F49; }
+  .dim:before { left:0; } .dim:after { right:0; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <div class="wrap">
+    <div>
+      <div class="tick">01 / STATYBŲ KIEKIAI IŠ BRĖŽINIŲ</div>
+      <h1>Pathon<span class="dot">.</span></h1>
+      <div class="tag">PDF brėžinys → sąmata Lietuvos formatu per kelias minutes.</div>
+    </div>
+    <div class="dim"></div>
+    <div class="flow">
+      <div class="chip">PROJEKTO PDF</div>
+      <div class="arrow">→</div>
+      <div class="chip">KIEKIAI + 21% PVM</div>
+      <div class="arrow">→</div>
+      <div class="chip hot">SĄMATA .XLSX / .PDF</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * StatsBar — 3-cell summary grid for dashboard. Mirrors claude.ai/design
@@ -42,6 +43,7 @@ function fmtDuration(seconds) {
 }
 
 export default function StatsBar({ projects }) {
+  const { t } = useTranslation();
   // Sprint §28: filter out archived projects from stats (consistent with Dashboard)
   const active = projects.filter(p => !p._archived);
   const totalProjects = active.length;
@@ -72,39 +74,39 @@ export default function StatsBar({ projects }) {
       style={{ gap: 1, background: 'hsl(var(--border))' }}
     >
       <StatCell
-        label="Aktyvūs projektai"
+        label={t('dashboard.stats.activeProjects')}
         value={String(totalProjects)}
-        sub={totalProjects > 0 ? 'visi paruošti' : 'pradėk pirmąjį'}
+        sub={totalProjects > 0 ? t('dashboard.stats.activeProjectsSubReady') : t('dashboard.stats.activeProjectsSubEmpty')}
       />
       <StatCell
-        label="Bendra suma su PVM"
+        label={t('dashboard.stats.totalWithVat')}
         value={
           totalValueWithVat > 0
             ? totalValueWithVat.toLocaleString('lt-LT', { maximumFractionDigits: 0 })
             : '—'
         }
         suffix={totalValueWithVat > 0 ? '€' : null}
-        sub={totalValueWithVat > 0 ? 'visi paruošti' : 'kainos dar nesuvestos'}
+        sub={totalValueWithVat > 0 ? t('dashboard.stats.totalWithVatSubReady') : t('dashboard.stats.totalWithVatSubEmpty')}
       />
       <StatCell
-        label="Visas plotas"
+        label={t('dashboard.stats.totalArea')}
         value={
           totalAreaM2 > 0
             ? totalAreaM2.toLocaleString('lt-LT', { maximumFractionDigits: 1 })
             : '—'
         }
         suffix={totalAreaM2 > 0 ? 'm²' : null}
-        sub={totalAreaM2 > 0 ? 'patalpų suma per visus' : null}
+        sub={totalAreaM2 > 0 ? t('dashboard.stats.totalAreaSub') : null}
       />
       <StatCell
-        label="Vid. pozicijų sk."
+        label={t('dashboard.stats.avgPositions')}
         value={avgPozicijuCount > 0 ? String(avgPozicijuCount) : '—'}
-        sub={avgPozicijuCount > 0 ? 'eilutės per projektą' : null}
+        sub={avgPozicijuCount > 0 ? t('dashboard.stats.avgPositionsSub') : null}
       />
       <StatCell
-        label="Per 30 d."
+        label={t('dashboard.stats.last30d')}
         value={String(recent30d)}
-        sub={recent30d > 0 ? 'naujų projektų' : 'nėra naujų'}
+        sub={recent30d > 0 ? t('dashboard.stats.last30dSub') : t('dashboard.stats.last30dSubEmpty')}
       />
     </div>
   );

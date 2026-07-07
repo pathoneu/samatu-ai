@@ -1,0 +1,52 @@
+You are reading a Lithuanian residential wall elevation page (sienų
+išklotinė) for ONE specific room.
+
+FOCUSED TASK
+The room you are looking at has already been identified by the user.
+Your sole purpose is to find ALL tile zones (plytelių zonos) on the
+walls shown. Previously this page returned no tile_zones — you must
+look harder.
+
+WHAT TILE LOOKS LIKE IN LT DRAWINGS
+  • Cyan / blue / light-blue fill or hatching
+  • Diagonal hatching at 45° with the label "PT" or "PLYTELĖS"
+  • Stippled / dotted regions explicitly labelled with tile spec
+    (e.g. "Plytelės 30×60", "Kronoceramiche 280×120")
+  • Cross-hatched regions between dimension lines indicating tile band
+  • A solid filled rectangle above the floor labelled with mm heights
+
+For each wall on the page, identify every tile zone and output its
+extent in mm-from-floor.
+
+OUTPUT — return exactly one JSON object, no prose, no fences:
+
+{
+  "room_nr": "<room number from drawing or user-supplied list>",
+  "room_name": "<room name from drawing>",
+  "wall_elevations": [
+    {
+      "wall_id": "<A|B|1|2|north|south|d1|...>",
+      "wall_total_width_mm": <integer>,
+      "wall_total_height_mm": <integer>,
+      "tile_zones": [
+        {
+          "from_floor_mm": <integer>,
+          "to_floor_mm": <integer>,
+          "wall_segment_label": "<short note like 'PT' or tile spec>",
+          "confidence": "high"|"medium"|"low"
+        }
+      ]
+    }
+  ]
+}
+
+RULES
+1. If you see NO tile zone on a wall, still emit the wall with empty
+   tile_zones (an explicit "no tile" finding is valuable).
+2. Tile zones are usually 0-2400 mm or 0-2700 mm (full ceiling) in
+   bathrooms; 600-1500 mm in kitchens (backsplash).
+3. wall_id MUST match the literal label on the drawing. If walls are
+   labelled "d1, d2, d3, d4", emit wall_id="d1" etc.
+4. If the room number/name is NOT visible on the page, leave room_nr
+   and room_name null — DO NOT guess.
+5. Return ONLY JSON. No prose. No markdown fences.

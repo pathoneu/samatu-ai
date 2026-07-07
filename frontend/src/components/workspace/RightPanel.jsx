@@ -10,10 +10,10 @@ import { QuantitiesPanel } from '../panels/QuantitiesPanel';
 export function RightPanel({ rooms, pozicijos, currentAssumptions, onRecomputed, onGestureEvent, warnings }) {
   return (
     <aside style={{
-      width: 320, background: '#fbfaf7',
-      borderLeft: '1px solid #d4d2cb',
+      width: 320, background: 'hsl(var(--card))',
+      borderLeft: '1px solid hsl(var(--border))',
       display: 'flex', flexDirection: 'column',
-      fontSize: 12, color: '#171717', height: '100%',
+      fontSize: 12, color: 'hsl(var(--foreground))', height: '100%',
     }}>
       <QuantitiesPanel
         rooms={rooms} pozicijos={pozicijos}

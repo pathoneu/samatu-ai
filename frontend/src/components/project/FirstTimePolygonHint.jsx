@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const STORAGE_KEY = 'samatu_polygon_hint_seen';
 
 export default function FirstTimePolygonHint({ active, onDismiss }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -34,12 +36,12 @@ export default function FirstTimePolygonHint({ active, onDismiss }) {
       }}
     >
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-        Apveskite kambarį spustelėdami kampus
+        {t('project.polygonHint.title')}
       </div>
       <div style={{ fontSize: 11, lineHeight: 1.5, opacity: 0.85 }}>
-        <strong>Enter</strong> arba dvigubas paspaudimas — užbaigti<br/>
-        <strong>Esc</strong> — atšaukti  ·  <strong>Backspace</strong> — pašalinti paskutinį tašką<br/>
-        <strong>Shift</strong> — laisva kryptis  ·  <strong>Alt</strong> — laikinas snap'o išjungimas
+        <strong>Enter</strong> {t('project.polygonHint.finish')}<br/>
+        <strong>Esc</strong> {t('project.polygonHint.cancel')}  ·  <strong>Backspace</strong> {t('project.polygonHint.removeLast')}<br/>
+        <strong>Shift</strong> {t('project.polygonHint.freeDir')}  ·  <strong>Alt</strong> {t('project.polygonHint.tempSnapOff')}
       </div>
     </div>
   );

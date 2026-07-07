@@ -21,7 +21,7 @@ from typing import Any
 
 import anthropic
 
-from .prompt import MODEL
+from models_config import model_for  # call-time model resolution
 from .vision_call import pdf_to_b64_images
 
 __all__ = ["read_eksplikacija"]
@@ -367,11 +367,12 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
     final_usage = None
     final_attempt = 0
 
+    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
     for attempt in range(3):
         final_attempt = attempt + 1
         try:
             with client.messages.stream(
-                model=MODEL,
+                model=model,
                 max_tokens=8192,  # tables are small vs full extract; 8k is ample
                 system=system,
                 messages=[{"role": "user", "content": user_content}],
@@ -440,7 +441,7 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
         "elapsed_s": elapsed,
         "attempts": final_attempt,
         "pages_sent": len(pages),
-        "model": MODEL,
+        "model": model,
     }
     return result
 

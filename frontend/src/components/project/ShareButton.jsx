@@ -6,11 +6,15 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share2, Check, Copy, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-provider';
 import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ShareButton({ project }) {
+  const { t } = useTranslation();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
@@ -31,16 +35,21 @@ export default function ShareButton({ project }) {
       }
       const body = await res.json();
       setToken(body.token);
-      toast.success('Nuoroda sugeneruota');
+      toast.success(t('project.share.toastGenerated'));
     } catch (e) {
-      toast.error(`Klaida: ${e.message}`);
+      toast.error(t('project.share.toastError', { msg: e.message }));
     } finally {
       setLoading(false);
     }
   };
 
   const revoke = async () => {
-    if (!window.confirm('Atšaukti nuorodą? Po to ji nebeveiks.')) return;
+    if (!(await confirm({
+      title: t('project.share.confirmRevokeTitle'),
+      description: t('project.share.confirmRevokeDesc'),
+      confirmText: t('project.share.confirmRevoke'),
+      destructive: true,
+    }))) return;
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/projects/${project.id}/share`, {
@@ -52,9 +61,9 @@ export default function ShareButton({ project }) {
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
       setToken(null);
-      toast.success('Nuoroda atšaukta');
+      toast.success(t('project.share.toastRevoked'));
     } catch (e) {
-      toast.error(`Klaida: ${e.message}`);
+      toast.error(t('project.share.toastError', { msg: e.message }));
     } finally {
       setLoading(false);
     }
@@ -65,10 +74,10 @@ export default function ShareButton({ project }) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast.success('Nuoroda nukopijuota');
+      toast.success(t('project.share.toastCopied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Nepavyko nukopijuoti');
+      toast.error(t('project.share.toastCopyFail'));
     }
   };
 
@@ -77,10 +86,10 @@ export default function ShareButton({ project }) {
       <button
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted/40 transition-colors"
-        title="Bendrinti su nuoroda (read-only)"
+        title={t('project.share.buttonTitle')}
       >
         <Share2 className="w-3.5 h-3.5" />
-        Bendrinti
+        {t('project.share.button')}
       </button>
 
       {open && (
@@ -91,12 +100,11 @@ export default function ShareButton({ project }) {
             <div className="flex items-center gap-2 mb-3">
               <Share2 className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">
-                Skaitomos nuorodos generavimas
+                {t('project.share.modalTitle')}
               </h2>
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Sukūrę nuorodą, galėsite ja pasidalinti su statybos vadovu / klientu.
-              Jis pamatys tik kiekius (be kainų redagavimo). Nuorodą bet kada galite atšaukti.
+              {t('project.share.modalDesc')}
             </p>
 
             {!token ? (

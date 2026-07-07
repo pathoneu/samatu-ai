@@ -1,0 +1,415 @@
+{
+  "rooms": [
+    {
+      "room_name": "Holas",
+      "room_nr": "1",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Garažas",
+          "to_room_nr": "11",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Virtuvė",
+          "to_room_nr": "8",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Entry hall on east side with entrance door; borders koridorius to west, garažas to north and virtuvė to south",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Katilinė",
+      "room_nr": "2",
+      "adjacent_rooms": [
+        {
+          "to_room": "Garažas",
+          "to_room_nr": "11",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "San. mazgas",
+          "to_room_nr": "4",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Boiler room located between garage and corridor in north-central area",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Koridorius",
+      "room_nr": "3",
+      "adjacent_rooms": [
+        {
+          "to_room": "Holas",
+          "to_room_nr": "1",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Katilinė",
+          "to_room_nr": "2",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "San. mazgas",
+          "to_room_nr": "4",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "5",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Sandėliukas",
+          "to_room_nr": "6",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "7",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Virtuvė",
+          "to_room_nr": "8",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 0,
+      "confidence": "medium",
+      "evidence": "Central corridor connecting most rooms in the dwelling",
+      "n_partition_walls": 7
+    },
+    {
+      "room_name": "San. mazgas",
+      "room_nr": "4",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Katilinė",
+          "to_room_nr": "2",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Sandėliukas",
+          "to_room_nr": "6",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Small bathroom near top of plan, accessed from corridor",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambarys",
+      "room_nr": "5",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "7",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Sandėliukas",
+          "to_room_nr": "6",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Room in upper-left area with terrace access",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Sandėliukas",
+      "room_nr": "6",
+      "adjacent_rooms": [
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "5",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "San. mazgas",
+          "to_room_nr": "4",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Small storage room at top of plan",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Kambarys",
+      "room_nr": "7",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "5",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Virtuvė",
+          "to_room_nr": "8",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Room on west side below kambarys 5",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Virtuvė",
+      "room_nr": "8",
+      "adjacent_rooms": [
+        {
+          "to_room": "Kambarys",
+          "to_room_nr": "7",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Valgomasis",
+          "to_room_nr": "9",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Holas",
+          "to_room_nr": "1",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 1,
+      "confidence": "medium",
+      "evidence": "Kitchen (purple area) in center-west part, opens to dining and living",
+      "n_partition_walls": 5
+    },
+    {
+      "room_name": "Valgomasis",
+      "room_nr": "9",
+      "adjacent_rooms": [
+        {
+          "to_room": "Virtuvė",
+          "to_room_nr": "8",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Svetainė",
+          "to_room_nr": "10",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Koridorius",
+          "to_room_nr": "3",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 2,
+      "confidence": "medium",
+      "evidence": "Dining area part of open-plan space between kitchen and living",
+      "n_partition_walls": 3
+    },
+    {
+      "room_name": "Svetainė",
+      "room_nr": "10",
+      "adjacent_rooms": [
+        {
+          "to_room": "Valgomasis",
+          "to_room_nr": "9",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Virtuvė",
+          "to_room_nr": "8",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 3,
+      "confidence": "medium",
+      "evidence": "Living room at the bottom, three exterior walls with windows/terrace",
+      "n_partition_walls": 2
+    },
+    {
+      "room_name": "Garažas",
+      "room_nr": "11",
+      "adjacent_rooms": [
+        {
+          "to_room": "Katilinė",
+          "to_room_nr": "2",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        },
+        {
+          "to_room": "Holas",
+          "to_room_nr": "1",
+          "shared_wall_count": 1,
+          "wall_types": [
+            "interior_partition"
+          ]
+        }
+      ],
+      "exterior_wall_count": 3,
+      "confidence": "medium",
+      "evidence": "Two-car garage in north-east corner with three exterior walls",
+      "n_partition_walls": 2
+    }
+  ],
+  "_meta": {
+    "cache": "hit",
+    "key": "20d04aa5bf2fd0affa0d5d65371ef7daccab585e6bdc278d6ca3177ff945df41",
+    "model": "claude-opus-4-7"
+  }
+}

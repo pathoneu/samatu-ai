@@ -53,7 +53,9 @@ if env_file.exists():
     except ImportError:
         pass
 
-MODEL = "claude-opus-4-7"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # backend/ for models_config
+from models_config import model_for
+MODEL = model_for("vision_pass1")  # one-shot script — import-time resolve is call time
 MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects (~20+ rooms with full pozicijos) need it
 DPI = 200
 MAX_PAGES = 20

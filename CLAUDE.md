@@ -4,6 +4,8 @@
 
 **Stack:** Python FastAPI backend + React/Vite/Tailwind/shadcn frontend. Anthropic Claude for vision + extraction. PDF→PNG via pdfplumber/pdf2image. Run `ls backend/`, `ls frontend/src/`, or `git log` to discover current code layout — don't trust a stale file tree here.
 
+**Start-here manuals** (read before touching code): [`docs/DEVELOPING.md`](docs/DEVELOPING.md) — how to run/test/debug/ship + the gotchas that waste an hour (no-`--reload` backend, auth-on testing, which test runner). [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — real data flow + the **CANONICAL-vs-stale file map** (the LT formula engine is `backend/extractor/universal_rules.py`; `frontend/src/lib/interiorCalc.js` is a stale FE copy — backend is source of truth) + known fragilities + accuracy reality. [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — production launch/DNS/hosting.
+
 ---
 
 ## How to work with me
@@ -63,7 +65,7 @@ Full bake-off: `detector_bench/README.md` + `results/2026-05-03-bakeoff.md`.
 
 `docs/superpowers/research/` (21 files, all kept):
 - **PDF feasibility & vision:** `2026-04-28-pdf-spike-findings`, `2026-04-29-phase-c-{libraries,opencv-feasibility,competitor-tech}`, `vision-prompting-techniques`
-- **Competitor UX:** `2026-05-02-competitor-viewer-ui-deep-dive`, `togal-{ux-patterns,clickcount-ux}`, `industry-takeoff-tools`
+- **Competitor UX:** `2026-05-02-competitor-viewer-ui-deep-dive`, `auto-count-{ux-patterns,clickcount-ux}`, `industry-takeoff-tools`
 - **LT specifics:** `lt-drawing-conventions`, `2026-04-28-takeoff-standards-and-pdf-ux`, `rangovo-p1-position-analysis`, `2026-04-2{8,9}-rangovas-*`
 - **Polygon UX:** `2026-04-29-phase-c-polygon-ux`, `2026-04-29-isklotines-quality`
 - **Validation / formulas:** `formula-validation`, `2026-04-28-accuracy-priorities`

@@ -79,3 +79,30 @@ def test_flags_whitespace_stripped(monkeypatch):
     flags = get_flags()
     assert flags["per_room_ceiling"] is True
     assert flags["paint_class_inference"] is True
+
+
+def test_extraction_voting_defaults_on():
+    """extraction_voting is DEFAULT ON since the 2026-06-09 live A/B proved it
+    (paint −5.4%→+2.3%, kampai −32%→−10.6%, ceiling heights + n_partition_walls
+    recovered, +13% wall-clock). Opt out with ENABLE_EXTRACTION_VOTING=0."""
+    from extractor.feature_flags import get_flags
+    assert get_flags()["extraction_voting"] is True
+
+
+def test_extraction_voting_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("ENABLE_EXTRACTION_VOTING", "0")
+    from extractor.feature_flags import get_flags
+    assert get_flags()["extraction_voting"] is False
+
+
+def test_voting_n_clamps(monkeypatch):
+    from extractor.feature_flags import voting_n
+    assert voting_n() == 3                       # unset → default
+    monkeypatch.setenv("VOTING_N", "1")
+    assert voting_n() == 2                        # clamp low
+    monkeypatch.setenv("VOTING_N", "9")
+    assert voting_n() == 5                        # clamp high
+    monkeypatch.setenv("VOTING_N", "4")
+    assert voting_n() == 4
+    monkeypatch.setenv("VOTING_N", "garbage")
+    assert voting_n() == 3                        # invalid → default

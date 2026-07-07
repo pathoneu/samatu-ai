@@ -64,7 +64,7 @@ from typing import Any
 
 import anthropic
 
-from .prompt import MODEL
+from models_config import model_for  # call-time model resolution
 from .vision_call import pdf_to_b64_images
 
 __all__ = ["extract_wall_elevations"]
@@ -86,6 +86,8 @@ PAGE_OUTPUT_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["wall_id", "tile_zones", "paint_zones", "niches", "furniture_zones"],
                 "properties": {
+                    "nr": {"type": ["string", "null"],
+                           "description": "Room number from eksplikacija (e.g. '107', '111'). REQUIRED when readable."},
                     "room_name": {"type": ["string", "null"],
                                   "description": "Room name as labelled in drawing title block. Match eksplikacija."},
                     "wall_id": {"type": "string",
@@ -176,8 +178,14 @@ GRIEŽTOS TAISYKLĖS:
 - Grąžink TIK strukturuotą JSON pagal pateiktą schemą. Jokio markdown'o.
 - VISI matmenys MILIMETRAIS (jei brėžinyje cm/m — konvertuok).
 - Jei matmuo neaiškus — palik `null`, NEMINTYJI.
-- `room_name` — kambario pavadinimas iš title block'o (pvz., „Vonia 1", „Tėvų vonia"). Jei nėra — `null`.
-- `wall_id` — vienetinis labelis kiekvienai sienai puslapyje. Naudok lygiai tokį, koks brėžinyje (A, B, C, D ir t.t.).
+- `nr` — KAMBARIO NUMERIS iš eksplikacijos (pvz., „107", „111"). Kiekviena išklotinė PRIKLAUSO konkrečiam kambariui. Ieškok numerio:
+  • virš išklotinės grupės (pvz., „IŠKLOTINĖ 107", „107 — Vonia")
+  • title block'e
+  • šalia sienos žymėjimo (pvz., „107-A", „107-B" = kambario 107 sienos A ir B)
+  • pateiktame kambarių sąraše (žiūrėk USER žinutę) — atitikink pavadinimą su numeriu
+  Jei numeris MATOMAS bet kuriame šaltinyje — UŽPILDYK. `null` tik kai TIKRAI neradai.
+- `room_name` — kambario pavadinimas (pvz., „Vonia 1", „Tėvų vonia", „Skalbykla"). Match'ink su sąrašu jei pateiktas.
+- `wall_id` — vienetinis labelis kiekvienai sienai puslapyje. Naudok lygiai tokį, koks brėžinyje (A, B, C, D arba 1, 2, 3 arba "north"/"south"). Jei brėžinys grupuoja: „107-A, 107-B, 107-C, 107-D" — wall_id = "A"/"B"/"C"/"D", nr = "107".
 - `confidence`:
   * `high` — visi matmenys aiškiai matomi su tiksliais skaičiais
   * `medium` — keli matmenys spėti iš proporcijos, ne visi anotuoti
@@ -185,14 +193,37 @@ GRIEŽTOS TAISYKLĖS:
 """
 
 
-def _build_user_content(page_image_b64: str, page_idx: int) -> list[dict]:
-    """Single-page user content: instruction + image."""
+def _build_user_content(
+    page_image_b64: str,
+    page_idx: int,
+    room_list: list[dict] | None = None,
+) -> list[dict]:
+    """Single-page user content: instruction + (optional) room list + image.
+
+    When ``room_list`` is provided, the model is asked to ATTRIBUTE each
+    elevation to a room by matching against this canonical list.
+    """
+    instructions = (
+        f"Šitas yra puslapis {page_idx} su sienų išklotine(-ėmis). "
+        f"Iš jo ištrauk visų matomų sienų zonų matmenis pagal pateiktą JSON schemą. "
+        f"Grąžink VIENĄ JSON objektą su `wall_elevations[]` masyvu — po vieną įrašą per sieną."
+    )
+    if room_list:
+        room_rows = "\n".join(
+            f"  • nr={r.get('nr')!r}, name={(r.get('pavadinimas') or '')!r}, "
+            f"paskirtis={r.get('paskirtis') or ''}"
+            for r in room_list
+        )
+        instructions += (
+            "\n\nKANONINIS KAMBARIŲ SĄRAŠAS — kiekviena išklotinė turi būti "
+            "priskirta vienam iš šių kambarių:\n" + room_rows +
+            "\n\nKai brėžinyje matai numerį arba pavadinimą, atitikink jį su "
+            "šio sąrašo įrašu ir užpildyk `nr` lauką lygiai taip, kaip nurodyta "
+            "viršuje (pvz., '107' o ne '107.', '02' o ne '2'). Vienai išklotinei "
+            "PRIVALOMAI priskirk vieną nr arba palik null jei tikrai negali nustatyti."
+        )
     return [
-        {"type": "text", "text": (
-            f"Šitas yra puslapis {page_idx} su sienų išklotine(-ėmis). "
-            f"Iš jo ištrauk visų matomų sienų zonų matmenis pagal pateiktą JSON schemą. "
-            f"Grąžink VIENĄ JSON objektą su `wall_elevations[]` masyvu — po vieną įrašą per sieną."
-        )},
+        {"type": "text", "text": instructions},
         {"type": "text", "text": json.dumps(PAGE_OUTPUT_SCHEMA, ensure_ascii=False, indent=2)},
         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": page_image_b64}},
     ]
@@ -214,18 +245,20 @@ def _extract_one_page(
     image_b64: str,
     page_idx: int,
     client: anthropic.Anthropic,
+    room_list: list[dict] | None = None,
 ) -> dict | None:
     """Extract one wall_elevation page. Returns parsed dict or None on failure."""
     system = [
         {"type": "text", "text": SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
     ]
-    content = _build_user_content(image_b64, page_idx)
+    content = _build_user_content(image_b64, page_idx, room_list=room_list)
 
     last_err = None
+    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
     for attempt in range(3):
         try:
             with client.messages.stream(
-                model=MODEL,
+                model=model,
                 max_tokens=8192,  # one page = small output
                 system=system,
                 messages=[{"role": "user", "content": content}],
@@ -266,6 +299,7 @@ def extract_wall_elevations(
     pdf_bytes: bytes,
     client: anthropic.Anthropic,
     wall_elevation_pages: list[int],
+    room_list: list[dict] | None = None,
 ) -> dict:
     """Per-page Vision extraction of sienų išklotinė data.
 
@@ -273,6 +307,9 @@ def extract_wall_elevations(
         pdf_bytes: full PDF
         client: anthropic.Anthropic instance
         wall_elevation_pages: 1-indexed list of pages classified as wall_elevation
+        room_list: optional canonical list of rooms (with nr + pavadinimas);
+                   when provided, the model is asked to attribute each
+                   elevation to a specific room nr from this list.
 
     Returns: dict per module docstring shape. Soft-fails per page.
     """
@@ -309,7 +346,7 @@ def extract_wall_elevations(
         if not image_b64:
             out["_meta"]["pages_failed"] += 1
             continue
-        result = _extract_one_page(image_b64, page_idx, client)
+        result = _extract_one_page(image_b64, page_idx, client, room_list=room_list)
         if result is None:
             out["_meta"]["pages_failed"] += 1
             continue

@@ -25,16 +25,20 @@ def test_billing_disabled_by_default(monkeypatch):
 
 
 def test_pricing_table_matches_canonical_plan():
+    """/status serves the canonical billing.plans.PUBLIC_PLANS (Pro 49/10,
+    Studio 149/35, one-off 12) — NOT the old stale inline €129/40 Studio.
+    PUBLIC_PLANS excludes the free tier (advertised separately)."""
     res = client.get("/api/billing/v2/status")
     body = res.json()
     plans = {p["name"]: p for p in body["plans"]}
-    assert plans["Free"]["pdf_quota_per_month"] == 1
+    assert "Free" not in plans  # PUBLIC_PLANS excludes the free trial
     assert plans["Pro"]["price_eur"] == 49
     assert plans["Pro"]["pdf_quota_per_month"] == 10
     assert plans["Pro"]["overage_eur_per_pdf"] == 8
-    assert plans["Studio"]["price_eur"] == 129
-    assert plans["Studio"]["pdf_quota_per_month"] == 40
+    assert plans["Studio"]["price_eur"] == 149
+    assert plans["Studio"]["pdf_quota_per_month"] == 35
     assert plans["Studio"]["seats"] == 3
+    assert plans["Vienkartinis"]["price_eur"] == 12
 
 
 def test_entry_tier_never_above_49(monkeypatch):

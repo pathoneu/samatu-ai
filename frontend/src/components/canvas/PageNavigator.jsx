@@ -25,14 +25,15 @@ export function PageNavigator({ pages, currentPage, onSelect, onClose }) {
     <div ref={ref} style={{
       position: 'absolute', top: 48, left: 'calc(50% - 200px)',
       width: 400, maxHeight: 480, overflow: 'auto',
-      background: '#fff', border: '1px solid #d4d2cb', borderRadius: 8,
-      boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, zIndex: 50,
+      background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.45)', padding: 8, zIndex: 50, color: 'hsl(var(--foreground))',
     }}>
       {pages.map((p, i) => (
         <button key={i} onClick={() => { onSelect(i); onClose?.(); }} style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           width: '100%', padding: '8px 12px', borderRadius: 5,
-          background: i === currentPage ? '#fdf6e7' : 'transparent',
+          background: i === currentPage ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+          color: 'hsl(var(--foreground))',
           border: 0, cursor: 'pointer', textAlign: 'left', fontSize: 12,
         }}>
           <span style={{ fontWeight: i === currentPage ? 600 : 400 }}>

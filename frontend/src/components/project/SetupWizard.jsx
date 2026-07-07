@@ -172,18 +172,18 @@ export default function SetupWizard({ onComplete, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-stone-600" />
-            <span className="font-semibold text-stone-800">Pradiniai nustatymai</span>
+            <Settings className="w-5 h-5 text-muted-foreground" />
+            <span className="font-semibold text-foreground">Pradiniai nustatymai</span>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-500 hover:text-stone-700"
+              className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
             </button>
@@ -197,28 +197,28 @@ export default function SetupWizard({ onComplete, onClose }) {
               <div
                 key={s.id}
                 className={`h-1 flex-1 rounded-full transition-colors ${
-                  i <= step ? 'bg-foreground' : 'bg-stone-200'
+                  i <= step ? 'bg-primary' : 'bg-muted'
                 }`}
               />
             ))}
           </div>
-          <div className="text-xs text-stone-500 mt-2">
+          <div className="text-xs text-muted-foreground mt-2">
             Žingsnis {step + 1} iš {STEPS.length}
           </div>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          <h2 className="text-xl font-bold text-stone-800 mb-1 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
             {currentStep.icon && <currentStep.icon className="w-5 h-5 text-muted-foreground" />}
             {currentStep.title}
           </h2>
-          <p className="text-sm text-stone-600 mb-5">{currentStep.desc}</p>
+          <p className="text-sm text-muted-foreground mb-5">{currentStep.desc}</p>
 
           {currentStep.id === 'welcome' && (
-            <div className="bg-muted border border-border rounded-lg p-4 text-sm text-stone-700">
+            <div className="bg-muted border border-border rounded-lg p-4 text-sm text-foreground">
               <p className="mb-2">
-                <strong>Sąmatų AI</strong> dirba pagal tarptautinius industries
+                <strong>Pathon</strong> dirba pagal tarptautinius industries
                 standartus (RICS NRM2, DIN 18363, CSI MasterFormat).
               </p>
               <p>
@@ -239,18 +239,18 @@ export default function SetupWizard({ onComplete, onClose }) {
                     className={`p-3 rounded-lg border-2 text-center transition-colors ${
                       prefs.bathroom_tile_height_m === h
                         ? 'border-foreground bg-muted'
-                        : 'border-stone-200 hover:border-stone-300'
+                        : 'border-border hover:border-primary/40'
                     }`}
                   >
-                    <div className="font-bold text-lg text-stone-800">{h.toFixed(1)} m</div>
-                    <div className="text-xs text-stone-500">
+                    <div className="font-bold text-lg text-foreground">{h.toFixed(1)} m</div>
+                    <div className="text-xs text-muted-foreground">
                       {h === 1.5 ? 'Žemai' : h === 2.0 ? 'Standart' : 'Iki lubų'}
                     </div>
                   </button>
                 ))}
               </div>
 
-              <div className="border-t border-stone-200 pt-4">
+              <div className="border-t border-border pt-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -259,10 +259,10 @@ export default function SetupWizard({ onComplete, onClose }) {
                     className="mt-1 w-4 h-4 accent-foreground"
                   />
                   <div>
-                    <div className="text-sm text-stone-800">
+                    <div className="text-sm text-foreground">
                       Dažyti sienas virš plytelių
                     </div>
-                    <div className="text-xs text-stone-500">
+                    <div className="text-xs text-muted-foreground">
                       Standart: dažoma iki lubų virš plytelių zonos
                     </div>
                   </div>
@@ -283,11 +283,11 @@ export default function SetupWizard({ onComplete, onClose }) {
               ].map(({ key, label, note }) => (
                 <label
                   key={key}
-                  className="flex items-center justify-between py-3 border-b border-stone-100 last:border-0 cursor-pointer hover:bg-stone-50 -mx-2 px-2 rounded"
+                  className="flex items-center justify-between py-3 border-b border-border last:border-0 cursor-pointer hover:bg-muted/60 -mx-2 px-2 rounded"
                 >
                   <div>
-                    <div className="text-sm font-medium text-stone-800">{label}</div>
-                    {note && <div className="text-xs text-stone-500">{note}</div>}
+                    <div className="text-sm font-medium text-foreground">{label}</div>
+                    {note && <div className="text-xs text-muted-foreground">{note}</div>}
                   </div>
                   <input
                     type="checkbox"
@@ -302,7 +302,7 @@ export default function SetupWizard({ onComplete, onClose }) {
 
           {currentStep.id === 'corners' && (
             <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-stone-300 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
                 <input
                   type="checkbox"
                   checked={prefs.count_outer_corners}
@@ -310,16 +310,16 @@ export default function SetupWizard({ onComplete, onClose }) {
                   className="mt-1 w-4 h-4 accent-foreground"
                 />
                 <div>
-                  <div className="text-sm font-medium text-stone-800">
+                  <div className="text-sm font-medium text-foreground">
                     Skaičiuoti išorės kampus
                   </div>
-                  <div className="text-xs text-stone-500">
+                  <div className="text-xs text-muted-foreground">
                     Standart: TAIP — kampuoti profiliai (corner bead)
                   </div>
                 </div>
               </label>
 
-              <label className="flex items-start gap-3 p-3 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-stone-300 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
                 <input
                   type="checkbox"
                   checked={prefs.count_inner_corners}
@@ -327,16 +327,16 @@ export default function SetupWizard({ onComplete, onClose }) {
                   className="mt-1 w-4 h-4 accent-foreground"
                 />
                 <div>
-                  <div className="text-sm font-medium text-stone-800">
+                  <div className="text-sm font-medium text-foreground">
                     Skaičiuoti vidaus kampus
                   </div>
-                  <div className="text-xs text-stone-500">
+                  <div className="text-xs text-muted-foreground">
                     Standart: NE (paprastai nereikalauja corner bead)
                   </div>
                 </div>
               </label>
 
-              <div className="border-t border-stone-200 pt-4">
+              <div className="border-t border-border pt-4">
                 <Label className="text-sm">Glaisto Q lygis</Label>
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {['Q1', 'Q2', 'Q3', 'Q4'].map(q => (
@@ -346,14 +346,14 @@ export default function SetupWizard({ onComplete, onClose }) {
                       className={`p-2 rounded-lg border-2 text-center text-sm font-medium transition-colors ${
                         prefs.glaistas_q_lygis === q
                           ? 'border-foreground bg-muted text-foreground'
-                          : 'border-stone-200 hover:border-stone-300 text-stone-600'
+                          : 'border-border hover:border-primary/40 text-muted-foreground'
                       }`}
                     >
                       {q}
                     </button>
                   ))}
                 </div>
-                <div className="text-xs text-stone-500 mt-1.5">
+                <div className="text-xs text-muted-foreground mt-1.5">
                   Q1: tapetams · Q2: matiniams dažams · Q3: pusblizgiams · Q4: blizgiams
                 </div>
               </div>
@@ -364,7 +364,7 @@ export default function SetupWizard({ onComplete, onClose }) {
             <div className="space-y-3">
               <Label className="text-sm">Plytelių skaičiavimo metodas</Label>
 
-              <label className="flex items-start gap-3 p-3 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-stone-300 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
                 <input
                   type="radio"
                   name="tile_method"
@@ -373,14 +373,14 @@ export default function SetupWizard({ onComplete, onClose }) {
                   className="mt-1 w-4 h-4 accent-foreground"
                 />
                 <div>
-                  <div className="text-sm font-medium text-stone-800">Tikslus</div>
-                  <div className="text-xs text-stone-500">
+                  <div className="text-sm font-medium text-foreground">Tikslus</div>
+                  <div className="text-xs text-muted-foreground">
                     Atimami langai, durys, kiti įdėklai. Plotas mažesnis, bet ekonomiška.
                   </div>
                 </div>
               </label>
 
-              <label className="flex items-start gap-3 p-3 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-stone-300 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
                 <input
                   type="radio"
                   name="tile_method"
@@ -389,14 +389,14 @@ export default function SetupWizard({ onComplete, onClose }) {
                   className="mt-1 w-4 h-4 accent-foreground"
                 />
                 <div>
-                  <div className="text-sm font-medium text-stone-800">Praktinis</div>
-                  <div className="text-xs text-stone-500">
+                  <div className="text-sm font-medium text-foreground">Praktinis</div>
+                  <div className="text-xs text-muted-foreground">
                     Be angų atėmimo (atliekos = pjovimo medžiaga). Standartas tarp meistrų.
                   </div>
                 </div>
               </label>
 
-              <div className="border-t border-stone-200 pt-4">
+              <div className="border-t border-border pt-4">
                 <Label className="text-sm">Atliekų % (waste)</Label>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {[5, 8, 10, 12, 15].map(w => (
@@ -406,7 +406,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                       className={`p-2 rounded-lg border-2 text-center text-sm font-medium transition-colors ${
                         prefs.tile_waste_pct === w
                           ? 'border-foreground bg-muted text-foreground'
-                          : 'border-stone-200 hover:border-stone-300 text-stone-600'
+                          : 'border-border hover:border-primary/40 text-muted-foreground'
                       }`}
                     >
                       {w}%
@@ -419,19 +419,19 @@ export default function SetupWizard({ onComplete, onClose }) {
 
           {currentStep.id === 'done' && (
             <div className="space-y-3">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-stone-700">
-                <div className="flex items-center gap-2 font-semibold text-green-800 mb-2">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-foreground">
+                <div className="flex items-center gap-2 font-semibold text-emerald-300 mb-2">
                   <Check className="w-4 h-4" />
                   Nustatymai išsaugoti
                 </div>
                 <p>Šie pasirinkimai bus naudojami visiems naujiems projektams. Galite juos keisti per "Nustatymai" mygtuką bet kuriuo metu.</p>
               </div>
 
-              <details className="border border-stone-200 rounded-lg">
-                <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-stone-700 hover:bg-stone-50">
+              <details className="border border-border rounded-lg">
+                <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-foreground hover:bg-muted/60">
                   Peržiūrėti pasirinkimus
                 </summary>
-                <div className="px-4 py-3 border-t border-stone-200 text-xs text-stone-600 space-y-1">
+                <div className="px-4 py-3 border-t border-border text-xs text-muted-foreground space-y-1">
                   <div>Vonios plytelės: <strong>{prefs.bathroom_tile_height_m} m</strong></div>
                   <div>Drabužinės dažomos: <strong>{prefs.drabuzine_painted ? 'TAIP' : 'NE'}</strong></div>
                   <div>Garažai dažomi: <strong>{prefs.garazas_painted ? 'TAIP' : 'NE'}</strong></div>
@@ -445,7 +445,7 @@ export default function SetupWizard({ onComplete, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-stone-200 flex items-center justify-between bg-stone-50">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-muted">
           <Button
             variant="outline"
             onClick={handleBack}
@@ -458,7 +458,7 @@ export default function SetupWizard({ onComplete, onClose }) {
 
           <Button
             onClick={handleNext}
-            className="bg-foreground hover:opacity-90 text-white gap-1"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1"
           >
             {isLast ? 'Pradėti darbą' : 'Toliau'}
             {!isLast && <ChevronRight className="w-4 h-4" />}

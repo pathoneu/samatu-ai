@@ -1,6 +1,7 @@
 """GET /api/config — exposes feature flags + active model IDs to frontend."""
 from fastapi import APIRouter
 from extractor.feature_flags import get_flags
+from models_config import model_for, resolved_models
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -14,23 +15,27 @@ def get_config() -> dict:
     - Know which models are active (for logging, analytics)
     - Verify backend connectivity
 
+    `models` is the LIVE role → model map from models_config (resolved at
+    request time, so MODEL_OVERRIDE / SAMATU_MODEL_* env changes show up
+    immediately). `pass1`/`pass2` keys are kept for backward compat with
+    the pre-W1.1 payload shape.
+
     Returns:
         {
-            "flags": {
-                "per_room_ceiling": bool,
-                "paint_class_inference": bool,
-                ...
-            },
+            "flags": {...},
             "models": {
-                "pass1": "claude-opus-4-7",
-                "pass2": "claude-opus-4-7",
+                "pass1": "<model>", "pass2": "<model>",   # legacy aliases
+                "vision_pass1": "...", "doors": "...", ...  # full role map
             }
         }
     """
+    models = resolved_models()
     return {
         "flags": get_flags(),
         "models": {
-            "pass1": "claude-opus-4-7",
-            "pass2": "claude-opus-4-7",
+            **models,
+            # Legacy aliases (pre-W1.1 payload shape)
+            "pass1": model_for("vision_pass1"),
+            "pass2": model_for("vision_pass2"),
         },
     }

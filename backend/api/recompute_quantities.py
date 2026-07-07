@@ -7,12 +7,18 @@ swap the canonical view in one re-render.
 
 Spec: §4.5, §5.4
 """
-from fastapi import APIRouter, HTTPException
+import logging
+import re
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
 from extractor.universal_rules import UNIVERSAL_RULES, paint_coverage_for_class
 
+import auth as _auth
+
 router = APIRouter(prefix="/api", tags=["recompute"])
+
+log = logging.getLogger("samatu.recompute")
 
 
 class Edit(BaseModel):
@@ -32,6 +38,11 @@ class RecomputeRequest(BaseModel):
     pozicijos: list[dict] = Field(default_factory=list)
     edits: list[Edit]
     current_assumptions: dict
+    # Reader/extraction context (_door_types, detected_symbols_summary,
+    # _plyteliu_specs, bendras_plotas_m2, v9_meta). Needed so an assumption edit
+    # (e.g. ceiling height) can rebuild the CANONICAL pozicijos from the
+    # recomputed rooms without losing the door/fixture/symbol lines.
+    context: dict = Field(default_factory=dict)
 
 
 # Sprint 0: assumption-class fields. Sprint 2 adds gesture fields below.
@@ -42,6 +53,11 @@ _ASSUMPTION_FIELDS = {
     "plyteliu_aukstis", "kampu_skaicius",
     "lubu_auksciai", "glaistimo_lygis", "sienos_storis_m",
     "custom_windows", "custom_doors",
+    # 2026-07-05: per-room finishing override (Beržų garage: contractors finish
+    # some garages/tambūrai — painted walls — that default to raw. Keyed by
+    # patalpa.nr → 0.0 (raw) / 1.0 (painted). Flips walls_paint in the room's
+    # rules and recomputes the paint fields, same live path as ceiling height.
+    "walls_paint_override",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -61,6 +77,7 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
     absorption = float(UNIVERSAL_RULES["first_coat_factor"])
     per_room_h = assumptions.get("lubu_auksciai") or {}
+    per_room_paint = assumptions.get("walls_paint_override") or {}
     default_h = float(assumptions.get("lubu_aukstis") or 2.82)
 
     out = []
@@ -102,6 +119,30 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                         )
                     except Exception:
                         pass
+            except (ValueError, TypeError):
+                pass
+        # Per-room finishing override (2026-07-05): flip walls_paint (raw↔painted)
+        # and recompute the paint geometry. Runs AFTER the height block so a room
+        # with BOTH overrides gets the combined result (calc reads the already-set
+        # lubu_aukstis_m). Same carry-forward set as the height path.
+        if isinstance(per_room_paint, dict) and nr in per_room_paint:
+            try:
+                wp = 1.0 if float(per_room_paint[nr]) >= 0.5 else 0.0
+                from extractor.universal_rules import (
+                    calc_room_quantities, ROOM_TYPE_RULES, normalize_paskirtis,
+                )
+                pask = normalize_paskirtis(room.get("paskirtis") or "")
+                rt = dict(ROOM_TYPE_RULES.get(pask) or ROOM_TYPE_RULES["gyvenamoji"])
+                rt["walls_paint"] = wp
+                room["_walls_paint_override"] = wp
+                recalc = calc_room_quantities(room, rules={pask: rt})
+                for k in ("walls_gross_m2", "walls_paintable_m2",
+                          "ceiling_paintable_m2", "dazymo_plotas_m2",
+                          "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                          "glaistas_kg", "gruntas_l",
+                          "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2"):
+                    if k in recalc:
+                        room[k] = recalc[k]
             except (ValueError, TypeError):
                 pass
         walls = float(room.get("dazomas_plotas_m2", 0) or room.get("walls_paintable_m2", 0) or 0)
@@ -241,8 +282,111 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
     return out_rooms, pozicijos
 
 
+_TIER_SUFFIX_RE = re.compile(
+    r"\s*\((?:iki|virš)\s*3\s*m[^)]*\)"          # (iki 3m aukščio) / (virš 3 m aukščio)
+    r"|\s*\(standartinis aukštis\)"               # GKP tier label
+    r"|\s*—\s*papildomas darbas dėl aukščio"      # height-premium tail
+    r"|\s*q4\s*\([^)]*\)",                         # Q4 sanding suffix
+    re.IGNORECASE,
+)
+
+
+def _norm_label(s: str | None) -> str:
+    """Height/Q-level-independent label key: strip the tier suffixes whose text
+    flips when a ceiling crosses 3 m or the glaistymo lygis changes, so a priced
+    line can be matched to its post-rebuild sibling."""
+    return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+
+
+def _has_user_edit(p: dict) -> bool:
+    return (p.get("kaina") not in (None, 0)
+            or p.get("manual_override") is True
+            or p.get("quantity_source") == "manual_override"
+            or bool(p.get("override_locked")))
+
+
+def _carry_edit(prev: dict, p: dict) -> None:
+    # 1. Manual count override / gesture lock FIRST — these set the final kiekis,
+    #    which the price→suma calc below depends on.
+    if prev.get("manual_override") is True or prev.get("quantity_source") == "manual_override":
+        p["kiekis"] = prev.get("kiekis")
+        p["manual_override"] = True
+        p["quantity_source"] = prev.get("quantity_source") or "manual_override"
+        if prev.get("ai_kiekis_original") is not None:
+            p["ai_kiekis_original"] = prev["ai_kiekis_original"]
+    if prev.get("override_locked"):
+        p["kiekis"] = prev.get("kiekis")
+        p["override_locked"] = True
+        if prev.get("override_orig") is not None:
+            p["override_orig"] = prev["override_orig"]
+    # 2. Entered price — carry it and recompute suma from the FINAL kiekis
+    #    (rebuilt-or-overridden), not the stale prior suma.
+    if prev.get("kaina") not in (None, 0):
+        p["kaina"] = prev["kaina"]
+        kiekis = p.get("kiekis")
+        p["suma"] = (round(float(kiekis) * float(prev["kaina"]), 2)
+                     if isinstance(kiekis, (int, float)) else prev.get("suma"))
+
+
+def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
+    """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
+    user's manual edits forward from the prior pozicijos so the rebuild doesn't
+    silently revert them.
+
+    Two-pass match:
+      1. EXACT aprasymas — handles the common case and the simultaneously-present
+         iki/virš tier pair in mixed-height projects (no collision).
+      2. HEIGHT-INDEPENDENT fallback for any prior edited line left unmatched
+         (its label flipped across the 3 m / Q-level boundary, e.g. a priced
+         '… (virš 3m aukščio)' line that became '… (iki 3m aukščio)'). Applied
+         ONLY when unambiguous — exactly one unmatched edited prior line and one
+         unmatched rebuilt line share the normalized key — so it can never
+         mis-assign a price between the two co-existing tier lines.
+
+    Preserved: kaina/suma (prices), manual count overrides, gesture locks.
+    Formula/geometry quantities are otherwise recomputed (the point of the rebuild).
+    """
+    if not prior:
+        return rebuilt
+    prior_by_label: dict[str, dict] = {}
+    for p in prior:
+        lab = (p.get("aprasymas") or "").strip().lower()
+        if lab:
+            prior_by_label.setdefault(lab, p)
+
+    matched_prior: set[int] = set()
+    matched_rebuilt: set[int] = set()
+    for p in rebuilt:
+        prev = prior_by_label.get((p.get("aprasymas") or "").strip().lower())
+        if prev is not None:
+            _carry_edit(prev, p)
+            matched_prior.add(id(prev))
+            matched_rebuilt.add(id(p))
+
+    # Pass 2 — rescue user edits on prior lines whose label changed on rebuild.
+    leftover_prior_by_norm: dict[str, list[dict]] = {}
+    for p in prior:
+        if id(p) in matched_prior or not _has_user_edit(p):
+            continue
+        leftover_prior_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
+    if leftover_prior_by_norm:
+        leftover_rebuilt_by_norm: dict[str, list[dict]] = {}
+        for p in rebuilt:
+            if id(p) in matched_rebuilt:
+                continue
+            leftover_rebuilt_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
+        for norm, priors in leftover_prior_by_norm.items():
+            cands = leftover_rebuilt_by_norm.get(norm, [])
+            if len(priors) == 1 and len(cands) == 1:  # unambiguous → safe to carry
+                _carry_edit(priors[0], cands[0])
+    return rebuilt
+
+
 @router.post("/recompute-quantities")
-def recompute(req: RecomputeRequest) -> dict:
+def recompute(
+    req: RecomputeRequest,
+    user: dict = Depends(_auth.require_user),  # F4 (2026-07-04): no anon compute
+) -> dict:
     # 1. Validate
     for e in req.edits:
         if e.field not in _VALID_FIELDS:
@@ -263,4 +407,60 @@ def recompute(req: RecomputeRequest) -> dict:
     # 4. Apply gesture edits (Sprint 2)
     rooms, pozicijos = _apply_gesture_edits(rooms, list(req.pozicijos), req.edits)
 
-    return {"rooms": rooms, "pozicijos": pozicijos, "assumptions": assumptions}
+    # 5. If an ASSUMPTION edit changed room geometry (e.g. ceiling height), the
+    # aggregated pozicijos (paint iki/virš split, kampai, GKP virš-3m, karnizas…)
+    # must be rebuilt from the recomputed rooms — otherwise the displayed/exported
+    # numbers stay stale (the Prielaidos recompute bug, 2026-06-17). Rebuild via
+    # the canonical builder, carrying the reader context so door/fixture/symbol
+    # lines survive. Gesture-only edits keep the in-place pozicijos above.
+    assumption_edited = any(e.field in _ASSUMPTION_FIELDS for e in req.edits)
+    degradations: list[str] = []
+    if assumption_edited and req.context:
+        try:
+            from extractor.vision_call import _build_pozicijos_from_rooms
+            overrides = {**(req.context.get("_overrides") or {}), **assumptions}
+            # The Prielaidos field is `glaistimo_lygis`, but the canonical builder
+            # reads the Q-level under `glaistas_q_lygis` (vision_call.py). Bridge
+            # the two names so a Q4 toggle actually emits the Q4 sanding-labor line.
+            if assumptions.get("glaistimo_lygis"):
+                overrides["glaistas_q_lygis"] = assumptions["glaistimo_lygis"]
+            parsed = {
+                **req.context,
+                "patalpos": rooms,
+                "_overrides": overrides,
+            }
+            rebuilt = _build_pozicijos_from_rooms(parsed)
+            if rebuilt.get("pozicijos"):
+                # Carry the user's manual edits (prices, corrected counts,
+                # locks) forward so the rebuild doesn't silently revert them.
+                pozicijos = _merge_user_edits(rebuilt["pozicijos"], list(req.pozicijos))
+        except Exception as exc:  # noqa: BLE001 — never break the recompute
+            log.warning("canonical pozicijos rebuild failed: %s", exc, exc_info=True)
+            degradations.append(
+                "Dalis kambarių nebuvo iki galo perskaičiuoti — kiekiai gali būti seni."
+            )
+
+    # Also emit the V8-compat darbu_sarasas from the final pozicijos. The Kiekiai
+    # table, the top-bar totals AND the Excel/PDF export all read darbu_sarasas —
+    # NOT pozicijos — so without this a Prielaidos recompute updated pozicijos but
+    # the visible/exported quantities stayed stale (2026-06-19 workspace hunt).
+    # The frontend re-applies the user's entered prices by matching aprasymas.
+    darbu_sarasas: list[dict] = []
+    try:
+        from extractor.vision_call import _emit_v8_compat_fields
+        darbu_sarasas = _emit_v8_compat_fields(
+            {"pozicijos": pozicijos, "santrauka": {}}
+        ).get("darbu_sarasas", [])
+    except Exception as exc:  # noqa: BLE001 — never break the recompute on compat emit
+        log.warning("v8-compat emit failed: %s", exc, exc_info=True)
+        degradations.append(
+            "Nepavyko atnaujinti kiekių lentelės — gali būti rodomi seni kiekiai."
+        )
+
+    return {
+        "rooms": rooms,
+        "pozicijos": pozicijos,
+        "darbu_sarasas": darbu_sarasas,
+        "assumptions": assumptions,
+        "_degradations": degradations,
+    }

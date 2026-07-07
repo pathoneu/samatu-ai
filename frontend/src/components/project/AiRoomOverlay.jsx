@@ -1,16 +1,16 @@
 /**
- * AiRoomOverlay — Togal-style AI auto-detect overlay.
+ * AiRoomOverlay — auto-count-style AI auto-detect overlay.
  *
  * AI grąžina patalpas su `bbox_pct: {x, y, w, h}` (procentais nuo puslapio).
  * Šis komponentas perdengia PDF su žaliomis transparentinėmis zonomis,
  * kiekviena su patalpos pavadinimu + plotu.
  *
- * Vartotojas mato VISUS AI atpažintus kambarius automatiškai (Togal Button stilius).
+ * Vartotojas mato VISUS AI atpažintus kambarius automatiškai (auto-detect stilius).
  */
 
 import { Stage, Layer, Rect, Text as KonvaText, Group, Line } from 'react-konva';
 
-// Phase C-4-bis: per-category colors per Kreo competitor research. Each room
+// Phase C-4-bis: per-category colors per competitor research. Each room
 // paskirtis gets its own hue so a glance at the polygon overlay reveals the
 // floor plan's functional zones without reading labels.
 const COLORS_BY_PASKIRTIS = {
