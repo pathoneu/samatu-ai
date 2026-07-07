@@ -64,7 +64,10 @@ def _reference_walls_paintable_m2(room: dict) -> float:
     if apdaila:
         tile_share = float(apdaila.get("plyteles_share") or 0)
         tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
-        tile_h_eff = tile_h if tile_h > 0 else H
+        # 2026-07-05 audit fix (bug 1): mirror the production floor — unknown
+        # tile height falls back to the 2.0 m band, NOT the full room height.
+        # (No Beržų room fires this path, but keep the mirror faithful.)
+        tile_h_eff = tile_h if tile_h > 0 else 2.0
         is_full_tile = (tile_share >= 0.8 and tile_h_eff >= H * 0.95)
 
     if is_full_tile:

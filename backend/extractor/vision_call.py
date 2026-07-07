@@ -1305,10 +1305,27 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         return
 
     from .universal_rules import is_high_ceiling as _is_high
-    virs_3m = round(sum(
-        (float(r.get("walls_paintable_m2") or 0) + float(r.get("ceiling_paintable_m2") or 0))
-        for r in rooms if _is_high(r.get("lubu_aukstis_m"))
-    ), 2)
+
+    def _room_virs_3m_paint(r: dict) -> float:
+        """m² of a room's paint (walls + ceiling) that belongs above 3 m.
+
+        2026-07-05 audit fix (bug 4): a room whose NOMINAL height is <3 m can
+        still carry explicit above-3m surfaces — a feature/soffit wall
+        (extra_walls_virs_3m_m2) or a raised ceiling coffer
+        (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
+        ceiling above 3 m). Splitting by room height alone dumped those into the
+        iki-3m line. A genuinely high room (≥3 m) still sends all its paint to
+        virš-3m."""
+        w = float(r.get("walls_paintable_m2") or 0)
+        c = float(r.get("ceiling_paintable_m2") or 0)
+        if _is_high(r.get("lubu_aukstis_m")):
+            return w + c
+        xw = float(r.get("extra_walls_virs_3m_m2") or 0)
+        hc = min(float(r.get("high_ceiling_area_m2") or 0), c)
+        # never allocate more to virš than the room actually paints
+        return min(xw + hc, w + c)
+
+    virs_3m = round(sum(_room_virs_3m_paint(r) for r in rooms), 2)
     virs_3m = min(max(virs_3m, 0.0), dazymo_total)
     iki_3m = round(dazymo_total - virs_3m, 2)
 

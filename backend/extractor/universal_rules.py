@@ -645,6 +645,13 @@ def _resolve_deduction_standard(rules: dict | None) -> str:
 _SYNTHETIC_PERIM_RECT_COEFF = 4.69
 _SYNTHETIC_AREA_SOURCES = ("wall_dim_calc", "default_fallback")
 
+# 2026-07-05 audit fix (bug 1): fallback wall-tile band height used ONLY on the
+# apdailos path when Vision detected a tile SHARE but neither a tile height nor
+# a room-type default is available. 2.0 m ≈ a standard bathroom tile line —
+# well below a typical 2.7–2.82 m ceiling, so a dominant-share room of unknown
+# height is NOT mistaken for full-tile-to-ceiling (which would zero its paint).
+_UNKNOWN_TILE_BAND_M = 2.0
+
 
 def _perimeter_floor_enabled() -> bool:
     """Feature-flag gate for the synthetic-perimeter wall floor (default ON)."""
@@ -833,7 +840,12 @@ def calc_room_quantities(room: dict,
         tile_walls_area = elevation_tile_area
     elif apdailos:
         tile_share = float(apdailos.get("plyteles_share") or 0)
-        tile_h_eff = tile_height if tile_height > 0 else H
+        # 2026-07-05 audit fix (bug 1): floor unknown tile height to a sane band
+        # (see _UNKNOWN_TILE_BAND_M) instead of the full room height H. Full-
+        # height fallback over-quoted tiled area ~1.4× AND could flip
+        # is_full_tile→True (zeroing all paint) for a room that merely has a
+        # dominant tile SHARE of unknown height.
+        tile_h_eff = tile_height if tile_height > 0 else _UNKNOWN_TILE_BAND_M
         # Full-tile criterion: tile dominates AND reaches ceiling (≥95% H)
         is_full_tile = (tile_share >= 0.8 and tile_h_eff >= H * 0.95)
         # Track tile area separately (used by Plytelių klijavimas line items)
@@ -895,7 +907,6 @@ def calc_room_quantities(room: dict,
         walls_net = walls_paintable
     else:
         # Legacy heuristic path: paskirtis-based walls_paint factor.
-        # Still uses CLAUDE.md formula (full opening deductions + tile zones).
         tile_walls_area = perim * tile_height if tile_height > 0 else 0
         if walls_paint_factor_override is not None:
             walls_paint_factor = float(walls_paint_factor_override)
@@ -907,7 +918,13 @@ def calc_room_quantities(room: dict,
         else:
             walls_paint_factor = rt_rules.get("walls_paint")
             walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
-        walls_net = max(0, walls_gross - doors_total - windows_total - tile_walls_area)
+        # 2026-07-05 audit fix (bug 3): do NOT subtract tile_walls_area from the
+        # glaistymas/dažymas base. Walls under a partial tile band still get
+        # glaistytas underneath (LT contractor convention), so the base is
+        # gross − openings, matching the apdailos branch and the reference
+        # calculator. The tiled band is billed separately (plyteles_sienos_m2).
+        # Prior code over-subtracted the tile zone from paint.
+        walls_net = max(0, walls_gross - doors_total - windows_total)
         walls_paintable = walls_net * walls_paint_factor
 
     # Add per-room "extra walls" (LED feature partitions, soffit step walls,
@@ -1197,6 +1214,14 @@ def calc_room_quantities(room: dict,
         "silikonavimas_m": round(perim * 2.3 if paskirtis in ("vonia", "wc", "san") else 0, 2),
         "doors_deducted_m2": round(doors_total, 2),
         "windows_deducted_m2": round(windows_total, 2),
+        # 2026-07-05 audit fix (bug 2): echo the resolved per-opening areas so
+        # the merger persists them on the room. They are not PRIMITIVE_KEYS and
+        # calc_input's copy is discarded, so without this echo every recompute
+        # (e.g. a ceiling-height edit) re-reads None → the UNIVERSAL_RULES
+        # 1.85 m² / 1.80 m² fallback, silently discarding the Vision-measured
+        # per-door/window areas parsed from elementai.
+        "door_area_m2": round(door_area, 2),
+        "window_area_m2": round(window_area, 2),
     }
 
 
