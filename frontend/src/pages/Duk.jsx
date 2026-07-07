@@ -12,7 +12,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import LegalLayout, { Section, P } from '@/components/legal/LegalLayout';
-import { setPageMeta, setJsonLd } from '@/lib/seo';
+import { setJsonLd } from '@/lib/seo';
 
 const QA = [
   {
@@ -58,13 +58,9 @@ const QA = [
 ];
 
 export default function Duk() {
+  // <title>/description/canonical come from LegalLayout (title + intro props);
+  // this effect only owns the FAQPage structured data.
   useEffect(() => {
-    setPageMeta({
-      title: 'DUK — dažniausiai užduodami klausimai',
-      description:
-        'Kaip veikia Pathon: kiekiai iš PDF brėžinių, tikslumas ir pasitikėjimo indikatoriai, kainos, eksportas į Excel/PDF, PVM ir duomenų sauga.',
-      path: '/duk',
-    });
     setJsonLd('jsonld-faq', {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
@@ -82,7 +78,7 @@ export default function Duk() {
       eyebrow="Pagalba"
       index="DUK-01"
       title="Dažniausiai užduodami klausimai"
-      intro="Trumpai ir be pagražinimų: kaip Pathon skaičiuoja kiekius, kiek tai kainuoja ir kur yra sistemos ribos."
+      intro="Trumpai ir be pagražinimų: kaip Pathon skaičiuoja kiekius iš PDF brėžinių, kiek tai kainuoja, kaip veikia eksportas į Excel bei PDF ir kur yra sistemos ribos."
       updated="2026-07-06"
       effective="2026-07-06"
     >

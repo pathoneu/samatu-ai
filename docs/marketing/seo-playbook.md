@@ -14,16 +14,28 @@
 | Per-route `<title>`/meta/canonical helper | `frontend/src/lib/seo.js` | ✅ |
 | /duk FAQ page + footer link + route | `frontend/src/pages/Duk.jsx` | ✅ |
 | GA4 consent-gated (Consent Mode v2; no-op until `VITE_GA4_ID`) | `frontend/src/lib/analytics.js` | ✅ |
+| Prerender: `npm run build:seo` → 10 public routes into `dist/<route>/index.html` | `frontend/scripts/prerender.mjs` + `prerender-driver.mjs` | ✅ 07-07 |
+| 4 BoFu pages (LT copy = DRAFT, founder polish pending) | `frontend/src/pages/bofu/` + `MarketingLayout.jsx` | ✅ 07-07 |
+| Legal + /duk titles/meta from layout props | `frontend/src/components/legal/LegalLayout.jsx` | ✅ 07-07 |
 
 ### Pending (chipped / next build)
-1. **Prerender public routes** — Googlebot renders JS, but AI crawlers and some
-   scrapers don't. Approach: post-build script (`vite build` → `vite preview` →
-   playwright CLI saves each public route's rendered HTML into `dist/<route>/index.html`).
-   Opt-in npm script `build:seo`, default build untouched. ~half a day.
-2. **4 BoFu pages** (below) + **public /kainos** (today /pricing is behind the
-   auth wall — a marketing bug; pricing must be visible logged-out once billing goes live).
+1. ~~Prerender public routes~~ ✅ 2026-07-07 — opt-in `npm run build:seo`
+   (default `npm run build` untouched; Render keeps using it). PROD adoption
+   still open: switch the host's build command to `build:seo`, add
+   `npx -y playwright@1.55.1 install chromium` to the build image (untested on
+   Render/Linux), and confirm the host serves `dist/<route>/index.html` for
+   extension-less URLs BEFORE the SPA fallback (`vite preview` does NOT — use
+   `python3 -m http.server -d dist` to spot-check locally).
+2. **4 BoFu pages** ✅ built 2026-07-07 as drafts — /samatininko-kaina,
+   /kiekiai-is-brezinio, /vidaus-apdailos-samata, /apva-renovacijos-kiekiai
+   (in sitemap + prerender list). Founder polish before publishing (LT copy
+   rule §5); price tables in /samatininko-kaina are marked orientacinės —
+   sources still wanted. Still pending: **public /kainos** (today /pricing is
+   behind the auth wall — a marketing bug; pricing must be visible logged-out
+   once billing goes live).
 3. `setPageMeta` on Login/Register (cosmetic); hreflang only if/when EN routes exist.
-4. Legal pages inherit default title — wire `setPageMeta` into `LegalLayout` (10-min task).
+4. ~~Wire `setPageMeta` into LegalLayout~~ ✅ 2026-07-07 — legal pages + /duk
+   derive `<title>`/description from their `title`/`intro` props.
 
 ## 2. Keyword map [VERIFY volumes via GSC + Keyword Planner after 2 wks of ads]
 

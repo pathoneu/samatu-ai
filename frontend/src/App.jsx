@@ -29,6 +29,12 @@ const SharedProject = lazy(() => import('@/pages/SharedProject'));
 const CookieBanner = lazy(() => import('@/components/CookieBanner'));
 const Landing = lazy(() => import('@/pages/Landing'));
 const Duk = lazy(() => import('@/pages/Duk'));
+// BoFu marketing pages (2026-07-06, seo-playbook §3) — public, listed in
+// sitemap.xml and prerendered by `npm run build:seo`.
+const SamatininkoKaina = lazy(() => import('@/pages/bofu/SamatininkoKaina'));
+const KiekiaiIsBrezinio = lazy(() => import('@/pages/bofu/KiekiaiIsBrezinio'));
+const VidausApdailosSamata = lazy(() => import('@/pages/bofu/VidausApdailosSamata'));
+const ApvaRenovacijosKiekiai = lazy(() => import('@/pages/bofu/ApvaRenovacijosKiekiai'));
 // Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
 const Annotator = lazy(() => import('@/pages/Annotator'));
 // Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
@@ -98,6 +104,10 @@ function App() {
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/duk" element={<Duk />} />
+              <Route path="/samatininko-kaina" element={<SamatininkoKaina />} />
+              <Route path="/kiekiai-is-brezinio" element={<KiekiaiIsBrezinio />} />
+              <Route path="/vidaus-apdailos-samata" element={<VidausApdailosSamata />} />
+              <Route path="/apva-renovacijos-kiekiai" element={<ApvaRenovacijosKiekiai />} />
               <Route path="/share/:token" element={<SharedProject />} />
 
               {/* Protected — wrapped in AppLayout (sidebar) */}
