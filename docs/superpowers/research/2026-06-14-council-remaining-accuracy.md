@@ -25,7 +25,7 @@ After fixing doors/paint/heights, current Beržų accuracy: paint −3.9%, doors
 1. **Variance-localization diagnostic FIRST** (cheap, no fitting): log per-run counted primitives across a few extractions; see whether kampai's scatter is openings / n_partition_walls / perimeters.
 2. **Decompose kampai** into corner-bead + reveals + partition-junctions, each matched to its contractor line (await the standards research for the canonical corner-bead rule). Honest correctness, even if the aggregate reads worse.
 3. **Leave 45° (+15%, legit 10–15% waste band) and rotband (−14%, would be fitting) FLAGGED**, don't tune.
-4. **Skylių**: the fixture reader already improved it (3→4); don't tune the formula. Verify on bacveviciaus too.
+4. **Skylių**: the fixture reader already improved it (3→4); don't tune the formula. Verify on objektas_b too.
 5. **Do NOT** propagate door→elementai; **do NOT** grind to the AI oracle.
 6. **Keystone**: get one human-confirmed count.
 

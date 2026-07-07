@@ -23,7 +23,7 @@ plans before `eval_harness.py --totals-only` can score them.
 
 | Project | Plan pages | Est. Vision spend* |
 |---|---:|---:|
-| `bacveviciaus` | 65 (TP) | $6.50 – $10 |
+| `objektas_b` | 65 (TP) | $6.50 – $10 |
 | `ciurliu` | 3 (A3) | $0.30 – $0.50 |
 | `romainiai` | 45 (subset) | $4.50 – $7 |
 | `sernu` | ⛔ missing | — |

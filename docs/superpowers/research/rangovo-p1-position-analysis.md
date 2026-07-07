@@ -3,7 +3,7 @@
 > **rangovo yra vienas LT rangovas — jo pozicijos rodo "kokio detalumo lygio sąmatos LT rangovai išleidžia."**
 > Skaičiai ne ground truth, bet POZICIJŲ TIPAI ir GRANULARITY yra orientyras kuris turi atspindėti į mūsų output'ą.
 
-P1: Naujos statybos namas Bacevičiaus g. Kaunas. Vidaus apdailos darbai. 2026-04-13.
+P1: Naujos statybos namas (Objektas B), Kaunas. Vidaus apdailos darbai. 2026-04-13.
 
 ## rangovo positions per skyrius
 

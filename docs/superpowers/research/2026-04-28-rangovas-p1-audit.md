@@ -1,6 +1,6 @@
 # rangovas P1 vs Sąmatų AI — Line-by-Line Audit
 
-**Project:** P1 — Naujos statybos namas Bacevičiaus g. Kaunas (224 m² su garažu)
+**Project:** P1 — Naujos statybos namas (Objektas B), Kaunas (224 m² su garažu)
 **rangovo PDF:** `/Users/ignasgaldikas/samatu-ai/training-data/projektas_1/projektas_1_pasiulymas.pdf` (112 lines, 8 skyriai, 80,161 € be PVM)
 **Mūsų output:** project `eeaad5fd-e1af-4cd9-9bb9-50d3c739922f`, 16 pozicijos
 **Auditor:** brutally honest

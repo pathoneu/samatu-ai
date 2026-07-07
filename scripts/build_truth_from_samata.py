@@ -11,7 +11,7 @@ Mapping is hardcoded per-project because:
   • regex parsing would be brittle and harder to audit
   • the cost of writing this once is small and the artefact is traceable
 
-All five sąmatos are from Rangovas A (Rangovas A) — same contractor
+All five sąmatos are from Rangovas A — same contractor
 as Beržų. This is a single-contractor cross-project benchmark, NOT a
 cross-contractor benchmark.
 """
@@ -36,14 +36,14 @@ def _val(value, source, confidence="green", notes=None):
 # ─────────────────────────────────────────────────────────────────────
 # Nr. 1 — Objektas B, Kaunas (5-page pasiūlymas, 65-page TP)
 # ─────────────────────────────────────────────────────────────────────
-BACEVICIAUS = {
+OBJEKTAS_B = {
     "$schema_version": 1,
     "project_id": "objektas_b",
-    "name": "Objektas B (Objektas B)",
+    "name": "Objektas B",
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "date_collected": "2026-04-13",
     },
     "notes_for_evaluator": (
@@ -89,7 +89,7 @@ CIURLIU = {
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "date_collected": "2026-02-12",
     },
     "notes_for_evaluator": (
@@ -114,16 +114,16 @@ CIURLIU = {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 3 — Romainiai (Deividas Norkaitis), 1-page pasiūlymas, 45-page interior
+# Nr. 3 — Romainiai (Objektas C), 1-page pasiūlymas, 45-page interior
 # ─────────────────────────────────────────────────────────────────────
 ROMAINIAI = {
     "$schema_version": 1,
     "project_id": "romainiai",
-    "name": "Romainiai (Deividas Norkaitis)",
-    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Deividas Norakitis INTERJERAS 4.1-5.1 punktas.pdf",
+    "name": "Romainiai (Objektas C)",
+    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Objektas C INTERJERAS 4.1-5.1 punktas.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "date_collected": "2026-01-15",
     },
     "notes_for_evaluator": (
@@ -170,7 +170,7 @@ SERNU = {
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "date_collected": "2025-07-16",
     },
     "notes_for_evaluator": (
@@ -207,7 +207,7 @@ LAZUNU = {
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf",
-        "contractor": "Rangovas A (Rangovas A)",
+        "contractor": "Rangovas A",
         "date_collected": "2024-06-26",
     },
     "notes_for_evaluator": (
@@ -237,7 +237,7 @@ LAZUNU = {
 }
 
 
-PROJECTS = [BACEVICIAUS, CIURLIU, ROMAINIAI, SERNU, LAZUNU]
+PROJECTS = [OBJEKTAS_B, CIURLIU, ROMAINIAI, SERNU, LAZUNU]
 
 
 def main() -> int:

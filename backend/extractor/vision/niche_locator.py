@@ -212,7 +212,7 @@ def fold_niches_into_rooms(
 
     2026-06-05 audit note: a confidence-weighted variant was tried but
     didn't help because the locator's current prompt over-extracts on
-    Beržų (52m vs 42m truth) and under-extracts on Bacveviciaus (23m
+    Beržų (52m vs 42m truth) and under-extracts on Objektas B (23m
     vs 55m truth). The locator finds real niches the main pass misses
     but also catches curtain/non-LED niches the contractor doesn't
     bill. The root fix is at the prompt level (precision/recall tuning)

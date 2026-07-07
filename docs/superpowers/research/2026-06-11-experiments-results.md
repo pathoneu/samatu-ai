@@ -2,7 +2,7 @@
 
 **Why:** The council + headroom research both demanded empirical verification before the strategy is locked. Two contractor-validated projects used (per user: "most trustable, proper full projects"):
 - **Beržų g. 24** — 58-line Rangovas A samata (existing fixture)
-- **Bacevičiaus g. (Gytis ir Simona)** — 112-line Rangovas A pasiūlymas 2026-04-13, 65-page TP (fixture existed; fresh voted extraction run today)
+- **Objektas B** — 112-line Rangovas A pasiūlymas 2026-04-13, 65-page TP (fixture existed; fresh voted extraction run today)
 
 Artifacts: `eval_runs/2026-06-11_experiments/` · harnesses: `scripts/exp1_false_green.py`, `scripts/exp2_text_vs_geometry.py`, `scripts/run_voted_extract.py`
 
@@ -46,7 +46,7 @@ Artifacts: `eval_runs/2026-06-11_experiments/` · harnesses: `scripts/exp1_false
 2. Voting flags ARE useful for what they see (5/8 precision) — they catch geometric instability — but they are one signal of several, not the confidence system.
 3. The systematic-error list IS the work queue: each false-green row is a rule/recall fix with a contractor-anchored target.
 
-## Experiment 1 — False-green rate · BACVEVIČIAUS (Gytis ir Simona) ✅ MEASURED
+## Experiment 1 — False-green rate · OBJEKTAS B ✅ MEASURED
 
 Fresh voted run: 803s, 15 rooms × 3 rounds, npw=59, 7 voting flags, ~$9. Scored vs 21 mappable truth quantities from the 112-line pasiūlymas.
 
@@ -72,10 +72,10 @@ Fresh voted run: 803s, 15 rooms × 3 rounds, npw=59, 7 voting flags, ~$9. Scored
 1. **Geometry extraction is NOT the bottleneck** (walls −2.8%/−0.7% across two projects). The research's symbol-detector/zoom levers target a layer that is already adequate at the totals level. **Re-rank: finish-semantics first.**
 2. **The #1 accuracy lever (measured): the finish-semantics lane** — extend the apdailos vocabulary (molio tinkas, mikrocementas, dekoras, "netinkuojama"), find the REAL finish-plan pages (not renders), per-project scope rules (is garažas painted? which ceilings are finished?). This is "measure by reading the project's own spec" — the text-first thesis is right at the SEMANTIC level, wrong at the dimension-chain level.
 3. **The #2 lever: confidence rebuild** — false-green 50–67% is unsellable. Calibrate per quantity-class (doors/silikonavimas/skylių classes → 🟡 by default with measured bias ranges), propagate self-reported low-confidence (apdailos pastabos), keep voting flags (100% precision when they fire, ~40% recall).
-4. **Heights: style-dependent** — right on berzas, inverted on bacveviciaus; voting flags them; zoom-apply fix (pending follow-up) + section-marker cross-check is the path.
+4. **Heights: style-dependent** — right on berzas, inverted on objektas_b; voting flags them; zoom-apply fix (pending follow-up) + section-marker cross-check is the path.
 5. **Both projects' false-green rows are the concrete fix queue** with contractor-anchored targets. Don't eval-fit to N=2 — fix mechanisms (vocabulary, scope rules), calibrate classes, and grow the anchor set.
 
-| | Beržų | Bacevičiaus |
+| | Beržų | Objektas B |
 |---|---|---|
 | False-green rate @10% | 50% | 60% |
 | Flag precision / error recall | 63% / 38% | 100% / 40% |
@@ -87,15 +87,15 @@ Fresh voted run: 803s, 15 rooms × 3 rounds, npw=59, 7 voting flags, ~$9. Scored
 
 ## SAME-DAY FIX ROUND (the "go" build) — measured before → after
 
-Shipped (commits `feat(finish)`, `feat(confidence)`, `feat(apdailos)` 2026-06-11): molio tinkas/kita_danga vocabulary + paint split; apdailos self-reported-confidence propagation; per-pozicija confidence post-pass (class calibration from the 2 anchors + finish provenance + voting flags, worst wins); apdailos page-finder excludes renders; **multi-page išklotinės reading** (Bacevičiaus TP carries finishes across pages 12–22 — single-page reads structurally cannot work).
+Shipped (commits `feat(finish)`, `feat(confidence)`, `feat(apdailos)` 2026-06-11): molio tinkas/kita_danga vocabulary + paint split; apdailos self-reported-confidence propagation; per-pozicija confidence post-pass (class calibration from the 2 anchors + finish provenance + voting flags, worst wins); apdailos page-finder excludes renders; **multi-page išklotinės reading** (Objektas B TP carries finishes across pages 12–22 — single-page reads structurally cannot work).
 
 | Metric | Before | After |
 |---|---|---|
 | Beržų false-green @10% | 50% | **25%** (error recall 38%→**85%**) |
-| Bacevičiaus false-green @10% | 60% | **0%** (error recall 40%→**100%**) |
-| Bacevičiaus apdailos low-confidence rooms | 14/15 (single page, renders) | **7/15** (11 išklotinės sheets, one call, ~$0.8) |
+| Objektas B false-green @10% | 60% | **0%** (error recall 40%→**100%**) |
+| Objektas B apdailos low-confidence rooms | 14/15 (single page, renders) | **7/15** (11 išklotinės sheets, one call, ~$0.8) |
 | Molio tinkas pozicija | not representable | emitted, 32.5 m², geltona |
-| Bacevičiaus combined paint | +62.8% | +56.9% (paint+molio vs contractor paint+molio: **+23.4%**) |
+| Objektas B combined paint | +62.8% | +56.9% (paint+molio vs contractor paint+molio: **+23.4%**) |
 
 **Honest residuals:** (1) Beržų's 2 remaining false greens are *confidently-wrong* apdailos shares (garažas walls +20%, vonia tile −19%) — the blind-audit class; self-flagging cannot catch them. (2) The molio gap (32.5 emitted vs 160 contracted) is a **TP-vs-contract divergence** — the drawing specifies paint where the client later chose clay; no drawing reader can see that. It stays geltona, and the correction UI is where it gets fixed — which is exactly why the council made the correction UI the product. (3) Greens are now scarce (8/24, 4/21) — the path back to green is fixing calibrated classes, not relabeling.
 
@@ -103,18 +103,18 @@ Shipped (commits `feat(finish)`, `feat(confidence)`, `feat(apdailos)` 2026-06-11
 
 Shipped after the multi-page apdailos work (commits `feat(heights)`, `fix(finish)` garage):
 
-- **Height-plausibility gate** (`apply_height_plausibility_gate`): Vision had put the 3.5 m tall ceiling on a 6.8 m² wet room + 2.9 m² WC while the 62 m² svetainė got the 2.82 default → inverted iki/virš-3m split. Gate moves the tall height to the large living room, clamps the wet rooms. **Bacevičiaus GKP virš-3m: 9.72 → 62.42 (truth 68.28; −86% → −8.6%).** Beržų (tall room already the large svetainė): gate does not fire → zero regression.
-- **Low-confidence apdailos no longer overrides structural no-paint:** the reader GUESSED "garažas — dažytos sienos (spėjimas)" and that override painted 76 m² of garage walls the contractor never finishes. Now a low-confidence breakdown can't override garažas/tambūras = no-paint (a confident read still can). **Bacevičiaus combined paint (vs contractor paint+molio 653 m²): +62.8% → +1.6%.**
+- **Height-plausibility gate** (`apply_height_plausibility_gate`): Vision had put the 3.5 m tall ceiling on a 6.8 m² wet room + 2.9 m² WC while the 62 m² svetainė got the 2.82 default → inverted iki/virš-3m split. Gate moves the tall height to the large living room, clamps the wet rooms. **Objektas B GKP virš-3m: 9.72 → 62.42 (truth 68.28; −86% → −8.6%).** Beržų (tall room already the large svetainė): gate does not fire → zero regression.
+- **Low-confidence apdailos no longer overrides structural no-paint:** the reader GUESSED "garažas — dažytos sienos (spėjimas)" and that override painted 76 m² of garage walls the contractor never finishes. Now a low-confidence breakdown can't override garažas/tambūras = no-paint (a confident read still can). **Objektas B combined paint (vs contractor paint+molio 653 m²): +62.8% → +1.6%.**
 - **Zoom-apply reframed (not a height fix):** the Pass-2 zoom is a floor-plan crop; ceiling heights live in sections (pjūviai), so floor-plan zoom structurally cannot recover them — "0 applied" for heights is expected, not a bug. The height fix is the plausibility gate above. The zoom-apply remains a *cost*-not-accuracy issue (it runs but rarely applies on single-pass; voting skips it when consensus carries heights). Deprioritized.
 
-**Cumulative finish-accuracy on the two anchors after both rounds:** false-green 50%/60% → 25%/0%; bacveviciaus combined paint +62.8% → +1.6%; GKP virš-3m −86% → −8.6%; berzas unchanged (zero regression). Geometry was never the problem — finish semantics + height attribution + scope rules were.
+**Cumulative finish-accuracy on the two anchors after both rounds:** false-green 50%/60% → 25%/0%; objektas_b combined paint +62.8% → +1.6%; GKP virš-3m −86% → −8.6%; berzas unchanged (zero regression). Geometry was never the problem — finish semantics + height attribution + scope rules were.
 
 ### Recall round (the "bit more backend recalls") — disciplined against N=2 fitting
 
 The systematic under-count classes were triaged for *mechanism* fixes (generalizable) vs *coefficient fitting* (overfit to 2 anchors):
 
-- ✅ **silikonavimas — SHIPPED (mechanism):** it only sealed `paskirtis ∈ {vonia,wc,san}`, missing skalbyklos and other apdailos-tiled rooms. Extended to all tiled rooms (`plyteles_share≥0.6`), unchanged ×1.4 coefficient → berzas −39%→−10%, bacveviciaus −68%→−55%. Residual is fixture-density-driven (needs more anchors) and stays flagged geltona.
-- ❌ **silikonavimas corner-seam term — REJECTED (fitting):** adding `internal_corners × tile_h` over-shot berzas (+31%) while still under-shooting bacveviciaus (−35%); per-room sealing genuinely differs ~2× (fixture density). Can't derive stable coefficients from N=2.
+- ✅ **silikonavimas — SHIPPED (mechanism):** it only sealed `paskirtis ∈ {vonia,wc,san}`, missing skalbyklos and other apdailos-tiled rooms. Extended to all tiled rooms (`plyteles_share≥0.6`), unchanged ×1.4 coefficient → berzas −39%→−10%, objektas_b −68%→−55%. Residual is fixture-density-driven (needs more anchors) and stays flagged geltona.
+- ❌ **silikonavimas corner-seam term — REJECTED (fitting):** adding `internal_corners × tile_h` over-shot berzas (+31%) while still under-shooting objektas_b (−35%); per-room sealing genuinely differs ~2× (fixture density). Can't derive stable coefficients from N=2.
 - ❌ **skylių gręžimas — LEFT AS-IS (fitting):** −11%/−21%. Adding the omitted fixture types (gyvatukai, trapai) doesn't close both gaps with stable per-fixture counts (`2g+3t=6` vs `4g+3t=23` → inconsistent). Mild + likely symbol-recall, not formula. Stays flagged.
 - ❌ **beapvadinės durys −61%/−64% — VISION RECALL, not deterministic:** the contractor treats ~all interior doors as frameless; Vision tags only the explicitly-marked ones. Forcing "all interior frameless" over-shoots projects with framed doors. Needs the doors-reader to classify better (Vision), not a formula.
 

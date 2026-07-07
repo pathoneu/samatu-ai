@@ -40,7 +40,7 @@ registry and produces `ground_truth/<slug>/contractor_samata_parsed.json`:
 | lazunu | 58 | 50 | 8 |
 
 Each samata has explicit LED-niche line items (Beržų #3+#5+#23,
-Bacveviciaus #4+#27+#29, etc.), all with units `m` or `b/m`.
+Objektas B #4+#27+#29, etc.), all with units `m` or `b/m`.
 
 ## Phase 4: the pattern
 

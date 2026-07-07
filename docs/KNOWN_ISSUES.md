@@ -122,10 +122,10 @@ that BOTH are Vision **measurement ceilings**, not code bugs — do not re-litig
   contractor's ceiling includes soffit/boxing surface a flat-ceiling model can't
   derive. AI floor (95.5) is only **−2.6%** vs the real floor (98.0); the headline
   −10.5% is mostly the unmodellable ceiling-soffit gap.
-- **Bacevičiaus LED −18%** — Vision *recall* gap (niche prompt already recall-hardened;
+- **Objektas B LED −18%** — Vision *recall* gap (niche prompt already recall-hardened;
   multi-page locator already runs pgs 5/6/7). The inference fallback over-bills Čiurlių
-  (+12.5%) while under-recovering Bacevičiaus; **no global ratio change is safe**
-  (verified: dropping san/vonia/wc → Bacevičiaus −29.6%).
+  (+12.5%) while under-recovering Objektas B; **no global ratio change is safe**
+  (verified: dropping san/vonia/wc → Objektas B −29.6%).
 
 **Root cause is DATA/input-completeness, same pattern as lazunu** — the dimensioned
 architectural plan lives on a separate sheet not in the bundle.
@@ -144,7 +144,7 @@ plan + Pakabinamu-lubu ceiling + Sviestuvu lighting → `lazunu_TP_bundled.pdf`)
 re-extracted ($0.49 Vision). Areas now read correctly from the **eksplikacija** (4 rooms,
 `plotas_saltinis=eksplikacija`; perimeter floor correctly did NOT fire). Overall MAE
 **5.78% (3 proj) → 6.66% (4 proj)** — *added coverage*, not a regression
-(berzas/bacveviciaus/ciurliu byte-identical). lazunu paint is still **−14.2%**, but for a
+(berzas/objektas_b/ciurliu byte-identical). lazunu paint is still **−14.2%**, but for a
 **distinct** reason from ciurliu: **multi-level suspended ceilings with bulkhead faces
 (kaktos at 2.39/2.51/2.66/2.26 m)**. Vision detects the heights (prose warning) but NOT the
 bulkhead boundary lengths, and `calc_room_quantities` has no bulkhead-face-paint term → not

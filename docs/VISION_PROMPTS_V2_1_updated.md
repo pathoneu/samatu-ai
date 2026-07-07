@@ -76,7 +76,7 @@ V2.1 — pridėti visus 5 klasių pavyzdžius iš `training_dataset_v2.json`:
 ```
 FEW-SHOT EXAMPLES (iš training_dataset_v2.json):
 
-# Example 1 — complex_house (P1 Bacevičiaus)
+# Example 1 — complex_house (P1 Objektas B)
 Input: 15 rooms, 180 m² be garažo + 44 m² garažas = 224 m² total. 
 R450/R600 arkos, MAZGAS A/B/C LED nišos, garažas su >3m lubomis.
 Output:

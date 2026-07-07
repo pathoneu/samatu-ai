@@ -24,7 +24,7 @@ projects:
     notes: "N=1 originator; only project with full gt_dimensions."
 
   - slug: objektas_b
-    name: "Objektas B (Objektas B)"
+    name: "Objektas B"
     truth_path: ground_truth/objektas_b/truth.json
     project_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/TP_Objektas B_2025naujausias.pdf
     samata_pdf: docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 1/Pasiūlymas 20260413.pdf
@@ -44,9 +44,9 @@ projects:
     notes: "3-page A3 plans; smallest project — fastest Vision ingestion."
 
   - slug: romainiai
-    name: "Romainiai (Deividas Norkaitis)"
+    name: "Romainiai (Objektas C)"
     truth_path: ground_truth/romainiai/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Deividas Norakitis INTERJERAS 4.1-5.1 punktas.pdf"
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Objektas C INTERJERAS 4.1-5.1 punktas.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf"
     contractor: "Rangovas A"
     has_gt_dimensions: false

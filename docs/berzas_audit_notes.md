@@ -29,7 +29,7 @@
 - **durų angų / beapvadinės durys −56%** (17.1 vs 39.2): Vision tagged 3 doors `pasleptos_duris` but the contractor prepped ~7. Vision under-classifies frameless doors. NOT deterministic — forcing "all interior doors frameless" would overfit berzas.
 
 **True remaining gaps are ALL Vision recall/stability** (the "double down on vision" bucket):
-1. Room dims / ceiling heights → iki/virš split + combined paint −10…−14% on bacveviciaus/ciurliu/lazunu
+1. Room dims / ceiling heights → iki/virš split + combined paint −10…−14% on objektas_b/ciurliu/lazunu
 2. Frameless-door classification (3 vs ~7)
 3. Symbol undercounts: praustuves 3<5, difuzoriai 6<15, sviestuvai 35<38, skylių 40<56
 4. Run-to-run instability (kampai fresh 325 vs cached 501 — wall_adjacency bails silently)
@@ -126,11 +126,11 @@ as the genuine −100% collapse **and** prints a `🔴 COLLAPSED METRICS` footno
 - ⚠️ **berzas** died on voting round 3; apdailos+doors passes failed → paint-degraded
   artifact → **rolled back to enriched baseline** (not scored — its collapse was a credit
   artifact, not the pipeline).
-- ❌ **bacveviciaus, romainiai** never written (all Vision calls 400'd) → enriched baseline.
+- ❌ **objektas_b, romainiai** never written (all Vision calls 400'd) → enriched baseline.
 
 So the benchmark is **partially honest** (overall 6.658% → 9.479%, a mixed figure).
 **To finish: top up credits, re-run `scripts/regenerate_truth_extracts.py --only berzas`
-(+ bacveviciaus, romainiai), then `eval_harness.py --totals-only`.**
+(+ objektas_b, romainiai), then `eval_harness.py --totals-only`.**
 
 ---
 

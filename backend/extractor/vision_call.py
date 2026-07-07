@@ -3526,7 +3526,7 @@ def extract_interior(
     # Verified Beržų: -5.44% → -0.99% (primary alone). Secondary pages
     # would over-extract (light-wiring rectangles mis-read as LED), so
     # the COVERAGE_GATE skips them when primary already covers many
-    # rooms. Bacveviciaus: -54.75% → -51.60% (primary 4 rooms < gate,
+    # rooms. Objektas B: -54.75% → -51.60% (primary 4 rooms < gate,
     # backfill kicks in, helps marginally — locator-limited beyond that).
     try:
         from .vision.niche_locator import (

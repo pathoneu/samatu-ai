@@ -15,11 +15,11 @@
 > | **lazunu** | ✅ complete (3 voting rounds, $0.47) | **FRESH honest** |
 > | **ciurliu** | ✅ complete (3 voting rounds, $0.52) | **FRESH honest** |
 > | **berzas** | ⚠️ credit died on voting round 3; apdailos + doors passes failed → paint-degraded **artifact** | **rolled back to enriched baseline** |
-> | **bacveviciaus** | ❌ `all_voting_runs_failed` (credit) — never written | enriched baseline (untouched) |
+> | **objektas_b** | ❌ `all_voting_runs_failed` (credit) — never written | enriched baseline (untouched) |
 > | **romainiai** | ❌ `all_voting_runs_failed` (credit) — never written | enriched baseline (untouched) |
 >
 > So the benchmark is **partially honest**: lazunu + ciurliu now score against
-> fresh production; berzas + bacveviciaus remain on the enriched cache. The
+> fresh production; berzas + objektas_b remain on the enriched cache. The
 > degraded berzas extract was **rolled back** (not scored) because its paint
 > metrics collapsed for the wrong reason (credit failure of the apdailos pass,
 > not the pipeline) — keeping it would inject a fake-bad number.
@@ -27,7 +27,7 @@
 > **To finish:** top up Anthropic credits, then re-run for the 3 remaining:
 > ```bash
 > venv/bin/python scripts/regenerate_truth_extracts.py --only berzas
-> venv/bin/python scripts/regenerate_truth_extracts.py --only bacveviciaus
+> venv/bin/python scripts/regenerate_truth_extracts.py --only objektas_b
 > venv/bin/python scripts/regenerate_truth_extracts.py --only romainiai   # MAE-excluded, optional
 > venv/bin/python eval_harness.py --totals-only --detailed
 > ```
@@ -56,7 +56,7 @@ This session:
    `scripts/regenerate_truth_extracts.py` — **2 of 5 completed before the API
    credit ran out** (see the ⛔ box above).
 4. **Re-ran** `--totals-only` and recorded the honest production MAE for the two
-   that completed (ciurliu, lazunu); berzas + bacveviciaus still await a credit
+   that completed (ciurliu, lazunu); berzas + objektas_b still await a credit
    top-up.
 
 ---
@@ -114,15 +114,15 @@ cached `ai_extract.json`** to regenerate:
 | slug | role | regen attempted | extract now | notes |
 |---|---|---|---|---|
 | berzas | MAE originator (only full `gt_dimensions`) | ⚠️ partial (credit) | enriched (rolled back) | the enrichment-dependent project; fresh run degraded by credit failure |
-| bacveviciaus | MAE-contributing | ❌ failed (credit) | enriched (untouched) | 65-page TP, largest |
+| objektas_b | MAE-contributing | ❌ failed (credit) | enriched (untouched) | 65-page TP, largest |
 | ciurliu | MAE-contributing | ✅ complete | **FRESH honest** | 3-page A3 plans, smallest scope |
 | lazunu | MAE-contributing | ✅ complete | **FRESH honest** | apartment, bundled sheets |
 | romainiai | **scope_mismatch** | ❌ failed (credit) | enriched (untouched) | eval skips it *before* reading the extract; MAE-excluded regardless |
 | sernu | **blocked_for_vision_extraction** | ⊘ skipped (correct) | none (n/a) | no architectural floor plan in the bundle; no `ai_extract.json` exists; Vision would produce garbage |
 
-So the headline MAE is driven by **4 projects** (berzas, bacveviciaus, ciurliu,
+So the headline MAE is driven by **4 projects** (berzas, objektas_b, ciurliu,
 lazunu); of those, **2 are now honest** (ciurliu, lazunu) and **2 await a credit
-top-up** (berzas, bacveviciaus). The task brief's "~11 projects" overcounts; the
+top-up** (berzas, objektas_b). The task brief's "~11 projects" overcounts; the
 real regenerable set is 5.
 
 `run_vision_on_truth_set.py` could **not** do this job: it filters out
@@ -177,7 +177,7 @@ the project average.
 ```
 slug           AI side         scored     MAE %    worst %
 berzas         ai_extract           5    1.991     4.745
-bacveviciaus   ai_extract           2    9.501    18.207
+objektas_b   ai_extract           2    9.501    18.207
 ciurliu        ai_extract           2   11.533    12.530
 lazunu         ai_extract           2   10.607    14.219
 romainiai      excluded_scope_mismatch
@@ -185,7 +185,7 @@ sernu          excluded_blocked
 overall MAE: 6.658%  (n=11 metric observations)
 ```
 
-Note even *here* bacveviciaus/ciurliu/lazunu only score **2** metrics each — their
+Note even *here* objektas_b/ciurliu/lazunu only score **2** metrics each — their
 truth.json tracks only combined-paint + LED. berzas is the only project with the
 full 5-metric headline set.
 
@@ -194,7 +194,7 @@ full 5-metric headline set.
 ```
 slug           AI side         scored     MAE %    worst %
 berzas         ai_extract           5    1.991     4.745     ← still enriched (rolled back)
-bacveviciaus   ai_extract           2    9.501    18.207     ← still enriched (untouched)
+objektas_b   ai_extract           2    9.501    18.207     ← still enriched (untouched)
 ciurliu        ai_extract           2   27.419    33.314     ← FRESH honest
 lazunu         ai_extract           2   10.235    18.012     ← FRESH honest
 romainiai      excluded_scope_mismatch
@@ -205,7 +205,7 @@ overall MAE: 9.479%  (n=11 metric observations)
 The overall 6.658% → 9.479% jump is driven **entirely by ciurliu** flipping to
 fresh. No collapse-footnote fired — neither fresh extract zeroed a headline metric.
 (The overall number is a **mixed** figure — 2 honest + 2 enriched — and should not
-be read as a clean "honest production MAE" until berzas + bacveviciaus regenerate.)
+be read as a clean "honest production MAE" until berzas + objektas_b regenerate.)
 
 ### Per-project honesty deltas (the two that completed)
 
@@ -240,10 +240,10 @@ From `eval_runs/regen_sprint_1781026986.json`:
 | ciurliu | ok | $0.52 | 309 | 6 |
 | berzas | partial (round 3 + apdailos failed) | $1.32 | 211 | 11 (degraded) |
 | romainiai | extractor_error (credit) | $0.00 | 39 | — |
-| bacveviciaus | extractor_error (credit) | $0.00 | 164 | — |
+| objektas_b | extractor_error (credit) | $0.00 | 164 | — |
 | **total** | | **$2.31** / $19 budget | | |
 
-(romainiai/bacveviciaus reached the free pdfplumber eksplikacija pass, then every
+(romainiai/objektas_b reached the free pdfplumber eksplikacija pass, then every
 Vision call 400'd on credit, so $0 Vision for them.)
 
 ---
@@ -264,7 +264,7 @@ Vision call 400'd on credit, so $0 Vision for them.)
 ## Rollback
 
 ```bash
-for s in berzas bacveviciaus ciurliu lazunu romainiai; do
+for s in berzas objektas_b ciurliu lazunu romainiai; do
   cp -p eval_runs/cached_baseline_backup_2026-06-09/$s/ai_extract.json     ground_truth/$s/
   cp -p eval_runs/cached_baseline_backup_2026-06-09/$s/ai_extract_meta.json ground_truth/$s/ 2>/dev/null
 done

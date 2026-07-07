@@ -1,4 +1,4 @@
-# Rangovas A (Rangovas A) — žodiniai skaičiavimo notes
+# Rangovas A — žodiniai skaičiavimo notes
 Date: 2026-05-26/27
 PDF: `project.pdf` (Beržų g. 24, MAK Group A1675, vienos šeimos namas)
 Author: rangovas (rangovas), perduota Ignui

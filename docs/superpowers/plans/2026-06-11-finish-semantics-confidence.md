@@ -2,14 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans. Checkbox steps.
 
-**Goal:** Fix the two empirically-measured top error sources (2026-06-11 experiments): finish-assignment semantics (bacveviciaus paint +62.8% — molio tinkas counted as paint, self-reported low confidence ignored) and the unsellable confidence system (false-green 50–60%).
+**Goal:** Fix the two empirically-measured top error sources (2026-06-11 experiments): finish-assignment semantics (objektas_b paint +62.8% — molio tinkas counted as paint, self-reported low confidence ignored) and the unsellable confidence system (false-green 50–60%).
 
 **Contractor-anchored success criteria:**
-- Bacevičiaus: "Sienų dekoravimas molio tinku" emitted (~160 m² target when apdailos re-read live); combined paint error shrinks from +62.8% toward ±15%.
+- Objektas B: "Sienų dekoravimas molio tinku" emitted (~160 m² target when apdailos re-read live); combined paint error shrinks from +62.8% toward ±15%.
 - False-green rate (exp1b, confidence-aware): 50%/60% → **<25%** on both projects, with error recall by flags ≥70%.
 - Zero regression on berzas paint (−6.6%) and the 772+ test suite.
 
-**Architecture:** (1) apdailos vocabulary gains molio_tinkas/kita_danga categories; universal_rules apdailos branch splits molio area OUT of walls_paintable into a new per-room `molio_tinko_m2`; pozicijos emit the decor line. (2) `merge_apdailos_into_rooms` propagates self-reported "low confidence" → `_apdailos_confidence`. (3) New `extractor/confidence.py` post-pass stamps every pozicija with `confidence` + `_confidence_reason`: per-class calibration table (classes with measured systematic bias → geltona), apdailos low-conf rooms → finish-derived lines geltona, voting flags → geometry-derived lines geltona. (4) apdailos page-finder excludes VIZUALIZACIJA pages, collects all candidates. (5) Verify: offline re-score both saved voted extracts; live cheap re-read of the bacveviciaus apdailos page only (merge → recompute → re-score).
+**Architecture:** (1) apdailos vocabulary gains molio_tinkas/kita_danga categories; universal_rules apdailos branch splits molio area OUT of walls_paintable into a new per-room `molio_tinko_m2`; pozicijos emit the decor line. (2) `merge_apdailos_into_rooms` propagates self-reported "low confidence" → `_apdailos_confidence`. (3) New `extractor/confidence.py` post-pass stamps every pozicija with `confidence` + `_confidence_reason`: per-class calibration table (classes with measured systematic bias → geltona), apdailos low-conf rooms → finish-derived lines geltona, voting flags → geometry-derived lines geltona. (4) apdailos page-finder excludes VIZUALIZACIJA pages, collects all candidates. (5) Verify: offline re-score both saved voted extracts; live cheap re-read of the objektas_b apdailos page only (merge → recompute → re-score).
 
 ### Task 1: molio tinkas vocabulary + calc split (TDD)
 - Modify `apdailos_reader.py`: SYSTEM_PROMPT + schema gain `molio_tinkas_share` + `kita_danga_share` ("molio/kalkinio tinko dekoras, mikrocementas — NE dažymas, NE plytelės").
@@ -36,5 +36,5 @@
 
 ### Task 5: verification (offline + cheap live)
 - Offline: rebuild pozicijos for both saved voted extracts → confidence-aware exp1b → false-green + recall vs criteria.
-- Live (~$0.3): re-run ONLY `read_apdailos_finishes` on bacveviciaus PDF with new vocabulary, merge into saved extract, recompute, re-score paint + molio line.
+- Live (~$0.3): re-run ONLY `read_apdailos_finishes` on objektas_b PDF with new vocabulary, merge into saved extract, recompute, re-score paint + molio line.
 - Full non-network suite green; commit each task.

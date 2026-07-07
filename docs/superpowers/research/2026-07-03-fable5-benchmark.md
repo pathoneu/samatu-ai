@@ -3,7 +3,7 @@
 - A = **claude-opus-4-8** (4 run(s))
 - B = **claude-fable-5** (4 run(s))
 
-## bacveviciaus
+## objektas_b
 
 | Metric | Unit | Truth | claude-opus-4-8 | claude-fable-5 | %err claude-opus-4-8 | %err claude-fable-5 |
 |---|---|---:|---:|---:|---:|---:|
@@ -66,7 +66,7 @@
 
 | Project | claude-opus-4-8 | claude-fable-5 |
 |---|---:|---:|
-| bacveviciaus | 51.53 | 64.20 |
+| objektas_b | 51.53 | 64.20 |
 | berzas | 15.66 | 12.55 |
 | ciurliu | 35.09 | 28.23 |
 | lazunu | 19.31 | 10.71 |

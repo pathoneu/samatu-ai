@@ -566,7 +566,7 @@ Taip galima testuoti V2 su keliais vartotojais, o kiti naudos V1 kol V2 validuot
 
 ## Laukiami rezultatai
 
-Po V2 įdiegimo, P1 projektas (Bacevičiaus g.) turėtų grąžinti maždaug:
+Po V2 įdiegimo, P1 projektas (Objektas B) turėtų grąžinti maždaug:
 
 ```json
 {
