@@ -31,6 +31,7 @@ import path from 'node:path';
 // prerendered "/" already carries the marketing head defaults.
 const ROUTES = [
   '/',
+  '/en',
   '/about',
   '/duk',
   '/privacy',

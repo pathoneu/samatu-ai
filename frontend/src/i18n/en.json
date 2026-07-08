@@ -13,156 +13,264 @@
     "en": "EN"
   },
   "landing": {
-    "trustPills": {
-      "nrm2": "NRM2",
-      "din": "DIN standards",
-      "ltSamata": "LT estimate",
-      "pvm": "21% VAT",
-      "excelPdf": "Excel & PDF"
+    "heroPlan": {
+      "title": "Pathon detects rooms and quantities on a floor plan: 6 rooms, 72 m²"
     },
-    "outcomes": {
-      "0": { "big": "minutes", "small": "instead of hours of manual take-off" },
-      "1": { "big": "any drawing", "small": "PDF, no CAD" },
-      "2": { "big": "LT estimate · 21% VAT", "small": "ready-to-use format" },
-      "3": { "big": "Excel + PDF", "small": "in one click" }
-    },
-    "steps": {
-      "1": { "t": "Upload a drawing", "d": "Any construction PDF: plans, sections, wall elevations, facades." },
-      "2": { "t": "Pathon detects and measures", "d": "Elements, areas, lengths, quantities. Every value with a source tag." },
-      "3": { "t": "Review and export", "d": "Adjust, enter prices, export to Excel or PDF with VAT." }
-    },
-    "trades": {
-      "interior": { "t": "Interior finishing", "d": "Paintable areas, tiles, flooring, drywall." },
-      "facade": { "t": "Facades", "d": "ETICS areas, render, insulation, openings." },
-      "roof": { "t": "Roofing", "d": "Covering areas with slope, gutters, ridge." },
-      "structure": { "t": "Structures", "d": "Concrete, rebar, slabs (m³, kg)." },
-      "earth": { "t": "Earthworks", "d": "Excavation, fill, volumes." },
-      "masonry": { "t": "Masonry", "d": "Wall areas, blocks, masonry quantities." }
-    },
-    "audiences": {
-      "0": { "t": "For contractors", "d": "Fast, accurate bids. Win more projects." },
-      "1": { "t": "For estimators", "d": "Leave the manual take-off to Pathon — verify instead of measuring from scratch." },
-      "2": { "t": "For construction companies", "d": "One tool for all quantity types — from foundations to finishing." }
-    },
-    "tiers": {
-      "vienkartinis": {
-        "name": "One-off",
-        "price": "€12",
-        "unit": "/ project",
-        "desc": "One project, no subscription.",
-        "feats": ["1 project", "All trade types", "Excel + PDF export"],
-        "cta": "Try it"
-      },
-      "pro": {
-        "name": "Pro",
-        "price": "€49",
-        "unit": "/ mo.",
-        "desc": "For the estimator working day to day.",
-        "feats": ["Unlimited projects", "Your own price list", "Correction tools", "Priority support"],
-        "cta": "Get started"
-      },
-      "studio": {
-        "name": "Studio",
-        "price": "€149",
-        "unit": "/ mo.",
-        "desc": "For teams and companies.",
-        "feats": ["Everything in Pro", "Team accounts", "Shared price lists", "API access (soon)"],
-        "cta": "Contact us"
-      }
-    },
-    "heroTabs": {
-      "interjeras": "Interior",
-      "fasadai": "Facades",
-      "stogai": "Roofing",
-      "konstrukcijos": "Structures",
-      "zemesDarbai": "Earthworks",
-      "muras": "Masonry"
-    },
-    "heroRooms": {
-      "svetaine": "Living room",
-      "miegamasis": "Bedroom",
-      "vaikoK": "Kids' room",
-      "koridorius": "Hallway",
-      "vonia": "Bathroom",
-      "wc": "WC"
+    "nav": {
+      "galimybes": "Features",
+      "kaipVeikia": "How it works",
+      "duk": "FAQ",
+      "kainos": "Pricing",
+      "login": "Log in",
+      "cta": "Try it free"
     },
     "hero": {
-      "eyebrow": "Construction AI · Quantities from drawings",
-      "titleA": "Any drawing —",
-      "titleAccent": "accurate quantities.",
-      "sub": "Pathon reads interior, facade, roofing and structural drawings, measures the quantities and prepares an estimate — automatically, in the Lithuanian format.",
-      "ctaPrimary": "Try for free",
-      "ctaDemo": "Watch demo",
-      "note": "First project — free. No commitment."
+      "eyebrow": "Quantities from construction drawings",
+      "titleA": "Drop in a PDF drawing —",
+      "titleB": "quantities in minutes.",
+      "sub1": "The same takeoff work you buy today for ",
+      "sub2": " per project. Quantities computed and flagged for review — you set the prices.",
+      "ctaPrimary": "Try it free",
+      "ctaDemo": "Watch the demo",
+      "micro": "First project per company — free. No commitments."
     },
-    "heroFrame": {
-      "fileLabel": "project_A3.pdf — 6 rooms detected",
-      "detected": "● detected",
-      "extractedTitle": "Extracted quantities",
-      "wallArea": "Wall area",
-      "floors": "Flooring",
-      "baseboards": "Baseboards",
-      "baseboardsVal": "73 m",
-      "estimateWithVat": "Estimate incl. VAT"
+    "heroSvg": {
+      "a1": "18.4 m²",
+      "tag1": "LIVING ROOM",
+      "a2": "14.2 m²",
+      "h": "H = 2.70",
+      "a3": "9.6 m²",
+      "a4": "4.8 m²",
+      "a5": "6.2 m²",
+      "count": "+1 pc"
     },
-    "heroPlan": {
-      "title": "Pathon detects rooms and quantities in a floor plan: 6 rooms, 72 m²",
-      "scale": "S 1:50",
-      "totalArea": "72.0 m²",
-      "sheetCode": "SA-01",
-      "roomsCount": "6 rooms"
+    "heroRooms": [
+      "Living room · 18.4 m²",
+      "Bedroom · 14.2 m²",
+      "Kitchen · 9.6 m²",
+      "Bathroom · 4.8 m²",
+      "Hallway · 6.2 m²",
+      "Office · 8.9 m²"
+    ],
+    "demo": {
+      "badge": "Demo",
+      "project": "Demo flat — 74.2 m²",
+      "tag": "Interior",
+      "noVat": "Excl. VAT",
+      "withVat": "Incl. VAT",
+      "assumptions": "Assumptions",
+      "exportBtn": "Export ▾",
+      "tabBrez": "Drawing",
+      "tabKiek": "Quantities",
+      "tabAsist": "Assistant",
+      "pause": "⏸ Pause",
+      "play": "▶ Play demo",
+      "hint": "The demo plays itself — or click around: rooms, tabs, the “Assumptions” stepper, “Export”.",
+      "posTitle": "Line items · 46",
+      "secPaint": "Painting works",
+      "secGkp": "Drywall works",
+      "rowPaint": "Wall painting, 2 coats",
+      "rowGlaist": "Wall skim coat Q2",
+      "rowAngok": "Reveal skim & paint",
+      "angokMeta": "42.6 m · computed with an assumption",
+      "rowGkp": "Ceiling frame + board, 1 layer",
+      "gkpMeta": "74.2 m² · 38 sheets",
+      "rowLed": "LED ceiling coves",
+      "ledMeta": "12.4 m · default value — verify",
+      "rowGrind": "MDF skirting",
+      "grindMeta": "58.4 m · €4.10/m",
+      "legendOk": "read",
+      "legendWarn": "assumption",
+      "legendBad": "default",
+      "popTitle": "Assumptions",
+      "popHeight": "Ceiling height",
+      "popNote": "Change the height and every related line recalculates instantly.",
+      "expXlsx": "Excel with live formulas",
+      "expPdf": "Lithuanian-format estimate",
+      "zoneSvet": "Living · 18.4 m²",
+      "zoneMieg": "Bedr. · 14.2 m²",
+      "zoneVon": "Bath · 4.8 m²",
+      "planRooms": "6 rooms"
     },
-    "eiga": {
-      "eyebrow": "How it works",
-      "titleA": "From PDF to estimate — ",
-      "titleAccent": "three steps",
-      "sub": "No CAD, no manual take-off. You just review and confirm."
+    "steps": {
+      "eyebrow": "02 · How it works",
+      "title": "From PDF to estimate — three steps",
+      "items": [
+        {
+          "t": "Upload the project PDF",
+          "d": "Floor plans, wall elevations, room schedules — vector or scanned. No CAD needed."
+        },
+        {
+          "t": "Review the flagged items",
+          "d": "Every line is marked: read from the drawing, computed with an assumption, or a default. You check only what is flagged."
+        },
+        {
+          "t": "Export the estimate",
+          "d": "Excel with live formulas, or a Lithuanian-format PDF with the 21% VAT line."
+        }
+      ]
     },
-    "trades": {
-      "eyebrow": "What Pathon reads",
-      "titleA": "Every construction type — ",
-      "titleAccent": "one system",
-      "sub": "Pathon recognises the sheets of Lithuanian construction drawings and extracts quantities according to international measurement rules — from foundations to finishing.",
-      "sideA": "NRM2 · DIN 18363",
-      "sideB": "Every line with a source tag",
-      "sideC": "6 trade types → 1 estimate"
+    "reads": {
+      "eyebrow": "03 · Capabilities",
+      "title": "What Pathon reads from your drawings",
+      "list": [
+        "Floor plans",
+        "Wall elevations",
+        "Ceiling plans",
+        "Flooring plans",
+        "Room schedules",
+        "Electrical & plumbing plans"
+      ],
+      "chipsLabel": "→ extracted quantities",
+      "chips": [
+        {
+          "label": "paintable area",
+          "val": "152.7 m²"
+        },
+        {
+          "label": "window & door reveals",
+          "val": "42.6 m"
+        },
+        {
+          "label": "drywall sheets",
+          "val": "38 pcs"
+        },
+        {
+          "label": "skirting",
+          "val": "58.4 m"
+        },
+        {
+          "label": "tiled zones",
+          "val": "24.8 m²"
+        },
+        {
+          "label": "LED coves",
+          "val": "12.4 m"
+        },
+        {
+          "label": "doors",
+          "val": "9 pcs"
+        },
+        {
+          "label": "excavation",
+          "val": "46.0 m³"
+        }
+      ],
+      "note": "Every number carries its unit and a link to the exact spot on the drawing it came from."
+    },
+    "trust": {
+      "eyebrow": "04 · Trust system",
+      "titleA": "We don’t say “trust it”.",
+      "titleB": "We say “verify it in 5 minutes”.",
+      "sub": "Every estimate line is labeled by where its number came from. The system shows you what to check first — the rest is already done.",
+      "cards": [
+        {
+          "t": "Green — read from the drawing",
+          "d": "The value comes straight from the room schedule or the plan geometry. Sources cross-checked."
+        },
+        {
+          "t": "Yellow — computed with an assumption",
+          "d": "E.g. the ceiling height came from a section, not the room table. The assumption is visible and editable."
+        },
+        {
+          "t": "Red — default value",
+          "d": "Nothing found in the drawing, so a standard value was used. Check it before you quote."
+        }
+      ],
+      "panelTitle": "Check first",
+      "panelCount": "3 of 46 lines",
+      "rowLed": "LED ceiling coves —",
+      "rowAngok": "Reveals —",
+      "rowVon": "Bathroom ceiling height —",
+      "showBtn": "Show on drawing",
+      "confirmed": "Confirmed",
+      "panelFoot": "The remaining 43 lines were read from the drawing."
+    },
+    "recalc": {
+      "eyebrow": "05 · Live recalculation",
+      "title": "Change an assumption — quantities follow",
+      "sub": "Ceiling height, skim level, painted or bare walls — every assumption is editable, and all related lines recalculate instantly, with no re-scan. Try it:",
+      "heightLabel": "Ceiling height:",
+      "panelTitle": "Assumptions → quantities",
+      "rowPaint": "Paintable wall area",
+      "rowGlaist": "Skim coat, Q2",
+      "rowGrind": "Skirting",
+      "grindNote": "(height-independent)"
+    },
+    "exportSec": {
+      "eyebrow": "06 · Export",
+      "title": "Documents your clients accept",
+      "excelStrong": "Excel with live formulas.",
+      "excelRest": " Change a quantity or a price — totals recalculate inside the file.",
+      "pdfStrong": "Lithuanian-format estimate PDF.",
+      "pdfRest": " Section totals, the 21% VAT line and a signature block — the local format."
     },
     "audience": {
-      "eyebrow": "Who it's for",
-      "titleA": "One tool, ",
-      "titleAccent": "for the whole team"
+      "eyebrow": "07 · Who it’s for",
+      "title": "Who estimates with Pathon",
+      "cards": [
+        {
+          "t": "Construction company owner",
+          "d": "A quote by tonight, not next week — no waiting in an estimator’s queue."
+        },
+        {
+          "t": "Finishing crew",
+          "d": "Quantities without an estimator — upload the drawing, get the bill of quantities, enter your rates."
+        },
+        {
+          "t": "Property developer",
+          "d": "A fast cross-check — do the contractor’s quantities match the drawing?"
+        }
+      ]
     },
     "pricing": {
-      "eyebrow": "Pricing",
-      "titleA": "Transparent, with no hidden ",
-      "titleAccent": "fees",
-      "sub": "Start free. Pay only once you see the value on your projects.",
+      "eyebrow": "08 · Pricing",
+      "title": "Transparent, no hidden fees",
       "popular": "Most popular",
-      "vatNote": "Prices exclude VAT — business clients are subject to the reverse-charge mechanism."
+      "tierCta": "Start",
+      "tiers": [
+        {
+          "name": "Free trial",
+          "price": "0 €",
+          "per": "1 project per company",
+          "desc": "Full scan and export — see for yourself on your own drawing."
+        },
+        {
+          "name": "One-off",
+          "price": "12 €",
+          "per": "/ project",
+          "desc": "One project, no subscription."
+        },
+        {
+          "name": "Pro",
+          "price": "49 €",
+          "per": "/ mo · 10 projects",
+          "desc": "For companies quoting all the time. Your own price list, correction tools."
+        },
+        {
+          "name": "Studio",
+          "price": "149 €",
+          "per": "/ mo · 35 projects",
+          "desc": "For teams and studios — shared price lists, priority processing."
+        }
+      ],
+      "note": "Prices excl. VAT. Every scan, recalculation and export is included."
     },
-    "closing": {
-      "eyebrow": "Why Pathon",
-      "titleA": "Pathon does the measuring. ",
-      "titleAccent": "You make the decisions.",
-      "sub": "Your prices, your project, your bid — Pathon just measures it quickly and accurately.",
-      "ctaPrimary": "Try for free",
-      "ctaContact": "Contact us"
+    "cta": {
+      "title": "First project is free. Upload and compare for yourself.",
+      "sub": "Got a drawing waiting for an estimate? In half an hour you’ll know if Pathon fits.",
+      "primary": "Try it free",
+      "contact": "Contact us"
     },
     "footer": {
       "tagline": "Construction quantities from drawings.",
-      "colProduktas": "Product",
-      "colPaskyra": "Account",
-      "galimybes": "Features",
-      "kaipVeikia": "How it works",
-      "kainos": "Pricing",
-      "prisijungti": "Log in",
-      "registruotis": "Sign up",
-      "copyright": "© 2026 Pathon",
       "duk": "FAQ",
-      "privatumas": "Privacy",
-      "slapukai": "Cookies",
-      "salygos": "Terms",
-      "slapukuNustatymai": "Cookie settings"
+      "privacy": "Privacy",
+      "cookies": "Cookies",
+      "terms": "Terms",
+      "cookieSettings": "Cookie settings",
+      "location": "Vilnius, Lithuania",
+      "copyright": "© 2026 Pathon"
     }
   },
   "pricing": {
@@ -1163,13 +1271,34 @@
   },
   "newProject": {
     "types": {
-      "interior": { "label": "Interior project", "desc": "Finishing quantities (recommended)" },
-      "auto": { "label": "Automatic", "desc": "AI will detect the type" },
-      "kz": { "label": "Bill of quantities", "desc": "BoQ table (if you already have one)" },
-      "fasadas": { "label": "Facades", "desc": "ETICS figures" },
-      "stogas": { "label": "Roof", "desc": "Roof quantities" },
-      "zeme": { "label": "Earthworks", "desc": "Excavation, trenches" },
-      "betonas": { "label": "Concrete", "desc": "Concrete quantities" }
+      "interior": {
+        "label": "Interior project",
+        "desc": "Finishing quantities (recommended)"
+      },
+      "auto": {
+        "label": "Automatic",
+        "desc": "AI will detect the type"
+      },
+      "kz": {
+        "label": "Bill of quantities",
+        "desc": "BoQ table (if you already have one)"
+      },
+      "fasadas": {
+        "label": "Facades",
+        "desc": "ETICS figures"
+      },
+      "stogas": {
+        "label": "Roof",
+        "desc": "Roof quantities"
+      },
+      "zeme": {
+        "label": "Earthworks",
+        "desc": "Excavation, trenches"
+      },
+      "betonas": {
+        "label": "Concrete",
+        "desc": "Concrete quantities"
+      }
     },
     "errNoPdf": "Select a PDF file",
     "statusUploading": "Uploading...",

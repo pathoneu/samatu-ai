@@ -13,156 +13,264 @@
     "en": "EN"
   },
   "landing": {
-    "trustPills": {
-      "nrm2": "NRM2",
-      "din": "DIN standartai",
-      "ltSamata": "LT sąmata",
-      "pvm": "21% PVM",
-      "excelPdf": "Excel & PDF"
+    "heroPlan": {
+      "title": "Pathon aptinka patalpas ir kiekius aukšto plane: 6 patalpos, 72 m²"
     },
-    "outcomes": {
-      "0": { "big": "kelios min.", "small": "vietoj valandų rankinio matavimo" },
-      "1": { "big": "bet kuris brėžinys", "small": "PDF, be CAD" },
-      "2": { "big": "LT sąmata · 21% PVM", "small": "paruoštas formatas" },
-      "3": { "big": "Excel + PDF", "small": "vienu paspaudimu" }
-    },
-    "steps": {
-      "1": { "t": "Įkelk brėžinį", "d": "Bet koks statybų PDF: planai, pjūviai, išklotinės, fasadai." },
-      "2": { "t": "Pathon aptinka ir matuoja", "d": "Elementai, plotai, ilgiai, kiekiai. Kiekviena reikšmė su šaltinio žyma." },
-      "3": { "t": "Peržiūrėk ir eksportuok", "d": "Pakoreguok, įrašyk kainas, eksportuok į Excel ar PDF su PVM." }
-    },
-    "trades": {
-      "interior": { "t": "Interjero apdaila", "d": "Dažomi plotai, plytelės, grindys, gipskartonis." },
-      "facade": { "t": "Fasadai", "d": "ETICS plotai, tinkas, šiltinimas, angos." },
-      "roof": { "t": "Stogai", "d": "Dangos plotai su nuolydžiu, latakai, kraigas." },
-      "structure": { "t": "Konstrukcijos", "d": "Betonas, armatūra, klotinės (m³, kg)." },
-      "earth": { "t": "Žemės darbai", "d": "Iškasos, pylimai, tūriai." },
-      "masonry": { "t": "Mūras", "d": "Sienų plotai, blokai, mūro kiekiai." }
-    },
-    "audiences": {
-      "0": { "t": "Rangovams", "d": "Greiti, tikslūs pasiūlymai. Laimėk daugiau objektų." },
-      "1": { "t": "Sąmatininkams", "d": "Rankinį matavimą palik Pathon’ui — tikrink, o ne skaičiuok iš naujo." },
-      "2": { "t": "Statybos įmonėms", "d": "Vienas įrankis visų tipų kiekiams — nuo pamatų iki apdailos." }
-    },
-    "tiers": {
-      "vienkartinis": {
-        "name": "Vienkartinis",
-        "price": "12 €",
-        "unit": "/ projektas",
-        "desc": "Vienas objektas, be prenumeratos.",
-        "feats": ["1 projektas", "Visi trade tipai", "Excel + PDF eksportas"],
-        "cta": "Išbandyti"
-      },
-      "pro": {
-        "name": "Pro",
-        "price": "49 €",
-        "unit": "/ mėn.",
-        "desc": "Nuolat dirbančiam sąmatininkui.",
-        "feats": ["Neriboti projektai", "Savo kainynas", "Korekcijų įrankis", "Prioritetinis palaikymas"],
-        "cta": "Pradėti"
-      },
-      "studio": {
-        "name": "Studio",
-        "price": "149 €",
-        "unit": "/ mėn.",
-        "desc": "Komandai ir įmonei.",
-        "feats": ["Viskas iš Pro", "Komandos paskyros", "Bendri kainynai", "API prieiga (netrukus)"],
-        "cta": "Susisiekti"
-      }
-    },
-    "heroTabs": {
-      "interjeras": "Interjeras",
-      "fasadai": "Fasadai",
-      "stogai": "Stogai",
-      "konstrukcijos": "Konstrukcijos",
-      "zemesDarbai": "Žemės darbai",
-      "muras": "Mūras"
-    },
-    "heroRooms": {
-      "svetaine": "Svetainė",
-      "miegamasis": "Miegamasis",
-      "vaikoK": "Vaiko k.",
-      "koridorius": "Koridorius",
-      "vonia": "Vonia",
-      "wc": "WC"
+    "nav": {
+      "galimybes": "Galimybės",
+      "kaipVeikia": "Kaip veikia",
+      "duk": "DUK",
+      "kainos": "Kainos",
+      "login": "Prisijungti",
+      "cta": "Išbandyti nemokamai"
     },
     "hero": {
-      "eyebrow": "Statybų AI · Kiekiai iš brėžinių",
-      "titleA": "Bet koks brėžinys —",
-      "titleAccent": "tikslūs kiekiai.",
-      "sub": "Pathon skaito interjero, fasadų, stogų ir konstrukcijų brėžinius, išmatuoja kiekius ir paruošia sąmatą — automatiškai, Lietuvos formatu.",
+      "eyebrow": "Kiekiai iš statybų brėžinių",
+      "titleA": "Užmeskite PDF brėžinį —",
+      "titleB": "kiekiai per kelias minutes.",
+      "sub1": "Tas pats sąmatos darbas, kurį dabar perkate už ",
+      "sub2": " už projektą. Kiekiai suskaičiuoti ir pažymėti patikrai — kainas suvedate patys.",
       "ctaPrimary": "Išbandyti nemokamai",
       "ctaDemo": "Žiūrėti demo",
-      "note": "Pirmas projektas — nemokamai. Be įsipareigojimų."
+      "micro": "Pirmas projektas įmonei — nemokamas. Be įsipareigojimų."
     },
-    "heroFrame": {
-      "fileLabel": "projektas_A3.pdf — aptikta 6 patalpų",
-      "detected": "● aptikta",
-      "extractedTitle": "Ištraukti kiekiai",
-      "wallArea": "Sienų plotas",
-      "floors": "Grindys",
-      "baseboards": "Grindjuostės",
-      "baseboardsVal": "73 m",
-      "estimateWithVat": "Sąmata su PVM"
+    "heroSvg": {
+      "a1": "18,4 m²",
+      "tag1": "SVETAINĖ",
+      "a2": "14,2 m²",
+      "h": "H = 2,70",
+      "a3": "9,6 m²",
+      "a4": "4,8 m²",
+      "a5": "6,2 m²",
+      "count": "+1 vnt."
     },
-    "heroPlan": {
-      "title": "Pathon aptinka patalpas ir kiekius aukšto plane: 6 patalpos, 72 m²",
-      "scale": "M 1:50",
-      "totalArea": "72,0 m²",
-      "sheetCode": "SA-01",
-      "roomsCount": "6 patalpos"
+    "heroRooms": [
+      "Svetainė · 18,4 m²",
+      "Miegamasis · 14,2 m²",
+      "Virtuvė · 9,6 m²",
+      "Vonia · 4,8 m²",
+      "Koridorius · 6,2 m²",
+      "Kabinetas · 8,9 m²"
+    ],
+    "demo": {
+      "badge": "Demo",
+      "project": "Demo butas — 74,2 m²",
+      "tag": "Interjeras",
+      "noVat": "Be PVM",
+      "withVat": "Su PVM",
+      "assumptions": "Prielaidos",
+      "exportBtn": "Eksportuoti ▾",
+      "tabBrez": "Brėžinys",
+      "tabKiek": "Kiekiai",
+      "tabAsist": "Asistentas",
+      "pause": "⏸ Pauzė",
+      "play": "▶ Leisti demo",
+      "hint": "Demo sukasi automatiškai — arba spauskite patys: patalpas, skirtukus, „Prielaidos“ steperį, „Eksportuoti“.",
+      "posTitle": "Pozicijos · 46 eil.",
+      "secPaint": "Dažymo darbai",
+      "secGkp": "GKP darbai",
+      "rowPaint": "Sienų dažymas 2 k.",
+      "rowGlaist": "Sienų glaistymas Q2",
+      "rowAngok": "Angokraščių glaistymas ir dažymas",
+      "angokMeta": "42,6 m · apskaičiuota su prielaida",
+      "rowGkp": "Lubų karkasas + GKP 1 sl.",
+      "gkpMeta": "74,2 m² · 38 lapai",
+      "rowLed": "LED nišos lubose",
+      "ledMeta": "12,4 m · numatytoji reikšmė — patikrinkite",
+      "rowGrind": "Grindjuostės MDF",
+      "grindMeta": "58,4 m · 4,10 €/m",
+      "legendOk": "nuskaityta",
+      "legendWarn": "su prielaida",
+      "legendBad": "numatytoji",
+      "popTitle": "Prielaidos",
+      "popHeight": "Lubų aukštis",
+      "popNote": "Pakeitus aukštį, visos susijusios eilutės perskaičiuojamos akimirksniu.",
+      "expXlsx": "Excel su formulėmis",
+      "expPdf": "Lokalinė sąmata",
+      "zoneSvet": "Svetainė · 18,4 m²",
+      "zoneMieg": "Mieg. · 14,2 m²",
+      "zoneVon": "Vonia · 4,8 m²",
+      "planRooms": "6 patalpos"
     },
-    "eiga": {
-      "eyebrow": "Kaip tai veikia",
-      "titleA": "Nuo PDF iki sąmatos — ",
-      "titleAccent": "trys žingsniai",
-      "sub": "Jokio CAD, jokio rankinio matavimo. Tu tik peržiūri ir patvirtini."
+    "steps": {
+      "eyebrow": "02 · Kaip veikia",
+      "title": "Nuo PDF iki sąmatos — trys žingsniai",
+      "items": [
+        {
+          "t": "Įkelkite projekto PDF",
+          "d": "Aukštų planai, išklotinės, eksplikacijos — vektoriniai ar skenuoti. Jokio CAD."
+        },
+        {
+          "t": "Peržiūrėkite pažymėtas vietas",
+          "d": "Kiekviena eilutė pažymėta: nuskaityta, su prielaida ar numatytoji. Tikrinate tik tai, kas pažymėta."
+        },
+        {
+          "t": "Eksportuokite sąmatą",
+          "d": "Excel su gyvomis formulėmis arba LOKALINĖ SĄMATA PDF su 21% PVM eilute."
+        }
+      ]
     },
-    "trades": {
-      "eyebrow": "Ką Pathon skaito",
-      "titleA": "Visi statybų tipai — ",
-      "titleAccent": "viena sistema",
-      "sub": "Pathon atpažįsta LT statybų brėžinių lapus ir ištraukia kiekius pagal tarptautines matavimo taisykles — nuo pamatų iki apdailos.",
-      "sideA": "NRM2 · DIN 18363",
-      "sideB": "Kiekviena eilutė su šaltinio žyma",
-      "sideC": "6 trade tipai → 1 sąmata"
+    "reads": {
+      "eyebrow": "03 · Galimybės",
+      "title": "Ką Pathon perskaito iš jūsų brėžinių",
+      "list": [
+        "Aukštų planai",
+        "Sienų išklotinės",
+        "Lubų planai",
+        "Grindų planai",
+        "Eksplikacijos",
+        "Elektros ir santechnikos planai"
+      ],
+      "chipsLabel": "→ ištraukti kiekiai",
+      "chips": [
+        {
+          "label": "dažomas plotas",
+          "val": "152,7 m²"
+        },
+        {
+          "label": "angokraščiai",
+          "val": "42,6 m"
+        },
+        {
+          "label": "GKP lapai",
+          "val": "38 vnt."
+        },
+        {
+          "label": "grindjuostės",
+          "val": "58,4 m"
+        },
+        {
+          "label": "plytelių zonos",
+          "val": "24,8 m²"
+        },
+        {
+          "label": "LED nišos",
+          "val": "12,4 m"
+        },
+        {
+          "label": "durys",
+          "val": "9 vnt."
+        },
+        {
+          "label": "iškasos",
+          "val": "46,0 m³"
+        }
+      ],
+      "note": "Kiekvienas skaičius — su matavimo vienetu ir nuoroda į brėžinio vietą, iš kurios jis paimtas."
+    },
+    "trust": {
+      "eyebrow": "04 · Pasitikėjimo sistema",
+      "titleA": "Nesakome „pasitikėk“.",
+      "titleB": "Sakome „patikrink per 5 minutes“.",
+      "sub": "Kiekviena sąmatos eilutė pažymėta pagal tai, iš kur atėjo skaičius. Sistema pati parodo, ką patikrinti pirmiausia — likusį darbą jau padarė.",
+      "cards": [
+        {
+          "t": "Žalia — nuskaityta iš brėžinio",
+          "d": "Reikšmė paimta tiesiai iš eksplikacijos ar plano geometrijos. Šaltinių sutapimas patikrintas."
+        },
+        {
+          "t": "Geltona — apskaičiuota su prielaida",
+          "d": "Pvz., lubų aukštis paimtas iš pjūvio, o ne iš patalpų lentelės. Prielaida matoma ir keičiama."
+        },
+        {
+          "t": "Raudona — numatytoji reikšmė",
+          "d": "Brėžinyje duomenų nerasta — įrašyta standartinė reikšmė. Būtina patikrinti prieš teikiant pasiūlymą."
+        }
+      ],
+      "panelTitle": "Tikrinti pirmiausia",
+      "panelCount": "3 iš 46 eil.",
+      "rowLed": "LED nišos lubose —",
+      "rowAngok": "Angokraščiai —",
+      "rowVon": "Vonios lubų aukštis —",
+      "showBtn": "Rodyti brėžinyje",
+      "confirmed": "Patvirtinta",
+      "panelFoot": "Likusios 43 eilutės — nuskaitytos iš brėžinio."
+    },
+    "recalc": {
+      "eyebrow": "05 · Gyvas perskaičiavimas",
+      "title": "Pakeitėte prielaidą — kiekiai persiskaičiavo",
+      "sub": "Lubų aukštis, glaistymo lygis, dažomos ar paliekamos sienos — kiekviena prielaida keičiama, ir visos susijusios eilutės perskaičiuojamos akimirksniu, be pakartotinio nuskaitymo. Išbandykite:",
+      "heightLabel": "Lubų aukštis:",
+      "panelTitle": "Prielaidos → kiekiai",
+      "rowPaint": "Dažomas sienų plotas",
+      "rowGlaist": "Glaistas Q2",
+      "rowGrind": "Grindjuostės",
+      "grindNote": "(nuo aukščio nepriklauso)"
+    },
+    "exportSec": {
+      "eyebrow": "06 · Eksportas",
+      "title": "Dokumentai, kuriuos priima užsakovai",
+      "excelStrong": "Excel su gyvomis formulėmis.",
+      "excelRest": " Keičiate kiekį ar kainą — sumos persiskaičiuoja pačiame faile.",
+      "pdfStrong": "LOKALINĖ SĄMATA PDF.",
+      "pdfRest": " Skyrių sumos, 21% PVM eilutė ir parašų blokas — LT formatas."
     },
     "audience": {
-      "eyebrow": "Kam skirta",
-      "titleA": "Vienas įrankis, ",
-      "titleAccent": "visai komandai"
+      "eyebrow": "07 · Kam skirta",
+      "title": "Kas skaičiuoja su Pathon",
+      "cards": [
+        {
+          "t": "Statybos įmonės savininkas",
+          "d": "Pasiūlymas per vakarą, ne per savaitę — nelaukiant sąmatininko eilės."
+        },
+        {
+          "t": "Apdailos brigada",
+          "d": "Kiekiai be sąmatininko — įkėlei brėžinį, gavai žiniaraštį, suvedei savo įkainius."
+        },
+        {
+          "t": "NT vystytojas",
+          "d": "Greita projekto patikra — ar rangovo pasiūlymo kiekiai sutampa su brėžiniu."
+        }
+      ]
     },
     "pricing": {
-      "eyebrow": "Kainos",
-      "titleA": "Skaidru, be paslėptų ",
-      "titleAccent": "mokesčių",
-      "sub": "Pradėk nemokamai. Mokėk tik tada, kai matai vertę savo objektuose.",
+      "eyebrow": "08 · Kainos",
+      "title": "Skaidru, be paslėptų mokesčių",
       "popular": "Populiariausias",
-      "vatNote": "Kainos be PVM — verslo klientams taikomas atvirkštinis apmokestinimas."
+      "tierCta": "Pradėti",
+      "tiers": [
+        {
+          "name": "Nemokamas bandomasis",
+          "price": "0 €",
+          "per": "1 projektas įmonei",
+          "desc": "Pilnas nuskaitymas ir eksportas — įsitikinkite savo brėžiniu."
+        },
+        {
+          "name": "Vienkartinis",
+          "price": "12 €",
+          "per": "/ projektas",
+          "desc": "Vienas objektas, be prenumeratos."
+        },
+        {
+          "name": "Pro",
+          "price": "49 €",
+          "per": "/ mėn. · 10 projektų",
+          "desc": "Nuolat skaičiuojančiai įmonei. Savo kainynas, korekcijų įrankiai."
+        },
+        {
+          "name": "Studio",
+          "price": "149 €",
+          "per": "/ mėn. · 35 projektai",
+          "desc": "Komandai ir biurui — bendri kainynai, prioritetinis apdorojimas."
+        }
+      ],
+      "note": "Kainos be PVM. Į kainą įskaičiuoti visi nuskaitymai, perskaičiavimai ir eksportai."
     },
-    "closing": {
-      "eyebrow": "Kodėl Pathon",
-      "titleA": "Matavimus atlieka Pathon. ",
-      "titleAccent": "Sprendimus priimi tu.",
-      "sub": "Tavo kainos, tavo objektas, tavo pasiūlymas — Pathon tik greitai ir tiksliai išmatuoja.",
-      "ctaPrimary": "Išbandyti nemokamai",
-      "ctaContact": "Susisiekti"
+    "cta": {
+      "title": "Pirmas projektas — nemokamas. Įkelkite ir palyginkite patys.",
+      "sub": "Turite brėžinį, kurio sąmatos laukiate? Per pusvalandį žinosite, ar Pathon jums tinka.",
+      "primary": "Išbandyti nemokamai",
+      "contact": "Susisiekti"
     },
     "footer": {
       "tagline": "Statybų kiekiai iš brėžinių.",
-      "colProduktas": "Produktas",
-      "colPaskyra": "Paskyra",
-      "galimybes": "Galimybės",
-      "kaipVeikia": "Kaip veikia",
-      "kainos": "Kainos",
-      "prisijungti": "Prisijungti",
-      "registruotis": "Registruotis",
-      "copyright": "© 2026 Pathon",
       "duk": "DUK",
-      "privatumas": "Privatumas",
-      "slapukai": "Slapukai",
-      "salygos": "Sąlygos",
-      "slapukuNustatymai": "Slapukų nustatymai"
+      "privacy": "Privatumas",
+      "cookies": "Slapukai",
+      "terms": "Sąlygos",
+      "cookieSettings": "Slapukų nustatymai",
+      "location": "Vilnius, Lietuva",
+      "copyright": "© 2026 Pathon"
     }
   },
   "pricing": {
@@ -1167,13 +1275,34 @@
   },
   "newProject": {
     "types": {
-      "interior": { "label": "Interjero projektas", "desc": "Apdailos kiekiai (rekomenduojama)" },
-      "auto": { "label": "Automatinis", "desc": "AI atpažins tipą" },
-      "kz": { "label": "Kiekių žiniaraštis", "desc": "KŽ lentelė (jei jau turi paruoštą)" },
-      "fasadas": { "label": "Fasadai", "desc": "ETICS skaičiai" },
-      "stogas": { "label": "Stogas", "desc": "Stogo kiekiai" },
-      "zeme": { "label": "Žemės darbai", "desc": "Iškasa, tranšėjos" },
-      "betonas": { "label": "Betonas", "desc": "Betono kiekiai" }
+      "interior": {
+        "label": "Interjero projektas",
+        "desc": "Apdailos kiekiai (rekomenduojama)"
+      },
+      "auto": {
+        "label": "Automatinis",
+        "desc": "AI atpažins tipą"
+      },
+      "kz": {
+        "label": "Kiekių žiniaraštis",
+        "desc": "KŽ lentelė (jei jau turi paruoštą)"
+      },
+      "fasadas": {
+        "label": "Fasadai",
+        "desc": "ETICS skaičiai"
+      },
+      "stogas": {
+        "label": "Stogas",
+        "desc": "Stogo kiekiai"
+      },
+      "zeme": {
+        "label": "Žemės darbai",
+        "desc": "Iškasa, tranšėjos"
+      },
+      "betonas": {
+        "label": "Betonas",
+        "desc": "Betono kiekiai"
+      }
     },
     "errNoPdf": "Pasirinkite PDF failą",
     "statusUploading": "Siunčiama...",

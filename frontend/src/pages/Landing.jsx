@@ -1,899 +1,1002 @@
 /**
- * Pathon — public landing page (2026-07-05 dark graphite rebuild).
+ * Pathon — public landing page.
  *
- * Shown at "/" for unauthenticated visitors. Authenticated users get
- * redirected to /dashboard via the wrapper in App.jsx.
+ * 2026-07-07: rebuilt as a 1:1 port of the founder-approved Claude Design
+ * export "Pathon Landing v2" (palette D · paper + clay). The design's dc
+ * bindings are reimplemented as React state:
+ *   - hero "measuring instrument": crosshair + coordinate tip + room hit-test
+ *     + cursor spotlight (mousemove over #virsus, skipped on reduced motion);
+ *   - 11s CSS scan choreography over the background floor plan (landing.css);
+ *   - self-playing product demo (animated cursor walks the UI: selects a room,
+ *     opens Prielaidos, steps the ceiling height 2.70→3.20 — every dependent
+ *     number recalculates live — then opens Export). Any manual interaction
+ *     takes the demo over; ⏸/▶ toggles it.
+ *   - section 5 live recalc (2,70 m ↔ 3,20 m buttons, rAF-animated numbers).
  *
- * Design language: DARK, TECHNICAL, PREMIUM construction-AI. Orange
- * (#F76B1C) on graphite (#15181E). Reference bar: dark product-led takeoff SaaS (dark,
- * serious, product-led) — distinct via orange, not their green/blue.
- * Sora display, Hanken Grotesk body, JetBrains Mono for every quantity /
- * price / technical label. Editorial asymmetry, mono coordinate ticks
- * (01 / HERO), dimension-line + blueprint-grid motifs.
+ * Two-page language model: "/" (+ /about) is ALWAYS Lithuanian, "/en" always
+ * English (hreflang pair; prerendered by build:seo). The footer language
+ * switch navigates between the routes. All copy lives in i18n landing.* keys.
  *
- * Positioning is GENERAL across ALL trades — interior, facade, roof,
- * structural, earthworks, masonry — not interior-only.
- *
- * Motion: framer-motion for scroll reveals + count-ups; a CSS-driven SVG
- * "AI aptinka kiekius" detection panel in the hero (scan line sweeps, orange
- * detection boxes snap on one-by-one). ROBUSTNESS: every section renders at
- * final state when reduced-motion is on OR when a reveal never fires —
- * reveals start at a visible fallback and only the *transition* is deferred;
- * the hero panel's base (no `.play`) is the fully-detected end state.
+ * Demo math mirrors the engine's shape, not its code: paint(h) = 61.8·h − 14.2
+ * (walls = perimeter × H − openings), costs = qty × rate, gross = net × 1.21.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  motion,
-  useReducedMotion,
-  useInView,
-  animate,
-} from 'framer-motion';
+import { changeAppLanguage } from '@/i18n';
 import { PathonMark } from '@/components/layout/Logo';
 import { openCookieSettings } from '@/components/CookieBanner';
-import LanguageToggle from '@/components/LanguageToggle';
+import { setPageMeta, setHreflang } from '@/lib/seo';
+import './landing/landing.css';
 
-// ─── Number formatting (locale-aware: lt-LT comma / en decimals) ─────
-// Keeps EUR and metric units; only the decimal/grouping convention flips.
+// Founder-approved palette (Claude Design export default: "D · Popierius ir
+// molis"). One-letter switch: A graphite · B navy · C blue · D clay · E ink ·
+// F orange · G plum — definitions in landing/landing.css.
+const PALETTE = 'D';
+const HERO_SCAN = true;
+const WA_URL = 'https://wa.me/37060271962';
+const MAIL_URL = 'mailto:solutions@pathon.eu';
 
-const localeFor = (lng) => (lng && lng.startsWith('en') ? 'en' : 'lt-LT');
+const calcPaint = (h) => 61.8 * h - 14.2;
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
-const fmt = (n, d = 1, lng = 'lt') =>
-  n.toLocaleString(localeFor(lng), { minimumFractionDigits: d, maximumFractionDigits: d });
+const mono = "'JetBrains Mono', monospace";
+const sora = "'Sora', sans-serif";
 
-// ─── Reveal — scroll-triggered fade+rise, reduced-motion aware ───────
+export default function Landing({ lang }) {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
-const EASE = [0.16, 1, 0.3, 1];
-
-function Reveal({ children, delay = 0, y = 16, className = '', as = 'div' }) {
-  const reduce = useReducedMotion();
-  const MotionTag = motion[as] || motion.div;
-  if (reduce) {
-    const Tag = as;
-    return <Tag className={className}>{children}</Tag>;
-  }
-  return (
-    <MotionTag
-      className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.62, ease: EASE, delay: delay / 1000 }}
-    >
-      {children}
-    </MotionTag>
+  const locale = (i18n.language || 'lt').startsWith('en') ? 'en-GB' : 'lt-LT';
+  const fmt = useCallback(
+    (n, d) => n.toLocaleString(locale, { minimumFractionDigits: d, maximumFractionDigits: d }),
+    [locale]
   );
-}
 
-// ─── CountUp — animates a number when scrolled into view ─────────────
-
-function CountUp({ to, decimals = 0, suffix = '', prefix = '', duration = 1.4 }) {
-  const reduce = useReducedMotion();
-  const { i18n } = useTranslation();
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
-  const [val, setVal] = useState(reduce ? to : 0);
-
+  // ── Deterministic two-page language model + per-route meta/hreflang ──
   useEffect(() => {
-    if (reduce || !inView) return;
-    const controls = animate(0, to, {
-      duration,
-      ease: EASE,
-      onUpdate: (v) => setVal(v),
-    });
-    return () => controls.stop();
-  }, [inView, to, reduce, duration]);
+    const target = lang || 'lt';
+    if (i18n.language !== target) i18n.changeLanguage(target);
+    try {
+      document.documentElement.lang = target;
+    } catch { /* no-op */ }
+    setPageMeta(
+      target === 'en'
+        ? {
+            title: 'Construction quantities from drawings',
+            description:
+              'Upload a construction PDF — Pathon measures rooms and finishing quantities and prepares a Lithuanian-format estimate in minutes. You review flagged items and set your own prices.',
+            path: '/en',
+          }
+        : {
+            title: 'Statybų kiekiai iš brėžinių',
+            description:
+              'Įkelk statybų PDF brėžinį — Pathon išmatuoja kiekius ir paruošia sąmatą Lietuvos formatu per kelias minutes. Kainas suvedi pats.',
+            path: window.location.pathname === '/about' ? '/about' : '/',
+          }
+    );
+    setHreflang([
+      { hrefLang: 'lt', href: 'https://pathon.eu/' },
+      { hrefLang: 'en', href: 'https://pathon.eu/en' },
+      { hrefLang: 'x-default', href: 'https://pathon.eu/' },
+    ]);
+    return () => setHreflang([]);
+  }, [lang, i18n]);
 
-  return (
-    <span ref={ref} className="tabular">
-      {prefix}
-      {fmt(val, decimals, i18n.language)}
-      {suffix}
-    </span>
-  );
-}
+  const reduceRef = useRef(false);
 
-// ─── Small primitives ────────────────────────────────────────────────
-
-const Eyebrow = ({ children, index }) => (
-  <div className="flex items-center gap-2.5">
-    {index && <span className="mono-tick">{index}</span>}
-    <span className="font-mono text-[11px] tracking-[0.18em] uppercase text-primary">
-      {children}
-    </span>
-  </div>
-);
-
-const ArrowIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor"
-    strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 8h10M9 4l4 4-4 4" />
-  </svg>
-);
-
-const CheckIcon = ({ size = 15, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="hsl(var(--primary))"
-    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M13 4L6 12l-3.5-3.5" />
-  </svg>
-);
-
-// ─── Marketing constants ─────────────────────────────────────────────
-
-// Nav links carry a stable i18n key + the anchor href; label resolved at render.
-const NAV_LINKS = [
-  { href: '#galimybes', key: 'galimybes' },
-  { href: '#eiga', key: 'kaipVeikia' },
-  { href: '#kainos', key: 'kainos' },
-];
-
-// Trust pills — stable keys (values like "NRM2" are identical across locales).
-const TRUST_PILL_KEYS = ['nrm2', 'din', 'ltSamata', 'pvm', 'excelPdf'];
-
-// Outcomes / steps / trades keep only structural data; text via t() by key.
-const OUTCOME_KEYS = ['0', '1', '2', '3'];
-
-const STEP_KEYS = [1, 2, 3];
-
-// GENERAL multi-trade grid (the KEY change) — icon kind is structural.
-const TRADES = [
-  { key: 'interior', icon: 'interior' },
-  { key: 'facade', icon: 'facade' },
-  { key: 'roof', icon: 'roof' },
-  { key: 'structure', icon: 'structure' },
-  { key: 'earth', icon: 'earth' },
-  { key: 'masonry', icon: 'masonry' },
-];
-
-const TradeIcon = ({ kind, size = 18 }) => {
-  const common = {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
-    stroke: 'hsl(var(--primary))', strokeWidth: 1.7,
-    strokeLinecap: 'round', strokeLinejoin: 'round',
-  };
-  switch (kind) {
-    case 'interior': // room / paint roller
-      return (<svg {...common}><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 10h18M9 10v10" /></svg>);
-    case 'facade': // building elevation
-      return (<svg {...common}><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2" /></svg>);
-    case 'roof': // pitched roof
-      return (<svg {...common}><path d="M3 12l9-8 9 8" /><path d="M5 11v9h14v-9" /><path d="M12 4v0" /></svg>);
-    case 'structure': // beams / rebar
-      return (<svg {...common}><path d="M4 6h16M4 18h16M8 6v12M16 6v12" /></svg>);
-    case 'earth': // excavation
-      return (<svg {...common}><path d="M3 8l4 2 4-2 4 2 4-2" /><path d="M3 8v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8" /></svg>);
-    case 'masonry': // brick bond
-      return (<svg {...common}><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 12h18M9 5v7M15 12v7" /></svg>);
-    default:
-      return null;
-  }
-};
-
-const AUDIENCE_KEYS = ['0', '1', '2'];
-
-// Pricing tiers — price/unit/labels via t(); `primary` is structural.
-const TIERS = [
-  { key: 'vienkartinis', primary: false },
-  { key: 'pro', primary: true },
-  { key: 'studio', primary: false },
-];
-
-// Hero panel: detected rooms + trade tabs. Room NAME via t() by key; the
-// quantity string (`p`) stays literal so LT renders byte-identically.
-const HERO_ROOMS = [
-  { key: 'svetaine', p: '28,4 m²' },
-  { key: 'miegamasis', p: '14,2 m²' },
-  { key: 'vaikoK', p: '11,8 m²' },
-  { key: 'koridorius', p: '10,9 m²' },
-  { key: 'vonia', p: '4,6 m²' },
-];
-
-const HERO_TABS = [
-  { key: 'interjeras', active: true },
-  { key: 'fasadai', active: true },
-  { key: 'stogai', active: true },
-  { key: 'konstrukcijos', active: false },
-  { key: 'zemesDarbai', active: false },
-  { key: 'muras', active: false },
-];
-
-// ─── Hero centerpiece: detection panel SVG ───────────────────────────
-// A dark floor plan (blueprint hairlines), an orange scan line sweeping
-// down, and orange detection boxes (with corner brackets) snapping onto
-// each detected room one-by-one. Base state (no `.play`) = fully detected.
-
-// SVG detection boxes. `roomKey` → localised label; `val` (quantity) stays
-// literal so the LT floor-plan renders byte-identically to the approved copy.
-const HERO_BOXES = [
-  { cls: 'd1', x: 4, y: 4, w: 128, h: 126, roomKey: 'svetaine', val: '28,4 m²', lx: 68, ly: 62 },
-  { cls: 'd2', x: 136, y: 4, w: 98, h: 126, roomKey: 'miegamasis', val: '14,2 m²', lx: 185, ly: 62 },
-  { cls: 'd3', x: 238, y: 4, w: 128, h: 126, roomKey: 'vaikoK', val: '11,8 m²', lx: 302, ly: 62 },
-  { cls: 'd4', x: 4, y: 134, w: 172, h: 92, roomKey: 'koridorius', val: '10,9 m²', lx: 90, ly: 184 },
-  { cls: 'd5', x: 180, y: 134, w: 98, h: 92, roomKey: 'vonia', val: '4,6 m²', lx: 229, ly: 184 },
-  { cls: 'd6', x: 282, y: 134, w: 84, h: 92, roomKey: 'wc', val: '2,1 m²', lx: 324, ly: 184 },
-];
-
-// Corner brackets for a detection box (drawn at each corner)
-function Brackets({ x, y, w, h }) {
-  const L = 9; // bracket arm length
-  const s = { stroke: 'hsl(var(--primary))', strokeWidth: 1.6, fill: 'none', strokeLinecap: 'round' };
-  return (
-    <g>
-      <path d={`M${x} ${y + L} V${y} H${x + L}`} {...s} />
-      <path d={`M${x + w - L} ${y} H${x + w} V${y + L}`} {...s} />
-      <path d={`M${x + w} ${y + h - L} V${y + h} H${x + w - L}`} {...s} />
-      <path d={`M${x + L} ${y + h} H${x} V${y + h - L}`} {...s} />
-    </g>
-  );
-}
-
-function HeroPlanSVG({ play, t }) {
-  return (
-    <svg
-      viewBox="0 0 390 268"
-      className={`hero-plan w-full h-auto ${play ? 'play' : ''}`}
-      role="img"
-      aria-labelledby="hero-plan-title"
-    >
-      <title id="hero-plan-title">
-        {t('landing.heroPlan.title')}
-      </title>
-      <g transform="translate(12, 14)">
-        {/* Faint floor-plan hairlines (blueprint on graphite) */}
-        <g>
-          <path className="plan-line" d="M0,0 H366 V226 H0 Z" fill="none"
-            stroke="hsl(var(--muted-foreground) / 0.55)" strokeWidth="1.4" />
-          <line className="plan-line" x1="0" y1="130" x2="366" y2="130" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="1" />
-          <line className="plan-line" x1="132" y1="0" x2="132" y2="130" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="1" />
-          <line className="plan-line" x1="234" y1="0" x2="234" y2="130" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="1" />
-          <line className="plan-line" x1="176" y1="130" x2="176" y2="226" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="1" />
-          <line className="plan-line" x1="278" y1="130" x2="278" y2="226" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="1" />
-          {/* Windows (double hairline on the top edge) */}
-          {[[40, 92], [160, 210], [280, 336]].map(([x1, x2], i) => (
-            <line key={i} className="plan-line" x1={x1} y1="0" x2={x2} y2="0"
-              stroke="hsl(var(--foreground) / 0.7)" strokeWidth="2.4" />
-          ))}
-          {/* Door arcs */}
-          <path className="plan-line" d="M62 130 a14 14 0 0 1 14 -14" fill="none" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="0.8" />
-          <path className="plan-line" d="M300 130 a12 12 0 0 1 12 -12" fill="none" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="0.8" />
-        </g>
-
-        {/* Detection boxes — orange fill wash + brackets + labels */}
-        {HERO_BOXES.map((b) => (
-          <g key={b.cls}>
-            <g className={`det-box ${b.cls}`}>
-              <rect x={b.x} y={b.y} width={b.w} height={b.h} rx="2"
-                fill="hsl(var(--primary) / 0.06)"
-                stroke="hsl(var(--primary) / 0.45)" strokeWidth="1" />
-              <Brackets x={b.x} y={b.y} w={b.w} h={b.h} />
-            </g>
-            <g className={`det-label ${b.cls}`} fontFamily="JetBrains Mono, monospace">
-              <text x={b.lx} y={b.ly} textAnchor="middle" fontSize="8.5"
-                fill="hsl(var(--foreground))" letterSpacing="0.02em">
-                {t(`landing.heroRooms.${b.roomKey}`).toUpperCase()}
-              </text>
-              <text x={b.lx} y={b.ly + 13} textAnchor="middle" fontSize="8"
-                fill="hsl(var(--primary))">{b.val}</text>
-            </g>
-          </g>
-        ))}
-
-        {/* Scan line — orange sweep, top → bottom */}
-        <g className="scan-line">
-          <rect x="-6" y="-8" width="378" height="10" fill="hsl(var(--primary) / 0.14)" />
-          <line x1="-6" y1="0" x2="372" y2="0" stroke="hsl(var(--primary))" strokeWidth="2" />
-          <circle cx="-6" cy="0" r="2.2" fill="hsl(var(--primary))" />
-          <circle cx="372" cy="0" r="2.2" fill="hsl(var(--primary))" />
-        </g>
-
-        {/* Dimension line (top) — coordinate-tick signature */}
-        <g fontFamily="JetBrains Mono, monospace">
-          <line x1="0" y1="-9" x2="366" y2="-9" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="0.5" />
-          <line x1="0" y1="-12" x2="0" y2="-6" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="0.6" />
-          <line x1="366" y1="-12" x2="366" y2="-6" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="0.6" />
-        </g>
-
-        {/* Title block */}
-        <g transform="translate(226, 246)" fontFamily="JetBrains Mono, monospace">
-          <rect x="0" y="0" width="140" height="26" fill="hsl(var(--surface-2))"
-            stroke="hsl(var(--border-strong))" strokeWidth="0.7" />
-          <line x1="70" y1="0" x2="70" y2="26" stroke="hsl(var(--border-strong))" strokeWidth="0.6" />
-          <text x="6" y="11" fontSize="7" fill="hsl(var(--foreground))">{t('landing.heroPlan.scale')}</text>
-          <text x="76" y="11" fontSize="7" fill="hsl(var(--foreground))">{t('landing.heroPlan.totalArea')}</text>
-          <text x="6" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">{t('landing.heroPlan.sheetCode')}</text>
-          <text x="76" y="21" fontSize="7" fill="hsl(var(--muted-foreground))">{t('landing.heroPlan.roomsCount')}</text>
-        </g>
-      </g>
-    </svg>
-  );
-}
-
-// ─── Hero product frame — plan (left) + extracted quantities (right) ──
-
-function HeroProductFrame() {
-  const { t } = useTranslation();
-  const reduce = useReducedMotion();
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: false, amount: 0.35 });
-  // Replay on scroll-into-view: key remounts the animated children.
-  const [key, setKey] = useState(0);
-  const wasOut = useRef(true);
+  // ── Scroll reveals ──
   useEffect(() => {
-    if (reduce) return;
-    if (inView && wasOut.current) {
-      setKey((k) => k + 1);
-      wasOut.current = false;
-    } else if (!inView) {
-      wasOut.current = true;
+    reduceRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Robustness: under automation (navigator.webdriver — the build:seo
+    // prerender driver, screenshots) or reduced motion, IntersectionObserver
+    // never fires for below-fold content in a no-scroll context, which would
+    // bake opacity-0 sections into the prerendered HTML. Reveal everything
+    // immediately there; real visitors get the staggered scroll reveals.
+    const els = document.querySelectorAll('#plr [data-reveal]');
+    if (navigator.webdriver || reduceRef.current || !('IntersectionObserver' in window)) {
+      els.forEach((el) => el.classList.add('plin'));
+      return undefined;
     }
-  }, [inView, reduce]);
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('plin');
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+    // Re-run on language change: translated content re-renders, and any DOM
+    // node React recreated would otherwise be left without .plin (invisible).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.resolvedLanguage]);
 
-  const play = !reduce;
-
-  return (
-    <div ref={ref} className="product-frame overflow-hidden">
-      {/* window chrome bar */}
-      <div className="flex items-center gap-2 px-4 h-9 border-b border-border bg-surface-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-        <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-        <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-        <span className="ml-3 font-mono text-[11px] text-muted-foreground truncate">
-          {t('landing.heroFrame.fileLabel')}
-        </span>
-        <span className="ml-auto font-mono text-[10px] text-primary hidden sm:inline">{t('landing.heroFrame.detected')}</span>
-      </div>
-      <div className="grid sm:grid-cols-[1.18fr_1fr]" key={key}>
-        {/* plan */}
-        <div className="relative blueprint-grid p-4 border-b sm:border-b-0 sm:border-r border-border bg-background">
-          <HeroPlanSVG play={play} t={t} />
-        </div>
-        {/* extracted quantities */}
-        <div className="p-4 sm:p-5 bg-card">
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-3">
-            {t('landing.heroFrame.extractedTitle')}
-          </div>
-          <div className={`qty-table ${play ? 'play' : ''}`}>
-            {HERO_ROOMS.map((r, i) => (
-              <div
-                key={r.key}
-                className="qty-row flex items-baseline justify-between py-[7px] border-b border-border/70 text-[12.5px]"
-                style={play ? { animationDelay: `${1000 + i * 130}ms` } : undefined}
-              >
-                <span className="text-foreground/80 truncate pr-2">{t(`landing.heroRooms.${r.key}`)}</span>
-                <span className="font-mono tabular text-foreground whitespace-nowrap">{r.p}</span>
-              </div>
-            ))}
-            <div className="flex items-baseline justify-between pt-3 mt-1">
-              <span className="text-[12px] font-medium text-foreground">{t('landing.heroFrame.wallArea')}</span>
-              <span className="font-mono tabular text-[15px] font-semibold text-primary">
-                <CountUp to={213} decimals={1} suffix=" m²" duration={1.3} />
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-y-2 font-mono text-[11px]">
-            <div className="text-muted-foreground">{t('landing.heroFrame.floors')}</div>
-            <div className="tabular text-right text-foreground">
-              <CountUp to={72} decimals={1} suffix=" m²" duration={1.3} />
-            </div>
-            <div className="text-muted-foreground">{t('landing.heroFrame.baseboards')}</div>
-            <div className="tabular text-right text-foreground">{t('landing.heroFrame.baseboardsVal')}</div>
-            <div className="text-foreground font-medium pt-2 border-t border-border/70">{t('landing.heroFrame.estimateWithVat')}</div>
-            <div className="tabular text-right font-semibold text-primary pt-2 border-t border-border/70">
-              <CountUp to={8017} decimals={0} suffix=" €" duration={1.7} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trade tabs — active ones highlighted orange */}
-      <div className="flex flex-wrap items-center gap-1.5 px-4 py-3 border-t border-border bg-surface-2">
-        {HERO_TABS.map((tab) => (
-          <span
-            key={tab.key}
-            className={`trade-tab font-mono text-[10.5px] px-2.5 py-1 rounded-md border ${
-              tab.active
-                ? 'text-primary border-primary/40 bg-primary/[0.08]'
-                : 'text-muted-foreground/70 border-border bg-transparent'
-            }`}
-          >
-            {t(`landing.heroTabs.${tab.key}`)}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Sticky top nav ──────────────────────────────────────────────────
-
-function LandingNav() {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  // ── Parallax + product-frame tilt (rAF-throttled, cheap transforms) ──
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
+    let raf = null;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        if (reduceRef.current) return;
+        const bg = document.getElementById('plHeroBg');
+        if (bg) bg.style.transform = `translateY(${window.scrollY * 0.16}px)`;
+        const fr = document.getElementById('plFrame');
+        if (fr) {
+          const r = fr.getBoundingClientRect();
+          const vh = window.innerHeight;
+          const p = Math.max(0, Math.min(1, (vh - r.top) / (vh * 0.7)));
+          const k = 1 - p;
+          fr.style.transform = `perspective(1400px) rotateX(${(k * 6).toFixed(2)}deg) translateY(${(k * 28).toFixed(1)}px) scale(${(0.985 + p * 0.015).toFixed(4)})`;
+        }
+      });
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    onScroll();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
-  return (
-    <header
-      className={`sticky top-0 z-40 transition-colors duration-300 ${
-        scrolled
-          ? 'border-b border-border bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70'
-          : 'border-b border-transparent'
-      }`}
-    >
-      <div className="max-w-[1200px] mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 text-foreground">
-          <PathonMark icon={26} />
-          <span className="font-display font-bold tracking-tight text-[19px]">Pathon</span>
-        </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-[14px] text-muted-foreground">
-          {NAV_LINKS.map((l) => (
-            <a key={l.href} href={l.href} className="link-draw">{t(`nav.${l.key}`)}</a>
-          ))}
-          <Link to="/login" className="link-draw">{t('nav.prisijungti')}</Link>
-        </nav>
-
-        <div className="hidden md:flex items-center gap-3">
-          <LanguageToggle />
-          <Link to="/register" className="btn-primary text-[14px] px-4 py-2">
-            {t('nav.isbandytiNemokamai')}
-          </Link>
-        </div>
-
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden inline-flex items-center justify-center w-10 h-10 -mr-2 text-foreground"
-          aria-label={t('nav.meniu')} aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-            {open ? <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>
-                  : <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>}
-          </svg>
-        </button>
-      </div>
-
-      {open && (
-        <div className="md:hidden border-t border-border bg-background/97 backdrop-blur-md">
-          <div className="px-5 py-4 flex flex-col gap-1 text-[15px]">
-            {NAV_LINKS.map((l) => (
-              <a key={l.href} href={l.href} onClick={() => setOpen(false)}
-                className="py-2.5 text-foreground/85 hover:text-foreground">{t(`nav.${l.key}`)}</a>
-            ))}
-            <Link to="/login" onClick={() => setOpen(false)} className="py-2.5 text-foreground/85 hover:text-foreground">{t('nav.prisijungti')}</Link>
-            <Link to="/register" onClick={() => setOpen(false)} className="btn-primary mt-2 justify-center py-2.5">
-              {t('nav.isbandytiNemokamai')}
-            </Link>
-            <div className="pt-3 mt-1 border-t border-border/70">
-              <LanguageToggle />
-            </div>
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
-
-// ─── Hero ────────────────────────────────────────────────────────────
-
-function Hero() {
-  const { t } = useTranslation();
-  const reduce = useReducedMotion();
-  return (
-    <section className="relative border-b border-border overflow-hidden">
-      {/* layered blueprint texture + orange radial glow */}
-      <div className="absolute inset-0 blueprint-grid-major opacity-80 pointer-events-none" aria-hidden />
-      <div
-        className="absolute -top-52 -right-40 w-[620px] h-[620px] rounded-full pointer-events-none"
-        aria-hidden
-        style={{
-          background:
-            'radial-gradient(circle, hsl(var(--primary) / 0.16), transparent 62%)',
-        }}
-      />
-      <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 pt-14 pb-20 lg:pt-24 lg:pb-28">
-        <div className="grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-16 items-center">
-          <div>
-            <Reveal>
-              <Eyebrow index="01 / HERO">{t('landing.hero.eyebrow')}</Eyebrow>
-            </Reveal>
-            <Reveal delay={70} as="h1"
-              className="mt-6 font-display font-bold text-foreground tracking-[-0.03em]
-                         leading-[0.98] text-[44px] sm:text-[60px] lg:text-[74px]">
-              {t('landing.hero.titleA')}{' '}
-              <br className="hidden sm:block" />
-              <span className="h-accent">{t('landing.hero.titleAccent')}</span>
-            </Reveal>
-            <Reveal delay={140} as="p"
-              className="mt-7 max-w-[560px] text-[17px] sm:text-[18.5px] text-ink-2 leading-[1.6]">
-              {t('landing.hero.sub')}
-            </Reveal>
-            <Reveal delay={210} className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Link to="/register" className="btn-primary justify-center px-5 py-3 text-[15px]">
-                {t('landing.hero.ctaPrimary')}
-                <ArrowIcon />
-              </Link>
-              <a href="#eiga" className="btn-ghost justify-center px-5 py-3 text-[15px]">
-                {t('landing.hero.ctaDemo')}
-              </a>
-            </Reveal>
-            <Reveal delay={280} as="p" className="mt-6 font-mono text-[12px] text-muted-foreground">
-              {t('landing.hero.note')}
-            </Reveal>
-
-            {/* Trust pills */}
-            <Reveal delay={340} className="mt-8 flex flex-wrap gap-x-4 gap-y-2 items-center">
-              {TRUST_PILL_KEYS.map((k, i) => (
-                <React.Fragment key={k}>
-                  {i > 0 && <span className="text-border-strong hidden sm:inline">·</span>}
-                  <span className="font-mono text-[11px] tracking-[0.04em] text-muted-foreground">{t(`landing.trustPills.${k}`)}</span>
-                </React.Fragment>
-              ))}
-            </Reveal>
-          </div>
-
-          <motion.div
-            className="lg:pl-2"
-            initial={reduce ? false : { opacity: 0, y: 24 }}
-            animate={reduce ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: EASE, delay: 0.15 }}
-          >
-            <HeroProductFrame />
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Outcome strip (4 mono facts) ────────────────────────────────────
-
-function OutcomeStrip() {
-  const { t } = useTranslation();
-  return (
-    <section className="border-b border-border bg-card">
-      <div className="max-w-[1200px] mx-auto px-5 lg:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-x divide-border [&>*]:border-border">
-          {OUTCOME_KEYS.map((k, i) => (
-            <Reveal key={k} delay={i * 70} className="p-6 lg:p-8">
-              <div className="font-mono font-medium text-[16px] lg:text-[18px] text-foreground tracking-[-0.01em]">
-                «{t(`landing.outcomes.${k}.big`)}»
-              </div>
-              <div className="mt-2 text-[13px] text-muted-foreground leading-snug">{t(`landing.outcomes.${k}.small`)}</div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Section header helper ───────────────────────────────────────────
-
-function SectionHead({ eyebrow, index, title, sub, align = 'left', className = '' }) {
-  const alignCls = align === 'center' ? 'mx-auto text-center items-center flex flex-col' : '';
-  return (
-    <div className={`max-w-[700px] ${alignCls} ${className}`}>
-      <Reveal><Eyebrow index={index}>{eyebrow}</Eyebrow></Reveal>
-      <Reveal delay={70} as="h2"
-        className="mt-5 font-display font-semibold text-foreground tracking-[-0.02em]
-                   leading-[1.04] text-[32px] sm:text-[46px]">
-        {title}
-      </Reveal>
-      {sub && (
-        <Reveal delay={140} as="p" className="mt-5 text-[16px] sm:text-[17px] text-ink-2 leading-[1.6]">
-          {sub}
-        </Reveal>
-      )}
-    </div>
-  );
-}
-
-// ─── Kaip tai veikia (3 steps, editorial numbered cards) ─────────────
-
-function Eiga() {
-  const { t } = useTranslation();
-  return (
-    <section id="eiga" className="border-b border-border scroll-mt-20 relative overflow-hidden">
-      <div className="absolute inset-0 blueprint-grid opacity-50 pointer-events-none" aria-hidden />
-      <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
-        <SectionHead
-          eyebrow={t('landing.eiga.eyebrow')}
-          index="02"
-          title={<>{t('landing.eiga.titleA')}<span className="h-accent">{t('landing.eiga.titleAccent')}</span></>}
-          sub={t('landing.eiga.sub')}
-        />
-        <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {STEP_KEYS.map((n, i) => (
-            <Reveal key={n} delay={i * 100}
-              className="card-lift relative bg-card border border-border rounded-xl p-7 overflow-hidden">
-              <div className="ghost-numeral" aria-hidden>{n}</div>
-              <div className="relative">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg
-                                border border-primary/30 bg-primary/[0.10] font-mono text-[14px] text-primary font-semibold">
-                  0{n}
-                </div>
-                <div className="mt-6 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{t(`landing.steps.${n}.t`)}</div>
-                <p className="mt-2.5 text-[14.5px] text-ink-2 leading-[1.55]">{t(`landing.steps.${n}.d`)}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Ką Pathon skaito (GENERAL trades grid — 6) ──────────────────────
-
-function Trades() {
-  const { t } = useTranslation();
-  return (
-    <section id="galimybes" className="border-b border-border bg-card scroll-mt-20">
-      <div className="max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
-        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 lg:gap-16 items-end">
-          <SectionHead
-            eyebrow={t('landing.trades.eyebrow')}
-            index="03"
-            title={<>{t('landing.trades.titleA')}<span className="h-accent">{t('landing.trades.titleAccent')}</span></>}
-            sub={t('landing.trades.sub')}
-          />
-          <Reveal delay={120} className="hidden lg:block font-mono text-[11px] text-muted-foreground leading-relaxed text-right">
-            <div>{t('landing.trades.sideA')}</div>
-            <div>{t('landing.trades.sideB')}</div>
-            <div className="text-primary mt-1">{t('landing.trades.sideC')}</div>
-          </Reveal>
-        </div>
-        <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border border border-border rounded-xl overflow-hidden">
-          {TRADES.map((e, i) => (
-            <Reveal key={e.key} delay={(i % 3) * 80}
-              className="card-lift bg-card p-6 lg:p-7 group relative">
-              <span className="absolute top-6 right-6 font-mono text-[10px] text-muted-foreground/60">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-lg border border-primary/25 bg-primary/[0.09] flex items-center justify-center shrink-0">
-                  <TradeIcon kind={e.icon} />
-                </span>
-                <span className="font-display font-semibold text-[16px] text-foreground">{t(`landing.trades.${e.key}.t`)}</span>
-              </div>
-              <p className="mt-3.5 text-[14px] text-ink-2 leading-[1.55]">{t(`landing.trades.${e.key}.d`)}</p>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Kam skirta (3) ──────────────────────────────────────────────────
-
-function Audience() {
-  const { t } = useTranslation();
-  return (
-    <section className="border-b border-border scroll-mt-20 relative overflow-hidden">
-      <div className="absolute inset-0 blueprint-grid opacity-50 pointer-events-none" aria-hidden />
-      <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
-        <SectionHead
-          eyebrow={t('landing.audience.eyebrow')}
-          index="04"
-          title={<>{t('landing.audience.titleA')}<span className="h-accent">{t('landing.audience.titleAccent')}</span></>}
-        />
-        <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {AUDIENCE_KEYS.map((k, i) => (
-            <Reveal key={k} delay={i * 100}
-              className="card-lift bg-card border border-border rounded-xl p-7">
-              <div className="font-mono text-[11px] text-primary tracking-[0.14em]">
-                {String(i + 1).padStart(2, '0')}
-              </div>
-              <div className="mt-4 font-display font-semibold text-[20px] text-foreground tracking-[-0.01em]">{t(`landing.audiences.${k}.t`)}</div>
-              <p className="mt-3 text-[14.5px] text-ink-2 leading-[1.55]">{t(`landing.audiences.${k}.d`)}</p>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Pricing teaser (3 compact cards → /pricing) ─────────────────────
-
-function Pricing() {
-  const { t } = useTranslation();
-  return (
-    <section id="kainos" className="border-b border-border bg-card scroll-mt-20">
-      <div className="max-w-[1200px] mx-auto px-5 lg:px-8 py-20 lg:py-28">
-        <SectionHead
-          eyebrow={t('landing.pricing.eyebrow')}
-          index="05"
-          title={<>{t('landing.pricing.titleA')}<span className="h-accent">{t('landing.pricing.titleAccent')}</span></>}
-          sub={t('landing.pricing.sub')}
-        />
-        <div className="mt-14 grid md:grid-cols-3 gap-5 lg:gap-6">
-          {TIERS.map((tier, i) => {
-            const feats = t(`landing.tiers.${tier.key}.feats`, { returnObjects: true });
-            return (
-            <Reveal key={tier.key} delay={i * 90}
-              className={`card-lift relative rounded-2xl p-7 flex flex-col ${
-                tier.primary
-                  ? 'bg-card border-2 border-primary shadow-[0_18px_50px_-20px_hsl(var(--primary)/0.4)]'
-                  : 'bg-card border border-border'
-              }`}>
-              {tier.primary && (
-                <span className="absolute -top-3 left-7 font-mono text-[10px] uppercase tracking-[0.12em]
-                                 bg-primary text-primary-foreground px-2.5 py-1 rounded-full">
-                  {t('landing.pricing.popular')}
-                </span>
-              )}
-              <div className="font-display font-semibold text-[17px] text-foreground">{t(`landing.tiers.${tier.key}.name`)}</div>
-              <div className="mt-3 flex items-baseline gap-1.5">
-                <span className="font-mono font-semibold text-[38px] text-foreground tracking-[-0.02em] tabular">{t(`landing.tiers.${tier.key}.price`)}</span>
-                <span className="text-[13px] text-muted-foreground">{t(`landing.tiers.${tier.key}.unit`)}</span>
-              </div>
-              <p className="mt-2 text-[13.5px] text-muted-foreground">{t(`landing.tiers.${tier.key}.desc`)}</p>
-              <ul className="mt-6 space-y-2.5 flex-1">
-                {(Array.isArray(feats) ? feats : []).map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-[14px] text-foreground/85">
-                    <CheckIcon className="mt-[3px] shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link to="/pricing"
-                className={`mt-7 justify-center py-2.5 text-[14px] ${tier.primary ? 'btn-primary' : 'btn-ghost'}`}>
-                {t(`landing.tiers.${tier.key}.cta`)}
-              </Link>
-            </Reveal>
-          );})}
-        </div>
-        <Reveal delay={120} as="p" className="mt-6 font-mono text-[12px] text-muted-foreground">
-          {t('landing.pricing.vatNote')}
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-// ─── Closing band ────────────────────────────────────────────────────
-
-function Closing() {
-  const { t } = useTranslation();
-  return (
-    <section className="border-b border-border relative overflow-hidden">
-      <div className="absolute inset-0 blueprint-grid-major opacity-70 pointer-events-none" aria-hidden />
-      <div
-        className="absolute -bottom-52 -left-40 w-[640px] h-[640px] rounded-full pointer-events-none"
-        aria-hidden
-        style={{ background: 'radial-gradient(circle, hsl(var(--primary) / 0.14), transparent 62%)' }}
-      />
-      <div className="relative max-w-[1200px] mx-auto px-5 lg:px-8 py-24 lg:py-32">
-        <div className="max-w-[820px]">
-          <Reveal><Eyebrow index="06">{t('landing.closing.eyebrow')}</Eyebrow></Reveal>
-          <Reveal delay={80} as="h2"
-            className="mt-6 font-display font-semibold text-foreground tracking-[-0.025em]
-                       leading-[1.02] text-[36px] sm:text-[54px]">
-            {t('landing.closing.titleA')}
-            <span className="h-accent">{t('landing.closing.titleAccent')}</span>
-          </Reveal>
-          <Reveal delay={150} as="p" className="mt-6 max-w-[600px] text-[17px] sm:text-[18px] text-ink-2 leading-[1.6]">
-            {t('landing.closing.sub')}
-          </Reveal>
-          <Reveal delay={210} className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <Link to="/register" className="btn-primary justify-center px-6 py-3 text-[15px]">
-              {t('landing.closing.ctaPrimary')}
-              <ArrowIcon />
-            </Link>
-            <a href="mailto:solutions@pathon.eu?subject=Pathon%20%E2%80%94%20u%C5%BEklausa"
-              className="btn-ghost justify-center px-6 py-3 text-[15px]">
-              {t('landing.closing.ctaContact')}
-            </a>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Footer ──────────────────────────────────────────────────────────
-
-function LandingFooter() {
-  const { t } = useTranslation();
-  const cols = [
-    {
-      h: t('landing.footer.colProduktas'),
-      links: [
-        { l: t('landing.footer.galimybes'), href: '#galimybes' },
-        { l: t('landing.footer.kaipVeikia'), href: '#eiga' },
-        { l: t('landing.footer.kainos'), href: '#kainos' },
-      ],
-    },
-    {
-      h: t('landing.footer.colPaskyra'),
-      links: [
-        { l: t('landing.footer.prisijungti'), to: '/login' },
-        { l: t('landing.footer.registruotis'), to: '/register' },
-      ],
-    },
+  // ── Hero measuring instrument ──
+  const [hoverRoom, setHoverRoom] = useState(null);
+  const heroRooms = [
+    { id: 'svet', x0: 60, x1: 460, y0: 60, y1: 560 },
+    { id: 'mieg', x0: 460, x1: 800, y0: 60, y1: 330 },
+    { id: 'virt', x0: 800, x1: 1120, y0: 60, y1: 330 },
+    { id: 'von', x0: 460, x1: 690, y0: 330, y1: 560 },
+    { id: 'kor', x0: 690, x1: 920, y0: 330, y1: 560 },
+    { id: 'kab', x0: 920, x1: 1120, y0: 330, y1: 560 },
   ];
+  const roomLabels = t('landing.heroRooms', { returnObjects: true });
+
+  const heroMove = (e) => {
+    if (reduceRef.current) return;
+    const hero = document.getElementById('virsus');
+    const svg = document.getElementById('plPlanSvg');
+    if (!hero || !svg) return;
+    const hr = hero.getBoundingClientRect();
+    const x = e.clientX - hr.left;
+    const y = e.clientY - hr.top;
+
+    const ch = document.getElementById('plCh');
+    if (ch) {
+      ch.style.opacity = '1';
+      const v = document.getElementById('plChV');
+      const h = document.getElementById('plChH');
+      if (v) v.style.left = `${x}px`;
+      if (h) h.style.top = `${y}px`;
+    }
+    const spot = document.getElementById('plSpot');
+    if (spot) {
+      spot.style.opacity = '1';
+      spot.style.transform = `translate(${x - 240}px, ${y - 240}px)`;
+    }
+
+    const sr = svg.getBoundingClientRect();
+    const vx = ((e.clientX - sr.left) / sr.width) * 1180;
+    const vy = ((e.clientY - sr.top) / sr.height) * 620;
+    const mx = Math.max(0, Math.min(11.2, ((vx - 60) / 1060) * 11.2));
+    const my = Math.max(0, Math.min(5.3, ((vy - 60) / 500) * 5.3));
+    const idx = heroRooms.findIndex(
+      (r) => vx >= r.x0 && vx <= r.x1 && vy >= r.y0 && vy <= r.y1
+    );
+    const tip = document.getElementById('plChTip');
+    if (tip) {
+      const coords = `x ${fmt(mx, 2)} m · y ${fmt(my, 2)} m`;
+      tip.textContent = idx >= 0 ? `${roomLabels[idx]}  —  ${coords}` : coords;
+      tip.style.left = `${Math.min(x + 16, hr.width - 190)}px`;
+      tip.style.top = `${Math.min(y + 16, hr.height - 60)}px`;
+    }
+    const id = idx >= 0 ? heroRooms[idx].id : null;
+    setHoverRoom((prev) => (prev === id ? prev : id));
+  };
+
+  const heroLeave = () => {
+    const ch = document.getElementById('plCh');
+    if (ch) ch.style.opacity = '0';
+    const spot = document.getElementById('plSpot');
+    if (spot) spot.style.opacity = '0';
+    setHoverRoom(null);
+  };
+
+  // ── Section 5: live recalc ──
+  const [rc, setRc] = useState({ h: 2.7, paint: calcPaint(2.7), glaist: calcPaint(2.7) * 1.1 });
+  const [rcTarget, setRcTarget] = useState(2.7);
+  const rcRaf = useRef(null);
+  const animateTo = (hTarget) => {
+    setRcTarget(hTarget);
+    if (rcRaf.current) cancelAnimationFrame(rcRaf.current);
+    const from = { ...rc };
+    const p = calcPaint(hTarget);
+    const to = { h: hTarget, paint: p, glaist: p * 1.1 };
+    const t0 = performance.now();
+    const dur = 550;
+    const tick = (now) => {
+      const k = easeOut(Math.min(1, (now - t0) / dur));
+      setRc({
+        h: from.h + (to.h - from.h) * k,
+        paint: from.paint + (to.paint - from.paint) * k,
+        glaist: from.glaist + (to.glaist - from.glaist) * k,
+      });
+      if (k < 1) rcRaf.current = requestAnimationFrame(tick);
+    };
+    rcRaf.current = requestAnimationFrame(tick);
+  };
+
+  // ── Product demo state machine ──
+  const [demo, setDemo] = useState({
+    playing: true,
+    dh: 2.7,
+    curL: '55%',
+    curT: '72%',
+    curClick: false,
+    popVis: false,
+    expVis: false,
+    stepUpOn: false,
+    rowFlash: false,
+    sel: null,
+    tab: 'brez',
+  });
+  const demoRef = useRef(demo);
+  demoRef.current = demo;
+  const timersRef = useRef([]);
+  const drafRef = useRef(null);
+  const dhTargetRef = useRef(null);
+  const flashTRef = useRef(null);
+  const runningRef = useRef(false);
+
+  const patch = (p) => setDemo((s) => ({ ...s, ...p }));
+
+  const clearDemo = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    runningRef.current = false;
+    if (drafRef.current) cancelAnimationFrame(drafRef.current);
+  }, []);
+
+  const animDh = useCallback((target, dur) => {
+    if (drafRef.current) cancelAnimationFrame(drafRef.current);
+    const from = demoRef.current.dh;
+    const t0 = performance.now();
+    const tick = (now) => {
+      const k = easeOut(Math.min(1, (now - t0) / dur));
+      patch({ dh: from + (target - from) * k });
+      if (k < 1) drafRef.current = requestAnimationFrame(tick);
+    };
+    drafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  const demoClick = useCallback((fn) => {
+    patch({ curClick: true });
+    if (fn) fn();
+    timersRef.current.push(setTimeout(() => patch({ curClick: false }), 600));
+  }, []);
+
+  const runDemo = useCallback(() => {
+    clearDemo();
+    runningRef.current = true;
+    const at = (ms, fn) => timersRef.current.push(setTimeout(fn, ms));
+    at(300, () => patch({ curL: '24%', curT: '52%' }));
+    at(1400, () => demoClick(() => patch({ sel: 'svet' })));
+    at(2600, () => patch({ curL: '80%', curT: '5%' }));
+    at(3700, () => demoClick(() => patch({ popVis: true })));
+    at(4700, () => patch({ curL: '86%', curT: '22%' }));
+    at(5800, () =>
+      demoClick(() => {
+        patch({ stepUpOn: true, rowFlash: true });
+        animDh(3.2, 700);
+      })
+    );
+    at(6600, () => patch({ stepUpOn: false }));
+    at(8000, () => patch({ curL: '93.5%', curT: '5%', popVis: false, rowFlash: false }));
+    at(9100, () => demoClick(() => patch({ expVis: true })));
+    at(11400, () => {
+      patch({ expVis: false, sel: null, curL: '55%', curT: '72%' });
+      animDh(2.7, 500);
+    });
+    at(12800, () => {
+      if (demoRef.current.playing) runDemo();
+    });
+  }, [animDh, clearDemo, demoClick]);
+
+  const takeover = useCallback(() => {
+    clearDemo();
+    if (demoRef.current.playing) patch({ playing: false });
+  }, [clearDemo]);
+
+  const manualSelect = (room) => {
+    takeover();
+    patch({
+      sel: demoRef.current.sel === room ? null : room,
+      popVis: false,
+      expVis: false,
+    });
+  };
+
+  const step = (dir) => {
+    takeover();
+    dhTargetRef.current = Math.max(
+      2.2,
+      Math.min(4.0, (dhTargetRef.current ?? Math.round(demoRef.current.dh * 10) / 10) + dir * 0.1)
+    );
+    patch({ popVis: true, rowFlash: true });
+    animDh(dhTargetRef.current, 280);
+    clearTimeout(flashTRef.current);
+    flashTRef.current = setTimeout(() => patch({ rowFlash: false }), 900);
+  };
+
+  const toggleDemo = () => {
+    const next = !demoRef.current.playing;
+    patch({ playing: next });
+    if (next) runDemo();
+    else clearDemo();
+  };
+
+  // Autoplay when the frame scrolls into view; full cleanup on unmount.
+  useEffect(() => {
+    const fr = document.getElementById('plFrame');
+    let dio = null;
+    if (fr && !reduceRef.current) {
+      dio = new IntersectionObserver(
+        (es) => {
+          es.forEach((e) => {
+            if (e.isIntersecting && demoRef.current.playing && !runningRef.current) runDemo();
+          });
+        },
+        { threshold: 0.35 }
+      );
+      dio.observe(fr);
+    }
+    return () => {
+      if (dio) dio.disconnect();
+      clearDemo();
+      if (rcRaf.current) cancelAnimationFrame(rcRaf.current);
+      clearTimeout(flashTRef.current);
+    };
+  }, [runDemo, clearDemo]);
+
+  // ── Demo derived values (identical math to the design export) ──
+  const dPaint = calcPaint(demo.dh);
+  const dPaintCost = dPaint * 3.2;
+  const dGlaistCost = dPaint * 4.5;
+  const baseNet = 6626.45 - 152.66 * 3.2 - 152.66 * 4.5;
+  const dNet = baseNet + dPaintCost + dGlaistCost;
+  const dGross = dNet * 1.21;
+
+  const switchLang = (lng) => {
+    changeAppLanguage(lng);
+    navigate(lng === 'en' ? '/en' : '/');
+  };
+
+  const eyebrowTick = <span style={{ width: 22, height: 1, background: 'var(--line2)', display: 'inline-block' }} />;
+  const steps = t('landing.steps.items', { returnObjects: true });
+  const readsList = t('landing.reads.list', { returnObjects: true });
+  const chips = t('landing.reads.chips', { returnObjects: true });
+  const trustCards = t('landing.trust.cards', { returnObjects: true });
+  const audienceCards = t('landing.audience.cards', { returnObjects: true });
+  const tiers = t('landing.pricing.tiers', { returnObjects: true });
+
   return (
-    <footer className="bg-background">
-      <div className="max-w-[1200px] mx-auto px-5 lg:px-8 py-14">
-        <div className="grid gap-10 lg:grid-cols-[1.6fr_1fr_1fr]">
-          <div>
-            <div className="flex items-center gap-2.5 text-foreground">
-              <PathonMark icon={26} />
-              <span className="font-display font-bold tracking-tight text-[18px]">Pathon</span>
-            </div>
-            <p className="mt-3 text-[13.5px] text-muted-foreground max-w-[280px] leading-relaxed">
-              {t('landing.footer.tagline')}
-            </p>
-            <a href="mailto:solutions@pathon.eu"
-              className="mt-4 inline-block font-mono text-[12.5px] text-muted-foreground hover:text-foreground transition-colors">
-              solutions@pathon.eu
+    <div id="plr" data-palette={PALETTE}>
+      {/* film grain overlay */}
+      <div className="plgrain" aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 40, pointerEvents: 'none', opacity: 'var(--grainop)' }} />
+
+      {/* ═══════════ NAV ═══════════ */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'color-mix(in srgb, var(--bg) 86%, transparent)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-wrap" style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+          <a href="#virsus" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <PathonMark icon={26} />
+            <span style={{ fontFamily: sora, fontWeight: 700, letterSpacing: '-0.02em', fontSize: 19 }}>Pathon</span>
+          </a>
+          <nav className="pl-navlinks" style={{ alignItems: 'center', gap: 32, fontSize: 14, color: 'var(--mut)' }}>
+            <a href="#galimybes">{t('landing.nav.galimybes')}</a>
+            <a href="#kaip-veikia">{t('landing.nav.kaipVeikia')}</a>
+            <Link to="/duk">{t('landing.nav.duk')}</Link>
+            <a href="#kainos">{t('landing.nav.kainos')}</a>
+          </nav>
+          <div className="pl-navauth" style={{ alignItems: 'center', gap: 18 }}>
+            <Link className="pl-login" to="/login" style={{ fontSize: 14, color: 'var(--mut)' }}>{t('landing.nav.login')}</Link>
+            <Link to="/register" className="pl-navbtn">{t('landing.nav.cta')}</Link>
+          </div>
+        </div>
+      </header>
+
+      {/* ═══════════ HERO ═══════════ */}
+      <section id="virsus" onMouseMove={heroMove} onMouseLeave={heroLeave} style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--line)' }}>
+        {/* drafting-paper grid */}
+        <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px)', backgroundSize: '56px 56px', WebkitMaskImage: 'radial-gradient(ellipse 85% 75% at 50% 40%, #000 45%, transparent 100%)', maskImage: 'radial-gradient(ellipse 85% 75% at 50% 40%, #000 45%, transparent 100%)' }} />
+
+        {/* scanned floor plan background (parallax target) */}
+        <div id="plHeroBg" data-scan={String(HERO_SCAN)} aria-hidden style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', willChange: 'transform', WebkitMaskImage: 'radial-gradient(ellipse 75% 68% at 50% 46%, #000 45%, transparent 98%)', maskImage: 'radial-gradient(ellipse 75% 68% at 50% 46%, #000 45%, transparent 98%)' }}>
+          <svg id="plPlanSvg" viewBox="0 0 1180 620" style={{ width: 1180, maxWidth: '100%', height: 'auto' }} preserveAspectRatio="xMidYMid meet">
+            <g fill="none" stroke="var(--planink)" strokeWidth="1.6">
+              <path d="M60 60 H1120 V560 H60 Z" />
+              <line x1="460" y1="60" x2="460" y2="560" />
+              <line x1="800" y1="60" x2="800" y2="330" />
+              <line x1="460" y1="330" x2="1120" y2="330" />
+              <line x1="690" y1="330" x2="690" y2="560" />
+              <line x1="920" y1="330" x2="920" y2="560" />
+            </g>
+            <g stroke="var(--planink)" strokeWidth="4">
+              <line x1="140" y1="60" x2="300" y2="60" />
+              <line x1="560" y1="60" x2="720" y2="60" />
+              <line x1="880" y1="60" x2="1040" y2="60" />
+            </g>
+            <g fill="none" stroke="var(--planink)" strokeWidth="1.2">
+              <path d="M460 400 a52 52 0 0 1 52 -52" />
+              <path d="M690 470 a44 44 0 0 1 44 -44" />
+              <path d="M920 400 a44 44 0 0 1 44 -44" />
+            </g>
+            <g className="plzone" style={{ animationDelay: '0.9s' }}>
+              <rect x="64" y="64" width="392" height="492" fill="var(--acc)" opacity="0.10" />
+              <text x="260" y="300" textAnchor="middle" fontFamily={mono} fontSize="15" fill="var(--acc)" opacity="0.8">{t('landing.heroSvg.a1')}</text>
+              <text x="260" y="324" textAnchor="middle" fontFamily={mono} fontSize="11" fill="var(--mut)" opacity="0.8">{t('landing.heroSvg.tag1')}</text>
+            </g>
+            <g className="plzone" style={{ animationDelay: '2.2s' }}>
+              <rect x="464" y="64" width="332" height="262" fill="var(--acc)" opacity="0.09" />
+              <text x="630" y="188" textAnchor="middle" fontFamily={mono} fontSize="14" fill="var(--acc)" opacity="0.8">{t('landing.heroSvg.a2')}</text>
+              <text x="630" y="210" textAnchor="middle" fontFamily={mono} fontSize="11" fill="var(--mut)" opacity="0.8">{t('landing.heroSvg.h')}</text>
+            </g>
+            <g className="plzone" style={{ animationDelay: '3.4s' }}>
+              <rect x="804" y="64" width="312" height="262" fill="var(--acc)" opacity="0.09" />
+              <text x="960" y="200" textAnchor="middle" fontFamily={mono} fontSize="14" fill="var(--acc)" opacity="0.8">{t('landing.heroSvg.a3')}</text>
+            </g>
+            <g className="plzone" style={{ animationDelay: '2.4s' }}>
+              <rect x="464" y="334" width="222" height="222" fill="var(--acc)" opacity="0.08" />
+              <text x="575" y="450" textAnchor="middle" fontFamily={mono} fontSize="13" fill="var(--acc)" opacity="0.8">{t('landing.heroSvg.a4')}</text>
+            </g>
+            <g className="plzone" style={{ animationDelay: '3.7s' }}>
+              <rect x="924" y="334" width="192" height="222" fill="var(--acc)" opacity="0.08" />
+              <text x="1020" y="450" textAnchor="middle" fontFamily={mono} fontSize="13" fill="var(--acc)" opacity="0.8">{t('landing.heroSvg.a5')}</text>
+            </g>
+            <g className="plzone" style={{ animationDelay: '2.0s' }}>
+              <line x1="430" y1="376" x2="490" y2="376" stroke="var(--acc)" strokeWidth="1" opacity="0.7" />
+              <line x1="460" y1="346" x2="460" y2="406" stroke="var(--acc)" strokeWidth="1" opacity="0.7" />
+              <circle cx="460" cy="376" r="10" fill="none" stroke="var(--acc)" strokeWidth="1" opacity="0.7" />
+              <rect x="474" y="352" width="66" height="20" rx="4" fill="var(--bg1)" stroke="var(--acc)" strokeWidth="0.8" opacity="0.9" />
+              <text x="507" y="366" textAnchor="middle" fontFamily={mono} fontSize="11" fill="var(--acc)">{t('landing.heroSvg.count')}</text>
+            </g>
+            <g>
+              <line className="pldim" x1="60" y1="34" x2="460" y2="34" stroke="var(--acc)" strokeWidth="0.9" opacity="0.55" style={{ animationDelay: '0.6s' }} />
+              <line x1="60" y1="28" x2="60" y2="40" stroke="var(--planink)" strokeWidth="1.2" />
+              <line x1="460" y1="28" x2="460" y2="40" stroke="var(--planink)" strokeWidth="1.2" />
+              <g className="plzone" style={{ animationDelay: '1.2s' }}>
+                <text x="260" y="26" textAnchor="middle" fontFamily={mono} fontSize="11" fill="var(--mut)" opacity="0.85">4 240</text>
+              </g>
+            </g>
+            {/* hover highlights (mouse instrument) */}
+            {heroRooms.map((r) => (
+              <g key={r.id} className="hz" data-on={String(hoverRoom === r.id)}>
+                <rect x={r.x0 + 4} y={r.y0 + 4} width={r.x1 - r.x0 - 8} height={r.y1 - r.y0 - 8} fill="var(--acc)" opacity="0.14" />
+                <rect x={r.x0 + 4} y={r.y0 + 4} width={r.x1 - r.x0 - 8} height={r.y1 - r.y0 - 8} fill="none" stroke="var(--acc)" strokeWidth="1.4" opacity="0.7" />
+              </g>
+            ))}
+            <g className="plbeam">
+              <rect x="-90" y="40" width="90" height="540" fill="url(#plgrad)" />
+              <line x1="0" y1="40" x2="0" y2="580" stroke="var(--acc)" strokeWidth="1.6" opacity="0.65" />
+              <line x1="0" y1="34" x2="0" y2="46" stroke="var(--acc)" strokeWidth="3" opacity="0.9" />
+              <line x1="0" y1="574" x2="0" y2="586" stroke="var(--acc)" strokeWidth="3" opacity="0.9" />
+            </g>
+            <defs>
+              <linearGradient id="plgrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stopColor="var(--acc)" stopOpacity="0" />
+                <stop offset="1" stopColor="var(--acc)" stopOpacity="0.07" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* cursor spotlight */}
+        <div id="plSpot" aria-hidden style={{ position: 'absolute', left: 0, top: 0, width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, var(--frameglow), transparent 62%)', pointerEvents: 'none', zIndex: 1 }} />
+
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: 1200, margin: '0 auto', padding: '112px 24px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          <div className="plu1" style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: mono, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--mut)' }}>
+            {eyebrowTick}
+            {t('landing.hero.eyebrow')}
+            {eyebrowTick}
+          </div>
+          <h1 className="pl-h1 plu2" style={{ margin: '26px 0 0', fontFamily: sora, fontWeight: 700, letterSpacing: '-0.035em', lineHeight: 1.02, fontSize: 70, maxWidth: 1000, textWrap: 'balance' }}>
+            {t('landing.hero.titleA')}<br />{t('landing.hero.titleB')}
+          </h1>
+          <p className="pl-hsub plu3" style={{ margin: '26px 0 0', maxWidth: 640, fontSize: 17.5, lineHeight: 1.6, color: 'var(--ink2)' }}>
+            {t('landing.hero.sub1')}
+            <span style={{ fontFamily: mono, fontSize: 16 }}>€200–500</span>
+            {t('landing.hero.sub2')}
+          </p>
+          <div className="pl-ctas plu4" style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Link to="/register" className="pl-btn-primary">
+              {t('landing.hero.ctaPrimary')}
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+            </Link>
+            <a href="#produktas" className="pl-btn-ghost">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z" /></svg>
+              {t('landing.hero.ctaDemo')}
             </a>
-            <div className="mt-5">
-              <LanguageToggle />
+          </div>
+          <p className="plu5" style={{ margin: '22px 0 0', fontFamily: mono, fontSize: 12, color: 'var(--mut)' }}>{t('landing.hero.micro')}</p>
+        </div>
+
+        {/* measuring crosshair (follows the mouse) */}
+        <div id="plCh" aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
+          <span id="plChV" style={{ position: 'absolute', top: 0, bottom: 0, width: 1, background: 'color-mix(in srgb, var(--acc) 38%, transparent)' }} />
+          <span id="plChH" style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'color-mix(in srgb, var(--acc) 38%, transparent)' }} />
+          <span id="plChTip" style={{ position: 'absolute', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: 'var(--acc)', background: 'color-mix(in srgb, var(--bg1) 88%, transparent)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 9px', whiteSpace: 'nowrap' }} />
+        </div>
+      </section>
+
+      {/* ═══════════ 01 · PRODUCT DEMO ═══════════ */}
+      <section id="produktas" style={{ position: 'relative', borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-sec" style={{ padding: '88px 24px' }}>
+          <div id="plFrame" style={{ willChange: 'transform' }}>
+            <div data-reveal="" style={{ position: 'relative', borderRadius: 14, border: '1px solid var(--line2)', background: 'var(--bg1)', overflow: 'hidden', boxShadow: '0 0 0 1px color-mix(in srgb, var(--acc) 14%, transparent), inset 0 1px 0 color-mix(in srgb, var(--bg1) 60%, transparent), 0 40px 90px -40px var(--shadow)' }}>
+
+              {/* animated cursor */}
+              <div className="dcur" data-click={String(demo.curClick)} data-hide={String(!demo.playing)} style={{ position: 'absolute', left: demo.curL, top: demo.curT, zIndex: 30, pointerEvents: 'none', transition: 'left .95s cubic-bezier(.4,.1,.2,1), top .95s cubic-bezier(.4,.1,.2,1), opacity .4s ease' }}>
+                <span className="dring" />
+                <svg width="20" height="20" viewBox="0 0 24 24" style={{ position: 'relative' }}><path d="M5 3l14 8-6.5 1.5L9 19z" fill="var(--ink)" stroke="var(--bg1)" strokeWidth="1.4" /></svg>
+              </div>
+
+              {/* Prielaidos popover */}
+              <div className="dvis" data-vis={String(demo.popVis)} style={{ position: 'absolute', right: '4%', top: '15%', width: 250, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 22px 55px -18px var(--shadow)', padding: '14px 16px', zIndex: 20 }}>
+                <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.demo.popTitle')}</div>
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ fontSize: 13 }}>{t('landing.demo.popHeight')}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: mono, fontSize: 14, fontVariantNumeric: 'tabular-nums', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 10px', background: 'var(--bg)' }}>{fmt(demo.dh, 2)} m</span>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span className="dstep" data-on={String(demo.stepUpOn)} onClick={() => step(1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 3, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▲</span>
+                      <span className="dstep" onClick={() => step(-1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 3, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▼</span>
+                    </span>
+                  </span>
+                </div>
+                <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.45, color: 'var(--mut)' }}>{t('landing.demo.popNote')}</div>
+              </div>
+
+              {/* Export dropdown */}
+              <div className="dvis" data-vis={String(demo.expVis)} style={{ position: 'absolute', right: '2%', top: '13%', width: 230, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 22px 55px -18px var(--shadow)', padding: 8, zIndex: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 7, background: 'color-mix(in srgb, var(--acc) 8%, transparent)', fontSize: 13 }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 3, padding: '1px 5px' }}>XLSX</span>
+                  {t('landing.demo.expXlsx')}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 7, fontSize: 13 }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--bad)', border: '1px solid color-mix(in srgb, var(--bad) 40%, transparent)', borderRadius: 3, padding: '1px 5px' }}>PDF</span>
+                  {t('landing.demo.expPdf')}
+                </div>
+              </div>
+
+              {/* project top bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 52, padding: '8px 16px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--acc)' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--acc)' }} />
+                  {t('landing.demo.badge')}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{t('landing.demo.project')}</span>
+                <span style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 3, border: '1px solid var(--line2)', color: 'var(--mut)', background: 'var(--bg1)' }}>{t('landing.demo.tag')}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, paddingRight: 14, borderRight: '1px solid var(--line)' }}>
+                  <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600 }}>{t('landing.demo.noVat')}</span>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: 'var(--ink2)', fontVariantNumeric: 'tabular-nums' }}>{fmt(dNet, 2)} €</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600 }}>{t('landing.demo.withVat')}</span>
+                  <span style={{ fontFamily: mono, fontSize: 17, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(dGross, 2)} €</span>
+                </span>
+                <span className="plhbtn dbtn" data-on={String(demo.popVis)} onClick={() => { takeover(); patch({ popVis: !demoRef.current.popVis, expVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', border: '1px solid var(--line2)', background: 'var(--bg1)', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--ink2)', transition: 'all .2s ease' }}>{t('landing.demo.assumptions')}</span>
+                <span className="dbtn" onClick={() => { takeover(); patch({ expVis: !demoRef.current.expVis, popVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', background: 'var(--acc)', color: 'var(--accink)', borderRadius: 6, fontSize: 12, fontWeight: 500 }}>{t('landing.demo.exportBtn')}</span>
+              </div>
+
+              {/* tab bar + player control */}
+              <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 12, borderBottom: '1px solid var(--line)', fontSize: 13 }}>
+                <span className="dtab" data-on={String(demo.tab === 'brez')} onClick={() => { takeover(); patch({ tab: 'brez' }); }}>{t('landing.demo.tabBrez')}</span>
+                <span className="dtab" data-on={String(demo.tab === 'kiek')} onClick={() => { takeover(); patch({ tab: 'kiek' }); }}>{t('landing.demo.tabKiek')}</span>
+                <span style={{ padding: '10px 16px', color: 'var(--mut)', fontWeight: 500, opacity: 0.55 }}>{t('landing.demo.tabAsist')}</span>
+                <span style={{ flex: 1 }} />
+                <button onClick={toggleDemo} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: mono, fontSize: 11, color: 'var(--mut)', background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', transition: 'color .15s ease, border-color .15s ease' }}>
+                  {demo.playing ? t('landing.demo.pause') : t('landing.demo.play')}
+                </button>
+              </div>
+
+              {/* plan viewer + positions panel */}
+              <div className="pl-framebody" data-tab={demo.tab === 'kiek' ? 'kiekiai' : 'brezinys'} style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr' }}>
+                <div className="dplanpane" style={{ position: 'relative', background: 'var(--bg)', padding: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 520 340" style={{ width: '100%', height: 'auto' }}>
+                    <rect x="0" y="0" width="520" height="340" fill="var(--bg2)" opacity="0.5" />
+                    <g fill="none" stroke="color-mix(in srgb, var(--ink) 38%, transparent)" strokeWidth="1.3">
+                      <path d="M30 26 H490 V314 H30 Z" />
+                      <line x1="210" y1="26" x2="210" y2="314" />
+                      <line x1="360" y1="26" x2="360" y2="170" />
+                      <line x1="210" y1="170" x2="490" y2="170" />
+                      <line x1="316" y1="170" x2="316" y2="314" />
+                      <line x1="410" y1="170" x2="410" y2="314" />
+                    </g>
+                    <g stroke="color-mix(in srgb, var(--ink) 55%, transparent)" strokeWidth="3.4">
+                      <line x1="60" y1="26" x2="140" y2="26" />
+                      <line x1="250" y1="26" x2="330" y2="26" />
+                      <line x1="390" y1="26" x2="460" y2="26" />
+                    </g>
+                    {/* clickable room zones */}
+                    <rect className="dz" onClick={() => manualSelect('svet')} x="32" y="28" width="176" height="284" fill="var(--acc)" opacity="0.13" />
+                    <rect className="dz" onClick={() => manualSelect('mieg')} x="212" y="28" width="146" height="140" fill="var(--ok)" opacity="0.12" />
+                    <rect className="dz" onClick={() => manualSelect('mieg')} x="362" y="28" width="126" height="140" fill="var(--acc)" opacity="0.09" />
+                    <rect className="dz" onClick={() => manualSelect('von')} x="212" y="172" width="102" height="140" fill="var(--warn)" opacity="0.13" />
+                    <rect className="dz" onClick={() => manualSelect('von')} x="318" y="172" width="90" height="140" fill="var(--ok)" opacity="0.10" />
+                    <rect className="dz" onClick={() => manualSelect('von')} x="412" y="172" width="76" height="140" fill="var(--acc)" opacity="0.09" />
+                    {/* selection outlines + chips */}
+                    <g className="dzsel" data-sel={String(demo.sel === 'svet')}>
+                      <rect x="32" y="28" width="176" height="284" fill="none" stroke="var(--acc)" strokeWidth="1.6" />
+                      <rect x="52" y="150" width="136" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
+                      <circle cx="66" cy="163" r="3" fill="var(--ok)" />
+                      <text x="76" y="167" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneSvet')}</text>
+                    </g>
+                    <g className="dzsel" data-sel={String(demo.sel === 'mieg')}>
+                      <rect x="212" y="28" width="146" height="140" fill="none" stroke="var(--acc)" strokeWidth="1.6" />
+                      <rect x="222" y="86" width="126" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
+                      <circle cx="236" cy="99" r="3" fill="var(--ok)" />
+                      <text x="246" y="103" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneMieg')}</text>
+                    </g>
+                    <g className="dzsel" data-sel={String(demo.sel === 'von')}>
+                      <rect x="212" y="172" width="102" height="140" fill="none" stroke="var(--warn)" strokeWidth="1.6" />
+                      <rect x="216" y="228" width="120" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
+                      <circle cx="230" cy="241" r="3" fill="var(--warn)" />
+                      <text x="240" y="245" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneVon')}</text>
+                    </g>
+                    <g fontFamily={mono}>
+                      <rect x="380" y="288" width="106" height="22" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.6" />
+                      <text x="388" y="298" fontSize="6.5" fill="var(--ink2)">M 1:50</text>
+                      <text x="388" y="306" fontSize="6.5" fill="var(--mut)">SA-01</text>
+                      <text x="430" y="298" fontSize="6.5" fill="var(--ink2)">74,2 m²</text>
+                      <text x="430" y="306" fontSize="6.5" fill="var(--mut)">{t('landing.demo.planRooms')}</text>
+                    </g>
+                  </svg>
+                </div>
+
+                <div className="pl-frame-side" style={{ borderLeft: '1px solid var(--line)', background: 'var(--bg1)', fontSize: 12 }}>
+                  <div style={{ padding: '12px 14px 8px', fontFamily: mono, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.demo.posTitle')}</div>
+                  <div style={{ padding: '4px 14px 6px', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>{t('landing.demo.secPaint')}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className="drow" data-flash={String(demo.rowFlash)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--ok)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowPaint')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{fmt(dPaint, 1)} m² · 3,20 €/m²</span>
+                      </span>
+                      <span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums', color: 'var(--ink2)' }}>{fmt(dPaintCost, 2)} €</span>
+                    </div>
+                    <div className="drow" data-flash={String(demo.rowFlash)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--ok)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowGlaist')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{fmt(dPaint, 1)} m² · 4,50 €/m²</span>
+                      </span>
+                      <span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums', color: 'var(--ink2)' }}>{fmt(dGlaistCost, 2)} €</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--warn) 6%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--warn)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowAngok')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{t('landing.demo.angokMeta')}</span>
+                      </span>
+                      <span style={{ fontFamily: mono, color: 'var(--mut)' }}>— €</span>
+                    </div>
+                    <div style={{ padding: '8px 14px 6px', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>{t('landing.demo.secGkp')}</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--ok)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowGkp')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{t('landing.demo.gkpMeta')}</span>
+                      </span>
+                      <span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums', color: 'var(--ink2)' }}>1 261,40 €</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--bad) 7%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--bad)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowLed')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{t('landing.demo.ledMeta')}</span>
+                      </span>
+                      <span style={{ fontFamily: mono, color: 'var(--mut)' }}>— €</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 14px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)' }}>
+                      <span className="pl-dot" style={{ background: 'var(--ok)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', color: 'var(--ink)', lineHeight: 1.35 }}>{t('landing.demo.rowGrind')}</span>
+                        <span style={{ display: 'block', fontFamily: mono, fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{t('landing.demo.grindMeta')}</span>
+                      </span>
+                      <span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums', color: 'var(--ink2)' }}>239,44 €</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderTop: '1px solid var(--line)', fontFamily: mono, fontSize: 10.5, color: 'var(--mut)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)' }} />{t('landing.demo.legendOk')}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--warn)' }} />{t('landing.demo.legendWarn')}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--bad)' }} />{t('landing.demo.legendBad')}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          {cols.map((c) => (
-            <div key={c.h}>
-              <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-4">{c.h}</div>
-              <ul className="space-y-2.5 text-[14px]">
-                {c.links.map((lk) => (
-                  <li key={lk.l}>
-                    {lk.href ? (
-                      <a href={lk.href} className="text-foreground/75 hover:text-foreground transition-colors">{lk.l}</a>
-                    ) : (
-                      <Link to={lk.to} className="text-foreground/75 hover:text-foreground transition-colors">{lk.l}</Link>
-                    )}
-                  </li>
+          <p data-reveal="" style={{ margin: '18px 0 0', textAlign: 'center', fontFamily: mono, fontSize: 11.5, color: 'var(--mut)' }}>{t('landing.demo.hint')}</p>
+        </div>
+      </section>
+
+      {/* ═══════════ 02 · KAIP VEIKIA ═══════════ */}
+      <section id="kaip-veikia" style={{ borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.steps.eyebrow')}</div>
+          <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.steps.title')}</h2>
+          <div className="pl-grid3" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0, borderTop: '1px solid var(--line2)', position: 'relative' }}>
+            {steps.map((s, i) => (
+              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 100}ms`, padding: `32px ${i === 2 ? 0 : 28}px 8px 0`, position: 'relative' }}>
+                <span style={{ position: 'absolute', top: -5, left: 0, width: 1, height: 10, background: 'var(--line2)' }} />
+                <div className="pl-step-num">{String(i + 1).padStart(2, '0')}</div>
+                <div className="pl-step-title">{s.t}</div>
+                <p style={{ margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.55, color: 'var(--ink2)', maxWidth: 320 }}>{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ 03 · KĄ PERSKAITO ═══════════ */}
+      <section id="galimybes" style={{ borderBottom: '1px solid var(--line)', background: 'var(--bg1)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.reads.eyebrow')}</div>
+          <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.reads.title')}</h2>
+          <div className="pl-grid2" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'start' }}>
+            <div data-reveal="" style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--line2)' }}>
+              {readsList.map((label, i) => (
+                <div key={i} className="pl-readrow">
+                  <span className="n">{String(i + 1).padStart(2, '0')}</span>
+                  <span style={{ fontSize: 15.5 }}>{label}</span>
+                </div>
+              ))}
+            </div>
+            <div data-reveal="" style={{ transitionDelay: '120ms' }}>
+              <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--mut)', marginBottom: 18 }}>{t('landing.reads.chipsLabel')}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {chips.map((c, i) => (
+                  <span key={i} className="pl-chip">{c.label} <span className="v">{c.val}</span></span>
                 ))}
-              </ul>
+              </div>
+              <p style={{ margin: '24px 0 0', fontSize: 14, lineHeight: 1.6, color: 'var(--mut)', maxWidth: 420 }}>{t('landing.reads.note')}</p>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-start
-                        sm:items-center justify-between gap-4 text-[12.5px] text-muted-foreground">
-          <div>{t('landing.footer.copyright')}</div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link to="/duk" className="hover:text-foreground transition-colors">{t('landing.footer.duk')}</Link>
-            <Link to="/privacy" className="hover:text-foreground transition-colors">{t('landing.footer.privatumas')}</Link>
-            <Link to="/cookies" className="hover:text-foreground transition-colors">{t('landing.footer.slapukai')}</Link>
-            <Link to="/terms" className="hover:text-foreground transition-colors">{t('landing.footer.salygos')}</Link>
-            <button
-              type="button"
-              onClick={openCookieSettings}
-              className="hover:text-foreground transition-colors"
-            >
-              {t('landing.footer.slapukuNustatymai')}
-            </button>
           </div>
         </div>
-      </div>
-    </footer>
-  );
-}
+      </section>
 
-// ─── Default export ─────────────────────────────────────────────────
+      {/* ═══════════ 04 · PASITIKĖJIMO SISTEMA ═══════════ */}
+      <section style={{ borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.trust.eyebrow')}</div>
+          <h2 className="pl-trust-copy pl-h2" data-reveal="" style={{ transitionDelay: '70ms', lineHeight: 1.12, maxWidth: 860, textWrap: 'balance' }}>
+            {t('landing.trust.titleA')}<br />{t('landing.trust.titleB')}
+          </h2>
+          <p className="pl-sub" data-reveal="" style={{ transitionDelay: '140ms' }}>{t('landing.trust.sub')}</p>
 
-export default function Landing() {
-  return (
-    <div className="pathon-landing min-h-screen bg-background text-foreground antialiased">
-      <LandingNav />
-      <Hero />
-      <OutcomeStrip />
-      <Eiga />
-      <Trades />
-      <Audience />
-      <Pricing />
-      <Closing />
-      <LandingFooter />
+          <div className="pl-grid2" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {trustCards.map((c, i) => (
+                <div key={i} data-reveal="" style={{ transitionDelay: `${i * 90}ms`, display: 'flex', gap: 16, padding: '20px 22px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--bg1)' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: `var(--${['ok', 'warn', 'bad'][i]})`, marginTop: 6, flexShrink: 0 }} />
+                  <span>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 15.5 }}>{c.t}</span>
+                    <span style={{ display: 'block', marginTop: 4, fontSize: 14, lineHeight: 1.5, color: 'var(--ink2)' }}>{c.d}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div data-reveal="" style={{ transitionDelay: '120ms', border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid var(--line)' }}>
+                <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.trust.panelTitle')}</span>
+                <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--warn)' }}>{t('landing.trust.panelCount')}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', background: 'color-mix(in srgb, var(--bad) 6%, transparent)' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bad)', flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowLed')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>12,4 m</span></span>
+                <span style={{ fontSize: 12, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 5, padding: '3px 10px' }}>{t('landing.trust.showBtn')}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowAngok')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>42,6 m</span></span>
+                <span style={{ fontSize: 12, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 5, padding: '3px 10px' }}>{t('landing.trust.showBtn')}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowVon')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>H = 2,45</span></span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 5, padding: '3px 10px' }}>
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 4L6 12l-3.5-3.5" /></svg>
+                  {t('landing.trust.confirmed')}
+                </span>
+              </div>
+              <div style={{ padding: '13px 18px', borderTop: '1px solid var(--line)', fontFamily: mono, fontSize: 11.5, color: 'var(--mut)' }}>{t('landing.trust.panelFoot')}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ 05 · GYVAS PERSKAIČIAVIMAS ═══════════ */}
+      <section style={{ borderBottom: '1px solid var(--line)', background: 'var(--bg1)' }}>
+        <div className="pl-sec">
+          <div className="pl-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center' }}>
+            <div>
+              <div className="pl-eyebrow" data-reveal="">{t('landing.recalc.eyebrow')}</div>
+              <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms', lineHeight: 1.08 }}>{t('landing.recalc.title')}</h2>
+              <p className="pl-sub" data-reveal="" style={{ transitionDelay: '140ms', maxWidth: 480 }}>{t('landing.recalc.sub')}</p>
+              <div data-reveal="" style={{ transitionDelay: '200ms', marginTop: 28, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 14, color: 'var(--ink2)' }}>{t('landing.recalc.heightLabel')}</span>
+                <button className="plhbtn" data-testid="rc-270" data-on={String(rcTarget === 2.7)} onClick={() => animateTo(2.7)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 7, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>2,70 m</button>
+                <button className="plhbtn" data-testid="rc-320" data-on={String(rcTarget === 3.2)} onClick={() => animateTo(3.2)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 7, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>3,20 m</button>
+              </div>
+            </div>
+            <div data-reveal="" style={{ transitionDelay: '120ms', border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg)', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
+                <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.recalc.panelTitle')}</span>
+                <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--mut)' }}>H = <span style={{ color: 'var(--acc)' }}>{fmt(rc.h, 2)}</span> m</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, padding: '17px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)' }}>
+                <span style={{ fontSize: 14.5 }}>{t('landing.recalc.rowPaint')}</span>
+                <span data-testid="rc-paint" style={{ fontFamily: mono, fontSize: 19, fontVariantNumeric: 'tabular-nums', color: 'var(--acc)' }}>{fmt(rc.paint, 1)} m²</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, padding: '17px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)' }}>
+                <span style={{ fontSize: 14.5 }}>{t('landing.recalc.rowGlaist')}</span>
+                <span style={{ fontFamily: mono, fontSize: 19, fontVariantNumeric: 'tabular-nums', color: 'var(--acc)' }}>{fmt(rc.glaist, 1)} kg</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, padding: '17px 20px' }}>
+                <span style={{ fontSize: 14.5 }}>{t('landing.recalc.rowGrind')} <span style={{ fontSize: 12, color: 'var(--mut)' }}>{t('landing.recalc.grindNote')}</span></span>
+                <span style={{ fontFamily: mono, fontSize: 19, fontVariantNumeric: 'tabular-nums', color: 'var(--ink2)' }}>58,4 m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ 06 · EKSPORTAS ═══════════ */}
+      <section style={{ borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.exportSec.eyebrow')}</div>
+          <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.exportSec.title')}</h2>
+          <div className="pl-docs" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+            <div data-reveal="">
+              <div style={{ border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--mut)' }}>fx</span>
+                  <span style={{ fontFamily: mono, fontSize: 12, color: 'var(--acc)', border: '1px solid var(--line)', borderRadius: 4, padding: '3px 10px', flex: 1 }}>=D8*E8</span>
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 11.5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '34px 2fr 0.8fr 0.9fr 0.9fr 1fr', borderBottom: '1px solid var(--line)', color: 'var(--mut)', textAlign: 'center' }}>
+                    <span style={{ padding: '6px 4px' }} /><span style={{ padding: '6px 4px' }}>B</span><span style={{ padding: '6px 4px' }}>C</span><span style={{ padding: '6px 4px' }}>D</span><span style={{ padding: '6px 4px' }}>E</span><span style={{ padding: '6px 4px' }}>F</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '34px 2fr 0.8fr 0.9fr 0.9fr 1fr', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}>
+                    <span style={{ padding: '7px 4px', color: 'var(--mut)', textAlign: 'center' }}>7</span><span style={{ padding: '7px 8px', fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 12.5 }}>{t('landing.demo.rowPaint')}</span><span style={{ padding: '7px 4px', textAlign: 'center' }}>m²</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>152,7</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>3,20</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>488,64</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '34px 2fr 0.8fr 0.9fr 0.9fr 1fr', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)', background: 'color-mix(in srgb, var(--acc) 6%, transparent)' }}>
+                    <span style={{ padding: '7px 4px', color: 'var(--mut)', textAlign: 'center' }}>8</span><span style={{ padding: '7px 8px', fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 12.5 }}>{t('landing.demo.rowGkp')}</span><span style={{ padding: '7px 4px', textAlign: 'center' }}>m²</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>74,2</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>17,00</span><span style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--acc)', outline: '1.5px solid var(--acc)', outlineOffset: -1.5 }}>1 261,40</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '34px 2fr 0.8fr 0.9fr 0.9fr 1fr', color: 'var(--ink2)' }}>
+                    <span style={{ padding: '7px 4px', color: 'var(--mut)', textAlign: 'center' }}>9</span><span style={{ padding: '7px 8px', fontFamily: "'Hanken Grotesk', sans-serif", fontSize: 12.5 }}>{t('landing.demo.rowGrind')}</span><span style={{ padding: '7px 4px', textAlign: 'center' }}>m</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>58,4</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>4,10</span><span style={{ padding: '7px 8px', textAlign: 'right' }}>239,44</span>
+                  </div>
+                </div>
+              </div>
+              <p style={{ margin: '16px 0 0', fontSize: 14, color: 'var(--ink2)' }}><strong style={{ fontWeight: 600, color: 'var(--ink)' }}>{t('landing.exportSec.excelStrong')}</strong>{t('landing.exportSec.excelRest')}</p>
+            </div>
+            <div data-reveal="" style={{ transitionDelay: '110ms' }}>
+              <div style={{ border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden', padding: '22px 26px' }}>
+                <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 12, letterSpacing: '0.22em', color: 'var(--ink)' }}>LOKALINĖ SĄMATA</div>
+                <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 10, color: 'var(--mut)', marginTop: 4 }}>Nr. S-001 · 2026-07-07</div>
+                <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', fontSize: 12.5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}><span>1. Dažymo darbai</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>2 214,30</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}><span>2. GKP darbai</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>2 897,15</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}><span>3. Grindų darbai</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>1 515,00</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)' }}><span>Iš viso be PVM</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>6 626,45</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}><span>PVM 21%</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>1 391,51</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', fontWeight: 600 }}><span>Iš viso su PVM</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums', color: 'var(--acc)' }}>8 017,96 €</span></div>
+                </div>
+                <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', gap: 24, fontFamily: mono, fontSize: 10.5, color: 'var(--mut)' }}>
+                  <span style={{ flex: 1 }}>Sudarė<br /><span style={{ display: 'block', borderBottom: '1px solid var(--line2)', height: 20 }} /></span>
+                  <span style={{ flex: 1 }}>Tvirtinu<br /><span style={{ display: 'block', borderBottom: '1px solid var(--line2)', height: 20 }} /></span>
+                </div>
+              </div>
+              <p style={{ margin: '16px 0 0', fontSize: 14, color: 'var(--ink2)' }}><strong style={{ fontWeight: 600, color: 'var(--ink)' }}>{t('landing.exportSec.pdfStrong')}</strong>{t('landing.exportSec.pdfRest')}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ 07 · KAM SKIRTA ═══════════ */}
+      <section style={{ borderBottom: '1px solid var(--line)', background: 'var(--bg1)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.audience.eyebrow')}</div>
+          <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.audience.title')}</h2>
+          <div className="pl-grid3" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
+            {audienceCards.map((c, i) => (
+              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 100}ms`, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--bg)', padding: 28 }}>
+                <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', color: 'var(--acc)' }}>{String(i + 1).padStart(2, '0')}</div>
+                <div style={{ marginTop: 14, fontFamily: sora, fontWeight: 600, fontSize: 19, letterSpacing: '-0.01em' }}>{c.t}</div>
+                <p style={{ margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.55, color: 'var(--ink2)' }}>{c.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ 08 · KAINOS ═══════════ */}
+      <section id="kainos" style={{ borderBottom: '1px solid var(--line)' }}>
+        <div className="pl-sec">
+          <div className="pl-eyebrow" data-reveal="">{t('landing.pricing.eyebrow')}</div>
+          <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.pricing.title')}</h2>
+          <div className="pl-grid4" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, alignItems: 'stretch' }}>
+            {tiers.map((tier, i) => (
+              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 80}ms`, border: i === 2 ? '1.5px solid var(--acc)' : '1px solid var(--line)', borderRadius: 12, background: 'var(--bg1)', padding: 26, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
+                {i === 2 && (
+                  <span style={{ position: 'absolute', top: -10, left: 24, fontFamily: mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'var(--acc)', color: 'var(--accink)', padding: '3px 10px', borderRadius: 20 }}>{t('landing.pricing.popular')}</span>
+                )}
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{tier.name}</div>
+                <div style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 8 }}>{tier.price}</div>
+                <div style={{ fontSize: 13, color: 'var(--mut)' }}>{tier.per}</div>
+                <p style={{ margin: '12px 0 0', fontSize: 13.5, lineHeight: 1.5, color: 'var(--ink2)', flex: 1 }}>{tier.desc}</p>
+                <Link to="/register" style={{ marginTop: 14, fontFamily: mono, fontSize: 12.5, color: 'var(--acc)' }}>{t('landing.pricing.tierCta')} →</Link>
+              </div>
+            ))}
+          </div>
+          <p className="pl-mono-note" data-reveal="" style={{ margin: '22px 0 0' }}>{t('landing.pricing.note')}</p>
+        </div>
+      </section>
+
+      {/* ═══════════ 09 · CTA + FOOTER ═══════════ */}
+      <section style={{ borderBottom: '1px solid var(--line)', position: 'relative', overflow: 'hidden' }}>
+        <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(-45deg, transparent 0 90px, color-mix(in srgb, var(--ink) 4%, transparent) 90px 91px)', pointerEvents: 'none' }} />
+        <div className="pl-sec" style={{ position: 'relative', padding: '110px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h2 className="pl-h2" data-reveal="" style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.03em', fontSize: 48, lineHeight: 1.05, maxWidth: 760, textWrap: 'balance' }}>{t('landing.cta.title')}</h2>
+          <p className="pl-sub" data-reveal="" style={{ transitionDelay: '80ms', margin: '20px 0 0', maxWidth: 540 }}>{t('landing.cta.sub')}</p>
+          <div className="pl-ctas" data-reveal="" style={{ transitionDelay: '160ms', marginTop: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <Link to="/register" className="pl-btn-primary">{t('landing.cta.primary')}</Link>
+            <a href={MAIL_URL} className="pl-btn-ghost">{t('landing.cta.contact')}</a>
+            <a href={WA_URL} target="_blank" rel="noopener noreferrer" className="pl-btn-ghost">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.6-6.1c-.3-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1-.2.3-.7.8-.8 1-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.4-3c-.3-.4 0-.5.1-.7l.4-.5c.1-.2.1-.3 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1.1 2.7c.1.2 1.9 2.9 4.6 4 .6.3 1.1.4 1.5.6.6.2 1.2.2 1.6.1.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2l-.5-.3z" /></svg>
+              WhatsApp
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <footer style={{ background: 'var(--bg)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 40px' }}>
+          <div className="pl-footcols" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <PathonMark icon={24} />
+                <span style={{ fontFamily: sora, fontWeight: 700, letterSpacing: '-0.02em', fontSize: 17 }}>Pathon</span>
+              </span>
+              <span style={{ fontSize: 13.5, color: 'var(--mut)' }}>{t('landing.footer.tagline')}</span>
+              <a href={MAIL_URL} style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--mut)' }}>solutions@pathon.eu</a>
+              <a href={WA_URL} target="_blank" rel="noopener noreferrer" style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--mut)' }}>WhatsApp +370 602 71962</a>
+            </div>
+            <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--mut)', paddingTop: 4 }}>
+              <Link to="/duk">{t('landing.footer.duk')}</Link>
+              <Link to="/privacy">{t('landing.footer.privacy')}</Link>
+              <Link to="/cookies">{t('landing.footer.cookies')}</Link>
+              <Link to="/terms">{t('landing.footer.terms')}</Link>
+              <button type="button" onClick={openCookieSettings} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13.5, color: 'var(--mut)' }}>{t('landing.footer.cookieSettings')}</button>
+            </div>
+          </div>
+          <div style={{ marginTop: 36, paddingTop: 20, borderTop: '1px solid var(--line)', fontSize: 12.5, color: 'var(--mut)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <span>{t('landing.footer.copyright')}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ display: 'inline-flex', gap: 2, fontFamily: mono, fontSize: 11 }}>
+                <button type="button" onClick={() => switchLang('lt')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: (lang || 'lt') === 'lt' ? 'var(--acc)' : 'var(--mut)' }}>LT</button>
+                <button type="button" onClick={() => switchLang('en')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: lang === 'en' ? 'var(--acc)' : 'var(--mut)' }}>EN</button>
+              </span>
+              <span style={{ fontFamily: mono, fontSize: 11 }}>{t('landing.footer.location')}</span>
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

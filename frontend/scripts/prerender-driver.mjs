@@ -56,6 +56,12 @@ try {
 
 try {
   const page = await browser.newPage();
+  // Deterministically ANONYMOUS: block every /api/* call. vite preview
+  // inherits the dev server proxy, so if the auth-disabled dev backend is up,
+  // /api/auth/me would auto-log-in the driver and "/" would prerender the
+  // DASHBOARD instead of the landing (2026-07-08 trap). Aborted auth = user
+  // null = public pages, regardless of what's running on :8000.
+  await page.route('**/api/**', (r) => r.abort());
   // Two passes on purpose: capture everything FIRST, write files at the END.
   // dist/index.html doubles as the preview server's SPA fallback — overwriting
   // it mid-run would make every later route render on top of the already-
@@ -66,7 +72,18 @@ try {
     await page.goto(new URL(route, origin).href, { waitUntil: 'networkidle', timeout: 45_000 });
     // Lazy routes mount through Suspense — the page is real once its h1 lands.
     await page.waitForSelector('h1', { timeout: 15_000 });
-    await page.waitForTimeout(250); // let mount effects (title/meta/JSON-LD) settle
+    // Scroll-reveal settle: under webdriver the app reveals ALL [data-reveal]
+    // content immediately, but on /en that happens across a language-flip
+    // re-render — a fixed sleep raced it (2026-07-08: /en captured with 1/42
+    // revealed). Wait for the invariant instead: no unrevealed elements left
+    // (vacuously true for routes without reveals).
+    await page
+      .waitForFunction(
+        () => document.querySelectorAll('[data-reveal]:not(.plin)').length === 0,
+        { timeout: 5_000 },
+      )
+      .catch(() => console.warn(`  ! ${route}: unrevealed [data-reveal] content at capture time`));
+    await page.waitForTimeout(400); // let mount effects (title/meta/JSON-LD) settle
     let html = await page.content();
     // Stamp so "is prod actually serving prerendered HTML?" is a one-grep check.
     html = html.replace(

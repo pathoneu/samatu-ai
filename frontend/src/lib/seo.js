@@ -63,6 +63,27 @@ export function setPageMeta({ title, description, path } = {}) {
 }
 
 /**
+ * Set hreflang alternate links for the current route (bilingual pages).
+ * Pass e.g. [{ hrefLang: 'lt', href: 'https://pathon.eu/' },
+ *            { hrefLang: 'en', href: 'https://pathon.eu/en' },
+ *            { hrefLang: 'x-default', href: 'https://pathon.eu/' }].
+ * Previous route-owned alternates are replaced (marked via data attribute).
+ */
+export function setHreflang(alternates = []) {
+  document.head
+    .querySelectorAll('link[rel="alternate"][data-pathon-hreflang]')
+    .forEach((el) => el.remove());
+  for (const { hrefLang, href } of alternates) {
+    const l = document.createElement('link');
+    l.setAttribute('rel', 'alternate');
+    l.setAttribute('hreflang', hrefLang);
+    l.setAttribute('href', href);
+    l.setAttribute('data-pathon-hreflang', '1');
+    document.head.appendChild(l);
+  }
+}
+
+/**
  * Inject (or replace) a JSON-LD structured-data block by id. `data` must be
  * an app-controlled object (never user input).
  */

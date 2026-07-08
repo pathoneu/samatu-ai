@@ -98,6 +98,9 @@ function App() {
               {/* Public routes (no auth required) */}
               <Route path="/" element={<RootRoute />} />
               <Route path="/about" element={<Landing />} />
+              {/* English landing — deterministic two-page model (LT at /, EN
+                  at /en) with hreflang pairing; see Landing's lang prop. */}
+              <Route path="/en" element={<Landing lang="en" />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/privacy" element={<Privacy />} />
