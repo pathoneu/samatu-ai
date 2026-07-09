@@ -16,8 +16,14 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { PathonMark } from '@/components/layout/Logo';
 
-// Room NAME localised via i18n key; the quantity string stays literal so the
-// LT panel renders identically to the founder-approved copy.
+// Room names — self-contained bilingual map (the landing i18n `heroRooms` is an
+// array keyed for the hero, not by room name). Quantity strings stay literal.
+const ROOM_NAMES = {
+  svetaine: { lt: 'Svetainė', en: 'Living room' },
+  miegamasis: { lt: 'Miegamasis', en: 'Bedroom' },
+  vonia: { lt: 'Vonia', en: 'Bathroom' },
+  koridorius: { lt: 'Koridorius', en: 'Hallway' },
+};
 const DEMO_ROOMS = [
   { key: 'svetaine', v: '28,4 m²' },
   { key: 'miegamasis', v: '14,2 m²' },
@@ -25,7 +31,9 @@ const DEMO_ROOMS = [
 ];
 
 export default function AuthBrandPanel({ eyebrow, headline, sub }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.language || 'lt').startsWith('en') ? 'en' : 'lt';
+  const roomName = (key) => (ROOM_NAMES[key] ? ROOM_NAMES[key][lang] : key);
   return (
     <div className="relative hidden lg:flex flex-col justify-between overflow-hidden border-l border-border bg-card p-14">
       {/* blueprint grid + orange glow motif */}
@@ -82,7 +90,7 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
                 ))}
                 <text x={b.x + 7} y={b.y + 18}
                   fontFamily="var(--font-mono)" fontSize="9" fontWeight="600"
-                  fill="hsl(var(--foreground))">{t(`landing.heroRooms.${b.roomKey}`)}</text>
+                  fill="hsl(var(--foreground))">{roomName(b.roomKey)}</text>
                 <text x={b.x + 7} y={b.y + 31}
                   fontFamily="var(--font-mono)" fontSize="9"
                   fill="hsl(var(--primary))">{b.val}</text>
@@ -96,7 +104,7 @@ export default function AuthBrandPanel({ eyebrow, headline, sub }) {
           {DEMO_ROOMS.map((r) => (
             <div key={r.key} className="flex items-center gap-1.5 text-xs">
               <span className="dot dot-table" />
-              <span className="text-muted-foreground">{t(`landing.heroRooms.${r.key}`)}</span>
+              <span className="text-muted-foreground">{roomName(r.key)}</span>
               <span className="mono tabular text-foreground">{r.v}</span>
             </div>
           ))}

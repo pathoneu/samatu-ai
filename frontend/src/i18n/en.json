@@ -90,7 +90,10 @@
       "zoneSvet": "Living · 18.4 m²",
       "zoneMieg": "Bedr. · 14.2 m²",
       "zoneVon": "Bath · 4.8 m²",
-      "planRooms": "6 rooms"
+      "planRooms": "6 rooms",
+      "zoneVirt": "Kitchen · 9.6 m²",
+      "zoneKor": "Hall · 6.2 m²",
+      "zoneWc": "WC · 2.4 m²"
     },
     "steps": {
       "eyebrow": "02 · How it works",

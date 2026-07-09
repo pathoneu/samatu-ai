@@ -370,6 +370,18 @@ export default function Landing({ lang }) {
   const dNet = baseNet + dPaintCost + dGlaistCost;
   const dGross = dNet * 1.21;
 
+  // Demo plan rooms — each independently clickable; clicking any one draws its
+  // own selection outline + chip. `cw` = chip width (narrow rooms get short
+  // labels + smaller font so the chip fits inside the room).
+  const demoZones = [
+    { id: 'svet', x: 32, y: 28, w: 176, h: 284, fill: 'var(--acc)', op: 0.13, outline: 'var(--acc)', dot: 'var(--ok)', label: t('landing.demo.zoneSvet'), cw: 138 },
+    { id: 'mieg', x: 212, y: 28, w: 146, h: 140, fill: 'var(--ok)', op: 0.12, outline: 'var(--acc)', dot: 'var(--ok)', label: t('landing.demo.zoneMieg'), cw: 126 },
+    { id: 'virt', x: 362, y: 28, w: 126, h: 140, fill: 'var(--acc)', op: 0.09, outline: 'var(--acc)', dot: 'var(--ok)', label: t('landing.demo.zoneVirt'), cw: 116 },
+    { id: 'von', x: 212, y: 172, w: 102, h: 140, fill: 'var(--warn)', op: 0.13, outline: 'var(--warn)', dot: 'var(--warn)', label: t('landing.demo.zoneVon'), cw: 94 },
+    { id: 'kor', x: 318, y: 172, w: 90, h: 140, fill: 'var(--ok)', op: 0.10, outline: 'var(--acc)', dot: 'var(--ok)', label: t('landing.demo.zoneKor'), cw: 82, fs: 8.5 },
+    { id: 'wc', x: 412, y: 172, w: 76, h: 140, fill: 'var(--acc)', op: 0.09, outline: 'var(--acc)', dot: 'var(--acc)', label: t('landing.demo.zoneWc'), cw: 68, fs: 8.5 },
+  ];
+
   const switchLang = (lng) => {
     changeAppLanguage(lng);
     navigate(lng === 'en' ? '/en' : '/');
@@ -621,32 +633,24 @@ export default function Landing({ lang }) {
                       <line x1="250" y1="26" x2="330" y2="26" />
                       <line x1="390" y1="26" x2="460" y2="26" />
                     </g>
-                    {/* clickable room zones */}
-                    <rect className="dz" onClick={() => manualSelect('svet')} x="32" y="28" width="176" height="284" fill="var(--acc)" opacity="0.13" />
-                    <rect className="dz" onClick={() => manualSelect('mieg')} x="212" y="28" width="146" height="140" fill="var(--ok)" opacity="0.12" />
-                    <rect className="dz" onClick={() => manualSelect('mieg')} x="362" y="28" width="126" height="140" fill="var(--acc)" opacity="0.09" />
-                    <rect className="dz" onClick={() => manualSelect('von')} x="212" y="172" width="102" height="140" fill="var(--warn)" opacity="0.13" />
-                    <rect className="dz" onClick={() => manualSelect('von')} x="318" y="172" width="90" height="140" fill="var(--ok)" opacity="0.10" />
-                    <rect className="dz" onClick={() => manualSelect('von')} x="412" y="172" width="76" height="140" fill="var(--acc)" opacity="0.09" />
-                    {/* selection outlines + chips */}
-                    <g className="dzsel" data-sel={String(demo.sel === 'svet')}>
-                      <rect x="32" y="28" width="176" height="284" fill="none" stroke="var(--acc)" strokeWidth="1.6" />
-                      <rect x="52" y="150" width="136" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
-                      <circle cx="66" cy="163" r="3" fill="var(--ok)" />
-                      <text x="76" y="167" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneSvet')}</text>
-                    </g>
-                    <g className="dzsel" data-sel={String(demo.sel === 'mieg')}>
-                      <rect x="212" y="28" width="146" height="140" fill="none" stroke="var(--acc)" strokeWidth="1.6" />
-                      <rect x="222" y="86" width="126" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
-                      <circle cx="236" cy="99" r="3" fill="var(--ok)" />
-                      <text x="246" y="103" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneMieg')}</text>
-                    </g>
-                    <g className="dzsel" data-sel={String(demo.sel === 'von')}>
-                      <rect x="212" y="172" width="102" height="140" fill="none" stroke="var(--warn)" strokeWidth="1.6" />
-                      <rect x="216" y="228" width="120" height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
-                      <circle cx="230" cy="241" r="3" fill="var(--warn)" />
-                      <text x="240" y="245" fontFamily={mono} fontSize="10.5" fill="var(--ink)">{t('landing.demo.zoneVon')}</text>
-                    </g>
+                    {/* clickable room zones — every room selectable + lights up */}
+                    {demoZones.map((z) => (
+                      <rect key={z.id} className="dz" onClick={() => manualSelect(z.id)}
+                        x={z.x} y={z.y} width={z.w} height={z.h} fill={z.fill} opacity={z.op} />
+                    ))}
+                    {/* selection outline + chip per room (all six) */}
+                    {demoZones.map((z) => {
+                      const cy = z.y + z.h / 2;
+                      const chipX = z.x + (z.w - z.cw) / 2;
+                      return (
+                        <g key={z.id} className="dzsel" data-sel={String(demo.sel === z.id)}>
+                          <rect x={z.x} y={z.y} width={z.w} height={z.h} fill="none" stroke={z.outline} strokeWidth="1.6" />
+                          <rect x={chipX} y={cy - 13} width={z.cw} height="26" rx="6" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.8" />
+                          <circle cx={chipX + 12} cy={cy} r="3" fill={z.dot} />
+                          <text x={chipX + 21} y={cy + 4} fontFamily={mono} fontSize={z.fs || 10} fill="var(--ink)">{z.label}</text>
+                        </g>
+                      );
+                    })}
                     <g fontFamily={mono}>
                       <rect x="380" y="288" width="106" height="22" fill="var(--bg1)" stroke="var(--line2)" strokeWidth="0.6" />
                       <text x="388" y="298" fontSize="6.5" fill="var(--ink2)">M 1:50</text>

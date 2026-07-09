@@ -11,87 +11,88 @@
     --font-display: 'Sora', 'Hanken Grotesk', sans-serif;
 
     /* ──────────────────────────────────────────────────────────────────────
-       Pathon — Dark Graphite Design Tokens (2026-07-05)
-       Orange-on-graphite. A serious, technical construction-AI product:
-       deep graphite surfaces, molten-orange accent, blueprint hairlines,
-       JetBrains Mono numerals as the estimator-precision signature.
-       Reference bar: dark product-led takeoff SaaS (dark, product-led) — distinct via
-       orange, not their green/blue. The whole app shell is dark by default.
+       Pathon — Paper + Clay Design Tokens (2026-07-09)
+       Matches the founder-approved landing (palette D): warm paper surfaces,
+       clay/terracotta accent, tan hairlines, dark warm ink. Sora display,
+       Hanken Grotesk body, JetBrains Mono numerals. Values are the landing
+       palette-D hexes converted to HSL. The app runs the LIGHT theme now
+       (no `dark` class on <html>); the `.dark` block below stays for any
+       explicit dark island (e.g. the PDF viewer keeps its own navy chrome).
        ────────────────────────────────────────────────────────────────────── */
 
-    /* Surfaces — deep graphite page, elevated panels */
-    --background: 220 18% 10%;           /* #15181E graphite page */
-    --foreground: 216 16% 94%;           /* #EDEFF2 near-white ink */
-    --card: 220 18% 13%;                 /* #1B1F27 elevated panel */
-    --card-foreground: 216 16% 94%;
-    --popover: 220 18% 13%;              /* #1B1F27 */
-    --popover-foreground: 216 16% 94%;
+    /* Surfaces — warm paper page, lighter elevated panels */
+    --background: 36 43% 93%;            /* #F5EFE6 paper page */
+    --foreground: 34 24% 11%;            /* #241E16 warm dark ink */
+    --card: 38 55% 97%;                  /* #FCF8F1 elevated panel */
+    --card-foreground: 34 24% 11%;
+    --popover: 38 55% 97%;               /* #FCF8F1 */
+    --popover-foreground: 34 24% 11%;
 
-    /* Accent — molten orange (Pathon brand) */
-    --primary: 22 93% 54%;               /* #F76B1C orange */
-    --primary-foreground: 220 18% 10%;   /* #15181E dark text on orange */
+    /* Accent — clay / terracotta (Pathon brand) */
+    --primary: 20 70% 40%;               /* #AD4E1F clay */
+    --primary-foreground: 33 57% 96%;    /* #FBF6F0 warm-white text on clay */
 
-    /* Secondary — graphite sub-surface */
-    --secondary: 222 16% 16%;            /* #22262F */
-    --secondary-foreground: 216 16% 94%;
+    /* Secondary — warm sub-surface */
+    --secondary: 39 39% 88%;             /* #EDE5D6 */
+    --secondary-foreground: 34 24% 11%;
 
-    /* Muted — graphite for soft text + hover backgrounds */
-    --muted: 222 16% 16%;                /* #22262F hover bg */
-    --muted-foreground: 215 11% 59%;     /* #8A94A2 cool muted text */
+    /* Muted — warm tan for soft text + hover backgrounds */
+    --muted: 39 39% 88%;                 /* #EDE5D6 hover bg */
+    --muted-foreground: 37 10% 49%;      /* #8A8070 warm muted text */
 
     /* Accent (component-state, NOT brand) */
-    --accent: 217 18% 14%;               /* selected row — surface-2 */
-    --accent-foreground: 216 16% 94%;
+    --accent: 39 39% 88%;                /* selected row — surface-2 */
+    --accent-foreground: 34 24% 11%;
 
-    /* Destructive (errors / red dots) — clear red on dark */
-    --destructive: 0 62% 52%;            /* red */
-    --destructive-foreground: 216 16% 94%;
+    /* Destructive (errors / red dots) — clear red on paper */
+    --destructive: 357 66% 45%;          /* #C0272E red */
+    --destructive-foreground: 33 57% 96%;
 
-    /* Borders — cool graphite hairlines */
-    --border: 220 15% 19%;               /* #2A2F39 default 1px */
-    --input: 220 15% 19%;
-    --ring: 22 93% 54%;                  /* match primary for focus rings */
+    /* Borders — warm tan hairlines */
+    --border: 40 32% 83%;                /* #E2D9C7 default 1px */
+    --input: 40 32% 83%;
+    --ring: 20 70% 40%;                  /* match primary for focus rings */
 
-    /* Extra brand tokens (per 2026-07-05 dark identity) */
-    --ink-2: 216 12% 78%;                /* softer near-white body text */
-    --accent-2: 22 100% 64%;             /* #FF8A47 lighter orange */
-    --surface-2: 217 18% 14%;            /* #1E232B nested surface */
-    --terracotta-deep: 20 90% 46%;       /* pressed / deep orange */
-    --accent-sand: 22 100% 64%;          /* alias → accent-2 (compat) */
+    /* Extra brand tokens (paper + clay) */
+    --ink-2: 40 15% 28%;                 /* #514A3C softer body text */
+    --accent-2: 20 63% 46%;              /* #C05E2C lighter clay (hover) */
+    --surface-2: 39 39% 88%;             /* #EDE5D6 nested surface */
+    --terracotta-deep: 20 70% 34%;       /* pressed / deep clay */
+    --accent-sand: 20 63% 46%;           /* alias → accent-2 (compat) */
 
     /* Charts (kept for future analytics) */
-    --chart-1: 22 93% 54%;               /* orange */
-    --chart-2: 215 11% 59%;              /* cool muted */
-    --chart-3: 152 45% 45%;              /* green */
-    --chart-4: 22 100% 64%;              /* light orange */
-    --chart-5: 216 16% 94%;
+    --chart-1: 20 70% 40%;               /* clay */
+    --chart-2: 37 10% 49%;               /* warm muted */
+    --chart-3: 150 60% 30%;              /* green */
+    --chart-4: 20 63% 46%;               /* lighter clay */
+    --chart-5: 34 24% 11%;
 
     --radius: 0.625rem;                  /* ~10px */
 
-    /* Sidebar — graphite (matches narrow icon rail) */
-    --sidebar-background: 220 18% 13%;    /* elevated panel */
-    --sidebar-foreground: 215 11% 59%;    /* muted icons */
-    --sidebar-primary: 22 93% 54%;        /* orange accent */
-    --sidebar-primary-foreground: 220 18% 10%;
-    --sidebar-accent: 217 18% 14%;        /* selected item bg */
-    --sidebar-accent-foreground: 216 16% 94%; /* ink when active */
-    --sidebar-border: 220 15% 19%;        /* match main border */
-    --sidebar-ring: 22 93% 54%;
+    /* Sidebar — warm paper (matches narrow icon rail) */
+    --sidebar-background: 39 39% 88%;     /* #EDE5D6 */
+    --sidebar-foreground: 37 10% 49%;     /* muted icons */
+    --sidebar-primary: 20 70% 40%;        /* clay accent */
+    --sidebar-primary-foreground: 33 57% 96%;
+    --sidebar-accent: 40 32% 83%;         /* selected item bg */
+    --sidebar-accent-foreground: 34 24% 11%; /* ink when active */
+    --sidebar-border: 40 32% 83%;         /* match main border */
+    --sidebar-ring: 20 70% 40%;
 
     /* ──── Provenance dots (data source indicator, 3-color system) ──── */
-    --source-table: 152 45% 45%;         /* green: from eksplikacija/spec table */
-    --source-computed: 255 55% 68%;      /* violet: Python computed */
-    --source-ai: 22 93% 54%;             /* orange: AI inferred */
+    --source-table: 150 60% 30%;         /* green: from eksplikacija/spec table */
+    --source-computed: 262 45% 52%;      /* violet: Python computed */
+    --source-ai: 20 70% 40%;             /* clay: AI inferred */
 
-    /* ──── Confidence dots (data quality indicator) ──── */
-    --conf-high: 152 45% 45%;            /* green — read directly */
-    --conf-med:  22 93% 54%;             /* orange — derived */
-    --conf-low:  0 62% 52%;              /* red — fallback default */
+    /* ──── Confidence dots (žalia / geltona / raudona — matches landing) ──── */
+    --conf-high: 150 60% 30%;            /* green — read directly */
+    --conf-med:  40 90% 32%;             /* amber — derived (su prielaida) */
+    --conf-low:  357 66% 45%;            /* red — fallback default */
 
     /* Surface elevation tiers */
-    --bg-1: 220 18% 13%;                 /* panel slight elevation */
-    --surface-3: 220 15% 19%;            /* selected/deep hover */
-    --border-strong: 218 14% 26%;        /* #3A414D stronger input/button border */
+    --bg-1: 38 55% 97%;                  /* #FCF8F1 panel slight elevation */
+    --surface-3: 40 32% 83%;             /* selected/deep hover */
+    --border-strong: 41 26% 73%;         /* #CCC1A9 stronger input/button border */
 
     /* ──── Viewer chrome (PDF viewer ONLY — hierarchical dark navy with cyan
             accents). Drawing area stays white; the surrounding chrome

@@ -90,7 +90,10 @@
       "zoneSvet": "Svetainė · 18,4 m²",
       "zoneMieg": "Mieg. · 14,2 m²",
       "zoneVon": "Vonia · 4,8 m²",
-      "planRooms": "6 patalpos"
+      "planRooms": "6 patalpos",
+      "zoneVirt": "Virtuvė · 9,6 m²",
+      "zoneKor": "Kor. · 6,2 m²",
+      "zoneWc": "WC · 2,4 m²"
     },
     "steps": {
       "eyebrow": "02 · Kaip veikia",
