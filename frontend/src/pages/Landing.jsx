@@ -889,7 +889,7 @@ export default function Landing({ lang }) {
             </div>
             <div data-reveal="" style={{ transitionDelay: '110ms' }}>
               <div style={{ border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden', padding: '22px 26px' }}>
-                <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 12, letterSpacing: '0.22em', color: 'var(--ink)' }}>LOKALINĖ SĄMATA</div>
+                <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 12, letterSpacing: '0.22em', color: 'var(--ink)' }}>SĄMATA</div>
                 <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 10, color: 'var(--mut)', marginTop: 4 }}>Nr. S-001 · 2026-07-07</div>
                 <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', fontSize: 12.5 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', color: 'var(--ink2)' }}><span>1. Dažymo darbai</span><span style={{ fontFamily: mono, fontVariantNumeric: 'tabular-nums' }}>2 214,30</span></div>

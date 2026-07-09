@@ -236,7 +236,7 @@ export default function KiekiaiIsBrezinio() {
             faile, sumos persiskaičiuoja pačios.
           </LI>
           <LI>
-            <Term>PDF</Term> — LOKALINĖS SĄMATOS formatas su skyrių sumomis, PVM
+            <Term>PDF</Term> — lietuviškos sąmatos formatas su skyrių sumomis, PVM
             eilute ir parašų bloku.
           </LI>
         </UL>

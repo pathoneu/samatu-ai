@@ -41,7 +41,7 @@ const QA = [
   },
   {
     q: 'Į kokius formatus galima eksportuoti?',
-    a: 'Excel (su gyvomis formulėmis — keičiant kiekius ar kainas, sumos persiskaičiuoja pačiame faile) ir PDF (LOKALINĖS SĄMATOS formatas su skyrių sumomis, PVM eilute ir parašų bloku). Kiekių žiniaraštį galima perkelti ir į kitas sąmatų programas.',
+    a: 'Excel (su gyvomis formulėmis — keičiant kiekius ar kainas, sumos persiskaičiuoja pačiame faile) ir PDF (lietuviškos sąmatos formatas su skyrių sumomis, PVM eilute ir parašų bloku). Kiekių žiniaraštį galima perkelti ir į kitas sąmatų programas.',
   },
   {
     q: 'Kaip skaičiuojamas PVM?',

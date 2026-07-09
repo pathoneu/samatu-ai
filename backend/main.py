@@ -4724,12 +4724,12 @@ async def generate_pdf(request: Request, data: dict):
                     or str(data.get("archetipas") or "").lower() == "renovacija")
     pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
     viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
-    # A priced export is a LOKALINĖ SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by
-    # definition carries no prices, so that title over Kaina/Suma columns + a VISO
-    # su PVM total is self-contradicting. Title by content. (export step 1.)
+    # A priced export is a SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by definition
+    # carries no prices, so that title over Kaina/Suma columns + a VISO su PVM
+    # total is self-contradicting. Title by content. (export step 1.)
     _has_prices  = any((e.get("kaina") or 0) or (e.get("suma") or 0) for e in eilutes)
     if _has_prices:
-        doc_title = "LOKALINĖ SĄMATA"
+        doc_title = "SĄMATA"
     elif tipas_pdf == "interjeras":
         doc_title = "VIDAUS APDAILOS KIEKIAI"
     else:

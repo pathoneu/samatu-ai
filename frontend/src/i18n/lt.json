@@ -85,7 +85,7 @@
       "popHeight": "Lubų aukštis",
       "popNote": "Pakeitus aukštį, visos susijusios eilutės perskaičiuojamos akimirksniu.",
       "expXlsx": "Excel su formulėmis",
-      "expPdf": "Lokalinė sąmata",
+      "expPdf": "Sąmata",
       "zoneSvet": "Svetainė · 18,4 m²",
       "zoneMieg": "Mieg. · 14,2 m²",
       "zoneVon": "Vonia · 4,8 m²",
@@ -108,7 +108,7 @@
         },
         {
           "t": "Eksportuokite sąmatą",
-          "d": "Excel su gyvomis formulėmis arba PDF „Lokalinė sąmata“ su 21 % PVM eilute."
+          "d": "Excel su gyvomis formulėmis arba sąmatos PDF su 21 % PVM eilute."
         }
       ]
     },
@@ -204,7 +204,7 @@
       "title": "Dokumentai, kuriuos priima užsakovai",
       "excelStrong": "Excel su gyvomis formulėmis.",
       "excelRest": " Pakeitus kiekį ar kainą, sumos persiskaičiuoja pačiame faile.",
-      "pdfStrong": "PDF „Lokalinė sąmata“.",
+      "pdfStrong": "Sąmatos PDF.",
       "pdfRest": " Skyrių sumos, 21 % PVM eilutė ir parašų blokas — lietuviškas formatas."
     },
     "audience": {
