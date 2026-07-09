@@ -26,13 +26,12 @@
     },
     "hero": {
       "eyebrow": "Quantities from construction drawings",
-      "titleA": "Drop in a PDF drawing —",
-      "titleB": "quantities in minutes.",
-      "sub1": "The same takeoff work you buy today for ",
-      "sub2": " per project. Quantities computed and flagged for review — you set the prices.",
+      "titleA": "Estimates and quantities —",
+      "titleB": "in minutes, not days.",
       "ctaPrimary": "Try it free",
       "ctaDemo": "Watch the demo",
-      "micro": "First project per company — free. No commitments."
+      "micro": "First project per company — free. No commitments.",
+      "sub": "Pathon pulls the quantities from your PDF drawing and assembles the bill of quantities in minutes — the same takeoff you’d do by hand in hours. You review and add your own prices."
     },
     "heroSvg": {
       "a1": "18.4 m²",
@@ -214,7 +213,7 @@
       "cards": [
         {
           "t": "Construction company owner",
-          "d": "A quote by tonight, not next week — no waiting in an estimator’s queue."
+          "d": "Your estimate ready the same evening, not next week."
         },
         {
           "t": "Finishing crew",

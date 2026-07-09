@@ -518,9 +518,7 @@ export default function Landing({ lang }) {
             {t('landing.hero.titleA')}<br />{t('landing.hero.titleB')}
           </h1>
           <p className="pl-hsub plu3" style={{ margin: '26px 0 0', maxWidth: 640, fontSize: 17.5, lineHeight: 1.6, color: 'var(--ink2)' }}>
-            {t('landing.hero.sub1')}
-            <span style={{ fontFamily: mono, fontSize: 16 }}>€200–500</span>
-            {t('landing.hero.sub2')}
+            {t('landing.hero.sub')}
           </p>
           <div className="pl-ctas plu4" style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 14 }}>
             <Link to="/register" className="pl-btn-primary">

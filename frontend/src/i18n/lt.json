@@ -26,13 +26,12 @@
     },
     "hero": {
       "eyebrow": "Statybų kiekiai iš PDF brėžinių",
-      "titleA": "Įkelkite brėžinį —",
-      "titleB": "kiekiai per kelias minutes.",
-      "sub1": "Tą patį darbą šiandien perkate iš sąmatininko — vidutiniškai ",
-      "sub2": " už projektą. Pathon iš PDF ištraukia kiekius ir paruošia žiniaraštį; įkainius suvedate patys.",
+      "titleA": "Sąmatos ir kiekiai —",
+      "titleB": "per minutes, ne dienas.",
       "ctaPrimary": "Išbandyti nemokamai",
       "ctaDemo": "Žiūrėti demo",
-      "micro": "Pirmas projektas įmonei — nemokamas. Be įsipareigojimų."
+      "micro": "Pirmas projektas įmonei — nemokamas. Be įsipareigojimų.",
+      "sub": "Pathon iš PDF brėžinio ištraukia kiekius ir sudėlioja žiniaraštį per minutes — tą patį, ką rankomis skaičiuotumėte valandas. Jums lieka peržiūrėti ir suvesti savo įkainius."
     },
     "heroSvg": {
       "a1": "18,4 m²",
@@ -214,7 +213,7 @@
       "cards": [
         {
           "t": "Statybos įmonės savininkas",
-          "d": "Pasiūlymas per vakarą, o ne per savaitę — nelaukiant sąmatininko eilės."
+          "d": "Sąmatą paruošiate tą patį vakarą, o ne po savaitės."
         },
         {
           "t": "Apdailos brigada",
