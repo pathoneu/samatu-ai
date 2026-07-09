@@ -994,7 +994,6 @@ export default function Landing({ lang }) {
                 <button type="button" onClick={() => switchLang('lt')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: (lang || 'lt') === 'lt' ? 'var(--acc)' : 'var(--mut)' }}>LT</button>
                 <button type="button" onClick={() => switchLang('en')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: lang === 'en' ? 'var(--acc)' : 'var(--mut)' }}>EN</button>
               </span>
-              <span style={{ fontFamily: mono, fontSize: 11 }}>{t('landing.footer.location')}</span>
             </span>
           </div>
         </div>
