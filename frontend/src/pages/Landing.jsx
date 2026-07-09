@@ -384,8 +384,19 @@ export default function Landing({ lang }) {
 
   const switchLang = (lng) => {
     changeAppLanguage(lng);
-    navigate(lng === 'en' ? '/en' : '/');
+    // Stay on the landing in both languages. LT → /about (NOT /, which
+    // redirects logged-in users to the dashboard); EN → /en.
+    navigate(lng === 'en' ? '/en' : '/about');
   };
+
+  // LT/EN switch — used in both the header nav and the footer.
+  const renderLangSwitch = (fs = 11) => (
+    <span style={{ display: 'inline-flex', gap: 2, fontFamily: mono, fontSize: fs }}>
+      <button type="button" onClick={() => switchLang('lt')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: fs, color: (lang || 'lt') === 'lt' ? 'var(--acc)' : 'var(--mut)' }}>LT</button>
+      <span style={{ color: 'var(--line2)' }}>/</span>
+      <button type="button" onClick={() => switchLang('en')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: fs, color: lang === 'en' ? 'var(--acc)' : 'var(--mut)' }}>EN</button>
+    </span>
+  );
 
   const eyebrowTick = <span style={{ width: 22, height: 1, background: 'var(--line2)', display: 'inline-block' }} />;
   const steps = t('landing.steps.items', { returnObjects: true });
@@ -414,6 +425,7 @@ export default function Landing({ lang }) {
             <a href="#kainos">{t('landing.nav.kainos')}</a>
           </nav>
           <div className="pl-navauth" style={{ alignItems: 'center', gap: 18 }}>
+            {renderLangSwitch(12)}
             <Link className="pl-login" to="/login" style={{ fontSize: 14, color: 'var(--mut)' }}>{t('landing.nav.login')}</Link>
             <Link to="/register" className="pl-navbtn">{t('landing.nav.cta')}</Link>
           </div>
@@ -989,12 +1001,7 @@ export default function Landing({ lang }) {
           </div>
           <div style={{ marginTop: 36, paddingTop: 20, borderTop: '1px solid var(--line)', fontSize: 12.5, color: 'var(--mut)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span>{t('landing.footer.copyright')}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ display: 'inline-flex', gap: 2, fontFamily: mono, fontSize: 11 }}>
-                <button type="button" onClick={() => switchLang('lt')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: (lang || 'lt') === 'lt' ? 'var(--acc)' : 'var(--mut)' }}>LT</button>
-                <button type="button" onClick={() => switchLang('en')} style={{ background: 'none', border: 'none', padding: '2px 6px', cursor: 'pointer', fontFamily: mono, fontSize: 11, color: lang === 'en' ? 'var(--acc)' : 'var(--mut)' }}>EN</button>
-              </span>
-            </span>
+            {renderLangSwitch(11)}
           </div>
         </div>
       </footer>
