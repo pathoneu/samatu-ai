@@ -25,11 +25,11 @@
       "cta": "Išbandyti nemokamai"
     },
     "hero": {
-      "eyebrow": "Kiekiai iš statybų brėžinių",
-      "titleA": "Užmeskite PDF brėžinį —",
+      "eyebrow": "Statybų kiekiai iš PDF brėžinių",
+      "titleA": "Įkelkite brėžinį —",
       "titleB": "kiekiai per kelias minutes.",
-      "sub1": "Tas pats sąmatos darbas, kurį dabar perkate už ",
-      "sub2": " už projektą. Kiekiai suskaičiuoti ir pažymėti patikrai — kainas suvedate patys.",
+      "sub1": "Tą patį darbą šiandien perkate iš sąmatininko — vidutiniškai ",
+      "sub2": " už projektą. Pathon iš PDF ištraukia kiekius ir paruošia žiniaraštį; įkainius suvedate patys.",
       "ctaPrimary": "Išbandyti nemokamai",
       "ctaDemo": "Žiūrėti demo",
       "micro": "Pirmas projektas įmonei — nemokamas. Be įsipareigojimų."
@@ -54,7 +54,7 @@
     ],
     "demo": {
       "badge": "Demo",
-      "project": "Demo butas — 74,2 m²",
+      "project": "Pavyzdinis butas — 74,2 m²",
       "tag": "Interjeras",
       "noVat": "Be PVM",
       "withVat": "Su PVM",
@@ -64,20 +64,20 @@
       "tabKiek": "Kiekiai",
       "tabAsist": "Asistentas",
       "pause": "⏸ Pauzė",
-      "play": "▶ Leisti demo",
-      "hint": "Demo sukasi automatiškai — arba spauskite patys: patalpas, skirtukus, „Prielaidos“ steperį, „Eksportuoti“.",
+      "play": "▶ Paleisti",
+      "hint": "Demonstracija rodoma automatiškai — arba valdykite patys: spustelėkite patalpą, perjunkite skirtuką, pakeiskite lubų aukštį ar eksportuokite.",
       "posTitle": "Pozicijos · 46 eil.",
       "secPaint": "Dažymo darbai",
       "secGkp": "GKP darbai",
-      "rowPaint": "Sienų dažymas 2 k.",
-      "rowGlaist": "Sienų glaistymas Q2",
+      "rowPaint": "Sienų dažymas (2 kartai)",
+      "rowGlaist": "Sienų glaistymas, Q2",
       "rowAngok": "Angokraščių glaistymas ir dažymas",
       "angokMeta": "42,6 m · apskaičiuota su prielaida",
-      "rowGkp": "Lubų karkasas + GKP 1 sl.",
-      "gkpMeta": "74,2 m² · 38 lapai",
+      "rowGkp": "Lubų karkasas + gipskartonis (1 sl.)",
+      "gkpMeta": "74,2 m² · 38 lakštai",
       "rowLed": "LED nišos lubose",
       "ledMeta": "12,4 m · numatytoji reikšmė — patikrinkite",
-      "rowGrind": "Grindjuostės MDF",
+      "rowGrind": "Grindjuostės, MDF",
       "grindMeta": "58,4 m · 4,10 €/m",
       "legendOk": "nuskaityta",
       "legendWarn": "su prielaida",
@@ -97,19 +97,19 @@
     },
     "steps": {
       "eyebrow": "02 · Kaip veikia",
-      "title": "Nuo PDF iki sąmatos — trys žingsniai",
+      "title": "Nuo brėžinio iki sąmatos — trys žingsniai",
       "items": [
         {
           "t": "Įkelkite projekto PDF",
-          "d": "Aukštų planai, išklotinės, eksplikacijos — vektoriniai ar skenuoti. Jokio CAD."
+          "d": "Aukštų planai, sienų išklotinės, eksplikacijos — vektoriniai ar skenuoti. CAD programos nereikia."
         },
         {
           "t": "Peržiūrėkite pažymėtas vietas",
-          "d": "Kiekviena eilutė pažymėta: nuskaityta, su prielaida ar numatytoji. Tikrinate tik tai, kas pažymėta."
+          "d": "Kiekviena eilutė turi ženklą: nuskaityta, su prielaida ar numatytoji. Tikrinate tik tai, kas pažymėta — ne visą sąmatą."
         },
         {
           "t": "Eksportuokite sąmatą",
-          "d": "Excel su gyvomis formulėmis arba LOKALINĖ SĄMATA PDF su 21% PVM eilute."
+          "d": "Excel su gyvomis formulėmis arba PDF „Lokalinė sąmata“ su 21 % PVM eilute."
         }
       ]
     },
@@ -159,25 +159,25 @@
           "val": "46,0 m³"
         }
       ],
-      "note": "Kiekvienas skaičius — su matavimo vienetu ir nuoroda į brėžinio vietą, iš kurios jis paimtas."
+      "note": "Kiekvienas skaičius — su matavimo vienetu ir nuoroda į brėžinio vietą, iš kurios paimtas."
     },
     "trust": {
       "eyebrow": "04 · Pasitikėjimo sistema",
       "titleA": "Nesakome „pasitikėk“.",
       "titleB": "Sakome „patikrink per 5 minutes“.",
-      "sub": "Kiekviena sąmatos eilutė pažymėta pagal tai, iš kur atėjo skaičius. Sistema pati parodo, ką patikrinti pirmiausia — likusį darbą jau padarė.",
+      "sub": "Kiekviena sąmatos eilutė pažymėta pagal tai, iš kur atėjo skaičius. Sistema pati parodo, ką tikrinti pirmiausia — likusį darbą jau padarė.",
       "cards": [
         {
           "t": "Žalia — nuskaityta iš brėžinio",
-          "d": "Reikšmė paimta tiesiai iš eksplikacijos ar plano geometrijos. Šaltinių sutapimas patikrintas."
+          "d": "Reikšmė paimta tiesiai iš eksplikacijos ar plano geometrijos. Šaltiniai sutampa."
         },
         {
           "t": "Geltona — apskaičiuota su prielaida",
-          "d": "Pvz., lubų aukštis paimtas iš pjūvio, o ne iš patalpų lentelės. Prielaida matoma ir keičiama."
+          "d": "Pavyzdžiui, lubų aukštis paimtas iš pjūvio, o ne iš patalpų lentelės. Prielaidą matote ir galite pakeisti."
         },
         {
           "t": "Raudona — numatytoji reikšmė",
-          "d": "Brėžinyje duomenų nerasta — įrašyta standartinė reikšmė. Būtina patikrinti prieš teikiant pasiūlymą."
+          "d": "Brėžinyje duomenų nerasta — įrašyta standartinė reikšmė. Būtinai patikrinkite prieš teikdami pasiūlymą."
         }
       ],
       "panelTitle": "Tikrinti pirmiausia",
@@ -192,11 +192,11 @@
     "recalc": {
       "eyebrow": "05 · Gyvas perskaičiavimas",
       "title": "Pakeitėte prielaidą — kiekiai persiskaičiavo",
-      "sub": "Lubų aukštis, glaistymo lygis, dažomos ar paliekamos sienos — kiekviena prielaida keičiama, ir visos susijusios eilutės perskaičiuojamos akimirksniu, be pakartotinio nuskaitymo. Išbandykite:",
+      "sub": "Lubų aukštis, glaistymo lygis, kurias sienas dažote — pakeiskite bet kurią prielaidą, ir kiekiai persiskaičiuos akimirksniu, be pakartotinio nuskaitymo. Išbandykite:",
       "heightLabel": "Lubų aukštis:",
       "panelTitle": "Prielaidos → kiekiai",
       "rowPaint": "Dažomas sienų plotas",
-      "rowGlaist": "Glaistas Q2",
+      "rowGlaist": "Glaistas, Q2",
       "rowGrind": "Grindjuostės",
       "grindNote": "(nuo aukščio nepriklauso)"
     },
@@ -204,9 +204,9 @@
       "eyebrow": "06 · Eksportas",
       "title": "Dokumentai, kuriuos priima užsakovai",
       "excelStrong": "Excel su gyvomis formulėmis.",
-      "excelRest": " Keičiate kiekį ar kainą — sumos persiskaičiuoja pačiame faile.",
-      "pdfStrong": "LOKALINĖ SĄMATA PDF.",
-      "pdfRest": " Skyrių sumos, 21% PVM eilutė ir parašų blokas — LT formatas."
+      "excelRest": " Pakeitus kiekį ar kainą, sumos persiskaičiuoja pačiame faile.",
+      "pdfStrong": "PDF „Lokalinė sąmata“.",
+      "pdfRest": " Skyrių sumos, 21 % PVM eilutė ir parašų blokas — lietuviškas formatas."
     },
     "audience": {
       "eyebrow": "07 · Kam skirta",
@@ -214,15 +214,15 @@
       "cards": [
         {
           "t": "Statybos įmonės savininkas",
-          "d": "Pasiūlymas per vakarą, ne per savaitę — nelaukiant sąmatininko eilės."
+          "d": "Pasiūlymas per vakarą, o ne per savaitę — nelaukiant sąmatininko eilės."
         },
         {
           "t": "Apdailos brigada",
-          "d": "Kiekiai be sąmatininko — įkėlei brėžinį, gavai žiniaraštį, suvedei savo įkainius."
+          "d": "Kiekiai be sąmatininko: įkeliate brėžinį, gaunate žiniaraštį, suvedate savo įkainius."
         },
         {
           "t": "NT vystytojas",
-          "d": "Greita projekto patikra — ar rangovo pasiūlymo kiekiai sutampa su brėžiniu."
+          "d": "Greita patikra — ar rangovo pasiūlymo kiekiai atitinka brėžinį."
         }
       ]
     },
@@ -236,7 +236,7 @@
           "name": "Nemokamas bandomasis",
           "price": "0 €",
           "per": "1 projektas įmonei",
-          "desc": "Pilnas nuskaitymas ir eksportas — įsitikinkite savo brėžiniu."
+          "desc": "Pilnas nuskaitymas ir eksportas — įsitikinkite su savo brėžiniu."
         },
         {
           "name": "Vienkartinis",
@@ -248,7 +248,7 @@
           "name": "Pro",
           "price": "49 €",
           "per": "/ mėn. · 10 projektų",
-          "desc": "Nuolat skaičiuojančiai įmonei. Savo kainynas, korekcijų įrankiai."
+          "desc": "Nuolat skaičiuojančiai įmonei: savo kainynas, korekcijų įrankiai."
         },
         {
           "name": "Studio",
