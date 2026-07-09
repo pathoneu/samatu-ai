@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/lib/authContext';
 import { useBilling } from '@/hooks/useBilling';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { PathonMark } from '@/components/layout/Logo';
 
 // 2026-05-06: removed '/exports' — route never existed (404). Eksportai
 // are accessible from each project's top-bar 'Eksportuoti' button instead.
@@ -123,24 +124,15 @@ export default function Sidebar({ onNavigate = null }) {
         flexShrink: 0,
       }}
     >
-      {/* North arrow logo — matches landing + brėžinių stilius */}
+      {/* Pathon monogram-P logo → landing/home page (the house icon below
+          goes to the app dashboard). */}
       <Link
-        to="/"
+        to="/about"
         title={t('layout.logoHome')}
-        className="mx-auto mb-4 flex items-center justify-center"
-        style={{
-          width: 32, height: 32,
-          color: 'hsl(var(--foreground))',
-        }}
+        className="mx-auto mb-4 flex items-center justify-center text-foreground"
+        style={{ width: 32, height: 32 }}
       >
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-          stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"
-          strokeLinejoin="round" aria-hidden>
-          <circle cx="12" cy="12" r="10.5" strokeOpacity="0.4" />
-          <path d="M12 4 L8.5 17 L12 14 L15.5 17 Z" fill="currentColor" />
-          <text x="12" y="3" textAnchor="middle" fontSize="3.4"
-            fontFamily="JetBrains Mono, monospace" fill="currentColor" stroke="none">Š</text>
-        </svg>
+        <PathonMark icon={26} />
       </Link>
 
       {/* Nav items */}
