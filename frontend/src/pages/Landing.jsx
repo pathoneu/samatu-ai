@@ -792,43 +792,67 @@ export default function Landing({ lang }) {
           </h2>
           <p className="pl-sub" data-reveal="" style={{ transitionDelay: '140ms' }}>{t('landing.trust.sub')}</p>
 
-          <div className="pl-grid2" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {trustCards.map((c, i) => (
-                <div key={i} data-reveal="" style={{ transitionDelay: `${i * 90}ms`, display: 'flex', gap: 16, padding: '20px 22px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--bg1)' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: `var(--${['ok', 'warn', 'bad'][i]})`, marginTop: 6, flexShrink: 0 }} />
-                  <span>
-                    <span style={{ display: 'block', fontWeight: 600, fontSize: 15.5 }}>{c.t}</span>
-                    <span style={{ display: 'block', marginTop: 4, fontSize: 14, lineHeight: 1.5, color: 'var(--ink2)' }}>{c.d}</span>
-                  </span>
-                </div>
-              ))}
+          {/* Two sibling panels: the legend explains each mark, the worklist
+              shows those marks doing their job on a real schedule. */}
+          <div className="pl-grid2" style={{ marginTop: 52, display: 'grid', gridTemplateColumns: '0.92fr 1.08fr', gap: 26, alignItems: 'start' }}>
+
+            {/* ── Legend — what each colour means ── */}
+            <div data-reveal="" style={{ border: '1px solid var(--line2)', borderRadius: 14, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
+                <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.trust.legendTitle')}</span>
+              </div>
+              {trustCards.map((c, i) => {
+                const tone = ['ok', 'warn', 'bad'][i];
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 14, flex: 1, padding: '17px 20px', borderBottom: i < trustCards.length - 1 ? '1px solid color-mix(in srgb, var(--line) 55%, transparent)' : 'none' }}>
+                    <span style={{ flexShrink: 0, marginTop: 4, width: 12, height: 12, borderRadius: '50%', background: `var(--${tone})`, boxShadow: `0 0 0 4px color-mix(in srgb, var(--${tone}) 15%, transparent)` }} />
+                    <span>
+                      <span style={{ display: 'block', fontWeight: 600, fontSize: 14.5, letterSpacing: '-0.005em' }}>{c.t}</span>
+                      <span style={{ display: 'block', marginTop: 5, fontSize: 13.5, lineHeight: 1.52, color: 'var(--ink2)' }}>{c.d}</span>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
-            <div data-reveal="" style={{ transitionDelay: '120ms', border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid var(--line)' }}>
+            {/* ── Worklist — the lines the system flags to check first ── */}
+            <div data-reveal="" style={{ transitionDelay: '100ms', border: '1px solid var(--line2)', borderRadius: 14, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.trust.panelTitle')}</span>
-                <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--warn)' }}>{t('landing.trust.panelCount')}</span>
+                <span style={{ fontFamily: mono, fontSize: 10.5, color: 'var(--warn)', background: 'color-mix(in srgb, var(--warn) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warn) 28%, transparent)', borderRadius: 20, padding: '3px 11px' }}>{t('landing.trust.panelCount')}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', background: 'color-mix(in srgb, var(--bad) 6%, transparent)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bad)', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowLed')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>12,4 m</span></span>
-                <span style={{ fontSize: 12, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 5, padding: '3px 10px' }}>{t('landing.trust.showBtn')}</span>
+
+              <div>
+                {/* Raudona — numatytoji reikšmė, reikia patikrinti */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--bad) 6%, transparent)' }}>
+                  <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--bad)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--bad) 16%, transparent)' }} />
+                  <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowLed')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>12,4 m</span></span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 11px', background: 'var(--bg)' }}>
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l3.5 3.5" /></svg>
+                    {t('landing.trust.showBtn')}
+                  </span>
+                </div>
+                {/* Geltona — prielaida, reikia patikrinti */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
+                  <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--warn)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent)' }} />
+                  <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowAngok')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>42,6 m</span></span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 11px', background: 'var(--bg)' }}>
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l3.5 3.5" /></svg>
+                    {t('landing.trust.showBtn')}
+                  </span>
+                </div>
+                {/* Ką tik patvirtinta — geltona → žalia */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', background: 'color-mix(in srgb, var(--ok) 5%, transparent)' }}>
+                  <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--ok) 16%, transparent)' }} />
+                  <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowVon')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>H = 2,45</span></span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 6, padding: '4px 11px', background: 'color-mix(in srgb, var(--ok) 9%, transparent)' }}>
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 4L6 12l-3.5-3.5" /></svg>
+                    {t('landing.trust.confirmed')}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid color-mix(in srgb, var(--line) 60%, transparent)', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowAngok')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>42,6 m</span></span>
-                <span style={{ fontSize: 12, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 5, padding: '3px 10px' }}>{t('landing.trust.showBtn')}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowVon')} <span style={{ fontFamily: mono, fontSize: 12.5 }}>H = 2,45</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 5, padding: '3px 10px' }}>
-                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 4L6 12l-3.5-3.5" /></svg>
-                  {t('landing.trust.confirmed')}
-                </span>
-              </div>
-              <div style={{ padding: '13px 18px', borderTop: '1px solid var(--line)', fontFamily: mono, fontSize: 11.5, color: 'var(--mut)' }}>{t('landing.trust.panelFoot')}</div>
+
+              <div style={{ padding: '13px 20px', borderTop: '1px solid var(--line)', fontFamily: mono, fontSize: 11.5, color: 'var(--mut)' }}>{t('landing.trust.panelFoot')}</div>
             </div>
           </div>
         </div>

@@ -179,6 +179,7 @@
           "d": "Nothing found in the drawing, so a standard value was used. Check it before you quote."
         }
       ],
+      "legendTitle": "What the colors mean",
       "panelTitle": "Check first",
       "panelCount": "3 of 46 lines",
       "rowLed": "LED ceiling coves —",
