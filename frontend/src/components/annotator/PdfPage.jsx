@@ -11,11 +11,11 @@
 import React from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 
-// react-pdf worker — same wiring as the legacy PdfViewer
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+// react-pdf worker — align with PlanViewer on the single 4.8.69 worker that
+// vite-plugin-static-copy emits to /pdf.worker.mjs. The old import.meta.url
+// resolution pulled a second, hoisted pdfjs-dist copy and drifted to a worker
+// version (4.10.38) that didn't match react-pdf's API (4.8.69).
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 
 export default function PdfPage({
   file,

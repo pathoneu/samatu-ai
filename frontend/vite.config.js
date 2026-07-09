@@ -11,12 +11,13 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          // pdfjs-dist 4.8.69 is installed at the top level (no nested copy
-          // under react-pdf). The legacy path 'node_modules/react-pdf/node_modules/...'
-          // does not exist; correct it to the actual install location so
-          // viteStaticCopy can find the PDF worker. Without this, every PDF
-          // load fails with "Nepavyko atidaryti PDF" because react-pdf can't
-          // fetch /pdf.worker.mjs.
+          // pdfjs-dist is pinned to 4.8.69 (exact) in package.json to match
+          // react-pdf's bundled pdfjs API; npm dedupes it to the top level.
+          // Copy THAT worker to /pdf.worker.mjs so PlanViewer and the annotator
+          // load one worker whose version matches the API. If pdfjs-dist is
+          // ever allowed to float (^) again it drifts (e.g. 4.10.38) and every
+          // PDF load fails with "Nepavyko atidaryti PDF" / a version-mismatch
+          // warning — keep it pinned to react-pdf's pdfjs version.
           src: 'node_modules/pdfjs-dist/build/pdf.worker.mjs',
           dest: '.',
           rename: 'pdf.worker.mjs',
