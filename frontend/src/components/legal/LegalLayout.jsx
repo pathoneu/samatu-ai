@@ -32,10 +32,16 @@ export default function LegalLayout({
   children,      // page body — <Section>…</Section> blocks
 }) {
   const { t, i18n } = useTranslation();
+  const isEn = (i18n.resolvedLanguage || i18n.language || '').startsWith('en');
+  // "Home" must target the always-landing route, NOT "/" — the root route
+  // redirects logged-in users to /dashboard, so "/" would dump a signed-in
+  // reader into the app instead of back to the marketing page. LT → /about,
+  // EN → /en (mirrors the landing language switch).
+  const homeHref = isEn ? '/en' : '/about';
   // Dense legal body stays LT-only for now (an EN legal translation genuinely
   // needs a lawyer). When the UI is in English, surface a clear notice above
   // the LT body rather than silently showing Lithuanian.
-  const showEnBodyNotice = i18n.language && i18n.language.startsWith('en');
+  const showEnBodyNotice = isEn;
   // Per-route <title>/<meta>: pages on this layout (legal + /duk) get their
   // tab title from the visible page title and their meta description from the
   // intro lede. Re-runs on language toggle (props come from i18n). A page that
@@ -49,14 +55,14 @@ export default function LegalLayout({
       {/* Lite header — logo home + back link, matches landing nav rhythm */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
         <div className="max-w-[1200px] mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 text-foreground">
+          <Link to={homeHref} className="flex items-center gap-2.5 text-foreground">
             <PathonMark icon={26} />
             <span className="font-display font-bold tracking-tight text-[19px]">Pathon</span>
           </Link>
           <div className="flex items-center gap-4">
             <LanguageToggle />
             <Link
-              to="/"
+              to={homeHref}
               className="inline-flex items-center gap-1.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> {t('legal.backHome')}
