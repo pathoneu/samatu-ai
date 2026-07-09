@@ -38,13 +38,15 @@ export default function MarketingLayout({
       {/* Lite header — logo home + back link, matches landing nav rhythm */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
         <div className="max-w-[1200px] mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 text-foreground">
+          {/* Home → /about (LT landing), NOT "/" — the root route redirects
+              logged-in users to /dashboard. These BoFu pages are LT-only. */}
+          <Link to="/about" className="flex items-center gap-2.5 text-foreground">
             <PathonMark icon={26} />
             <span className="font-display font-bold tracking-tight text-[19px]">Pathon</span>
           </Link>
           <div className="flex items-center gap-4">
             <Link
-              to="/"
+              to="/about"
               className="inline-flex items-center gap-1.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Grįžti į pradžią

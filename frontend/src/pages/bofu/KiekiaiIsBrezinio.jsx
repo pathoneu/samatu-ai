@@ -88,7 +88,7 @@ export default function KiekiaiIsBrezinio() {
         </P>
         <SubHead>2. Sistema nuskaito ir paskaičiuoja</SubHead>
         <P>
-          <Link to="/" className="text-primary hover:underline">Pathon</Link>{' '}
+          <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           klasifikuoja kiekvieną lapą (planas, išklotinė, lubų planas…),
           atpažįsta patalpas ir elementus, tada pritaiko Lietuvos sąmatininkų
           praktikos formules: plotai, perimetrai, angų atėmimai, atliekų

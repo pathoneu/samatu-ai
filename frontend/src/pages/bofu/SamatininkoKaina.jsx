@@ -173,7 +173,7 @@ export default function SamatininkoKaina() {
           tik po savaitės — brangiausias būdas pralaimėti konkurenciją dėl greičio.
         </P>
         <P>
-          <Link to="/" className="text-primary hover:underline">Pathon</Link>{' '}
+          <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           automatizuoja būtent tą dalį, kuri suryja valandas: nuskaito PDF brėžinį,
           atpažįsta patalpas ir elementus, paskaičiuoja kiekius pagal Lietuvos
           praktiką ir parengia kiekių žiniaraštį. Jums lieka peržiūrėti pažymėtas

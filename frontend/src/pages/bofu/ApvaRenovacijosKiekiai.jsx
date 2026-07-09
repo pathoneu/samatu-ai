@@ -228,7 +228,7 @@ export default function ApvaRenovacijosKiekiai() {
       <Section n={7} title="Kaip tai padaryti per dieną">
         <P>
           Didžioji renovacijos pasiūlymo laiko dalis — ne kainodara, o kiekiai.
-          Su <Link to="/" className="text-primary hover:underline">Pathon</Link>{' '}
+          Su <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           darbas atrodo taip:
         </P>
         <UL>

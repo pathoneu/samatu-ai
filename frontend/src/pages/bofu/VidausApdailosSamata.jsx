@@ -303,7 +303,7 @@ export default function VidausApdailosSamata() {
         ))}
         <Callout title="Arba automatiškai">
           <P>
-            <Link to="/" className="text-primary hover:underline">Pathon</Link>{' '}
+            <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
             1–4 žingsnius atlieka pats: nuskaito PDF brėžinį, pritaiko šias
             formules ir parengia kiekių žiniaraštį su pasitikėjimo
             indikatoriais prie kiekvienos reikšmės. Jums lieka peržiūra ir
