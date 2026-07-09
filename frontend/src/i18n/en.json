@@ -162,9 +162,9 @@
     },
     "trust": {
       "eyebrow": "04 · Trust system",
-      "titleA": "We don’t say “trust it”.",
-      "titleB": "We say “verify it in 5 minutes”.",
-      "sub": "Every estimate line is labeled by where its number came from. The system shows you what to check first — the rest is already done.",
+      "titleA": "You check three lines,",
+      "titleB": "not all forty-six.",
+      "sub": "Every quantity shows where it came from: read straight off the drawing, computed from an assumption, or a default. The system surfaces the few lines worth a review before you quote — the rest are already done.",
       "cards": [
         {
           "t": "Green — read from the drawing",
