@@ -1,13 +1,17 @@
 /**
  * /samatininko-kaina — BoFu landing page (docs/marketing/seo-playbook.md §3.1).
- * Sells by naming the price the buyer already pays for sąmatininko paslaugos.
  *
- * ⚠️ JUODRAŠTIS (2026-07-06): visą LT tekstą prieš publikavimą peržiūri ir
- * nušlifuoja founderis (LT copy rule: Claude drafts → founder polishes → publish).
- * Ypač patikrinti: rinkos kainų intervalus lentelėse (orientaciniai, be šaltinių —
- * playbook prašo šaltinių; pridėti arba palikti „orientacinės“) ir DUK atsakymus.
+ * ANGLE (2026-07-09, founder): the real cost of a sąmata is NOT money paid to
+ * someone — most LT contractors do it themselves. The cost is HOURS out of
+ * their day. So this page answers "kiek kainuoja / kiek laiko atima sąmata"
+ * with the honest answer: your time. No "you pay a sąmatininkas €X" framing.
+ *
+ * ⚠️ JUODRAŠTIS: visą LT tekstą prieš publikavimą peržiūri founderis
+ * (LT copy rule: Claude drafts → founder polishes → publish).
  *
  * Schema: Article + FAQPage (matomas DUK blokas — vienintelis šaltinis abiem).
+ * NOTE: URL slug kept as /samatininko-kaina to avoid breaking sitemap/prerender;
+ * content now targets time-cost intent ("kiek laiko atima sąmata", "sąmata pačiam").
  */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -23,8 +27,8 @@ const URL = `https://pathon.eu${PATH}`;
 // Single source of truth: renders the visible DUK section AND FAQPage JSON-LD.
 const FAQ = [
   {
-    q: 'Kiek kainuoja statybos sąmata Lietuvoje?',
-    a: 'Tipinė sąmatininko paslaugų kaina 2026 m. — apie €200–500 už objektą: buto vidaus apdailos sąmata dažniausiai pigesnė, pilna individualaus namo sąmata su visomis dalimis — brangesnė. Galutinę kainą lemia projekto apimtis, dokumentacijos kokybė ir terminai.',
+    q: 'Kiek laiko atima statybos sąmata?',
+    a: 'Rankinis kiekių skaičiavimas iš brėžinių tipiniam objektui atima nuo kelių valandų iki poros dienų: reikia išmatuoti plotus ir perimetrus, suskaičiuoti angas, pritaikyti atliekų koeficientus ir viską suvesti į lentelę. Daugiausiai laiko suryja ne kainodara, o būtent kiekių skaičiavimas.',
   },
   {
     q: 'Ar galiu sąmatą pasidaryti pats, be sąmatininko?',
@@ -39,23 +43,23 @@ const FAQ = [
 export default function SamatininkoKaina() {
   useEffect(() => {
     setPageMeta({
-      title: 'Sąmatininko kaina 2026 ir kada skaičiuoti pačiam',
+      title: 'Kiek laiko atima sąmata ir kaip skaičiuoti greičiau',
       description:
-        'Kiek kainuoja sąmatininko paslaugos Lietuvoje 2026 m.? Rinkos kainos, kas jas lemia, kada verta samdyti specialistą ir kada kiekius paskaičiuoti pačiam.',
+        'Kiek laiko atima statybos sąmatos skaičiavimas iš brėžinių, kur dingsta valandos ir kaip jį sutrumpinti nuo valandų iki minučių — patys, be sąmatininko.',
       path: PATH,
     });
     setJsonLd('jsonld-article-samatininko-kaina', {
       '@context': 'https://schema.org',
       '@type': 'Article',
       '@id': `${URL}#article`,
-      headline: 'Sąmatininko paslaugos: kiek kainuoja ir kada apsimoka skaičiuoti pačiam',
+      headline: 'Kiek laiko atima sąmata — ir kaip ją skaičiuoti greičiau, patys',
       description:
-        'Sąmatininko paslaugų rinkos kainos Lietuvoje, kas jas lemia, kada verta samdyti specialistą, o kada statybos kiekius ir sąmatą pasiskaičiuoti pačiam.',
+        'Tikroji statybos sąmatos kaina — jūsų laikas. Kiek valandų atima kiekių skaičiavimas iš brėžinių, kur jos dingsta ir kaip skaičiavimą sutrumpinti iki minučių.',
       inLanguage: 'lt',
       mainEntityOfPage: URL,
       image: 'https://pathon.eu/og-image.png',
       datePublished: '2026-07-06',
-      dateModified: '2026-07-06',
+      dateModified: '2026-07-09',
       author: { '@id': 'https://pathon.eu/#org' },
       publisher: { '@id': 'https://pathon.eu/#org' },
     });
@@ -76,76 +80,69 @@ export default function SamatininkoKaina() {
 
   return (
     <MarketingLayout
-      eyebrow="Gidas / Kainos"
+      eyebrow="Gidas / Sąmatos"
       index="GID-01"
-      title="Sąmatininko paslaugos: kiek kainuoja ir kada apsimoka skaičiuoti pačiam"
-      intro="Rinkos kainos 2026 m., kas jas lemia ir sąžiningas atsakymas, kada verta mokėti specialistui, o kada sąmatą pasidaryti pačiam."
-      updated="2026-07-06"
+      title="Kiek laiko atima sąmata — ir kaip ją skaičiuoti greičiau"
+      intro="Tikroji sąmatos kaina — ne pinigai kažkam, o valandos iš jūsų dienos. Kiek laiko atima kiekių skaičiavimas iš brėžinių ir kaip jį sutrumpinti nuo valandų iki minučių."
+      updated="2026-07-09"
       related={[
         { to: '/kiekiai-is-brezinio', label: 'Kiekiai iš PDF brėžinio' },
         { to: '/vidaus-apdailos-samata', label: 'Vidaus apdailos sąmata' },
         { to: '/duk', label: 'DUK' },
       ]}
     >
-      <Section n={1} title="Kiek kainuoja sąmatininko paslaugos 2026 m.">
+      <Section n={1} title="Tikroji sąmatos kaina — jūsų laikas">
         <P>
-          Lietuvoje sąmatininko paslaugos tipiniam objektui dažniausiai kainuoja{' '}
-          <Term>apie €200–500</Term>. Mažesnė buto apdailos sąmata gali kainuoti
-          pigiau, o pilna individualaus namo sąmata su konstrukcijomis, inžinerija
-          ir apdaila — daugiau. Prie kainos beveik visada prisideda ir laukimas:
-          geri sąmatininkai užimti, todėl darbas paprastai atliekamas per kelias
-          darbo dienas ar savaites, ne per valandą.
+          Dauguma statybos ir apdailos įmonių sąmatų niekam neužsako — jas
+          skaičiuoja patys: savininkas ar meistras vakarais matuoja brėžinius ir
+          veda lenteles. Todėl tikroji sąmatos kaina — ne pinigai kažkam, o{' '}
+          <Term>valandos iš jūsų dienos</Term>. Vienam objektui rankinis kiekių
+          skaičiavimas dažniausiai atima nuo kelių valandų iki poros dienų.
         </P>
         <DefTable
-          head={['Paslauga', 'Orientacinė kaina', 'Įprastas terminas']}
+          head={['Būdas', 'Jūsų laikas', 'Terminas']}
           rows={[
-            ['Buto vidaus apdailos sąmata', '€150–300', '2–5 d. d.'],
-            ['Namo sąmata (visos dalys)', '€300–500 ir daugiau', '1–2 sav.'],
-            ['Kiekių žiniaraštis iš brėžinių', '€100–250', '2–4 d. d.'],
-            ['Valandinis įkainis', '€20–40/val.', '—'],
+            ['Rankinis skaičiavimas (PDF + Excel)', '4–12 val.', '1–2 dienos'],
+            ['Su Pathon', '~1 val. (peržiūra + kainos)', '~15 min.'],
           ]}
         />
         <P className="text-[13px] text-muted-foreground">
-          Kainos orientacinės — jos priklauso nuo objekto, regiono ir susitarimo.
-          Intervalai atspindi įprastą rinkos praktiką, ne konkretaus tiekėjo
-          kainoraštį.
+          Skaičiai orientaciniai — priklauso nuo objekto apimties ir
+          dokumentacijos kokybės.
         </P>
       </Section>
 
-      <Section n={2} title="Kas lemia kainą">
+      <Section n={2} title="Kur dingsta valandos">
         <UL>
           <LI>
-            <Term>Apimtis ir dalių skaičius.</Term> Vien apdaila ar apdaila +
-            konstrukcijos + elektra + santechnika — skirtingos darbo valandos.
+            <Term>Matavimai.</Term> Plotai, perimetrai, lubų aukščiai, angos —
+            kiekvienas skaičius ranka iš brėžinio.
           </LI>
           <LI>
-            <Term>Dokumentacijos kokybė.</Term> Kai brėžiniuose trūksta matmenų,
-            eksplikacijų ar išklotinių, sąmatininkas matuoja ir klausinėja — tai
-            laikas, už kurį mokate.
+            <Term>Atliekos ir koeficientai.</Term> Kiekvienai medžiagai — savas
+            priedas; lengva suklysti arba pamiršti.
           </LI>
           <LI>
-            <Term>Skubumas.</Term> „Reikia rytoj“ beveik visada reiškia priedą
-            prie kainos arba atsisakymą.
+            <Term>Dokumentacijos spragos.</Term> Kai brėžiniuose trūksta matmenų,
+            eksplikacijų ar išklotinių, tenka spėlioti ir tikslintis — dar valandos.
           </LI>
           <LI>
-            <Term>Pakeitimai.</Term> Projektas pasikeitė — kiekius reikia
-            perskaičiuoti. Dažnai tai atskirai apmokamas darbas, o kiekvienas
-            ratas vėl trunka dienas.
+            <Term>Pakeitimai.</Term> Pasikeitė projektas — kiekius skaičiuojate iš
+            naujo. Kiekvienas ratas vėl trunka valandas.
           </LI>
         </UL>
         <P>
-          Ir svarbiausia — kaina sumuojasi. Įmonei, kuri teikia 8–10 pasiūlymų
-          per mėnesį, sąmatininko paslaugos virsta tūkstančiais eurų mėnesio
-          sąnaudų (arba savaitėmis savininko vakarų), nors užsakymu virsta tik
-          dalis tų pasiūlymų. Būtent todėl skaičiavimo savikaina — ne
-          smulkmena, o konkurencinis veiksnys.
+          Ir tai kartojasi. Įmonei, teikiančiai 8–10 pasiūlymų per mėnesį, sąmatų
+          skaičiavimas virsta dešimtimis valandų per mėnesį — savaitėmis
+          savininko vakarų — nors užsakymu virsta tik dalis pasiūlymų. Būtent
+          todėl skaičiavimo greitis — ne smulkmena, o konkurencinis veiksnys.
         </P>
       </Section>
 
-      <Section n={3} title="Kada verta samdyti sąmatininką">
+      <Section n={3} title="Kada vis dėlto verta kreiptis į specialistą">
         <P>
-          Sąžiningai: yra situacijų, kuriose žmogus-specialistas yra teisingas
-          pasirinkimas, ir jokia programa to nepakeičia.
+          Sąžiningai: yra atvejų, kai žmogus-specialistas — teisingas pasirinkimas,
+          ir jokia programa jo nepakeičia.
         </P>
         <UL>
           <LI>
@@ -162,66 +159,49 @@ export default function SamatininkoKaina() {
             normatyvų reikalavimais.
           </LI>
           <LI>
-            <Term>Visiškai nėra laiko</Term> — net valandai peržiūrėti kiekius ir
-            suvesti kainas. Tuomet perkate ne skaičiavimą, o galvos skausmo
-            nebuvimą.
+            <Term>Visai nėra laiko</Term> — net valandos peržiūrėti kiekiams ir
+            suvesti kainoms. Tada darbą verta atiduoti visą.
           </LI>
         </UL>
       </Section>
 
-      <Section n={4} title="Kada apsimoka skaičiuoti pačiam">
+      <Section n={4} title="Kaip sutrumpinti skaičiavimą nuo valandų iki minučių">
         <P>
           Daugumai apdailos ir remonto įmonių sąmata — ne vienkartinis įvykis, o
           kassavaitinė rutina: pasiūlymai klientams, kurių dalis niekada nevirs
-          užsakymu. Mokėti po kelis šimtus eurų už kiekvieną pasiūlymą ir laukti
-          po savaitę — brangiausias įmanomas būdas pralaimėti konkurenciją dėl
-          greičio. Skaičiuoti pačiam apsimoka, kai:
+          užsakymu. Praleisti po pusdienį prie kiekvieno pasiūlymo ir pateikti jį
+          tik po savaitės — brangiausias būdas pralaimėti konkurenciją dėl greičio.
         </P>
-        <UL>
-          <LI>objektai kartojasi — butų ir namų apdaila, o ne unikalūs statiniai;</LI>
-          <LI>pasiūlymą reikia pateikti šiandien ar rytoj, kol klientas dar „šiltas“;</LI>
-          <LI>įkainius ir maržą norite valdyti patys, o ne perimti svetimus;</LI>
-          <LI>sąmata reikalinga deryboms ir darbui, o ne formaliam dokumentui su parašu.</LI>
-        </UL>
-        <SubHead>Ką realiai kainuoja viena sąmata</SubHead>
-        <DefTable
-          head={['Būdas', 'Pinigai', 'Jūsų laikas', 'Terminas']}
-          rows={[
-            ['Sąmatininkas', '€200–500', '~1 val. (perduoti projektą)', '2 d. d. – 2 sav.'],
-            ['Pačiam „ranka“ (PDF + Excel)', '€0', '4–12 val. matavimų ir lentelių', '1–2 dienos'],
-            ['Su Pathon', 'nuo €12', '~1 val. peržiūrai ir kainoms', '~15 min. skaičiavimas'],
-          ]}
-        />
         <P>
           <Link to="/" className="text-primary hover:underline">Pathon</Link>{' '}
-          automatizuoja būtent tą dalį, kuri suryja valandas: nuskaito PDF
-          brėžinį, atpažįsta patalpas ir elementus, paskaičiuoja kiekius pagal
-          Lietuvos sąmatininkų praktiką ir parengia kiekių žiniaraštį. Kaip tai
-          veikia žingsnis po žingsnio —{' '}
+          automatizuoja būtent tą dalį, kuri suryja valandas: nuskaito PDF brėžinį,
+          atpažįsta patalpas ir elementus, paskaičiuoja kiekius pagal Lietuvos
+          praktiką ir parengia kiekių žiniaraštį. Jums lieka peržiūrėti pažymėtas
+          vietas ir suvesti savo įkainius. Kaip tai veikia žingsnis po žingsnio —{' '}
           <Link to="/kiekiai-is-brezinio" className="text-primary hover:underline">
             kiekiai iš PDF brėžinio
           </Link>.
         </P>
       </Section>
 
-      <Section n={5} title="Trys būdai sumažinti sąmatų kaštus jau šį mėnesį">
+      <Section n={5} title="Trys būdai skaičiuoti greičiau jau šį mėnesį">
         <UL>
           <LI>
-            <Term>Susikurkite savo įkainių katalogą.</Term> Didžioji derybų su
-            sąmatininku (ar su savimi) dalis — „kiek čia dėti už kvadratą?“.
-            Vieną kartą susirašyti savo darbų įkainius ir juos perpanaudoti —
-            valandų sutaupymas kiekviename pasiūlyme.
+            <Term>Susikurkite savo įkainių katalogą.</Term> Didžioji laiko dalis
+            dingsta ties klausimu „kiek čia dėti už kvadratą?“. Vieną kartą
+            surašykite savo darbų įkainius ir juos perpanaudokite — valandos
+            sutaupomos kiekviename pasiūlyme.
           </LI>
           <LI>
             <Term>Automatizuokite kiekius, ne sprendimus.</Term> Kiekiai —
-            mechaninis darbas su aiškiomis taisyklėmis; būtent jį verta
-            atiduoti programai. Kainodara ir pasiūlymo strategija lieka žmogui.
+            mechaninis darbas su aiškiomis taisyklėmis; būtent jį verta atiduoti
+            programai. Kainodara ir pasiūlymo strategija lieka jums.
           </LI>
           <LI>
             <Term>Perskaičiavimus darykite prielaidomis, ne iš naujo.</Term>{' '}
-            Projektai keičiasi visada. Jei pakeitus lubų aukštį ar glaistymo
-            lygį sąmata persiskaičiuoja pati, pakeitimas kainuoja minutę, o ne
-            dar vieną apmokamą ratą.
+            Projektai keičiasi visada. Jei pakeitus lubų aukštį ar glaistymo lygį
+            sąmata persiskaičiuoja pati, pakeitimas kainuoja minutę, o ne dar vieną
+            pusdienį.
           </LI>
         </UL>
       </Section>
@@ -243,25 +223,25 @@ export default function SamatininkoKaina() {
           <LI>
             <Term>Šimtaprocentinio atpažinimo.</Term> Simbolių ir elementų
             nuskaitymas iš brėžinių nėra tobulas, todėl kiekvienas kiekis Pathon
-            sistemoje turi pasitikėjimo indikatorių: žalias — nuskaityta tiesiai
-            iš brėžinio, geltonas — su prielaidomis, raudonas — numatytoji
-            reikšmė. Prieš komercinį pasiūlymą kiekius reikia peržiūrėti.
+            sistemoje turi pasitikėjimo indikatorių: žalias — nuskaityta tiesiai iš
+            brėžinio, geltonas — su prielaidomis, raudonas — numatytoji reikšmė.
+            Prieš komercinį pasiūlymą kiekius reikia peržiūrėti.
           </LI>
           <LI>
-            <Term>Atsakomybės.</Term> Už pateiktą pasiūlymą atsakote jūs — kaip
-            ir naudodami bet kokį kitą skaičiavimo įrankį.
+            <Term>Atsakomybės.</Term> Už pateiktą pasiūlymą atsakote jūs — kaip ir
+            naudodami bet kokį kitą skaičiavimo įrankį.
           </LI>
         </UL>
         <Callout title="Sąžininga riba">
           <P>
-            Pathon tikslas — kad techninė kiekių dalis truktų minutes, o ne
-            dienas. Ekspertizės, atsakomybės ir derybų jis neperima. Daugiau
-            atsakymų — <Link to="/duk" className="text-primary hover:underline">DUK puslapyje</Link>.
+            Pathon tikslas — kad techninė kiekių dalis truktų minutes, o ne dienas.
+            Ekspertizės, atsakomybės ir derybų jis neperima. Daugiau atsakymų —{' '}
+            <Link to="/duk" className="text-primary hover:underline">DUK puslapyje</Link>.
           </P>
         </Callout>
       </Section>
 
-      <Section n={7} title="Dažni klausimai apie sąmatos kainą">
+      <Section n={7} title="Dažni klausimai apie sąmatos skaičiavimą">
         {FAQ.map(({ q, a }) => (
           <React.Fragment key={q}>
             <SubHead>{q}</SubHead>

@@ -73,7 +73,7 @@ export default function KiekiaiIsBrezinio() {
       intro="Kaip iš statybos projekto PDF gimsta kiekių žiniaraštis ir sąmata: žingsniai, ką sistema išmatuoja ir kur — sąžiningai — jos ribos."
       updated="2026-07-06"
       related={[
-        { to: '/samatininko-kaina', label: 'Sąmatininko kaina' },
+        { to: '/samatininko-kaina', label: 'Kiek laiko atima sąmata' },
         { to: '/vidaus-apdailos-samata', label: 'Vidaus apdailos sąmata' },
         { to: '/duk', label: 'DUK' },
       ]}
@@ -263,10 +263,10 @@ export default function KiekiaiIsBrezinio() {
           <P>
             Jei per metus darote vieną sąmatą — greičiausiai užteks ir Excel.
             Pathon apsimoka, kai pasiūlymai kartojasi ir kiekviena laukimo
-            diena kainuoja užsakymus. Kiek kainuoja alternatyvos — palyginome
-            puslapyje{' '}
+            diena kainuoja užsakymus. Kiek laiko atima kiekvienas būdas —
+            palyginome puslapyje{' '}
             <Link to="/samatininko-kaina" className="text-primary hover:underline">
-              sąmatininko kaina
+              kiek laiko atima sąmata
             </Link>.
           </P>
         </Callout>
