@@ -1,5 +1,10 @@
 /**
- * CookieBanner — Pathon slapukų sutikimo juosta (DARK graphite identitetas).
+ * CookieBanner — Pathon slapukų sutikimo juosta.
+ *
+ * Route-aware skin (2026-07-08): on the landing routes (/, /en, /about) the
+ * banner wears the paper + clay palette so it matches the marketing page it
+ * floats over; everywhere else (the app, legal/BoFu pages) it keeps the dark
+ * graphite look. The dark path is unchanged — only a `paper` branch was added.
  *
  * Real consent UX:
  *   • Pirmą kartą (kol nėra įrašo `pathon_cookie_consent`) rodoma juosta su
@@ -20,11 +25,16 @@
  * Būtinasis sesijos slapukas veikia nepriklausomai nuo šio pasirinkimo.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import '@/pages/landing/landing.css'; // paper-palette tokens + pl-btn-* (scoped under #plr)
 
 export const STORAGE_KEY = 'pathon_cookie_consent';
 const OPEN_EVENT = 'pathon:open-cookie-settings';
+
+// Landing (/, /en, /about) is the only paper+clay surface today; the app and
+// the legal/BoFu pages are dark graphite. Extend this set if those get reskinned.
+const PAPER_ROUTES = new Set(['/', '/en', '/about']);
 
 // Privacy-first default — nothing non-essential enabled until consent.
 const DEFAULT_CATEGORIES = { necessary: true, analytics: false, marketing: false };
@@ -71,9 +81,49 @@ function persist(categories) {
   }
 }
 
-// ─── Small toggle switch (dark, orange when on) ──────────────────────
+// ─── Small toggle switch ─────────────────────────────────────────────
 
-function Toggle({ checked, disabled, onChange, label }) {
+function Toggle({ checked, disabled, onChange, label, paper }) {
+  if (paper) {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        style={{
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center',
+          height: 20,
+          width: 36,
+          flexShrink: 0,
+          borderRadius: 999,
+          border: 'none',
+          padding: 0,
+          background: checked ? 'var(--acc)' : 'var(--line2)',
+          opacity: disabled ? 0.6 : 1,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: 'background .2s ease',
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            height: 14,
+            width: 14,
+            borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+            transform: `translateX(${checked ? 18 : 3}px)`,
+            transition: 'transform .2s ease',
+          }}
+        />
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -94,7 +144,36 @@ function Toggle({ checked, disabled, onChange, label }) {
   );
 }
 
-function CategoryRow({ title, desc, checked, disabled, badge, onChange }) {
+function CategoryRow({ title, desc, checked, disabled, badge, onChange, paper }) {
+  if (paper) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '12px 0',
+          borderBottom: '1px solid color-mix(in srgb, var(--line) 70%, transparent)',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--ink)' }}>{title}</span>
+            {badge && (
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 4, padding: '2px 6px' }}>
+                {badge}
+              </span>
+            )}
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--mut)', lineHeight: 1.5 }}>{desc}</p>
+        </div>
+        <div style={{ paddingTop: 2 }}>
+          <Toggle checked={checked} disabled={disabled} onChange={onChange} label={title} paper />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-start justify-between gap-4 py-3 border-b border-border/70 last:border-b-0">
       <div className="min-w-0">
@@ -119,6 +198,8 @@ function CategoryRow({ title, desc, checked, disabled, badge, onChange }) {
 
 export default function CookieBanner() {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const paper = PAPER_ROUTES.has(pathname);
   const [show, setShow] = useState(false);
   const [manage, setManage] = useState(false);
   const [cats, setCats] = useState(DEFAULT_CATEGORIES);
@@ -167,7 +248,10 @@ export default function CookieBanner() {
 
   if (!show) return null;
 
-  return (
+  // Paper button sizing override (the landing pl-btn-* are hero-sized).
+  const paperBtn = { padding: '11px 20px', fontSize: '13.5px', borderRadius: '9px' };
+
+  const inner = (
     <div
       className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-3 sm:px-5 sm:pb-5 pointer-events-none"
       role="dialog"
@@ -175,27 +259,52 @@ export default function CookieBanner() {
       aria-label={t('cookie.ariaLabel')}
     >
       <div
-        className="pointer-events-auto mx-auto max-w-[720px] rounded-2xl border border-border-strong bg-card/95 backdrop-blur-md
-                   shadow-[0_2px_4px_hsl(220_40%_2%/0.5),0_24px_60px_-24px_hsl(220_40%_2%/0.75)]"
+        className={
+          paper
+            ? 'pointer-events-auto mx-auto max-w-[720px] rounded-2xl backdrop-blur-md'
+            : 'pointer-events-auto mx-auto max-w-[720px] rounded-2xl border border-border-strong bg-card/95 backdrop-blur-md shadow-[0_2px_4px_hsl(220_40%_2%/0.5),0_24px_60px_-24px_hsl(220_40%_2%/0.75)]'
+        }
+        style={
+          paper
+            ? {
+                border: '1px solid var(--line2)',
+                background: 'color-mix(in srgb, var(--bg1) 96%, transparent)',
+                boxShadow: '0 2px 4px color-mix(in srgb, var(--shadow) 40%, transparent), 0 28px 64px -28px var(--shadow)',
+              }
+            : undefined
+        }
       >
         <div className="p-5 sm:p-6">
           <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-primary">
+            <span
+              className={paper ? '' : 'bg-primary'}
+              style={{ width: 8, height: 8, borderRadius: '50%', background: paper ? 'var(--acc)' : undefined }}
+              aria-hidden
+            />
+            <span
+              className={paper ? '' : 'font-mono text-[10.5px] uppercase tracking-[0.16em] text-primary'}
+              style={paper ? { fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--acc)' } : undefined}
+            >
               {t('cookie.eyebrow')}
             </span>
           </div>
 
-          <p className="mt-3 text-[13.5px] text-ink-2 leading-[1.6]">
+          <p
+            className={paper ? '' : 'mt-3 text-[13.5px] text-ink-2 leading-[1.6]'}
+            style={paper ? { margin: '12px 0 0', fontSize: 13.5, lineHeight: 1.6, color: 'var(--ink2)' } : undefined}
+          >
             {t('cookie.body')}{' '}
-            <Link to="/cookies" className="text-primary hover:underline">{t('cookie.bodyCookiesLink')}</Link>{' '}
+            <Link to="/cookies" className={paper ? 'underline' : 'text-primary hover:underline'} style={paper ? { color: 'var(--acc)' } : undefined}>{t('cookie.bodyCookiesLink')}</Link>{' '}
             {t('cookie.bodyAnd')}{' '}
-            <Link to="/privacy" className="text-primary hover:underline">{t('cookie.bodyPrivacyLink')}</Link>.
+            <Link to="/privacy" className={paper ? 'underline' : 'text-primary hover:underline'} style={paper ? { color: 'var(--acc)' } : undefined}>{t('cookie.bodyPrivacyLink')}</Link>.
           </p>
 
           {/* Category toggles — shown when "Tvarkyti" is expanded */}
           {manage && (
-            <div className="mt-4 rounded-xl border border-border bg-surface-2/60 px-4">
+            <div
+              className={paper ? '' : 'mt-4 rounded-xl border border-border bg-surface-2/60 px-4'}
+              style={paper ? { margin: '16px 0 0', borderRadius: 12, border: '1px solid var(--line)', background: 'color-mix(in srgb, var(--bg2) 45%, transparent)', padding: '0 16px' } : undefined}
+            >
               <CategoryRow
                 title={t('cookie.catNecessaryTitle')}
                 badge={t('cookie.catNecessaryBadge')}
@@ -203,18 +312,21 @@ export default function CookieBanner() {
                 checked
                 disabled
                 onChange={() => {}}
+                paper={paper}
               />
               <CategoryRow
                 title={t('cookie.catAnalyticsTitle')}
                 desc={t('cookie.catAnalyticsDesc')}
                 checked={cats.analytics}
                 onChange={(v) => setCats((c) => ({ ...c, analytics: v }))}
+                paper={paper}
               />
               <CategoryRow
                 title={t('cookie.catMarketingTitle')}
                 desc={t('cookie.catMarketingDesc')}
                 checked={cats.marketing}
                 onChange={(v) => setCats((c) => ({ ...c, marketing: v }))}
+                paper={paper}
               />
             </div>
           )}
@@ -224,28 +336,32 @@ export default function CookieBanner() {
             {manage ? (
               <button
                 onClick={saveSelection}
-                className="btn-primary justify-center px-4 py-2.5 text-[13.5px]"
+                className={paper ? 'pl-btn-primary' : 'btn-primary justify-center px-4 py-2.5 text-[13.5px]'}
+                style={paper ? paperBtn : undefined}
               >
                 {t('cookie.saveSelection')}
               </button>
             ) : (
               <button
                 onClick={acceptAll}
-                className="btn-primary justify-center px-4 py-2.5 text-[13.5px]"
+                className={paper ? 'pl-btn-primary' : 'btn-primary justify-center px-4 py-2.5 text-[13.5px]'}
+                style={paper ? paperBtn : undefined}
               >
                 {t('cookie.acceptAll')}
               </button>
             )}
             <button
               onClick={rejectNonEssential}
-              className="btn-ghost justify-center px-4 py-2.5 text-[13.5px]"
+              className={paper ? 'pl-btn-ghost' : 'btn-ghost justify-center px-4 py-2.5 text-[13.5px]'}
+              style={paper ? paperBtn : undefined}
             >
               {t('cookie.onlyNecessary')}
             </button>
             {!manage && (
               <button
                 onClick={() => setManage(true)}
-                className="justify-center px-4 py-2.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors font-medium"
+                className={paper ? '' : 'justify-center px-4 py-2.5 text-[13.5px] text-muted-foreground hover:text-foreground transition-colors font-medium'}
+                style={paper ? { padding: '11px 18px', fontSize: 13.5, fontWeight: 500, color: 'var(--mut)', background: 'none', border: 'none', cursor: 'pointer' } : undefined}
               >
                 {t('cookie.manage')}
               </button>
@@ -255,4 +371,16 @@ export default function CookieBanner() {
       </div>
     </div>
   );
+
+  // Paper variant: expose the landing palette (D) variables + pl-btn-* by
+  // scoping under #plr, but neutralize the #plr base layout (min-height:100vh /
+  // full-bleed background) so the wrapper stays a 0-size var provider.
+  if (paper) {
+    return (
+      <div id="plr" data-palette="D" style={{ minHeight: 0, background: 'transparent' }}>
+        {inner}
+      </div>
+    );
+  }
+  return inner;
 }
