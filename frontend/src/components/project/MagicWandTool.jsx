@@ -107,12 +107,12 @@ export default function MagicWandTool({
           position: 'absolute',
           top: 8,
           left: 8,
-          background: 'rgba(255,255,255,0.92)',
-          border: '1px solid #cbd5e1',
+          background: 'hsl(var(--popover) / 0.96)',
+          border: '1px solid hsl(var(--border-strong))',
           borderRadius: 4,
           padding: '6px 10px',
           fontSize: 12,
-          color: '#0f172a',
+          color: 'hsl(var(--foreground))',
           pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -137,10 +137,10 @@ export default function MagicWandTool({
           />
           <span style={{ width: 20, textAlign: 'right' }}>{closeKernel}</span>
         </label>
-        <div style={{ fontSize: 10, color: '#6b7280' }}>
+        <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
           Jei patalpa "išteka" už sienų — pakelkite šliaužiklį į dešinę.
         </div>
-        {error && <div style={{ color: '#b91c1c', fontSize: 11 }}>{error}</div>}
+        {error && <div style={{ color: 'hsl(var(--destructive))', fontSize: 11 }}>{error}</div>}
       </div>
     </div>
   );

@@ -94,17 +94,17 @@
     --surface-3: 40 32% 83%;             /* selected/deep hover */
     --border-strong: 41 26% 73%;         /* #CCC1A9 stronger input/button border */
 
-    /* ──── Viewer chrome (PDF viewer ONLY — hierarchical dark navy with cyan
-            accents). Drawing area stays white; the surrounding chrome
-            (toolbar / tool rail / thumbs / status bar / drawing-area frame)
-            uses these tokens. ──── */
-    --viewer-chrome: 220 30% 12%;            /* dark navy — toolbar/rail/thumbs */
-    --viewer-chrome-foreground: 215 20% 88%; /* light text on dark chrome */
-    --viewer-chrome-muted: 220 25% 18%;       /* subtler dark for nested cards */
-    --viewer-chrome-border: 220 25% 22%;      /* divider lines on dark chrome */
-    --viewer-chrome-hover: 220 20% 24%;       /* button hover */
-    --viewer-chrome-active: 192 80% 55%;      /* cyan accent for active state */
-    --viewer-blueprint-bg: 220 35% 8%;        /* darkest — drawing-area "frame" */
+    /* ──── Viewer chrome (PDF viewer — paper + clay, 2026-07-09). Drawing area
+            stays white; the surrounding chrome (toolbar / tool rail / thumbs /
+            status bar / drawing-area frame) uses these tokens. Warm paper
+            surfaces, clay active accent, tan hairlines. ──── */
+    --viewer-chrome: 39 39% 88%;             /* #EDE5D6 warm toolbar/rail/thumbs */
+    --viewer-chrome-foreground: 34 24% 11%;  /* #241E16 ink on paper chrome */
+    --viewer-chrome-muted: 38 55% 97%;        /* #FCF8F1 elevated nested cards */
+    --viewer-chrome-border: 41 26% 73%;       /* #CCC1A9 divider lines */
+    --viewer-chrome-hover: 40 32% 83%;        /* #E2D9C7 button hover */
+    --viewer-chrome-active: 20 70% 40%;       /* clay accent for active state */
+    --viewer-blueprint-bg: 40 24% 82%;        /* warm tan drawing-area "frame" */
   }
 
   /* Dark parity block — the app is dark by default now (tokens above are
