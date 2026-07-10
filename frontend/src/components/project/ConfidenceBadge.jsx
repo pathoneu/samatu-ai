@@ -47,11 +47,10 @@ export default function ConfidenceBadge({ room, projectId, onClick }) {
   const { t } = useTranslation();
   const result = computeAreaConfidence(room);
   if (result.confidence === 'unknown') return null;
-  // 2026-05-06: hide badge when confidence is 'high' — trustworthy data
-  // doesn't need a "tikslus" pill that just adds visual clutter. The
-  // ProvenanceChip ("iš eksplikacijos") is enough signal. We only flag
-  // medium / low / disagreeing rooms where the user should look closer.
-  if (result.confidence === 'high' && !result.disagreement) return null;
+  // Founder ask (2026-07-09): show the confidence dot on EVERY room, including
+  // 🟢 high — the traffic-light system (🟢 read directly / 🟡 assumption /
+  // 🔴 default) is a core trust signal and must be visible per CLAUDE.md §7,
+  // not hidden for "clean" rooms. (Was: hide 'high' to declutter — 2026-05-06.)
 
   const style = STYLES[result.confidence];
   if (!style) return null;

@@ -722,7 +722,8 @@ const PositionRow = memo(function PositionRow({
     background: 'hsl(var(--muted) / 0.35)',
   };
   const conf = (row.confidence || 'high').toLowerCase();
-  const confClass = conf === 'medium' ? 'dot-med' : conf === 'low' ? 'dot-low' : null;
+  const confClass = conf === 'medium' ? 'dot-med' : conf === 'low' ? 'dot-low' : 'dot-high';
+  const confTitle = `Pasitikėjimas: ${conf === 'medium' ? 'vidutinis — patikrinkite' : conf === 'low' ? 'žemas — būtina patikrinti' : 'aukštas — nuskaityta iš brėžinio'}`;
   const sum = (row.kiekis || 0) * (row.kaina || 0);
   const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
   const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
@@ -771,12 +772,13 @@ const PositionRow = memo(function PositionRow({
         borderBottom: '1px solid hsl(var(--border) / 0.5)',
       }}
     >
-      {/* Sprint §FIX-8: dots default off — confidence info'rmuoja Peržiūra queue
-          (top of panel). Source dots — opt-in via Pažangu toggle. */}
+      {/* Every quantity row shows its confidence dot (🟢/🟡/🔴) by default —
+          founder ask 2026-07-09, CLAUDE.md §7 ("indicator on every quantity").
+          The Pažangu toggle swaps it for the source dot (table/computed/AI). */}
       {showProvenance ? (
         <span className={`dot ${sourceClass}`} title={SOURCE_TITLE[classifySource(row)]} />
       ) : (
-        <span />
+        <span className={`dot ${confClass}`} title={confTitle} />
       )}
       <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
         {row.eil_nr || ''}

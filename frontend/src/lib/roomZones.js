@@ -95,7 +95,13 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
       approximate = false;
     }
   }
-  if (!geometry) {
+  // Tier 2 markers are ONLY honest when the room has a real label anchor. For
+  // NON_TRACED_SOURCES (manual_needed / bbox_fallback / synthesized) the backend
+  // seed often matched the eksplikacija number column, not the on-plan label, so
+  // the marker floats in empty space (rooms 106/107/110 on the Beržų demo). Skip
+  // the marker for those — they fall to the honest "N patalpų be vietos plane"
+  // aggregate chip instead of a fake-confident circle on the wrong spot.
+  if (!geometry && !NON_TRACED_SOURCES.has(room.polygon_source)) {
     // Tier 2: circled-number marker at the printed label (label-anchored only).
     const c = markerCenter(room, { renderedWidth, renderedHeight });
     if (c) {
