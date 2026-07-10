@@ -52,13 +52,15 @@ test('toViewport(toPdf(sp)) round-trips screen points for all rotations', () => 
 });
 
 // The verified Beržų anchor: room 102 sits at mediabox pct (0.30, 0.34) on a
-// reported-/Rotate-270 sheet and must land at DISPLAY pct (0.66, 0.30) —
-// PDFium shows the complement, i.e. a 90° CW turn of the mediabox.
-test('room-102 anchor: mediabox (0.30,0.34) on reported-270 page lands at display (0.66,0.30)', () => {
+// reported-/Rotate-270 sheet. The base render is now rotated to the TRUE /Rotate
+// (270°), so the display map is rotatePctPoint(x,y,270) = (y, 1-x):
+// (0.30,0.34) -> (0.34, 0.70). Browser-verified 2026-07-09 — room 102's zone
+// sits on the Svetainė/virtuvė room with this transform.
+test('room-102 anchor: mediabox (0.30,0.34) on reported-270 page lands at display (0.34,0.70)', () => {
   const a = adapterFor(270);
   const sp = a.toViewport({ x: 0.30 * W, y: 0.34 * H });
-  assert.ok(Math.abs(sp.x / a.width - 0.66) < 1e-9, `display fx ${sp.x / a.width}`);
-  assert.ok(Math.abs(sp.y / a.height - 0.30) < 1e-9, `display fy ${sp.y / a.height}`);
+  assert.ok(Math.abs(sp.x / a.width - 0.34) < 1e-9, `display fx ${sp.x / a.width}`);
+  assert.ok(Math.abs(sp.y / a.height - 0.70) < 1e-9, `display fy ${sp.y / a.height}`);
 });
 
 test('scale is px per PDF point and uses the swapped axis on 90/270', () => {

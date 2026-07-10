@@ -15,7 +15,7 @@ import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { SearchLayer } from '@embedpdf/plugin-search/react';
 import { PagePointerProvider, usePointerHandlers } from '@embedpdf/plugin-interaction-manager/react';
 import { makeViewport } from '@/lib/viewerEngine/pageViewport';
-import { rotateRoomGeometry, displayRotationFor } from '@/lib/viewerEngine/pageRotation';
+import { rotateRoomGeometry, displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
 import { makeEmbedAdapter } from '@/lib/viewerEngine/embedPdfAdapter';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { polygonCentroid } from '@/lib/polygonGeometry';
@@ -108,7 +108,29 @@ export default function PageOverlayHost({
 
   return (
     <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
-      <RenderLayer documentId={documentId} pageIndex={layout.pageIndex} />
+      {/* EmbedPDF's <RenderLayer> draws the UNROTATED mediabox raster (PDFium's
+          /Rotate is bypassed by its matrix render path), so /Rotate 90|270 sheets
+          come out sideways. Apply the page's true /Rotate as a CSS transform on
+          the base <img> (RenderLayer forwards `style`). width/height here are the
+          rotation-applied host dims; for a quarter-turn we give the <img> the
+          swapped (un-rotated) box so it fills the host after the rotate. The
+          tiling layer is already rotation-aware, so it needs no change. */}
+      <RenderLayer
+        documentId={documentId}
+        pageIndex={layout.pageIndex}
+        style={(() => {
+          const angle = normalizeRotation(pageRotation);
+          if (angle === 0) return undefined;
+          const swap = angle === 90 || angle === 270;
+          return {
+            position: 'absolute', left: '50%', top: '50%',
+            width: swap ? height : width,
+            height: swap ? width : height,
+            transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+            transformOrigin: 'center center',
+          };
+        })()}
+      />
       <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
       {/* Search hit highlights (Task 4.1) — page-glued, pointer-transparent,
           below the room zones so measure/zone interactions are unaffected. */}

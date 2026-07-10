@@ -36,15 +36,16 @@ export function inverseRotatePctPoint(x, y, rot) {
   return rotatePctPoint(x, y, (360 - normalizeRotation(rot)) % 360);
 }
 
-// The rotation EmbedPDF/PDFium actually APPLIES on screen for a reported page
-// /Rotate. Empirically PDFium displays the COMPLEMENT of the reported quarter
-// turns (verified on the Beržų /Rotate-270 sheet — see PageOverlayHost), so
-// 90 and 270 swap while 0/180 pass through. Shared by PageOverlayHost (forward
-// overlay transform) and TakeoffViewer's handlePagePoint (inverse click
-// transform) so the two sites can never diverge.
+// The rotation the page is displayed at, which our overlays/clicks/measurements
+// rotate INTO. Now that PageOverlayHost rotates the base render to the page's
+// TRUE /Rotate (via CSS transform), display rotation == reported /Rotate — this
+// is the identity. (Previously it returned the COMPLEMENT, a workaround for the
+// base raster being drawn UNROTATED; once the raster is rotated correctly the
+// complement would put every overlay 180° off, so it must be identity.) Shared
+// by PageOverlayHost (forward overlay transform) and TakeoffViewer's
+// handlePagePoint (inverse click transform) so the two sites can never diverge.
 export function displayRotationFor(reported) {
-  const r = normalizeRotation(reported);
-  return r === 90 ? 270 : r === 270 ? 90 : r;
+  return normalizeRotation(reported);
 }
 
 export function rotateBboxPct(bbox, rot) {

@@ -74,13 +74,15 @@ test('inverseRotatePctPoint: display click on a 90-display page maps back to med
   assert.ok(Math.abs(my - 0.34) < 1e-9, `my=${my}`);
 });
 
-test('displayRotationFor: swaps 90<->270 (PDFium complement), keeps 0/180', () => {
+test('displayRotationFor: identity — display rotation == reported /Rotate', () => {
+  // Now that PageOverlayHost rotates the base render to the TRUE /Rotate, the
+  // overlays rotate by the same reported angle (was the PDFium "complement").
   assert.equal(displayRotationFor(0), 0);
-  assert.equal(displayRotationFor(90), 270);
+  assert.equal(displayRotationFor(90), 90);
   assert.equal(displayRotationFor(180), 180);
-  assert.equal(displayRotationFor(270), 90);
-  // quarter-turn form: 3 -> 270 reported -> 90 display
-  assert.equal(displayRotationFor(3), 90);
+  assert.equal(displayRotationFor(270), 270);
+  // quarter-turn enum form: 3 -> 270 reported -> 270 display
+  assert.equal(displayRotationFor(3), 270);
   assert.equal(displayRotationFor(undefined), 0);
 });
 
