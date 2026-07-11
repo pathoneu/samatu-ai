@@ -135,7 +135,7 @@ export default function Privacy() {
             <Term>Anthropic (Claude), JAV</Term> — brėžinių AI apdorojimas. Perdavimas už
             ES/EEE ribų vykdomas remiantis Europos Komisijos Standartinėmis
             sutartinėmis sąlygomis (SCC). Anthropic įsipareigoja nenaudoti API duomenų
-            modeliams treniruoti. Žr.{' '}
+            modeliams mokyti. Žr.{' '}
             <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">anthropic.com/legal/privacy</a>.
           </LI>
           <LI>
@@ -178,7 +178,7 @@ export default function Privacy() {
           <LI><Term>Apriboti tvarkymą</Term> (18 str.).</LI>
           <LI><Term>Perkelti duomenis</Term> (20 str.) — gauti savo projektus struktūruotu, kompiuterio skaitomu formatu (Excel / PDF / JSON eksportas).</LI>
           <LI><Term>Prieštarauti</Term> (21 str.) — teisėto intereso pagrindu vykdomam tvarkymui.</LI>
-          <LI><Term>Atšaukti sutikimą</Term> — bet kada, neveikiant atgaline data (pvz. rinkodaros ar analitikos slapukams).</LI>
+          <LI><Term>Atšaukti sutikimą</Term> — bet kada, neveikiant atgaline data (pvz., rinkodaros ar analitikos slapukams).</LI>
         </UL>
         <Callout title="Skundas priežiūros institucijai">
           <P>

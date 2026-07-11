@@ -256,7 +256,7 @@ export default function KiekiaiIsBrezinio() {
             ['Laikas kiekiams', '4–12 val.', '~15 min. + peržiūra'],
             ['Klaidų rizika', 'praleistos angos, dvigubos sienos', 'indikatoriai + patikros taisyklės'],
             ['Projekto pakeitimai', 'skaičiuoti iš naujo', 'perskaičiavimas akimirksniu'],
-            ['Kaina', 'jūsų valandos', 'nuo €12 už projektą'],
+            ['Kaina', 'jūsų valandos', 'nuo 12 € už projektą'],
           ]}
         />
         <Callout title="Kada tai neapsimoka">

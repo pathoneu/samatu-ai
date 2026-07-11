@@ -34,7 +34,7 @@ export default function Cookies() {
           Slapukai (angl. <em>cookies</em>) — nedideli tekstiniai failai, kuriuos
           svetainė įrašo jūsų įrenginyje naršant. Jie leidžia svetainei atpažinti
           jūsų naršyklę, išlaikyti prisijungimo būseną ir prisiminti pasirinkimus.
-          Panašias technologijas (pvz. <Code>localStorage</Code>) naudojame jūsų
+          Panašias technologijas (pvz., <Code>localStorage</Code>) naudojame jūsų
           slapukų sutikimui įsiminti.
         </P>
       </Section>
@@ -63,7 +63,7 @@ export default function Cookies() {
         <Callout title="Numatytoji būsena — privatumas pirmiausia">
           <P>
             Kol neduodate sutikimo, jokie nebūtinieji (analitiniai, rinkodaros)
-            slapukai neįjungiami. Sutikimą galite duoti, atsisakyti arba tvarkyti
+            slapukai neįjungiami. Sutikimą galite duoti, jo atsisakyti arba tvarkyti
             pagal kategoriją slapukų juostoje.
           </P>
         </Callout>
@@ -71,7 +71,7 @@ export default function Cookies() {
 
       <Section n={3} title="Konkretūs naudojami slapukai">
         <P>
-          Žemiau — pagrindiniai Pathon naudojami slapukai. Sąrašą periodiškai
+          Toliau — pagrindiniai Pathon naudojami slapukai. Sąrašą periodiškai
           atnaujiname; jei įdiegsime naujų analitikos ar rinkodaros priemonių,
           papildysime šią lentelę.
         </P>
@@ -130,7 +130,7 @@ export default function Cookies() {
           <LI>
             <Term>Naršyklės nustatymuose</Term> — galite blokuoti ar ištrinti slapukus.
             Atkreipkite dėmesį: išjungę būtinuosius slapukus, negalėsite naudotis
-            paslauga (pvz. prisijungti).
+            paslauga (pvz., prisijungti).
           </LI>
         </UL>
       </Section>

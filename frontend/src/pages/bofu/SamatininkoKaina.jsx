@@ -28,15 +28,15 @@ const URL = `https://pathon.eu${PATH}`;
 const FAQ = [
   {
     q: 'Kiek laiko atima statybos sąmata?',
-    a: 'Rankinis kiekių skaičiavimas iš brėžinių tipiniam objektui atima nuo kelių valandų iki poros dienų: reikia išmatuoti plotus ir perimetrus, suskaičiuoti angas, pritaikyti atliekų koeficientus ir viską suvesti į lentelę. Daugiausiai laiko suryja ne kainodara, o būtent kiekių skaičiavimas.',
+    a: 'Rankinis kiekių skaičiavimas iš brėžinių tipiniam objektui atima nuo kelių valandų iki poros dienų: reikia išmatuoti plotus ir perimetrus, suskaičiuoti angas, pritaikyti atliekų koeficientus ir viską suvesti į lentelę. Daugiausia laiko suryja ne kainodara, o būtent kiekių skaičiavimas.',
   },
   {
     q: 'Ar galiu sąmatą pasidaryti pats, be sąmatininko?',
-    a: 'Taip — jei turite projekto brėžinius ir žinote savo įkainius. Daugiausiai laiko suryja ne kainodara, o kiekių skaičiavimas: plotai, perimetrai, angos, atliekų koeficientai. Šią techninę dalį galima automatizuoti — įrankis paskaičiuoja kiekius, o sprendimus dėl kainų ir technologijų priimate jūs.',
+    a: 'Taip — jei turite projekto brėžinius ir žinote savo įkainius. Daugiausia laiko suryja ne kainodara, o kiekių skaičiavimas: plotai, perimetrai, angos, atliekų koeficientai. Šią techninę dalį galima automatizuoti — įrankis apskaičiuoja kiekius, o sprendimus dėl kainų ir technologijų priimate jūs.',
   },
   {
     q: 'Kiek kainuoja sąmata su Pathon?',
-    a: 'Vienkartinis projektas — €12. „Pro“ planas — €49/mėn. (10 projektų per mėnesį), „Studio“ — €149/mėn. (35 projektai). Naujoms įmonėms pirmasis bandomasis projektas nemokamas. Kainos nurodytos be PVM.',
+    a: 'Vienkartinis projektas — 12 €. „Pro“ planas — 49 €/mėn. (10 projektų per mėnesį), „Studio“ — 149 €/mėn. (35 projektai). Naujoms įmonėms pirmasis bandomasis projektas nemokamas. Kainos nurodytos be PVM.',
   },
 ];
 

@@ -56,8 +56,8 @@ export default function Terms() {
           <LI>Įkelti tik teisėtai gautus brėžinius — turėdami užsakovo ar savininko leidimą juos tvarkyti.</LI>
           <LI>Nepažeisti trečiųjų asmenų intelektinės nuosavybės ar konfidencialumo teisių.</LI>
           <LI>Nenaudoti paslaugos neteisėtais tikslais ar pažeidžiant galiojančius teisės aktus.</LI>
-          <LI>Nebandyti sutrikdyti, apeiti saugumo priemonių ar automatiškai (angl. <em>scraping</em>) rinkti paslaugos duomenų be leidimo.</LI>
-          <LI>Neperparduoti paslaugos tretiesiems asmenims be raštiško mūsų sutikimo.</LI>
+          <LI>Nebandyti sutrikdyti paslaugos veikimo, apeiti saugumo priemonių ar automatiškai (angl. <em>scraping</em>) rinkti paslaugos duomenų be leidimo.</LI>
+          <LI>Neperparduoti paslaugos tretiesiems asmenims be rašytinio mūsų sutikimo.</LI>
         </UL>
       </Section>
 
@@ -118,7 +118,7 @@ export default function Terms() {
           Kiek tai leidžia teisės aktai, bendra mūsų atsakomybė ribojama suma, kurią
           sumokėjote už paslaugą per 12 mėnesių iki įvykio, dėl kurio kilo pretenzija.
           Šie apribojimai netaikomi tais atvejais, kai atsakomybės neleidžia riboti
-          imperatyvios teisės normos (pvz. tyčia ar didelis neatsargumas).
+          imperatyvios teisės normos (pvz., tyčia ar didelis neatsargumas).
         </P>
       </Section>
 
@@ -127,7 +127,7 @@ export default function Terms() {
           <LI>Galime tobulinti, keisti ar nutraukti atskiras paslaugos funkcijas; apie esminius pakeitimus pranešime iš anksto.</LI>
           <LI>Galite bet kada nutraukti naudojimąsi ir ištrinti paskyrą — susisiekę <a href="mailto:solutions@pathon.eu" className="text-primary hover:underline">solutions@pathon.eu</a> arba per paskyros nustatymus.</LI>
           <LI>Galime sustabdyti ar nutraukti prieigą, jei iš esmės pažeidžiate šias sąlygas arba naudojatės paslauga neteisėtai.</LI>
-          <LI>Nutraukus paskyrą, jūsų duomenys tvarkomi pagal <Link to="/privacy" className="text-primary hover:underline">Privatumo politiką</Link>.</LI>
+          <LI>Ištrynus paskyrą, jūsų duomenys tvarkomi pagal <Link to="/privacy" className="text-primary hover:underline">Privatumo politiką</Link>.</LI>
         </UL>
       </Section>
 

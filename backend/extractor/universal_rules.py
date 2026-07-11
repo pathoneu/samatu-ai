@@ -283,16 +283,16 @@ def apply_height_plausibility_gate(rooms: list) -> list:
         recipient["lubu_aukstis_saltinis"] = "height_gate_reattributed"
         recipient["_height_gate"] = (
             f"Aukštis {moved_h} m perkeltas iš mažų drėgnų patalpų (Vision "
-            f"priskyrė klaidingai) — aukštos lubos būna dideliame svetainės/"
-            f"virtuvės plote")
+            f"priskyrė klaidingai) — aukštos lubos būdingos didelei svetainės/"
+            f"virtuvės erdvei")
 
     for r in implausible:
         old = _h(r)
         r["lubu_aukstis_m"] = modal_h
         r["lubu_aukstis_saltinis"] = "height_gate_clamped"
         r["_height_gate"] = (
-            f"Aukštis {old} m nepatikimas {r.get('paskirtis')} patalpai "
-            f"({_a(r):.1f} m²) — sumažinta iki {modal_h} m")
+            f"Aukštis {old} m nepatikimas „{r.get('paskirtis')}“ tipo patalpai "
+            f"({_a(r):.1f} m²) — sumažintas iki {modal_h} m")
         corrections.append({"action": "clamp", "room": r.get("pavadinimas"),
                             "from": old, "to": modal_h})
     return corrections

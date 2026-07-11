@@ -21,7 +21,7 @@ const QA = [
   },
   {
     q: 'Kiek laiko užtrunka paruošti sąmatą?',
-    a: 'Brėžinio nuskaitymas paprastai trunka 10–15 minučių (priklauso nuo lapų skaičiaus). Po to kiekiai jau paskaičiuoti — lieka peržiūrėti pažymėtas vietas ir suvesti kainas. Palyginimui: tuos pačius kiekius skaičiuojant ranka iš brėžinių, sugaištama nuo kelių valandų iki poros dienų.',
+    a: 'Brėžinio nuskaitymas paprastai trunka 10–15 minučių (priklauso nuo lapų skaičiaus). Po to kiekiai jau apskaičiuoti — lieka peržiūrėti pažymėtas vietas ir suvesti kainas. Palyginti: tuos pačius kiekius skaičiuojant ranka iš brėžinių, sugaištama nuo kelių valandų iki poros dienų.',
   },
   {
     q: 'Ar galiu pasitikėti automatiškai apskaičiuotais kiekiais?',
@@ -33,11 +33,11 @@ const QA = [
   },
   {
     q: 'Kiek kainuoja Pathon?',
-    a: 'Vienkartinis projektas — €12. „Pro" planas — €49/mėn. (10 projektų per mėnesį), „Studio" — €149/mėn. (35 projektai). Naujoms įmonėms — vienas nemokamas bandomasis projektas. Į kainą įskaičiuotas visas nuskaitymas, perskaičiavimai ir eksportai; kainos nurodytos be PVM.',
+    a: 'Vienkartinis projektas — 12 €. „Pro" planas — 49 €/mėn. (10 projektų per mėnesį), „Studio" — 149 €/mėn. (35 projektai). Naujoms įmonėms — vienas nemokamas bandomasis projektas. Į kainą įskaičiuotas visas nuskaitymas, perskaičiavimai ir eksportai; kainos nurodytos be PVM.',
   },
   {
     q: 'Ar Pathon pakeičia sąmatininką?',
-    a: 'Pathon atlieka techninę kiekių skaičiavimo dalį — tą, kuri užima daugiausiai laiko. Sprendimus (įkainius, technologijas, pasiūlymo strategiją) priimate jūs. Mažoms įmonėms tai dažnai reiškia, kad savininkas sąmatą pasidaro pats per vakarą, o ne skiria jai kelias dienas.',
+    a: 'Pathon atlieka techninę kiekių skaičiavimo dalį — tą, kuri užima daugiausia laiko. Sprendimus (įkainius, technologijas, pasiūlymo strategiją) priimate jūs. Mažoms įmonėms tai dažnai reiškia, kad savininkas sąmatą pasidaro pats per vakarą, o ne skiria jai kelias dienas.',
   },
   {
     q: 'Į kokius formatus galima eksportuoti?',

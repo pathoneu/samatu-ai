@@ -56,7 +56,7 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
     if page_count > 100:
         warning = (
             f"PDF turi {page_count} puslapių. AI analizuos tik pirmus 100 — "
-            f"jei svarbi info (pvz. eksplikacija) yra vėlesniuose puslapiuose, "
+            f"jei svarbi info (pvz., eksplikacija) yra vėlesniuose puslapiuose, "
             f"perorganizuokite PDF arba įkelkite atskirai pirmus 100 + likusius."
         )
         log.info("large PDF: %d pages (will cap at 100)", page_count)
@@ -1202,7 +1202,7 @@ async def api_get_shared(token: str):
     """
     project = db.get_project_by_share_token(token)
     if not project:
-        raise HTTPException(status_code=404, detail="Share link netinkamas, atšauktas arba pasibaigęs galiojimas")
+        raise HTTPException(status_code=404, detail="Bendrinimo nuoroda netinkama, atšaukta arba jos galiojimas pasibaigęs")
     # Sprint §36: bump view count on every successful access
     try:
         db.increment_share_view(token)
@@ -2108,7 +2108,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
                 )
 
             if not chunks:
-                return {"error": "PDF tekstas nerastas — galbūt skanuotas vaizdas?"}
+                return {"error": "PDF tekstas nerastas — galbūt skenuotas vaizdas?"}
 
             total_pages = int(chunks[-1]["pages"].split("-")[-1])
 
@@ -2189,7 +2189,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
             }
 
     except asyncio.TimeoutError:
-        return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+        return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
     except HTTPException:
         # F5 (2026-07-04 pentest): let the 400/413 raised by _validate_pdf_upload
         # (invalid PDF, oversized upload) propagate as the real HTTP status
@@ -3326,7 +3326,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
     if heights:
         pastabos.append("Lubų aukščiai — iš teksto analizės")
     else:
-        pastabos.append("Lubų aukščiai — numatytasis 2800 mm (nepavyko išskirti)")
+        pastabos.append("Lubų aukštis — numatytasis 2800 mm (nepavyko nustatyti)")
     if sekcijos:
         pastabos.append(f"Sienų plotai — iš {len(sekcijos)} išklotinių sekcijų (tikslūs matmenys)")
     elif uses_vision:
@@ -3383,7 +3383,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
                 langai_source = "niches"
                 pastabos.append(
                     "⚠ Langai nerasti išklotinėse — panaudotos užuolaidų nišos langų skaičiui nustatyti. "
-                    "Patikrink prielaidų skyriuje."
+                    "Patikrinkite prielaidų skyriuje."
                 )
 
         # Step 2: room-type fallback if niches also absent
@@ -3412,7 +3412,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
                 langai_source = "room_defaults"
                 pastabos.append(
                     "⚠ Langai nerasti brėžiniuose — pateikiami standartiniai pasiūlymai. "
-                    "Patikrink prielaidų skyriuje ir pakoreguok."
+                    "Patikrinkite prielaidų skyriuje ir pakoreguokite."
                 )
 
     # ── Task 6: FORGOTTEN ITEMS WARNINGS ────────────────────────────────────
@@ -4051,7 +4051,7 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
                 **quantities,
             }
     except asyncio.TimeoutError:
-        return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+        return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
     except Exception as e:
         return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
 
@@ -4092,7 +4092,7 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
                 **quantities,
             }
     except asyncio.TimeoutError:
-        return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+        return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
     except Exception as e:
         return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
 
@@ -4136,7 +4136,7 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
                 **quantities,
             }
     except asyncio.TimeoutError:
-        return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+        return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
     except Exception as e:
         return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
 
@@ -4181,7 +4181,7 @@ async def extract_concrete(request: Request, file: UploadFile = File(...)):
                 **quantities,
             }
     except asyncio.TimeoutError:
-        return {"error": "Timeout — PDF per didelis arba API neatsakė laiku."}
+        return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
     except Exception as e:
         return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
 
@@ -4443,11 +4443,11 @@ async def generate_excel(request: Request, data: dict):
 
         _tot(r,     "Suma be PVM:",  sum_formula,                  top=True)
         if _reverse_vat:
-            _tot(r + 1, "VISO (be PVM):", f"=F{r}",
+            _tot(r + 1, "IŠ VISO (be PVM):", f"=F{r}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
         else:
             _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
-            _tot(r + 2, "VISO su PVM:",  f"=F{r}+F{r+1}",
+            _tot(r + 2, "IŠ VISO su PVM:",  f"=F{r}+F{r+1}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -4817,7 +4817,7 @@ async def generate_pdf(request: Request, data: dict):
     # Right metadata cell: small doc-type label + data / nr / galioja iki.
     _meta_cell = [Paragraph(f"Data: {doc_date}", _meta_r)]
     if pasiulymo_nr:
-        _meta_cell.append(Paragraph(f"Pasiūlymo nr.: {pasiulymo_nr}", _meta_r))
+        _meta_cell.append(Paragraph(f"Pasiūlymo Nr.: {pasiulymo_nr}", _meta_r))
     _meta_cell.append(Paragraph(f"Galioja iki: {galioja_iki}", _meta_r))
 
     header_row = Table(
@@ -4868,7 +4868,7 @@ async def generate_pdf(request: Request, data: dict):
     table_data.append([
         Paragraph("Nr.",       hdr_l),
         Paragraph("Aprašymas", hdr_l),
-        Paragraph("Vnt.",      hdr_c),
+        Paragraph("Mat. vnt.", hdr_c),
         Paragraph("Kiekis",    hdr_r),
         Paragraph("Kaina €",   hdr_r),
         Paragraph("Suma €",    hdr_r),
@@ -5001,10 +5001,10 @@ async def generate_pdf(request: Request, data: dict):
     tot_row("Suma be PVM:",  viso_be_pvm)
     if _reverse_vat:
         # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
-        tot_row("VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
+        tot_row("IŠ VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
     else:
         tot_row("PVM 21%:",      pvm)
-        tot_row("VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
+        tot_row("IŠ VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
 
     # Global style
     style_cmds += [
