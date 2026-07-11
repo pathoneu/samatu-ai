@@ -19,8 +19,9 @@ import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { useExport } from '@embedpdf/plugin-export/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search, Printer, Download } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
+import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
 import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { DEFAULT_COUNT_TYPES } from '@/lib/measurements';
@@ -110,7 +111,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho, searchOpen, onToggleSearch, onCloseSearch }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -140,6 +141,19 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Pritaikyti plotį (1)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
       <button className={btn} title="Visas puslapis (0)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
+      {onToggleZoneFills && (
+        <>
+          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
+          {/* Zone-fill layer toggle. Founder decision 2026-07-11: markers are the
+              default; this re-enables the filled room polygons. */}
+          <button
+            className={zoneFillsVisible ? pressed : btn}
+            title={zoneFillsVisible ? 'Patalpų zonų užpildai: įjungta (rodyti žymeklius)' : 'Patalpų zonų užpildai: išjungta (rodyti užpildus)'}
+            aria-pressed={!!zoneFillsVisible}
+            onClick={onToggleZoneFills}
+          ><Layers className="w-4 h-4" /></button>
+        </>
+      )}
       {onMeasureTool && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
@@ -396,6 +410,9 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const [fillFor, setFillFor] = useState(null);
   // Drop the armed room if focus changes away (avoid filling the wrong room).
   useEffect(() => { setFillFor(null); }, [focusedRoomNr]);
+  // Room layer presentation. Founder decision 2026-07-11: numbered markers by
+  // default; the toolbar Layers toggle re-enables the filled polygon zones.
+  const [zoneFillsVisible, setZoneFillsVisible] = useState(ROOM_POLYGON_FILLS_DEFAULT_VISIBLE);
 
   // ---- Measurement subsystem (Phase 3) ------------------------------------
   // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
@@ -533,6 +550,8 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             searchOpen={searchOpen}
             onToggleSearch={() => setSearchOpen((v) => !v)}
             onCloseSearch={() => setSearchOpen(false)}
+            zoneFillsVisible={zoneFillsVisible}
+            onToggleZoneFills={() => setZoneFillsVisible((v) => !v)}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
           <ViewerHotkeys
@@ -564,6 +583,7 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
                       focusedRoomNr={focusedRoomNr}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
+                      zoneFillsVisible={zoneFillsVisible}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}

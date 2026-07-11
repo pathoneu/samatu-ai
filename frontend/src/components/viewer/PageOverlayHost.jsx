@@ -57,6 +57,9 @@ export default function PageOverlayHost({
   focusedRoomNr,
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
+  // Founder decision 2026-07-11: rooms render as numbered markers by default;
+  // polygon fills only when the toolbar zone-fill toggle turns this on.
+  zoneFillsVisible = false,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -155,6 +158,7 @@ export default function PageOverlayHost({
           focusedRoomNr={focusedRoomNr}
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
+          zoneFillsVisible={zoneFillsVisible}
           interactive={!measureActive}
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />

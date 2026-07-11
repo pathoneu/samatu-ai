@@ -22,6 +22,15 @@ import { SearchPluginPackage } from '@embedpdf/plugin-search/react';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 
+// Default zoom (founder feedback 2026-07-11: plans opened "far away, hard to
+// read"). FitPage computes ONE document zoom that fits the tallest page — the
+// portrait A3 cover — so every LANDSCAPE floor plan shrank with it (60% at a
+// 1512×982 window, 43% at 1280×720). FitWidth sizes to the widest sheet
+// instead: landscape plans fill the pane width (~25-45% larger, readable at
+// rest) and the portrait cover is simply taller than the viewport — vertical
+// scroll, which this continuous scroller already is.
+export const DEFAULT_ZOOM_LEVEL = ZoomMode.FitWidth;
+
 export function engineOptions() {
   return {
     // ABSOLUTE url — resolvable from the worker context (Task 1).
@@ -39,7 +48,7 @@ export function makeViewerPlugins(initialUrl) {
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
     createPluginRegistration(RenderPluginPackage),
-    createPluginRegistration(ZoomPluginPackage, { defaultZoomLevel: ZoomMode.FitPage }),
+    createPluginRegistration(ZoomPluginPackage, { defaultZoomLevel: DEFAULT_ZOOM_LEVEL }),
     createPluginRegistration(TilingPluginPackage),
     createPluginRegistration(InteractionManagerPluginPackage),
     createPluginRegistration(ThumbnailPluginPackage, { width: 120, gap: 8, labelHeight: 16 }),

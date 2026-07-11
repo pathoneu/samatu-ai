@@ -33,6 +33,14 @@ export const ROOM_ZONE_COLORS = {
 
 const DEFAULT_ZONE_COLOR = '#10b981';
 
+// FOUNDER DECISION (2026-07-11): the default room presentation is a numbered
+// MARKER at the polygon centroid, NOT the filled polygon — on real plans the
+// flood-fill outlines bleed over walls / notch around annotations and read as
+// "polygons don't match the rooms". The polygon fills stay in the codebase and
+// are reachable via the viewer toolbar's zone-fill toggle; flip this to true
+// once the traced polygons are trusted again.
+export const ROOM_POLYGON_FILLS_DEFAULT_VISIBLE = false;
+
 export function roomZoneColor(paskirtis) {
   return ROOM_ZONE_COLORS[paskirtis] || DEFAULT_ZONE_COLOR;
 }
@@ -54,6 +62,34 @@ export function confidenceHex(confidence) {
 // polygon it may carry is a fabricated coarse rectangle, so the room becomes a
 // Tier-2 marker (circled number), never a solid zone.
 const NON_TRACED_SOURCES = new Set(['synthesized_from_bbox', 'bbox_fallback', 'manual_needed']);
+
+// Area-weighted centroid of a scaled polygon ([[x,y], …] screen px). Falls back
+// to the bbox center for degenerate (zero-area) rings. Used to anchor the
+// default numbered marker of a TRACED room — the centroid is reliable even when
+// the traced outline itself is sloppy at the edges.
+export function polygonPointsCentroid(points) {
+  if (!Array.isArray(points) || points.length < 3) return null;
+  let cx = 0, cy = 0, areaSum = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % n];
+    const f = x1 * y2 - x2 * y1;
+    cx += (x1 + x2) * f;
+    cy += (y1 + y2) * f;
+    areaSum += f;
+  }
+  if (areaSum !== 0) {
+    const a = areaSum / 2;
+    return { cx: cx / (6 * a), cy: cy / (6 * a) };
+  }
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  return {
+    cx: (Math.min(...xs) + Math.max(...xs)) / 2,
+    cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+  };
+}
 
 function markerCenter(room, { renderedWidth, renderedHeight }) {
   // ONLY a reliable printed-number anchor (marker_pct = the backend's label seed,
@@ -112,6 +148,13 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
 
   if (!geometry) return null;
 
+  // Marker anchor for the default numbered-marker presentation (founder
+  // decision 2026-07-11): traced polygons anchor at their CENTROID (reliable
+  // even when the outline is sloppy); tier-2 rooms reuse their label anchor.
+  const marker = geometry.type === 'polygon'
+    ? polygonPointsCentroid(geometry.points)
+    : { cx: geometry.cx, cy: geometry.cy };
+
   const { confidence } = computeAreaConfidence(room);
   const area = Number.isFinite(room.plotas_m2) ? room.plotas_m2 : null;
 
@@ -127,7 +170,45 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
     confidenceColor: confidenceHex(confidence),
     approximate,
     geometry,
+    marker,
   };
+}
+
+/**
+ * spreadOverlappingMarkers — de-overlap marker anchors so every circled room
+ * number stays readable and clickable. On real plans several rooms can carry
+ * near-identical polygons (duplicated flood-fills → identical centroids), which
+ * stacks their markers exactly on top of each other. Groups anchors within
+ * `minGap` of each other (transitively), then fans each group out horizontally
+ * around the group's center, ordered by nr for determinism.
+ *
+ * @param items [{ nr, cx, cy }] — original anchors
+ * @param minGap px — minimum center-to-center distance (default 2R + 4)
+ * @returns Map nr(String) → { cx, cy } adjusted anchors
+ */
+export function spreadOverlappingMarkers(items, minGap = 30) {
+  const out = new Map();
+  if (!Array.isArray(items) || items.length === 0) return out;
+  // Union-find style greedy clustering on the ORIGINAL positions.
+  const groups = [];
+  for (const it of items) {
+    const hit = groups.find((g) => g.some(
+      (m) => Math.hypot(m.cx - it.cx, m.cy - it.cy) < minGap));
+    if (hit) hit.push(it); else groups.push([it]);
+  }
+  for (const g of groups) {
+    if (g.length === 1) {
+      out.set(String(g[0].nr), { cx: g[0].cx, cy: g[0].cy });
+      continue;
+    }
+    const midX = g.reduce((s, m) => s + m.cx, 0) / g.length;
+    const midY = g.reduce((s, m) => s + m.cy, 0) / g.length;
+    const sorted = [...g].sort((a, b) => String(a.nr).localeCompare(String(b.nr), 'lt', { numeric: true }));
+    sorted.forEach((m, i) => {
+      out.set(String(m.nr), { cx: midX + (i - (sorted.length - 1) / 2) * minGap, cy: midY });
+    });
+  }
+  return out;
 }
 
 function roomPage(room) {

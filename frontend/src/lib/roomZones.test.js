@@ -86,12 +86,13 @@ test('buildRoomZone: synthesized_from_bbox polygon is a fake rect → not traced
   assert.equal(z, null);
 });
 
-test('buildRoomZone: synthesized_from_bbox WITH marker_pct → located marker, not a polygon', () => {
+test('buildRoomZone: synthesized_from_bbox WITH marker_pct → null (floating markers dropped, be9221a)', () => {
+  // NON_TRACED_SOURCES seeds often matched the eksplikacija number column, not
+  // the on-plan label — a marker there floats in empty space. Suppressed since
+  // be9221a: these rooms fall to the honest "be vietos" chip instead.
   const z = buildRoomZone(
     { ...roomPolygon, polygon_source: 'synthesized_from_bbox', marker_pct: [0.3, 0.4] }, SIZE);
-  assert.equal(z.geometry.type, 'marker');
-  assert.deepEqual([z.geometry.cx, z.geometry.cy], [300, 320]);  // 0.3*1000, 0.4*800
-  assert.equal(z.approximate, true);
+  assert.equal(z, null);
 });
 
 test('buildRoomZone: no polygon, only bbox (no anchor) → null (no rect fallback)', () => {
@@ -146,21 +147,27 @@ test('C1(a): real auto_floodfill polygon → solid polygon tier, not approximate
   assert.equal(z.approximate, false);
 });
 
-test('C1(b): manual_needed with marker_pct → marker tier at the printed label', () => {
+test('C1(b): manual_needed with marker_pct → null (floating markers dropped, be9221a)', () => {
   const z = buildRoomZone(
     { nr: '108', polygon_source: 'manual_needed', marker_pct: [0.55, 0.30] },
     { renderedWidth: 1000, renderedHeight: 2000 });
-  assert.equal(z.geometry.type, 'marker');
-  assert.deepEqual([z.geometry.cx, z.geometry.cy], [550, 600]);  // 0.55*1000, 0.30*2000
-  assert.equal(z.approximate, true);
+  assert.equal(z, null);
 });
 
-test('C1(c): manual_needed with label_pct (no marker_pct) → marker at label_pct', () => {
+test('C1(c): manual_needed with label_pct → null (floating markers dropped, be9221a)', () => {
   const z = buildRoomZone(
     { nr: '109', polygon_source: 'manual_needed', label_pct: [0.40, 0.25] },
     { renderedWidth: 1000, renderedHeight: 2000 });
+  assert.equal(z, null);
+});
+
+test('C1(b2): NO polygon_source with marker_pct → tier-2 marker at the printed label', () => {
+  // Tier 2 stays reachable when the source is not a known-bad seed.
+  const z = buildRoomZone(
+    { nr: '108', marker_pct: [0.55, 0.30] },
+    { renderedWidth: 1000, renderedHeight: 2000 });
   assert.equal(z.geometry.type, 'marker');
-  assert.deepEqual([z.geometry.cx, z.geometry.cy], [400, 500]);  // 0.40*1000, 0.25*2000
+  assert.deepEqual([z.geometry.cx, z.geometry.cy], [550, 600]);  // 0.55*1000, 0.30*2000
   assert.equal(z.approximate, true);
 });
 
@@ -177,6 +184,68 @@ test('C1(e): no geometry, no anchor → null (Tier 3, counted as missing)', () =
   const z = buildRoomZone({ nr: '900', polygon_source: 'manual_needed' },
     { renderedWidth: 1000, renderedHeight: 1000 });
   assert.equal(z, null);
+});
+
+// ── Marker-by-default (founder decision 2026-07-11) ────────────────────────
+// Every placeable zone carries a `marker` anchor: traced polygons anchor at
+// their area centroid; tier-2 rooms reuse their label anchor. The polygon
+// fills default OFF (RoomZoneLayer renders the marker unless toggled on).
+import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, polygonPointsCentroid } from './roomZones.js';
+
+test('founder default 2026-07-11: polygon fills are OFF by default', () => {
+  assert.equal(ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, false);
+});
+
+test('buildRoomZone: traced polygon carries a centroid marker anchor', () => {
+  const z = buildRoomZone(roomPolygon, SIZE);
+  assert.equal(z.geometry.type, 'polygon');
+  // Rectangle (0.1..0.5)×1000 × (0.13..0.55)×800 → centroid (300, 272)
+  assert.ok(Math.abs(z.marker.cx - 300) < 1e-9);
+  assert.ok(Math.abs(z.marker.cy - 272) < 1e-9);
+});
+
+test('buildRoomZone: tier-2 marker zone anchors at its label point', () => {
+  const z = buildRoomZone(
+    { nr: '108', marker_pct: [0.3, 0.4] }, SIZE);
+  assert.equal(z.geometry.type, 'marker');
+  assert.deepEqual([z.marker.cx, z.marker.cy], [300, 320]);
+});
+
+test('polygonPointsCentroid: L-shape centroid is area-weighted, not bbox center', () => {
+  // L-shape (0,0)(2,0)(2,1)(1,1)(1,2)(0,2): area 3, centroid (5/6, 5/6) —
+  // bbox center would be (1,1), so this pins the area weighting.
+  const c = polygonPointsCentroid([[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]]);
+  assert.ok(Math.abs(c.cx - 5 / 6) < 1e-9);
+  assert.ok(Math.abs(c.cy - 5 / 6) < 1e-9);
+});
+
+test('polygonPointsCentroid: degenerate ring falls back to bbox center', () => {
+  const c = polygonPointsCentroid([[0, 0], [4, 0], [8, 0]]);
+  assert.deepEqual(c, { cx: 4, cy: 0 });
+});
+
+import { spreadOverlappingMarkers } from './roomZones.js';
+
+test('spreadOverlappingMarkers: solo markers keep their true anchor', () => {
+  const m = spreadOverlappingMarkers([
+    { nr: '101', cx: 100, cy: 100 },
+    { nr: '102', cx: 400, cy: 100 },
+  ], 30);
+  assert.deepEqual(m.get('101'), { cx: 100, cy: 100 });
+  assert.deepEqual(m.get('102'), { cx: 400, cy: 100 });
+});
+
+test('spreadOverlappingMarkers: identical centroids fan out horizontally, nr-ordered', () => {
+  // duplicated flood-fill polygons → 3 rooms share one centroid (Beržų 103/108/109 case)
+  const m = spreadOverlappingMarkers([
+    { nr: '109', cx: 648, cy: 506 },
+    { nr: '103', cx: 648, cy: 506 },
+    { nr: '108', cx: 649, cy: 506 },
+  ], 30);
+  const xs = ['103', '108', '109'].map((nr) => m.get(nr).cx);
+  assert.ok(xs[0] < xs[1] && xs[1] < xs[2]);              // fanned left→right by nr
+  assert.ok(Math.abs(xs[1] - xs[0] - 30) < 1e-6);         // exactly minGap apart
+  assert.ok(['103', '108', '109'].every((nr) => m.get(nr).cy === 506));
 });
 
 import { buildPageRoomZones, countRoomsMissingGeometry } from './roomZones.js';

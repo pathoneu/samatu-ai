@@ -1,12 +1,18 @@
 /**
  * RoomZoneLayer — the AI Takeoff Viewer's first visible layer (Phase 1).
  *
- * Draws the app's ALREADY-COMPUTED rooms onto the PDF page as translucent SVG
- * zones. Declutter contract (declutter pattern, 2026-07-02): at rest a zone is a
- * quiet fill-only polygon — NO label chip. The chip (name + area + confidence
- * dot) appears only on hover, and stays pinned while the room is focused.
- * Synthesized/bbox geometry gets a DASHED border + "apytikslė" so the viewer
- * never fakes a precise outline (design spec §9).
+ * FOUNDER DECISION (2026-07-11): the DEFAULT presentation for every placeable
+ * room is a compact numbered MARKER (circled room nr at the polygon centroid /
+ * label anchor) — on real plans the flood-fill outlines bleed over walls and
+ * notch around annotations, reading as "polygons don't match the rooms". The
+ * filled polygon zones stay implemented and render when `zoneFillsVisible` is
+ * true (viewer toolbar toggle; default ROOM_POLYGON_FILLS_DEFAULT_VISIBLE).
+ *
+ * Declutter contract (2026-07-02): at rest a shape is quiet — NO label chip.
+ * The chip (name + area + confidence dot) appears on hover, and stays pinned
+ * while the room is focused; a focused marker also gets a pulsing halo (the
+ * "Rodyti brėžinyje" flash). Synthesized/bbox geometry stays DASHED +
+ * "apytikslė" so the viewer never fakes a precise outline (design spec §9).
  *
  * A FACE over the engine — no quantity math here. Geometry + confidence come
  * from lib/roomZones (which reuses planOverlayGeometry + areaConfidence).
@@ -17,7 +23,10 @@
  */
 
 import { useMemo, useState } from 'react';
-import { buildPageRoomZones, countRoomsMissingGeometry } from '@/lib/roomZones';
+import {
+  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers,
+  ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
+} from '@/lib/roomZones';
 
 function centroidOf(geometry) {
   if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
@@ -47,6 +56,11 @@ function chipLabelFor(label) {
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
+// Marker aesthetics: professional "clean number marker" — white/paper fill,
+// ink stroke + ink number, constant screen size at every zoom (map-pin style).
+const MARKER_R = 13;
+const MARKER_INK = '#1f2937';
+
 export default function RoomZoneLayer({
   rooms = [],
   page,
@@ -58,6 +72,9 @@ export default function RoomZoneLayer({
   // false while a measurement tool is armed: zones stay visible but must not
   // swallow the measure clicks (their <g> normally re-enable pointer events).
   interactive = true,
+  // Founder decision 2026-07-11: polygon fills are OFF by default — every
+  // placeable room renders as a numbered marker until this is toggled on.
+  zoneFillsVisible = ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 }) {
   const width = renderedSize?.width;
   const height = renderedSize?.height;
@@ -86,6 +103,14 @@ export default function RoomZoneLayer({
     [zones, hiddenSet],
   );
 
+  // De-overlapped marker anchors: rooms with duplicated polygons share a
+  // centroid, which would stack their circled numbers unreadably — fan those
+  // clusters out (nr → {cx, cy}); solo markers keep their true anchor.
+  const markerAt = useMemo(() => spreadOverlappingMarkers(
+    visibleZones.map((z) => ({ nr: z.nr, cx: z.marker.cx, cy: z.marker.cy })),
+    MARKER_R * 2 + 4,
+  ), [visibleZones]);
+
   if (!width || !height) return null;
   if (zones.length === 0 && missingCount === 0) return null;
 
@@ -95,6 +120,9 @@ export default function RoomZoneLayer({
   const isHoveredZone = (z) =>
     (hoverNr != null && String(z.nr) === hoverNr)
     || (hoveredRoomNrExternal != null && String(z.nr) === String(hoveredRoomNrExternal));
+  // Marker presentation applies to every zone while fills are off, and always
+  // to tier-2 (label-anchored) rooms, which have no traced outline to fill.
+  const rendersAsMarker = (z) => !zoneFillsVisible || z.geometry.type === 'marker';
 
   return (
     <svg
@@ -103,6 +131,15 @@ export default function RoomZoneLayer({
       className="absolute left-0 top-0 z-[16]"
       style={{ pointerEvents: 'none' }}
     >
+      {/* Focus pulse for markers ("Rodyti brėžinyje" flash). r is a CSS
+          geometry property — animatable in all evergreen browsers. */}
+      <style>{`
+        @keyframes rz-marker-pulse {
+          0% { r: ${MARKER_R}px; opacity: 0.75; }
+          100% { r: ${MARKER_R * 2.2}px; opacity: 0; }
+        }
+        .rz-marker-pulse { animation: rz-marker-pulse 1.5s ease-out infinite; }
+      `}</style>
       {/* Pass 1: shapes only — fill-quiet at rest, brighter on hover/focus. */}
       {visibleZones.map((z) => {
         const isFocused = isFocusedZone(z);
@@ -122,12 +159,18 @@ export default function RoomZoneLayer({
             onMouseEnter={() => setHoverNr(String(z.nr))}
             onMouseLeave={() => setHoverNr((cur) => (cur === String(z.nr) ? null : cur))}
           >
-            {z.geometry.type === 'marker' ? (
-              <g transform={`translate(${z.geometry.cx}, ${z.geometry.cy})`}>
-                <circle r={15} fill="white" fillOpacity={0.9} stroke={z.color}
-                  strokeWidth={isHovered || isFocused ? 3 : 2} strokeDasharray="4 3" />
+            {rendersAsMarker(z) ? (
+              <g transform={`translate(${(markerAt.get(String(z.nr)) || z.marker).cx}, ${(markerAt.get(String(z.nr)) || z.marker).cy})`}>
+                {isFocused && (
+                  <circle className="rz-marker-pulse" r={MARKER_R} fill="none"
+                    stroke={MARKER_INK} strokeWidth={2} style={{ pointerEvents: 'none' }} />
+                )}
+                <circle r={MARKER_R} fill="#ffffff" fillOpacity={0.95}
+                  stroke={MARKER_INK}
+                  strokeWidth={isFocused ? 2.5 : isHovered ? 2 : 1.25}
+                  strokeDasharray={z.approximate ? '4 3' : undefined} />
                 <text x={0} y={0} textAnchor="middle" dominantBaseline="central"
-                  fontSize={12} fontWeight="700" fill={z.color}
+                  fontSize={11} fontWeight="700" fill={MARKER_INK}
                   style={{ pointerEvents: 'none' }}>
                   {z.nr}
                 </text>
@@ -160,14 +203,17 @@ export default function RoomZoneLayer({
       })}
 
       {/* Pass 2: label chips — hovered/focused zones only, drawn AFTER every
-          polygon so a chip is never buried under a neighbor zone's fill.
-          Suppressed for markers — a marker already shows its number. */}
+          shape so a chip is never buried under a neighbor zone's fill. Markers
+          get the chip ABOVE the circle so it never covers the number. */}
       {visibleZones.map((z) => {
-        if (z.geometry.type === 'marker') return null;
         const isFocused = isFocusedZone(z);
         const isHovered = isHoveredZone(z);
         if (!isFocused && !isHovered) return null;
-        const { cx, cy } = centroidOf(z.geometry);
+        const asMarker = rendersAsMarker(z);
+        const anchor = asMarker ? (markerAt.get(String(z.nr)) || z.marker) : null;
+        const { cx, cy } = asMarker
+          ? { cx: anchor.cx, cy: anchor.cy - MARKER_R - 21 }
+          : centroidOf(z.geometry);
         const w = chipWidthFor(z.label);
         const half = w / 2;
         return (
@@ -178,7 +224,7 @@ export default function RoomZoneLayer({
           >
             <rect
               x={-half} y={-17} width={w} height={34} rx={4}
-              fill="white" stroke={z.color} strokeWidth={1} opacity={0.96}
+              fill="white" stroke={asMarker ? MARKER_INK : z.color} strokeWidth={1} opacity={0.96}
             />
             <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
               <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
@@ -186,7 +232,7 @@ export default function RoomZoneLayer({
             <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
               {chipLabelFor(z.label)}
             </text>
-            <text x={-half + 18} y={11} fontSize={10} fill={z.color}>
+            <text x={-half + 18} y={11} fontSize={10} fill={asMarker ? '#4b5563' : z.color}>
               {z.areaLabel}{z.approximate ? ' · apytikslė vieta' : ''}
             </text>
           </g>
