@@ -1,10 +1,16 @@
 /**
- * pageRotation — corrects a known data-pipeline bug: room polygon_pct / bbox_pct
- * are computed by the extractor on the UNROTATED (mediabox) page raster (pdf2image
- * ignores /Rotate), but the viewer DISPLAYS the page with /Rotate applied. So on a
- * rotated page the pct land in the wrong place. These helpers rotate a top-left-
- * origin fractional point/bbox by the page's /Rotate so extraction-space pct map
- * onto the rotated display. Rotation 0 pages pass through untouched (safe).
+ * pageRotation — mediabox-space ⇄ display-space transforms for /Rotate pages.
+ *
+ * COORDINATE SPACES (verified 2026-07-11 on the Beržų /Rotate-270 sheets):
+ * - Room polygon_pct / bbox_pct from the extractor are DISPLAY-space: pdf2image
+ *   (poppler) APPLIES /Rotate when rastering, so the extraction raster is the
+ *   rotation-applied readable sheet. (An earlier note here claimed pdf2image
+ *   ignores /Rotate — that was wrong, and it mis-motivated two bad viewer
+ *   fixes. Ground truth: the legacy react-pdf viewer plots the pct RAW over a
+ *   rotation-applied render and they align.) Zones therefore need NO transform.
+ * - Measurements and EmbedPDF interaction-manager click points are UNROTATED
+ *   mediabox PDF points. These helpers map that space onto the rotation-applied
+ *   display (and back). Rotation 0 pages pass through untouched (safe).
  *
  * Convention: rotate the IMAGE clockwise by /Rotate degrees (PDF /Rotate is CW).
  *   90:  (x,y) -> (1-y, x)
@@ -36,14 +42,14 @@ export function inverseRotatePctPoint(x, y, rot) {
   return rotatePctPoint(x, y, (360 - normalizeRotation(rot)) % 360);
 }
 
-// The rotation the page is displayed at, which our overlays/clicks/measurements
-// rotate INTO. Now that PageOverlayHost rotates the base render to the page's
-// TRUE /Rotate (via CSS transform), display rotation == reported /Rotate — this
-// is the identity. (Previously it returned the COMPLEMENT, a workaround for the
-// base raster being drawn UNROTATED; once the raster is rotated correctly the
-// complement would put every overlay 180° off, so it must be identity.) Shared
-// by PageOverlayHost (forward overlay transform) and TakeoffViewer's
-// handlePagePoint (inverse click transform) so the two sites can never diverge.
+// The rotation the page is displayed at. PageOverlayHost's content wrapper
+// CSS-rotates ALL EmbedPDF page content (base render + tiles + search
+// highlights) by the page's TRUE /Rotate, so display rotation == reported
+// /Rotate — the identity. (Previously this returned the COMPLEMENT, a
+// workaround from the era when the base raster was drawn unrotated.) Shared by
+// PageOverlayHost (content wrapper angle), makeEmbedAdapter (measurement
+// mediabox⇄display mapping) and TakeoffViewer's handlePagePoint (click-to-fill
+// seed mediabox→display) so those sites can never diverge.
 export function displayRotationFor(reported) {
   return normalizeRotation(reported);
 }
@@ -63,7 +69,10 @@ export function rotateBboxPct(bbox, rot) {
   return { x: nx, y: ny, w: Math.max(...xs) - nx, h: Math.max(...ys) - ny };
 }
 
-// Return a shallow-cloned room whose polygon_pct / bbox_pct are rotated for display.
+// Return a shallow-cloned room whose polygon_pct / bbox_pct are rotated by rot.
+// NOTE: currently UNUSED by the viewer — room pct are already display-space
+// (see header), so PageOverlayHost plots them raw. Kept (with tests) for any
+// future geometry that genuinely lives in mediabox space.
 export function rotateRoomGeometry(room, rot) {
   const r = normalizeRotation(rot);
   if (r === 0 || !room) return room;

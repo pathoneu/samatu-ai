@@ -21,7 +21,7 @@ import { usePrint } from '@embedpdf/plugin-print/react';
 import { useExport } from '@embedpdf/plugin-export/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search, Printer, Download } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
-import { displayRotationFor, inverseRotatePctPoint } from '@/lib/viewerEngine/pageRotation';
+import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { uncalibratedScale } from '@/lib/measureGeometry';
@@ -478,14 +478,16 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
     }
     const { x, y, pageIndex, pageWidth, pageHeight, pageRotation } = pt;
     if (!pageWidth || !pageHeight) { setFillFor(null); return; }
-    // BUGFIX (2026-07-02): the click lands in DISPLAY space (page shown with
-    // PDFium's /Rotate complement — see displayRotationFor), but the
-    // click-to-fill backend rasters the UNROTATED mediabox page (pdf2image
-    // ignores /Rotate). Inverse-rotate the pct so the flood-fill seed lands
-    // where the user actually clicked. Zones render correctly because
-    // PageOverlayHost applies the FORWARD transform with the same helper.
+    // COORDINATE CONTRACT (see PageClicks in PageOverlayHost): x/y arrive in
+    // UNROTATED mediabox PDF points — EmbedPDF's PagePointerProvider already
+    // un-rotated the display click by the page's /Rotate and divided by zoom
+    // scale. pageWidth/pageHeight are the mediabox size in POINTS. The
+    // click-to-fill backend rasters pages via pdf2image (poppler APPLIES
+    // /Rotate — the same rotation-applied space the stored room pct live in),
+    // so forward-rotate the mediabox pct into display space for the seed.
+    // Zoom-independent by construction (points, not CSS px).
     const rot = displayRotationFor(pageRotation ?? 0);
-    const [mx, my] = inverseRotatePctPoint(x / pageWidth, y / pageHeight, rot);
+    const [mx, my] = rotatePctPoint(x / pageWidth, y / pageHeight, rot);
     try {
       const data = await clickToFill({
         projectId,

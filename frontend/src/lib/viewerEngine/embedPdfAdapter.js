@@ -6,10 +6,10 @@
  *
  * PDF points here are TOP-LEFT-origin mediabox points (rotation-independent):
  * measurements stored in this space survive zoom and /Rotate changes. The
- * display transform goes through the shared pageRotation helpers so it can
- * never diverge from PageOverlayHost's zone transform or TakeoffViewer's
- * click-to-fill inverse transform (see displayRotationFor for why reported
- * /Rotate 90 and 270 swap on screen).
+ * display transform goes through the shared pageRotation helpers
+ * (displayRotationFor = the page's true /Rotate now that PageOverlayHost's
+ * content wrapper rotates the whole rendered page) so it can never diverge
+ * from the wrapper's angle or TakeoffViewer's click-to-fill seed transform.
  */
 import {
   normalizeRotation,

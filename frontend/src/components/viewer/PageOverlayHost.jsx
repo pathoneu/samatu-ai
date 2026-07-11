@@ -15,7 +15,7 @@ import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { SearchLayer } from '@embedpdf/plugin-search/react';
 import { PagePointerProvider, usePointerHandlers } from '@embedpdf/plugin-interaction-manager/react';
 import { makeViewport } from '@/lib/viewerEngine/pageViewport';
-import { rotateRoomGeometry, displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
+import { displayRotationFor } from '@/lib/viewerEngine/pageRotation';
 import { makeEmbedAdapter } from '@/lib/viewerEngine/embedPdfAdapter';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { polygonCentroid } from '@/lib/polygonGeometry';
@@ -24,8 +24,14 @@ import MeasureLayer from './MeasureLayer';
 
 function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
-  // pageRotation = the page's REPORTED /Rotate — included so consumers
-  // (TakeoffViewer.handlePagePoint) can inverse-map display clicks to mediabox.
+  // COORDINATE CONTRACT (verified in @embedpdf/plugin-interaction-manager dist):
+  // PagePointerProvider's default convertEventToPoint runs restorePosition(),
+  // which un-rotates the display click by the page's effective /Rotate AND
+  // divides by the zoom scale. So pos.x/pos.y arrive ALREADY in UNROTATED
+  // mediabox PDF POINTS — not display px. pageWidth/pageHeight passed along
+  // here must therefore be the mediabox size in POINTS (pageSizePt), so that
+  // consumers get pct with a straight divide. pageRotation (/Rotate enum) is
+  // included for context only — no rotation math belongs in this path.
   useEffect(() => register({
     onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation }),
   }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint]);
@@ -67,21 +73,16 @@ export default function PageOverlayHost({
   onMeasureSelect = null,
   onMeasureDelete = null,
 }) {
-  // Correct the extraction-vs-display rotation mismatch: room pct are computed on
-  // the UNROTATED (mediabox) raster by the extractor, but EmbedPDF/PDFium DISPLAYS
-  // the page with /Rotate applied — and empirically applies the COMPLEMENT of the
-  // reported /Rotate. Verified by compositing the real viewer raster with the
-  // overlay on the Beržų /Rotate-270 sheet: the page shows as mediabox rotated 90°
-  // CW, so room 102 (mediabox 0.30,0.34) sits upper-right (0.66,0.30) and the title
-  // block (0.85,0.90) sits bottom-left (0.10,0.85). The mediabox→display map is thus
-  // (1-y,x) = the 90° transform for a /Rotate-270 page. So swap 90<->270 — via the
-  // shared displayRotationFor helper, which TakeoffViewer's handlePagePoint also
-  // uses for the INVERSE (click → mediabox) transform, so the two can't diverge.
+  // Room pct are ALREADY display-space: the extractor rasters pages via
+  // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
+  // the legacy react-pdf viewer, which plots the very same pct RAW over a
+  // rotation-applied render and aligns perfectly (room 102 centroid 0.31,0.32
+  // = the top-left open-plan room on the LANDSCAPE Beržų sheet). The content
+  // wrapper below rotates the base render into that same rotation-applied
+  // display, so zones consume the pct unchanged — any per-page rotation of the
+  // room geometry here would double-rotate them off their rooms.
   const rot = displayRotationFor(pageRotation);
-  const displayRooms = useMemo(
-    () => (rot === 0 ? rooms : (rooms || []).map((r) => rotateRoomGeometry(r, rot))),
-    [rooms, rot],
-  );
+  const displayRooms = rooms;
   const vp = makeViewport(layout);
   const { width, height } = vp ? vp.renderedSize() : { width: 0, height: 0 };
   // Screen<->PDF-point boundary for the measure layer. Rebuilt on zoom (rendered
@@ -108,34 +109,43 @@ export default function PageOverlayHost({
 
   return (
     <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
-      {/* EmbedPDF's <RenderLayer> draws the UNROTATED mediabox raster (PDFium's
-          /Rotate is bypassed by its matrix render path), so /Rotate 90|270 sheets
-          come out sideways. Apply the page's true /Rotate as a CSS transform on
-          the base <img> (RenderLayer forwards `style`). width/height here are the
-          rotation-applied host dims; for a quarter-turn we give the <img> the
-          swapped (un-rotated) box so it fills the host after the rotate. The
-          tiling layer is already rotation-aware, so it needs no change. */}
-      <RenderLayer
-        documentId={documentId}
-        pageIndex={layout.pageIndex}
-        style={(() => {
-          const angle = normalizeRotation(pageRotation);
-          if (angle === 0) return undefined;
-          const swap = angle === 90 || angle === 270;
-          return {
-            position: 'absolute', left: '50%', top: '50%',
-            width: swap ? height : width,
-            height: swap ? width : height,
-            transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-            transformOrigin: 'center center',
-          };
-        })()}
-      />
-      <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
-      {/* Search hit highlights (Task 4.1) — page-glued, pointer-transparent,
-          below the room zones so measure/zone interactions are unaffected. */}
-      <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={width} pageHeight={height} pageRotation={pageRotation} onPagePoint={onPagePoint} />
+      {/* ── Rotated page content ─────────────────────────────────────────────
+          EmbedPDF draws ALL page content in UNROTATED mediabox space:
+          <RenderLayer>'s raster ignores /Rotate (PDFium matrix render path),
+          <TilingLayer> absolutely positions tiles at unrotated-page-coords ×
+          scale, and <SearchLayer> places hit rects the same way. Upstream,
+          EmbedPDF expects renderPage to wrap these in a rotation container
+          (its <Rotate> component from plugin-rotate, which we don't ship).
+          This div IS that container: sized to the UNROTATED scaled page
+          (layout.width/height), centered inside the rotation-applied host
+          (layout.rotatedWidth/rotatedHeight) and CSS-rotated by the page's
+          true /Rotate.
+          INVARIANT: base raster + tiles + search highlights must all live in
+          this ONE wrapper. Rotating any of them individually (8f9bb8c rotated
+          only the base <img>) leaves the others drawn sideways on top of it —
+          that was the "still sideways + zone on the neighbouring sheet" bug:
+          the unrotated portrait TILE covered the correctly rotated base.
+          Rotation-0 pages get a plain inset:0 wrapper — pixel-identical. */}
+      <div
+        style={rot === 0
+          ? { position: 'absolute', inset: 0 }
+          : {
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: layout.width,
+              height: layout.height,
+              transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+              transformOrigin: 'center center',
+            }}
+      >
+        <RenderLayer documentId={documentId} pageIndex={layout.pageIndex} />
+        <TilingLayer documentId={documentId} pageIndex={layout.pageIndex} />
+        {/* Search hit highlights (Task 4.1) — page-glued, pointer-transparent,
+            below the room zones so measure/zone interactions are unaffected. */}
+        <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
+      </div>
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <RoomZoneLayer
