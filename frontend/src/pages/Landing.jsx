@@ -30,15 +30,16 @@ import { setPageMeta, setHreflang } from '@/lib/seo';
 import HeroWalkthrough from './landing/HeroWalkthrough';
 import './landing/landing.css';
 
-// PROTOTYPE gate (2026-07-11): ?hero=v2 swaps in the 21st.dev-style walkthrough
-// hero (HeroWalkthrough) for founder review. Default landing is untouched.
-const heroV2 = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('hero') === 'v2';
+// Founder-approved 2026-07-11: the walkthrough hero (HeroWalkthrough) is the
+// DEFAULT hero. The old measuring-instrument hero stays reachable via ?hero=v1
+// for comparison/rollback.
+const heroV2 = typeof window === 'undefined'
+  || new URLSearchParams(window.location.search).get('hero') !== 'v1';
 
 // Founder-approved palette (Claude Design export default: "D · Popierius ir
 // molis"). One-letter switch: A graphite · B navy · C blue · D clay · E ink ·
 // F orange · G plum — definitions in landing/landing.css.
-const PALETTE = 'D';
+const PALETTE = 'N';
 const HERO_SCAN = true;
 const WA_URL = 'https://wa.me/37060271962';
 const MAIL_URL = 'mailto:solutions@pathon.eu';
@@ -46,8 +47,8 @@ const MAIL_URL = 'mailto:solutions@pathon.eu';
 const calcPaint = (h) => 61.8 * h - 14.2;
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
-const mono = "'JetBrains Mono', monospace";
-const sora = "'Sora', sans-serif";
+const mono = "'IBM Plex Mono', monospace";
+const sora = "'IBM Plex Sans', sans-serif";
 
 export default function Landing({ lang }) {
   const { t, i18n } = useTranslation();
@@ -556,7 +557,7 @@ export default function Landing({ lang }) {
         <div id="plCh" aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
           <span id="plChV" style={{ position: 'absolute', top: 0, bottom: 0, width: 1, background: 'color-mix(in srgb, var(--acc) 38%, transparent)' }} />
           <span id="plChH" style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'color-mix(in srgb, var(--acc) 38%, transparent)' }} />
-          <span id="plChTip" style={{ position: 'absolute', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: 'var(--acc)', background: 'color-mix(in srgb, var(--bg1) 88%, transparent)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 9px', whiteSpace: 'nowrap' }} />
+          <span id="plChTip" style={{ position: 'absolute', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: 'var(--acc)', background: 'color-mix(in srgb, var(--bg1) 88%, transparent)', border: '1px solid var(--line2)', borderRadius: 2, padding: '4px 9px', whiteSpace: 'nowrap' }} />
         </div>
       </section>
       )}
@@ -565,7 +566,7 @@ export default function Landing({ lang }) {
       <section id="produktas" style={{ position: 'relative', borderBottom: '1px solid var(--line)' }}>
         <div className="pl-sec" style={{ padding: '88px 24px' }}>
           <div id="plFrame" style={{ willChange: 'transform' }}>
-            <div data-reveal="" style={{ position: 'relative', borderRadius: 14, border: '1px solid var(--line2)', background: 'var(--bg1)', overflow: 'hidden', boxShadow: '0 0 0 1px color-mix(in srgb, var(--acc) 14%, transparent), inset 0 1px 0 color-mix(in srgb, var(--bg1) 60%, transparent), 0 40px 90px -40px var(--shadow)' }}>
+            <div data-reveal="" style={{ position: 'relative', borderRadius: 2, border: '1px solid var(--line2)', background: 'var(--bg1)', overflow: 'hidden', boxShadow: '0 0 0 1px color-mix(in srgb, var(--acc) 14%, transparent), inset 0 1px 0 color-mix(in srgb, var(--bg1) 60%, transparent), 0 40px 90px -40px var(--shadow)' }}>
 
               {/* animated cursor */}
               <div className="dcur" data-click={String(demo.curClick)} data-hide={String(!demo.playing)} style={{ position: 'absolute', left: demo.curL, top: demo.curT, zIndex: 30, pointerEvents: 'none', transition: 'left .95s cubic-bezier(.4,.1,.2,1), top .95s cubic-bezier(.4,.1,.2,1), opacity .4s ease' }}>
@@ -574,15 +575,15 @@ export default function Landing({ lang }) {
               </div>
 
               {/* Prielaidos popover */}
-              <div className="dvis" data-vis={String(demo.popVis)} style={{ position: 'absolute', right: '4%', top: '15%', width: 250, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 22px 55px -18px var(--shadow)', padding: '14px 16px', zIndex: 20 }}>
+              <div className="dvis" data-vis={String(demo.popVis)} style={{ position: 'absolute', right: '4%', top: '15%', width: 250, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 2, boxShadow: '0 22px 55px -18px var(--shadow)', padding: '14px 16px', zIndex: 20 }}>
                 <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.demo.popTitle')}</div>
                 <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <span style={{ fontSize: 13 }}>{t('landing.demo.popHeight')}</span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: mono, fontSize: 14, fontVariantNumeric: 'tabular-nums', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 10px', background: 'var(--bg)' }}>{fmt(demo.dh, 2)} m</span>
+                    <span style={{ fontFamily: mono, fontSize: 14, fontVariantNumeric: 'tabular-nums', border: '1px solid var(--line2)', borderRadius: 2, padding: '4px 10px', background: 'var(--bg)' }}>{fmt(demo.dh, 2)} m</span>
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <span className="dstep" data-on={String(demo.stepUpOn)} onClick={() => step(1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 3, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▲</span>
-                      <span className="dstep" onClick={() => step(-1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 3, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▼</span>
+                      <span className="dstep" data-on={String(demo.stepUpOn)} onClick={() => step(1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 2, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▲</span>
+                      <span className="dstep" onClick={() => step(-1)} style={{ width: 18, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line2)', borderRadius: 2, color: 'var(--mut)', fontSize: 9, lineHeight: 1, transition: 'color .15s ease, border-color .15s ease' }}>▼</span>
                     </span>
                   </span>
                 </div>
@@ -590,13 +591,13 @@ export default function Landing({ lang }) {
               </div>
 
               {/* Export dropdown */}
-              <div className="dvis" data-vis={String(demo.expVis)} style={{ position: 'absolute', right: '2%', top: '13%', width: 230, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 22px 55px -18px var(--shadow)', padding: 8, zIndex: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 7, background: 'color-mix(in srgb, var(--acc) 8%, transparent)', fontSize: 13 }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 3, padding: '1px 5px' }}>XLSX</span>
+              <div className="dvis" data-vis={String(demo.expVis)} style={{ position: 'absolute', right: '2%', top: '13%', width: 230, background: 'var(--bg1)', border: '1px solid var(--line2)', borderRadius: 2, boxShadow: '0 22px 55px -18px var(--shadow)', padding: 8, zIndex: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 2, background: 'color-mix(in srgb, var(--acc) 8%, transparent)', fontSize: 13 }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 2, padding: '1px 5px' }}>XLSX</span>
                   {t('landing.demo.expXlsx')}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 7, fontSize: 13 }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--bad)', border: '1px solid color-mix(in srgb, var(--bad) 40%, transparent)', borderRadius: 3, padding: '1px 5px' }}>PDF</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 2, fontSize: 13 }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: 'var(--bad)', border: '1px solid color-mix(in srgb, var(--bad) 40%, transparent)', borderRadius: 2, padding: '1px 5px' }}>PDF</span>
                   {t('landing.demo.expPdf')}
                 </div>
               </div>
@@ -608,7 +609,7 @@ export default function Landing({ lang }) {
                   {t('landing.demo.badge')}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{t('landing.demo.project')}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 3, border: '1px solid var(--line2)', color: 'var(--mut)', background: 'var(--bg1)' }}>{t('landing.demo.tag')}</span>
+                <span style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 2, border: '1px solid var(--line2)', color: 'var(--mut)', background: 'var(--bg1)' }}>{t('landing.demo.tag')}</span>
                 <span style={{ flex: 1 }} />
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, paddingRight: 14, borderRight: '1px solid var(--line)' }}>
                   <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600 }}>{t('landing.demo.noVat')}</span>
@@ -618,8 +619,8 @@ export default function Landing({ lang }) {
                   <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--mut)', fontWeight: 600 }}>{t('landing.demo.withVat')}</span>
                   <span style={{ fontFamily: mono, fontSize: 17, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(dGross, 2)} €</span>
                 </span>
-                <span className="plhbtn dbtn" data-on={String(demo.popVis)} onClick={() => { takeover(); patch({ popVis: !demoRef.current.popVis, expVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', border: '1px solid var(--line2)', background: 'var(--bg1)', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--ink2)', transition: 'all .2s ease' }}>{t('landing.demo.assumptions')}</span>
-                <span className="dbtn" onClick={() => { takeover(); patch({ expVis: !demoRef.current.expVis, popVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', background: 'var(--acc)', color: 'var(--accink)', borderRadius: 6, fontSize: 12, fontWeight: 500 }}>{t('landing.demo.exportBtn')}</span>
+                <span className="plhbtn dbtn" data-on={String(demo.popVis)} onClick={() => { takeover(); patch({ popVis: !demoRef.current.popVis, expVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', border: '1px solid var(--line2)', background: 'var(--bg1)', borderRadius: 2, fontSize: 12, fontWeight: 500, color: 'var(--ink2)', transition: 'all .2s ease' }}>{t('landing.demo.assumptions')}</span>
+                <span className="dbtn" onClick={() => { takeover(); patch({ expVis: !demoRef.current.expVis, popVis: false }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', background: 'var(--acc)', color: 'var(--accink)', borderRadius: 2, fontSize: 12, fontWeight: 500 }}>{t('landing.demo.exportBtn')}</span>
               </div>
 
               {/* tab bar + player control */}
@@ -628,7 +629,7 @@ export default function Landing({ lang }) {
                 <span className="dtab" data-on={String(demo.tab === 'kiek')} onClick={() => { takeover(); patch({ tab: 'kiek' }); }}>{t('landing.demo.tabKiek')}</span>
                 <span style={{ padding: '10px 16px', color: 'var(--mut)', fontWeight: 500, opacity: 0.55 }}>{t('landing.demo.tabAsist')}</span>
                 <span style={{ flex: 1 }} />
-                <button onClick={toggleDemo} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: mono, fontSize: 11, color: 'var(--mut)', background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', transition: 'color .15s ease, border-color .15s ease' }}>
+                <button onClick={toggleDemo} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: mono, fontSize: 11, color: 'var(--mut)', background: 'none', border: '1px solid var(--line2)', borderRadius: 2, padding: '5px 12px', cursor: 'pointer', transition: 'color .15s ease, border-color .15s ease' }}>
                   {demo.playing ? t('landing.demo.pause') : t('landing.demo.play')}
                 </button>
               </div>
@@ -805,7 +806,7 @@ export default function Landing({ lang }) {
           <div className="pl-grid2" style={{ marginTop: 52, display: 'grid', gridTemplateColumns: '0.92fr 1.08fr', gap: 26, alignItems: 'start' }}>
 
             {/* ── Legend — what each colour means ── */}
-            <div data-reveal="" style={{ border: '1px solid var(--line2)', borderRadius: 14, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div data-reveal="" style={{ border: '1px solid var(--line2)', borderRadius: 2, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.trust.legendTitle')}</span>
               </div>
@@ -824,10 +825,10 @@ export default function Landing({ lang }) {
             </div>
 
             {/* ── Worklist — the lines the system flags to check first ── */}
-            <div data-reveal="" style={{ transitionDelay: '100ms', border: '1px solid var(--line2)', borderRadius: 14, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div data-reveal="" style={{ transitionDelay: '100ms', border: '1px solid var(--line2)', borderRadius: 2, background: 'var(--bg1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.trust.panelTitle')}</span>
-                <span style={{ fontFamily: mono, fontSize: 10.5, color: 'var(--warn)', background: 'color-mix(in srgb, var(--warn) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warn) 28%, transparent)', borderRadius: 20, padding: '3px 11px' }}>{t('landing.trust.panelCount')}</span>
+                <span style={{ fontFamily: mono, fontSize: 10.5, color: 'var(--warn)', background: 'color-mix(in srgb, var(--warn) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warn) 28%, transparent)', borderRadius: 2, padding: '3px 11px' }}>{t('landing.trust.panelCount')}</span>
               </div>
 
               <div>
@@ -835,7 +836,7 @@ export default function Landing({ lang }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--bad) 6%, transparent)' }}>
                   <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--bad)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--bad) 16%, transparent)' }} />
                   <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowLed')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>12,4 m</span></span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 11px', background: 'var(--bg)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 2, padding: '4px 11px', background: 'var(--bg)' }}>
                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l3.5 3.5" /></svg>
                     {t('landing.trust.showBtn')}
                   </span>
@@ -844,7 +845,7 @@ export default function Landing({ lang }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', borderBottom: '1px solid color-mix(in srgb, var(--line) 55%, transparent)', background: 'color-mix(in srgb, var(--warn) 5%, transparent)' }}>
                   <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--warn)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent)' }} />
                   <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowAngok')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>42,6 m</span></span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 11px', background: 'var(--bg)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink2)', border: '1px solid var(--line2)', borderRadius: 2, padding: '4px 11px', background: 'var(--bg)' }}>
                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l3.5 3.5" /></svg>
                     {t('landing.trust.showBtn')}
                   </span>
@@ -853,7 +854,7 @@ export default function Landing({ lang }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 20px', background: 'color-mix(in srgb, var(--ok) 5%, transparent)' }}>
                   <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--ok) 16%, transparent)' }} />
                   <span style={{ flex: 1, fontSize: 13.5 }}>{t('landing.trust.rowVon')} <span style={{ fontFamily: mono, fontSize: 12.5, color: 'var(--ink)' }}>H = 2,45</span></span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 6, padding: '4px 11px', background: 'color-mix(in srgb, var(--ok) 9%, transparent)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--ok)', border: '1px solid color-mix(in srgb, var(--ok) 40%, transparent)', borderRadius: 2, padding: '4px 11px', background: 'color-mix(in srgb, var(--ok) 9%, transparent)' }}>
                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 4L6 12l-3.5-3.5" /></svg>
                     {t('landing.trust.confirmed')}
                   </span>
@@ -876,11 +877,11 @@ export default function Landing({ lang }) {
               <p className="pl-sub" data-reveal="" style={{ transitionDelay: '140ms', maxWidth: 480 }}>{t('landing.recalc.sub')}</p>
               <div data-reveal="" style={{ transitionDelay: '200ms', marginTop: 28, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 14, color: 'var(--ink2)' }}>{t('landing.recalc.heightLabel')}</span>
-                <button className="plhbtn" data-testid="rc-270" data-on={String(rcTarget === 2.7)} onClick={() => animateTo(2.7)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 7, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>2,70 m</button>
-                <button className="plhbtn" data-testid="rc-320" data-on={String(rcTarget === 3.2)} onClick={() => animateTo(3.2)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 7, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>3,20 m</button>
+                <button className="plhbtn" data-testid="rc-270" data-on={String(rcTarget === 2.7)} onClick={() => animateTo(2.7)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 2, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>2,70 m</button>
+                <button className="plhbtn" data-testid="rc-320" data-on={String(rcTarget === 3.2)} onClick={() => animateTo(3.2)} style={{ fontFamily: mono, fontSize: 14, padding: '8px 18px', borderRadius: 2, border: '1px solid var(--line2)', background: 'var(--bg)', color: 'var(--ink)', cursor: 'pointer', transition: 'all .15s ease' }}>3,20 m</button>
               </div>
             </div>
-            <div data-reveal="" style={{ transitionDelay: '120ms', border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg)', overflow: 'hidden' }}>
+            <div data-reveal="" style={{ transitionDelay: '120ms', border: '1px solid var(--line2)', borderRadius: 2, background: 'var(--bg)', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 20px', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mut)' }}>{t('landing.recalc.panelTitle')}</span>
                 <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--mut)' }}>H = <span style={{ color: 'var(--acc)' }}>{fmt(rc.h, 2)}</span> m</span>
@@ -909,10 +910,10 @@ export default function Landing({ lang }) {
           <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.exportSec.title')}</h2>
           <div className="pl-docs" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
             <div data-reveal="">
-              <div style={{ border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden' }}>
+              <div style={{ border: '1px solid var(--line2)', borderRadius: 2, background: 'var(--bg1)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
                   <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--mut)' }}>fx</span>
-                  <span style={{ fontFamily: mono, fontSize: 12, color: 'var(--acc)', border: '1px solid var(--line)', borderRadius: 4, padding: '3px 10px', flex: 1 }}>=D8*E8</span>
+                  <span style={{ fontFamily: mono, fontSize: 12, color: 'var(--acc)', border: '1px solid var(--line)', borderRadius: 2, padding: '3px 10px', flex: 1 }}>=D8*E8</span>
                 </div>
                 <div style={{ fontFamily: mono, fontSize: 11.5 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '34px 2fr 0.8fr 0.9fr 0.9fr 1fr', borderBottom: '1px solid var(--line)', color: 'var(--mut)', textAlign: 'center' }}>
@@ -932,7 +933,7 @@ export default function Landing({ lang }) {
               <p style={{ margin: '16px 0 0', fontSize: 14, color: 'var(--ink2)' }}><strong style={{ fontWeight: 600, color: 'var(--ink)' }}>{t('landing.exportSec.excelStrong')}</strong>{t('landing.exportSec.excelRest')}</p>
             </div>
             <div data-reveal="" style={{ transitionDelay: '110ms' }}>
-              <div style={{ border: '1px solid var(--line2)', borderRadius: 12, background: 'var(--bg1)', overflow: 'hidden', padding: '22px 26px' }}>
+              <div style={{ border: '1px solid var(--line2)', borderRadius: 2, background: 'var(--bg1)', overflow: 'hidden', padding: '22px 26px' }}>
                 <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 12, letterSpacing: '0.22em', color: 'var(--ink)' }}>SĄMATA</div>
                 <div style={{ textAlign: 'center', fontFamily: mono, fontSize: 10, color: 'var(--mut)', marginTop: 4 }}>Nr. S-001 · 2026-07-07</div>
                 <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', fontSize: 12.5 }}>
@@ -961,7 +962,7 @@ export default function Landing({ lang }) {
           <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.audience.title')}</h2>
           <div className="pl-grid3" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
             {audienceCards.map((c, i) => (
-              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 100}ms`, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--bg)', padding: 28 }}>
+              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 100}ms`, border: '1px solid var(--line)', borderRadius: 2, background: 'var(--bg)', padding: 28 }}>
                 <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.14em', color: 'var(--acc)' }}>{String(i + 1).padStart(2, '0')}</div>
                 <div style={{ marginTop: 14, fontFamily: sora, fontWeight: 600, fontSize: 19, letterSpacing: '-0.01em' }}>{c.t}</div>
                 <p style={{ margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.55, color: 'var(--ink2)' }}>{c.d}</p>
@@ -978,9 +979,9 @@ export default function Landing({ lang }) {
           <h2 className="pl-h2" data-reveal="" style={{ transitionDelay: '70ms' }}>{t('landing.pricing.title')}</h2>
           <div className="pl-grid4" style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, alignItems: 'stretch' }}>
             {tiers.map((tier, i) => (
-              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 80}ms`, border: i === 2 ? '1.5px solid var(--acc)' : '1px solid var(--line)', borderRadius: 12, background: 'var(--bg1)', padding: 26, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
+              <div key={i} data-reveal="" style={{ transitionDelay: `${i * 80}ms`, border: i === 2 ? '1.5px solid var(--acc)' : '1px solid var(--line)', borderRadius: 2, background: 'var(--bg1)', padding: 26, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
                 {i === 2 && (
-                  <span style={{ position: 'absolute', top: -10, left: 24, fontFamily: mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'var(--acc)', color: 'var(--accink)', padding: '3px 10px', borderRadius: 20 }}>{t('landing.pricing.popular')}</span>
+                  <span style={{ position: 'absolute', top: -10, left: 24, fontFamily: mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'var(--acc)', color: 'var(--accink)', padding: '3px 10px', borderRadius: 2 }}>{t('landing.pricing.popular')}</span>
                 )}
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{tier.name}</div>
                 <div style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 8 }}>{tier.price}</div>
@@ -994,14 +995,17 @@ export default function Landing({ lang }) {
         </div>
       </section>
 
-      {/* ═══════════ 09 · CTA + FOOTER ═══════════ */}
-      <section style={{ borderBottom: '1px solid var(--line)', position: 'relative', overflow: 'hidden' }}>
-        <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(-45deg, transparent 0 90px, color-mix(in srgb, var(--ink) 4%, transparent) 90px 91px)', pointerEvents: 'none' }} />
-        <div className="pl-sec" style={{ position: 'relative', padding: '110px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h2 className="pl-h2" data-reveal="" style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.03em', fontSize: 48, lineHeight: 1.05, maxWidth: 760, textWrap: 'balance' }}>{t('landing.cta.title')}</h2>
-          <p className="pl-sub" data-reveal="" style={{ transitionDelay: '80ms', margin: '20px 0 0', maxWidth: 540 }}>{t('landing.cta.sub')}</p>
-          <div className="pl-ctas" data-reveal="" style={{ transitionDelay: '160ms', marginTop: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
-            <Link to="/register" className="pl-btn-primary">{t('landing.cta.primary')}</Link>
+      {/* ═══════════ 09 · CTA + FOOTER ═══════════
+          Nordic Slate dark petrol band (mirrors the approved Stitch design's
+          dark CTA section): deep slate gradient, inverse type, parchment
+          button. The only dark surface on the page — deliberate contrast. */}
+      <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #0F1B21 0%, #192830 52%, #24343D 100%)' }}>
+        <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(-45deg, transparent 0 90px, rgba(240,241,239,0.035) 90px 91px)', pointerEvents: 'none' }} />
+        <div className="pl-sec" style={{ position: 'relative', padding: '120px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h2 className="pl-h2" data-reveal="" style={{ margin: 0, fontWeight: 600, letterSpacing: '-0.03em', fontSize: 46, lineHeight: 1.08, maxWidth: 760, textWrap: 'balance', color: '#F0F1EF' }}>{t('landing.cta.title')}</h2>
+          <p className="pl-sub" data-reveal="" style={{ transitionDelay: '80ms', margin: '20px 0 0', maxWidth: 540, color: 'rgba(240,241,239,0.68)' }}>{t('landing.cta.sub')}</p>
+          <div className="pl-ctas" data-reveal="" style={{ transitionDelay: '160ms', marginTop: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <Link to="/register" className="pl-btn-primary" style={{ background: '#F9FAF8', color: '#192830' }}>{t('landing.cta.primary')}</Link>
           </div>
         </div>
       </section>

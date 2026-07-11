@@ -377,7 +377,7 @@ export default function CookieBanner() {
   // full-bleed background) so the wrapper stays a 0-size var provider.
   if (paper) {
     return (
-      <div id="plr" data-palette="D" style={{ minHeight: 0, background: 'transparent' }}>
+      <div id="plr" data-palette="N" style={{ minHeight: 0, background: 'transparent' }}>
         {inner}
       </div>
     );

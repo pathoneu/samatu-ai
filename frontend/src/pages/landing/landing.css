@@ -6,7 +6,7 @@
  * default). The others are kept so switching is a one-letter change on the
  * data-palette attribute in Landing.jsx.
  *
- * Fonts (Sora / Hanken Grotesk / JetBrains Mono) come from src/index.css —
+ * Fonts (IBM Plex Sans / IBM Plex Mono — Nordic Slate, 2026-07-11) come from src/index.css —
  * do not add @font-face here.
  */
 
@@ -84,8 +84,24 @@
   --frameglow: rgba(92,58,99,0.15);
   --shadow: rgba(26,31,29,0.16);
 }
+/* N — "Nordic Slate" (founder-approved Stitch system, 2026-07-11):
+   parchment ground, slate ink, ONE muted evergreen accent, hairline
+   structure, sharp 2px shapes. Buttons are deep slate (not the accent) —
+   --btnbg/--btnbgB exist only here; other palettes fall back to --acc. */
+#plr[data-palette^="N"] {
+  --bg: #F9FAF8; --bg1: #FFFFFF; --bg2: #EDEEEC;
+  --ink: #191C1B; --ink2: #43474A; --mut: #73787B;
+  --line: #E1E3E1; --line2: #C3C7CA;
+  --acc: #3F665C; --accB: #2F4F47; --accink: #FFFFFF;
+  --btnbg: #192830; --btnbgB: #2F3E46;
+  --ok: #1F7C4D; --warn: #9A6A08; --bad: #BA1A1A;
+  --planink: rgba(25,28,27,0.12);
+  --frameglow: rgba(63,102,92,0.13);
+  --shadow: rgba(25,40,48,0.14);
+  --grainop: 0.25;
+}
 
-#plr { min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'Hanken Grotesk', sans-serif; -webkit-font-smoothing: antialiased; }
+#plr { min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', sans-serif; -webkit-font-smoothing: antialiased; }
 #plr a { color: inherit; text-decoration: none; }
 #plr a:hover { color: var(--acc); }
 #plr button { font-family: inherit; }
@@ -95,23 +111,27 @@
 /* ── Shared building blocks (promoted from repeated inline styles) ── */
 #plr .pl-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 #plr .pl-sec { max-width: 1200px; margin: 0 auto; padding: 96px 24px; }
-#plr .pl-eyebrow { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--acc); }
-#plr .pl-h2 { margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 600; letter-spacing: -0.025em; font-size: 42px; line-height: 1.06; max-width: 720px; }
+#plr .pl-eyebrow { display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--acc); }
+#plr .pl-h2 { margin: 18px 0 0; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; letter-spacing: -0.025em; font-size: 42px; line-height: 1.06; max-width: 720px; }
 #plr .pl-sub { margin: 22px 0 0; max-width: 620px; font-size: 16px; line-height: 1.6; color: var(--ink2); }
-#plr .pl-mono-note { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--mut); }
-#plr .pl-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; background: var(--acc); color: var(--accink); font-weight: 600; font-size: 15.5px; padding: 14px 26px; border-radius: 9px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 30px -12px var(--frameglow); transition: background .15s ease, transform .15s ease; }
-#plr .pl-btn-primary:hover { background: var(--accB); color: var(--accink); transform: translateY(-1px); }
-#plr .pl-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--line2); background: color-mix(in srgb, var(--bg1) 60%, transparent); color: var(--ink); font-weight: 500; font-size: 15.5px; padding: 13px 26px; border-radius: 9px; transition: border-color .15s ease; }
-#plr .pl-btn-ghost:hover { border-color: var(--mut); color: var(--ink); }
-#plr .pl-navbtn { display: inline-flex; align-items: center; gap: 8px; background: var(--acc); color: var(--accink); font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 18px -8px var(--frameglow); transition: background .15s ease; }
-#plr .pl-navbtn:hover { background: var(--accB); color: var(--accink); }
-#plr .pl-chip { display: inline-flex; align-items: baseline; gap: 8px; border: 1px solid var(--line2); background: var(--bg); border-radius: 7px; padding: 9px 14px; font-size: 13.5px; }
-#plr .pl-chip .v { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--acc); }
-#plr .pl-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg1); }
+#plr .pl-mono-note { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--mut); }
+/* Nordic Slate buttons: architectural-notation labels (uppercase, tracked),
+   sharp 2px corners, flat fills — no inner highlights, no lift shadows.
+   Solid buttons use --btnbg (deep slate) where the palette defines it,
+   falling back to --acc for legacy palettes. */
+#plr .pl-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; background: var(--btnbg, var(--acc)); color: var(--accink); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding: 15px 26px; border-radius: 2px; transition: background .18s ease; }
+#plr .pl-btn-primary:hover { background: var(--btnbgB, var(--accB)); color: var(--accink); }
+#plr .pl-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--line2); background: transparent; color: var(--ink); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding: 14px 26px; border-radius: 2px; transition: border-color .18s ease, background .18s ease; }
+#plr .pl-btn-ghost:hover { border-color: var(--ink); background: color-mix(in srgb, var(--bg2) 55%, transparent); color: var(--ink); }
+#plr .pl-navbtn { display: inline-flex; align-items: center; gap: 8px; background: var(--btnbg, var(--acc)); color: var(--accink); font-weight: 600; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 16px; border-radius: 2px; transition: background .18s ease; }
+#plr .pl-navbtn:hover { background: var(--btnbgB, var(--accB)); color: var(--accink); }
+#plr .pl-chip { display: inline-flex; align-items: baseline; gap: 8px; border: 1px solid var(--line2); background: var(--bg); border-radius: 2px; padding: 9px 14px; font-size: 13.5px; }
+#plr .pl-chip .v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--acc); }
+#plr .pl-card { border: 1px solid var(--line); border-radius: 2px; background: var(--bg1); }
 #plr .pl-readrow { display: flex; align-items: baseline; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-#plr .pl-readrow .n { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--mut); width: 22px; }
-#plr .pl-step-title { margin-top: 16px; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
-#plr .pl-step-num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--acc); }
+#plr .pl-readrow .n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--mut); width: 22px; }
+#plr .pl-step-title { margin-top: 16px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
+#plr .pl-step-num { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--acc); }
 #plr .pl-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
 
 /* ── Interactive hero instrument ── */
