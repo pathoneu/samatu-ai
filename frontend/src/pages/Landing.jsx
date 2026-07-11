@@ -27,7 +27,13 @@ import { changeAppLanguage } from '@/i18n';
 import { PathonMark } from '@/components/layout/Logo';
 import { openCookieSettings } from '@/components/CookieBanner';
 import { setPageMeta, setHreflang } from '@/lib/seo';
+import HeroWalkthrough from './landing/HeroWalkthrough';
 import './landing/landing.css';
+
+// PROTOTYPE gate (2026-07-11): ?hero=v2 swaps in the 21st.dev-style walkthrough
+// hero (HeroWalkthrough) for founder review. Default landing is untouched.
+const heroV2 = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('hero') === 'v2';
 
 // Founder-approved palette (Claude Design export default: "D · Popierius ir
 // molis"). One-letter switch: A graphite · B navy · C blue · D clay · E ink ·
@@ -433,6 +439,7 @@ export default function Landing({ lang }) {
       </header>
 
       {/* ═══════════ HERO ═══════════ */}
+      {heroV2 ? <HeroWalkthrough /> : (
       <section id="virsus" onMouseMove={heroMove} onMouseLeave={heroLeave} style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--line)' }}>
         {/* drafting-paper grid */}
         <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px)', backgroundSize: '56px 56px', WebkitMaskImage: 'radial-gradient(ellipse 85% 75% at 50% 40%, #000 45%, transparent 100%)', maskImage: 'radial-gradient(ellipse 85% 75% at 50% 40%, #000 45%, transparent 100%)' }} />
@@ -552,6 +559,7 @@ export default function Landing({ lang }) {
           <span id="plChTip" style={{ position: 'absolute', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: 'var(--acc)', background: 'color-mix(in srgb, var(--bg1) 88%, transparent)', border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 9px', whiteSpace: 'nowrap' }} />
         </div>
       </section>
+      )}
 
       {/* ═══════════ 01 · PRODUCT DEMO ═══════════ */}
       <section id="produktas" style={{ position: 'relative', borderBottom: '1px solid var(--line)' }}>
