@@ -162,8 +162,8 @@
     },
     "trust": {
       "eyebrow": "04 · Pasitikėjimo sistema",
-      "titleA": "Tikrinate tris eilutes,",
-      "titleB": "o ne visas keturiasdešimt šešias.",
+      "titleA": "Pasitikėjimą galima patikrinti.",
+      "titleB": "",
       "sub": "Kiekvienas kiekis rodo, iš kur atėjo: nuskaitytas tiesiai iš brėžinio, apskaičiuotas su prielaida ar numatytasis. Sistema pati iškelia tas kelias eilutes, kurias verta peržiūrėti prieš pasiūlymą — likusias jau paskaičiavo.",
       "cards": [
         {

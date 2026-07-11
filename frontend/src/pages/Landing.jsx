@@ -797,7 +797,8 @@ export default function Landing({ lang }) {
         <div className="pl-sec">
           <div className="pl-eyebrow" data-reveal="">{t('landing.trust.eyebrow')}</div>
           <h2 className="pl-trust-copy pl-h2" data-reveal="" style={{ transitionDelay: '70ms', lineHeight: 1.12, maxWidth: 860, textWrap: 'balance' }}>
-            {t('landing.trust.titleA')}<br />{t('landing.trust.titleB')}
+            {t('landing.trust.titleA')}
+            {t('landing.trust.titleB') ? <><br />{t('landing.trust.titleB')}</> : null}
           </h2>
           <p className="pl-sub" data-reveal="" style={{ transitionDelay: '140ms' }}>{t('landing.trust.sub')}</p>
 

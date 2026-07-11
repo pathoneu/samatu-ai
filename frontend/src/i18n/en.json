@@ -162,8 +162,8 @@
     },
     "trust": {
       "eyebrow": "04 · Trust system",
-      "titleA": "You check three lines,",
-      "titleB": "not all forty-six.",
+      "titleA": "Trust you can verify.",
+      "titleB": "",
       "sub": "Every quantity shows where it came from: read straight off the drawing, computed from an assumption, or a default. The system surfaces the few lines worth a review before you quote — the rest are already done.",
       "cards": [
         {
