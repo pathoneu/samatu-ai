@@ -6,83 +6,82 @@
 
 @layer base {
   :root {
-    --font-sans: 'Hanken Grotesk', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-    --font-display: 'Sora', 'Hanken Grotesk', sans-serif;
+    --font-sans: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-display: 'IBM Plex Sans', sans-serif;
 
     /* ──────────────────────────────────────────────────────────────────────
-       Pathon — Paper + Clay Design Tokens (2026-07-09)
-       Matches the founder-approved landing (palette D): warm paper surfaces,
-       clay/terracotta accent, tan hairlines, dark warm ink. Sora display,
-       Hanken Grotesk body, JetBrains Mono numerals. Values are the landing
-       palette-D hexes converted to HSL. The app runs the LIGHT theme now
-       (no `dark` class on <html>); the `.dark` block below stays for any
-       explicit dark island (e.g. the PDF viewer keeps its own navy chrome).
+       Pathon — Nordic Slate Design Tokens (2026-07-11)
+       Matches the founder-approved landing (palette N, Stitch "Nordic Slate"):
+       parchment surfaces, white panels, slate ink, deep-slate primary buttons,
+       ONE muted evergreen accent (focus/active/links), grey hairlines, sharp
+       2px radius. IBM Plex Sans + IBM Plex Mono. The app runs the LIGHT theme
+       (no `dark` class on <html>); the `.dark` block below is inert compat.
        ────────────────────────────────────────────────────────────────────── */
 
-    /* Surfaces — warm paper page, lighter elevated panels */
-    --background: 36 43% 93%;            /* #F5EFE6 paper page */
-    --foreground: 34 24% 11%;            /* #241E16 warm dark ink */
-    --card: 38 55% 97%;                  /* #FCF8F1 elevated panel */
-    --card-foreground: 34 24% 11%;
-    --popover: 38 55% 97%;               /* #FCF8F1 */
-    --popover-foreground: 34 24% 11%;
+    /* Surfaces — parchment page, white elevated panels */
+    --background: 90 17% 98%;            /* #F9FAF8 parchment page */
+    --foreground: 160 6% 10%;            /* #191C1B slate ink */
+    --card: 0 0% 100%;                   /* #FFFFFF elevated panel */
+    --card-foreground: 160 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 6% 10%;
 
-    /* Accent — clay / terracotta (Pathon brand) */
-    --primary: 20 70% 40%;               /* #AD4E1F clay */
-    --primary-foreground: 33 57% 96%;    /* #FBF6F0 warm-white text on clay */
+    /* Primary — deep slate (buttons / CTAs, like the landing) */
+    --primary: 201 32% 14%;              /* #192830 deep slate */
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary — warm sub-surface */
-    --secondary: 39 39% 88%;             /* #EDE5D6 */
-    --secondary-foreground: 34 24% 11%;
+    /* Secondary — light slate sub-surface */
+    --secondary: 90 8% 95%;              /* #F3F4F2 */
+    --secondary-foreground: 160 6% 10%;
 
-    /* Muted — warm tan for soft text + hover backgrounds */
-    --muted: 39 39% 88%;                 /* #EDE5D6 hover bg */
-    --muted-foreground: 37 10% 49%;      /* #8A8070 warm muted text */
+    /* Muted — fog surfaces + muted text */
+    --muted: 90 6% 93%;                  /* #EDEEEC hover bg */
+    --muted-foreground: 202 3% 47%;      /* #73787B muted text */
 
     /* Accent (component-state, NOT brand) */
-    --accent: 39 39% 88%;                /* selected row — surface-2 */
-    --accent-foreground: 34 24% 11%;
+    --accent: 90 6% 93%;                 /* selected row — fog */
+    --accent-foreground: 160 6% 10%;
 
-    /* Destructive (errors / red dots) — clear red on paper */
-    --destructive: 357 66% 45%;          /* #C0272E red */
-    --destructive-foreground: 33 57% 96%;
+    /* Destructive (errors / red dots) */
+    --destructive: 0 75% 42%;            /* #BA1A1A */
+    --destructive-foreground: 90 17% 98%;
 
-    /* Borders — warm tan hairlines */
-    --border: 40 32% 83%;                /* #E2D9C7 default 1px */
-    --input: 40 32% 83%;
-    --ring: 20 70% 40%;                  /* match primary for focus rings */
+    /* Borders — light slate hairlines */
+    --border: 120 3% 89%;                /* #E1E3E1 default 1px */
+    --input: 120 3% 89%;
+    --ring: 165 24% 32%;                 /* #3F665C evergreen focus ring */
 
-    /* Extra brand tokens (paper + clay) */
-    --ink-2: 40 15% 28%;                 /* #514A3C softer body text */
-    --accent-2: 20 63% 46%;              /* #C05E2C lighter clay (hover) */
-    --surface-2: 39 39% 88%;             /* #EDE5D6 nested surface */
-    --terracotta-deep: 20 70% 34%;       /* pressed / deep clay */
-    --accent-sand: 20 63% 46%;           /* alias → accent-2 (compat) */
+    /* Extra brand tokens (Nordic Slate) */
+    --ink-2: 206 5% 28%;                 /* #43474A softer body text */
+    --accent-2: 165 24% 32%;             /* #3F665C evergreen (links/active) */
+    --surface-2: 90 6% 93%;              /* #EDEEEC nested surface */
+    --terracotta-deep: 201 20% 23%;      /* #2F3E46 pressed slate (legacy name) */
+    --accent-sand: 165 24% 32%;          /* alias → accent-2 (compat) */
 
     /* Charts (kept for future analytics) */
-    --chart-1: 20 70% 40%;               /* clay */
-    --chart-2: 37 10% 49%;               /* warm muted */
+    --chart-1: 165 24% 32%;              /* evergreen */
+    --chart-2: 202 3% 47%;               /* muted */
     --chart-3: 150 60% 30%;              /* green */
-    --chart-4: 20 63% 46%;               /* lighter clay */
-    --chart-5: 34 24% 11%;
+    --chart-4: 201 20% 23%;              /* slate */
+    --chart-5: 160 6% 10%;
 
-    --radius: 0.625rem;                  /* ~10px */
+    --radius: 2px;                       /* sharp — technical-drawing shapes */
 
-    /* Sidebar — warm paper (matches narrow icon rail) */
-    --sidebar-background: 39 39% 88%;     /* #EDE5D6 */
-    --sidebar-foreground: 37 10% 49%;     /* muted icons */
-    --sidebar-primary: 20 70% 40%;        /* clay accent */
-    --sidebar-primary-foreground: 33 57% 96%;
-    --sidebar-accent: 40 32% 83%;         /* selected item bg */
-    --sidebar-accent-foreground: 34 24% 11%; /* ink when active */
-    --sidebar-border: 40 32% 83%;         /* match main border */
-    --sidebar-ring: 20 70% 40%;
+    /* Sidebar — light slate rail */
+    --sidebar-background: 90 8% 95%;      /* #F3F4F2 */
+    --sidebar-foreground: 202 3% 47%;     /* muted icons */
+    --sidebar-primary: 165 24% 32%;       /* evergreen accent */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 90 6% 93%;          /* selected item bg */
+    --sidebar-accent-foreground: 160 6% 10%; /* ink when active */
+    --sidebar-border: 120 3% 89%;         /* match main border */
+    --sidebar-ring: 165 24% 32%;
 
     /* ──── Provenance dots (data source indicator, 3-color system) ──── */
     --source-table: 150 60% 30%;         /* green: from eksplikacija/spec table */
     --source-computed: 262 45% 52%;      /* violet: Python computed */
-    --source-ai: 20 70% 40%;             /* clay: AI inferred */
+    --source-ai: 201 20% 23%;            /* slate: AI inferred (was clay) */
 
     /* ──── Confidence dots (žalia / geltona / raudona — matches landing) ──── */
     --conf-high: 150 60% 30%;            /* green — read directly */
@@ -90,21 +89,21 @@
     --conf-low:  357 66% 45%;            /* red — fallback default */
 
     /* Surface elevation tiers */
-    --bg-1: 38 55% 97%;                  /* #FCF8F1 panel slight elevation */
-    --surface-3: 40 32% 83%;             /* selected/deep hover */
-    --border-strong: 41 26% 73%;         /* #CCC1A9 stronger input/button border */
+    --bg-1: 0 0% 100%;                   /* white panel slight elevation */
+    --surface-3: 120 3% 89%;             /* selected/deep hover */
+    --border-strong: 206 6% 78%;         /* #C3C7CA stronger input/button border */
 
-    /* ──── Viewer chrome (PDF viewer — paper + clay, 2026-07-09). Drawing area
+    /* ──── Viewer chrome (PDF viewer — Nordic Slate, 2026-07-11). Drawing area
             stays white; the surrounding chrome (toolbar / tool rail / thumbs /
-            status bar / drawing-area frame) uses these tokens. Warm paper
-            surfaces, clay active accent, tan hairlines. ──── */
-    --viewer-chrome: 39 39% 88%;             /* #EDE5D6 warm toolbar/rail/thumbs */
-    --viewer-chrome-foreground: 34 24% 11%;  /* #241E16 ink on paper chrome */
-    --viewer-chrome-muted: 38 55% 97%;        /* #FCF8F1 elevated nested cards */
-    --viewer-chrome-border: 41 26% 73%;       /* #CCC1A9 divider lines */
-    --viewer-chrome-hover: 40 32% 83%;        /* #E2D9C7 button hover */
-    --viewer-chrome-active: 20 70% 40%;       /* clay accent for active state */
-    --viewer-blueprint-bg: 40 24% 82%;        /* warm tan drawing-area "frame" */
+            status bar / drawing-area frame) uses these tokens. Parchment/fog
+            surfaces, evergreen active accent, slate hairlines. ──── */
+    --viewer-chrome: 90 8% 95%;              /* #F3F4F2 toolbar/rail/thumbs */
+    --viewer-chrome-foreground: 160 6% 10%;  /* #191C1B ink on light chrome */
+    --viewer-chrome-muted: 0 0% 100%;         /* white elevated nested cards */
+    --viewer-chrome-border: 206 6% 78%;       /* #C3C7CA divider lines */
+    --viewer-chrome-hover: 90 6% 93%;         /* #EDEEEC button hover */
+    --viewer-chrome-active: 165 24% 32%;      /* evergreen active state */
+    --viewer-blueprint-bg: 120 3% 89%;        /* #E1E3E1 drawing-area "frame" */
   }
 
   /* Dark parity block — the app is dark by default now (tokens above are
