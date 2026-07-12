@@ -9,6 +9,7 @@
  *           layer toggles, then flip to default + delete PlanViewer.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { Viewport } from '@embedpdf/plugin-viewport/react';
@@ -263,7 +264,7 @@ function scaleStatusText(pageScale) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, measureScales }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -283,7 +284,9 @@ function StatusBar({ documentId, totalPages, pages, fillFor, measureScales }) {
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
       <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[hsl(var(--viewer-chrome-active))]' : (pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : '')}`}>
-        {fillFor != null ? `Spustelėkite patalpos ${fillFor} viduje` : scaleText}
+        {fillFor != null
+          ? (fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`)
+          : scaleText}
       </span>
     </div>
   );
@@ -408,6 +411,9 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
   const [fillFor, setFillFor] = useState(null);
+  // Round-trip in flight (backend flood-fill takes ~3-6 s) — drives the status
+  // hint so the user sees progress instead of a silent stall (audit P0).
+  const [fillBusy, setFillBusy] = useState(false);
   // Drop the armed room if focus changes away (avoid filling the wrong room).
   useEffect(() => { setFillFor(null); }, [focusedRoomNr]);
   // Room layer presentation. Founder decision 2026-07-11: numbered markers by
@@ -517,6 +523,8 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
     // Zoom-independent by construction (points, not CSS px).
     const rot = displayRotationFor(pageRotation ?? 0);
     const [mx, my] = rotatePctPoint(x / pageWidth, y / pageHeight, rot);
+    if (fillBusy) return;   // one request at a time
+    setFillBusy(true);
     try {
       const data = await clickToFill({
         projectId,
@@ -527,10 +535,19 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
         pdfBlob,
       });
       onRoomPolygonFill?.(fillFor, data);
-    } catch (e) {
-      console.warn('[click-to-fill] failed:', e?.message);
-    } finally {
+      toast.success(`Patalpos ${fillFor} kontūras pažymėtas`);
       setFillFor(null);
+    } catch (e) {
+      // Audit P0 (2026-07-12): failure used to be console-only + silent disarm
+      // — the user concluded the feature is broken. Surface a human message
+      // and KEEP fill mode armed so they can try another spot right away.
+      console.warn('[click-to-fill] failed:', e?.message);
+      toast.error(
+        `Nepavyko automatiškai apvesti patalpos ${fillFor} šioje vietoje.`,
+        { description: 'Spustelėkite kitą tašką patalpos viduje arba pažymėkite kontūrą ranka (Esc — atšaukti).' },
+      );
+    } finally {
+      setFillBusy(false);
     }
   };
 
@@ -635,6 +652,7 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             totalPages={totalPages}
             pages={documentState?.document?.pages}
             fillFor={fillFor}
+            fillBusy={fillBusy}
             measureScales={measureScales}
           />
           <CalibrateDialog
