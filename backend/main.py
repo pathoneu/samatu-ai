@@ -6179,7 +6179,11 @@ async def detect_room_polygons_endpoint(
         if r is None:
             res = {"polygon_source": "manual_needed", "confidence": "manual"}
             if marker:
+                # marker_source tells the viewer this anchor is a VERIFIED
+                # printed-label location (table columns filtered out), so a
+                # Tier-2 circled number may be shown even without a polygon.
                 res["marker_pct"] = marker
+                res["marker_source"] = "plan_label"
             results[nr] = res
             n_manual += 1
             continue
@@ -6195,10 +6199,23 @@ async def detect_room_polygons_endpoint(
             "area_err": r.area_err,
             "marker_pct": marker,
         }
+        if marker:
+            results[nr]["marker_source"] = "plan_label"
         n_auto += 1
+
+    # Post-pass (2026-07-12): fills are produced per-room with no cross-check,
+    # so corridor-callout labels seed IDENTICAL polygons for different rooms
+    # (Beržų 103/108/109) and nothing catches it. Resolve duplicate clusters to
+    # a single owner and demote grossly mis-sized fills — an honest
+    # manual_needed beats a confidently wrong polygon.
+    from extractor.polygon_dedupe import resolve_duplicate_fills
+    results, n_demoted = resolve_duplicate_fills(results, plotas, scale)
+    n_auto -= n_demoted
+    n_manual += n_demoted
 
     return {"results": results, "page_nr": page_nr,
             "stats": {"auto": n_auto, "manual": n_manual, "total": len(nrs),
+                      "deduped": n_demoted,
                       "page_scale_m2_per_pct": scale}}
 
 

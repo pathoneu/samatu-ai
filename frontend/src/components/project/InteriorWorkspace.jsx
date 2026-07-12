@@ -216,8 +216,21 @@ export default function InteriorWorkspace({
               polygon_confidence: res.confidence,
               area_err: res.area_err,
               marker_pct: res.marker_pct ?? null,
+              marker_source: res.marker_source ?? null,
             }
-            : { polygon_source: res.polygon_source, marker_pct: res.marker_pct ?? null };
+            // No polygon → CLEAR stale geometry fields too (contract audit
+            // 2026-07-12: 6 rooms across 3 projects carried manual_needed
+            // plus a leftover fabricated rect that any new reader would
+            // mistake for real geometry).
+            : {
+              polygon_source: res.polygon_source,
+              polygon_pct: null,
+              polygon_pdf: null,
+              polygon_confidence: null,
+              area_err: null,
+              marker_pct: res.marker_pct ?? null,
+              marker_source: res.marker_source ?? null,
+            };
         }
         const updated = applyRoomPatch(project, patchByNr);
         updateProject(project.id, updated);
