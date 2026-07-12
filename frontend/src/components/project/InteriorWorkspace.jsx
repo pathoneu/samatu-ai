@@ -267,10 +267,16 @@ export default function InteriorWorkspace({
   // Persist measurements + per-page calibration scales from the viewer's local
   // state onto the project. New top-level keys (measurements / pageScalesDurable)
   // ride the existing project JSON — zero backend changes. The viewer debounces.
+  // FIELD-SCOPED patch (P0-2, arch review 2026-07-12): updateProject merges
+  // onto the CURRENT stored project, so a render-captured `project` spread can
+  // no longer revert concurrent writes (async polygon patches, panel price
+  // edits, a second tab) that landed after this component last rendered.
   const handleMeasureDataChange = ({ measurements, measureScales }) => {
-    const updated = { ...project, measurements, pageScalesDurable: measureScales };
-    updateProject(project.id, updated);
-    onProjectChange?.(updated);
+    const updated = updateProject(project.id, {
+      measurements,
+      pageScalesDurable: measureScales,
+    });
+    if (updated) onProjectChange?.(updated);
   };
 
   // Per-room canvas visibility handlers (panel eye toggles, Phase 1 declutter).

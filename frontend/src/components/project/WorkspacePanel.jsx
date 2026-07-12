@@ -9,9 +9,11 @@
 
 import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import {
-  Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff,
+  Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff, Ruler,
 } from 'lucide-react';
-import { loadTakeoff, removePolygon, subscribeTakeoff } from '@/lib/takeoffStore';
+import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
+import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
+import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
@@ -117,7 +119,13 @@ export default function WorkspacePanel({
       confirmText: 'Ištrinti',
       destructive: true,
     }))) return;
-    setTakeoff(t => removePolygon(t, id));
+    // Persist the removal (P0-1, arch review 2026-07-12): removePolygon is
+    // pure — without saveTakeoff the polygon returned after every reload.
+    setTakeoff(t => {
+      const next = removePolygon(t, id);
+      saveTakeoff(project.id, next);
+      return next;
+    });
   };
 
   // Rooms (V8 + manual polygons)
@@ -176,6 +184,73 @@ export default function WorkspacePanel({
 
   const totalPositions = positionGroups.reduce((s, g) => s + g.rows.length, 0);
   const totalNet = positionGroups.reduce((s, g) => s + g.subtotal, 0);
+
+  // ── MATAVIMAI — the viewer's measurements, surfaced in the panel (P0-1,
+  // arch review 2026-07-12: measurements previously reached project JSON but
+  // NO panel read them — "you measure things and nothing shows up"). Counts
+  // are grouped per type with an "Į sąmatą" action; lengths/areas are listed
+  // with their calibrated values.
+  const projMeasurements = project.measurements || [];
+  const measCountRows = useMemo(() => {
+    const byType = new Map();
+    for (const m of projMeasurements) {
+      if (m.kind !== 'count' || !m.typeId) continue;
+      const cur = byType.get(m.typeId);
+      if (cur) cur.count += 1;
+      else {
+        const type = DEFAULT_COUNT_TYPES.find((t) => t.id === m.typeId);
+        byType.set(m.typeId, {
+          typeId: m.typeId,
+          label: type?.label || m.typeId,
+          color: m.color || type?.color || 'hsl(var(--primary))',
+          count: 1,
+        });
+      }
+    }
+    return [...byType.values()];
+  }, [projMeasurements]);
+  const measGeomRows = useMemo(() => {
+    const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
+    return projMeasurements
+      .filter((m) => KIND_LT[m.kind])
+      .map((m) => {
+        const scale = project.pageScalesDurable?.[m.page]
+          ?? project.pageScalesDurable?.[String(m.page)] ?? null;
+        let display = 'nekalibruota';
+        if (scale) {
+          const { value } = measurementValue(m, scale);
+          display = m.kind === 'area' ? `${fmt(value, 2)} m²` : `${fmt(value, 2)} m`;
+        }
+        return { id: m.id, label: KIND_LT[m.kind], page: m.page, display };
+      });
+  }, [projMeasurements, project.pageScalesDurable]);
+
+  // Push a counted type into the estimate as a position row (kiekis = count,
+  // price left for the user). Re-running updates the existing measurement row
+  // instead of duplicating it. Field-scoped save — merges onto the CURRENT
+  // stored project (same P0-2 contract as measurement saves).
+  const addCountToEstimate = useCallback((row) => {
+    const list = [...(project.darbu_sarasas || [])];
+    const idx = list.findIndex((p) => p.measure_type_id === row.typeId
+      && p.quantity_source === 'measurement_count');
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], kiekis: row.count };
+    } else {
+      list.push({
+        eil_nr: list.length + 1,
+        aprasymas: `${row.label} (suskaičiuota brėžinyje)`,
+        mato_vnt: 'vnt.',
+        kiekis: row.count,
+        kaina: 0,
+        skyrius: 'Matavimai',
+        confidence: 'high',
+        quantity_source: 'measurement_count',
+        measure_type_id: row.typeId,
+      });
+    }
+    const updated = updateProject(project.id, { darbu_sarasas: list });
+    if (updated) onProjectChange?.(updated);
+  }, [project.id, project.darbu_sarasas, onProjectChange]);
 
   // Filter rooms by name when filter active
   const filteredRooms = useMemo(() => {
@@ -427,6 +502,43 @@ export default function WorkspacePanel({
           <div className="px-3 py-3 text-xs text-muted-foreground text-center">
             {filter ? `Patalpų nerasta pagal „${filter}“` : 'Patalpų dar nėra.'}
           </div>
+        )}
+
+        {/* MATAVIMAI — viewer measurements (counts + lengths/areas) */}
+        {(measCountRows.length > 0 || measGeomRows.length > 0) && (
+          <>
+            <SectionHeader
+              icon={Ruler}
+              title="Matavimai"
+              count={`${measCountRows.length + measGeomRows.length}`}
+              collapsed={!!collapsed.meas}
+              onToggle={() => toggleSection('meas')}
+              top={0}
+            />
+            {!collapsed.meas && measCountRows.map((r) => (
+              <div key={r.typeId} className="flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
+                <span className="flex-1 min-w-0 truncate">{r.label}</span>
+                <span className="font-mono tabular-nums text-foreground">{r.count} vnt.</span>
+                <button
+                  type="button"
+                  onClick={() => addCountToEstimate(r)}
+                  className="text-primary hover:underline shrink-0"
+                  title="Įtraukti kiekį į sąmatą (kainą suvesite patys)"
+                >
+                  Į sąmatą
+                </button>
+              </div>
+            ))}
+            {!collapsed.meas && measGeomRows.map((m) => (
+              <div key={m.id} className="flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs">
+                <span className="flex-1 min-w-0 truncate text-muted-foreground">{m.label} · psl. {m.page}</span>
+                <span className={`font-mono tabular-nums ${m.display === 'nekalibruota' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  {m.display}
+                </span>
+              </div>
+            ))}
+          </>
         )}
 
         {/* KIEKIAI section */}

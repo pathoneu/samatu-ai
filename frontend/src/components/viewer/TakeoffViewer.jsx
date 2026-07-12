@@ -469,11 +469,23 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const onMeasureDataChangeRef = useRef(onMeasureDataChange);
   useEffect(() => { onMeasureDataChangeRef.current = onMeasureDataChange; });
   const measureDirtyRef = useRef(false);
+  // Latest unsaved payload — flushed on unmount so switching views inside the
+  // 600 ms debounce window can no longer DROP the last measurement (P0-2).
+  const pendingMeasureSaveRef = useRef(null);
   useEffect(() => {
     if (!measureDirtyRef.current) { measureDirtyRef.current = true; return undefined; } // skip mount
-    const t = setTimeout(() => onMeasureDataChangeRef.current?.({ measurements, measureScales }), 600);
+    pendingMeasureSaveRef.current = { measurements, measureScales };
+    const t = setTimeout(() => {
+      pendingMeasureSaveRef.current = null;
+      onMeasureDataChangeRef.current?.({ measurements, measureScales });
+    }, 600);
     return () => clearTimeout(t);
   }, [measurements, measureScales]);
+  useEffect(() => () => {
+    if (pendingMeasureSaveRef.current) {
+      onMeasureDataChangeRef.current?.(pendingMeasureSaveRef.current);
+    }
+  }, []);
   // Thumbnail rail preference: null = "no explicit choice yet" → default OPEN
   // when the document has more than one page (resolved where pageCount is known).
   const [thumbsPref, setThumbsPref] = useState(() => {
