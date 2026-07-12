@@ -121,7 +121,10 @@ export default function InteriorWorkspace({
   // already on this view, bump local focused page/room (in addition to
   // bubbling up). Prop changes take priority — local override resets on prop.
   const [localFocusedPage, setLocalFocusedPage] = useState(null);
-  const [localFocusedRoom, setLocalFocusedRoom] = useState(null);
+  // Sentinel semantics (audit P2 "sticky chip"): undefined = no local override
+  // (parent focus applies), null = user EXPLICITLY cleared focus (blank-canvas
+  // click / Esc) — must win over a still-set parent focusedRoom.
+  const [localFocusedRoom, setLocalFocusedRoom] = useState(undefined);
   // Phase 1 declutter (2026-07-02): panel-driven per-room canvas visibility.
   // Set of String(nr) hidden from the canvas + the panel-row hover that
   // brightens the matching zone (panel → canvas half of the hover sync).
@@ -131,14 +134,14 @@ export default function InteriorWorkspace({
   // Re-derive the focused room from the LIVE patalpos by nr — the focusedRoom
   // prop / local state is a captured object and can carry a stale polygon after
   // auto-detect upgrades the room's polygon_pct. Always render the latest.
-  const rawFocusedRoom = localFocusedRoom ?? focusedRoom;
+  const rawFocusedRoom = localFocusedRoom === undefined ? focusedRoom : localFocusedRoom;
   const effectiveFocusedRoom = rawFocusedRoom
     ? ((project.v8_rooms || project.patalpos || []).find(
         (r) => String(r.nr) === String(rawFocusedRoom.nr)) || rawFocusedRoom)
     : null;
   useEffect(() => {
     setLocalFocusedPage(null);
-    setLocalFocusedRoom(null);
+    setLocalFocusedRoom(undefined);
   }, [focusedPage, focusedRoom]);
 
   useEffect(() => {
@@ -242,6 +245,17 @@ export default function InteriorWorkspace({
       }
     })();
   }, [pdfBlob, project.id]);   
+
+  // Review-queue pencil → focus the room, jump to its plan page AND arm
+  // click-to-fill in the viewer (fillRequest is consumed by TakeoffViewer;
+  // t is a nonce so re-clicking the same pencil re-arms after Esc).
+  const [fillRequest, setFillRequest] = useState(null);
+  const handleEditRoomZone = (room) => {
+    if (!room?.nr) return;
+    if (room.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
+    setLocalFocusedRoom(room);
+    setFillRequest({ nr: room.nr, t: Date.now() });
+  };
 
   // Manual fix: persist a click-to-fill polygon as the focused room's accurate
   // contour (polygon_source 'corrected'). Clears the manual_needed flag.
@@ -350,6 +364,8 @@ export default function InteriorWorkspace({
               pdfBlob={pdfBlob}
               onClearFocus={() => setLocalFocusedRoom(null)}
               onRoomPolygonFill={handleRoomPolygonFill}
+              fillRequest={fillRequest}
+              exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
               initialMeasurements={project?.measurements || []}
               initialMeasureScales={project?.pageScalesDurable || {}}
               onMeasureDataChange={handleMeasureDataChange}
@@ -499,6 +515,7 @@ export default function InteriorWorkspace({
           onToggleRoomVisibility={handleToggleRoomVisibility}
           onIsolateRoom={handleIsolateRoom}
           onShowAllRooms={() => setHiddenRoomNrs(new Set())}
+          onEditRoomZone={handleEditRoomZone}
           onRoomRowHover={setHoveredRoomNr}
           onJumpToPage={(pageNr, room) => {
             setLocalFocusedPage(pageNr);

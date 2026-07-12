@@ -20,7 +20,7 @@ import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { useExport } from '@embedpdf/plugin-export/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Hash, Scaling, Magnet, Search, Printer, Download, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Magnet, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
 import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -32,14 +32,30 @@ import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
-// can be picked (→ delete affordance); drawing keys 2/3/6 match the hotkeys.
+// can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
 const MEASURE_TOOLS = [
   { id: 'select', Icon: MousePointer2, title: 'Žymėti matavimą' },
   { id: 'distance', Icon: Ruler, title: 'Atstumas (2)' },
   { id: 'area', Icon: Pentagon, title: 'Plotas (3)' },
+  { id: 'perimeter', Icon: Spline, title: 'Perimetras (4)' },
   { id: 'count', Icon: Hash, title: 'Skaičiuoti (6)' },
   { id: 'calibrate', Icon: Scaling, title: 'Kalibruoti mastelį' },
 ];
+
+// The page the user is actually LOOKING at. The scroll plugin's `currentPage`
+// goes stale under wheel-scrolling (audit P1: "psl. 2" while page 3 fills the
+// screen; fit then yanks the viewport back) while pageVisibilityMetrics stay
+// live — virtualization depends on them — so derive from the metrics and fall
+// back to the plugin's field.
+function visiblePageOf(scroll) {
+  const m = scroll?.pageVisibilityMetrics;
+  if (Array.isArray(m) && m.length) {
+    let best = m[0];
+    for (const x of m) if (x.visiblePercentage > best.visiblePercentage) best = x;
+    return best.pageNumber;
+  }
+  return scroll?.currentPage ?? 1;
+}
 
 /**
  * SearchBox — inline toolbar search (Task 4.1). Debounced live query through
@@ -118,9 +134,15 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const { provides: printApi } = usePrint(documentId);
   const { provides: exportApi } = useExport(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
-  const cur = scroll?.currentPage ?? 1;
+  const cur = visiblePageOf(scroll);
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
   const total = totalPages || 1;
+  // Fit actions consult the PLUGIN's currentPage, which can lag the viewport
+  // (audit P1: fit yanked the view back to a stale page) — sync it first.
+  const syncPageThen = (fn) => {
+    if (cur !== (scroll?.currentPage ?? cur)) scrollApi?.scrollToPage({ pageNumber: cur });
+    fn();
+  };
   const btn = 'p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40 disabled:hover:bg-transparent';
   const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
   const canFill = focusedRoomNr != null && onStartFill;
@@ -132,16 +154,16 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPreviousPage()}><ChevronLeft className="w-4 h-4" /></button>
+      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => syncPageThen(() => scrollApi?.scrollToPreviousPage())}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
-      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => scrollApi?.scrollToNextPage()}><ChevronRight className="w-4 h-4" /></button>
+      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => syncPageThen(() => scrollApi?.scrollToNextPage())}><ChevronRight className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Tolinti (−)" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
       <span className="mono tabular w-11 text-center">{pct}%</span>
       <button className={btn} title="Artinti (+)" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Pritaikyti plotį (1)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitWidth)}><MoveHorizontal className="w-4 h-4" /></button>
-      <button className={btn} title="Visas puslapis (0)" onClick={() => zoomApi?.requestZoom(ZoomMode.FitPage)}><Maximize2 className="w-4 h-4" /></button>
+      <button className={btn} title="Pritaikyti plotį (1)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
+      <button className={btn} title="Visas puslapis (0)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
       {onToggleZoneFills && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
@@ -268,7 +290,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
-  const cur = scroll?.currentPage ?? 1;
+  const cur = visiblePageOf(scroll);
   const size = pages?.[cur - 1]?.size;
   let sheet = null;
   if (size?.width && size?.height) {
@@ -299,7 +321,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
  */
 function ThumbnailRail({ documentId }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
-  const cur = scroll?.currentPage ?? 1;
+  const cur = visiblePageOf(scroll);
   return (
     <aside className="w-[148px] shrink-0 bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]">
       <ThumbnailsPane documentId={documentId} style={{ height: '100%' }}>
@@ -341,7 +363,7 @@ function ThumbnailRail({ documentId }) {
  * Editable) and browser combos (meta/ctrl) are never intercepted.
  *   +/= zoom in · − zoom out · 0 fit page · 1 fit width ·
  *   ]/PageDown next page · [/PageUp prev page · T thumbnail rail ·
- *   2 distance · 3 area · 6 count (measure tools; ignored while fill armed) ·
+ *   2 distance · 3 area · 4 perimeter · 6 count (measure tools; ignored while fill armed) ·
  *   Delete/Backspace delete the selected measurement (select mode only, so it
  *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
  *   Ctrl/Cmd+F or / open search · Ctrl/Cmd+P print · Esc chain: close search
@@ -352,9 +374,19 @@ function ThumbnailRail({ documentId }) {
  */
 function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape }) {
   const { provides: zoomApi } = useZoom(documentId);
-  const { provides: scrollApi } = useScroll(documentId);
+  const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
+  // Scroll state through a ref so the window listener isn't re-bound on every
+  // scroll tick — only the fit keys ('0'/'1') read it, to pre-sync the plugin's
+  // lagging currentPage to the page actually on screen before fitting.
+  const scrollRef = useRef(scroll);
+  useEffect(() => { scrollRef.current = scroll; });
   useEffect(() => {
+    const fitTo = (mode) => {
+      const vp = visiblePageOf(scrollRef.current);
+      if (vp !== (scrollRef.current?.currentPage ?? vp)) scrollApi?.scrollToPage({ pageNumber: vp });
+      zoomApi?.requestZoom(mode);
+    };
     const onKeyDown = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
@@ -367,10 +399,11 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       switch (e.key) {
         case '+': case '=': e.preventDefault(); zoomApi?.zoomIn(); break;
         case '-': e.preventDefault(); zoomApi?.zoomOut(); break;
-        case '0': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitPage); break;
-        case '1': e.preventDefault(); zoomApi?.requestZoom(ZoomMode.FitWidth); break;
+        case '0': e.preventDefault(); fitTo(ZoomMode.FitPage); break;
+        case '1': e.preventDefault(); fitTo(ZoomMode.FitWidth); break;
         case '2': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('distance'); } break;
         case '3': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('area'); } break;
+        case '4': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('perimeter'); } break;
         case '6': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('count'); } break;
         case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
         case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
@@ -406,7 +439,7 @@ function FocusScroller({ documentId, focusedRoom }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
+function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -443,6 +476,11 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
     });
   };
   const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); setFillFor(nr); };
+  // External fill arming (review-queue pencil → "Taisyti zoną" armed here).
+  // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
+  useEffect(() => {
+    if (fillRequest?.nr != null) startFill(fillRequest.nr);
+  }, [fillRequest]);
   const deleteMeasurement = (id) => {
     if (id == null) return;
     setMeasurements((prev) => prev.filter((m) => m.id !== id));
@@ -506,9 +544,15 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   };
 
   const handlePagePoint = async (pt) => {
-    // Not in fill mode → normal viewing: forward to any external consumer.
     if (fillFor == null) {
-      onPagePoint?.(pt);
+      // Plain canvas click (no fill, no measure tool): clear the focused-room
+      // chip — a room stays "selected" only while the user means it (audit P2
+      // sticky chip) — and forward to any external consumer. While a measure
+      // tool owns the pointer, leave focus alone.
+      if (measureTool == null) {
+        onClearFocus?.();
+        onPagePoint?.(pt);
+      }
       return;
     }
     const { x, y, pageIndex, pageWidth, pageHeight, pageRotation } = pt;
@@ -687,6 +731,10 @@ export default function TakeoffViewer({
   projectId = null,
   pdfBlob = null,
   onRoomPolygonFill = null,
+  // External "arm click-to-fill for room nr" request: { nr, t } (t = nonce).
+  fillRequest = null,
+  // Download filename for the export button (defaults inside the engine).
+  exportFileName = null,
   // Measurement persistence (Phase 3): hydrate from the project, report back
   // debounced ({ measurements, measureScales }) for the project save flow.
   initialMeasurements = null,
@@ -694,7 +742,10 @@ export default function TakeoffViewer({
   onMeasureDataChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
-  const plugins = useMemo(() => (fileUrl ? makeViewerPlugins(fileUrl) : null), [fileUrl]);
+  const plugins = useMemo(
+    () => (fileUrl ? makeViewerPlugins(fileUrl, exportFileName || undefined) : null),
+    [fileUrl, exportFileName],
+  );
   if (error) return <div className="p-5 text-sm text-red-600">Variklio klaida: {String(error.message || error)}</div>;
   if (isLoading || !engine || !plugins) return <div className="p-5 text-sm text-muted-foreground">Kraunamas PDF variklis…</div>;
   return (
@@ -711,6 +762,7 @@ export default function TakeoffViewer({
           projectId={projectId}
           pdfBlob={pdfBlob}
           onRoomPolygonFill={onRoomPolygonFill}
+          fillRequest={fillRequest}
           initialMeasurements={initialMeasurements}
           initialMeasureScales={initialMeasureScales}
           onMeasureDataChange={onMeasureDataChange}

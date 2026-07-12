@@ -98,6 +98,8 @@ export default function WorkspacePanel({
   hiddenRoomNrs = null,
   onToggleRoomVisibility = null,
   onIsolateRoom = null,
+  // Review-queue pencil → arm click-to-fill for the room in the viewer.
+  onEditRoomZone = null,
   onShowAllRooms = null,
   onRoomRowHover = null,
 }) {
@@ -354,6 +356,7 @@ export default function WorkspacePanel({
           positions={project.darbu_sarasas || []}
           eksplikacijaSourcePage={project?._eksplikacija?.eksplikacija_source_page}
           onJumpToPage={onJumpToPage}
+          onEditRoom={onEditRoomZone}
           onReviewStatusChange={onProjectChange ? (kind, key, status) => {
             // Sprint G2 Phase 2: persist _review_status on the matching item.
             if (kind === 'room') {

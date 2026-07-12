@@ -107,7 +107,12 @@ export default function MeasureLayer({
 
   const commitDraft = useCallback((points) => {
     if (!onCommit) return;
-    onCommit(makeMeasurement(tool, pageNr, points));
+    // Drop consecutive coincident vertices — the double-click commit path
+    // appends the terminal point twice (audit P1: stored junk vertices made
+    // the label read the zero-length last segment).
+    const pts = points.filter((p, i) =>
+      i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 0.5);
+    if (pts.length >= 2) onCommit(makeMeasurement(tool, pageNr, pts));
     dispatch({ type: 'reset' });
     setCursor(null);
     setSnapPt(null);
@@ -323,9 +328,13 @@ function CommittedMeasurement({ m, adapter, scale, countTypes, selected, decimal
   const d = pathD(sp, closed);
 
   const { value } = measurementValue(m, scale);
-  const label = closed
-    ? `${formatNumberLT(value, decimals)} m²`
-    : `${formatNumberLT(value, decimals)} m`;
+  // An uncalibrated page has no real meters — say so instead of lying "0,00 m"
+  // (audit P1). The draft chip already does this; committed labels now match.
+  const label = !scale?.calibrated
+    ? 'nekalibruota'
+    : closed
+      ? `${formatNumberLT(value, decimals)} m²`
+      : `${formatNumberLT(value, decimals)} m`;
 
   const labelAt = closed
     ? (() => { const c = polygonCentroid(m.points); return c ? adapter.toViewport(c) : sp[0]; })()

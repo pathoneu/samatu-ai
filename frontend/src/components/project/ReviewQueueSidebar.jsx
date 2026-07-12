@@ -53,6 +53,7 @@ export default function ReviewQueueSidebar({
   eksplikacijaSourcePage = null,
   onJumpToPage = null,
   onReviewStatusChange = null,  // Sprint G2 Phase 2: (kind, key, status) => void
+  onEditRoom = null,            // pencil: focus room + arm click-to-fill (falls back to jump)
 }) {
   const [open, setOpen] = useState(true);
 
@@ -195,7 +196,7 @@ export default function ReviewQueueSidebar({
                   onClick={() => handleRoomClick(r)}
                   onAccept={onReviewStatusChange ? () => onReviewStatusChange('room', r.nr, 'accepted') : null}
                   onReject={onReviewStatusChange ? () => onReviewStatusChange('room', r.nr, 'rejected') : null}
-                  onEdit={onReviewStatusChange ? () => handleRoomClick(r) : null}
+                  onEdit={onEditRoom ? () => onEditRoom(r) : (onReviewStatusChange ? () => handleRoomClick(r) : null)}
                 />
               ))}
             </>

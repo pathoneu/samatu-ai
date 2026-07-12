@@ -40,7 +40,7 @@ export function engineOptions() {
   };
 }
 
-export function makeViewerPlugins(initialUrl) {
+export function makeViewerPlugins(initialUrl, exportFileName = 'brezinys.pdf') {
   return [
     createPluginRegistration(DocumentManagerPluginPackage, {
       initialDocuments: [{ url: initialUrl, autoActivate: true }],
@@ -55,6 +55,6 @@ export function makeViewerPlugins(initialUrl) {
     createPluginRegistration(SearchPluginPackage),
     createPluginRegistration(PrintPluginPackage),
     // Fallback name only — export prefers the loaded document's own name.
-    createPluginRegistration(ExportPluginPackage, { defaultFileName: 'brezinys.pdf' }),
+    createPluginRegistration(ExportPluginPackage, { defaultFileName: exportFileName }),
   ];
 }

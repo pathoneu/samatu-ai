@@ -162,7 +162,7 @@ export default function RoomZoneLayer({
               pointerEvents: interactive ? 'auto' : 'none',
               cursor: interactive && onRoomClick ? 'pointer' : 'default',
             }}
-            onClick={() => onRoomClick?.(z)}
+            onClick={(e) => { e.stopPropagation(); onRoomClick?.(z); }}
             onMouseEnter={() => setHoverNr(String(z.nr))}
             onMouseLeave={() => setHoverNr((cur) => (cur === String(z.nr) ? null : cur))}
           >
