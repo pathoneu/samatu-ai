@@ -425,7 +425,7 @@ export default function WorkspacePanel({
         })}
         {!collapsed.rooms && filteredRooms.length === 0 && (
           <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-            {filter ? `Patalpų nerasta pagal „${filter}"` : 'Patalpų dar nėra.'}
+            {filter ? `Patalpų nerasta pagal „${filter}“` : 'Patalpų dar nėra.'}
           </div>
         )}
 
@@ -433,7 +433,7 @@ export default function WorkspacePanel({
         <SectionHeader
           icon={FileText}
           title="Kiekiai"
-          count={`${totalPositions} pozicijų`}
+          count={`${totalPositions} poz.`}
           summary={fmtEur(totalNet)}
           collapsed={false}
           onToggle={null}
@@ -454,7 +454,7 @@ export default function WorkspacePanel({
         ))}
         {positionGroups.length === 0 && filter && (
           <div className="px-3 py-6 text-xs text-muted-foreground text-center">
-            Pozicijų nerasta pagal „{filter}".
+            Pozicijų nerasta pagal „{filter}“.
           </div>
         )}
 
@@ -825,7 +825,7 @@ const PositionRow = memo(function PositionRow({
             onClick={beginQtyEdit}
             className="mono tabular text-foreground/90 whitespace-nowrap text-right rounded px-1 py-0.5 hover:bg-primary/10 hover:text-primary transition-colors"
             style={{ fontSize: 11 }}
-            title="Spausk pataisyti kiekį"
+            title="Spustelėkite, norėdami pataisyti kiekį"
           >
             {fmt(row.kiekis)}
             <span className="text-muted-foreground/70 ml-1" style={{ fontSize: 9 }}>{row.mato_vnt}</span>
@@ -880,7 +880,7 @@ const PositionRow = memo(function PositionRow({
             textAlign: 'right',
             textUnderlineOffset: 2,
           }}
-          title="Spausk redaguoti kainą"
+          title="Spustelėkite, norėdami redaguoti kainą"
         >
           {row.kaina ? `${row.kaina.toFixed(2)} €` : '—'}
         </span>

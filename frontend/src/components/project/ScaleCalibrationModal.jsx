@@ -46,7 +46,7 @@ export default function ScaleCalibrationModal({
     const m = parseFloat(String(distanceM).replace(',', '.'));
     if (!m || m <= 0) return null;
     if (m < 0.5) return { type: 'warn', text: 'Atrodo mažai. Įprastai matuoja sienas (>1m).' };
-    if (m > 50) return { type: 'warn', text: 'Atrodo daug. Patikrink ar tikrai metrai (ne mm).' };
+    if (m > 50) return { type: 'warn', text: 'Atrodo daug. Patikrinkite, ar tikrai metrai (ne mm).' };
     return { type: 'ok', text: `Įvertintas mastelis ≈ 1:${Math.round(pxDist / m * 50 / pxDist * 1000 / 1000 * 50 || 50)}` };
   })();
 
@@ -57,7 +57,7 @@ export default function ScaleCalibrationModal({
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Ruler className="w-4 h-4 text-foreground" />
-            <span className="font-semibold text-sm text-foreground">Mastelio kalibracija</span>
+            <span className="font-semibold text-sm text-foreground">Mastelio kalibravimas</span>
           </div>
           <button onClick={onCancel}
             className="p-1 hover:bg-muted rounded text-muted-foreground">
@@ -67,12 +67,12 @@ export default function ScaleCalibrationModal({
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="text-sm text-foreground">
-            Pažymėjai du taškus, atstumas tarp jų — <strong className="font-mono">{pxDist.toFixed(1)} px</strong>.
+            Pažymėjote du taškus, atstumas tarp jų — <strong className="font-mono">{pxDist.toFixed(1)} px</strong>.
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1.5">
-              Įvesk realų atstumą metrais
+              Įveskite realų atstumą metrais
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -80,7 +80,7 @@ export default function ScaleCalibrationModal({
                 inputMode="decimal"
                 value={distanceM}
                 onChange={e => setDistanceM(e.target.value)}
-                placeholder="Pvz. 3,45"
+                placeholder="Pvz., 3,45"
                 autoFocus
                 className="flex-1 px-3 py-2 border border-border bg-background rounded-lg text-base font-mono focus:outline-none focus:border-foreground/40"
               />
@@ -96,7 +96,7 @@ export default function ScaleCalibrationModal({
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Patarimas: matuok ilgą žinomą atstumą (sienos ilgį, kambario ilgį) — tikslesni rezultatai.
+              Patarimas: matuokite ilgą žinomą atstumą (sienos ilgį, kambario ilgį) — tikslesni rezultatai.
             </p>
           </div>
 
@@ -114,7 +114,7 @@ export default function ScaleCalibrationModal({
                   Taikyti visiems {totalPages} puslapiams
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  Naudoti tą patį mastelį visam dokumentui. Atjunk, jei pjūvis ar fasadas turi kitokį mastelį.
+                  Naudoti tą patį mastelį visam dokumentui. Atjunkite, jei pjūvis ar fasadas turi kitokį mastelį.
                 </div>
               </div>
             </label>

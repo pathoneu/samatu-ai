@@ -26,7 +26,7 @@ const SUGGESTED_QUESTIONS = [
   'Kiek hidroizoliacijos zonų ir kokie metrai?',
   'Kokios plytelių specifikacijos rastos brėžinyje?',
   'Ar visiems kambariams nustatytas mastelis?',
-  'Kiek dažų litrų reikės jei pereisiu į Klasę 3?',
+  'Kiek dažų litrų reikės, jei pereisiu į 3 klasę?',
 ];
 
 export default function AiChat({ project, inline = false }) {
@@ -126,7 +126,7 @@ export default function AiChat({ project, inline = false }) {
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-4">
             <Sparkles className="w-6 h-6 mx-auto mb-2 text-muted-foreground/60" />
-            <p className="mb-3">Klauskite ką nors apie projektą</p>
+            <p className="mb-3">Užduokite klausimą apie projektą</p>
             <div className="space-y-1.5">
               {SUGGESTED_QUESTIONS.map((q, i) => (
                 <button

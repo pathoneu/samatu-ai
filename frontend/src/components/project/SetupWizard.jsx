@@ -141,7 +141,7 @@ const STEPS = [
     id: 'done',
     title: 'Viskas paruošta',
     icon: Check,
-    desc: 'Galite koreguoti šiuos nustatymus bet kada per "Nustatymai" mygtuką.',
+    desc: 'Galite koreguoti šiuos nustatymus bet kada per mygtuką „Nustatymai“.',
   },
 ];
 
@@ -218,12 +218,12 @@ export default function SetupWizard({ onComplete, onClose }) {
           {currentStep.id === 'welcome' && (
             <div className="bg-muted border border-border rounded-lg p-4 text-sm text-foreground">
               <p className="mb-2">
-                <strong>Pathon</strong> dirba pagal tarptautinius industries
+                <strong>Pathon</strong> dirba pagal tarptautinius pramonės
                 standartus (RICS NRM2, DIN 18363, CSI MasterFormat).
               </p>
               <p>
                 Tačiau kiekvienos įmonės stilius šiek tiek skiriasi —
-                šis trumpas wizard padės tai pritaikyti.
+                šis trumpas vedlys padės tai pritaikyti.
               </p>
             </div>
           )}
@@ -244,7 +244,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                   >
                     <div className="font-bold text-lg text-foreground">{h.toFixed(1)} m</div>
                     <div className="text-xs text-muted-foreground">
-                      {h === 1.5 ? 'Žemai' : h === 2.0 ? 'Standart' : 'Iki lubų'}
+                      {h === 1.5 ? 'Žemai' : h === 2.0 ? 'Standartas' : 'Iki lubų'}
                     </div>
                   </button>
                 ))}
@@ -263,7 +263,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                       Dažyti sienas virš plytelių
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Standart: dažoma iki lubų virš plytelių zonos
+                      Standartas: dažoma iki lubų virš plytelių zonos
                     </div>
                   </div>
                 </label>
@@ -274,12 +274,12 @@ export default function SetupWizard({ onComplete, onClose }) {
           {currentStep.id === 'rooms' && (
             <div className="space-y-1">
               {[
-                { key: 'drabuzine_painted', label: 'Drabužinės', note: 'Industries standart: TAIP' },
+                { key: 'drabuzine_painted', label: 'Drabužinės', note: 'Pramonės standartas: TAIP' },
                 { key: 'rubine_painted', label: 'Rūbinės', note: '' },
                 { key: 'sandeliukas_painted', label: 'Sandėliukai', note: '' },
                 { key: 'katiline_painted', label: 'Katilinės', note: 'Pagal poreikį' },
-                { key: 'garazas_painted', label: 'Garažai', note: 'Standart: NE' },
-                { key: 'tamburas_painted', label: 'Tambūrai', note: 'Standart: NE' },
+                { key: 'garazas_painted', label: 'Garažai', note: 'Standartas: NE' },
+                { key: 'tamburas_painted', label: 'Tambūrai', note: 'Standartas: NE' },
               ].map(({ key, label, note }) => (
                 <label
                   key={key}
@@ -314,7 +314,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                     Skaičiuoti išorės kampus
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Standart: TAIP — kampuoti profiliai (corner bead)
+                    Standartas: TAIP — kampų profiliai (corner bead)
                   </div>
                 </div>
               </label>
@@ -331,7 +331,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                     Skaičiuoti vidaus kampus
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Standart: NE (paprastai nereikalauja corner bead)
+                    Standartas: NE (paprastai kampuotis nereikalingas)
                   </div>
                 </div>
               </label>
@@ -375,7 +375,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                 <div>
                   <div className="text-sm font-medium text-foreground">Tikslus</div>
                   <div className="text-xs text-muted-foreground">
-                    Atimami langai, durys, kiti įdėklai. Plotas mažesnis, bet ekonomiška.
+                    Atimami langai, durys, kitos angos. Plotas mažesnis, bet ekonomiška.
                   </div>
                 </div>
               </label>
@@ -424,7 +424,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                   <Check className="w-4 h-4" />
                   Nustatymai išsaugoti
                 </div>
-                <p>Šie pasirinkimai bus naudojami visiems naujiems projektams. Galite juos keisti per "Nustatymai" mygtuką bet kuriuo metu.</p>
+                <p>Šie pasirinkimai bus naudojami visiems naujiems projektams. Galite juos keisti per mygtuką „Nustatymai“ bet kuriuo metu.</p>
               </div>
 
               <details className="border border-border rounded-lg">

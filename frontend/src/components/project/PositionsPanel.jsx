@@ -280,7 +280,7 @@ export default function PositionsPanel({
             <button
               onClick={onCollapse}
               className="p-1.5 hover:bg-muted rounded text-muted-foreground"
-              title="Slėpti panel'ę"
+              title="Slėpti skydelį"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -363,7 +363,7 @@ export default function PositionsPanel({
             <span>Pozicijos</span>
             {toCheckCount > 0 && (
               <span
-                title={`${toCheckCount} pozicijos pažymėtos „patikrinti" — užvesk pelę ant geltono/raudono taško, kad pamatytum priežastį`}
+                title={`${toCheckCount} pozicijos pažymėtos „patikrinti“ — užveskite pelę ant geltono/raudono taško, kad pamatytum priežastį`}
                 className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 px-1.5 h-4 text-[10px] font-medium normal-case tracking-normal"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />

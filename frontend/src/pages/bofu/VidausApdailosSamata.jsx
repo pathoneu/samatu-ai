@@ -134,7 +134,7 @@ export default function VidausApdailosSamata() {
         </UL>
         <P>
           Greita savikontrolė: dažomas sienų plotas paprastai būna{' '}
-          <Term>2,5–4 karto didesnis už grindų plotą</Term>. Jei jūsų skaičius
+          <Term>2,5–4 kartus didesnis už grindų plotą</Term>. Jei jūsų skaičius
           iškrenta iš šio intervalo — kažkur klaida.
         </P>
       </Section>
@@ -230,7 +230,7 @@ export default function VidausApdailosSamata() {
           <LI>Drėgnoms zonoms — drėgmei atsparus (žalias) GKP.</LI>
           <LI>
             Vienam lapui — apie 30 sraigtų; siūlių glaistui — apie 5 kg kibiras
-            12 m².
+            12 m² plotui.
           </LI>
           <LI>
             Kampų profiliai — tik <Term>išoriniams</Term> kampams; vidiniams
@@ -248,8 +248,8 @@ export default function VidausApdailosSamata() {
       <Section n={6} title="Atliekų koeficientai — kiek pridėti prie neto kiekių">
         <P>
           Neto kiekis iš brėžinio nėra užsakymo kiekis. Prie kiekvienos
-          medžiagos pridedamas atliekų koeficientas — priklausomai nuo
-          medžiagos ir klojimo rašto:
+          medžiagos pridedamas atliekų koeficientas — pagal
+          medžiagą ir klojimo raštą:
         </P>
         <DefTable
           head={['Medžiaga', 'Atliekos']}

@@ -161,7 +161,7 @@ export default function ReviewQueueSidebar({
                 background: 'hsl(var(--source-table) / 0.06)',
                 borderBottom: '1px solid hsl(var(--border) / 0.4)',
               }}
-              title="Šitie įrašai turi tikslias mm reikšmes iš eksplikacijos/specifikacijos lentelių"
+              title="Šie įrašai turi tikslias mm reikšmes iš eksplikacijos/specifikacijos lentelių"
             >
               <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
               <span>
@@ -260,7 +260,7 @@ function ReviewRow({ conf, primary, secondary, meta, reasonHint, onClick, onAcce
         gap: 8, padding: '6px 12px', fontSize: 12,
         borderBottom: '1px solid hsl(var(--border) / 0.5)',
       }}
-      title={`${confTitle} · spustelk peržiūrai brėžinyje`}
+      title={`${confTitle} · spustelėkite peržiūrai brėžinyje`}
     >
       <Icon className="w-3 h-3 shrink-0" style={{ color: confColor }} />
       <div className="min-w-0">

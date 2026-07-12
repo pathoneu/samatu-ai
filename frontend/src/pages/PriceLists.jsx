@@ -56,7 +56,7 @@ function parseCsv(text) {
     if (m) colIdx[m] = i;
   });
   if (colIdx.aprasymas == null || colIdx.kaina == null) {
-    throw new Error('Reikalingi stulpeliai: skyrius, aprasymas, vnt, kaina (kalbantis su Excel ar atsisiųstu CSV)');
+    throw new Error('Reikalingi stulpeliai: skyrius, aprasymas, vnt, kaina (suderinama su „Excel“ ar atsisiųstu CSV)');
   }
 
   const items = [];
@@ -99,13 +99,13 @@ export default function PriceLists() {
     setName('');
     setCompany('');
     setIsSaving(false);
-    toast.success('Kainynė sukurta');
+    toast.success('Kainynas sukurtas');
   };
 
   const handleDelete = (id) => {
     deletePriceList(id);
     queryClient.invalidateQueries({ queryKey: ['priceLists'] });
-    toast.success('Kainynė ištrinta');
+    toast.success('Kainynas ištrintas');
   };
 
   // Sprint §30: bulk CSV import — parse + create new pricelist
@@ -119,7 +119,7 @@ export default function PriceLists() {
           toast.error('CSV neturi tinkamų eilučių');
           return;
         }
-        const safeName = file.name.replace(/\.csv$/i, '').slice(0, 60) || 'Importuota kainynė';
+        const safeName = file.name.replace(/\.csv$/i, '').slice(0, 60) || 'Importuotas kainynas';
         createPriceList({
           name: safeName,
           company_name: '',
@@ -127,7 +127,7 @@ export default function PriceLists() {
           total_items: items.length,
         });
         queryClient.invalidateQueries({ queryKey: ['priceLists'] });
-        toast.success(`Importuota ${items.length} eilutės iš „${file.name}"`);
+        toast.success(`Importuota ${items.length} eil. iš „${file.name}"`);
       } catch (e) {
         toast.error(`CSV klaida: ${e.message}`);
       }
@@ -162,17 +162,17 @@ export default function PriceLists() {
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Upload className="w-4 h-4 mr-2" />
-              Nauja kainynė
+              Naujas kainynas
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-foreground">Nauja kainynė</DialogTitle>
+              <DialogTitle className="text-foreground">Naujas kainynas</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-2">
               <div>
                 <Label className="text-sm text-muted-foreground">Pavadinimas</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pvz. 2024 m. kainynė" className="mt-1.5 bg-background border-border" />
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pvz., 2024 m. kainynas" className="mt-1.5 bg-background border-border" />
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground">Įmonė</Label>
@@ -200,9 +200,9 @@ export default function PriceLists() {
           <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <FileSpreadsheet className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="font-semibold text-foreground mb-1">Dar nėra kainynių</h3>
+          <h3 className="font-semibold text-foreground mb-1">Dar nėra kainynų</h3>
           <p className="text-sm text-muted-foreground text-center max-w-md">
-            Sukurkite kainynę norėdami sekti kainų sąrašus.
+            Sukurkite kainyną, norėdami sekti kainų sąrašus.
           </p>
         </div>
       ) : (

@@ -34,7 +34,7 @@ export default function ReextractButton({ project, onComplete }) {
         throw new Error('PDF nerastas. Negalima pakartoti analizės. Sukurkite naują projektą su PDF.');
       }
 
-      setProgress('AI analizuoja brėžinį (palaukite 3-8 min)...');
+      setProgress('AI analizuoja brėžinį (palaukite 3–8 min)...');
       const fd = new FormData();
       fd.append('files', blob, project.name + '.pdf');
       // Forward existing rules_override so user's prefs aren't lost

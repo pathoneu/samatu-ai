@@ -194,7 +194,7 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm">
           {totals.gkp_lubu_standart_m2 > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">GKP lubos (standart)</span>
+              <span className="text-muted-foreground">GKP lubos (standartinės)</span>
               <span className="font-medium">{totals.gkp_lubu_standart_m2.toFixed(2)} m²</span>
             </div>
           )}

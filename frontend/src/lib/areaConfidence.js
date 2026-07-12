@@ -28,7 +28,7 @@ export const AREA_AGREEMENT_TOLERANCE_PCT = 0.05;
 
 const SOURCE_LABEL_LT = {
   eksplikacija: 'iš eksplikacijos',
-  manual_polygon: 'manualu',
+  manual_polygon: 'rankinis',
   vision: 'iš AI',
   dimension: 'iš dimensijos',
 };

@@ -526,7 +526,7 @@ function FormulasCard({ sienosStorisM, glaistimoLygis }) {
           />
           <FormulaRow
             name="Glaistymo kampai"
-            formula="kampu_metrai = išorinių_kampų_skaičius × lubų_aukštis"
+            formula="kampų_metrai = išorinių_kampų_skaičius × lubų_aukštis"
             source="CLAUDE.md §1.3 — vidaus kampai paprastai be apkalo"
           />
           <FormulaRow
@@ -541,7 +541,7 @@ function FormulasCard({ sienosStorisM, glaistimoLygis }) {
           />
           <FormulaRow
             name="Užuolaidų nišos"
-            formula="L_niša = lango_plotis + 2 × 0.20 m\nplotas = L_niša × niša_gylis × 3 (viršus + 2 šonai)"
+            formula="L_niša = lango_plotis + 2 × 0.20 m\nplotas = L_niša × nišos_gylis × 3 (viršus + 2 šonai)"
             source="CLAUDE.md §1.5"
           />
           <FormulaRow

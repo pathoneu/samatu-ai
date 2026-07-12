@@ -4,7 +4,7 @@
  * Po extract-interior'o, vartotojas gali keisti:
  *  - Ar dažomos sienos drabužinėse, garažuose, tambūruose, sandėliukuose
  *  - Vonios sienų plytelių aukštis
- *  - Virtuvės backsplash aukštis
+ *  - Virtuvės prijuostės aukštis
  *  - Per-room overrides (force tile_floor TAIP/NE konkretiems kambariams)
  *
  * Pakeitimai siunčiami į backend /recompute-interior (be Vision call'o,
@@ -34,7 +34,7 @@ const PASKIRTIS_TOGGLES = [
 
 const NUMERIC_FIELDS = [
   { key: 'bathroom_tile_height_m',     label: 'Vonios plytelių aukštis',  unit: 'm', min: 1.5, max: 3.0, step: 0.1, default: 2.0 },
-  { key: 'kitchen_backsplash_height_m', label: 'Virtuvės backsplash aukštis', unit: 'm', min: 0.4, max: 1.2, step: 0.1, default: 0.6 },
+  { key: 'kitchen_backsplash_height_m', label: 'Virtuvės prijuostės aukštis', unit: 'm', min: 0.4, max: 1.2, step: 0.1, default: 0.6 },
   { key: 'high_ceiling_threshold_m',   label: 'Aukšta luba (>X m = atskira pozicija)', unit: 'm', min: 2.5, max: 4.0, step: 0.1, default: 3.0 },
 ];
 
@@ -201,7 +201,7 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
         <div>
           <h2 className="text-lg font-semibold">Prielaidos ir nustatymai</h2>
           <p className="text-sm text-muted-foreground">
-            Pakeisk default'us — sumos perskaičiuojamos per ~1 sek (be Vision call'o).
+            Pakeiskite numatytąsias reikšmes — sumos perskaičiuojamos per ~1 sek (be Vision call'o).
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -285,7 +285,7 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
           <div className="flex gap-1.5 flex-wrap">
             {[
               { val: 'LT',   title: 'LT — Lietuvos pramonės įprotis. Atimama kiekviena anga ≥1 m², angokraščiai pridedami prie kiekvieno lango/durų' },
-              { val: 'NRM2', title: 'NRM2 — Britanijos standartas (RICS). Smulkios angos (iki 0.5 m²) neatimamos. 0.5–3 m² — atimama, bet angokraščių nepridedam. Virš 3 m² — atimama + pridedami angokraščiai' },
+              { val: 'NRM2', title: 'NRM2 — Britanijos standartas (RICS). Smulkios angos (iki 0,5 m²) neatimamos. 0,5–3 m² — atimama, bet angokraščių nepridedame. Virš 3 m² — atimama + pridedami angokraščiai' },
               { val: 'VOB',  title: 'VOB DIN 18363 — Vokietijos standartas. Kaip NRM2, bet angokraščiai pridedami nuo 2.5 m² (ne 3 m²)' },
             ].map(opt => {
               const cur = overrides.paint_deduction_standard || 'LT';
@@ -319,9 +319,9 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {[
-              { val: 'Q1', title: 'Q1 — Pagrindinis glaistymas. Po sunkių tapetų, struktūrinių dangos ar betoninio paviršiaus. Storis 0.5–1 mm. Nereikalauja tobulo paviršiaus' },
-              { val: 'Q2', title: 'Q2 — Standartinis paruošimas po matiniais dažais. Storis 1–1.5 mm. Lietuvos gyvenamųjų patalpų default — 95% projektų' },
-              { val: 'Q3', title: 'Q3 — Aukštesnis paruošimas po pusiau blizgiais dažais ar šviesa krintančiomis sienomis. Storis 1.5–2 mm. Reikalauja kruopštesnio šlifavimo' },
+              { val: 'Q1', title: 'Q1 — Pagrindinis glaistymas. Po sunkių tapetų, struktūrinių dangų ar betoninio paviršiaus. Storis 0.5–1 mm. Nereikalauja tobulo paviršiaus' },
+              { val: 'Q2', title: 'Q2 — Standartinis paruošimas po matiniais dažais. Storis 1–1.5 mm. numatytoji Lietuvos gyvenamųjų patalpų parinktis — 95 % projektų' },
+              { val: 'Q3', title: 'Q3 — Aukštesnis paruošimas po pusiau blizgiais dažais ar sienoms, kurias apšviečia šoninė šviesa. Storis 1.5–2 mm. Reikalauja kruopštesnio šlifavimo' },
               { val: 'Q4', title: 'Q4 — Premium paruošimas po blizgiais/lakuotais dažais arba salonams. Pilno paviršiaus glaistymas 3–5 mm + 80–120 grit šlifavimas (0.30 h/m²). Brangiausias darbas' },
             ].map(opt => {
               const cur = overrides.glaistas_q_lygis || 'Q2';
@@ -355,8 +355,8 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {[
-              { val: 1, label: 'Klasė 1', title: 'Aukščiausios kokybės dengiamieji dažai (pvz. Tikkurila Joker, Sikkens Alphalon). Dengiamumas 10 m²/L, pakanka 1 sluoksnio ant paruošto pagrindo' },
-              { val: 2, label: 'Klasė 2', title: 'Standartiniai vidaus dažai (pvz. Sikkens Alpha Matt, Dulux Easycare, Sniezka). Dengiamumas 9 m²/L, reikia 2 sluoksnių. Lietuvos gyvenamųjų patalpų default' },
+              { val: 1, label: 'Klasė 1', title: 'Aukščiausios kokybės dengiamieji dažai (pvz., Tikkurila Joker, Sikkens Alphalon). Dengiamumas 10 m²/L, pakanka 1 sluoksnio ant paruošto pagrindo' },
+              { val: 2, label: 'Klasė 2', title: 'Standartiniai vidaus dažai (pvz., Sikkens Alpha Matt, Dulux Easycare, Sniezka). Dengiamumas 9 m²/L, reikia 2 sluoksnių. Lietuvos gyvenamųjų patalpų default' },
               { val: 3, label: 'Klasė 3', title: 'Ekonomija arba sudėtingas pagrindas (šviežias tinkas, neglaistytos sienos). Dengiamumas 7.5 m²/L, reikia 3 sluoksnių dėl didesnio sugėrimo' },
             ].map(opt => {
               const cur = overrides.paint_class || 2;
@@ -395,7 +395,7 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
         <div className="border border-border rounded-xl p-4">
           <h3 className="text-sm font-semibold mb-2">Konkretūs kambariai</h3>
           <p className="text-xs text-muted-foreground mb-3">
-            Force'ink plytelės/parketas ar dažoma TAIP/NE konkrečiai patalpai (apeina default'ą).
+            Nustatykite plytelės/parketas ar dažoma TAIP/NE konkrečiai patalpai (apeina default'ą).
           </p>
           <div className="space-y-2">
             {candidateRooms.map(r => {
@@ -602,7 +602,7 @@ function FloorMultiplierSection({ project, onProjectUpdate }) {
   };
   const hint = value > 1
     ? `Visi kiekiai bus padauginti iš ${value} (eksportui ir santraukoms).`
-    : 'Tipinis vienbutis. Pakeisk į 2+, jei tas pats brėžinys kartojasi keliuose aukštuose.';
+    : 'Tipinis vienbutis. Pakeiskite į 2+, jei tas pats brėžinys kartojasi keliuose aukštuose.';
   return (
     <div className="border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2 mb-1">
@@ -711,7 +711,7 @@ function FormulasCard({ sienosStorisM, glaistimoLygis }) {
           />
           <FormulaRow
             name="Glaistymo kampai"
-            formula="kampu_metrai = išorinių_kampų_skaičius × lubų_aukštis"
+            formula="kampų_metrai = išorinių_kampų_skaičius × lubų_aukštis"
             source="CLAUDE.md §1.3 — vidaus kampai paprastai be apkalo"
           />
           <FormulaRow
@@ -726,7 +726,7 @@ function FormulasCard({ sienosStorisM, glaistimoLygis }) {
           />
           <FormulaRow
             name="Užuolaidų nišos"
-            formula="L_niša = lango_plotis + 2 × 0.20 m\nplotas = L_niša × niša_gylis × 3 (viršus + 2 šonai)"
+            formula="L_niša = lango_plotis + 2 × 0.20 m\nplotas = L_niša × nišos_gylis × 3 (viršus + 2 šonai)"
             source="CLAUDE.md §1.5"
           />
           <FormulaRow

@@ -316,7 +316,7 @@ export default function PlanViewer({
 
   const runSymbolDetect = async (nextType) => {
     if (!pdfFile) {
-      setSymbolError('PDF failas nerastas šiame naršyklės porte.');
+      setSymbolError('PDF failas nerastas šios naršyklės saugykloje.');
       return;
     }
     setSymbolLoading(true);
@@ -345,7 +345,7 @@ export default function PlanViewer({
 
   const runPageSymbolDetect = async () => {
     if (!pdfFile) {
-      setSymbolError('PDF failas nerastas šiame naršyklės porte.');
+      setSymbolError('PDF failas nerastas šios naršyklės saugykloje.');
       return;
     }
     setSymbolLoading(true);
@@ -694,10 +694,10 @@ export default function PlanViewer({
                   : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
               } disabled:opacity-50`}
               disabled={fillLoading || !pdfFile}
-              title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėk patalpos viduje`}
+              title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėkite patalpos viduje`}
             >
               <Wand2 className="w-4 h-4 inline mr-1.5" />
-              {fillMode ? `Spustelėk patalpos ${focusedRoom.nr} viduje` : 'Taisyti zoną'}
+              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Taisyti zoną'}
             </button>
           )}
           {fillLoading && (

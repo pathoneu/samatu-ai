@@ -84,7 +84,7 @@ export default function PolygonRoomModal({
               type="text"
               value={label}
               onChange={e => setLabel(e.target.value)}
-              placeholder="Pvz. Svetainė, Miegamasis 1, Vonia"
+              placeholder="Pvz., Svetainė, Miegamasis 1, Vonia"
               autoFocus
               className="w-full px-3 py-2 border border-border bg-background rounded-lg text-sm focus:outline-none focus:border-foreground/40"
             />

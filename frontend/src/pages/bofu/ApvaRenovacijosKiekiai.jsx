@@ -66,7 +66,7 @@ export default function ApvaRenovacijosKiekiai() {
       <Section n={1} title="Kas įeina į renovacijos kiekių žiniaraštį">
         <P>
           Daugiabučio modernizavimo projektas sujungia kelias statybos dalis į
-          vieną žiniaraštį — ir būtent dėl to jo kiekiai užima tiek laiko:
+          vieną žiniaraštį — ir būtent dėl to jo kiekiai atima tiek laiko:
         </P>
         <UL>
           <LI>
@@ -179,7 +179,7 @@ export default function ApvaRenovacijosKiekiai() {
             nuomos kainos dalis.
           </LI>
           <LI>
-            Nuomos trukmė rišama prie darbų grafiko — fasado ciklas, ne
+            Nuomos trukmė siejama su darbų grafiku — fasado ciklas, ne
             kalendorinis mėnuo.
           </LI>
           <LI>
@@ -209,7 +209,7 @@ export default function ApvaRenovacijosKiekiai() {
       <Section n={6} title="Investicijų plano formatas">
         <P>
           APVA administruojamoje daugiabučių atnaujinimo programoje pasiūlymai
-          rišami prie <Term>investicijų plano</Term>: jame priemonės (fasado
+          siejami su <Term>investicijų planu</Term>: jame priemonės (fasado
           šiltinimas, stogo šiltinimas, langų keitimas ir t. t.) išvardytos su
           kiekiais, įkainiais ir energinio efektyvumo tikslu (paprastai — ne
           žemesnė kaip B klasė ir apie 40 % energijos sutaupymas). Paramos
@@ -219,7 +219,7 @@ export default function ApvaRenovacijosKiekiai() {
         <P>
           Rangovui praktinė išvada paprasta: <Term>pasiūlymo kiekiai turi
           atitikti investicijų plano priemonių struktūrą</Term> — kitaip
-          pasiūlymo palyginti neįmanoma ir jis grįžta taisymui. Kiekių
+          pasiūlymo palyginti neįmanoma ir jis grąžinamas taisyti. Kiekių
           žiniaraštis pagal dalis (fasadas, stogas, cokolis, laiptinės,
           inžinerija) yra to pagrindas.
         </P>
@@ -239,14 +239,14 @@ export default function ApvaRenovacijosKiekiai() {
           </LI>
           <LI>
             <Term>Laiptinių ir kitų vidaus patalpų apdailą</Term> sistema
-            paskaičiuoja giliausiai — nuo dažomų plotų iki glaisto kiekių pagal
+            apskaičiuoja giliausiai — nuo dažomų plotų iki glaisto kiekių pagal
             Q lygį (formulės —{' '}
             <Link to="/vidaus-apdailos-samata" className="text-primary hover:underline">
               vidaus apdailos sąmatos gide
             </Link>).
           </LI>
           <LI>
-            Fasado ir stogo kiekiams taikomos aukščiau aprašytos normos pagal
+            Fasado ir stogo kiekiams taikomos pirmiau aprašytos normos pagal
             brėžinių matmenis — visos prielaidos matomos ir keičiamos, o
             kiekvienas kiekis turi pasitikėjimo indikatorių.
           </LI>

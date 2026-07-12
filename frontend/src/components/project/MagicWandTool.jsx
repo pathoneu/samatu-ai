@@ -62,7 +62,7 @@ export default function MagicWandTool({
           * (Math.max(...ys) - Math.min(...ys));
         if (bboxArea > pageW * pageH * 0.6) {
           setError(
-            'Patalpa "ištekėjo" pro tarpus tarp sienų. Pakelkite jautrumą '
+            'Patalpa „ištekėjo“ pro tarpus tarp sienų. Pakelkite jautrumą '
             + '(stumkite šliaužiklį į dešinę) ir bandykite dar kartą.',
           );
           return;
@@ -138,7 +138,7 @@ export default function MagicWandTool({
           <span style={{ width: 20, textAlign: 'right' }}>{closeKernel}</span>
         </label>
         <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
-          Jei patalpa "išteka" už sienų — pakelkite šliaužiklį į dešinę.
+          Jei patalpa „išteka“ už sienų — pakelkite šliaužiklį į dešinę.
         </div>
         {error && <div style={{ color: 'hsl(var(--destructive))', fontSize: 11 }}>{error}</div>}
       </div>

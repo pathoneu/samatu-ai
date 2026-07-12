@@ -60,7 +60,7 @@ function buildInteriorRows(project) {
 
   add('Lubų apdaila', 'Lubų dažymas', 'm²', dp.lubos_m2, dp.confidence);
   add('Lubų apdaila', 'Lubų dažai (2 sluoksniai)', 'l', daz.lubos_l, daz.confidence);
-  add('Lubų apdaila', 'Lubų perimetras (grindjuostės/karniizai)', 'm', lp.viso_m, lp.confidence);
+  add('Lubų apdaila', 'Lubų perimetras (grindjuostės/karnizai)', 'm', lp.viso_m, lp.confidence);
   if (project.lubu_data?.gkp_m2) add('Lubų apdaila', 'GKP lubos', 'm²', project.lubu_data.gkp_m2, 'medium');
   if (project.lubu_data?.led_nisu_m) add('Lubų apdaila', 'LED nišos', 'm', project.lubu_data.led_nisu_m, 'medium');
   if (project.lubu_data?.uzuolaidu_nisu_m) add('Lubų apdaila', 'Užuolaidų nišos', 'm', project.lubu_data.uzuolaidu_nisu_m, 'medium');
@@ -96,9 +96,9 @@ function buildInteriorRows(project) {
   }
 
   if (Object.keys(aps).length > 0) {
-    add('Apšvietimas', 'Įleidžiami sviestuvai', 'vnt.', aps.ileidziami_sviestuvai_vnt, 'high');
-    add('Apšvietimas', 'Pakabinami sviestuvai', 'vnt.', aps.pakabinami_sviestuvai_vnt, 'high');
-    add('Apšvietimas', 'Sieniniai sviestuvai', 'vnt.', aps.sieniniai_sviestuvai_vnt, 'high');
+    add('Apšvietimas', 'Įleidžiami šviestuvai', 'vnt.', aps.ileidziami_sviestuvai_vnt, 'high');
+    add('Apšvietimas', 'Pakabinami šviestuvai', 'vnt.', aps.pakabinami_sviestuvai_vnt, 'high');
+    add('Apšvietimas', 'Sieniniai šviestuvai', 'vnt.', aps.sieniniai_sviestuvai_vnt, 'high');
     add('Apšvietimas', 'LED juostos', 'm', aps.led_juostos_m, 'high');
     add('Apšvietimas', 'Gaisro davikliai', 'vnt.', aps.gaisro_davikliai_vnt, 'high');
   }
@@ -192,9 +192,9 @@ function exportErrors(project) {
 
 const exportOptions = [
   { icon: FileSpreadsheet, label: 'Excel (.xlsx)', desc: 'Profesionaliai suformatuota Excel sąmata su skyriais', action: 'excel' },
-  { icon: FileText, label: 'PDF pasiūlymas', desc: 'Komercinė pasiūlymo PDF su skyriais ir totalais', action: 'pdf' },
+  { icon: FileText, label: 'PDF pasiūlymas', desc: 'Komercinio pasiūlymo PDF su skyriais ir sumomis', action: 'pdf' },
   { icon: AlertCircle, label: 'Klaidų ataskaita', desc: 'Įtartinos eilutės, žemas AI tikslumas, trūkstamos kainos', action: 'errors' },
-  { icon: FileCode, label: 'XML (Sistela/SES)', desc: 'Netrukus — XML eksportas Sistela sistemai', action: 'xml', disabled: true },
+  { icon: FileCode, label: 'XML (Sistela/SES)', desc: 'Netrukus — XML eksportas į sistemą „Sistela“', action: 'xml', disabled: true },
 ];
 
 export default function ExportModal({ open, onClose, project }) {

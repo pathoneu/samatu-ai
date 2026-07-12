@@ -86,14 +86,14 @@ export default function KiekiaiIsBrezinio() {
           eksplikacijos — tiek vektoriniai, tiek skenuoti failai. Jokio
           paruošimo: keliate tą patį PDF, kurį gavote iš projektuotojo.
         </P>
-        <SubHead>2. Sistema nuskaito ir paskaičiuoja</SubHead>
+        <SubHead>2. Sistema nuskaito ir apskaičiuoja</SubHead>
         <P>
           <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           klasifikuoja kiekvieną lapą (planas, išklotinė, lubų planas…),
           atpažįsta patalpas ir elementus, tada pritaiko Lietuvos sąmatininkų
           praktikos formules: plotai, perimetrai, angų atėmimai, atliekų
           koeficientai. Nuskaitymas paprastai trunka 10–15 minučių —
-          priklausomai nuo lapų skaičiaus.
+          trukmė priklauso nuo lapų skaičiaus.
         </P>
         <SubHead>3. Peržiūrite ir suvedate kainas</SubHead>
         <P>
@@ -152,7 +152,7 @@ export default function KiekiaiIsBrezinio() {
           kiekiais.
         </P>
         <P>
-          Sąžiningas pastebėjimas: kuo pilnesnis projektas, tuo daugiau žalių
+          Sąžiningas pastebėjimas: kuo išsamesnis projektas, tuo daugiau žalių
           indikatorių. Jei išklotinių ar eksplikacijų nėra, sistema skaičiuoja
           su prielaidomis ir aiškiai jas parodo — tokias vietas verta peržiūrėti
           pirmiausia.
@@ -161,8 +161,8 @@ export default function KiekiaiIsBrezinio() {
 
       <Section n={4} title="Pasitikėjimo indikatoriai — kodėl jais tikime">
         <P>
-          Joks įrankis (nei žmogus) neatpažįsta brėžinių šimtu procentų. Vietoj
-          to, kad apsimestume, jog klaidų nebūna, kiekvienam kiekiui rodome, iš
+          Joks įrankis (nei žmogus) neatpažįsta brėžinių šimtu procentų. Užuot
+          apsimetę, jog klaidų nebūna, kiekvienam kiekiui rodome, iš
           kur jis atsirado:
         </P>
         <UL>
@@ -181,7 +181,7 @@ export default function KiekiaiIsBrezinio() {
         </UL>
         <P>
           Papildomai veikia patikros taisyklės — pavyzdžiui, dažomas sienų
-          plotas paprastai būna 2,5–4 karto didesnis už grindų plotą. Jei
+          plotas paprastai būna 2,5–4 kartus didesnis už grindų plotą. Jei
           santykis įtartinas, sistema įspėja, o ne nutyli.
         </P>
       </Section>
@@ -194,7 +194,7 @@ export default function KiekiaiIsBrezinio() {
         <UL>
           <LI>
             <Term>Nepatikrintas mastelis.</Term> Brėžinys atspausdintas ar
-            eksportuotas kitu masteliu nei parašyta — ir visi ilgiai „nuplaukia“
+            eksportuotas kitu masteliu, nei parašyta — ir visi ilgiai „nuplaukia“
             10–20 %. Mastelį būtina pasitikrinti pagal žinomą matmenį.
           </LI>
           <LI>
@@ -219,7 +219,7 @@ export default function KiekiaiIsBrezinio() {
           </LI>
         </UL>
         <P>
-          Automatika šių klaidų nedaro iš principo: formulės tos pačios visiems
+          Automatika šių klaidų nedaro dėl paties veikimo principo: formulės tos pačios visiems
           projektams, patikros taisyklės — visada įjungtos.
         </P>
       </Section>

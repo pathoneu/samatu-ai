@@ -45,14 +45,14 @@ export default function SamatininkoKaina() {
     setPageMeta({
       title: 'Kiek laiko atima sąmata ir kaip skaičiuoti greičiau',
       description:
-        'Kiek laiko atima statybos sąmatos skaičiavimas iš brėžinių, kur dingsta valandos ir kaip jį sutrumpinti nuo valandų iki minučių — patys, be sąmatininko.',
+        'Kiek laiko atima statybos sąmatos skaičiavimas iš brėžinių, kur dingsta valandos ir kaip jį sutrumpinti nuo valandų iki minučių — patiems, be sąmatininko.',
       path: PATH,
     });
     setJsonLd('jsonld-article-samatininko-kaina', {
       '@context': 'https://schema.org',
       '@type': 'Article',
       '@id': `${URL}#article`,
-      headline: 'Kiek laiko atima sąmata — ir kaip ją skaičiuoti greičiau, patys',
+      headline: 'Kiek laiko atima sąmata — ir kaip ją skaičiuoti greičiau patiems',
       description:
         'Tikroji statybos sąmatos kaina — jūsų laikas. Kiek valandų atima kiekių skaičiavimas iš brėžinių, kur jos dingsta ir kaip skaičiavimą sutrumpinti iki minučių.',
       inLanguage: 'lt',
@@ -141,7 +141,7 @@ export default function SamatininkoKaina() {
 
       <Section n={3} title="Kada vis dėlto verta kreiptis į specialistą">
         <P>
-          Sąžiningai: yra atvejų, kai žmogus-specialistas — teisingas pasirinkimas,
+          Sąžiningai: yra atvejų, kai žmogus specialistas — teisingas pasirinkimas,
           ir jokia programa jo nepakeičia.
         </P>
         <UL>
@@ -151,7 +151,7 @@ export default function SamatininkoKaina() {
           </LI>
           <LI>
             <Term>Oficiali atsakomybė</Term> — teismo ekspertizės, ginčai su
-            užsakovu ar rangovu, draudiminiai įvykiai, kur reikia specialisto
+            užsakovu ar rangovu, draudžiamieji įvykiai, kur reikia specialisto
             parašo ir kvalifikacijos.
           </LI>
           <LI>
@@ -175,7 +175,7 @@ export default function SamatininkoKaina() {
         <P>
           <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           automatizuoja būtent tą dalį, kuri suryja valandas: nuskaito PDF brėžinį,
-          atpažįsta patalpas ir elementus, paskaičiuoja kiekius pagal Lietuvos
+          atpažįsta patalpas ir elementus, apskaičiuoja kiekius pagal Lietuvos
           praktiką ir parengia kiekių žiniaraštį. Jums lieka peržiūrėti pažymėtas
           vietas ir suvesti savo įkainius. Kaip tai veikia žingsnis po žingsnio —{' '}
           <Link to="/kiekiai-is-brezinio" className="text-primary hover:underline">
@@ -189,7 +189,7 @@ export default function SamatininkoKaina() {
           <LI>
             <Term>Susikurkite savo įkainių katalogą.</Term> Didžioji laiko dalis
             dingsta ties klausimu „kiek čia dėti už kvadratą?“. Vieną kartą
-            surašykite savo darbų įkainius ir juos perpanaudokite — valandos
+            surašykite savo darbų įkainius ir naudokite juos pakartotinai — valandos
             sutaupomos kiekviename pasiūlyme.
           </LI>
           <LI>
