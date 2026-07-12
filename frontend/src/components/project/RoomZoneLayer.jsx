@@ -107,7 +107,14 @@ export default function RoomZoneLayer({
   // centroid, which would stack their circled numbers unreadably — fan those
   // clusters out (nr → {cx, cy}); solo markers keep their true anchor.
   const markerAt = useMemo(() => spreadOverlappingMarkers(
-    visibleZones.map((z) => ({ nr: z.nr, cx: z.marker.cx, cy: z.marker.cy })),
+    visibleZones.map((z) => ({
+      nr: z.nr,
+      cx: z.marker.cx,
+      cy: z.marker.cy,
+      // Own polygon (screen px) lets the spreader keep fanned numbers INSIDE
+      // their room instead of drifting into empty plan space.
+      points: z.geometry?.type === 'polygon' ? z.geometry.points : null,
+    })),
     MARKER_R * 2 + 4,
   ), [visibleZones]);
 

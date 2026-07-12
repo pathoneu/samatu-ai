@@ -180,6 +180,7 @@ export default function PageOverlayHost({
             onCommit={onMeasureCommit}
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
+            onDelete={onMeasureDelete}
             selectedId={selectedMeasureId}
           />
           {deleteAt && onMeasureDelete && (

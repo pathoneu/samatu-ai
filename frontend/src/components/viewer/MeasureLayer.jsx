@@ -37,6 +37,7 @@ export default function MeasureLayer({
   onCommit,
   onCalibrate,
   onSelect,
+  onDelete,
   selectedId = null,
   display = { decimals: 2 },
 }) {
@@ -148,6 +149,17 @@ export default function MeasureLayer({
 
     if (tool === 'count') {
       if (!activeCountTypeId) return;
+      // Place/remove toggle (founder 2026-07-12: "no way to delete them"):
+      // clicking ON an existing count dot removes THAT dot instead of stacking
+      // a new one next to it — no separate eraser or select-tool detour needed.
+      // Hit-test against the RAW (unsnapped) click, like the select tool.
+      const hitId = hitTest(
+        eventToPdf(e),
+        measurements.filter((m) => m.kind === 'count'),
+        pageNr,
+        SNAP_TOL_PX / adapter.scale,
+      );
+      if (hitId) { onDelete?.(hitId); return; }
       const type = countTypes.find((t) => t.id === activeCountTypeId) || {};
       onCommit?.(makeMeasurement('count', pageNr, [point], {
         typeId: activeCountTypeId,
@@ -166,7 +178,7 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, draft, commitDraft]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, draft, commitDraft]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;

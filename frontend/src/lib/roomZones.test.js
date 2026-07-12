@@ -280,3 +280,49 @@ test('countRoomsMissingGeometry: counts current-page rooms we cannot place', () 
   const n = countRoomsMissingGeometry(rooms, { renderedWidth: 1000, renderedHeight: 800, page: 2 });
   assert.equal(n, 1);                   // only room 3 (page 2, no geometry)
 });
+
+// ── 2026-07-12: duplicate-polygon disqualification + interior anchors ──────
+import {
+  duplicatePolygonLosers, interiorMarkerAnchor, pointInPolygonPoints,
+} from './roomZones.js';
+
+const SQ = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]];
+
+test('duplicatePolygonLosers: identical polygons keep only the m²-matching owner', () => {
+  // Unique reference rooms fix the pct-area→m² scale at k = 0.001/m².
+  const rooms = [
+    { nr: 201, puslapio_nr: 2, plotas_m2: 50, polygon_source: 'auto_floodfill', polygon_pct: SQ(0.1, 0.1, 0.25, 0.2) },   // 0.05 pct²
+    { nr: 202, puslapio_nr: 2, plotas_m2: 10, polygon_source: 'auto_floodfill', polygon_pct: SQ(0.6, 0.1, 0.10, 0.1) },   // 0.01
+    // Duplicate trio claiming the SAME strip of 0.009 pct² ≈ 9 m² at k=0.001:
+    { nr: 103, puslapio_nr: 2, plotas_m2: 9.6,  polygon_source: 'auto_floodfill', polygon_pct: SQ(0.45, 0.4, 0.03, 0.3) },
+    { nr: 108, puslapio_nr: 2, plotas_m2: 12.7, polygon_source: 'auto_floodfill', polygon_pct: SQ(0.45, 0.4, 0.03, 0.3) },
+    { nr: 109, puslapio_nr: 2, plotas_m2: 12.7, polygon_source: 'auto_floodfill', polygon_pct: SQ(0.45, 0.4, 0.03, 0.3) },
+  ];
+  const losers = duplicatePolygonLosers(rooms, 2);
+  assert.deepEqual([...losers].sort(), ['108', '109']);   // 103 fits the area → keeps it
+  const zones = buildPageRoomZones(rooms, { renderedWidth: 1000, renderedHeight: 800, page: 2 });
+  assert.deepEqual(zones.map((z) => String(z.nr)).sort(), ['103', '201', '202']);
+});
+
+test('interiorMarkerAnchor: L-shape whose centroid falls outside gets an inside anchor', () => {
+  // L-shape: thin horizontal + thin vertical arm; centroid lands in the notch.
+  const L = [[0, 0], [100, 0], [100, 10], [10, 10], [10, 100], [0, 100]];
+  const a = interiorMarkerAnchor(L);
+  assert.ok(pointInPolygonPoints(a.cx, a.cy, L), 'anchor must be inside the L');
+});
+
+test('spreadOverlappingMarkers: fanned markers stay inside their own polygon', () => {
+  // Two markers stacked inside a NARROW vertical strip: a horizontal fan would
+  // exit the strip, so the spreader must fall back to the vertical fan.
+  const strip = SQ(480, 300, 40, 300);   // x 480..520 — narrower than the fan gap
+  const items = [
+    { nr: 'A', cx: 500, cy: 450, points: strip },
+    { nr: 'B', cx: 500, cy: 452, points: strip },
+  ];
+  const out = spreadOverlappingMarkers(items, 30);
+  for (const [, pos] of out) {
+    assert.ok(pointInPolygonPoints(pos.cx, pos.cy, strip), 'marker escaped its polygon');
+  }
+  const a = out.get('A'), b = out.get('B');
+  assert.ok(Math.hypot(a.cx - b.cx, a.cy - b.cy) >= 29, 'markers still overlap');
+});
