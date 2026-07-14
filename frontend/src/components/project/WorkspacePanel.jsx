@@ -202,7 +202,8 @@ export default function WorkspacePanel({
         cur.count += 1;
         if (m.page && (!cur.firstPage || m.page < cur.firstPage)) cur.firstPage = m.page;
       } else {
-        const type = DEFAULT_COUNT_TYPES.find((t) => t.id === m.typeId);
+        const type = (project.countTypes || []).find((t) => t.id === m.typeId)
+          || DEFAULT_COUNT_TYPES.find((t) => t.id === m.typeId);
         byType.set(m.typeId, {
           typeId: m.typeId,
           label: type?.label || m.typeId,
@@ -213,7 +214,7 @@ export default function WorkspacePanel({
       }
     }
     return [...byType.values()];
-  }, [projMeasurements]);
+  }, [projMeasurements, project.countTypes]);
   const measGeomRows = useMemo(() => {
     const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
     return projMeasurements

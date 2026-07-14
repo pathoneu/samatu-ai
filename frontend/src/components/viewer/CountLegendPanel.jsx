@@ -1,10 +1,13 @@
 /**
  * CountLegendPanel — standalone, props-driven legend for the "count" tool.
- * Lists each count type with a colored shape glyph, its label, and a running
- * tally. Clicking a row selects that type as the active count type.
+ * Lists each USER-DEFINED count type (founder 2026-07-14: no fixed list) with
+ * a colored glyph, label, running tally, and a per-type clear/remove action.
+ * "+ Pridėti tipą" creates a new type inline. Clicking a row selects it as
+ * the active count type.
  *
  * Purely presentational: no store, no PlanViewer import.
  */
+import { useState } from 'react';
 
 function Glyph({ shape, color }) {
   const size = 14;
@@ -57,7 +60,18 @@ export default function CountLegendPanel({
   onToggleCollapse = null,
   // Per-type "clear all marks" (audit P3). Only shown when the type has marks.
   onClearType = null,
+  // Custom types: create / remove (remove only offered when the type is empty).
+  onAddType = null,
+  onRemoveType = null,
 }) {
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const submitNew = () => {
+    const v = newLabel.trim();
+    if (v) onAddType?.(v);
+    setNewLabel('');
+    setAdding(false);
+  };
   return (
     <div
       className="flex flex-col gap-1 p-2 rounded-lg border bg-card text-card-foreground"
@@ -108,6 +122,23 @@ export default function CountLegendPanel({
               <span className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right">
                 {tally}
               </span>
+              {onRemoveType && tally === 0 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  data-testid={`clegend-remove-${type.id}`}
+                  title={`Pašalinti tipą „${type.label}"`}
+                  onClick={(e) => { e.stopPropagation(); onRemoveType(type.id); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onRemoveType(type.id); }
+                  }}
+                  className="p-0.5 rounded text-muted-foreground hover:text-destructive"
+                >
+                  <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden="true">
+                    <path d="M 2.5 2.5 L 8.5 8.5 M 8.5 2.5 L 2.5 8.5" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+                  </svg>
+                </span>
+              )}
               {onClearType && tally > 0 && (
                 <span
                   role="button"
@@ -128,6 +159,38 @@ export default function CountLegendPanel({
             </button>
           );
         })}
+        {countTypes.length === 0 && !adding && (
+          <p className="px-2 py-1 text-xs text-muted-foreground">
+            Sukurkite tipą, kurį skaičiuosite (pvz., „Rozetės").
+          </p>
+        )}
+        {onAddType && (adding ? (
+          <input
+            autoFocus
+            type="text"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); submitNew(); }
+              else if (e.key === 'Escape') { e.preventDefault(); setNewLabel(''); setAdding(false); }
+            }}
+            onBlur={submitNew}
+            placeholder="Tipo pavadinimas…"
+            aria-label="Naujo tipo pavadinimas"
+            data-testid="clegend-new-type-input"
+            className="mx-1 mb-1 px-2 py-1 rounded border border-border bg-background text-sm focus:outline-none focus:border-primary"
+          />
+        ) : (
+          <button
+            type="button"
+            data-testid="clegend-add-type"
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left text-primary hover:bg-accent"
+          >
+            <span className="text-base leading-none">＋</span>
+            <span>Pridėti tipą</span>
+          </button>
+        ))}
       </div>
       )}
     </div>

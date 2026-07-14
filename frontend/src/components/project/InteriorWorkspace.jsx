@@ -285,10 +285,11 @@ export default function InteriorWorkspace({
   // onto the CURRENT stored project, so a render-captured `project` spread can
   // no longer revert concurrent writes (async polygon patches, panel price
   // edits, a second tab) that landed after this component last rendered.
-  const handleMeasureDataChange = ({ measurements, measureScales }) => {
+  const handleMeasureDataChange = ({ measurements, measureScales, countTypes }) => {
     const updated = updateProject(project.id, {
       measurements,
       pageScalesDurable: measureScales,
+      ...(countTypes ? { countTypes } : {}),
     });
     if (updated) onProjectChange?.(updated);
   };
@@ -369,6 +370,7 @@ export default function InteriorWorkspace({
               exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
               initialMeasurements={project?.measurements || []}
               initialMeasureScales={project?.pageScalesDurable || {}}
+              initialCountTypes={project?.countTypes || null}
               onMeasureDataChange={handleMeasureDataChange}
               onRoomZoneClick={(room) => {
                 if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);

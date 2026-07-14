@@ -1,12 +1,15 @@
 /**
  * RoomZoneLayer — the AI Takeoff Viewer's first visible layer (Phase 1).
  *
- * FOUNDER DECISION (2026-07-11): the DEFAULT presentation for every placeable
- * room is a compact numbered MARKER (circled room nr at the polygon centroid /
- * label anchor) — on real plans the flood-fill outlines bleed over walls and
- * notch around annotations, reading as "polygons don't match the rooms". The
- * filled polygon zones stay implemented and render when `zoneFillsVisible` is
- * true (viewer toolbar toggle; default ROOM_POLYGON_FILLS_DEFAULT_VISIBLE).
+ * FOUNDER DECISION (2026-07-14): the DEFAULT is a CLEAN drawing — nothing is
+ * drawn at rest. Selecting a room in the panel draws ONE red ring around that
+ * room's own printed number (labelAnchor = the verified plan-label position),
+ * checked-drawing style. One ring at a time → no de-overlap fanning → the
+ * ring always lands exactly on the printed number. This replaced the
+ * always-on numbered markers (2026-07-11), whose overlap-fanning pushed
+ * circles onto walls and read as "numbers marked wrong".
+ * The filled polygon zones stay implemented and render when `zoneFillsVisible`
+ * is true (viewer toolbar Layers toggle) — the QA/verification view.
  *
  * Declutter contract (2026-07-02): at rest a shape is quiet — NO label chip.
  * The chip (name + area + confidence dot) appears on hover, and stays pinned
@@ -127,9 +130,72 @@ export default function RoomZoneLayer({
   const isHoveredZone = (z) =>
     (hoverNr != null && String(z.nr) === hoverNr)
     || (hoveredRoomNrExternal != null && String(z.nr) === String(hoveredRoomNrExternal));
-  // Marker presentation applies to every zone while fills are off, and always
-  // to tier-2 (label-anchored) rooms, which have no traced outline to fill.
-  const rendersAsMarker = (z) => !zoneFillsVisible || z.geometry.type === 'marker';
+
+  // ── SIMPLE MODE (default): clean drawing; focused/hovered room → red ring
+  // around its printed number. Entirely pointer-transparent, so it can never
+  // swallow measure or fill clicks.
+  if (!zoneFillsVisible) {
+    const active = zones.filter((z) => isFocusedZone(z) || isHoveredZone(z));
+    if (active.length === 0) return null;
+    // Ring sized to enclose the printed label plate; scales with the render.
+    const ringR = Math.min(44, Math.max(16, width * 0.02));
+    const RED = '#dc2626';
+    return (
+      <svg
+        width={width}
+        height={height}
+        className="absolute left-0 top-0 z-[16]"
+        style={{ pointerEvents: 'none' }}
+      >
+        <style>{`
+          @keyframes rz-ring-pulse {
+            0% { transform: scale(1); opacity: 0.65; }
+            100% { transform: scale(1.9); opacity: 0; }
+          }
+          .rz-ring-pulse {
+            animation: rz-ring-pulse 1.6s ease-out infinite;
+            transform-box: fill-box;
+            transform-origin: center;
+          }
+        `}</style>
+        {active.map((z) => {
+          const isFocused = isFocusedZone(z);
+          const a = z.labelAnchor || z.marker;
+          const w = chipWidthFor(z.label);
+          const half = w / 2;
+          return (
+            <g key={z.nr} transform={`translate(${a.cx}, ${a.cy})`}>
+              {isFocused && (
+                <circle className="rz-ring-pulse" r={ringR} fill="none"
+                  stroke={RED} strokeWidth={2} />
+              )}
+              <circle r={ringR} fill="none" stroke={RED}
+                strokeWidth={isFocused ? 2.5 : 1.75}
+                opacity={isFocused ? 1 : 0.65} />
+              {isFocused && (
+                <g transform={`translate(0, ${-ringR - 21})`}>
+                  <rect x={-half} y={-17} width={w} height={34} rx={4}
+                    fill="white" stroke={RED} strokeWidth={1} opacity={0.96} />
+                  <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
+                    <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
+                  </circle>
+                  <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
+                    {chipLabelFor(z.label)}
+                  </text>
+                  <text x={-half + 18} y={11} fontSize={10} fill="#4b5563">
+                    {z.areaLabel}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+  // ── FILLS MODE (Layers toggle): traced rooms as filled zones; tier-2
+  // (label-anchored, no traced outline) rooms as numbered markers.
+  const rendersAsMarker = (z) => z.geometry.type === 'marker';
 
   return (
     <svg

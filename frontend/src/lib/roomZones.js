@@ -160,6 +160,13 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
     ? interiorMarkerAnchor(geometry.points)
     : { cx: geometry.cx, cy: geometry.cy };
 
+  // Exact printed-label anchor (verified plan_label seeds only) — the simple
+  // "red ring around the room's own number" presentation targets THIS, not the
+  // polygon interior anchor.
+  const labelAnchor = room.marker_source === 'plan_label'
+    ? markerCenter(room, { renderedWidth, renderedHeight })
+    : null;
+
   const { confidence } = computeAreaConfidence(room);
   const area = Number.isFinite(room.plotas_m2) ? room.plotas_m2 : null;
 
@@ -176,6 +183,7 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
     approximate,
     geometry,
     marker,
+    labelAnchor,
   };
 }
 

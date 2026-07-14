@@ -20,12 +20,12 @@ import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { useExport } from '@embedpdf/plugin-export/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Magnet, Search, Printer, Download, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
 import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
-import { DEFAULT_COUNT_TYPES } from '@/lib/measurements';
+import { makeCountType, countTypesFromMeasurements } from '@/lib/measurements';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
@@ -128,7 +128,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, snapEnabled, onToggleSnap, orthoEnabled, onToggleOrtho, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -154,9 +154,13 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => syncPageThen(() => scrollApi?.scrollToPreviousPage())}><ChevronLeft className="w-4 h-4" /></button>
+      {/* Deterministic: jump to visible page ± 1. The plugin's relative
+          scrollToNext/PreviousPage steps from its own (stale) currentPage —
+          under wheel scrolling that no-ops or bounces (founder: "page changer
+          does not work"). */}
+      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
-      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => syncPageThen(() => scrollApi?.scrollToNextPage())}><ChevronRight className="w-4 h-4" /></button>
+      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title="Tolinti (−)" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
       <span className="mono tabular w-11 text-center">{pct}%</span>
@@ -189,19 +193,6 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               onClick={() => onMeasureTool(id)}
             ><Icon className="w-4 h-4" /></button>
           ))}
-          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          <button
-            className={snapEnabled ? pressed : btn}
-            title="Pritraukti prie taškų"
-            aria-pressed={!!snapEnabled}
-            onClick={onToggleSnap}
-          ><Magnet className="w-4 h-4" /></button>
-          <button
-            className={(orthoEnabled ? pressed : btn) + ' w-7'}
-            title="Statmenai (Shift)"
-            aria-pressed={!!orthoEnabled}
-            onClick={onToggleOrtho}
-          ><span className="mono text-[10px] leading-none">90°</span></button>
         </>
       )}
       {canFill && (
@@ -405,8 +396,18 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
         case '3': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('area'); } break;
         case '4': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('perimeter'); } break;
         case '6': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('count'); } break;
-        case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
-        case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
+        case ']': case 'PageDown': {
+          e.preventDefault();
+          const vp = visiblePageOf(scrollRef.current);
+          scrollApi?.scrollToPage({ pageNumber: Math.min(scrollRef.current?.totalPages ?? vp + 1, vp + 1) });
+          break;
+        }
+        case '[': case 'PageUp': {
+          e.preventDefault();
+          const vp = visiblePageOf(scrollRef.current);
+          scrollApi?.scrollToPage({ pageNumber: Math.max(1, vp - 1) });
+          break;
+        }
         case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
         case '/': case 'f': case 'F': if (onOpenSearch) { e.preventDefault(); onOpenSearch(); } break;
         case 'Delete': case 'Backspace':
@@ -441,7 +442,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
+function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -462,9 +463,25 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
   const [measureTool, setMeasureTool] = useState(null);
   const [measurements, setMeasurements] = useState(() => initialMeasurements || []);
   const [measureScales, setMeasureScales] = useState(() => initialMeasureScales || {});
-  const [snapEnabled, setSnapEnabled] = useState(false);
-  const [orthoEnabled, setOrthoEnabled] = useState(false);
-  const [activeCountTypeId, setActiveCountTypeId] = useState(DEFAULT_COUNT_TYPES[0]?.id ?? null);
+  // Toolbar toggles removed 2026-07-14 (founder: confusing). Snap stays ON —
+  // it only pulls to existing measurement endpoints; ortho off.
+  const snapEnabled = true;
+  const orthoEnabled = false;
+  // User-defined count types (persisted with the measurements). Projects saved
+  // before custom types existed hydrate their list from the marks themselves.
+  const [countTypes, setCountTypes] = useState(() => (
+    initialCountTypes?.length ? initialCountTypes : countTypesFromMeasurements(initialMeasurements || [])
+  ));
+  const [activeCountTypeId, setActiveCountTypeId] = useState(() => countTypes[0]?.id ?? null);
+  const addCountType = (label) => {
+    const t = makeCountType(label, countTypes);
+    setCountTypes((prev) => [...prev, t]);
+    setActiveCountTypeId(t.id);
+  };
+  const removeCountType = (typeId) => {
+    setCountTypes((prev) => prev.filter((t) => t.id !== typeId));
+    setActiveCountTypeId((cur) => (cur === typeId ? (countTypes.find((t) => t.id !== typeId)?.id ?? null) : cur));
+  };
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   const [selectedMeasureId, setSelectedMeasureId] = useState(null);
@@ -522,13 +539,13 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
   const pendingMeasureSaveRef = useRef(null);
   useEffect(() => {
     if (!measureDirtyRef.current) { measureDirtyRef.current = true; return undefined; } // skip mount
-    pendingMeasureSaveRef.current = { measurements, measureScales };
+    pendingMeasureSaveRef.current = { measurements, measureScales, countTypes };
     const t = setTimeout(() => {
       pendingMeasureSaveRef.current = null;
-      onMeasureDataChangeRef.current?.({ measurements, measureScales });
+      onMeasureDataChangeRef.current?.({ measurements, measureScales, countTypes });
     }, 600);
     return () => clearTimeout(t);
-  }, [measurements, measureScales]);
+  }, [measurements, measureScales, countTypes]);
   useEffect(() => () => {
     if (pendingMeasureSaveRef.current) {
       onMeasureDataChangeRef.current?.(pendingMeasureSaveRef.current);
@@ -620,10 +637,6 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
             onToggleThumbs={() => setRailOpen(!railOpen)}
             measureTool={measureTool}
             onMeasureTool={armMeasureTool}
-            snapEnabled={snapEnabled}
-            onToggleSnap={() => setSnapEnabled((v) => !v)}
-            orthoEnabled={orthoEnabled}
-            onToggleOrtho={() => setOrthoEnabled((v) => !v)}
             searchOpen={searchOpen}
             onToggleSearch={() => setSearchOpen((v) => !v)}
             onCloseSearch={() => setSearchOpen(false)}
@@ -673,7 +686,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                       measureScale={measureScales[layout.pageNumber] || null}
                       snapEnabled={snapEnabled}
                       orthoEnabled={orthoEnabled}
-                      countTypes={DEFAULT_COUNT_TYPES}
+                      countTypes={countTypes}
                       activeCountTypeId={activeCountTypeId}
                       selectedMeasureId={selectedMeasureId}
                       onMeasureCommit={(m) => setMeasurements((prev) => [...prev, m])}
@@ -692,12 +705,14 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                 style={{ left: railOpen ? 156 : 8 }}
               >
                 <CountLegendPanel
-                  countTypes={DEFAULT_COUNT_TYPES}
+                  countTypes={countTypes}
                   activeCountTypeId={activeCountTypeId}
                   onSelectType={setActiveCountTypeId}
                   tallies={countTallies}
                   collapsed={countLegendCollapsed}
                   onToggleCollapse={() => setCountLegendCollapsed((v) => !v)}
+                  onAddType={addCountType}
+                  onRemoveType={removeCountType}
                   onClearType={(typeId) => setMeasurements((prev) =>
                     prev.filter((m) => !(m.kind === 'count' && m.typeId === typeId)))}
                 />
@@ -753,6 +768,7 @@ export default function TakeoffViewer({
   // debounced ({ measurements, measureScales }) for the project save flow.
   initialMeasurements = null,
   initialMeasureScales = null,
+  initialCountTypes = null,
   onMeasureDataChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
@@ -780,6 +796,7 @@ export default function TakeoffViewer({
           fillRequest={fillRequest}
           initialMeasurements={initialMeasurements}
           initialMeasureScales={initialMeasureScales}
+          initialCountTypes={initialCountTypes}
           onMeasureDataChange={onMeasureDataChange}
         />
       </EmbedPDF>
