@@ -27,20 +27,34 @@ import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotat
 import { clickToFill } from '@/lib/clickToFillApi';
 import { makeCountType, countTypesFromMeasurements } from '@/lib/measurements';
 import { uncalibratedScale } from '@/lib/measureGeometry';
+import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
+// Labeled: founder 2026-07-14 — unlabeled icons read as "all of these do the
+// same thing". label renders next to the icon; title keeps the hotkey hint.
 const MEASURE_TOOLS = [
-  { id: 'select', Icon: MousePointer2, title: 'Žymėti matavimą' },
-  { id: 'distance', Icon: Ruler, title: 'Atstumas (2)' },
-  { id: 'area', Icon: Pentagon, title: 'Plotas (3)' },
-  { id: 'perimeter', Icon: Spline, title: 'Perimetras (4)' },
-  { id: 'count', Icon: Hash, title: 'Skaičiuoti (6)' },
-  { id: 'calibrate', Icon: Scaling, title: 'Kalibruoti mastelį' },
+  { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Žymėti / trinti matavimą' },
+  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: 'Matuoti atstumą (2)' },
+  { id: 'area', Icon: Pentagon, label: 'Plotas', title: 'Matuoti plotą (3)' },
+  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: 'Matuoti perimetrą (4)' },
+  { id: 'count', Icon: Hash, label: 'Kiekis', title: 'Skaičiuoti vienetus (6)' },
+  { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Kalibruoti mastelį — spustelėkite 2 taškus, tarp kurių žinote atstumą' },
 ];
+
+// One-line instruction per armed tool (status bar) — the tools LOOK similar,
+// the hint says what each one is doing right now.
+const MEASURE_HINTS = {
+  select: 'Spustelėkite matavimą jam pažymėti · Delete — ištrinti',
+  distance: 'Atstumas: spustelėkite taškus · dukart spustelėkite — baigti',
+  area: 'Plotas: apveskite kontūrą taškais · dukart spustelėkite — uždaryti',
+  perimeter: 'Perimetras: spustelėkite kampus · dukart spustelėkite — baigti',
+  count: 'Kiekis: spustelėkite kiekvieną elementą · spustelėjimas ant žymės — pašalinti',
+  calibrate: 'Kalibravimas: spustelėkite 2 taškus, tarp kurių žinote tikrą atstumą',
+};
 
 // The page the user is actually LOOKING at. The scroll plugin's `currentPage`
 // goes stale under wheel-scrolling (audit P1: "psl. 2" while page 3 fills the
@@ -184,14 +198,17 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       {onMeasureTool && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {MEASURE_TOOLS.map(({ id, Icon, title }) => (
+          {MEASURE_TOOLS.map(({ id, Icon, label, title }) => (
             <button
               key={id}
-              className={measureTool === id ? pressed : btn}
+              className={(measureTool === id ? pressed : btn) + ' inline-flex items-center gap-1'}
               title={title}
               aria-pressed={measureTool === id}
               onClick={() => onMeasureTool(id)}
-            ><Icon className="w-4 h-4" /></button>
+            >
+              <Icon className="w-4 h-4" />
+              <span className="text-[11px] leading-none hidden lg:inline">{label}</span>
+            </button>
           ))}
         </>
       )}
@@ -266,18 +283,20 @@ function isoALabel(wMm, hMm) {
 // PDF point; 1 pt = 1/72 inch of paper, so ratio = mpp / (0.0254/72). A named
 // label (e.g. standard "1:50") wins over the computed ratio.
 function scaleStatusText(pageScale) {
-  if (!pageScale?.calibrated) return 'Mastelis: nekalibruotas';
+  if (!pageScale?.calibrated) return 'Mastelis: nekalibruotas — spustelėkite čia';
   if (pageScale.label) return `Mastelis: ${pageScale.label}`;
   const mpp = pageScale.metersPerPointX || 0;
   const ratio = mpp > 0 ? Math.round((mpp * 72) / 0.0254) : 0;
-  return ratio > 0 ? `Mastelis: 1:${ratio}` : 'Mastelis: kalibruotas';
+  if (ratio <= 0) return 'Mastelis: kalibruotas';
+  // Auto scale is derived from the eksplikacija areas — honest ~ + disclosure.
+  return pageScale.source === 'auto' ? `Mastelis: ~1:${ratio} (automatinis)` : `Mastelis: 1:${ratio}`;
 }
 
 /**
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -292,15 +311,28 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   }
   const pageScale = measureScales?.[cur];
   const scaleText = scaleStatusText(pageScale);
+  const measureHint = measureTool ? MEASURE_HINTS[measureTool] : null;
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
-      <span className={`ml-auto whitespace-nowrap ${fillFor != null ? 'text-[hsl(var(--viewer-chrome-active))]' : (pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : '')}`}>
-        {fillFor != null
-          ? (fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`)
-          : scaleText}
-      </span>
+      {fillFor != null ? (
+        <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">
+          {fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`}
+        </span>
+      ) : measureHint ? (
+        <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">{measureHint}</span>
+      ) : (
+        /* Idle: the scale readout doubles as the calibration entry point. */
+        <button
+          type="button"
+          onClick={onCalibrateClick || undefined}
+          title="Kalibruoti mastelį"
+          className={`ml-auto whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
+        >
+          {scaleText}
+        </button>
+      )}
     </div>
   );
 }
@@ -463,6 +495,11 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
   const [measureTool, setMeasureTool] = useState(null);
   const [measurements, setMeasurements] = useState(() => initialMeasurements || []);
   const [measureScales, setMeasureScales] = useState(() => initialMeasureScales || {});
+  // Auto-calibration: pages whose traced rooms carry eksplikacija areas get a
+  // derived meters-per-point — measurements read real meters with no manual
+  // step. A user calibration (measureScales) always wins the merge.
+  const autoScales = useMemo(() => autoPageScalesFromRooms(rooms), [rooms]);
+  const effectiveScales = useMemo(() => ({ ...autoScales, ...measureScales }), [autoScales, measureScales]);
   // Toolbar toggles removed 2026-07-14 (founder: confusing). Snap stays ON —
   // it only pulls to existing measurement endpoints; ortho off.
   const snapEnabled = true;
@@ -683,7 +720,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}
                       measurements={measurements}
-                      measureScale={measureScales[layout.pageNumber] || null}
+                      measureScale={effectiveScales[layout.pageNumber] || null}
                       snapEnabled={snapEnabled}
                       orthoEnabled={orthoEnabled}
                       countTypes={countTypes}
@@ -725,12 +762,14 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
             pages={documentState?.document?.pages}
             fillFor={fillFor}
             fillBusy={fillBusy}
-            measureScales={measureScales}
+            measureScales={effectiveScales}
+            measureTool={measureTool}
+            onCalibrateClick={() => armMeasureTool('calibrate')}
           />
           <CalibrateDialog
             request={calibRequest}
             numPages={totalPages}
-            currentScale={calibRequest ? (measureScales[calibRequest.pageNr] || uncalibratedScale()) : null}
+            currentScale={calibRequest ? (effectiveScales[calibRequest.pageNr] || uncalibratedScale()) : null}
             onConfirm={(scale, pages) => {
               setMeasureScales((prev) => {
                 const next = { ...prev };

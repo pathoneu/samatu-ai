@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
+import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
@@ -217,11 +218,15 @@ export default function WorkspacePanel({
   }, [projMeasurements, project.countTypes]);
   const measGeomRows = useMemo(() => {
     const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
+    // Same merge as the viewer: pages auto-calibrated from their traced rooms
+    // read real meters here too; a user calibration overrides.
+    const autoScales = autoPageScalesFromRooms(project.v8_rooms || project.patalpos || []);
     return projMeasurements
       .filter((m) => KIND_LT[m.kind])
       .map((m) => {
         const scale = project.pageScalesDurable?.[m.page]
-          ?? project.pageScalesDurable?.[String(m.page)] ?? null;
+          ?? project.pageScalesDurable?.[String(m.page)]
+          ?? autoScales[m.page] ?? null;
         let display = 'nekalibruota';
         if (scale) {
           const { value } = measurementValue(m, scale);
@@ -229,7 +234,7 @@ export default function WorkspacePanel({
         }
         return { id: m.id, label: KIND_LT[m.kind], page: m.page, display };
       });
-  }, [projMeasurements, project.pageScalesDurable]);
+  }, [projMeasurements, project.pageScalesDurable, project.v8_rooms, project.patalpos]);
 
   // Push a counted type into the estimate as a position row (kiekis = count,
   // price left for the user). Re-running updates the existing measurement row
