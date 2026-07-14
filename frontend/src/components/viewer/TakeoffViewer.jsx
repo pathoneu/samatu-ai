@@ -366,7 +366,7 @@ function ThumbnailRail({ documentId }) {
  *   2 distance · 3 area · 4 perimeter · 6 count (measure tools; ignored while fill armed) ·
  *   Delete/Backspace delete the selected measurement (select mode only, so it
  *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
- *   Ctrl/Cmd+F or / open search · Ctrl/Cmd+P print · Esc chain: close search
+ *   Ctrl/Cmd+F, / or F open search · Ctrl/Cmd+P print · Esc chain: close search
  *   → measure (close calibration dialog / drop tool) → cancel fill-mode →
  *   clear focused room. (When focus is IN the search input, its own onKeyDown
  *   handles Esc — the input guard below keeps this listener out of typing
@@ -408,7 +408,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
         case ']': case 'PageDown': e.preventDefault(); scrollApi?.scrollToNextPage(); break;
         case '[': case 'PageUp': e.preventDefault(); scrollApi?.scrollToPreviousPage(); break;
         case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
-        case '/': if (onOpenSearch) { e.preventDefault(); onOpenSearch(); } break;
+        case '/': case 'f': case 'F': if (onOpenSearch) { e.preventDefault(); onOpenSearch(); } break;
         case 'Delete': case 'Backspace':
           if (canDeleteSelected) { e.preventDefault(); onDeleteSelected?.(); }
           break;
@@ -427,10 +427,12 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
   return null;
 }
 
-// Scroll the viewport to a focused room's page when it changes (panel → canvas nav).
-function FocusScroller({ documentId, focusedRoom }) {
+// Scroll the viewport to a focused room's page when it changes (panel → canvas
+// nav). Page-only jumps (Matavimai rows, provenance links) carry no room —
+// fall back to the focusedPage prop so they scroll the Embed viewer too.
+function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   const { provides: scrollApi } = useScroll(documentId);
-  const targetPage = focusedRoom?.puslapio_nr ?? focusedRoom?.page_nr ?? null;
+  const targetPage = focusedRoom?.puslapio_nr ?? focusedRoom?.page_nr ?? focusedPage ?? null;
   useEffect(() => {
     if (targetPage && scrollApi?.scrollToPage) {
       scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
@@ -439,7 +441,7 @@ function FocusScroller({ documentId, focusedRoom }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
+function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -463,6 +465,8 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [orthoEnabled, setOrthoEnabled] = useState(false);
   const [activeCountTypeId, setActiveCountTypeId] = useState(DEFAULT_COUNT_TYPES[0]?.id ?? null);
+  // Floating count legend collapse — it swallows placement clicks underneath.
+  const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   const [selectedMeasureId, setSelectedMeasureId] = useState(null);
   // Pending 2-point calibration pick: { pageNr, a, b } | null → CalibrateDialog.
   const [calibRequest, setCalibRequest] = useState(null);
@@ -626,7 +630,7 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
             zoneFillsVisible={zoneFillsVisible}
             onToggleZoneFills={() => setZoneFillsVisible((v) => !v)}
           />
-          <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} />
+          <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />
           <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
@@ -642,8 +646,13 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
           />
           <div className="relative flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
-            <ZoomGestureWrapper documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
-              <Viewport documentId={activeDocumentId} style={{ height: '100%', background: 'hsl(var(--viewer-blueprint-bg))' }}>
+            {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
+                reads ViewportElementContext, whose Provider is rendered BY the
+                Viewport component. As a parent it got null → setupZoomGestures
+                never ran → no ctrl+wheel / pinch zoom (audit P2, root-caused
+                2026-07-14 via defaultPrevented=false on a synthetic event). */}
+            <Viewport documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0, background: 'hsl(var(--viewer-blueprint-bg))' }}>
+              <ZoomGestureWrapper documentId={activeDocumentId}>
                 <Scroller
                   documentId={activeDocumentId}
                   renderPage={(layout) => (
@@ -674,8 +683,8 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
                     />
                   )}
                 />
-              </Viewport>
-            </ZoomGestureWrapper>
+              </ZoomGestureWrapper>
+            </Viewport>
             {/* Floating count-type legend while the count tool is armed. */}
             {measureTool === 'count' && (
               <div
@@ -687,6 +696,10 @@ function ViewerInner({ rooms, focusedRoom, hiddenRoomNrs, hoveredRoomNrExternal,
                   activeCountTypeId={activeCountTypeId}
                   onSelectType={setActiveCountTypeId}
                   tallies={countTallies}
+                  collapsed={countLegendCollapsed}
+                  onToggleCollapse={() => setCountLegendCollapsed((v) => !v)}
+                  onClearType={(typeId) => setMeasurements((prev) =>
+                    prev.filter((m) => !(m.kind === 'count' && m.typeId === typeId)))}
                 />
               </div>
             )}
@@ -723,6 +736,7 @@ export default function TakeoffViewer({
   fileUrl,
   rooms = [],
   focusedRoom = null,
+  focusedPage = null,
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
   onRoomZoneClick = null,
@@ -754,6 +768,7 @@ export default function TakeoffViewer({
         <ViewerInner
           rooms={rooms}
           focusedRoom={focusedRoom}
+          focusedPage={focusedPage}
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           onRoomZoneClick={onRoomZoneClick}

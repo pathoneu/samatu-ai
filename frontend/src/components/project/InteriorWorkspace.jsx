@@ -358,6 +358,7 @@ export default function InteriorWorkspace({
               fileUrl={pdfUrl}
               rooms={project?.v8_rooms || project?.patalpos || []}
               focusedRoom={effectiveFocusedRoom}
+              focusedPage={effectiveFocusedPage}
               hiddenRoomNrs={hiddenRoomNrs}
               hoveredRoomNrExternal={hoveredRoomNr}
               projectId={project.id}

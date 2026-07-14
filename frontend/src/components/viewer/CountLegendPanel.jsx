@@ -51,15 +51,41 @@ export default function CountLegendPanel({
   activeCountTypeId = null,
   onSelectType,
   tallies = {},
+  // The panel floats OVER the canvas and swallows placement clicks in the
+  // region it covers (audit P2) — collapsible so the user can tuck it away.
+  collapsed = false,
+  onToggleCollapse = null,
+  // Per-type "clear all marks" (audit P3). Only shown when the type has marks.
+  onClearType = null,
 }) {
   return (
     <div
       className="flex flex-col gap-1 p-2 rounded-lg border bg-card text-card-foreground"
       data-testid="count-legend-panel"
     >
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-1">
-        Skaičiavimas (vnt.)
-      </h3>
+      <div className="flex items-center px-1 pb-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex-1">
+          Skaičiavimas (vnt.)
+        </h3>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Išskleisti' : 'Suskleisti (netrukdo žymėti)'}
+            className="p-0.5 rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <svg width={12} height={12} viewBox="0 0 12 12" aria-hidden="true">
+              <path
+                d={collapsed ? 'M 3 7.5 L 6 4.5 L 9 7.5' : 'M 3 4.5 L 6 7.5 L 9 4.5'}
+                fill="none" stroke="currentColor" strokeWidth={1.5}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+      {!collapsed && (
       <div className="flex flex-col gap-0.5">
         {countTypes.map((type) => {
           const active = type.id === activeCountTypeId;
@@ -82,10 +108,28 @@ export default function CountLegendPanel({
               <span className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right">
                 {tally}
               </span>
+              {onClearType && tally > 0 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  data-testid={`clegend-clear-${type.id}`}
+                  title={`Ištrinti visus „${type.label}" žymėjimus (${tally})`}
+                  onClick={(e) => { e.stopPropagation(); onClearType(type.id); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClearType(type.id); }
+                  }}
+                  className="p-0.5 rounded text-muted-foreground hover:text-destructive"
+                >
+                  <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden="true">
+                    <path d="M 2.5 2.5 L 8.5 8.5 M 8.5 2.5 L 2.5 8.5" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+                  </svg>
+                </span>
+              )}
             </button>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

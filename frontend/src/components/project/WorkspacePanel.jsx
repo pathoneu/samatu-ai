@@ -198,14 +198,17 @@ export default function WorkspacePanel({
     for (const m of projMeasurements) {
       if (m.kind !== 'count' || !m.typeId) continue;
       const cur = byType.get(m.typeId);
-      if (cur) cur.count += 1;
-      else {
+      if (cur) {
+        cur.count += 1;
+        if (m.page && (!cur.firstPage || m.page < cur.firstPage)) cur.firstPage = m.page;
+      } else {
         const type = DEFAULT_COUNT_TYPES.find((t) => t.id === m.typeId);
         byType.set(m.typeId, {
           typeId: m.typeId,
           label: type?.label || m.typeId,
           color: m.color || type?.color || 'hsl(var(--primary))',
           count: 1,
+          firstPage: m.page || null,
         });
       }
     }
@@ -431,10 +434,14 @@ export default function WorkspacePanel({
               <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
                 {String(r.nr || i + 1).padStart(2, '0')}
               </span>
-              <div className="flex items-center gap-1.5 min-w-0">
+              {/* overflow-hidden: at narrow widths (audit P2, ~1000px) the fixed
+                  pills used to paint straight over the area column — the grid
+                  item can shrink (min-w-0) but its flex children overflowed
+                  visibly. Clip instead of collide; the name truncates first. */}
+              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                 {showProvenance && (
                   <span
-                    className={`dot ${r._source === 'manual' ? 'dot-computed' : 'dot-table'}`}
+                    className={`dot shrink-0 ${r._source === 'manual' ? 'dot-computed' : 'dot-table'}`}
                     title={r._source === 'manual' ? 'Pažymėta brėžinyje (rankinis polygon)' : SOURCE_TITLE.table}
                   />
                 )}
@@ -519,13 +526,18 @@ export default function WorkspacePanel({
               top={0}
             />
             {!collapsed.meas && measCountRows.map((r) => (
-              <div key={r.typeId} className="flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs">
+              <div
+                key={r.typeId}
+                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                onClick={onJumpToPage && r.firstPage ? () => onJumpToPage(r.firstPage) : undefined}
+                title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage})` : undefined}
+              >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
                 <span className="flex-1 min-w-0 truncate">{r.label}</span>
                 <span className="font-mono tabular-nums text-foreground">{r.count} vnt.</span>
                 <button
                   type="button"
-                  onClick={() => addCountToEstimate(r)}
+                  onClick={(e) => { e.stopPropagation(); addCountToEstimate(r); }}
                   className="text-primary hover:underline shrink-0"
                   title="Įtraukti kiekį į sąmatą (kainą suvesite patys)"
                 >
@@ -534,7 +546,12 @@ export default function WorkspacePanel({
               </div>
             ))}
             {!collapsed.meas && measGeomRows.map((m) => (
-              <div key={m.id} className="flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs">
+              <div
+                key={m.id}
+                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                onClick={onJumpToPage && m.page ? () => onJumpToPage(m.page) : undefined}
+                title={m.page ? `Rodyti brėžinyje (psl. ${m.page})` : undefined}
+              >
                 <span className="flex-1 min-w-0 truncate text-muted-foreground">{m.label} · psl. {m.page}</span>
                 <span className={`font-mono tabular-nums ${m.display === 'nekalibruota' ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {m.display}
