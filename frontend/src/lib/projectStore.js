@@ -81,13 +81,17 @@ function _migrateProject(p) {
 
 // ── Backend sync helpers (fire-and-forget) ────────────────────────────────────
 
-const _syncToBackend = (project) => {
+const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
   if (!project?.id) return;
-  // Sprint §AUDIT (2026-04-29): strip frontend-only meta keys before sync so
-  // backend never persists _archived/_archived_at — they're frontend soft-delete
-  // state. If they accidentally synced, restoreProject + page refresh wouldn't
-  // stick because backend would override the restored state on next pull.
-  const { _archived, _archived_at, ...persisted } = project;
+  // Archive flags are persisted server-side SINCE 2026-07-15 (pre-prod QA:
+  // localStorage-only soft-delete meant "deleted" projects resurrected after
+  // logout / on a second device). archiveProject syncs WITH the flags;
+  // ordinary content saves still strip them so a stale in-memory copy can't
+  // accidentally flip archive state — archive/restore are the only writers.
+  // (Backend PUT replaces the whole blob, so restoreProject syncing a
+  // flag-less object clears them server-side too.)
+  const { _archived, _archived_at, ...stripped } = project;
+  const persisted = keepArchiveFlags ? project : stripped;
   fetch(`${API}/api/projects/${project.id}`, {
     method: 'PUT',
     credentials: 'include',
@@ -128,28 +132,14 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 
     // Backend is source of truth — replace cache fully (don't merge old localStorage
     // entries from a previous user/session; we cleared on logout but this is defensive).
-    // Sprint §FIX (2026-04-29): preserve local archive state across pulls.
-    // _archived is frontend-only soft-delete flag; backend doesn't know about
-    // it, so a naïve overwrite would resurrect deleted projects on every refresh.
-    let archiveMap = {};
-    try {
-      const localList = JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
-      for (const p of localList) {
-        if (p?._archived && p.id) {
-          archiveMap[p.id] = {
-            _archived: p._archived,
-            _archived_at: p._archived_at,
-          };
-        }
-      }
-    } catch { /* ignore */ }
+    // 2026-07-15: archive state now rides the backend blob (archiveProject
+    // syncs the flags), so the pull no longer needs the localStorage archive
+    // map that used to paper over a frontend-only soft-delete — and that
+    // resurrected "deleted" projects after logout or on a second device.
 
     if (list.length === 0) {
-      // Even if backend returns empty, keep the archived projects locally
-      // so user can still see/restore them from Šiukšliadėžė.
-      const archivedOnly = Object.entries(archiveMap).map(([id, a]) => ({ id, ...a }));
-      localStorage.setItem(PROJECTS_KEY, JSON.stringify(archivedOnly));
-      return archivedOnly;
+      localStorage.setItem(PROJECTS_KEY, JSON.stringify([]));
+      return [];
     }
 
     // Backend returns SUMMARIES — fetch full data per project.
@@ -157,10 +147,7 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
       list.map(p => fetch(`${API}/api/projects/${p.id}`, { credentials: 'include' })
                      .then(r => r.ok ? r.json() : null))
     );
-    const valid = fulls.filter(Boolean).map(p => ({
-      ...p,
-      ...(archiveMap[p.id] || {}),  // restore _archived/_archived_at if present
-    })).sort((a, b) =>
+    const valid = fulls.filter(Boolean).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
     localStorage.setItem(PROJECTS_KEY, JSON.stringify(valid));
@@ -244,7 +231,10 @@ export function archiveProject(id) {
   target._archived = true;
   target._archived_at = new Date().toISOString();
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
-  // Don't delete from backend yet — preserved until purge window expires.
+  // Soft-delete is durable: persist the flags server-side so the project stays
+  // deleted after logout / on another device (data itself is preserved until
+  // the purge window expires — restore stays possible from Šiukšliadėžė).
+  _syncToBackend(target, { keepArchiveFlags: true });
 }
 
 export function restoreProject(id) {
@@ -254,6 +244,9 @@ export function restoreProject(id) {
   delete target._archived;
   delete target._archived_at;
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
+  // PUT replaces the whole blob → syncing the flag-less object un-archives
+  // server-side as well.
+  _syncToBackend(target);
 }
 
 export function permanentlyDeleteProject(id) {

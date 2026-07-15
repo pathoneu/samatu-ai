@@ -4641,8 +4641,11 @@ async def generate_excel(request: Request, data: dict):
 
         for ri, room in enumerate(patalpos, 3):
             fill = PatternFill("solid", fgColor="FFFFFF" if (ri % 2 == 1) else C_GRAY)
-            h_mm = room.get("lubu_aukstis_mm") or 2800
-            h_str = f"{h_mm/1000:.2f} m"
+            # Rooms store lubu_aukstis_m (meters) — the old lubu_aukstis_mm
+            # key never existed, so every room printed the 2.80 m fallback
+            # even when the project carried 3.4/3.0 m overrides (QA 2026-07-15).
+            h_m = room.get("lubu_aukstis_m") or ((room.get("lubu_aukstis_mm") or 2800) / 1000)
+            h_str = f"{float(h_m):.2f} m"
             for ci, val in enumerate([
                 room.get("nr", ""),
                 room.get("pavadinimas", ""),
@@ -4813,7 +4816,7 @@ async def generate_pdf(request: Request, data: dict):
     # total is self-contradicting. Title by content. (export step 1.)
     _has_prices  = any((e.get("kaina") or 0) or (e.get("suma") or 0) for e in eilutes)
     if _has_prices:
-        doc_title = "SĄMATA"
+        doc_title = "LOKALINĖ SĄMATA"
     elif tipas_pdf == "interjeras":
         doc_title = "VIDAUS APDAILOS KIEKIAI"
     else:
@@ -4933,7 +4936,10 @@ async def generate_pdf(request: Request, data: dict):
         story.append(Spacer(1, 0.3*cm))
 
     # ── Heading ───────────────────────────────────────────────────────────────
-    story.append(Paragraph("Pasiūlymas", ParagraphStyle(
+    # doc_title was computed above but the heading was hardcoded "Pasiūlymas" —
+    # a priced export must present as the actual document type (LOKALINĖ
+    # SĄMATA), unpriced as a kiekių žiniaraštis. (Pre-prod QA 2026-07-15.)
+    story.append(Paragraph(doc_title, ParagraphStyle(
         "pname", fontName=_FONT_BOLD, fontSize=15, textColor=DARK, leading=19,
     )))
     story.append(Spacer(1, 0.4*cm))

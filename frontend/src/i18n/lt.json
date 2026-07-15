@@ -782,7 +782,8 @@
       "hideReasoning": "Slėpti paaiškinimą",
       "why": "Kodėl?",
       "feedbackOk": "Teisingai",
-      "feedbackBad": "Neteisingai / peržiūrėti"
+      "feedbackBad": "Neteisingai / peržiūrėti",
+      "renameLabel": "Pervadinti projektą"
     },
     "share": {
       "toastGenerated": "Nuoroda sugeneruota",
@@ -989,7 +990,7 @@
       "windowsNotFound": "Langai nerasti brėžiniuose",
       "windowsNotFoundDesc": "Pateikiami standartiniai pasiūlymai pagal patalpų tipus. Patikrinkite ir pakoreguokite apačioje.",
       "wallThickness": "Sienos storis (pertvaros)",
-      "wallThicknessNote": "Naudojama angokraščių (langų / durų rėmo perimetro) ploto skaičiavimui. LT pertvaroms tipiniai 0,075–0,10 m, blokeliams 0,20–0,25 m.",
+      "wallThicknessNote": "Informacinė prielaida — angokraščių pozicija sąmatoje skaičiuojama metrais (ilgiu), todėl storis kiekių nekeičia; jis rodomas formulių kortelėje. LT pertvaroms tipiniai 0,075–0,10 m, blokeliams 0,20–0,25 m.",
       "puttyLevel": "Glaistymo lygis",
       "puttyLevelNote": "Q1 — po sunkiais tapetais (0,8 kg/m²/mm); Q2 — po matiniais dažais (1.0); Q3 — po pusiau blizgiais (1.2); Q4 — po blizgiais/lakuotais, pilnas glaistymas (1.5). Aukštesnis lygis = daugiau glaisto + šlifavimo darbų.",
       "ceilingHeightLabel": "Lubų aukštis ",
@@ -1342,7 +1343,9 @@
     "companyPlaceholder": "Pvz., UAB Statyba",
     "pdfLabel": "Projekto PDF",
     "uploadLabel": "PDF — statybų projekto brėžinys",
-    "startAnalysis": "Pradėti analizę"
+    "startAnalysis": "Pradėti analizę",
+    "errStalled": "Analizė sustojo (7 min be atsako iš serverio). Pabandykite dar kartą — jei kartojasi, praneškite mums.",
+    "errTimeout": "Analizė viršijo 45 min limitą. Pabandykite mažesnį PDF arba praneškite mums."
   },
   "upload": {
     "zone": {

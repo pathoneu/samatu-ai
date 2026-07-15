@@ -8,7 +8,7 @@ import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map as MapIcon, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2,
+  Map as MapIcon, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2, Pencil,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -73,8 +73,18 @@ function ConfidenceDot({ level }) {
 // company (11 muted) · Interjeras pill · spacer · Be PVM (13) | Su PVM (18 bold) ·
 // Prielaidos button · Eksportuoti button. Always visible above tab bar.
 
-function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete }) {
+function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete, onRename }) {
   const { t } = useTranslation();
+  // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
+  // creation — no rename control existed anywhere in the UI).
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const startRename = () => { setNameDraft(project.name || ''); setEditingName(true); };
+  const commitRename = () => {
+    setEditingName(false);
+    const v = nameDraft.trim();
+    if (v && v !== project.name) onRename?.(v);
+  };
   return (
     <div
       className="flex items-center flex-wrap bg-background border-b border-border py-2 sm:py-0 gap-y-2"
@@ -91,9 +101,38 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
         <ArrowLeft className="w-3.5 h-3.5" />
       </Link>
       <div className="flex items-baseline gap-2.5 min-w-0">
-        <span className="font-semibold text-foreground truncate" style={{ fontSize: 13 }}>
-          {project.name || t('project.interior.untitled')}
-        </span>
+        {editingName ? (
+          <input
+            autoFocus
+            type="text"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+              else if (e.key === 'Escape') { e.preventDefault(); setEditingName(false); }
+            }}
+            aria-label={t('project.interior.renameLabel')}
+            className="font-semibold text-foreground bg-background border border-border rounded px-1.5 focus:outline-none focus:border-primary"
+            style={{ fontSize: 13, height: 24, minWidth: 180 }}
+          />
+        ) : (
+          <span className="flex items-center gap-1 min-w-0">
+            <span className="font-semibold text-foreground truncate" style={{ fontSize: 13 }}>
+              {project.name || t('project.interior.untitled')}
+            </span>
+            {onRename && (
+              <button
+                type="button"
+                onClick={startRename}
+                title={t('project.interior.renameLabel')}
+                className="p-0.5 rounded text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </span>
+        )}
         {project.company_name && (
           <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: 11 }}>
             {project.company_name}
@@ -791,6 +830,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         onPrielaidos={() => setTab('rules')}
         onEksportuoti={() => setTab('eksport')}
         onDelete={onDelete}
+        onRename={project.is_demo ? null : (newName) => {
+          const updated = updateProject(project.id, { name: newName });
+          if (updated) setProject(updated);
+        }}
       />
 
       <TabBar

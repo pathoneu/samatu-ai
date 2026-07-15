@@ -190,6 +190,7 @@ export default function NewProject() {
   });
   const [streamElapsed, setStreamElapsed] = useState(0);
   const elapsedTimerRef = useRef(null);
+  const abortReasonRef = useRef(null);
 
   const handleCreate = async () => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
@@ -203,6 +204,7 @@ export default function NewProject() {
     // Naujas controller — vartotojas gali atšaukti su mygtuku
     const controller = new AbortController();
     setAbortController(controller);
+    abortReasonRef.current = null; // 'stalled' | 'timeout' | null (= user cancel)
 
     // Generic per-second elapsed counter (also used by streaming UI).
     const elapsedStart = Date.now();
@@ -222,9 +224,9 @@ export default function NewProject() {
       let idleTimer = null;
       const bumpIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => controller.abort(), IDLE_ABORT_MS);
+        idleTimer = setTimeout(() => { abortReasonRef.current = 'stalled'; controller.abort(); }, IDLE_ABORT_MS);
       };
-      const timeoutId = setTimeout(() => controller.abort(), HARD_ABORT_MS);
+      const timeoutId = setTimeout(() => { abortReasonRef.current = 'timeout'; controller.abort(); }, HARD_ABORT_MS);
       let json, res, projType;
 
       // Status text fallback only when NOT streaming (KŽ + construction types).
@@ -446,7 +448,11 @@ export default function NewProject() {
       console.error('Upload pipeline failed:', e);
       let userMessage;
       if (e.name === 'AbortError') {
-        userMessage = t('newProject.errAborted');
+        // Honest message per abort cause (pre-prod QA: a STALLED extraction
+        // used to read as if the USER cancelled it).
+        userMessage = abortReasonRef.current === 'stalled' ? t('newProject.errStalled')
+          : abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
+          : t('newProject.errAborted');
       } else if (/network|fetch/i.test(e.message)) {
         userMessage = t('newProject.errNetwork');
       } else {

@@ -778,7 +778,8 @@
       "hideReasoning": "Hide explanation",
       "why": "Why?",
       "feedbackOk": "Correct",
-      "feedbackBad": "Incorrect / review"
+      "feedbackBad": "Incorrect / review",
+      "renameLabel": "Rename project"
     },
     "share": {
       "toastGenerated": "Link generated",
@@ -985,7 +986,7 @@
       "windowsNotFound": "No windows found in the drawings",
       "windowsNotFoundDesc": "Standard suggestions by room type are provided. Check and adjust below.",
       "wallThickness": "Wall thickness (partitions)",
-      "wallThicknessNote": "Used to calculate the reveal (window / door frame perimeter) area. Typical for LT partitions 0.075–0.10 m, for blocks 0.20–0.25 m.",
+      "wallThicknessNote": "Informational assumption — the reveal position in the estimate is measured in meters (length), so thickness does not change quantities; it is shown in the formulas card. Typical for LT partitions 0.075–0.10 m, for blocks 0.20–0.25 m.",
       "puttyLevel": "Putty level",
       "puttyLevelNote": "Q1 — under heavy wallpaper (0.8 kg/m²/mm); Q2 — under matte paint (1.0); Q3 — under semi-gloss (1.2); Q4 — under gloss/lacquer, full skim (1.5). A higher level = more putty + sanding work.",
       "ceilingHeightLabel": "Ceiling height ",
@@ -1338,7 +1339,9 @@
     "companyPlaceholder": "e.g. Statyba Ltd.",
     "pdfLabel": "Project PDF",
     "uploadLabel": "PDF — construction project drawing",
-    "startAnalysis": "Start analysis"
+    "startAnalysis": "Start analysis",
+    "errStalled": "The analysis stalled (no server response for 7 min). Please retry — if it repeats, let us know.",
+    "errTimeout": "The analysis exceeded the 45 min limit. Try a smaller PDF or let us know."
   },
   "upload": {
     "zone": {

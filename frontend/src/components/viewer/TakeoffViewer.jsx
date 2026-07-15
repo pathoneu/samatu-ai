@@ -159,7 +159,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
   const canFill = focusedRoomNr != null && onStartFill;
   return (
-    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))]">
+    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
       <button
         className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
         title="Puslapių juosta (T)"
@@ -674,6 +674,33 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
     }
   };
 
+  // Damp DISCRETE mouse-wheel ctrl+zoom (pre-prod QA P2: EmbedPDF's gesture
+  // handler applies factor = 1 − deltaY·0.01, i.e. ≈2.2× per 120-unit notch —
+  // three notches overshoot 10×). Document-level CAPTURE listener (the viewer
+  // root div mounts only after the document loads, so a ref-scoped listener
+  // attached on mount misses it): swallow big-delta ctrl-wheel events inside
+  // the viewer and re-dispatch a 0.125× clone (≈1.16×/notch), marked so we
+  // don't re-intercept it. Small-delta trackpad streams pass through untouched.
+  useEffect(() => {
+    const onWheel = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.__pathonDamped) return;
+      if (Math.abs(e.deltaY) < 60) return; // trackpad: already smooth
+      if (!e.target?.closest?.('[data-tv-root]')) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const clone = new WheelEvent('wheel', {
+        bubbles: true, cancelable: true, view: window,
+        clientX: e.clientX, clientY: e.clientY,
+        ctrlKey: e.ctrlKey, metaKey: e.metaKey,
+        deltaX: e.deltaX, deltaY: e.deltaY * 0.125, deltaMode: e.deltaMode,
+      });
+      clone.__pathonDamped = true;
+      e.target.dispatchEvent(clone);
+    };
+    document.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    return () => document.removeEventListener('wheel', onWheel, { capture: true });
+  }, []);
+
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
@@ -683,7 +710,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
         // No explicit user choice yet → open by default on multi-page documents.
         const railOpen = thumbsPref ?? ((totalPages ?? 1) > 1);
         return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full" data-tv-root>
           <Toolbar
             documentId={activeDocumentId}
             totalPages={totalPages}
