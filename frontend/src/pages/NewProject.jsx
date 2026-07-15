@@ -211,9 +211,20 @@ export default function NewProject() {
     }, 1000);
 
     try {
-      // Realus laikas: 30-90s mažiems PDF, iki 8-10 min dideliems projektams
-      // su two-pass zoom (P1 65 psl. + 15 zoom call'ų ≈ 8 min worst case).
-      const timeoutId = setTimeout(() => controller.abort(), 600_000);
+      // Extraction time scales with project size — a real Beržų-class drawing
+      // runs ~19 min, well past the old fixed 600 s cap that made contractors
+      // watch the browser abort a HEALTHY extraction (pre-prod QA 2026-07-15).
+      // The streaming path emits progress events throughout, so abort only when
+      // progress STALLS (idle), with a generous absolute ceiling as a backstop
+      // for a trickle-but-stuck stream and the non-streaming (KŽ) path.
+      const IDLE_ABORT_MS = 420_000;    // 7 min with no progress event → hung
+      const HARD_ABORT_MS = 2_700_000;  // 45 min absolute ceiling
+      let idleTimer = null;
+      const bumpIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort(), IDLE_ABORT_MS);
+      };
+      const timeoutId = setTimeout(() => controller.abort(), HARD_ABORT_MS);
       let json, res, projType;
 
       // Status text fallback only when NOT streaming (KŽ + construction types).
@@ -230,10 +241,12 @@ export default function NewProject() {
         if (projTypeChoice === 'interior') {
           // SM01: stream the extraction so user sees progress in real time.
           setStreamPhase('rendering');
+          bumpIdle();  // arm the stall detector before the first event arrives
           ({ json, projType } = await streamInteriorExtract(
             file, controller.signal,
             { interiorSubtype },
             (ev) => {
+              bumpIdle();  // every progress event resets the stall timer
               if (ev.event === 'started') {
                 setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
               } else if (ev.event === 'pass1_started') {
@@ -273,6 +286,7 @@ export default function NewProject() {
         setStatus(t('newProject.statusSaving'));
       } finally {
         clearTimeout(timeoutId);
+        if (idleTimer) clearTimeout(idleTimer);
         if (statusTimer) clearInterval(statusTimer);
         if (elapsedTimerRef.current) {
           clearInterval(elapsedTimerRef.current);

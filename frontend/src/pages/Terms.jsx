@@ -17,7 +17,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export default function Terms() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Pricing lives on the public landing (#kainos section), not the auth-gated
+  // /pricing route — that route redirects logged-out→/login, logged-in→
+  // /dashboard, so a bare /pricing link dead-ends for everyone. Mirror the
+  // legal home locale split (LT → /about, EN → /en).
+  const isEn = (i18n.resolvedLanguage || i18n.language || '').startsWith('en');
+  const pricingHref = `${isEn ? '/en' : '/about'}#kainos`;
   return (
     <LegalLayout
       eyebrow={t('legal.terms.eyebrow')}
@@ -63,7 +69,7 @@ export default function Terms() {
 
       <Section n={4} title="Planai, kainos ir mokėjimai">
         <UL>
-          <LI>Aktualūs planai ir kainos skelbiami <Link to="/pricing" className="text-primary hover:underline">kainų puslapyje</Link>.</LI>
+          <LI>Aktualūs planai ir kainos skelbiami <Link to={pricingHref} className="text-primary hover:underline">kainų puslapyje</Link>.</LI>
           <LI>Prenumeratos mokamos periodiškai (mėnesiniais ar kitais nurodytais intervalais) ir, jei nenutraukiamos, atnaujinamos automatiškai.</LI>
           <LI>Mokėjimus tvarko Stripe. Verslo klientams gali būti taikomas atvirkštinis PVM apmokestinimas pagal LR teisės aktus.</LI>
           <LI>Prenumeratą galite nutraukti bet kada — ji galios iki apmokėto laikotarpio pabaigos. Jau prasidėjusio laikotarpio mokestis paprastai negrąžinamas, nebent to reikalauja imperatyvios teisės normos ar susitarsime kitaip.</LI>

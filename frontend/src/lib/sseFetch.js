@@ -56,7 +56,14 @@ export async function postSse(url, body, { onEvent, signal } = {}) {
           .split('\n')
           .filter(l => l.startsWith('data:'))
           .map(l => l.slice(5).trim());
-        if (dataLines.length === 0) continue;
+        if (dataLines.length === 0) {
+          // Comment-only block (the server sends `: heartbeat` every 10 s during
+          // slow phases like pass-1). Surface it as a heartbeat event so a
+          // client-side stall/idle detector counts it as activity — otherwise a
+          // long silent phase looks "hung" even though the extraction is alive.
+          if (block.trim()) onEvent?.({ event: 'heartbeat' });
+          continue;
+        }
         const payload = dataLines.join('\n');
         try {
           const parsed = JSON.parse(payload);
