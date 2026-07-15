@@ -43,7 +43,12 @@ export function engineOptions() {
 export function makeViewerPlugins(initialUrl, exportFileName = 'brezinys.pdf') {
   return [
     createPluginRegistration(DocumentManagerPluginPackage, {
-      initialDocuments: [{ url: initialUrl, autoActivate: true }],
+      // Name the document at load time: @embedpdf/plugin-export resolves the
+      // download filename as `coreDoc.name ?? defaultFileName`, and the loaded
+      // doc's name defaults to the URL's UUID — so defaultFileName alone was
+      // dead (pre-prod QA 2026-07-15: exports downloaded as a raw UUID). Set
+      // the name here so the export is the project name.
+      initialDocuments: [{ url: initialUrl, autoActivate: true, name: exportFileName }],
     }),
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
