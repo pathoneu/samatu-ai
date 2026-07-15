@@ -24,6 +24,33 @@ log = logging.getLogger("samatu_ai")
 MAX_PDF_SIZE_BYTES = 200 * 1024 * 1024
 MIN_PDF_SIZE_BYTES = 100               # below = junk
 
+# Per-page dimension cap — bounds render memory BEFORE Poppler rasterizes a page.
+# A0 (the largest standard drawing sheet, 841×1189 mm ≈ 2384×3370 pt ≈ 139 MP at
+# 300 DPI) must pass; absurd "PDF bombs" with giant mediaboxes must be rejected.
+_MAX_PAGE_DIM_PT = 4320            # 60 inches — generous vs A0's 46.8 in long edge
+_MAX_PAGE_AREA_PT2 = 11_520_000   # ≈ 200 MP at 300 DPI: w_pt*h_pt*(300/72)^2 ≈ 200e6
+
+
+def _check_page_dimensions(sizes) -> None:
+    """Reject uploads whose ANY page exceeds sane render bounds (pure helper).
+
+    Raises HTTPException(413) if a page's single dimension > 60 in, OR its area
+    implies > ~200 MP at 300 DPI — the two ways a page can OOM Poppler on
+    rasterize. Sizes are (width_pt, height_pt) tuples. Empty/None → no-op (the
+    page probe may have failed; total-size + magic-byte checks still apply).
+    """
+    for i, dims in enumerate(sizes or [], 1):
+        try:
+            w = float(dims[0]); h = float(dims[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if w > _MAX_PAGE_DIM_PT or h > _MAX_PAGE_DIM_PT or (w * h) > _MAX_PAGE_AREA_PT2:
+            raise HTTPException(
+                status_code=413,
+                detail=(f"PDF puslapis {i} per didelis atvaizduoti "
+                        f"({w/72:.0f}×{h/72:.0f} col.). Maksimalus lapo dydis ~A0."))
+
+
 def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
     """Reject malformed/oversize uploads BEFORE expensive Vision call.
     Raises HTTPException on failure.
@@ -47,6 +74,12 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
         import io as _io
         with pdfplumber.open(_io.BytesIO(pdf_bytes)) as _pdf:
             page_count = len(_pdf.pages)
+            # Per-page render-OOM guard: pdfplumber exposes mediabox-derived
+            # width/height (points) per page. Cheap metadata read.
+            _sizes = [(p.width, p.height) for p in _pdf.pages]
+        _check_page_dimensions(_sizes)  # raises 413 on absurd mediabox
+    except HTTPException:
+        raise
     except Exception as e:
         log.warning("pdf page count probe failed: %s", e)
         page_count = 0
@@ -172,6 +205,32 @@ def _check_trial_gate(user_id: str | None) -> None:
                     "message": "Nemokamas bandymas jau panaudotas šiai "
                                "įmonei. Įsigykite planą."},
         )
+
+
+def _client_key(request: "Request") -> str:
+    """Rate-limit key derived from a NON-client-controllable source IP.
+
+    In production uvicorn runs with ``--forwarded-allow-ips='*'`` so
+    ``request.client.host`` becomes the LEFTMOST ``X-Forwarded-For`` value —
+    which is fully client-controlled and can be rotated to bypass the per-IP
+    login/register limits. The RIGHTMOST XFF hop is the one appended by our
+    trusted proxy (the last hop before the app) and cannot be spoofed by the
+    client, so we key on it. No XFF header → fall back to request.client.host.
+
+    NOTE: the infra half — pinning ``--forwarded-allow-ips`` to the actual
+    proxy IP instead of ``'*'`` in render.yaml — is flagged to the operator
+    SEPARATELY; this is the code-side half only.
+    """
+    # getattr guards: some internal call sites pass a minimal request stub that
+    # has .client but no .headers — never AttributeError on the rate-limit path.
+    headers = getattr(request, "headers", None)
+    xff = headers.get("x-forwarded-for") if headers else None
+    if xff:
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        if hops:
+            return hops[-1]  # rightmost = trusted-proxy-appended, not spoofable
+    client = getattr(request, "client", None)
+    return client.host if client else "unknown"
 
 
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
@@ -597,7 +656,7 @@ async def log_frontend_error(request: Request):
     the WHOLE body before our code runs, re-opening the memory-amplification hole.
     We cap the raw read first, THEN parse.
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_key(request)
     _check_rate_limit(client_ip, "log-error")  # 429 on overflow
     # F8: reject oversized bodies BEFORE buffering the whole thing.
     raw = await _read_body_capped(request, _LOG_ERROR_BODY_CAP)  # 413 on overflow
@@ -648,35 +707,59 @@ class LoginPayload(BaseModel):
     password: str
 
 
+def _admin_allowlist() -> set[str]:
+    """Parse SAMATU_ADMIN_EMAIL into a normalized set of allowed admin emails.
+
+    Comma-separated, case-insensitive, trimmed. Unset/empty → empty set.
+    """
+    raw = os.environ.get("SAMATU_ADMIN_EMAIL", "") or ""
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def _is_admin_email(email: str) -> bool:
+    """Decide admin status for a NEWLY-created user (register + OAuth create).
+
+    If SAMATU_ADMIN_EMAIL is set (non-empty) → ONLY listed emails become admin
+    (opt-in allowlist). This stops the first stranger to register on a fresh
+    production DB from self-bootstrapping to global admin.
+    If unset/empty → preserve the legacy "first-ever user is admin" dev
+    convenience EXACTLY (must not break local/dev bootstrap).
+    """
+    allow = _admin_allowlist()
+    if allow:
+        return email.lower() in allow
+    return len(db.list_users()) == 0
+
+
 @app.post("/api/auth/register")
 async def api_register(payload: RegisterPayload, request: Request):
     """Register new user. Validates email + password, hashes password, creates DB row,
-    starts session. First-ever registered user becomes admin automatically."""
-    _check_rate_limit(request.client.host if request.client else "unknown", "register")
+    starts session. Admin status via SAMATU_ADMIN_EMAIL allowlist, else first-user."""
+    _check_rate_limit(_client_key(request), "register")
     email = _auth.validate_email(payload.email)
     _auth.validate_password(payload.password)
     if db.get_user_by_email(email):
         raise HTTPException(status_code=409, detail="Vartotojas su šiuo el. paštu jau egzistuoja")
 
-    # First user → admin (self-bootstrap)
-    is_first = len(db.list_users()) == 0
+    # Admin bootstrap: opt-in SAMATU_ADMIN_EMAIL allowlist, else legacy first-user.
+    is_admin = _is_admin_email(email)
     pw_hash = _auth.hash_password(payload.password)
     user = db.create_user(
         email=email, password_hash=pw_hash,
         name=payload.name, company_name=payload.company_name,
-        is_admin=is_first,
+        is_admin=is_admin,
     )
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
-    log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_first)
+    log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_admin)
     user.pop("password_hash", None)
-    return {"user": user, "is_first_admin": is_first}
+    return {"user": user, "is_first_admin": is_admin}
 
 
 @app.post("/api/auth/login")
 async def api_login(payload: LoginPayload, request: Request):
     """Email + password → session cookie. Generic error message (avoid user enumeration)."""
-    _check_rate_limit(request.client.host if request.client else "unknown", "login")
+    _check_rate_limit(_client_key(request), "login")
     email = _auth.validate_email(payload.email)
     user = db.get_user_by_email(email)
     if not user or not user.get("is_active"):
@@ -733,7 +816,7 @@ async def api_change_password(payload: PasswordChangePayload, request: Request):
     """Change user's password. Verifies current_password first.
     Generic error message on wrong current password (no enumeration helper)."""
     user = _auth.require_user(request)
-    _check_rate_limit(request.client.host if request.client else "unknown", "change-password")
+    _check_rate_limit(_client_key(request), "change-password")
     _auth.validate_password(payload.new_password)
 
     full_user = db.get_user_by_id(user["id"])
@@ -912,11 +995,12 @@ async def api_google_callback(request: Request, code: str | None = None,
             db.link_google_to_user(existing["id"], google_sub, avatar)
             user = db.get_user_by_id(existing["id"])
         else:
-            # First-ever user becomes admin (matches /api/auth/register policy).
-            is_first = len(db.list_users()) == 0
+            # Admin via SAMATU_ADMIN_EMAIL allowlist, else legacy first-user
+            # (matches /api/auth/register policy).
+            is_admin = _is_admin_email(email)
             user = db.create_user_oauth(
                 email=email, google_sub=google_sub, name=name,
-                avatar_url=avatar, is_admin=is_first,
+                avatar_url=avatar, is_admin=is_admin,
             )
     # Admin-disable enforcement (2026-07-05): a deactivated account must not be
     # able to mint a session via OAuth either. The password /api/auth/login path
@@ -5103,7 +5187,7 @@ async def extract_interior_endpoint(
     #   _check_trial_gate → 403 company_code_required / 402 trial_used (free tier)
     _check_user_quota(_user["id"])
     _check_trial_gate(_user["id"])
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_key(request)
     _check_rate_limit(client_ip, "extract-interior")
 
     if not files:
@@ -5196,7 +5280,7 @@ async def extract_interior_stream_endpoint(
     rules_override: str | None = Form(None),
 ):
     _user = _billable_user(request)
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_key(request)
     _check_rate_limit(client_ip, "extract-interior")
 
     if not files:
@@ -5341,6 +5425,11 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     Used by AssumptionsPanel — user edits a toggle, we recompute synchronously.
     """
     _billable_user(request)
+    # DoS guard: bound per-request work. A real interior project is tens of
+    # rooms; 500 is generous headroom, absurd payloads are rejected.
+    if len(payload.patalpos) > 500:
+        raise HTTPException(status_code=400,
+                            detail="Per daug patalpų vienoje užklausoje (maks. 500).")
     from extractor.universal_rules import (
         calc_room_quantities, normalize_paskirtis,
         ROOM_TYPE_RULES, translate_user_prefs_to_room_rules, UNIVERSAL_RULES,
@@ -5801,7 +5890,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     - {"project_context": {...}, "question": "..."}               (legacy fallback — uses passed data)
     """
     user = _billable_user(request)
-    _check_rate_limit(request.client.host if request.client else "unknown", "chat")
+    _check_rate_limit(_client_key(request), "chat")
 
     # Bound user-supplied input BEFORE building the Claude messages, so a huge
     # question or hundreds of history turns can't burn far more tokens than the
@@ -5945,6 +6034,11 @@ async def detect_scale_hint(payload: DetectScalePayload, request: Request):
 
     try:
         with pdfplumber.open(io.BytesIO(raw)) as pdf:
+            # DoS guard: bound page iteration. Real drawings are < 100 pages;
+            # 200 is generous, absurd page counts are rejected.
+            if len(pdf.pages) > 200:
+                raise HTTPException(status_code=400,
+                                    detail="PDF turi per daug puslapių (maks. 200).")
             for page_idx, page in enumerate(pdf.pages, 1):
                 txt = page.extract_text() or ""
                 for pat in SCALE_PATTERNS:
@@ -5958,6 +6052,8 @@ async def detect_scale_hint(payload: DetectScalePayload, request: Request):
                                 "scale_text": f"1:{ratio}",
                                 "confidence": "high" if pat is SCALE_PATTERNS[0] or pat is SCALE_PATTERNS[1] or pat is SCALE_PATTERNS[2] else "medium",
                             }
+    except HTTPException:
+        raise  # let the page-cap 400 propagate, don't swallow into {found:false}
     except Exception as e:
         return {"found": False, "error": str(e)}
     return {"found": False, "page": None, "scale_ratio": None, "scale_text": None, "confidence": "low"}
@@ -5984,7 +6080,7 @@ async def click_to_fill_endpoint(
     """
     _user = _billable_user(request)
     _check_rate_limit(
-        request.client.host if request.client else "unknown",
+        _client_key(request),
         "click-to-fill",
     )
     # N6 (2026-07-04 pentest, pass 2 — re-audit): this route shares the same
@@ -6080,7 +6176,7 @@ async def detect_room_polygons_endpoint(
     """
     _n6_user = _billable_user(request)
     _check_rate_limit(
-        request.client.host if request.client else "unknown",
+        _client_key(request),
         "detect-room-polygons",
     )
     # N6 (2026-07-04 pentest, pass 2): F4 authed this route but added no

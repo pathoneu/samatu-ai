@@ -21,6 +21,7 @@ upload + DB write.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -122,8 +123,13 @@ async def get_room_graph(
                                 description="If set, ignore DB and load a named fixture (demo only)."),
 ) -> dict[str, Any]:
     """Return per-room polygons + paint quantities for the Annotator overlay."""
-    if fixture:
+    if fixture and os.environ.get("ENV") != "production":
         # Demo / dev mode — no auth, no DB. Useful for the Beržų fixture.
+        # SECURITY (2026-07-15): gated to non-production. Even though this branch
+        # reads only a fixed committed file (no per-tenant leak), serving a real
+        # contractor project's geometry to ANONYMOUS callers on prod is not
+        # acceptable — so in production we ignore ?fixture= and fall through to
+        # the normal authenticated path below.
         # SECURITY (pass-3 sweep, 2026-07-04): safe ONLY because this branch reads
         # nothing but the fixed FIXTURES file and echoes ``fixture:{name}`` as the
         # id — it never touches a ``{URL_project_id}``-keyed per-user store. If you
