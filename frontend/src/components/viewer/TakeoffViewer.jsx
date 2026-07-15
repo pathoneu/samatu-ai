@@ -19,7 +19,6 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { useExport } from '@embedpdf/plugin-export/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
@@ -142,11 +141,10 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, onDownload }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
-  const { provides: exportApi } = useExport(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
   const cur = visiblePageOf(scroll);
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
@@ -257,7 +255,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         ><Search className="w-4 h-4" /></button>
         <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
         <button className={btn} title="Spausdinti (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
-        <button className={btn} title="Atsisiųsti PDF" disabled={!exportApi} onClick={() => exportApi?.download()}><Download className="w-4 h-4" /></button>
+        <button className={btn} title="Atsisiųsti PDF" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -474,7 +472,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange }) {
+function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
@@ -601,6 +599,29 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
     setThumbsPref(next);
   };
 
+  // Download the ORIGINAL source PDF blob directly (pre-prod QA 2026-07-15:
+  // EmbedPDF's exportApi.download() → pdfium saveAsCopy() silently no-ops on a
+  // cold context ~1/3 of the time — a dead toolbar button in a demo). The
+  // viewer never bakes edits into the PDF (measurements are an SVG overlay), so
+  // the source blob IS the correct download — instant, reliable, no pdfium. A
+  // toast guarantees the click is never silent.
+  const handleDownload = pdfBlob ? () => {
+    try {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = exportFileName || 'brezinys.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success('Brėžinys atsisiunčiamas');
+    } catch (e) {
+      console.warn('[download] failed:', e?.message);
+      toast.error('Nepavyko atsisiųsti brėžinio.');
+    }
+  } : null;
+
   const handlePagePoint = async (pt) => {
     if (fillFor == null) {
       // Plain canvas click (no fill, no measure tool): clear the focused-room
@@ -679,6 +700,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
             onCloseSearch={() => setSearchOpen(false)}
             zoneFillsVisible={zoneFillsVisible}
             onToggleZoneFills={() => setZoneFillsVisible((v) => !v)}
+            onDownload={handleDownload}
           />
           <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />
           <ViewerHotkeys
@@ -831,6 +853,7 @@ export default function TakeoffViewer({
           onClearFocus={onClearFocus}
           projectId={projectId}
           pdfBlob={pdfBlob}
+          exportFileName={exportFileName}
           onRoomPolygonFill={onRoomPolygonFill}
           fillRequest={fillRequest}
           initialMeasurements={initialMeasurements}
