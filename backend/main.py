@@ -4749,7 +4749,7 @@ async def generate_pdf(request: Request, data: dict):
             footer_y = 0.8 * cm
             self.drawRightString(A4[0] - 1.5 * cm, footer_y,
                                  f"Puslapis {self._pageNumber} / {total}")
-            self.drawString(1.5 * cm, footer_y, "Sąmatų AI · samatu.ai")
+            self.drawString(1.5 * cm, footer_y, "Pathon · pathon.eu")
             self.setStrokeColor(colors.HexColor("#DDDDDD"))
             self.setLineWidth(0.5)
             self.line(1.5 * cm, footer_y + 0.35 * cm, A4[0] - 1.5 * cm, footer_y + 0.35 * cm)
