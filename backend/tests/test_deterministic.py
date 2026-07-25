@@ -276,17 +276,23 @@ def test_pozicijos_pastoliu_only_when_high_ceiling():
 
 
 def test_pozicijos_elektros_skyrius_uses_symbols_when_available():
-    """Elektros eilutės pridedamos tik kai sutartinių ženklų count'ai > 0
-    (per parsed['detected_symbols_summary'] arba v9_meta.symbols_detected).
-    Be tos info — placeholders neatsiranda (kad nesumaišytų vartotojo)."""
+    """Elektros eilutės su kiekiais pridedamos tik kai sutartinių ženklų
+    count'ai > 0. Be tos info — jokių SKAIČIUOTŲ eilučių, bet 2026-07-25
+    HONESTY CHECKLIST visada palieka difūzorių + termoreguliatorių eilutes su
+    kiekis=None (raudona) — anksčiau kategorijos dingdavo TYLIAI (truth: 15
+    difūzorių / 8 termoreguliatoriai referenciniame projekte, app rodė nieko)."""
     base = {"patalpos": [{"nr": "1", "pavadinimas": "X", "paskirtis": "gyvenamoji",
                           "plotas_m2": 20, "perimetras_m": 18, "lubu_aukstis_m": 2.65,
                           "elementai": [], "confidence": "high"}]}
-    # No symbols → no elektros lines
+    # No symbols → only the two null-kiekis checklist TODO lines
     out_no = _run_full_pipeline(base)
     el_no = [p for p in out_no["pozicijos"]
              if p["skyrius"] == "Elektros instaliacijos darbai"]
-    assert len(el_no) == 0
+    assert len(el_no) == 2
+    assert all(p["kiekis"] is None for p in el_no)
+    assert all(p["saltinis"] == "checklist" for p in el_no)
+    assert any("Difūzorių" in p["aprasymas"] for p in el_no)
+    assert any("Termoreguliatorių" in p["aprasymas"] for p in el_no)
 
     # With symbols → Rozetės/jungiklio + šviestuvai eilutės
     with_sym = copy.deepcopy(base)
@@ -797,9 +803,10 @@ def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
 
 
 def test_pozicijos_p3_silikon_split_per_rangovas_audit():
-    """Silikonavimas split into two lines per Rangovas 2026-04-29 audit:
-    sanitaryware silikonas (×0.8) + plytelių vidinių kampų silikonas (×0.6).
-    Combined still ~ wet_perim × 1.4 (slightly more than legacy 1.2×).
+    """Silikonavimas split into two lines (rangovas 2026-04-29 audit), total
+    RECALIBRATED 2026-07-25 from ×1.4 to the ×2.3 the per-room field and
+    ground truth carry (berzas gt 107/111 = ×2.15/×2.65; samata line 50.14 m
+    where ×1.4 gave −39% and ×2.3 gives −0.5%). Split stays 4:3.
     """
     parsed = {
         "patalpos": [
@@ -813,11 +820,11 @@ def test_pozicijos_p3_silikon_split_per_rangovas_audit():
     out = _run_full_pipeline(parsed)
     silikon_lines = [p for p in out["pozicijos"] if "silikon" in p["aprasymas"].lower()]
     assert len(silikon_lines) == 2, f"expected 2 silikon lines (san + kampai), got {len(silikon_lines)}"
-    # Wet perim 12.0; sanitarinis = 12 × 0.8 = 9.6; kampai = 12 × 0.6 = 7.2
+    # Wet perim 12.0; sanitarinis = 12 × 1.31 = 15.72; kampai = 12 × 0.99 = 11.88
     san = next(p for p in silikon_lines if "sanitarinės" in p["aprasymas"].lower())
     kampai = next(p for p in silikon_lines if "kampų" in p["aprasymas"].lower())
-    assert abs(san["kiekis"] - 9.6) < 0.1
-    assert abs(kampai["kiekis"] - 7.2) < 0.1
+    assert abs(san["kiekis"] - 15.72) < 0.1
+    assert abs(kampai["kiekis"] - 11.88) < 0.1
 
 
 def test_eksplikacija_merge_propagates_bbox_to_room():

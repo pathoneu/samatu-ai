@@ -1964,11 +1964,16 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # silicone (between tile zones / floor-wall junctions / outside
             # corners) from sanitaryware sealing. rangovas itemizes both.
             #
-            # Empirical splits across his 5 projects:
-            #   Sanitaryware silikonas ≈ wet_perim × 0.8 (around bath/sink/WC)
-            #   Plytelių kampų silikonas ≈ wet_perim × 0.6 (inside corners)
-            silikon_san_m = round(tiled_perim * 0.8, 2)
-            silikon_kampai_m = round(tiled_perim * 0.6, 2)
+            # CALIBRATION 2026-07-25: the two emitted lines summed to ×1.4 of
+            # wet perimeter while the calibrated per-room field
+            # (universal_rules.silikonavimas_m, scored by the eval harness) is
+            # ×2.3 — and ground truth agrees: berzas gt_per_room 107 = 23.64 m
+            # on 11.0 m perim (×2.15), 111 = 31.74 on 12.0 (×2.65); the
+            # rangovas samata line is 50.14 m where ×1.4 produced 30.38 (−39%)
+            # and ×2.3 predicts 49.9 (−0.5%). Keep the documented 4:3 split,
+            # rescale the total to the calibrated ×2.3.
+            silikon_san_m = round(tiled_perim * 1.31, 2)     # 2.3 × 4/7
+            silikon_kampai_m = round(tiled_perim * 0.99, 2)  # 2.3 × 3/7
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
@@ -2260,6 +2265,26 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "vnt", "kiekis": difuzoriai_n,
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
+    else:
+        # HONESTY CHECKLIST (2026-07-25): the symbol reader persistently finds
+        # 0 difūzoriai (truth: 15+21 on the reference project) and the line
+        # used to VANISH — a contractor notices missing ventilation instantly.
+        # Emit the position with kiekis=null (KŽ rule: user fills in) + red
+        # confidence so the miss is a visible TODO, not a silent hole.
+        el_lines.append({
+            "skyrius": SK_EL,
+            "aprasymas": "Difūzorių montavimas ir apdirbimas — suveskite kiekį (lubų planas)",
+            "vnt": "vnt", "kiekis": None,
+            "saltinis": "checklist", "confidence": "low",
+        })
+    # Termoreguliatoriai: no reader tracks them at all (truth: 8 vnt on the
+    # reference project) — always a checklist TODO until a reader exists.
+    el_lines.append({
+        "skyrius": SK_EL,
+        "aprasymas": "Termoreguliatorių pajungimas — suveskite kiekį",
+        "vnt": "vnt", "kiekis": None,
+        "saltinis": "checklist", "confidence": "low",
+    })
 
     # Sprint §40 (2026-04-29): HVAC ortakiai — rangovas audit v2 top gap.
     # 40% premium projektų turi ortakius (D100/125/160 mm). Vision prompt'as
