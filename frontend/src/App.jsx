@@ -112,6 +112,10 @@ function App() {
               <Route path="/vidaus-apdailos-samata" element={<VidausApdailosSamata />} />
               <Route path="/apva-renovacijos-kiekiai" element={<ApvaRenovacijosKiekiai />} />
               <Route path="/share/:token" element={<SharedProject />} />
+              {/* Public by founder decision (2026-06 "pricing behind auth is a
+                  marketing bug"): prospects must see prices without an account.
+                  Pricing self-gates — billing off → redirect to /about#kainos. */}
+              <Route path="/pricing" element={<Pricing />} />
 
               {/* Protected — wrapped in AppLayout (sidebar) */}
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -120,10 +124,9 @@ function App() {
                 <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/project/:id/annotator" element={<Annotator />} />
                 <Route path="/price-lists" element={<PriceLists />} />
-                {/* Phase 7 billing — pages self-gate via useBilling(): when the
-                    flag is off, /pricing redirects to /dashboard and result
-                    pages simply bounce back. No billing UI leaks when disabled. */}
-                <Route path="/pricing" element={<Pricing />} />
+                {/* Phase 7 billing — result pages self-gate via useBilling()
+                    and bounce back when the flag is off. (/pricing is public,
+                    registered above.) */}
                 <Route path="/billing/success" element={<BillingResult variant="success" />} />
                 <Route path="/billing/cancel" element={<BillingResult variant="cancel" />} />
                 <Route path="/settings" element={<Settings />} />

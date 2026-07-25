@@ -2215,7 +2215,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     led_juostu_m = float(symbols.get("led_juostos") or 0)
     difuzoriai_n = int(symbols.get("difuzoriai") or 0)
 
-    # Šitos pozicijos pridedam VISADA (kaip Tomos „checklist") — kiekiai 0/null
+    # Šitos pozicijos pridedam VISADA (kaip rangovo „checklist") — kiekiai 0/null
     # kai nėra duomenų; vartotojas gali įvesti rankiniu būdu.
     el_lines: list[dict] = []
     if rozetes_n + jungikliai_n > 0:

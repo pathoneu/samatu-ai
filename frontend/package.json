@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test:units": "node --test src/lib/*.test.js"
+    "test:units": "node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js"
   },
   "dependencies": {
     "@embedpdf/core": "^2.14.4",

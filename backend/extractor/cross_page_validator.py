@@ -382,7 +382,7 @@ def _rule_paint_consumption_sane(rooms: list[dict]) -> list[dict]:
 # Outliers indicate either (a) AI extraction error or (b) atypical project —
 # warning level so user can decide. Bounds widened to capture top/bottom 5%.
 
-TOMAS_RATIO_BOUNDS = {
+RANGOVAS_RATIO_BOUNDS = {
     # Dažomas plotas per m² of floor — typically perim×H plus ceiling
     "dazomas_per_plotas": (1.8, 5.0),  # Rangovas avg 2.8-3.5
     # Grindjuostės per m² — sausų patalpų perim
@@ -394,7 +394,7 @@ TOMAS_RATIO_BOUNDS = {
 }
 
 
-def _rule_tomas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dict]:
+def _rule_rangovas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dict]:
     """Rangovas P1-P5 empirical ratio bounds. Warning when project totals fall
     outside typical LT residential range — usually AI extraction issue."""
     out = []
@@ -406,7 +406,7 @@ def _rule_tomas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dict]:
     dazomas = sum(float(r.get("dazymo_plotas_m2") or 0) for r in rooms)
     if dazomas > 0:
         ratio = dazomas / plotas
-        lo, hi = TOMAS_RATIO_BOUNDS["dazomas_per_plotas"]
+        lo, hi = RANGOVAS_RATIO_BOUNDS["dazomas_per_plotas"]
         if ratio < lo or ratio > hi:
             out.append({
                 "level": "warning" if (ratio < lo * 0.7 or ratio > hi * 1.3) else "info",
@@ -420,7 +420,7 @@ def _rule_tomas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dict]:
     grindjuosciu = sum(float(r.get("grindjuosciu_m") or 0) for r in rooms)
     if grindjuosciu > 0:
         ratio = grindjuosciu / plotas
-        lo, hi = TOMAS_RATIO_BOUNDS["grindjuosciu_per_plotas"]
+        lo, hi = RANGOVAS_RATIO_BOUNDS["grindjuosciu_per_plotas"]
         # Note: pozicijos generator already caps grindjuostes at 0.65 — but
         # raw room sums (before cap) could still be high if user disabled cap
         if ratio > hi * 1.3:
@@ -523,7 +523,7 @@ def validate_consistency(parsed: dict) -> list[dict]:
     warnings.extend(_rule_hidroizoliacija_in_wet_rooms(rooms))
     warnings.extend(_rule_plyteles_in_vonios(rooms))
     warnings.extend(_rule_paint_consumption_sane(rooms))
-    warnings.extend(_rule_tomas_empirical_ratios(rooms, parsed))
+    warnings.extend(_rule_rangovas_empirical_ratios(rooms, parsed))
     warnings.extend(_rule_floor_consistency(rooms))
 
     # Sort: error → warning → info

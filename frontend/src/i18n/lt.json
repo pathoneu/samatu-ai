@@ -341,7 +341,8 @@
     "brandHeadlineA": "Kiekiai iš PDF ",
     "brandHeadlineAccent": "per minutes",
     "brandHeadlineB": ", ne per dienas.",
-    "brandSub": "Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams."
+    "brandSub": "Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams.",
+    "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis"
   },
   "register": {
     "backHome": "Į pradžią",
@@ -1108,6 +1109,9 @@
       "purpose": "Paskirtis",
       "sourcePrefix": "Šaltinis: pdfplumber lentelė, psl. {{page}}",
       "sourceSuffix": " · deterministinis (be AI)"
+    },
+    "workspace": {
+      "measExportLabel": "Eksportuoti matavimus"
     }
   },
   "shared": {
@@ -1352,7 +1356,7 @@
     "subtitle": "Įkelkite statybų projekto brėžinį (PDF). Pathon automatiškai atpažins tipą ir išskirs kiekius.",
     "typeLabel": "Projekto tipas",
     "hideOtherTypes": "− Paslėpti kitus tipus",
-    "showOtherTypes": "+ Kitas projekto tipas (KŽ, fasadai, stogas, žemės darbai…)",
+    "showOtherTypes": "+ Kitas projekto tipas (Automatinis, KŽ)",
     "nameLabel": "Projekto pavadinimas",
     "namePlaceholder": "Pvz., Gyvenamojo namo statyba",
     "companyLabel": "Įmonės pavadinimas",

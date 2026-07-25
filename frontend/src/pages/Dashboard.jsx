@@ -9,7 +9,7 @@ import StatsBar from '@/components/dashboard/StatsBar';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import EmptyState from '@/components/dashboard/EmptyState';
 import UsageMeter from '@/components/billing/UsageMeter';
-import { getProjects, pullProjectsFromBackend } from '@/lib/projectStore';
+import { getProjects, pullProjectsFromBackend, purgeExpiredArchive } from '@/lib/projectStore';
 import { useQueryClient } from '@tanstack/react-query';
 import SetupWizard from '@/components/project/SetupWizard';
 
@@ -30,6 +30,11 @@ export default function Dashboard() {
   // then returning to Dashboard tab B showed the stale localStorage
   // snapshot from first mount. Real users hit this on the 2026-05-07
   // prod test.
+  // Šiukšliadėžė's "liko X d." countdown ends in an actual purge (pre-prod
+  // audit 2026-07-25: purgeExpiredArchive existed but had zero callers — the
+  // countdown hit 0 and nothing happened, client or server).
+  React.useEffect(() => { purgeExpiredArchive(); }, []);
+
   React.useEffect(() => {
     const refresh = () => {
       pullProjectsFromBackend().then((merged) => {

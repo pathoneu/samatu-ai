@@ -45,8 +45,9 @@ export default function Pricing() {
     );
   }
 
-  // Flag-off invariant: no billing → route is invisible.
-  if (!enabled) return <Navigate to="/dashboard" replace />;
+  // Flag-off invariant: no billing → send visitors to the public pricing
+  // section on the landing instead of a dead end (route is public now).
+  if (!enabled) return <Navigate to="/about#kainos" replace />;
 
   // ORDER holds plan IDs ('pro'/'studio'/'oneoff'); match the backend plan by
   // its `id` (NOT `name`, which is the display label "Pro"/"Studio"/…).

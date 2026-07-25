@@ -539,7 +539,7 @@ def test_pozicijos_p3_skyliu_grezimas_fallback_no_symbols():
     assert line[0]["confidence"] == "raudona"
 
 
-def test_tomas_baseline_p1_style_residential_emits_all_key_skyriai():
+def test_rangovas_baseline_p1_style_residential_emits_all_key_skyriai():
     """Rangovas P1-style residential project (180m², 5 wet rooms, 3+ years modern
     construction) should produce ALL the key skyriai that Rangovas writes:
 
@@ -796,7 +796,7 @@ def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
     assert line["medziagos_kiekis"] == round(line["_detail_m2"] * 3.0, 2)
 
 
-def test_pozicijos_p3_silikon_split_per_tomas_audit():
+def test_pozicijos_p3_silikon_split_per_rangovas_audit():
     """Silikonavimas split into two lines per Rangovas 2026-04-29 audit:
     sanitaryware silikonas (×0.8) + plytelių vidinių kampų silikonas (×0.6).
     Combined still ~ wet_perim × 1.4 (slightly more than legacy 1.2×).

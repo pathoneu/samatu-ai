@@ -105,6 +105,14 @@ export default function Login() {
             {t('login.noAccount')}{' '}
             <Link to="/register" className="text-primary font-medium hover:underline">{t('login.registerLink')}</Link>
           </div>
+          <p className="text-center text-xs text-muted-foreground mt-2">
+            {/* Interim recovery path until email-based reset ships (2026-07-25):
+                no email infra exists, so a forgotten password would otherwise be
+                a permanent lockout. */}
+            <a href="mailto:solutions@pathon.eu?subject=Slapta%C5%BEod%C5%BEio%20atk%C5%ABrimas" className="hover:text-foreground underline">
+              {t('login.forgotPassword')}
+            </a>
+          </p>
 
           <div className="mt-8 pt-6 border-t border-border text-xs text-muted-foreground text-center">
             <Link to="/privacy" className="hover:text-foreground transition-colors">{t('login.privacyPolicy')}</Link>

@@ -5,7 +5,7 @@
  * copies to clipboard. DELETE revokes.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Share2, Check, Copy, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +18,24 @@ export default function ShareButton({ project }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
+
+  // Load the EXISTING share state when the dialog opens (pre-prod audit
+  // 2026-07-25: token always started null, so the dialog always offered
+  // "generate" — and regenerating silently invalidated the link the user had
+  // already emailed to their client).
+  useEffect(() => {
+    if (!open || !project?.id) return;
+    let dead = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API}/api/projects/${project.id}/share`, { credentials: 'include' });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!dead && body?.token) setToken(body.token);
+      } catch { /* offline — dialog still allows generating */ }
+    })();
+    return () => { dead = true; };
+  }, [open, project?.id]);
   const [copied, setCopied] = useState(false);
 
   const url = token ? `${window.location.origin}/share/${token}` : null;

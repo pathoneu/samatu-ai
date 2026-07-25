@@ -341,7 +341,8 @@
     "brandHeadlineA": "Quantities from PDF ",
     "brandHeadlineAccent": "in minutes",
     "brandHeadlineB": ", not days.",
-    "brandSub": "Interior, facades, roofing, structures — one tool for all quantity types."
+    "brandSub": "Interior, facades, roofing, structures — one tool for all quantity types.",
+    "forgotPassword": "Forgot your password? Contact us"
   },
   "register": {
     "backHome": "Home",
@@ -1104,6 +1105,9 @@
       "purpose": "Purpose",
       "sourcePrefix": "Source: pdfplumber table, p. {{page}}",
       "sourceSuffix": " · deterministic (no AI)"
+    },
+    "workspace": {
+      "measExportLabel": "Export measurements"
     }
   },
   "shared": {
@@ -1348,7 +1352,7 @@
     "subtitle": "Upload a construction project drawing (PDF). Pathon will automatically detect the type and extract quantities.",
     "typeLabel": "Project type",
     "hideOtherTypes": "− Hide other types",
-    "showOtherTypes": "+ Other project type (BoQ, facades, roof, earthworks…)",
+    "showOtherTypes": "+ Other project type (Automatic, BoQ)",
     "nameLabel": "Project name",
     "namePlaceholder": "e.g. Residential house construction",
     "companyLabel": "Company name",

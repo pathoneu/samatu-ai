@@ -5286,6 +5286,12 @@ async def extract_interior_stream_endpoint(
     rules_override: str | None = Form(None),
 ):
     _user = _billable_user(request)
+    # Billing parity with /extract-interior (pre-prod audit 2026-07-25): this
+    # STREAM endpoint is the app's primary creation path but skipped the quota
+    # and trial gates — flipping BILLING_ENABLED on would have left it an
+    # unlimited free lane. Both are hard no-ops while the flag is off.
+    _check_user_quota(_user["id"])
+    _check_trial_gate(_user["id"])
     client_ip = _client_key(request)
     _check_rate_limit(client_ip, "extract-interior")
 
@@ -5367,6 +5373,14 @@ async def extract_interior_stream_endpoint(
             # the non-streaming endpoint does, so the UI banner still fires.
             if ev.get("event") == "done" and isinstance(ev.get("result"), dict):
                 result = ev["result"]
+                # Billing parity: count the successful extraction against the
+                # monthly quota / trial credit exactly like the non-stream twin
+                # (no-op while BILLING_ENABLED != '1'). Never break the stream.
+                if result.get("status") != "error":
+                    try:
+                        db.record_extract_and_maybe_consume_credit(_user["id"])
+                    except Exception:
+                        log.warning("stream: credit increment failed", exc_info=True)
                 if validation.get("warning"):
                     existing = result.get("warnings") or []
                     existing.append({"level": "WARN", "message": validation["warning"]})

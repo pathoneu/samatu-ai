@@ -26,13 +26,13 @@ const PROJECT_TYPES = [
 ];
 
 // Advanced tipai — paslėpti pagal nutylėjimą, vartotojas atskleidžia spaudžiant.
+// Founder decision 2026-07-25: Fasadai/Stogas/Žemės/Betonas HIDDEN for the
+// contractor launch — their endpoints run simplistic math (roof silently
+// defaults pitch to 30°) while the validated roof engine is unwired. Interior
+// + KŽ are the product; re-add these only wired to real engines.
 const ADVANCED_PROJECT_TYPES = [
   { id: 'auto' },
   { id: 'kz' },
-  { id: 'fasadas' },
-  { id: 'stogas' },
-  { id: 'zeme' },
-  { id: 'betonas' },
 ];
 
 // Interior sub-type still flows to backend (default 'naujas'). UI selector

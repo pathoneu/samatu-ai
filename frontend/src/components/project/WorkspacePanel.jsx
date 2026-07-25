@@ -14,6 +14,7 @@ import {
 import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
+import { exportCSVFile, exportJSONFile } from '@/lib/measureExport';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
@@ -531,6 +532,29 @@ export default function WorkspacePanel({
               onToggle={() => toggleSection('meas')}
               top={0}
             />
+            {!collapsed.meas && (measCountRows.length > 0 || measGeomRows.length > 0) && (
+              /* Export the raw measurements (pre-prod audit 2026-07-25: the
+                 tested export lib had no UI since the legacy toolbar died). */
+              <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 text-[11px] text-muted-foreground">
+                <span className="flex-1">{t('project.workspace.measExportLabel')}</span>
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => exportCSVFile(
+                    { measurements: projMeasurements, measureScales: project.pageScalesDurable || {}, countTypes: project.countTypes || [] },
+                    `${(project?.name || 'projektas').trim()} - matavimai.csv`,
+                  )}
+                >CSV</button>
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => exportJSONFile(
+                    { measurements: projMeasurements, measureScales: project.pageScalesDurable || {}, countTypes: project.countTypes || [] },
+                    `${(project?.name || 'projektas').trim()} - matavimai.json`,
+                  )}
+                >JSON</button>
+              </div>
+            )}
             {!collapsed.meas && measCountRows.map((r) => (
               <div
                 key={r.typeId}
