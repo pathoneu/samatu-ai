@@ -1,38 +1,65 @@
-# Render.com Blueprint — alternative to railway.toml.
+# Render.com Blueprint — alternative to railway.toml (both are shipped; pick one).
 # https://render.com/docs/blueprint-spec
 #
-# Backend FastAPI as a web service + frontend as a static site. Postgres
-# can be attached as a Render managed DB OR pointed at Supabase free tier
-# via DATABASE_URL env var (saves $7/mo).
+# Backend FastAPI as a DOCKER web service + frontend as a static site.
+# Docker (not runtime: python) because extraction hard-depends on native libs
+# Render's python runtime cannot install: poppler-utils (pdf2image) and
+# libglib2.0-0 (opencv flood-fill). See backend/Dockerfile.
+#
+# STORAGE TRUTH (2026-07-25): the DB is SQLite (backend/db.py — there is no
+# Postgres/DATABASE_URL support). A persistent disk is MANDATORY or every
+# deploy/restart wipes users+projects. Uploaded PDFs + nightly DB backups go
+# to Cloudflare R2 when the R2_* vars are set (strongly recommended);
+# without them storage.py silently falls back to the (ephemeral-unless-
+# mounted) local disk.
+#
+# NOTE: deploys from GitHub track the repo DEFAULT branch (main). Keep main
+# fast-forwarded to the working branch or Render ships stale code.
 
 services:
   - type: web
     name: samatu-api
-    runtime: python
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
     region: frankfurt
     plan: starter
-    buildCommand: pip install -r backend/requirements.txt
-    # --proxy-headers + --forwarded-allow-ips='*' so request.client.host reflects
-    # the REAL client IP behind Render's proxy (the per-IP login/register rate
-    # limiter keyed on the proxy IP otherwise — one abuser DoSes everyone's auth;
-    # 2026-06-19 security hunt). '*' is safe here: the service is only reachable
-    # via Render's edge, never directly.
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /health
     autoDeploy: true
+    disk:
+      name: samatu-data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: ENV
         value: production
+      # SQLite lives on the persistent disk (see STORAGE TRUTH above).
+      - key: SAMATU_DB_PATH
+        value: /data/samatu.db
       - key: ANTHROPIC_API_KEY
         sync: false   # set manually in Render dashboard
       - key: SAMATU_SECRET_KEY
+        sync: false
+      # Admin allowlist (2026-07-15 hardening): without it the FIRST user to
+      # register on a fresh DB becomes admin. Set to the founder's email(s).
+      - key: SAMATU_ADMIN_EMAIL
+        sync: false
+      # Cloudflare R2 — durable PDFs + nightly DB backups (bucket samatu-pdfs).
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
         sync: false
       - key: SAMATU_USER_DAILY_SPEND_EUR
         value: "0.50"
       - key: SAMATU_USER_HOURLY_EXTRACTS
         value: "10"
+      # Must equal the real frontend origin (canonical apex: https://pathon.eu).
       - key: SAMATU_CORS_ORIGINS
-        sync: false   # set to https://samatu.pathon.eu after DNS
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -44,6 +71,10 @@ services:
     name: samatu-web
     runtime: static
     region: frankfurt
+    # NOTE: `npm run build:seo` (prerender) exists but is NOT used here — the
+    # SPA rewrite below would shadow dist/<route>/index.html anyway. Adopting
+    # prerender in prod = switch the build AND serve prerendered files before
+    # the fallback (docs/marketing/seo-playbook.md §1, still-open item).
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     routes:
