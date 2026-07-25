@@ -108,10 +108,24 @@ _HEIGHT_MM_RE = re.compile(r'(\d{4})\s*mm\b')
 # "+3000", "+3.000", "+3,000" — drafting marker
 _HEIGHT_MARKER_RE = re.compile(r'\+\s*(\d[.,]?\d{1,3})')
 
+# 2026-07-07 fix (objektas_b pastoliai collapse): double-height living spaces
+# are real ceilings — Vision narrated "dvigubo aukščio lubas (~5.7m)" for the
+# 62 m² svetainė but MAX_CEILING_M=4.5 (a page-marker band meant to reject
+# RIDGE markers on sections) threw the value away, so every room kept 2.82 m
+# and the virš-3m split + pastolių line zeroed out against a contractor who
+# bills 68.28 m² of >3m ceiling and 90 d.d. of tall scaffolds. In the salvage
+# lane the value comes from Vision's own sentence about a NAMED room's lubos —
+# far stronger context than a bare drafting marker — so allow up to a
+# double-height interior, but only when the warning actually talks about
+# lubos/aukštis (guards against wall-LENGTH narrations like "siena 5.2m ilgio").
+MAX_NARRATED_CEILING_M = 6.5
+_CEILING_CONTEXT_RE = re.compile(r'lub|aukš', re.IGNORECASE)
 
-def _to_metres(raw: str, unit: str) -> float | None:
+
+def _to_metres(raw: str, unit: str, max_m: float = MAX_CEILING_M) -> float | None:
     """Convert raw numeric string + unit to metres. Returns None if outside
-    plausible ceiling range to keep noise out of structured data."""
+    the plausible ceiling range [MIN_CEILING_M, max_m] to keep noise out of
+    structured data."""
     try:
         val = float(raw.replace(',', '.'))
     except ValueError:
@@ -124,7 +138,7 @@ def _to_metres(raw: str, unit: str) -> float | None:
         # "+3000" → 3.000 m; "+3.000" → 3.000 m; "+3,2" → 3.2 m
         if val > 100:        # bare integer like 3000
             val = val / 1000.0
-    if not (MIN_CEILING_M <= val <= MAX_CEILING_M):
+    if not (MIN_CEILING_M <= val <= max_m):
         return None
     return val
 
@@ -185,22 +199,26 @@ def salvage_heights_from_warnings(
         if not text:
             continue
 
-        # Collect every plausible height value from this single warning
+        # Collect every plausible height value from this single warning.
+        # Warnings that explicitly talk about lubos/aukštis get the extended
+        # double-height band; anything else keeps the strict scanner band.
+        max_m = (MAX_NARRATED_CEILING_M if _CEILING_CONTEXT_RE.search(text)
+                 else MAX_CEILING_M)
         heights: list[float] = []
         for m in _HEIGHT_MARKER_RE.finditer(text):
-            v = _to_metres(m.group(1), "marker")
+            v = _to_metres(m.group(1), "marker", max_m)
             if v is not None:
                 heights.append(v)
         for m in _HEIGHT_M_RE.finditer(text):
-            v = _to_metres(m.group(1), "m")
+            v = _to_metres(m.group(1), "m", max_m)
             if v is not None:
                 heights.append(v)
         for m in _HEIGHT_CM_RE.finditer(text):
-            v = _to_metres(m.group(1), "cm")
+            v = _to_metres(m.group(1), "cm", max_m)
             if v is not None:
                 heights.append(v)
         for m in _HEIGHT_MM_RE.finditer(text):
-            v = _to_metres(m.group(1), "mm")
+            v = _to_metres(m.group(1), "mm", max_m)
             if v is not None:
                 heights.append(v)
 

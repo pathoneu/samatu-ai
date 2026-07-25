@@ -26,24 +26,11 @@ OPUS_OUTPUT_PER_M = 75.0
 
 
 def _pick_title_block_page(ai: dict) -> int:
-    """Choose the page most likely to carry the height annotation.
-
-    Order of preference:
-      1. eksplikacija_source_page (the page that has the room table)
-      2. First section page (tipas=section)
-      3. scale_source_page
-      4. Page 1
-    """
-    eks_pg = ai.get("eksplikacija_source_page")
-    if eks_pg:
-        return int(eks_pg)
-    for p in (ai.get("puslapiai") or []):
-        if (p.get("tipas") or "").lower() == "section":
-            return int(p.get("nr") or 1)
-    scale_pg = ai.get("scale_source_page")
-    if scale_pg:
-        return int(scale_pg)
-    return 1
+    """Choose the page most likely to carry the height annotation —
+    first pick of the classification-aware sampler (sections lead;
+    page 1 only as a last resort)."""
+    from extractor.height_fusion import height_scan_pages
+    return height_scan_pages(ai, max_pages=1)[0]
 
 
 def _resolve_pdf(slug: str, entry: dict) -> Path:
