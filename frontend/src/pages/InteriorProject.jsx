@@ -73,7 +73,7 @@ function ConfidenceDot({ level }) {
 // company (11 muted) · Interjeras pill · spacer · Be PVM (13) | Su PVM (18 bold) ·
 // Prielaidos button · Eksportuoti button. Always visible above tab bar.
 
-function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete, onRename }) {
+function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false }) {
   const { t } = useTranslation();
   // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
   // creation — no rename control existed anywhere in the UI).
@@ -122,11 +122,15 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
               {project.name || t('project.interior.untitled')}
             </span>
             {onRename && (
+              /* Founder 2026-07-25: pencil stays VISIBLE on the demo (he
+                 searched for it and found nothing) — disabled with an honest
+                 tooltip instead of hidden. */
               <button
                 type="button"
-                onClick={startRename}
-                title={t('project.interior.renameLabel')}
-                className="p-0.5 rounded text-muted-foreground hover:text-foreground shrink-0"
+                onClick={renameLocked ? undefined : startRename}
+                disabled={renameLocked}
+                title={renameLocked ? t('project.interior.renameDemoLocked') : t('project.interior.renameLabel')}
+                className="p-0.5 rounded text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-40 disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
               >
                 <Pencil className="w-3 h-3" />
               </button>
@@ -830,10 +834,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         onPrielaidos={() => setTab('rules')}
         onEksportuoti={() => setTab('eksport')}
         onDelete={onDelete}
-        onRename={project.is_demo ? null : (newName) => {
+        onRename={(newName) => {
           const updated = updateProject(project.id, { name: newName });
           if (updated) setProject(updated);
         }}
+        renameLocked={!!project.is_demo}
       />
 
       <TabBar

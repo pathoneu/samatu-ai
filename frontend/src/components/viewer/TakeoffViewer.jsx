@@ -24,7 +24,7 @@ import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
 import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
-import { makeCountType, countTypesFromMeasurements } from '@/lib/measurements';
+import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import PageOverlayHost from './PageOverlayHost';
@@ -461,13 +461,22 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
 // Scroll the viewport to a focused room's page when it changes (panel → canvas
 // nav). Page-only jumps (Matavimai rows, provenance links) carry no room —
 // fall back to the focusedPage prop so they scroll the Embed viewer too.
+//
+// FOUNDER BUG 2026-07-25 ("scrolls to other pages by itself; zoom snaps to
+// one spot"): scrollApi's identity churns with scroll/zoom state, and with a
+// focused room the old effect re-ran scrollToPage on EVERY tick — the viewer
+// literally fought the user's navigation. Jump ONCE per new target; re-arm
+// only when the focus object itself changes (clicking a room again re-jumps).
 function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   const { provides: scrollApi } = useScroll(documentId);
   const targetPage = focusedRoom?.puslapio_nr ?? focusedRoom?.page_nr ?? focusedPage ?? null;
+  const doneRef = useRef(null);
+  useEffect(() => { doneRef.current = null; }, [focusedRoom, focusedPage]);
   useEffect(() => {
-    if (targetPage && scrollApi?.scrollToPage) {
-      scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
-    }
+    if (!targetPage || !scrollApi?.scrollToPage) return;
+    if (doneRef.current === targetPage) return; // one jump per target — never re-yank
+    doneRef.current = targetPage;
+    scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
   }, [targetPage, scrollApi]);
   return null;
 }
@@ -775,7 +784,22 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                       countTypes={countTypes}
                       activeCountTypeId={activeCountTypeId}
                       selectedMeasureId={selectedMeasureId}
-                      onMeasureCommit={(m) => setMeasurements((prev) => [...prev, m])}
+                      onMeasureCommit={(m) => {
+                        setMeasurements((prev) => [...prev, m]);
+                        // Founder 2026-07-25 ("no way to get measurements"):
+                        // announce the committed value + where it lives.
+                        if (m.kind !== 'count') {
+                          const sc = effectiveScales[m.page];
+                          const unit = m.kind === 'area' ? 'm²' : 'm';
+                          const label = sc?.calibrated
+                            ? `${measurementValue(m, sc).value.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unit}`
+                            : 'nekalibruota';
+                          const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
+                          toast.success(`${KIND_LT[m.kind] || 'Matavimas'}: ${label}`, {
+                            description: 'Įrašyta dešinės pusės skydelyje „Matavimai".',
+                          });
+                        }
+                      }}
                       onMeasureCalibrate={(pageNr, a, b) => setCalibRequest({ pageNr, a, b })}
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureDelete={deleteMeasurement}
@@ -784,6 +808,13 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                 />
               </ZoomGestureWrapper>
             </Viewport>
+            {/* Prominent tool instructions — the status-bar hint alone was
+                invisible to the founder ("no buttons... or anything"). */}
+            {measureTool != null && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap">
+                {MEASURE_HINTS[measureTool]}
+              </div>
+            )}
             {/* Floating count-type legend while the count tool is armed. */}
             {measureTool === 'count' && (
               <div

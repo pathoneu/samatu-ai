@@ -780,7 +780,8 @@
       "why": "Why?",
       "feedbackOk": "Correct",
       "feedbackBad": "Incorrect / review",
-      "renameLabel": "Rename project"
+      "renameLabel": "Rename project",
+      "renameDemoLocked": "The sample project cannot be renamed"
     },
     "share": {
       "toastGenerated": "Link generated",

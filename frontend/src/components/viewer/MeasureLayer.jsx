@@ -192,6 +192,21 @@ export default function MeasureLayer({
     if (finished.committed) commitDraft(finished.points);
   }, [tool, draft, commitDraft]);
 
+  // Explicit on-canvas Baigti/Atšaukti (founder 2026-07-25: "no buttons on how
+  // to stop" — double-click and Esc were the only exits, and neither is
+  // discoverable). Same code paths as dblclick / Escape.
+  const finishDraft = useCallback(() => {
+    const finished = draftReducer(draft, { type: 'finish', tool });
+    if (finished.committed) commitDraft(finished.points);
+  }, [tool, draft, commitDraft]);
+  const cancelDraft = useCallback(() => {
+    dispatch({ type: 'reset' });
+    setCursor(null);
+    setSnapPt(null);
+  }, []);
+  const draftMinPoints = tool === 'area' ? 3 : 2;
+  const draftFinishable = POLY_TOOLS.has(tool) && draft.points.length >= draftMinPoints;
+
   // Keyboard: Enter = finish, Escape = reset, z = undo. Bound to window while a
   // poly tool is active so the user need not focus the SVG.
   useEffect(() => {
@@ -280,6 +295,17 @@ export default function MeasureLayer({
         decimals={decimals}
       />
 
+      {POLY_TOOLS.has(tool) && draft.points.length > 0 && (
+        <DraftActions
+          lastPt={adapter.toViewport(draft.points[draft.points.length - 1])}
+          width={adapter.width}
+          height={adapter.height}
+          finishable={draftFinishable}
+          onFinish={finishDraft}
+          onCancel={cancelDraft}
+        />
+      )}
+
       {tool === 'calibrate' && (
         <CalibrationLayer
           calibA={calibA}
@@ -289,6 +315,41 @@ export default function MeasureLayer({
         />
       )}
     </svg>
+  );
+}
+
+// Floating Baigti / Atšaukti buttons beside the draft's last vertex. SVG-native
+// (this layer is an <svg>), stopPropagation on pointerdown+click so pressing a
+// button never adds a draft vertex underneath it. Clamped inside the page.
+function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel }) {
+  const W = 168, H = 30;
+  const x = Math.min(Math.max(lastPt.x + 14, 4), Math.max(4, width - W - 4));
+  const y = Math.min(Math.max(lastPt.y - H - 12, 4), Math.max(4, height - H - 4));
+  const stop = (e) => { e.stopPropagation(); };
+  const btn = (bx, bw, label, enabled, onClick, primary) => (
+    <g
+      transform={`translate(${bx}, 0)`}
+      style={{ cursor: enabled ? 'pointer' : 'not-allowed', pointerEvents: 'auto' }}
+      onPointerDown={stop}
+      onDoubleClick={stop}
+      onClick={(e) => { stop(e); if (enabled) onClick(); }}
+    >
+      <rect width={bw} height={H} rx={6}
+        fill={primary ? (enabled ? '#1d4ed8' : '#93a8e8') : '#ffffff'}
+        stroke={primary ? 'none' : '#cbd5e1'} strokeWidth={1} />
+      <text x={bw / 2} y={H / 2 + 1} textAnchor="middle" dominantBaseline="central"
+        fontSize={12} fontWeight={600}
+        fill={primary ? '#ffffff' : '#334155'}
+        style={{ pointerEvents: 'none', userSelect: 'none' }}>{label}</text>
+    </g>
+  );
+  return (
+    <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
+      <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={8}
+        fill="#ffffff" fillOpacity={0.92} stroke="#e2e8f0" strokeWidth={1} />
+      {btn(0, 84, 'Baigti', finishable, onFinish, true)}
+      {btn(92, 76, 'Atšaukti', true, onCancel, false)}
+    </g>
   );
 }
 

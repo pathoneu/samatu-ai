@@ -784,7 +784,8 @@
       "why": "Kodėl?",
       "feedbackOk": "Teisingai",
       "feedbackBad": "Neteisingai / peržiūrėti",
-      "renameLabel": "Pervadinti projektą"
+      "renameLabel": "Pervadinti projektą",
+      "renameDemoLocked": "Pavyzdinio projekto pervadinti negalima"
     },
     "share": {
       "toastGenerated": "Nuoroda sugeneruota",

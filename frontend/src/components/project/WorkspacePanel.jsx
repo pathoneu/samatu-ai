@@ -536,7 +536,7 @@ export default function WorkspacePanel({
               /* Export the raw measurements (pre-prod audit 2026-07-25: the
                  tested export lib had no UI since the legacy toolbar died). */
               <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 text-[11px] text-muted-foreground">
-                <span className="flex-1">{t('project.workspace.measExportLabel')}</span>
+                <span className="flex-1">Eksportuoti matavimus</span>
                 <button
                   type="button"
                   className="text-primary hover:underline"

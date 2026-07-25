@@ -4816,7 +4816,8 @@ async def generate_pdf(request: Request, data: dict):
     # total is self-contradicting. Title by content. (export step 1.)
     _has_prices  = any((e.get("kaina") or 0) or (e.get("suma") or 0) for e in eilutes)
     if _has_prices:
-        doc_title = "LOKALINĖ SĄMATA"
+        # Founder 2026-07-25: plain "Sąmata" on the printed document.
+        doc_title = "SĄMATA"
     elif tipas_pdf == "interjeras":
         doc_title = "VIDAUS APDAILOS KIEKIAI"
     else:

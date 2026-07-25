@@ -364,7 +364,7 @@ export default function InteriorWorkspace({
               hoveredRoomNrExternal={hoveredRoomNr}
               projectId={project.id}
               pdfBlob={pdfBlob}
-              onClearFocus={() => setLocalFocusedRoom(null)}
+              onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
               onRoomPolygonFill={handleRoomPolygonFill}
               fillRequest={fillRequest}
               exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
