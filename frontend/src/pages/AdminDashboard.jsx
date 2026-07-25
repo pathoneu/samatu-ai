@@ -25,6 +25,7 @@ import KpiRow from '@/components/admin/KpiRow';
 import CostMonitor from '@/components/admin/CostMonitor';
 import AnalyticsCharts from '@/components/admin/AnalyticsCharts';
 import UsersTable from '@/components/admin/UsersTable';
+import AuditLogPanel from '@/components/admin/AuditLogPanel';
 import HealthPanel from '@/components/admin/HealthPanel';
 import { fetchAdmin, downloadCsv } from '@/components/admin/adminUtils';
 
@@ -162,6 +163,9 @@ export default function AdminDashboard() {
 
         {/* ── 5. User management ── */}
         <UsersTable />
+
+        {/* ── 5b. Admin audit log (read-only accountability trail) ── */}
+        <AuditLogPanel />
 
         {/* ── 6. System health ── */}
         <HealthPanel health={health} loading={healthLoading} error={healthError} />

@@ -1220,6 +1220,22 @@
       "projects": "Projects",
       "extractions": "Extractions"
     },
+    "audit": {
+      "eyebrow": "Security",
+      "title": "Audit log",
+      "hint": "State-changing admin actions — who did what to whom and when. Read-only.",
+      "refresh": "Refresh log",
+      "colTime": "Time",
+      "colActor": "Admin",
+      "colAction": "Action",
+      "colTarget": "User",
+      "colDetail": "Detail",
+      "none": "No actions yet.",
+      "actions": {
+        "disable": "Disabled user",
+        "enable": "Enabled user"
+      }
+    },
     "health": {
       "eyebrow": "System",
       "title": "Health",

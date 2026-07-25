@@ -1224,6 +1224,22 @@
       "projects": "Projektai",
       "extractions": "Ekstrakcijos"
     },
+    "audit": {
+      "eyebrow": "Sauga",
+      "title": "Veiksmų žurnalas",
+      "hint": "Administratorių atlikti būsenos keitimo veiksmai — kas, ką, kam ir kada. Tik skaitymui.",
+      "refresh": "Atnaujinti žurnalą",
+      "colTime": "Laikas",
+      "colActor": "Administratorius",
+      "colAction": "Veiksmas",
+      "colTarget": "Vartotojas",
+      "colDetail": "Detalės",
+      "none": "Veiksmų dar nėra.",
+      "actions": {
+        "disable": "Išjungė vartotoją",
+        "enable": "Įjungė vartotoją"
+      }
+    },
     "health": {
       "eyebrow": "Sistema",
       "title": "Būklė",

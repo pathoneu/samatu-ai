@@ -897,6 +897,24 @@ def _migrate_schema() -> None:
                 created_at  TEXT NOT NULL
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_invoices_user_time ON invoices(user_id, created_at)")
+        # admin_audit_log (2026-07-06 audit): accountability for state-changing
+        # admin operations. Append-only ledger — who (actor_user_id) did what
+        # (action) to whom (target_user_id), when (created_at), plus an optional
+        # human-readable detail (e.g. the target's email, preserved even if that
+        # user is later deleted). Before this, disable/enable discarded the
+        # calling admin's identity entirely; harmless with one admin, but a
+        # second admin makes incident investigation impossible without it.
+        # target_user_id/detail are nullable (an action need not target a user).
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                actor_user_id  TEXT NOT NULL,
+                action         TEXT NOT NULL,
+                target_user_id TEXT,
+                detail         TEXT,
+                created_at     TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC)")
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────
@@ -1407,6 +1425,42 @@ def set_user_active(user_id: str, active: bool) -> bool:
             "UPDATE users SET is_active = ? WHERE id = ?",
             (1 if active else 0, user_id))
         return cur.rowcount > 0
+
+
+def record_admin_action(actor_id: str, action: str,
+                        target_id: str | None = None,
+                        detail: str | None = None) -> None:
+    """Append one admin-action audit row. Call AFTER the mutation succeeds so the
+    trail records what actually happened, never an attempt. `actor_id` is the
+    acting admin's user id; `action` is a dotted verb (e.g. 'user.disable');
+    `target_id` is the affected user (None if the action has no user target);
+    `detail` is a short human-readable string (e.g. the target's email)."""
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO admin_audit_log
+                (actor_user_id, action, target_user_id, detail, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (actor_id, action, target_id, detail, _now_iso()))
+
+
+def list_admin_actions(limit: int = 100) -> list[dict]:
+    """Most-recent admin actions first (newest → oldest), capped at `limit`.
+    Ties on created_at (1-second resolution) break on the autoincrement id so
+    same-second actions still read back in insertion order. LEFT JOINs users to
+    surface actor/target emails for display — a since-deleted user leaves a NULL
+    email, but the row (and its `detail`) still stands."""
+    with _conn() as c:
+        rows = c.execute("""
+            SELECT a.id, a.actor_user_id, act.email AS actor_email,
+                   a.action, a.target_user_id, tgt.email AS target_email,
+                   a.detail, a.created_at
+              FROM admin_audit_log a
+              LEFT JOIN users act ON act.id = a.actor_user_id
+              LEFT JOIN users tgt ON tgt.id = a.target_user_id
+          ORDER BY a.created_at DESC, a.id DESC
+             LIMIT ?
+        """, (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
 
 def admin_events_by_kind(days: int = 30) -> list[dict]:
