@@ -4,18 +4,18 @@
     "created": "2026-04-21",
     "previous_version": "1.0 (training_dataset.json)",
     "purpose": "Realios LT rangovo (Rangovas A) sąmatų duomenys, naudojami kaip ground truth kalibracijai ir few-shot prompting V2 pipeline'ui",
-    "rangovas": "Rangovas A, Rangovas A",
+    "rangovas": "Rangovas A",
     "vienetai": "Aiškiai nurodyti per kiekvieną poziciją lauke 'unit'",
     "major_changes_from_v1": [
       "Sparse array struktūra per skyrių (items[] su kategorija+unit), vietoj flat fields",
       "scope_method per darbo tipą — fiksuoja ar įtraukti angokraščiai/nišos/buffer",
       "scope_type laukas per projektą (full_project vs partial_*)",
       "accuracy_test_fields whitelist — kuriuos laukus test'as lygina",
-      "drawing_calculation_notes — paaiškinimas, kodėl rangovo skaičius skiriasi nuo gryno brėžinio",
+      "drawing_calculation_notes — paaiškinimas, kodėl Rangovo skaičius skiriasi nuo gryno brėžinio",
       "work_quantity_netto vs material_quantity_brutto split (kur žinoma)",
       "Visų 5 projektų patalpų eksplikacijos pilnai (buvo tik P1 ir P5)"
     ],
-    "svarbi_pastaba_AI": "Šie duomenys yra GROUND TRUTH tik sąmatose nurodyto scope ribose. P3 ir P4 yra DALINIAI pasiūlymai — tikri brėžiniai rodo daugiau darbų, kuriuos atliko kiti rangovai, ne rangovas. Todėl P3/P4 accuracy testų taikymas TIK whitelist'uotiems laukams."
+    "svarbi_pastaba_AI": "Šie duomenys yra GROUND TRUTH tik sąmatose nurodyto scope ribose. P3 ir P4 yra DALINIAI pasiūlymai — tikri brėžiniai rodo daugiau darbų, kuriuos atliko kiti rangovai, ne Rangovas. Todėl P3/P4 accuracy testų taikymas TIK whitelist'uotiems laukams."
   },
   "_schema_enums": {
     "_comment": "Enumai, naudojami per `kategorija` laukus visuose darbo tipuose. Modelis turi grąžinti TIK šias reikšmes — kitaip validator'ius flaguos.",
@@ -788,7 +788,7 @@
           "skyriaus_pavadinimas_samatoje": "Elektros instaliacijos darbai — NEBUVO P1 samatoje",
           "items": [],
           "scope_method": {
-            "notes": "P1 sąmatoje elektros darbai neįtraukti — atlikti atskiro elektros rangovo. rangovas tik GKP/dažymo/plytelių/grindų/santechnikos rangovas šiame projekte. BET: eil. 11 'Lubinių priglaistomų šviestuvų montavimas 69 vnt' yra GKP skyriuje (mechaninis montavimas į GKP lubos), o ne elektros pajungimas."
+            "notes": "P1 sąmatoje elektros darbai neįtraukti — atlikti atskiro elektros rangovo. Rangovas tik GKP/dažymo/plytelių/grindų/santechnikos rangovas šiame projekte. BET: eil. 11 'Lubinių priglaistomų šviestuvų montavimas 69 vnt' yra GKP skyriuje (mechaninis montavimas į GKP lubos), o ne elektros pajungimas."
           }
         },
         "ventilation": {
@@ -953,7 +953,7 @@
           ],
           "scope_method": {
             "rekuperacija_skaicuojama_is_HVAC_projekto": true,
-            "rekuperacija_notes": "Ortakių ilgiai, alkūnių/trišakių/movų skaičius PAGAL HVAC inžinerinį projektą, kurio NĖRA training brėžiniuose. AI NEGALI šito ištraukti iš interjero brėžinių — reikia HVAC plano kaip atskiro input'o arba rangovas įveda rankiniu būdu. REKOMENDACIJA V2.0 MVP: ventilation scope LAUKIA Phase 4 hardcoded templates, ne AI extract."
+            "rekuperacija_notes": "Ortakių ilgiai, alkūnių/trišakių/movų skaičius PAGAL HVAC inžinerinį projektą, kurio NĖRA training brėžiniuose. AI NEGALI šito ištraukti iš interjero brėžinių — reikia HVAC plano kaip atskiro input'o arba Rangovas įveda rankiniu būdu. REKOMENDACIJA V2.0 MVP: ventilation scope LAUKIA Phase 4 hardcoded templates, ne AI extract."
           }
         },
         "special_works": {
@@ -1324,7 +1324,7 @@
           ],
           "scope_method": {
             "elektros_skyrius_yra_P2": true,
-            "notes": "P2 turi atskirą elektros skyrių — rangovas apmoka elektros komutavimą (rozetės/jungikliai vietos pritaikymas), bet NE pilna elektros instaliacija su laidynimu. Tai 'finishing stage' elektra, ne 'first fix'."
+            "notes": "P2 turi atskirą elektros skyrių — Rangovas apmoka elektros komutavimą (rozetės/jungikliai vietos pritaikymas), bet NE pilna elektros instaliacija su laidynimu. Tai 'finishing stage' elektra, ne 'first fix'."
           }
         },
         "ventilation": {
@@ -1402,7 +1402,7 @@
       "data": "2026-01-15",
       "uzsakovas": "Objektas C",
       "scope_type": "partial_paint_only",
-      "scope_notes": "DALINIS pasiūlymas — TIK dažymo skyrius (15 pozicijų). rangovas neatlieka GKP/plytelių/grindų/santechnikos/elektros P3. Brėžiniai rodo pilną namą, bet dataset'e lyginame TIK dažymo kategorijas.",
+      "scope_notes": "DALINIS pasiūlymas — TIK dažymo skyrius (15 pozicijų). Rangovas neatlieka GKP/plytelių/grindų/santechnikos/elektros P3. Brėžiniai rodo pilną namą, bet dataset'e lyginame TIK dažymo kategorijas.",
       "sudetingumas": "premium",
       "sudetingumo_pozymiai": [
         "premium dažai: Benjamin Moore (lubos), Benjamin Moore (sienos+lubos), Supreme Ultimate",
@@ -1528,7 +1528,7 @@
           "skyriaus_pavadinimas_samatoje": "NEBUVO P3 samatoje",
           "items": [],
           "scope_method": {
-            "notes": "P3 sąmatoje nėra GKP skyriaus. rangovas tik DAŽO, o GKP atliko kitas rangovas prieš jam ateinant. Tik viena GKP pozicija dažymo skyriuje — lubos_laiptineje (1 vnt), tai yra 'apdirbimas' po kito rangovo darbo."
+            "notes": "P3 sąmatoje nėra GKP skyriaus. Rangovas tik DAŽO, o GKP atliko kitas rangovas prieš jam ateinant. Tik viena GKP pozicija dažymo skyriuje — lubos_laiptineje (1 vnt), tai yra 'apdirbimas' po kito rangovo darbo."
           }
         },
         "tiles": {
@@ -1600,7 +1600,7 @@
         "moldingai_bm"
       ],
       "accuracy_test_tolerance": 0.15,
-      "accuracy_test_scope_note": "P3 yra DALINIS pasiūlymas. AI paleistas ant pilnų brėžinių grąžins plyteles/grindis/GKP kiekius, kurie brėžiniuose yra. Testas turi IGNORUOTI tuos laukus, nes rangovas jų neskaičiavo.",
+      "accuracy_test_scope_note": "P3 yra DALINIS pasiūlymas. AI paleistas ant pilnų brėžinių grąžins plyteles/grindis/GKP kiekius, kurie brėžiniuose yra. Testas turi IGNORUOTI tuos laukus, nes Rangovas jų neskaičiavo.",
       "pastaba": "P3 = PREMIUM klasės referencas. Naudojamas few-shot pavyzdžiu Phase 1 klasifikatoriui atpažinti premium žymes (Benjamin Moore, Supreme Ultimate, stiklo audinys, moldingai, paslėptos durys). KRITIŠKAI SVARBU: P3 dalinis pasiūlymas — testai tikrina TIK dažymo kategorijas."
     },
     {
@@ -2241,7 +2241,7 @@
           ],
           "scope_method": {
             "pilna_elektros_instaliacija_P5": true,
-            "notes": "P5 rangovas atlieka PILNĄ elektrą — 252 m kabeliavimo (naujas), 17 automatinių jungiklių skyde. Tai reno projektas, kur rangovas perima 'first fix' elektrą."
+            "notes": "P5 Rangovas atlieka PILNĄ elektrą — 252 m kabeliavimo (naujas), 17 automatinių jungiklių skyde. Tai reno projektas, kur Rangovas perima 'first fix' elektrą."
           }
         },
         "ventilation": {
@@ -2733,15 +2733,15 @@
       "solution": "Phase 2 ceiling_tool schema turi 'gkp_plotas_standartinis_m2' + 'gkp_plotas_virs_3m_m2' kaip EXCLUSIVE (nesidengiantys). V1 'faktiniai_kiekiai_suvestinis' laukas 'dazymo_plotas_total_m2' = standart + virs_3m kaip atskiros zonos."
     },
     {
-      "pitfall": "rangovas method netto vs brutto",
+      "pitfall": "Rangovas method netto vs brutto",
       "description": "Sąmatose skaičiai yra NETTO (work_quantity), ne brutto (material_quantity). Medžiagų skaičiavimui reikia +5-10% buffer'io.",
-      "solution": "Dataset'e laukas 'work_quantity_netto' = rangovo sąmatos skaičius. 'material_quantity_brutto' = null dabartiniame etape, bus užpildytas kai gausim medžiagų kvitus. Materials calculator Phase 4 naudos coefficient (1.05-1.10) iš material_conversion_coefficients."
+      "solution": "Dataset'e laukas 'work_quantity_netto' = Rangovo sąmatos skaičius. 'material_quantity_brutto' = null dabartiniame etape, bus užpildytas kai gausim medžiagų kvitus. Materials calculator Phase 4 naudos coefficient (1.05-1.10) iš material_conversion_coefficients."
     },
     {
       "pitfall": "Ventilation/HVAC reikalauja atskiro HVAC projekto",
       "description": "P1 turi 36 rekuperacijos pozicijų (ortakiai, alkūnės, difuzoriai). Šitos detalės yra HVAC inžineriniame projekte, ne interjero brėžinyje.",
       "impact": "AI NEGALI ištraukti rekuperacijos kiekių iš interjero brėžinių su pakankamu tikslumu.",
-      "solution": "V2.0 MVP rekomendacija: ventilation_tool grąžina tik 'rekuperatoriaus_montavimas_vnt' ir 'kondicionieriaus_irengimas_vnt' — bazinės pozicijos. Detalūs ortakiai pridedami rangovo rankiniu būdu arba iš atskiro HVAC planas upload'o (V2.1+)."
+      "solution": "V2.0 MVP rekomendacija: ventilation_tool grąžina tik 'rekuperatoriaus_montavimas_vnt' ir 'kondicionieriaus_irengimas_vnt' — bazinės pozicijos. Detalūs ortakiai pridedami Rangovo rankiniu būdu arba iš atskiro HVAC planas upload'o (V2.1+)."
     }
   ]
 }

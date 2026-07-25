@@ -1,7 +1,7 @@
 """Create skeleton ground-truth JSONs (Week 1 Task 1.5).
 
 Creates 10 templates under `data/human_gt/` with all top-5 EUR-weighted
-lines preset to quantity=0 + rangovas mid-market Kaunas prices (R4 research).
+lines preset to quantity=0 + Rangovas mid-market Kaunas prices (R4 research).
 The samatininkas fills in `quantity` and `verified_by` for each line.
 
 Usage:
@@ -21,7 +21,7 @@ sys.path.insert(0, str(REPO_ROOT))
 OUT_DIR = REPO_ROOT / "data" / "human_gt"
 
 # R4 (research session 2026-05-10): bundled glaistymas+dažymas at 14 €/m² is
-# the dominant LT invoice convention, confirmed across rangovas P2-P5.
+# the dominant LT invoice convention, confirmed across Rangovas P2-P5.
 LINE_TEMPLATE = [
     # Top-5 EUR-weighted lines (60% of typical project budget)
     {"code": "glaistymas_dazymas_bundle",

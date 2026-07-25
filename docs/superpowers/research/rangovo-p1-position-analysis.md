@@ -1,11 +1,11 @@
-# rangovo P1 Pasiūlymo Pozicijų Analizė
+# Rangovo P1 Pasiūlymo Pozicijų Analizė
 
-> **rangovo yra vienas LT rangovas — jo pozicijos rodo "kokio detalumo lygio sąmatos LT rangovai išleidžia."**
+> **Rangovo yra vienas LT rangovas — jo pozicijos rodo "kokio detalumo lygio sąmatos LT rangovai išleidžia."**
 > Skaičiai ne ground truth, bet POZICIJŲ TIPAI ir GRANULARITY yra orientyras kuris turi atspindėti į mūsų output'ą.
 
 P1: Naujos statybos namas (Objektas B), Kaunas. Vidaus apdailos darbai. 2026-04-13.
 
-## rangovo positions per skyrius
+## Rangovo positions per skyrius
 
 ### Skyrius 1 — Gipso kartono montavimas
 
@@ -70,9 +70,9 @@ P1: Naujos statybos namas (Objektas B), Kaunas. Vidaus apdailos darbai. 2026-04-
 
 Out of interior-takeoff scope (HVAC + plumbing). Mūsų pipeline'as šiuos skyrius gali pažymėti "out_of_scope" ir nepateikti.
 
-## Comparison: V8 baseline P1 vs rangovo P1
+## Comparison: V8 baseline P1 vs Rangovo P1
 
-| Metric | V8 P1 | rangovo P1 | Δ% (V8 vs rangovo) | Verdict |
+| Metric | V8 P1 | Rangovo P1 | Δ% (V8 vs Rangovo) | Verdict |
 |--------|-------|---------|----------------|---------|
 | Rooms detected | 13 | 13 (eksplikacija) | 0% | ✅ V8 matches |
 | Bendras plotas m² | 205.55 | ~205 (sum from drawings) | ~0% | ✅ Match |
@@ -87,15 +87,15 @@ Out of interior-takeoff scope (HVAC + plumbing). Mūsų pipeline'as šiuos skyri
 
 1. **Output schema must be richer** than V8's `santrauka` totals. Need per-position list, organized by skyrius. Each position has: skyrius, aprašymas, vnt, kiekis, šaltinis (eksplikacija | iš brėžinio | apskaičiuota).
 
-2. **V8 undercounts kampai by 34%** — formula gap. rangovo gets 580m for ~205m² apartment. CLAUDE.md formula says: perimetras (lubų periferija) + 4×H (vidiniai kampai) per room. For 13 rooms × ~24m/room = 312m. But rangovo gets 580m. Likely rangovo also includes:
+2. **V8 undercounts kampai by 34%** — formula gap. Rangovo gets 580m for ~205m² apartment. CLAUDE.md formula says: perimetras (lubų periferija) + 4×H (vidiniai kampai) per room. For 13 rooms × ~24m/room = 312m. But Rangovo gets 580m. Likely Rangovo also includes:
    - Išoriniai kampai (kolonos, atsikišimai, L-formų išorė)
    - Angokraščių dažymo kampai (per durų reveal)
    - Lubos/sienos sandūra (lubų periferija KIEKVIENAM kambariui)
    - Plus GKP nišų išoriniai kampai
 
-3. **V8 undercounts plytelės sienos** — rangovo lists separately by tile size (1200×1200×6 = 157m², 1200×600×9 = 52m², didžiaformatės = 7.52m²). V8 just gives 87.2m² aggregate. Pipeline should report by TILE SIZE (from brėžinio plytelių specifikacija ar wall-development legendos).
+3. **V8 undercounts plytelės sienos** — Rangovo lists separately by tile size (1200×1200×6 = 157m², 1200×600×9 = 52m², didžiaformatės = 7.52m²). V8 just gives 87.2m² aggregate. Pipeline should report by TILE SIZE (from brėžinio plytelių specifikacija ar wall-development legendos).
 
-4. **rangovo includes positions V8 doesn't think about:**
+4. **Rangovo includes positions V8 doesn't think about:**
    - Lubos virš 3m aukščio (atskira pozicija — kitokia kaina)
    - Skylių gręžimas plytelėse (109 vnt — kiekvienam santechnikos prijungimui, lentynai, kabykloi)
    - Kampų silikonavimas (vonia perimetrai prie grindų ir lubų)
@@ -105,7 +105,7 @@ Out of interior-takeoff scope (HVAC + plumbing). Mūsų pipeline'as šiuos skyri
 
 5. **Granularity rule**: jei brėžinyje matoma SPECIFIKACIJA (pvz. plytelės 1200×1200, 1200×600), output'e turi pasirodyti atskiros pozicijos. Universal pipeline'as neaproksimuoja, jei specifika brėžinyje yra.
 
-6. **Hidroizoliacija** — rangovo skaičiuoja 3 vnt (vonia + WC + dušas). Mūsų pipeline turi išvardinti `hidroizoliacijos_vnt` per kambarį pagal paskirtis (vonia/wc/skalbykla/dušo zonos).
+6. **Hidroizoliacija** — Rangovo skaičiuoja 3 vnt (vonia + WC + dušas). Mūsų pipeline turi išvardinti `hidroizoliacijos_vnt` per kambarį pagal paskirtis (vonia/wc/skalbykla/dušo zonos).
 
 ## What this means for the Phase 1 prompt
 
@@ -121,7 +121,7 @@ This gives the user a **kiekių žiniaraštis** structure that maps cleanly to t
 
 ---
 
-# Cross-validation: rangovo P3
+# Cross-validation: Rangovo P3
 
 P3 pasiulymas (2026-01-15, "Naujos statybos namas Romainiuose", rangovas Rangovas A) has a DIFFERENT structure — only **1 skyrius** "Sienų lubų glaistymas dažymas" with 15 positions. This shows: pipeline must adapt to PROJECT SCOPE, not force a 5-skyrius structure.
 
@@ -134,10 +134,10 @@ P3 positions (NOT in P1) — broadens the universal vocabulary:
 - Different paint products separately ("Benjamin Moore", "Supreme Ultimate") — premium tier separation
 
 P3 vs V8 comparison — V8 over-estimates here:
-- V8 dažymas P3 = 734.6 m² | rangovo total dažymas P3 = 95 + 139.79 + 250.95 + 134.79 + 29.34 = 649.87 m² | V8 +13%
-- V8 kampai P3 = 583.66 m | rangovo P3 = 329.77 m | **V8 +77%** (opposite direction from P1!)
+- V8 dažymas P3 = 734.6 m² | Rangovo total dažymas P3 = 95 + 139.79 + 250.95 + 134.79 + 29.34 = 649.87 m² | V8 +13%
+- V8 kampai P3 = 583.66 m | Rangovo P3 = 329.77 m | **V8 +77%** (opposite direction from P1!)
 
-So V8 is unstable across projects — sometimes under, sometimes over. Different formula interpretations between V8 and rangovo, not a consistent bias.
+So V8 is unstable across projects — sometimes under, sometimes over. Different formula interpretations between V8 and Rangovo, not a consistent bias.
 
 # Universal LT position vocabulary (confirmed across P1+P3)
 
@@ -164,7 +164,7 @@ These positions appear in LT contractor pasiulymai for residential interior work
 - Durų varčios dažymas (vnt)
 - Angokraščių glaistymas/dažymas (b/m)
 - Moldingų dažymas (bv/m)
-- **Dažymo kampų montavimas** (m) — universal, big variance across V8 vs rangovo
+- **Dažymo kampų montavimas** (m) — universal, big variance across V8 vs Rangovo
 - LED profilių apdirbimas (m)
 - Šviestuvų apdirbimas (vnt)
 - Difuzorių apdirbimas (vnt, apvalūs/plyšiniai separately)

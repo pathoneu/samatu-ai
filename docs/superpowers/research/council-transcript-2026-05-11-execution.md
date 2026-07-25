@@ -27,15 +27,15 @@ Three fatal flaws in the implied plan:
 
 **2. "Write test_universal_math.py W1" is the wrong yardstick if you skip the gap.** `universal_rules.py:553` adds +10% waste inline to grindjuostės — but CLAUDE.md §1.4 says +10% on baseboard, +5% on cornice. Are these two computed in one place or split? You don't know yet. Before writing the test file, grep for every `* 1.05`, `* 1.10`, `* 1.08` constant — your unit tests will lock in whatever's currently wrong if you assert against current outputs instead of CLAUDE.md numbers.
 
-**3. "5 rangovas PDFs = customer-call substitute" — dangerous framing.** Batch-testing reveals bug distribution, not willingness to pay or which bugs block trust. Spending W1 hunting bugs across 5 PDFs without re-pinging the contractor who promised to test is procrastination dressed as rigor. W1 acceptance criterion must include: "contractor X re-engaged with prod link."
+**3. "5 Rangovas PDFs = customer-call substitute" — dangerous framing.** Batch-testing reveals bug distribution, not willingness to pay or which bugs block trust. Spending W1 hunting bugs across 5 PDFs without re-pinging the contractor who promised to test is procrastination dressed as rigor. W1 acceptance criterion must include: "contractor X re-engaged with prod link."
 
-**Risk if ignored:** W4 ends with a green test suite, a clean `_total` audit, 5 perfect rangovas reproductions — and zero users.
+**Risk if ignored:** W4 ends with a green test suite, a clean `_total` audit, 5 perfect Rangovas reproductions — and zero users.
 
 ### The First Principles Thinker (Response B)
 
 Three separate problems hiding in one ask: (1) **Math correctness** — does `calc_room_quantities` faithfully implement CLAUDE.md §1? Answerable today, pure unit tests. (2) **Vision input correctness** — does the model extract the right rooms/dimensions/openings from a drawing? Needs hand-GT, probabilistic. (3) **Bugs blocking confidence** (lubų >3m, stale project cards) — felt-pain items from your own first prod test. These three have different feedback loops. Bundling them is the trap.
 
-The real W1 question — and the one the user must answer before any plan is written: *if no contractor calls back for 4 weeks, what evidence in W1 would convince you the app is closer to shippable?* If the answer is "math is provably right" → write `test_universal_math.py` against §1, full stop. If "Vision reads p1 of rangovas-1 correctly" → hand-extract GT from ONE PDF and diff. Don't batch 5. If "I trust the demo I'd give a contractor tomorrow" → fix the two bugs, ignore accuracy.
+The real W1 question — and the one the user must answer before any plan is written: *if no contractor calls back for 4 weeks, what evidence in W1 would convince you the app is closer to shippable?* If the answer is "math is provably right" → write `test_universal_math.py` against §1, full stop. If "Vision reads p1 of Rangovas-1 correctly" → hand-extract GT from ONE PDF and diff. Don't batch 5. If "I trust the demo I'd give a contractor tomorrow" → fix the two bugs, ignore accuracy.
 
 My vote: (b) unit tests first, because math bugs invalidate every Vision measurement above them. But the user must own this choice — not the council.
 
@@ -44,7 +44,7 @@ My vote: (b) unit tests first, because math bugs invalidate every Vision measure
 Upside lives inside the four artifacts you're already building.
 
 1. **The 5-PDF W1 batch test is a bug-class detector, not a pass/fail.** Bucket failures by class (scale misread / opening-deduction / per-room ceiling / wall-thickness default). One root-cause class probably owns 40%+ of EUR variance. Fix the class, not the symptom.
-2. **`test_universal_math.py` is the compounding asset.** Each new PDF gets its drawing-printed dimensions frozen as fixtures. By W4 the file becomes your only honest accuracy number — replaces the EUR-rangovas benchmark you killed. Future Vision-prompt tweaks become a 30-second pytest. 2× speedup.
+2. **`test_universal_math.py` is the compounding asset.** Each new PDF gets its drawing-printed dimensions frozen as fixtures. By W4 the file becomes your only honest accuracy number — replaces the EUR-Rangovas benchmark you killed. Future Vision-prompt tweaks become a 30-second pytest. 2× speedup.
 3. **The `vision_call.py:1100` boundary fix is a prompt-tuning unlock.** Once that layer is clean, you can A/B prompts deterministically against the fixture set from #2.
 4. **Wow-before-contractor (ship by W2):** confidence-annotated quantities with the source dimension shown inline. "Lubų aukštis: 3.20 m 🟢 (read from pjūvis p.4)". CLAUDE.md §7 already specifies this. Bigger "wow" than +10% accuracy he can't verify.
 
@@ -56,7 +56,7 @@ You are planning four weeks of engineering for an app with zero paying users. Th
 
 The 4-week plan is procrastination dressed as rigor. Hour-by-hour W1, contingent branches W2-W4, `[RESEARCH]` tags, risk register — this is the comfort of pretending engineering is the bottleneck. It isn't. The bottleneck is one human running one real PDF and telling you what hurt.
 
-Real plan, one page: Today/tomorrow fix the two known bugs, deploy. This week drive to that contractor, sit beside him, watch him quote one job. Record it. The next 3 weeks write themselves from what you saw. The 5 rangovas PDFs are not a customer substitute. They are rangovas.
+Real plan, one page: Today/tomorrow fix the two known bugs, deploy. This week drive to that contractor, sit beside him, watch him quote one job. Record it. The next 3 weeks write themselves from what you saw. The 5 Rangovas PDFs are not a customer substitute. They are Rangovas.
 
 Friday deliverable: 90-second screen recording of his own PDF being quoted, sent to his WhatsApp. Burn the 4-week plan. Book the visit.
 
@@ -71,24 +71,24 @@ Friday deliverable: 90-second screen recording of his own PDF being quoted, sent
 - **15:00–16:00** Fix stale cards. `frontend/src/pages/Dashboard.jsx:24` — change useEffect to also re-pull on window focus + `useQuery` `refetchOnWindowFocus: true`.
 - **16:00–17:00** Fix boundary violation `vision_call.py:1100`. Move the loop INTO `universal_rules._build_pozicijos_from_rooms`. Run test suite.
 
-**W1 Tue–Fri:** Tue run benchmark on all 5 rangovas PDFs, diff vs drawing-printed dimensions, categorize errors by formula. Wed fix top-3 categories in `universal_rules.py` only. Thu visual diff tool. Fri tag `w1-baseline`.
+**W1 Tue–Fri:** Tue run benchmark on all 5 Rangovas PDFs, diff vs drawing-printed dimensions, categorize errors by formula. Wed fix top-3 categories in `universal_rules.py` only. Thu visual diff tool. Fri tag `w1-baseline`.
 
 **W2-W4 contingent branches:**
 - **Branch A — Vision wrong > formulas:** if >40% errors are bad Vision input. W2 typed Pydantic schema at boundary; W3 split `vision_call.py`; W4 prompt iteration with golden-set regression.
 - **Branch B — Formulas wrong > Vision:** if >40% errors are formula bugs. W2 expand tests to 40; W3 implement missing CLAUDE.md §1 items (hidroizoliacija, Q4 sanding, LED juostos); W4 cross-page validator improvements.
-- **Branch C — Both ~equal:** ship count-correction UI per CLAUDE.md "Open/next". W2 inline-edit any quantity row with provenance pinning; W3 persist corrections to `data/corrections/`; W4 dogfood rangovas PDF #4+#5.
+- **Branch C — Both ~equal:** ship count-correction UI per CLAUDE.md "Open/next". W2 inline-edit any quantity row with provenance pinning; W3 persist corrections to `data/corrections/`; W4 dogfood Rangovas PDF #4+#5.
 
 **Trigger rule:** W1 Friday EOD count errors per category, pick branch by majority.
 
 **[RESEARCH] items:**
 1. Page classifier reliability on p1 — read `backend/extractor/page_classifier.py`. Run on 5 PDFs page 1, log tipas. If p1 mis-tagged → height-marker scan misses it.
 2. Vision boundary surface area — `grep -n "parsed\[" backend/extractor/vision_call.py | wc -l`. Each aggregate Vision-side field is a candidate boundary violation.
-3. rangovas PDFs ground truth — hand-build `training-data/gt/projektas_N.yaml` from drawing-printed dimensions. ~2h work, replaces AI-seeded GT flagged in CLAUDE.md.
+3. Rangovas PDFs ground truth — hand-build `training-data/gt/projektas_N.yaml` from drawing-printed dimensions. ~2h work, replaces AI-seeded GT flagged in CLAUDE.md.
 4. `universal_rules.calc_room_quantities` coverage — map each function to CLAUDE.md §1 formula. Missing entries = W2 backlog.
 
 **Risk register:** vision_call.py regression HIGH (touch only prompt + L2247 threshold W1, no refactor until W3 with tag-revert plan); boundary fix breaks `_build_pozicijos_from_rooms` MED (snapshot test first); `refetchOnWindowFocus` price-edit thrash LOW (scope to Dashboard route); height-marker threshold 0.15 false override on Soviet 2.50m MED (asymmetric guard: only override when `cand_m > 2.95`); TDD pins wrong values LOW (cross-check each test against §1 line numbers in commit).
 
-**Substitutes for customer calls:** Drawing-printed dimensions oracle (all 5 rangovas PDFs have human-drawn `+2.800`, `+3.200`, `Plotas: 18.5 m²`). Cross-formula sanity per CLAUDE.md §6 (paintable/floor 2.5–4×, ceiling ≈ floor, baseboard ≈ perim − 0.8/door). Self-dogfood end-to-end Friday.
+**Substitutes for customer calls:** Drawing-printed dimensions oracle (all 5 Rangovas PDFs have human-drawn `+2.800`, `+3.200`, `Plotas: 18.5 m²`). Cross-formula sanity per CLAUDE.md §6 (paintable/floor 2.5–4×, ceiling ≈ floor, baseboard ≈ perim − 0.8/door). Self-dogfood end-to-end Friday.
 
 ---
 
@@ -120,7 +120,7 @@ D's specific line numbers are slightly off (425, 1851 — not 425/1831/1851) but
 
 1. **Strongest: D.** D is the only response that audited the actual code before answering. The `_total` grep (L425, 1831, 1851) means C's "fix L1100 only, don't touch vision_call.py" is dangerously wrong — partial fix regresses siblings. D's catch that `universal_rules.py:553` already hard-codes +10% on all baseboards (CLAUDE.md §1.4 says cornice is +5%) means E and C's "lock current values in tests" would freeze a bug as ground truth. D also reframes W1 success criterion correctly: re-engaged contractor > N bugs closed.
 2. **Biggest blind spot: A.** A is right that no-users-is-the-problem, but ignores that the user explicitly locked the premise: "no live user, contractor pending, MVP 1-2mo." A burns the question instead of answering it. Shipping bugs tonight on a `_total` boundary violation when D shows 3 sibling sites exist would brick the demo PDF mid-contractor-visit. Wrong order.
-3. **All missed:** None checked whether the 5 rangovas PDFs are representative of the *pending* contractor's drawing style. If pending contractor draws differently (different CAD, no +3.000 markers), W1 work optimizes for a dead benchmark.
+3. **All missed:** None checked whether the 5 Rangovas PDFs are representative of the *pending* contractor's drawing style. If pending contractor draws differently (different CAD, no +3.000 markers), W1 work optimizes for a dead benchmark.
 
 ### Reviewer 5
 

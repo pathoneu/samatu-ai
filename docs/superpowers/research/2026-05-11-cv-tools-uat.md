@@ -2,7 +2,7 @@
 
 **Status:** Draft, pending 5-user run
 **Date:** 2026-05-11
-**Owner:** product + first paying samatininkai (rangovas + 4 others)
+**Owner:** product + first paying samatininkai (Rangovas + 4 others)
 **Source:** Task 11 of `2026-05-10-drawing-analysis-tools.md`
 **Branch shipping the feature:** `week1-canonical-execution`
 
@@ -24,7 +24,7 @@ Both are gated behind `localStorage.setItem('samatu_experimental_tools', '1')`. 
 5 samatininkai, each working on a real LT interior project that has:
 - ≥1 floor plan page with ≥10 rozečių/jungiklių symbols
 - ≥1 room with a closed door (architectural ~6-12 px door gap)
-- Existing manual takeoff data we can compare against (we already have rangovo P1, P3 — reuse)
+- Existing manual takeoff data we can compare against (we already have Rangovo P1, P3 — reuse)
 
 Time per session: 30-45 min. Recorded screen + voice. We pay an honorarium so the session is reciprocal, not extractive.
 

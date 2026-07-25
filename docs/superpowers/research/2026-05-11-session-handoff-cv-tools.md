@@ -84,7 +84,7 @@ Full findings: `docs/superpowers/research/2026-05-11-cv-tools-real-world-limits.
 ## Open questions you'll need answered before deciding
 
 1. Is licensing a commercial CAD viewer ($20–100k/year) acceptable for current business model? (User is pre-revenue.)
-2. Do users actually need the drag-rect interaction, or is "click each marker individually" good enough? (rangovas pasiūlymai analysis would help.)
+2. Do users actually need the drag-rect interaction, or is "click each marker individually" good enough? (Rangovas pasiūlymai analysis would help.)
 3. Should V1 `/v9/symbols/detect` be deprecated entirely (broken + confusing alongside CV V2), or kept as a "best-effort" fallback?
 
 ---

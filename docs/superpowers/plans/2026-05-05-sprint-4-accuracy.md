@@ -1,6 +1,6 @@
 # Sprint 4 — Accuracy Through Pure Math
 
-> **Anchor:** Memory `feedback_tomo_reference_only.md` — rangovo is reference, NOT ground truth. Sprint 4 measures accuracy against the **drawing itself** (eksplikacija lentelė, dimensions, symbol counts) and **canonical LT formulas** (CLAUDE.md Section 1 + Section 6). NO rangovas comparison anywhere in this sprint.
+> **Anchor:** Memory `feedback_tomo_reference_only.md` — Rangovo is reference, NOT ground truth. Sprint 4 measures accuracy against the **drawing itself** (eksplikacija lentelė, dimensions, symbol counts) and **canonical LT formulas** (CLAUDE.md Section 1 + Section 6). NO Rangovas comparison anywhere in this sprint.
 
 **Goal:** Verify primitives match drawing source, formulas match CLAUDE.md, math sanity checks emit warnings on broken outputs. Activate `wall_adjacency` (Sprint 2 work) to fix grindjuostės double-count.
 

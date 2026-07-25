@@ -1,4 +1,4 @@
-# Phase 1 Review — 3-Way Comparison (V8 / New Pipeline / rangovas)
+# Phase 1 Review — 3-Way Comparison (V8 / New Pipeline / Rangovas)
 
 **Captured:** 2026-04-27
 **Pipeline:** Single Vision call, claude-opus-4-7, effort=high, 8k+ token system prompt with cache_control, schema-in-prompt + JSON repair fallback. Image-first ordering with page labels.
@@ -11,16 +11,16 @@
 |----|--------|-------|-----------|------------|----------|--------------------|------|
 | **P1** | V8 | 13 | 205.55 | 446.55 | 380.98 | 87.2 | 242.4 |
 | P1 | **New** | **15** | 180.0 | **478.76** | 353.7 | **162.48** | 225.3 |
-| P1 | rangovas | 13 | 205.55 | 424.75 | 580.54 | 157.34 | n/a |
+| P1 | Rangovas | 13 | 205.55 | 424.75 | 580.54 | 157.34 | n/a |
 | **P2** | V8 | **0** ❌ | 0 | 0 | 0 | 0 | 50.8 |
 | P2 | **New** | **6** ✅ | 95.0 | 292.57 | 216.53 | 1.74 | 110.0 |
-| P2 | rangovas | n/a | — | — | — | — | — |
+| P2 | Rangovas | n/a | — | — | — | — | — |
 | **P3** | V8 | 18 | 240.05 | 734.56 | 583.66 | 65.1 | 39.5 |
 | P3 | **New** | **21** | 267.71 | **819.46** | 491.0 | **208.4** | 266.4 |
-| P3 | rangovas | n/a | n/a | 649.87 | 329.77 | n/a | — |
+| P3 | Rangovas | n/a | n/a | 649.87 | 329.77 | n/a | — |
 | **P4** | V8 | 💥 SIGABRT | — | — | — | — | — |
 | P4 | **New** | **3** ✅ | 25.5 | 0 | 0 | 83.2 | 108.5 |
-| P4 | rangovas | n/a | — | — | — | — | — |
+| P4 | Rangovas | n/a | — | — | — | — | — |
 | **P5** | V8 | 0 | 0 | 0 | 0 | 0 | 20.5 |
 | P5 | **New** | 0 | 0 | 0 | 0 | 0 | 34.6 |
 
@@ -39,7 +39,7 @@ Per ACCURACY_GATE.md tolerances: rooms ±20%, bendras ±10%, dažymas ±15%, ply
 | P5 | 0 vs 0 | n/a | n/a | n/a | n/a | TIE (drawing has no floor plan) |
 
 **Plytelės differences explained:**
-- P1: V8 87.2, New 162.48, rangovas 157.34 → New is **+3% off rangovas** (excellent), V8 was -45% (under)
+- P1: V8 87.2, New 162.48, Rangovas 157.34 → New is **+3% off Rangovas** (excellent), V8 was -45% (under)
 - P3: V8 65.1, New 208.4 → New found tile zones V8 missed (likely from išklotinės pages)
 
 **Plotas differences:**
@@ -47,11 +47,11 @@ Per ACCURACY_GATE.md tolerances: rooms ±20%, bendras ±10%, dažymas ±15%, ply
 - P3: V8 240.05, New 267.71 (+11.5%, just over ±10% gate) → minor over-estimate
 
 **Kampai across P1, P3:**
-Both V8 and New pipeline UNDER-count vs rangovas. This is a SYSTEMATIC issue:
-- P1: New 353.7 vs rangovas 580.54 (-39%)
-- P3: New 491.0 vs rangovas 329.77 (+49%)
+Both V8 and New pipeline UNDER-count vs Rangovas. This is a SYSTEMATIC issue:
+- P1: New 353.7 vs Rangovas 580.54 (-39%)
+- P3: New 491.0 vs Rangovas 329.77 (+49%)
 
-rangovas's kampai count varies project-to-project. Likely rangovas includes additional corner work (e.g. išorinės kolonų briaunos, balcony reveals, decorative cornice corners) that universal formula doesn't capture from drawings alone. **NOT a refactor blocker** — universal formula matches industry standard; rangovas-specific can be added as personalization later.
+Rangovas's kampai count varies project-to-project. Likely Rangovas includes additional corner work (e.g. išorinės kolonų briaunos, balcony reveals, decorative cornice corners) that universal formula doesn't capture from drawings alone. **NOT a refactor blocker** — universal formula matches industry standard; Rangovas-specific can be added as personalization later.
 
 ---
 
@@ -76,7 +76,7 @@ Per `ACCURACY_GATE.md`:
 - P5: TIE — neither pipeline can extract from a PDF without floor plans (data limitation, not pipeline)
 
 **Notable wins beyond accuracy:**
-- New pipeline produces **`pozicijos`** array (44 for P3, 42 for P1, 20 for P2/P4) — flat kiekių žiniaraštis organized by rangovo-style skyriai
+- New pipeline produces **`pozicijos`** array (44 for P3, 42 for P1, 20 for P2/P4) — flat kiekių žiniaraštis organized by Rangovo-style skyriai
 - **`calculation_trace`** per room — auditable formula derivation
 - **`confidence`** per room — explicit uncertainty
 - **No SIGABRT crashes** — single Vision call removes V8/V9 architectural fragility
@@ -139,5 +139,5 @@ The new architecture (1 Vision call + cached system prompt + LT-grounded compreh
 
 Open issues to address in Phase 2/3:
 - P5: drawing without floor plan — pipeline limitation (data, not architecture)
-- Kampai under-count vs rangovas (-39%) — needs prompt iteration on outer corners + reveals + L-shape detection. Personalization-tier issue, not a blocker.
+- Kampai under-count vs Rangovas (-39%) — needs prompt iteration on outer corners + reveals + L-shape detection. Personalization-tier issue, not a blocker.
 - P4 dažymas=0 — only had wall_elevation pages; would benefit from floor plan in same upload.

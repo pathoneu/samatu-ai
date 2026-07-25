@@ -1,7 +1,7 @@
 {
   "currency": "EUR",
   "vat_mode": "be_pvm",
-  "_source": "rangovas P2-P5 invoice audit (Kaunas mid-market) + R4 council research 2026-05-10",
+  "_source": "Rangovas P2-P5 invoice audit (Kaunas mid-market) + R4 council research 2026-05-10",
   "weights": {
     "glaistymas_dazymas_bundle": 0.30,
     "plyteles_sienos_m2": 0.10,

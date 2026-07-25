@@ -61,7 +61,7 @@
 
 <section class="block">
   <h2 style="color: var(--ink);">Klausimas</h2>
-  <p>Pateikite konkretų 4-savaičių EXECUTABLE planą su failais, funkcijomis, testais, acceptance criteria, <code>[RESEARCH]</code> items, ir risk register'iu. Prior decisions locked: CV V2 unwired (Option F), EUR-rangovas benchmark killed, universal math + drawing-printed dims = GT. Live prod user nepasiekiamas (rangovas pending). Bug'ai: lubų >3m p1, stale localStorage cards. Vision/Python boundary violation prie <code>vision_call.py:1100</code>. <code>test_universal_math.py</code> neegzistuoja. 5 rangovas PDFs available.</p>
+  <p>Pateikite konkretų 4-savaičių EXECUTABLE planą su failais, funkcijomis, testais, acceptance criteria, <code>[RESEARCH]</code> items, ir risk register'iu. Prior decisions locked: CV V2 unwired (Option F), EUR-Rangovas benchmark killed, universal math + drawing-printed dims = GT. Live prod user nepasiekiamas (rangovas pending). Bug'ai: lubų >3m p1, stale localStorage cards. Vision/Python boundary violation prie <code>vision_call.py:1100</code>. <code>test_universal_math.py</code> neegzistuoja. 5 Rangovas PDFs available.</p>
 </section>
 
 <section class="block verdict">
@@ -88,7 +88,7 @@
   <ul>
     <li><strong>Branch state contradiction</strong> — <code>data/corrections/</code> + <code>data/legends/</code> untracked, contradicts "Option F locked" claim. Reviewer 1 catch. Action: <code>git status</code> + add to .gitignore or stage explicitly before W1 starts.</li>
     <li><strong>Lubų >3m bug needs DIAGNOSIS, not assumed prompt fix.</strong> Reviewer 2 catch — nobody ran the failing PDF through pipeline to see WHERE 2.5m default wins. May be page-classifier issue, not prompt issue. Instrument first.</li>
-    <li><strong>rangovas PDFs may not be representative of pending contractor's CAD style.</strong> Reviewer 4 catch. Mitigation: assume nothing about contractor's PDF; design W1 fixes against drawing-printed dimensions (universal), not rangovas-specific quirks.</li>
+    <li><strong>Rangovas PDFs may not be representative of pending contractor's CAD style.</strong> Reviewer 4 catch. Mitigation: assume nothing about contractor's PDF; design W1 fixes against drawing-printed dimensions (universal), not Rangovas-specific quirks.</li>
     <li><strong><code>build_ground_truth.py</code> flow exists but nobody runs it.</strong> Reviewer 5 catch (CLAUDE.md "Open/next" §). Highest-leverage W1 item per project's own documentation.</li>
     <li><strong>Constants audit must precede TDD or tests calcify bugs.</strong> D R1 + 2 reviewers. Cornice missing from <code>calc_room_quantities</code>; +10%/+5% split per CLAUDE.md §1.4.</li>
   </ul>
@@ -121,23 +121,23 @@
   <p><strong>Day 4-5 (Ketv-Penkt) — Boundary pattern fix (only after audit)</strong></p>
   <ul>
     <li>Per Day 1 audit's 26-site inventory, refactor the boundary as a PATTERN: Vision returns ONLY raw geometric primitives (room perim, ceiling height, opening dims, kambario polygon), Python aggregates in <code>universal_rules.calc_room_quantities</code> or <code>_build_pozicijos_from_rooms</code>. <strong>Don't touch all 26 sites at once</strong> — pick 3-5 highest-EUR-impact (rough heuristic: ones that feed pozicijos with prices), fix as one PR, verify all tests pass, commit, then next batch. Use feature branch.</li>
-    <li>Run 5-rangovas batch end of W1 as Branch trigger detection (Executor R1). Categorize errors. Tag <code>w1-baseline</code>.</li>
+    <li>Run 5-Rangovas batch end of W1 as Branch trigger detection (Executor R1). Categorize errors. Tag <code>w1-baseline</code>.</li>
   </ul>
 
   <h3 style="color: var(--accent);">W2-W4 contingent branches</h3>
   <ul>
-    <li><strong>Branch A (Vision wrong > formulas):</strong> if W1 5-rangovas batch shows >40% errors from bad Vision inputs. W2 typed Pydantic schema at vision/python boundary; W3 split <code>vision_call.py</code> by extracting <code>_build_pozicijos_*</code>; W4 prompt iteration with golden-set regression.</li>
+    <li><strong>Branch A (Vision wrong > formulas):</strong> if W1 5-Rangovas batch shows >40% errors from bad Vision inputs. W2 typed Pydantic schema at vision/python boundary; W3 split <code>vision_call.py</code> by extracting <code>_build_pozicijos_*</code>; W4 prompt iteration with golden-set regression.</li>
     <li><strong>Branch B (Formulas wrong > Vision):</strong> if >40% errors are formula bugs. W2 expand <code>test_universal_math.py</code> to 40 tests; W3 implement missing §1 items (cornice +5%, hidroizoliacija full coverage, Q4 sanding, LED juostos); W4 cross-page validator improvements.</li>
-    <li><strong>Branch C (Both ~equal) — Wow-by-W2 (Expansionist R1):</strong> ship confidence-annotated quantities with source dimension inline ("Lubų: 3.20 m 🟢 from pjūvis p.4") per CLAUDE.md §7. Plus inline-edit count-correction UI from CLAUDE.md "Open/next". W2 UI; W3 persist corrections to <code>data/corrections/</code>; W4 dogfood rangovas PDF #4+#5.</li>
+    <li><strong>Branch C (Both ~equal) — Wow-by-W2 (Expansionist R1):</strong> ship confidence-annotated quantities with source dimension inline ("Lubų: 3.20 m 🟢 from pjūvis p.4") per CLAUDE.md §7. Plus inline-edit count-correction UI from CLAUDE.md "Open/next". W2 UI; W3 persist corrections to <code>data/corrections/</code>; W4 dogfood Rangovas PDF #4+#5.</li>
   </ul>
 
   <h3 style="color: var(--accent);"><code>[RESEARCH]</code> items</h3>
   <ol>
-    <li><strong>Page classifier reliability on p1.</strong> Read <code>backend/extractor/page_classifier.py</code>. Run on 5 rangovas PDFs, log classification per p1. If p1 ever mis-tagged, height-marker scan misses it.</li>
+    <li><strong>Page classifier reliability on p1.</strong> Read <code>backend/extractor/page_classifier.py</code>. Run on 5 Rangovas PDFs, log classification per p1. If p1 ever mis-tagged, height-marker scan misses it.</li>
     <li><strong>Vision boundary surface area inventory.</strong> Done in W1 Day 1 audit; output is <code>reports/2026-05-11-total-audit.md</code>.</li>
     <li><strong>Constants audit vs CLAUDE.md §1.</strong> Done in W1 Day 1 audit.</li>
-    <li><strong>Hand-build drawing-printed GT for 5 rangovas PDFs.</strong> ~2h work. Output: <code>training-data/gt/projektas_N.yaml</code> with every dimension stamped on the drawing (lubų aukštis, kambario plotas, langų matmenys). REPLACES AI-seeded GT flagged in CLAUDE.md "Open/next".</li>
-    <li><strong>Pending contractor's CAD style sample.</strong> If/when contractor sends test PDF, add to corpus and verify W1 fixes still hold. Risk per Reviewer 4: he may draw differently than rangovas.</li>
+    <li><strong>Hand-build drawing-printed GT for 5 Rangovas PDFs.</strong> ~2h work. Output: <code>training-data/gt/projektas_N.yaml</code> with every dimension stamped on the drawing (lubų aukštis, kambario plotas, langų matmenys). REPLACES AI-seeded GT flagged in CLAUDE.md "Open/next".</li>
+    <li><strong>Pending contractor's CAD style sample.</strong> If/when contractor sends test PDF, add to corpus and verify W1 fixes still hold. Risk per Reviewer 4: he may draw differently than Rangovas.</li>
     <li><strong>Branch state cleanup.</strong> <code>data/corrections/</code> and <code>data/legends/</code> untracked — decide stage or gitignore. Per Reviewer 1.</li>
   </ol>
 
@@ -147,7 +147,7 @@
     <tr><td><code>vision_call.py</code> 2732 LOC regression on boundary refactor</td><td>HIGH</td><td>Audit-first (W1 Day 1); batch-3-to-5 sites per PR; tests must pass before next batch; feature branch with revert plan</td></tr>
     <tr><td>TDD tests calcify wrong values</td><td>HIGH</td><td>Each test cites CLAUDE.md §1.X line; <code>@pytest.mark.xfail</code> for known bugs with reason</td></tr>
     <tr><td>Lubų prompt fix breaks Soviet 2.50m default</td><td>MED</td><td>Asymmetric guard: only override when <code>cand_m > 2.95</code></td></tr>
-    <tr><td>5-rangovas batch result doesn't transfer to pending contractor's CAD</td><td>MED</td><td>Design fixes against drawing-printed dims (universal), not rangovas-specific quirks</td></tr>
+    <tr><td>5-Rangovas batch result doesn't transfer to pending contractor's CAD</td><td>MED</td><td>Design fixes against drawing-printed dims (universal), not Rangovas-specific quirks</td></tr>
     <tr><td><code>refetchOnWindowFocus</code> price-edit thrash</td><td>LOW</td><td>Scope to Dashboard route only; ProjectMainView has separate scan logic per comment</td></tr>
     <tr><td>Branch state confusion (uncommitted CV files)</td><td>LOW</td><td>Day 1 first task: <code>git status</code> + decide</td></tr>
   </table>
@@ -164,7 +164,7 @@
     <tr><td>Audit BEFORE fix?</td><td><strong style="color: var(--emerald)">YES</strong></td><td>partial</td><td>no</td><td>no</td><td>no (jumps to fix)</td></tr>
     <tr><td>L1100 boundary fix Monday?</td><td><strong style="color: var(--red)">NO — 26 sites</strong></td><td>defer</td><td>W3</td><td>tonight</td><td><strong style="color: var(--red)">YES (wrong)</strong></td></tr>
     <tr><td>TDD test_universal_math.py W1?</td><td>only after constants audit</td><td>YES, primary</td><td>YES, compounding asset</td><td>bureaucracy</td><td>Monday morning</td></tr>
-    <tr><td>5-rangovas as customer substitute?</td><td>partial; AC must include contractor re-engagement</td><td>1 PDF deep > 5 shallow</td><td>bug-class detector</td><td><strong style="color: var(--red)">NO</strong></td><td>yes (Tue-Fri)</td></tr>
+    <tr><td>5-Rangovas as customer substitute?</td><td>partial; AC must include contractor re-engagement</td><td>1 PDF deep > 5 shallow</td><td>bug-class detector</td><td><strong style="color: var(--red)">NO</strong></td><td>yes (Tue-Fri)</td></tr>
     <tr><td>Wow-by-W2 feature?</td><td>not addressed</td><td>not addressed</td><td><strong style="color: var(--emerald)">confidence-annotated quantities</strong></td><td>90-sec WhatsApp demo</td><td>not addressed</td></tr>
   </table>
 </section>
@@ -176,8 +176,8 @@
     <summary><span class="role">Contrarian</span> 26 <code>_total"</code> sites, not 1; constants audit BEFORE tests; contractor re-engaged = W1 AC <span class="strongest tag">peer-pick: STRONGEST (4/5)</span></summary>
     <p>(1) "Vision/Python boundary at vision_call.py:1100" is mis-scoped. Grepped: <code>angokrasciu_gkp_m_total</code> appears at L425, L1831, L1851. Pattern is "Vision returns _total aggregate, Python re-derives." Single-site fix regresses two. Audit grep entire 2732 LOC first.</p>
     <p>(2) "Write test_universal_math.py W1" — wrong if you skip the gap. <code>universal_rules.py:553</code> +10% inline; CLAUDE.md §1.4 splits 10% baseboard / 5% cornice. Tests will lock current wrong values. Audit constants first.</p>
-    <p>(3) "5 rangovas = customer substitute" — dangerous framing. Batch reveals bug distribution, not WTP. W1 AC must include "contractor X re-engaged with prod link."</p>
-    <p><strong>Risk if ignored:</strong> W4 ends with green tests, clean audit, 5 perfect rangovas reproductions — and zero users.</p>
+    <p>(3) "5 Rangovas = customer substitute" — dangerous framing. Batch reveals bug distribution, not WTP. W1 AC must include "contractor X re-engaged with prod link."</p>
+    <p><strong>Risk if ignored:</strong> W4 ends with green tests, clean audit, 5 perfect Rangovas reproductions — and zero users.</p>
   </details>
 
   <details>
@@ -185,7 +185,7 @@
     <p>Math correctness, Vision input correctness, confidence-blocking bugs — three different feedback loops, time-to-truth, ROI. Bundling is the trap.</p>
     <p>Real W1 question: <em>if no contractor calls back for 4 weeks, what evidence in W1 would convince you the app is closer to shippable?</em></p>
     <p>(a) "math is provably right" → write test_universal_math.py against §1.<br>
-       (b) "Vision reads p1 of rangovas-1 correctly" → hand-extract GT from ONE PDF and diff.<br>
+       (b) "Vision reads p1 of Rangovas-1 correctly" → hand-extract GT from ONE PDF and diff.<br>
        (c) "I trust the demo" → fix two bugs, ignore accuracy.</p>
     <p>Vote: (a) unit tests first. Math bugs invalidate every Vision measurement above them.</p>
   </details>
@@ -207,7 +207,7 @@
 
   <details>
     <summary><span class="role">Executor</span> Hour-by-hour Monday + Branch A/B/C contingent + risk register <span class="blindspot tag">peer-pick: BLIND SPOT (2/5)</span></summary>
-    <p>Full hour-by-hour Monday plan covering TDD test_universal_math.py first, lubų >3m prompt fix with threshold 0.15, Dashboard.jsx:24 refetchOnWindowFocus, vision_call.py:1100 boundary move. Tue-Fri 5-rangovas batch + visual diff + tag w1-baseline. W2-W4 Branch A (Vision wrong)/B (formulas wrong)/C (count-correction UI).</p>
+    <p>Full hour-by-hour Monday plan covering TDD test_universal_math.py first, lubų >3m prompt fix with threshold 0.15, Dashboard.jsx:24 refetchOnWindowFocus, vision_call.py:1100 boundary move. Tue-Fri 5-Rangovas batch + visual diff + tag w1-baseline. W2-W4 Branch A (Vision wrong)/B (formulas wrong)/C (count-correction UI).</p>
     <p><em>Chairman: plan structure is excellent, targets are wrong. C jumps to L1100 fix before D's audit reveals 26 sites; TDD-RED-first against current output (not §1 spec) calcifies bugs. Adopted with modifications.</em></p>
   </details>
 </section>
@@ -223,7 +223,7 @@
     <ul>
       <li>Branch state: uncommitted <code>data/corrections/</code> + <code>data/legends/</code> contradict "Option F locked"</li>
       <li>Lubų >3m needs DIAGNOSIS, not assumed prompt fix</li>
-      <li>5 rangovas PDFs may not represent pending contractor's CAD style</li>
+      <li>5 Rangovas PDFs may not represent pending contractor's CAD style</li>
       <li><code>build_ground_truth.py</code> flow exists but unused (CLAUDE.md "Open/next" #1)</li>
       <li>Constants audit must precede TDD</li>
     </ul>

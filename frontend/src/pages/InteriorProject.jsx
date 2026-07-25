@@ -395,7 +395,7 @@ function RoomCard({ room }) {
   );
 }
 
-// ── Detalus darbų sąrašas (rangovo-stiliaus sąmatos pozicijos) ───────────────────
+// ── Detalus darbų sąrašas (Rangovo-stiliaus sąmatos pozicijos) ───────────────────
 
 // Merge the user's manual edits onto a freshly-rebuilt darbu_sarasas (matched by
 // aprasymas), mirroring the backend _merge_user_edits. Preserves: entered prices
@@ -1260,7 +1260,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             )}
           </div>
 
-          {/* ── Detalus darbų sąrašas (visos rangovo-stiliaus pozicijos) ──── */}
+          {/* ── Detalus darbų sąrašas (visos Rangovo-stiliaus pozicijos) ──── */}
           <DarbuSarasas items={project.darbu_sarasas || []} />
 
           {/* ── Additional materials ──────────────────────────────────────── */}

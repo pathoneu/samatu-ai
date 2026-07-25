@@ -1,4 +1,4 @@
-"""Ištraukia VISAS 5 rangovo sąmatų eilutes per pdfplumber lentelių parser'į.
+"""Ištraukia VISAS 5 Rangovo sąmatų eilutes per pdfplumber lentelių parser'į.
 
 Output: backend/training-data/parsed_pasiulymai.json
 """

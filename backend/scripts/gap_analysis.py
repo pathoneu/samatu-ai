@@ -1,5 +1,5 @@
 """
-GAP analizė — kurios pozicijos per visus 5 rangovo sąmatų projektus,
+GAP analizė — kurios pozicijos per visus 5 Rangovo sąmatų projektus,
 koks kiekio range, ar V8 grąžina tą pozicija.
 
 Output: backend/training-data/gap_analysis.md (markdown lentelė)
@@ -139,7 +139,7 @@ def main():
     }
 
     # Markdown output
-    out_lines = ["# Gap Analizė — rangovo sąmatos vs V8\n",
+    out_lines = ["# Gap Analizė — Rangovo sąmatos vs V8\n",
                  "**Šaltinis:** `training-data/parsed_pasiulymai.json` (5 projektai, ~242 eilutės)\n",
                  "## Per projektus\n"]
 

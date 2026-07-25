@@ -1,7 +1,7 @@
-# rangovas Coverage Analysis — Follow-up after 5 Audit Additions
+# Rangovas Coverage Analysis — Follow-up after 5 Audit Additions
 
 > **Date**: 2026-04-29
-> **Trigger**: Verify ROI of 5 rangovas audit additions made earlier same day
+> **Trigger**: Verify ROI of 5 Rangovas audit additions made earlier same day
 
 ## Executive Summary
 
@@ -15,18 +15,18 @@ All 5 items from 2026-04-29 audit additions are now COVERED in code (100% presen
 
 ## Coverage by Project (line-item count)
 
-| Project | rangovas Items | Our Matches | Coverage % |
+| Project | Rangovas Items | Our Matches | Coverage % |
 |---------|------------|---|---|
 | P1      | 113 | 19 | 16.8% |
 | P3      | 15  | 5  | 33.3% |
 | P5      | 50  | 22 | 44.0% |
 | **Average** | - | - | **31.4%** |
 
-**Critical context**: Numbers look low because we count individual line items (incl. material SKUs, tile sizes, product names). rangovas writes one line per material variant; we generate templates.
+**Critical context**: Numbers look low because we count individual line items (incl. material SKUs, tile sizes, product names). Rangovas writes one line per material variant; we generate templates.
 
 By **labor category** coverage: **~85% solid for standard LT residential**. We cover all major skyriai (Sienų lubų glaistymas dažymas, GKP montavimas, Plytelių klijavimas, Hidroizoliacija, Grindys, Santechnikos, Elektros, Pridėtiniai). Gaps are configuration depth, not category coverage.
 
-## Top 5 New Gaps (by recurrence in rangovas's portfolio)
+## Top 5 New Gaps (by recurrence in Rangovas's portfolio)
 
 | # | Gap | Affected projects | Effort to add |
 |---|-----|---|---|

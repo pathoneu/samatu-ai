@@ -3,14 +3,14 @@
 **Question (raw):** pasiziurekit kodus, pasiziurekit kaip kas skaiciuojama, stress-testinkit vienas kita iki tol, kol grisite su tiksliu planu kaip improvinti accuracy projektu analizeje.
 
 **Updated context (mid-debate):**
-- CONSTRAINT 1 — rangovas ≠ 100% ground truth (each LT contractor calculates differently). Yardstick must be universal math (RICS NRM2 + DIN + LT STR + CLAUDE.md §1), not rangovas. Parsed rangovas (242 lines, ~168k EUR, 5 projects) is *reference corpus* only.
+- CONSTRAINT 1 — Rangovas ≠ 100% ground truth (each LT contractor calculates differently). Yardstick must be universal math (RICS NRM2 + DIN + LT STR + CLAUDE.md §1), not Rangovas. Parsed Rangovas (242 lines, ~168k EUR, 5 projects) is *reference corpus* only.
 - CONSTRAINT 2 — Parallel council already decided Option F (no-CV MVP). Focus: prod bugs (lubų >3m, stale cards) + customer discovery (3–5 builders) + inline-number hypothesis. Per `2026-05-11-council-cv-strategy-decision.md`.
 
 **Repository signals fed to all advisors:**
 - Vision pipeline `vision_call.py` 2732 LOC, prompt v3, mature
 - `universal_rules.calc_room_quantities` + `_build_pozicijos_from_rooms` exist
 - 2026-04-28 priorities partly shipped: grindjuostės cap @ 0.65, angokrasciai_m, pasleptu_duru_staktu_m
-- `backend/extractor/benchmark/eur_weighted.py` + `lt_unit_prices.json` scaffolded; prices rangovas-derived
+- `backend/extractor/benchmark/eur_weighted.py` + `lt_unit_prices.json` scaffolded; prices Rangovas-derived
 - VISION violation `vision_call.py:1100` — returns aggregated `angokrasciu_gkp_m_total` (should be raw geometry only per Vision-perception/Python-arithmetic principle)
 - CV V2 infra on disk, NOT mounted, frozen by Option F
 
@@ -29,13 +29,13 @@
 
 **The fatal flaw: you don't have a customer yet, and you're writing a 4-week accuracy plan.**
 
-Stop. The 2026-05-07 production test was *one* real PDF. You have zero paying users. You have not validated that "AI suggests 26 outlets" is even the unit of value LT builders will pay for. And you're about to spend 4 weeks tuning math against a yardstick (universal RICS/DIN) that no Lithuanian contractor cites in their pasiulymai. rangovas doesn't use NRM2. None of them do. You're building accuracy against a standard your buyers have never heard of.
+Stop. The 2026-05-07 production test was *one* real PDF. You have zero paying users. You have not validated that "AI suggests 26 outlets" is even the unit of value LT builders will pay for. And you're about to spend 4 weeks tuning math against a yardstick (universal RICS/DIN) that no Lithuanian contractor cites in their pasiulymai. Rangovas doesn't use NRM2. None of them do. You're building accuracy against a standard your buyers have never heard of.
 
 **What you're avoiding:** the customer discovery calls. Option F said "3-5 LT builders in parallel" — that's the actual experiment. Everything else is yak-shaving. If 3 builders tell you they only care about KŽ extraction speed and don't trust any AI quantity, your universal-math benchmark is worthless on day 28.
 
 **What breaks in week 2:** you'll discover the "lubų >3m" bug is a symptom of 8 more page-classification edge cases, the inline-number hypothesis test requires UX you haven't built, and the `vision_call.py:1100` refactor cascades into 200 LOC of prompt rewrites. Week 4 you ship nothing.
 
-**On the EUR-weighted benchmark:** kill it. If rangovas isn't GT, then a benchmark weighted by rangovas's prices measures agreement-with-rangovas dressed up in money. Same AI-seeded ground truth problem from the bake-off, rebranded. Already flagged in CLAUDE.md and about to repeat the mistake.
+**On the EUR-weighted benchmark:** kill it. If Rangovas isn't GT, then a benchmark weighted by Rangovas's prices measures agreement-with-Rangovas dressed up in money. Same AI-seeded ground truth problem from the bake-off, rebranded. Already flagged in CLAUDE.md and about to repeat the mistake.
 
 **Real priority order:** Week 1: prod bugs + 3 customer calls *before writing code*. Week 2: build the smallest thing the calls demand. Weeks 3-4: TBD based on what week 1 taught you. Anything else is procrastination disguised as engineering.
 
@@ -43,9 +43,9 @@ Stop. The 2026-05-07 production test was *one* real PDF. You have zero paying us
 
 Stop. You're conflating three different problems and calling the bundle "accuracy."
 
-**Problem A:** Does the math (CLAUDE.md §1 formulas) produce the right number *given correct inputs*? This is a unit test. It's either right or it's a bug. It has nothing to do with PDFs, Vision, or rangovas. You can fix it in an afternoon with pytest.
+**Problem A:** Does the math (CLAUDE.md §1 formulas) produce the right number *given correct inputs*? This is a unit test. It's either right or it's a bug. It has nothing to do with PDFs, Vision, or Rangovas. You can fix it in an afternoon with pytest.
 
-**Problem B:** Does Vision extract the right *inputs* (room perimeter, ceiling height, opening count, wall thickness) from a PDF? This is the only thing that needs a benchmark — and the benchmark is **dimensions stamped on the drawing**, not rangovas's bid. The drawing literally has the ground truth printed on it. Build a 20-room human-labeled fixture of "perimeter=14.2m, h=2.65m, 2 windows" and measure Vision against *that*. rangovas is irrelevant.
+**Problem B:** Does Vision extract the right *inputs* (room perimeter, ceiling height, opening count, wall thickness) from a PDF? This is the only thing that needs a benchmark — and the benchmark is **dimensions stamped on the drawing**, not Rangovas's bid. The drawing literally has the ground truth printed on it. Build a 20-room human-labeled fixture of "perimeter=14.2m, h=2.65m, 2 windows" and measure Vision against *that*. Rangovas is irrelevant.
 
 **Problem C:** Will a Lithuanian builder pay 50€/mo for this? Unknown, unrelated to A or B, and the dominant risk.
 
@@ -65,7 +65,7 @@ Everyone is treating "universal math benchmark" as a QA tool. It isn't. It's the
 
 Once you encode RICS NRM2 + DIN 18363 + STR + CLAUDE.md §1 as an executable rule engine, you stop being a takeoff app and become **the canonical "what does LT building code actually require you to quote?" engine.** Every LT estimator currently guesses whether Q4 sanding is a separate line, whether <0.5m² openings deduct, whether hidroizoliacija belongs in the bathroom row. You will *know*, with a citation. That's a compliance product. Sell it to: insurance adjusters validating renovation claims, APVA auditing modernizavimas subsidies, banks underwriting construction loans, courts in statybos ginčai. None of those buyers care about your CV pipeline.
 
-The parsed rangovas corpus is a goldmine you're underusing. Five proposals is enough to ship a **"LT Contractor Variance Index"** — show a builder "your grindjuostės markup is 23% above the LT median, your angokraščiai pricing is 15% below." Builders will pay to see where they're leaving money on the table. Get 20 more proposals (offer free extraction in exchange) and you have a defensible pricing dataset no competitor can replicate without 6 months of LT-specific work.
+The parsed Rangovas corpus is a goldmine you're underusing. Five proposals is enough to ship a **"LT Contractor Variance Index"** — show a builder "your grindjuostės markup is 23% above the LT median, your angokraščiai pricing is 15% below." Builders will pay to see where they're leaving money on the table. Get 20 more proposals (offer free extraction in exchange) and you have a defensible pricing dataset no competitor can replicate without 6 months of LT-specific work.
 
 Inline-number hypothesis positive means something bigger than UX: it means **the PDF is already a structured database** and you're the parser. That unlocks auto-generated F2/F3 forms, defektinis aktas drafts, and direct Sistela export — i.e. the entire LT documentation stack, not just the quote.
 
@@ -83,7 +83,7 @@ The "inline-number hypothesis" — I have no idea what that is. It sounds like a
 
 Hard truth: **your benchmark is wrong.** You're optimizing for "matches universal math." A buyer's benchmark is "did this save me 3 hours and did the total at the bottom look right enough that I'd send it to a client." Those are different problems. The second one tolerates 10% error if the workflow is fast. The first one tolerates a 4-hour workflow if math is pristine.
 
-What would convince me to pay? **A 90-second video of a real PDF going from upload to a finished quote PDF I could email a client.** Not accuracy charts. Not rangovas-vs-universal-math. A demo.
+What would convince me to pay? **A 90-second video of a real PDF going from upload to a finished quote PDF I could email a client.** Not accuracy charts. Not Rangovas-vs-universal-math. A demo.
 
 Week 1 should be: talk to 5 builders, ask them to time their last quote, and watch their face when you show the demo. Everything else is premature.
 

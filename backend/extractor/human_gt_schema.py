@@ -16,7 +16,7 @@ class HumanGTLine(BaseModel):
     """One line item on a samatininkas's invoice for one PDF.
 
     Convention: prices are be-PVM (without VAT) to avoid mode noise across
-    the dataset. `bundled_group` lets us collapse rangovas-style invoice lines
+    the dataset. `bundled_group` lets us collapse Rangovas-style invoice lines
     (e.g. glaistymas + dažymas + gruntavimas → one bundle at ~14 €/m²).
     """
     code: str

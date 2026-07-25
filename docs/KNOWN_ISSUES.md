@@ -211,6 +211,6 @@ Before flipping the switch:
 
 - **Week 1:** Daily review of upload errors + warnings emitted. Patch obvious data-quality issues.
 - **Week 2:** Sample 5 real production projects, manually verify accuracy vs backend output. Calibrate prompts.
-- **Week 4:** Validate kampai variance vs real contractor proposals (Phase 8 known issue — rangovas counts more outer corners than universal NRM2).
+- **Week 4:** Validate kampai variance vs real contractor proposals (Phase 8 known issue — Rangovas counts more outer corners than universal NRM2).
 - **Month 2:** Begin togal.ai-inspired UX iteration (separate plan, post-accuracy).
 - **Month 3:** Add per-contractor personalization layer if multiple rangovai onboard.

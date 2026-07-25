@@ -4,7 +4,7 @@
 # eval_harness.py + validate_truth_files.py read this to enumerate the
 # contractor-validated benchmark set.
 #
-# Contractor notes: ALL six projects are from Rangovas A (rangovas
+# Contractor notes: ALL six projects are from Rangovas A (Rangovas
 # Rangovas A). This is a single-contractor cross-project benchmark.
 # Cross-contractor calibration needs at least one non-Rangovas A truth
 # file before the calibration_learner's promotion gate has industry-

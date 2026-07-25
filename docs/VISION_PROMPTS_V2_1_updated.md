@@ -650,7 +650,7 @@ def calculate_materials_and_line_items(
     """
     Iš Phase 2 granuliarnų items sugeneruoti:
     1. Medžiagų sąrašą (dažai, glaistas, GKP lapai, plytelių klijai)
-    2. Sąmatos eilutes (line items) pagal rangovo metodiką
+    2. Sąmatos eilutes (line items) pagal Rangovo metodiką
     
     Naudoja scope_method iš training_data projektų tam pačiam klasei.
     """
@@ -664,7 +664,7 @@ def calculate_materials_and_line_items(
     # ... similar for other materials
     
     # Sąmatos line items — tiesiog kopijuoti iš Phase 2 items, 
-    # pridėti kainas iš "rangovo standart pricing" (ateityje iš DB)
+    # pridėti kainas iš "Rangovo standart pricing" (ateityje iš DB)
     line_items = []
     for section_name, section_data in phase2_output.items():
         if section_name.endswith("_items"):

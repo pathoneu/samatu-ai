@@ -221,7 +221,7 @@ def test_pdfplumber_row_parser_skips_total_rows():
 
 
 def test_pozicijos_includes_rotband_for_paintable_walls(three_room_parsed):
-    """Rotband leveling must appear when walls_paintable > 0 (rangovas P1-P5
+    """Rotband leveling must appear when walls_paintable > 0 (Rangovas P1-P5
     pattern — 5/5 projects). Quantity = walls_paintable_m2."""
     out = _run_full_pipeline(three_room_parsed)
     rotband = [p for p in out["pozicijos"]
@@ -235,7 +235,7 @@ def test_pozicijos_includes_rotband_for_paintable_walls(three_room_parsed):
 
 
 def test_pozicijos_santechnika_skyrius_has_klozetas_per_wet_room(three_room_parsed):
-    """Each vonia/wc/san paskirtis room → 1 klozetas + 1 WC rėmas (rangovas pattern)."""
+    """Each vonia/wc/san paskirtis room → 1 klozetas + 1 WC rėmas (Rangovas pattern)."""
     out = _run_full_pipeline(three_room_parsed)
     sant = [p for p in out["pozicijos"] if p["skyrius"] == "Santechnikos darbai"]
     assert len(sant) > 0, "Santechnikos darbai skyrius missing entirely"
@@ -306,7 +306,7 @@ def test_pozicijos_elektros_skyrius_uses_symbols_when_available():
 
 
 def test_grindjuostes_capped_at_065_per_m2():
-    """Per-room (perim − Σdurys) sums double-count interior walls. rangovas
+    """Per-room (perim − Σdurys) sums double-count interior walls. Rangovas
     ratios 0.50-0.62 m/m². Cap = 0.65 m/m². When raw exceeds cap, capped
     value is used + audit fields populated."""
     # Three rooms with high perim (all share interior walls) → raw will
@@ -375,7 +375,7 @@ def test_grindjuostes_not_capped_when_within_ratio():
 
 def test_pozicijos_includes_angokrasciu_gkp_pair():
     """When openings exist, BOTH glaistymas-dažymas AND GKP skyriaus
-    angokraščių lines should be emitted (rangovas 4/5 freq pattern)."""
+    angokraščių lines should be emitted (Rangovas 4/5 freq pattern)."""
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
@@ -470,7 +470,7 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
 
 
 def test_pozicijos_p3_dezuciu_gkp_per_wet_room():
-    """Dėžučių iš GKP per wet room (vonia/wc/san). rangovas P1=2, P2=2, P5=1."""
+    """Dėžučių iš GKP per wet room (vonia/wc/san). Rangovas P1=2, P2=2, P5=1."""
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
@@ -540,8 +540,8 @@ def test_pozicijos_p3_skyliu_grezimas_fallback_no_symbols():
 
 
 def test_tomas_baseline_p1_style_residential_emits_all_key_skyriai():
-    """rangovas P1-style residential project (180m², 5 wet rooms, 3+ years modern
-    construction) should produce ALL the key skyriai that rangovas writes:
+    """Rangovas P1-style residential project (180m², 5 wet rooms, 3+ years modern
+    construction) should produce ALL the key skyriai that Rangovas writes:
 
     - Gipso kartono montavimas (GKP)
     - Sienų lubų glaistymas dažymas
@@ -604,7 +604,7 @@ def test_tomas_baseline_p1_style_residential_emits_all_key_skyriai():
     out = _run_full_pipeline(parsed)
     skyrius_set = {p["skyrius"] for p in out["pozicijos"]}
 
-    # Key rangovas-style skyriai must all be present
+    # Key Rangovas-style skyriai must all be present
     REQUIRED = {
         "GKP montavimas",
         "Sienų lubų glaistymas dažymas",
@@ -616,24 +616,24 @@ def test_tomas_baseline_p1_style_residential_emits_all_key_skyriai():
         "Pridėtiniai elementai",
     }
     missing = REQUIRED - skyrius_set
-    assert not missing, f"Missing key skyriai for rangovas-baseline residential: {missing}"
+    assert not missing, f"Missing key skyriai for Rangovas-baseline residential: {missing}"
 
-    # Pozicijų count should be at least 30 (rangovas P2 = 36, P5 = 50; we should
+    # Pozicijų count should be at least 30 (Rangovas P2 = 36, P5 = 50; we should
     # match this magnitude for a comparable project size)
     n_pozicijos = len(out["pozicijos"])
     assert n_pozicijos >= 30, (
         f"Expected ≥30 pozicijos for residential 67m², got {n_pozicijos}. "
-        f"This is a major coverage regression vs rangovas P2 (36)/P5 (50)."
+        f"This is a major coverage regression vs Rangovas P2 (36)/P5 (50)."
     )
 
-    # Specific high-priority items from rangovas frequency analysis
+    # Specific high-priority items from Rangovas frequency analysis
     aprasymai_lower = [p["aprasymas"].lower() for p in out["pozicijos"]]
-    assert any("rotband" in a for a in aprasymai_lower), "Missing Sienų lyginimas Rotband (rangovas 5/5 freq)"
-    assert any("klozet" in a for a in aprasymai_lower), "Missing Klozeto montavimas (rangovas 3/5 freq)"
-    assert any("wc rėm" in a for a in aprasymai_lower), "Missing WC rėmo montavimas (rangovas 3/5 freq)"
-    assert any("gyvatuk" in a for a in aprasymai_lower), "Missing Gyvatuko montavimas (rangovas 2/5 freq)"
-    assert any("rozet" in a for a in aprasymai_lower), "Missing Rozetės/jungiklio komutavimas (rangovas 2/5 freq, symbols=28)"
-    assert any("šviestuv" in a for a in aprasymai_lower), "Missing Šviestuvų montavimas (rangovas 2/5 freq, symbols=18)"
+    assert any("rotband" in a for a in aprasymai_lower), "Missing Sienų lyginimas Rotband (Rangovas 5/5 freq)"
+    assert any("klozet" in a for a in aprasymai_lower), "Missing Klozeto montavimas (Rangovas 3/5 freq)"
+    assert any("wc rėm" in a for a in aprasymai_lower), "Missing WC rėmo montavimas (Rangovas 3/5 freq)"
+    assert any("gyvatuk" in a for a in aprasymai_lower), "Missing Gyvatuko montavimas (Rangovas 2/5 freq)"
+    assert any("rozet" in a for a in aprasymai_lower), "Missing Rozetės/jungiklio komutavimas (Rangovas 2/5 freq, symbols=28)"
+    assert any("šviestuv" in a for a in aprasymai_lower), "Missing Šviestuvų montavimas (Rangovas 2/5 freq, symbols=18)"
 
 
 def test_pipeline_handles_empty_patalpos():
@@ -689,7 +689,7 @@ def test_pipeline_handles_high_ceiling_3plus_m():
     pastoliai = [p for p in out["pozicijos"]
                  if "pastolių" in p["aprasymas"].lower()]
     assert len(high_gkp) == 1, "Missing GKP virš 3m line for high-ceiling room"
-    assert len(high_paint) == 1, "Missing Lubų >3m painting line (rangovas P1 split)"
+    assert len(high_paint) == 1, "Missing Lubų >3m painting line (Rangovas P1 split)"
     assert len(pastoliai) == 1, "Missing pastolių nuoma for high-ceiling room"
 
 
@@ -772,7 +772,7 @@ def test_pozicijos_p7_legacy_skyrius_migration():
 
 def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
     """P6: 4 hidroizoliacijos eilučių stack collapsed to 1 line per LT
-    contractor convention (rangovas style: '1 vnt = vonia komplektas')."""
+    contractor convention (Rangovas style: '1 vnt = vonia komplektas')."""
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
@@ -797,7 +797,7 @@ def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
 
 
 def test_pozicijos_p3_silikon_split_per_tomas_audit():
-    """Silikonavimas split into two lines per rangovas 2026-04-29 audit:
+    """Silikonavimas split into two lines per Rangovas 2026-04-29 audit:
     sanitaryware silikonas (×0.8) + plytelių vidinių kampų silikonas (×0.6).
     Combined still ~ wet_perim × 1.4 (slightly more than legacy 1.2×).
     """

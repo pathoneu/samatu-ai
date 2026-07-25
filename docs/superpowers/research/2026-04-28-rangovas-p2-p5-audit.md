@@ -1,6 +1,6 @@
-# rangovas P2-P5 Cross-Project Audit — Sąmatų AI Coverage Gap
+# Rangovas P2-P5 Cross-Project Audit — Sąmatų AI Coverage Gap
 
-**Auditor:** evidence-first; recommendations gated on appearing in 2+ rangovo projects.
+**Auditor:** evidence-first; recommendations gated on appearing in 2+ Rangovo projects.
 **Anchor:** P1 audit at `/Users/ignasgaldikas/samatu-ai/docs/superpowers/research/2026-04-28-rangovas-p1-audit.md` (16 vs 112 lines, 14% line coverage; identifies missing universals: angokraščių GKP, paslėptų durų staktos, šviestuvų/difuzorių montavimas+apdirbimas, reviziniai dureliai, skylių gręžimas, kampų silikonavimas, plytelių 45° pjovimas, statybvietės).
 
 This audit replicates that work across P2-P5 to test whether the "missing universals" thesis holds beyond a single contract, and to find any items P1 missed.
@@ -29,7 +29,7 @@ PDFs read (pdfplumber, full text):
 | **Total lines** | **~70 (interior scope)** | **36** | **15** | **28** | **49** |
 | Total project € be PVM | ~80,161 | 24,252 | 18,602 | 25,021 | 20,638 |
 
-P3 is unusual — only one skyrius (glaistymas dažymas + GKP merged into it). rangovas drops Gipso kartono header on P3/P4 and folds carpentry-style line items into the glaistymas section. So skyrius headers are NOT load-bearing in his lexicon — they are tag groupings, and lines move between groups.
+P3 is unusual — only one skyrius (glaistymas dažymas + GKP merged into it). Rangovas drops Gipso kartono header on P3/P4 and folds carpentry-style line items into the glaistymas section. So skyrius headers are NOT load-bearing in his lexicon — they are tag groupings, and lines move between groups.
 
 P5 is the only one explicitly itemizing rekuperaciją + kondicionierius + klozeto montavimas — likely because it's a butas (apartment renovation) where the contractor includes more MEP scope.
 
@@ -43,7 +43,7 @@ For each unique LT line item across P2-P5, count appearances. Bold = matched our
 
 ### 4/4 (every project)
 
-| Item (rangovo phrasing) | P2 | P3 | P4 | P5 | We have? |
+| Item (Rangovo phrasing) | P2 | P3 | P4 | P5 | We have? |
 |---|---|---|---|---|---|
 | Sienų lyginimas sausu gipsiniu tinku "Rotband" — m² | line 6 (37) | line 1 (95) | line 1 (132.36) | line 12 (32.41) | NO |
 | Sienų, lubų glaistymas/dažymas — m² | line 7 (388) | line 3 (250.95) | line 2 (461.31) | line 13 (150.57) | YES (3 split lines: glaistymas + gruntas + dažai) |
@@ -79,7 +79,7 @@ For each unique LT line item across P2-P5, count appearances. Bold = matched our
 | **Priglaistomų gipsinių šviestuvų apdirbimas / montavimas** — vnt | P3 line 13 (37), P5 line 8/16 (9+15) + P1 (69 vnt) | NO |
 | **Priglaistomų difūzorių montavimas (apvalūs / pailgi)** — vnt | P4 lines 6,7 (2+9), P5 line 7 (6) + P1 (7+13) | NO |
 | **Paslėptų durų staktų apdirbimas** — m / b/m | P3 line 7 (5), P5 line 6 (10.22) + P1 (separately) | NO |
-| **Wc rėmo montavimas** — vnt | P2 line 18 (2), P5 line 26 (1) | NO (santechnika out of vidaus apdaila scope, but rangovas includes it) |
+| **Wc rėmo montavimas** — vnt | P2 line 18 (2), P5 line 26 (1) | NO (santechnika out of vidaus apdaila scope, but Rangovas includes it) |
 | **Drėgmės surinkėjo nuoma** — d.d. | P2 line 10 (25 d.d.), P4 line 28 (8 d.d.) | NO |
 | **Pastolių nuoma (>3m)** — d.d. | P4 line 27 (25), P1 (90) | YES partially (gkp_lubu_virs_3m_m2 detection) |
 | **Plytelių glaistymas epoksidiniu glaistu** — m² | P2 line 12b (37.11), P1 implied | NO |
@@ -107,25 +107,25 @@ P2-only: `Trasų kondicionieriams įrengimas` (2 vnt), `Signalizacijos daviklių
 
 ## 3. Top 10 items WE'RE MISSING (in 3+/4 of P2-P5, plus P1 anchor confirms)
 
-These are universal LT-samatininkas standard items that every rangovo project itemizes but our pipeline produces 0 lines for. Ranked by combined frequency × monetary impact:
+These are universal LT-samatininkas standard items that every Rangovo project itemizes but our pipeline produces 0 lines for. Ranked by combined frequency × monetary impact:
 
 1. **Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas** (3/4: P2/P3/P5 + P1). Always paired with the montavimas line (same kiekis). We have montavimas (called "Užuolaidų / LED nišos") but produce no second glaistymo line. Quick fix: when `nisu_metrai > 0` emit two pozicijos (montavimas + glaistymas dažymas), same kiekis, different skyrius.
 
-2. **Angokraščių apdirbimas GKP** (3/4: P2/P4/P5 + P1 with 94.02 m). Our `angokrasciu_gkp_m` field exists in `_recompute_per_room_via_python` but is always 0 because no paskirtis triggers it. Formula: `Σ((2·H_lango + W_lango) × langai) + Σ((2·H_durys + W_durys) × pasleptos_durys)`. Per rangovo data: 32-85 m typical.
+2. **Angokraščių apdirbimas GKP** (3/4: P2/P4/P5 + P1 with 94.02 m). Our `angokrasciu_gkp_m` field exists in `_recompute_per_room_via_python` but is always 0 because no paskirtis triggers it. Formula: `Σ((2·H_lango + W_lango) × langai) + Σ((2·H_durys + W_durys) × pasleptos_durys)`. Per Rangovo data: 32-85 m typical.
 
 3. **Sienų lyginimas Rotband** (4/4 — every single project). Always present, kiekis 30-140 m². This is the layer BEFORE glaistymas — masonry/concrete walls need 3-5mm dry plaster before 1-2 mm glaistas. Our pipeline collapses all preparation into "glaistymas". Formula: per-room `sienu_konstrukcija ∈ {muras, betonas, gkp}`, default 50% of non-GKP wall area gets Rotband. Typical ratio: Rotband m² ≈ 0.3-0.5 × paintable_walls_m².
 
-4. **Skylių gręžimas plytelėse — vnt** (3/4: P2/P4/P5 + P1=109). Tied to wet-room fixture count. Formula: `klozetai × 4 + praustuvai × 6 + dušai × 8 + WC × 5`. rangovo kiekiai 17-49 per project (1-2 vonios). Easy add.
+4. **Skylių gręžimas plytelėse — vnt** (3/4: P2/P4/P5 + P1=109). Tied to wet-room fixture count. Formula: `klozetai × 4 + praustuvai × 6 + dušai × 8 + WC × 5`. Rangovo kiekiai 17-49 per project (1-2 vonios). Easy add.
 
-5. **Kampų silikonavimas — m** (3/4: P2/P4/P5 + P1=128.97). Formula: per vonios/WC `(grindų_perimetras + plyteliuotų_lubų_periferija + dušo_kabinos_perimetras)`. rangovo kiekiai 25-60 m. Easy add.
+5. **Kampų silikonavimas — m** (3/4: P2/P4/P5 + P1=128.97). Formula: per vonios/WC `(grindų_perimetras + plyteliuotų_lubų_periferija + dušo_kabinos_perimetras)`. Rangovo kiekiai 25-60 m. Easy add.
 
-6. **Plytelių supjovimas 45° kampu — m** (3/4: P2/P4/P5 + P1=45.72). Outer corners of tile zones (vonia kraštai, dušo niša). Formula: `Σ(išorinių plytelių kampų × ceiling_height_to_tile)`. rangovo kiekiai 5-32 m.
+6. **Plytelių supjovimas 45° kampu — m** (3/4: P2/P4/P5 + P1=45.72). Outer corners of tile zones (vonia kraštai, dušo niša). Formula: `Σ(išorinių plytelių kampų × ceiling_height_to_tile)`. Rangovo kiekiai 5-32 m.
 
-7. **Nuolydžio formavimas dušo kabinoje — vnt** (3/4: P2/P4/P5 + P1=1). Per dušo zoną. Formula: count `dušas_be_padėklo` zones (linear drain or floor-flush drain). rangovo always 1-2 vnt.
+7. **Nuolydžio formavimas dušo kabinoje — vnt** (3/4: P2/P4/P5 + P1=1). Per dušo zoną. Formula: count `dušas_be_padėklo` zones (linear drain or floor-flush drain). Rangovo always 1-2 vnt.
 
-8. **Hidroizoliacijos kaip vnt, ne m²** (3/4 + P1). We HAVE m² output, but UX mismatch. rangovas itemizes per drėgna zona. Fix: emit `vnt = count(vonios + WC + skalbykla + katiline)` AS PRIMARY, m² as expandable detail.
+8. **Hidroizoliacijos kaip vnt, ne m²** (3/4 + P1). We HAVE m² output, but UX mismatch. Rangovas itemizes per drėgna zona. Fix: emit `vnt = count(vonios + WC + skalbykla + katiline)` AS PRIMARY, m² as expandable detail.
 
-9. **Šiukšlių išvežimas** (3/4: P2/P4/P5 + P1). Universal closing line. Formula: `bendras_plotas × 0.05-0.07 m³/m²`, output unit `m³` (P2/P5) or `vnt` (P4) — m³ more honest. rangovo kiekiai 8-12 m³ for 100-200 m² butas/namas.
+9. **Šiukšlių išvežimas** (3/4: P2/P4/P5 + P1). Universal closing line. Formula: `bendras_plotas × 0.05-0.07 m³/m²`, output unit `m³` (P2/P5) or `vnt` (P4) — m³ more honest. Rangovo kiekiai 8-12 m³ for 100-200 m² butas/namas.
 
 10. **Durų angų paruošimas beapvadinėms durims — m** (3/4: P3/P4/P5 + P1=55.52 m). Per `durys_total` with `tipas: pasleptos`. Formula: `Σ((2·H + W) × pasleptu_duru_kiekis)`. Our `pasleptu_duru_staktu_m` always 0.
 
@@ -138,37 +138,37 @@ Honourable mentions (just below cutoff but still 2/4 + P1 confirms):
 
 ---
 
-## 4. Top 5 OVER-COVERAGE — we have, rangovas never includes
+## 4. Top 5 OVER-COVERAGE — we have, Rangovas never includes
 
-1. **Glaisto medžiaga (kg) as separate line.** None of P2-P5 has a line "glaisto medžiaga" — rangovas embeds the cost into the glaistymas/dažymas € rate and into the `Medžiagų kaina` column of THE SAME line. rangovo line format puts darbų € and medžiagų € side-by-side per line, eliminating the need for our split. **Recommend**: collapse our 6 paint-related lines (Rotband + glaistymas + glaistas-kg + gruntas + grunto-l + dažymas + dažai-l) into 2-3 lines with darbai/medžiagos columns inline.
+1. **Glaisto medžiaga (kg) as separate line.** None of P2-P5 has a line "glaisto medžiaga" — Rangovas embeds the cost into the glaistymas/dažymas € rate and into the `Medžiagų kaina` column of THE SAME line. Rangovo line format puts darbų € and medžiagų € side-by-side per line, eliminating the need for our split. **Recommend**: collapse our 6 paint-related lines (Rotband + glaistymas + glaistas-kg + gruntas + grunto-l + dažymas + dažai-l) into 2-3 lines with darbai/medžiagos columns inline.
 
 2. **Grunto medžiaga (l) as separate line.** Same as #1.
 
 3. **Dažų medžiaga (2 sluoksniai, l) as separate line.** Same as #1.
 
-4. **Sienų ir lubų gruntavimas (1 sluoksnis) as separate line.** rangovas never separates gruntas from glaistymas/dažymas. P3 line 3 = "Sienų, lubų glaistymas/dažymas (Benajamin Moore dažai) — m² 250.95 @ 15 €/m²" — single line covers grunto + glaisto + 2 dažų sluoksniai. Our split makes the sąmata look 3× as long without adding info to a contractor.
+4. **Sienų ir lubų gruntavimas (1 sluoksnis) as separate line.** Rangovas never separates gruntas from glaistymas/dažymas. P3 line 3 = "Sienų, lubų glaistymas/dažymas (Benajamin Moore dažai) — m² 250.95 @ 15 €/m²" — single line covers grunto + glaisto + 2 dažų sluoksniai. Our split makes the sąmata look 3× as long without adding info to a contractor.
 
 5. **Lubų karnizas (sumontavimas + dažymas) — m.** None of P2-P5 has a "lubų karnizas" line. Karnizas only appears as part of nišų / molding / dekoro accent items, project-specific. Recommend: gate on user flag `karnizas: true`, default off.
 
-Bonus over-coverage suspect: **"Hidroizoliacija drėgnose patalpose (grindys + sienos drėgmės zonoje)"** as our verbose aprasymas. rangovas writes simply `Hidroizoliacijos įrengimas`. Cosmetic but matters for credibility.
+Bonus over-coverage suspect: **"Hidroizoliacija drėgnose patalpose (grindys + sienos drėgmės zonoje)"** as our verbose aprasymas. Rangovas writes simply `Hidroizoliacijos įrengimas`. Cosmetic but matters for credibility.
 
 ---
 
 ## 5. Notable convention differences
 
-**Material/labor split.** rangovas always splits: every line has both darbų € and medžiagų € populated where applicable. Some lines are labor-only (medžiagų = 0) — Rotband, dažymas (with material in same row), kampų montavimas, skylių gręžimas. Rule observable: **rangovas never creates a separate "medžiaga" pozicija**. Materials live inside the work line. Our pipeline does the opposite — separate medžiagų lines with kiekis in kg / l. Recommend a `medziagos_kiekis_per_unit` field on each pozicija and render as a 4th column rather than separate row.
+**Material/labor split.** Rangovas always splits: every line has both darbų € and medžiagų € populated where applicable. Some lines are labor-only (medžiagų = 0) — Rotband, dažymas (with material in same row), kampų montavimas, skylių gręžimas. Rule observable: **Rangovas never creates a separate "medžiaga" pozicija**. Materials live inside the work line. Our pipeline does the opposite — separate medžiagų lines with kiekis in kg / l. Recommend a `medziagos_kiekis_per_unit` field on each pozicija and render as a 4th column rather than separate row.
 
-**Q-level coefficients.** rangovas does not vary by Q-level explicitly. Same line "Sienų lubų glaistymas/dažymas" used at €13/m² (P2, naujos statybos), €15/m² (P3, premium with Benjamin Moore), €13/m² (P4), €14/m² (P5). The Q-level adjustment (0.8/1.0/1.2 kg/m² in our coeff) does NOT match rangovas's invoice — he only varies the price, not the kiekis. The only kiekis multiplier he uses is on Rotband: it's a separate line item that activates when walls need extra prep. **Recommendation:** drop Q-level kg/m² variation in the medžiaga calculation; it's an over-engineered abstraction. Replace with `Rotband m²` switch (binary per wall type).
+**Q-level coefficients.** Rangovas does not vary by Q-level explicitly. Same line "Sienų lubų glaistymas/dažymas" used at €13/m² (P2, naujos statybos), €15/m² (P3, premium with Benjamin Moore), €13/m² (P4), €14/m² (P5). The Q-level adjustment (0.8/1.0/1.2 kg/m² in our coeff) does NOT match Rangovas's invoice — he only varies the price, not the kiekis. The only kiekis multiplier he uses is on Rotband: it's a separate line item that activates when walls need extra prep. **Recommendation:** drop Q-level kg/m² variation in the medžiaga calculation; it's an over-engineered abstraction. Replace with `Rotband m²` switch (binary per wall type).
 
-**Grindjuostės waste / formula.** rangovas's grindjuostės = 23-30 m for ~30-50 m² flooring, ratio ~0.6-0.8 m/m². Never adds 10% waste in displayed kiekis. P5 line 45 = `23.07 m` for `36.99 m² PVC` = 0.62 m/m². P1 had 93.8 m for 180 m² = 0.52 m/m². Our 176.56 m for 180 m² = 0.98 m/m² is 2× too high (P1 finding confirmed). The bug: we sum per-room `perimetras − Σdurys` and shared interior walls get counted twice. Need global unique-segment list.
+**Grindjuostės waste / formula.** Rangovas's grindjuostės = 23-30 m for ~30-50 m² flooring, ratio ~0.6-0.8 m/m². Never adds 10% waste in displayed kiekis. P5 line 45 = `23.07 m` for `36.99 m² PVC` = 0.62 m/m². P1 had 93.8 m for 180 m² = 0.52 m/m². Our 176.56 m for 180 m² = 0.98 m/m² is 2× too high (P1 finding confirmed). The bug: we sum per-room `perimetras − Σdurys` and shared interior walls get counted twice. Need global unique-segment list.
 
 **"vnt" instead of "m²" for zone-based work.** Pattern across all 4: hidroizoliacija, nuolydis dušo kabinoje, dėžutės, latakai, trapai, palangės — all itemized in vnt. Reflects how the contractor charges (per zone visit / per fixture). Our m² outputs are correct internally but should also produce vnt-based pozicijos for these.
 
-**Skyriaus naming with proper Lithuanian diacritics.** rangovas: `Sienų lubų glaistymas dažymas`, `Plytelių klijavimas`, `Gipso kartono montavimas`, `Statybvietės išlaidos`, `Grindų durų montavimas`, `Vėdinimas/ kondicionavimas/šildymas`. We use `Glaistymas dazymas`, `GKP montavimas`, `Plyteles`, `Hidroizoliacija`, `Pridetiniai elementai`. The mojibake makes us look amateur.
+**Skyriaus naming with proper Lithuanian diacritics.** Rangovas: `Sienų lubų glaistymas dažymas`, `Plytelių klijavimas`, `Gipso kartono montavimas`, `Statybvietės išlaidos`, `Grindų durų montavimas`, `Vėdinimas/ kondicionavimas/šildymas`. We use `Glaistymas dazymas`, `GKP montavimas`, `Plyteles`, `Hidroizoliacija`, `Pridetiniai elementai`. The mojibake makes us look amateur.
 
 **Skyrius merger pattern.** P3 has only one skyrius (everything in `Sienų lubų glaistymas dažymas`). P4 merges GKP into glaistymas. So the GKP skyrius is OPTIONAL for paint-only or paint-heavy jobs. Recommend: `Gipso kartono montavimas` skyrius only emitted when GKP-related kiekis > threshold (e.g., GKP_lubu > 5 m² OR GKP_pertvaros > 0 OR GKP nišos > 2 m).
 
-**Pridetiniai elementai is not a rangovas skyrius.** rangovas uses `Papildomi darbai ir medžiagos` (P1) and `Statybvietės išlaidos` (P2/P4/P5). The English-mojibake `Pridetiniai elementai` is anti-LT.
+**Pridetiniai elementai is not a Rangovas skyrius.** Rangovas uses `Papildomi darbai ir medžiagos` (P1) and `Statybvietės išlaidos` (P2/P4/P5). The English-mojibake `Pridetiniai elementai` is anti-LT.
 
 ---
 
@@ -275,7 +275,7 @@ if total_nuolydzio > 0:
 n_drēgnos = sum(1 for r in rooms if (r.get("paskirtis") in ("vonia","wc","san","skalbykla","katiline")))
 if n_drēgnos > 0:
     pozicijos.append({
-        "skyrius": "Plytelių klijavimas",   # NOTE: merged into plytelės, like rangovas
+        "skyrius": "Plytelių klijavimas",   # NOTE: merged into plytelės, like Rangovas
         "aprasymas": "Hidroizoliacijos įrengimas",
         "vnt": "vnt", "kiekis": n_drēgnos,
         "_detail_m2": round(total_hidro_m2, 2),  # for expandable UI
@@ -320,12 +320,12 @@ _SKYRIUS_LT = {
     "Glaistymas dazymas":   "Sienų lubų glaistymas dažymas",
     "GKP montavimas":       "Gipso kartono montavimas",
     "Plyteles":             "Plytelių klijavimas",
-    "Hidroizoliacija":      "Plytelių klijavimas",   # rangovas merges
+    "Hidroizoliacija":      "Plytelių klijavimas",   # Rangovas merges
     "Pridetiniai elementai":"Papildomi darbai ir medžiagos",
 }
 ```
 
-**Collapse material lines** (drop separate rows for glaisto-kg, grunto-l, dažų-l). Move kiekis into `medziagos_kiekis` field on the parent darbo line; render in UI as 4-column table (vnt | kiekis | darbai € | medžiagos €) like rangovas's PDF.
+**Collapse material lines** (drop separate rows for glaisto-kg, grunto-l, dažų-l). Move kiekis into `medziagos_kiekis` field on the parent darbo line; render in UI as 4-column table (vnt | kiekis | darbai € | medžiagos €) like Rangovas's PDF.
 
 **Drop Q-level kg/m² variation** in glaisto medžiaga calc; replace with binary per-wall `Rotband: yes/no`.
 
@@ -339,12 +339,12 @@ _SKYRIUS_LT = {
 
 Cross-project, P1's diagnosis holds: 12-15 standard LT-samatininkas line items are missing from our pipeline. Of these, the 10 listed in §3 appear in 3 of 4 P2-P5 projects (and in P1) — they are NOT P1-specific noise. Each has a deterministic formula from primitives we already extract or trivially can.
 
-Less obvious finding: our material/labor split into separate pozicijos is non-standard. rangovas always inlines materials. Our 4-row paint stack (glaistas + glaistas-kg + gruntas + grunto-l + dažai + dažai-l) maps to rangovas's 1 row. **Fixing this single architectural change cuts our line count by ~40% and immediately makes the sąmata read like an LT contractor wrote it.**
+Less obvious finding: our material/labor split into separate pozicijos is non-standard. Rangovas always inlines materials. Our 4-row paint stack (glaistas + glaistas-kg + gruntas + grunto-l + dažai + dažai-l) maps to Rangovas's 1 row. **Fixing this single architectural change cuts our line count by ~40% and immediately makes the sąmata read like an LT contractor wrote it.**
 
 Three highest-ROI changes, ranked:
 
 1. Add the 10 missing universal pozicijos in §3 and §6 — each is 5-10 lines of Python.
-2. Collapse material rows into inline `medziagos_kiekis` field; restructure UI table to 4 columns like rangovo's PDF.
+2. Collapse material rows into inline `medziagos_kiekis` field; restructure UI table to 4 columns like Rangovo's PDF.
 3. Apply skyriaus rename map + drop the `Pridetiniai elementai` umbrella (split into Statybvietės / Grindų / Papildomi).
 
-After these three, we'd jump from 16 pozicijos to ~25-28 per project, matching rangovo's typical 28-49 line range for vidaus apdaila scope. Closes the embarrassment gap identified in P1 audit — every contractor who actually itemizes properly would no longer find our output amateur.
+After these three, we'd jump from 16 pozicijos to ~25-28 per project, matching Rangovo's typical 28-49 line range for vidaus apdaila scope. Closes the embarrassment gap identified in P1 audit — every contractor who actually itemizes properly would no longer find our output amateur.

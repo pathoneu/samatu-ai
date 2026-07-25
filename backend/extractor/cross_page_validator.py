@@ -377,16 +377,16 @@ def _rule_paint_consumption_sane(rooms: list[dict]) -> list[dict]:
     return out
 
 
-# ── rangovas-empirical ratio bounds ─────────────────────────────────────────────
+# ── Rangovas-empirical ratio bounds ─────────────────────────────────────────────
 # Computed from training-data/parsed_pasiulymai.json (5 LT residential projects).
 # Outliers indicate either (a) AI extraction error or (b) atypical project —
 # warning level so user can decide. Bounds widened to capture top/bottom 5%.
 
 TOMAS_RATIO_BOUNDS = {
     # Dažomas plotas per m² of floor — typically perim×H plus ceiling
-    "dazomas_per_plotas": (1.8, 5.0),  # rangovas avg 2.8-3.5
+    "dazomas_per_plotas": (1.8, 5.0),  # Rangovas avg 2.8-3.5
     # Grindjuostės per m² — sausų patalpų perim
-    "grindjuosciu_per_plotas": (0.30, 0.70),  # rangovas 0.50-0.62
+    "grindjuosciu_per_plotas": (0.30, 0.70),  # Rangovas 0.50-0.62
     # Hidroizoliacijos vnt vs total wet rooms — should match exactly
     # GKP lubų plotas / bendras plotas — typically 0.5-0.9 (modern construction
     # uses GKP everywhere except WC/vonia which have pakabinamos)
@@ -395,7 +395,7 @@ TOMAS_RATIO_BOUNDS = {
 
 
 def _rule_tomas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dict]:
-    """rangovas P1-P5 empirical ratio bounds. Warning when project totals fall
+    """Rangovas P1-P5 empirical ratio bounds. Warning when project totals fall
     outside typical LT residential range — usually AI extraction issue."""
     out = []
     plotas = sum(float(r.get("plotas_m2") or 0) for r in rooms)
