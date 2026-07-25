@@ -1,9 +1,12 @@
-# Sąmatų AI — Known Issues (Pre-Launch Assessment)
+# Pathon — Known Issues (Pre-Launch Assessment)
 
-**Last updated:** 2026-04-27
+**Last updated:** 2026-07-25 (doc-truth pass — limitation statuses re-verified
+against code). The body below is still the 2026-04-27 assessment; entries that
+have since shipped are marked inline rather than deleted, so the history reads.
 **Status:** Pre-production refactor complete + Phase 9 production-readiness fixes landed.
 **Honest production-readiness for AI extraction:** ~93% (Phase 10 + cleanup + Phase 11 safety/observability).
 **Honest production-readiness for full app (auth, design polish, multi-tenancy, browser cross-test):** ~70% — significant gaps remain.
+*(2026-07-25: three of those four have since shipped — auth, per-user multi-tenancy, and the Nordic Slate design pass. The remaining items from that list are **automated browser cross-test** and an **accessibility audit**. The ~70% figure was never re-measured, so treat it as a stale April number, not a current score.)*
 
 User audit (2026-04-27) flagged: dizainas, togal.ai UX, brėžinio žiūrėjimas, debugging, safety features. Phase 11 addressed safety + debugging + browser PDF overlay verification. Design polish + togal-style UX remain for separate plan.
 
@@ -30,9 +33,10 @@ This document is the result of an Explore-subagent UI audit + manual stress test
 
 ### ✅ Limitation 1: AssumptionsPanel — FIXED in Phase 10
 Backend `/recompute-interior` endpoint + frontend `RulesOverridePanel.jsx`. 6 per-paskirtis toggles + 3 numeric inputs + per-room override table. Sub-second roundtrip (~8ms measured). "Prielaidos" tab restored to TabBar.
+**Update 2026-07-25:** `RulesOverridePanel` was **removed from the UI 2026-05-06** (founder request: too heavy) and is now an orphan file. The live surface is `AssumptionsPanel`, opened from the **Prielaidos** button in `ProjectTopBar`, and it recomputes via `POST /api/recompute-quantities`, not `/recompute-interior`. `/recompute-interior` is still live — it now serves the room/polygon-edit path (`handleRoomsChange`).
 
-### Limitation 2: Hidden tabs (`puslapiai`, `kiekiai`, `workspace`)
-**Severity:** LOW. Tab content code exists but unreachable. **Note:** "Prielaidos" was added back as a working tab in Phase 10; the others remain dead.
+### Limitation 2: Hidden tabs (`puslapiai`, `kiekiai`, `workspace`, `prielaidos`)
+**Severity:** LOW. Tab content code exists but unreachable. **Status 2026-07-25: still true, and the TabBar shrank.** It now renders only `brezinys` / `main` / `aichat`; `rules` and `eksport` are reachable only via `ProjectTopBar` buttons, and the `prielaidos` block in `InteriorProject.jsx` is explicitly dead-gated `{false && tab === 'prielaidos'}`.
 **Future fix:** Delete dead tab code or add to TabBar.
 
 ### ✅ Limitation 3: Mobile sidebar — FIXED in Phase 10 follow-up
@@ -50,7 +54,7 @@ RoomCard now has expandable details section showing zoom audit trail, calculatio
 ## Phase 11 — production safety + observability (2026-04-27)
 
 **Fixed:**
-- ✅ File size limits (50 MB max, 100 B min) — HTTP 413 / 400
+- ✅ File size limits — HTTP 413 / 400. *(Current values, 2026-07-25: `MAX_PDF_SIZE_BYTES = 200 MB`, `MIN_PDF_SIZE_BYTES = 100 B`. The "50 MB" written here in April is stale.)*
 - ✅ File type validation (%PDF magic bytes check)
 - ✅ Filename sanity (path traversal rejection)
 - ✅ Rate limit (30 req/min per IP, 60s sliding window) — HTTP 429
@@ -62,28 +66,28 @@ RoomCard now has expandable details section showing zoom audit trail, calculatio
 - ✅ aiRooms PdfViewer prop defensive fallback (`v8_rooms || patalpos`)
 - ✅ _meta debug panel in ProjectMainView (cost/tokens/zoom transparency)
 
+## Phase 11 — SHIPPED SINCE (verified against code 2026-07-25)
+
+### ✅ Limitation 8: No authentication / multi-tenancy — FIXED
+Session auth shipped: email + password (**bcrypt**, work factor 12) **and** Google OAuth (`/api/auth/google*`). `backend/auth.py` + `require_user` / `require_admin`. Every project-scoped endpoint requires auth and scopes the query by `user_id`; `db.upsert_project` has an ownership barrier. `SAMATU_AUTH_DISABLED=1` is a dev-only bypass and the app **hard-fails at boot** if it is set with `ENV=production`. Admin is an explicit `SAMATU_ADMIN_EMAIL` allowlist (legacy first-user fallback only when unset).
+
+### ✅ Limitation 9: Project data only in localStorage — FIXED
+SQLite backing store (`backend/db.py`, 10 tables) behind `/api/projects` CRUD. `frontend/src/lib/projectStore.js` is write-through: every mutation hits localStorage (instant) **and** the backend (durable, cross-device). Backend is the source of truth; the cache is purged on logout.
+**Residual (small):** `pullProjectsFromBackend` replaces the cache wholesale rather than merging, so a project that only ever existed in localStorage (created while the backend write was failing) is dropped on the next pull.
+
+### ✅ Limitation 10: No "re-extract" button — FIXED
+`frontend/src/components/project/ReextractButton.jsx`, wired into `ProjectMainView`'s action row.
+
+### ◐ Limitation 11: Design polish / accessibility audit — PARTLY FIXED
+**Design:** done. The app runs the founder-approved **Nordic Slate** light theme (2026-07-11) — parchment/ink/evergreen tokens in `frontend/src/index.css`, plus the viewer chrome tokens. The old "functional but not designed" note no longer holds.
+**Accessibility:** still open. No formal keyboard-nav audit, no WCAG contrast pass; ARIA labels exist in only ~18 components. Treat a11y as unaudited.
+
 ## Phase 11 — STILL PENDING
 
-### Limitation 8: No authentication / multi-tenancy
-**Severity:** MED for public-facing deployment, LOW for in-house tool.
-**Status:** App is open. Anyone with URL can upload + extract.
-**Future fix:** Add Auth0 / Clerk / simple email+pw before public launch. Currently OK for soft-launch with known users.
-
-### Limitation 9: Project data only in localStorage
-**Severity:** MED. **Impact:** Projects lost if user clears browser data. No cross-device sync.
-**Future fix:** Backend `/api/projects` CRUD with database (SQLite or Postgres). LocalStorage as offline cache.
-
-### Limitation 10: No "re-extract" button on existing projects
-**Severity:** LOW. **Impact:** If user wants to redo extraction (eg. after upgrading prompt), they must delete + re-upload.
-**Future fix:** Add "Re-extract" button that re-uses the saved PDF (in IndexedDB) with current pipeline.
-
-### Limitation 11: No design polish / accessibility audit
-**Severity:** LOW for MVP, MED for public launch. **Impact:** UI is functional but not "designed." No keyboard nav audit, no ARIA labels review, no empty/loading state polish across all views.
-**Future fix:** Dedicated design pass (likely separate plan with togal.ai UX research).
-
 ### Limitation 12: No browser cross-test
-**Severity:** MED. **Impact:** Pipeline + UI tested only via curl + Vite dev server. Chrome/Safari/Firefox compatibility not verified by automated test.
-**Future fix:** Manual smoke test by user before launch + Playwright/Cypress test in CI.
+**Severity:** MED. **Impact:** Chrome/Safari/Firefox compatibility is not verified by any automated test.
+**Status 2026-07-25:** UI changes *are* verified in a real browser, but ad-hoc via the Playwright MCP — there is **no `playwright.config.*` and no `e2e/` suite in the repo**, so nothing runs in CI and nothing is repeatable.
+**Future fix:** Commit a Playwright config + a smoke spec, then run it in CI.
 
 ### Limitation 6: Plytelės sienos high variance without sienų išklotinės
 **Severity:** MED for projects without wall-development pages.
@@ -98,7 +102,7 @@ RoomCard now has expandable details section showing zoom audit trail, calculatio
 - Open-plan kitchen tile zones (partial tile area within larger gyvenamoji room)
 This is a CLASSIFICATION ambiguity (not measurement) — even high-res zoom on the floor plan doesn't fully resolve it without `grindų planas` (separate floor finish drawing) or `apdailos lentelė` (finish schedule) showing finish codes per room.
 **Mitigation in production:** User can edit per-room values inline via RoomCard. The aggregate works/materials list will reflect their override.
-**Future fix:** Reactivate AssumptionsPanel (Limitation 1 above) so user sets default per-paskirtis tile/parquet preferences AND triggers backend re-extract with rules_override. This is the highest-impact UX improvement post-launch.
+**Future fix:** ~~Reactivate AssumptionsPanel~~ — done (Limitation 1). `AssumptionsPanel` is live and `ReextractButton` exists, so the user *can* set overrides and re-run. What remains open is the narrower piece: **default per-paskirtis tile/parquet preferences** that persist across projects.
 
 ---
 
@@ -156,7 +160,7 @@ distinct reasons** (no readable dimensions; multi-level ceilings). sernu remains
 
 ## 🚫 Untested scenarios (cannot resolve without sample data)
 
-We have only 5 training projects, all private residential new-builds. The pipeline has NEVER been validated on:
+We have **6** ground-truth projects (`ground_truth/`: berzas, ciurliu, lazunu, objektas_b, romainiai, sernu — was 5 when this was written), all private residential new-builds. The pipeline has NEVER been validated on:
 
 | Scenario | Risk | Mitigation if encountered |
 |----------|------|---------------------------|
@@ -168,7 +172,7 @@ We have only 5 training projects, all private residential new-builds. The pipeli
 | Scanned/raster PDFs (low-DPI photocopies) | Mm annotations may be illegible | Pipeline returns empty with warning |
 | Tiny rooms (<2m²), open-plan >40m² | Edge of formula range | Sanity warnings should fire |
 | PDFs with security/password protection | pdf2image will fail | Backend returns `pdf_to_images_failed` error |
-| PDFs >100 pages | Hits MAX_PAGES cap (rare in LT residential) | Will silently cap at 100; document as known limit |
+| PDFs >100 pages | Hits MAX_PAGES cap (rare in LT residential) | No longer silent — `_validate_pdf_upload` returns an LT warning naming the page count and that only the first 100 are analysed |
 
 **Recommendation:** Soft-launch with ≤5 friendly contractors on private-residential projects FIRST. Collect 10-20 real PDFs across the untested scenarios above before broad launch.
 
@@ -202,7 +206,7 @@ Before flipping the switch:
 - [ ] Phase 9 determinism on P1, P3 with zoom (in progress)
 - [ ] Browser smoke test in Chrome / Safari / Firefox by a real user
 - [ ] Set up monitoring / error reporting (Sentry, LogRocket, or similar)
-- [ ] Document the soft-launch scope (which contractors, which project types)
+- [x] Document the soft-launch scope — **project types decided 2026-07-25: interior only.** Fasadai / Stogas / Žemės / Betonas are hidden behind the "kitas tipas" advanced disclosure in `NewProject.jsx` because their endpoints are thin (e.g. roof silently assumes a 30° pitch). Which contractors: still open.
 - [ ] Plan for post-launch sample collection (10-20 real PDFs across untested scenarios)
 
 ---

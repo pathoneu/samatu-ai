@@ -31,11 +31,13 @@ Fix: `pkill -f "uvicorn main:app"` and relaunch — or run with `--reload` while
 
 ## Tests — what "green" means
 
-- **Backend:** `cd backend && ../venv/bin/python -m pytest -q` → **1392 passed** (~71 s). `conftest` autouse-clears rate-limit buckets between tests.
-- **Frontend units:** `cd frontend && node --test src/lib/*.test.js` → **224 pass**. These use **node:test, not vitest** — running vitest errors "No test suite found."
+- **Backend:** `cd backend && ../venv/bin/python -m pytest -q` → **≈1468 passed** (~71 s) as of 2026-07-25. `conftest` autouse-clears rate-limit buckets between tests.
+- **Frontend units:** `cd frontend && node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js` → **≈258 pass** as of 2026-07-25. These use **node:test, not vitest** — running vitest errors "No test suite found."
+  - ⚠️ **The bare `src/lib/*.test.js` glob silently skips `src/lib/viewerEngine/*.test.js`** — 3 files, 23 tests (`embedPdfAdapter`, `pageRotation`, `pageViewport`). `*` does not recurse into subdirectories, and the glob still matches plenty of files in `src/lib/` itself, so nothing errors: you get a green run that quietly proves less than you think. Those 23 tests do pass — they just never ran. `package.json`'s `test:units` still carries the narrow glob (being fixed separately) — until then, type the full command above.
+  - Treat both counts as **drifting**. They are a smell test, not a contract: run the suite and read its own total rather than diffing against a number in a doc.
 - **Lint:** `cd frontend && npx eslint . --quiet`.
-- There is no frontend component-test harness — **verify UI changes in a real browser** (Playwright), not just a type-check.
-- **SEO build (opt-in):** `cd frontend && npm run build:seo` — `vite build` + prerenders the 10 public routes into `dist/<route>/index.html` (pinned `playwright@1.55.1` via npm exec; chromium cached in `~/Library/Caches/ms-playwright`). Default `npm run build` untouched. Spot-check with `python3 -m http.server -d dist` — **`vite preview` skips the directory index files**, so it will misleadingly show the SPA shell.
+- There is no frontend component-test harness and **no Playwright config in the repo** (no `playwright.config.*`, no `e2e/`) — browser verification is done ad-hoc via the Playwright MCP. **Verify UI changes in a real browser**, not just a type-check.
+- **SEO build (opt-in):** `cd frontend && npm run build:seo` — `vite build` + prerenders the **11** public routes (`/`, `/en`, `/about`, `/duk`, `/privacy`, `/terms`, `/cookies` + the 4 BoFu pages) into `dist/<route>/index.html` (pinned `playwright@1.55.1` via npm exec; chromium cached in `~/Library/Caches/ms-playwright`). Default `npm run build` untouched. Spot-check with `python3 -m http.server -d dist` — **`vite preview` skips the directory index files**, so it will misleadingly show the SPA shell.
 
 ## Run the extractor on a real PDF ($ + slow)
 

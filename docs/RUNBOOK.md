@@ -1,7 +1,15 @@
-# Sąmatų AI — production launch runbook
+# Pathon — production launch runbook
 
 **Audience:** Pathon owner / DevOps. The CLI agent cannot reach DNS, billing,
 or hosting consoles, so this is the manual checklist for going live.
+
+> **Database reality check (read before anything else):** Pathon has **no
+> Postgres**. `backend/db.py` is `sqlite3`-only and `DATABASE_URL` appears
+> nowhere in the codebase. The whole app runs off one SQLite file — see §2a.
+> Any older text about "managed Postgres" was aspirational and is now removed
+> from this runbook. **`render.yaml` still carries the same stale comment in
+> its header** ("Postgres can be attached … via `DATABASE_URL`") — ignore it;
+> nothing reads that variable.
 
 ---
 
@@ -13,34 +21,65 @@ or hosting consoles, so this is the manual checklist for going live.
       https://console.cloud.google.com/apis/credentials
 - [ ] Pathon registrar access for DNS records.
 - [ ] Cloudflare account (free tier OK) — DDoS + auto-TLS + DMARC dashboard.
-- [ ] Hosting platform decision. Recommended: **Render.com** (easiest +
-      managed Postgres, $7/mo for the basic web instance) or **Fly.io**
-      (more flexible, slightly more setup).
+- [ ] Cloudflare R2 bucket + API token (PDF storage **and** the nightly DB
+      backup — see §7). Without the `R2_*` vars there are no backups at all.
+- [ ] Hosting platform decision. The repo ships configs for exactly two:
+      **Render** (`render.yaml`) and **Railway** (`railway.toml` +
+      `nixpacks.toml`). There is **no Fly.io config** — ignore older advice
+      to use it. See §2 for the one difference that actually matters
+      (system packages).
 
 ## 1. Pick a domain target
 
-Subdomain on Pathon registry: `samatu.pathon.eu` (recommended), or apex
-domain if you want.
+Canonical, and what ships today: the **apex `pathon.eu`** for the frontend.
+(`samatu.pathon.eu` / `samatu-api.pathon.eu` were the pre-rebrand plan — do
+not use them.) The **API host** is whatever the platform assigns
+(e.g. `samatu-api.onrender.com`) unless you configure a custom domain for it.
+Whichever you end up with: `SAMATU_CORS_ORIGINS` must equal the **real
+frontend origin**, exactly, or the browser blocks every API call.
 
 ## 2. Hosting setup — Render.com path
 
+**Deploys track the repo's GitHub default branch (`main`), not your working
+branch.** Active development lives on `viewer-rebuild`. Fast-forward `main`
+to the branch you want live before deploying, or Render will happily ship
+months-old code and report a green deploy.
+
 1. Sign up at render.com using your Pathon Google account.
-2. Click **New → Web Service**.
+2. Click **New → Web Service** (or point Render at `render.yaml` as a Blueprint).
 3. Connect this GitHub repo (or push from local — Render supports both).
-4. **Root directory:** `backend`
+4. **Root directory:** repo root — the blueprint does its own `cd backend` in
+   the start command, and the build installs `backend/requirements.txt`.
 5. **Build command:**
    ```
-   pip install -r requirements.txt
+   pip install -r backend/requirements.txt
    ```
-6. **Start command:**
+6. **Start command** — must match `render.yaml`, flags included:
    ```
-   uvicorn main:app --host 0.0.0.0 --port $PORT
+   cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
    ```
+   `--proxy-headers --forwarded-allow-ips='*'` is **not optional**: the per-IP
+   login/register rate limiter keys on the **rightmost `X-Forwarded-For` hop**
+   (2026-07-15 hardening). Drop the flags and every request looks like it came
+   from Render's proxy — one abuser then locks out everyone's auth. `'*'` is
+   safe here because the service is only reachable via Render's edge.
 7. **Region:** Frankfurt (closest EU).
 8. **Instance type:** Starter ($7/mo).
-9. Add a **Postgres** instance (Render → New → Postgres). Copy the
-   internal connection string.
+9. **Attach a persistent disk and mount it over `backend/data`** — see §2a.
+   Skipping this is the single most destructive mistake available: every
+   deploy silently wipes all users and projects.
 10. Add the env vars (see §4).
+
+⚠️ **System packages.** `pdf2image` needs the **poppler** binaries and
+`opencv-python-headless` needs **libGL + libglib2** at runtime. Railway's
+`nixpacks.toml` declares these explicitly (`poppler_utils`, `libgl1`,
+`libglib2.0-0`). `render.yaml`'s build is a plain
+`pip install -r backend/requirements.txt` with **no apt/native package step** —
+so on Render you must supply them yourself (a custom Docker runtime, or
+Render's native-dependency mechanism). The failure mode is loud but late:
+extraction returns *"Nepavyko konvertuoti PDF — įdiekite poppler (pdf2image)"*
+at the first upload, long after the deploy went green. Verify with a real PDF
+upload in the §5 smoke test, not with `/health`.
 
 For the **frontend**:
 1. **New → Static Site**
@@ -48,24 +87,59 @@ For the **frontend**:
 3. **Root directory:** `frontend`
 4. **Build:** `npm install && npm run build`
 5. **Publish dir:** `dist`
-6. Add `VITE_BACKEND_URL=https://samatu-api.pathon.eu` (or whatever the
-   backend URL ends up being).
+6. Add `VITE_BACKEND_URL=<the real backend origin>` (the blueprint currently
+   ships `https://samatu-api.onrender.com`).
+
+## 2a. The database — one SQLite file, and how not to lose it
+
+- `backend/db.py` is **`sqlite3`-only**. Path: `SAMATU_DB_PATH`, defaulting to
+  **`backend/data/samatu.db`**. 10 tables (users, projects, extractions,
+  usage_events, corrections, consumed_trials, billing_usage, webhook_events,
+  invoices, admin_audit_log).
+- On Render/Railway the container filesystem is **ephemeral**. You **MUST**
+  attach a persistent disk and mount it over `backend/data` (or mount it
+  elsewhere and point `SAMATU_DB_PATH` at it, e.g. `/data/samatu.db`).
+  Without that, the DB is recreated empty on every deploy and restart.
+- **Backups:** `backend/backup_scheduler.py` runs a nightly in-process
+  snapshot (default 03:15 UTC; `SAMATU_BACKUP_HOUR_UTC` /
+  `SAMATU_BACKUP_MINUTE_UTC`). It is **default-on in prod** — enabled
+  automatically when `R2_BUCKET` is set, or explicitly via
+  `SAMATU_NIGHTLY_BACKUP=1`. It uploads to the R2 bucket as
+  **`backups/samatu-<utc-stamp>.db`**. It runs in-process on purpose: on
+  Render a separate cron service cannot see this service's disk.
+- **There is NO automated restore.** Restoring is manual: download the chosen
+  `backups/samatu-<stamp>.db` object from the R2 bucket, stop the service,
+  replace the file at `SAMATU_DB_PATH`, restart. Nothing in the codebase does
+  this for you — rehearse it once before you need it.
+- Run a single uvicorn worker. N workers = N identical snapshots per night
+  (harmless, just redundant).
+
+## 2b. Hosting setup — Railway path (the alternative that's already wired)
+
+`railway.toml` + `nixpacks.toml` at repo root are complete and current. The
+build creates a venv at `/opt/venv`, installs `backend/requirements.txt`, and —
+the reason to prefer it — **declares the native deps Render doesn't**:
+`poppler_utils` (nixPkgs) plus `libgl1` + `libglib2.0-0` (aptPkgs). The start
+command carries the same `--proxy-headers --forwarded-allow-ips='*'` flags;
+health check is `/`. Same rules otherwise: attach a **Volume**, point
+`SAMATU_DB_PATH` at its mount (e.g. `/data/samatu.db`), set the §4 env vars.
 
 ## 3. DNS records on Pathon registrar
 
-Replace `<ip>` with the IP Render assigns to your services.
+Frontend on the apex, API on whatever host the platform gives you.
 
 ```
-samatu.pathon.eu          A     <render-frontend-ip>
-samatu-api.pathon.eu      A     <render-backend-ip>
+pathon.eu                 A     <render-frontend-ip>      (or ALIAS/CNAME flattening)
+www.pathon.eu             CNAME pathon.eu
 ```
 
-Or use Render-provided CNAMEs if no static IPs.
+Or use Render-provided CNAMEs if no static IPs. If you give the API its own
+custom domain, add it here too **and** update `SAMATU_CORS_ORIGINS` +
+`VITE_BACKEND_URL` + `GOOGLE_REDIRECT_URI` to match.
 
 If using Cloudflare in front:
 ```
-samatu.pathon.eu          CNAME proxy → samatu.onrender.com
-samatu-api.pathon.eu      CNAME proxy → samatu-api.onrender.com
+pathon.eu                 CNAME proxy → samatu-web.onrender.com
 ```
 
 ## 4. Environment variables (backend)
@@ -78,41 +152,70 @@ ENV=production
 ANTHROPIC_API_KEY=sk-ant-...
 SAMATU_SECRET_KEY=<generate: python -c "import secrets; print(secrets.token_urlsafe(48))">
 
+# Admin allowlist — comma-separated emails (case/whitespace tolerant).
+# SET THIS. If it is unset or empty, the backend falls back to legacy
+# behaviour: the FIRST account registered on a fresh DB becomes admin.
+SAMATU_ADMIN_EMAIL=solutions@pathon.eu
+
 # Cost protection
 SAMATU_USER_DAILY_SPEND_EUR=0.50
 SAMATU_USER_HOURLY_EXTRACTS=10
 
-# CORS — exact frontend domain(s), comma-separated
-SAMATU_CORS_ORIGINS=https://samatu.pathon.eu
+# CORS — exact frontend origin(s), comma-separated. Must match reality.
+SAMATU_CORS_ORIGINS=https://pathon.eu
 
-# Database
-SAMATU_DB_PATH=/var/data/samatu.db   # or use Render's managed Postgres if you wire DATABASE_URL through
+# Database — SQLite file. Point at the PERSISTENT DISK mount (§2a).
+SAMATU_DB_PATH=/var/data/samatu.db
 
-# Optional — Google OAuth
+# Storage + backups (Cloudflare R2). All four required, or PDFs fall back to
+# local disk and the nightly DB backup never runs.
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=samatu-pdfs
+
+# Optional — Google OAuth. Redirect URI must match the real API origin.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=https://samatu-api.pathon.eu/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://<api-host>/api/auth/google/callback
 ```
 
+**Boot-time guards (the app refuses to start rather than run insecure):**
+- `ENV=production` + `SAMATU_SECRET_KEY` unset (or left at the dev fallback)
+  → **FATAL, process exits.** Every session cookie would be forgeable.
+- `ENV=production` + `SAMATU_AUTH_DISABLED=1` → **FATAL, process exits.**
+  `SAMATU_AUTH_DISABLED` is a dev-only bypass; it must never reach prod.
+
 CRITICAL: never commit `.env`. Render's secret manager handles this safely.
+Note `render.yaml` does **not** yet declare `SAMATU_ADMIN_EMAIL`,
+`SAMATU_DB_PATH` or the `R2_*` vars — add them in the dashboard.
 
 ## 5. Smoke test (after first deploy)
 
 From your laptop, with browser DevTools open:
 
-1. Open `https://samatu.pathon.eu/`
-   → Expected: Landing page with "Sąmatos per minutes, ne dienas" hero.
-2. Click **Sukurti paskyrą** → register with your email.
+1. Open `https://pathon.eu/`
+   → Expected: the Pathon landing page (no "Sąmatų AI" branding anywhere).
+2. **Before sharing the URL with anyone:** register the founder account
+   yourself, and make sure `SAMATU_ADMIN_EMAIL` already lists that email.
+   Belt and braces — the allowlist is the real control (2026-07-15
+   hardening, commit `5adac1c`); pre-registering also closes the legacy
+   first-user-wins path if the allowlist is ever cleared. Do not rely on
+   "whoever registers first is admin": on a public URL that is a stranger.
 3. Open **DevTools → Application → Cookies** — verify `samatu_session`
    has `Secure` + `HttpOnly` flags ticked, `SameSite=Lax`.
 4. Open **DevTools → Network** for a backend request — verify response
    headers contain `Strict-Transport-Security`, `Content-Security-Policy`,
    `X-Frame-Options: DENY`.
-5. Upload a small test PDF — verify extraction returns within ~30s.
-6. As the FIRST registered user, you should be admin. Visit `/admin` —
-   must show stats dashboard.
+5. Upload a small test PDF — verify extraction returns without a
+   *"įdiekite poppler"* error (that's the §2 native-package check) and
+   completes. This is slow: budget minutes, not ~30s.
+6. Visit `/admin` as the founder account — must show the stats dashboard.
 7. Open in incognito → register a SECOND test user → visit `/admin` →
-   must redirect to `/dashboard` (non-admin can't see admin).
+   must redirect to `/dashboard` (non-admin can't see admin). If the second
+   user *does* get admin, `SAMATU_ADMIN_EMAIL` is not set — fix immediately.
+8. Confirm the DB survives a deploy: redeploy, then log in again. Still
+   there = the persistent disk (§2a) is mounted correctly. Gone = it isn't.
 
 ## 6. Cost monitoring (first week)
 
@@ -124,8 +227,14 @@ From your laptop, with browser DevTools open:
 
 ## 7. Post-launch
 
-- **Backups:** Render Postgres has daily snapshots. Verify they're enabled.
-- **Uptime monitoring:** UptimeRobot free tier — ping every 5 min.
+- **Backups:** there is no managed-DB snapshot service — the only backup is
+  the app's own nightly R2 upload (§2a). Verify it: after the first night,
+  list the bucket and confirm a `backups/samatu-<stamp>.db` object exists,
+  then check the log line `nightly backup ok: ...`. **Also rehearse the
+  manual restore once** — it is not automated, and discovering that during
+  an outage is the wrong time.
+- **Uptime monitoring:** UptimeRobot free tier — ping every 5 min
+  (`/health` is the backend health check path).
 - **Error tracking:** Sentry free tier (5k events/mo) — wire later if needed.
 - **Email:** until SMTP is set up, password reset is unavailable. For beta,
   this is acceptable — users can register fresh.
@@ -144,7 +253,9 @@ If a deploy breaks production:
 If you ever need to take the service down:
 
 1. Render → Suspend service. Frontend + backend stop serving immediately.
-2. Snapshot Postgres before deleting.
+2. Take a final DB snapshot **before** deleting the persistent disk — the
+   disk *is* the database. Either run a manual backup to R2 or copy
+   `SAMATU_DB_PATH` off the disk; deleting the disk is irreversible.
 3. Notify users via email at least 30 days in advance per Privacy policy §11.
 4. Export user data on request before final shutdown (BDAR Art. 20 — duomenų
    perkeliamumas).
@@ -155,7 +266,10 @@ If you ever need to take the service down:
 
 - **Email service** (Postmark / Resend / AWS SES) — pick when password
   reset becomes a real need. Without it, register-only flow is fine.
-- **Stripe / billing** — not in scope for beta. Add in a separate sprint.
+- **Stripe / billing** — the code is **already built but dormant**, gated by
+  `BILLING_ENABLED` (defaults `'0'`). Not "add in a separate sprint" — it is
+  "run the pre-flight, then flip the flag" (see `DEVELOPING.md` for that
+  checklist). Keep it off for beta.
 - **Multi-floor / multi-tenant** — not in scope for beta.
 - **Mobile-native UI** — web responsive is good enough.
 

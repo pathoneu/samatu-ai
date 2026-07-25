@@ -1,10 +1,12 @@
-# SĄMATŲ AI — Master Knowledge Base
+# PATHON — Master Knowledge Base
+
+> **Naming:** the product is **Pathon**. "Sąmatų AI" is the pre-2026-07-03 name — it should not appear in UI, exports or marketing. Code identifiers keep the old prefix on purpose: env vars (`SAMATU_*`), the SQLite file (`samatu.db`), localStorage keys (`samatu_projects`), the session cookie (`samatu_session`) and Render service names. Don't "fix" those — renaming them breaks live sessions and prod config.
 
 **What this is:** A Lithuanian construction cost-estimation web app. It reads project PDFs, extracts quantities, calculates areas/volumes/lengths, and generates kiekių žiniaraščiai (quantity schedules). Replaces manual estimator (samatininko) work for construction company owners.
 
 **Stack:** Python FastAPI backend + React/Vite/Tailwind/shadcn frontend. Anthropic Claude for vision + extraction. PDF→PNG via pdfplumber/pdf2image. Run `ls backend/`, `ls frontend/src/`, or `git log` to discover current code layout — don't trust a stale file tree here.
 
-**Start-here manuals** (read before touching code): [`docs/DEVELOPING.md`](docs/DEVELOPING.md) — how to run/test/debug/ship + the gotchas that waste an hour (no-`--reload` backend, auth-on testing, which test runner). [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — real data flow + the **CANONICAL-vs-stale file map** (the LT formula engine is `backend/extractor/universal_rules.py`; `frontend/src/lib/interiorCalc.js` is a stale FE copy — backend is source of truth) + known fragilities + accuracy reality. [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — production launch/DNS/hosting.
+**Start-here manuals** (read before touching code): [`docs/DEVELOPING.md`](docs/DEVELOPING.md) — how to run/test/debug/ship + the gotchas that waste an hour (no-`--reload` backend, auth-on testing, which test runner). [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — real data flow + the **CANONICAL-vs-stale file map** (the LT formula engine is `backend/extractor/universal_rules.py` — canonical, backend is source of truth; `frontend/src/lib/interiorCalc.js` is **live**, not dead: `InteriorProject.jsx` still calls it as the fallback for legacy project blobs that carry no `skaiciavimai`, so never extend it and never delete it) + known fragilities + accuracy reality. [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — production launch/DNS/hosting.
 
 ---
 
@@ -22,14 +24,15 @@ I do not want a yes-man. The single most valuable thing you can do is push back 
 
 ---
 
-## What we built (working today on `main`)
+## What we built (working today on `viewer-rebuild` — the active branch; `main` is behind)
 
 - **KŽ extraction** (`/extract`) — Claude reads construction PDF → rows (nr, description, unit, quantity, section). User enters prices. 21% PVM. Excel/PDF export.
 - **Interior analysis** (`/extract-interior`) — Claude Vision reads interior design PDFs → dažomas plotas, angokraščiai, glaistymo kampai, lubų perimetras, užuolaidų nišos, grindjuostės, dažų kiekis, GK lapai, glaistas.
-- **Assumptions panel** — `Prielaidos` tab; live recalculation via `frontend/src/utils/interiorCalc.js` when user edits sienos storis, Q lygis, langai, durys per kambarį.
+- **Assumptions panel** — `AssumptionsPanel`, opened from the **Prielaidos** button in `ProjectTopBar` (it is not a TabBar tab); live recalculation via `POST /api/recompute-quantities` (`frontend/src/lib/recomputeApi.js`) when user edits sienos storis, Q lygis, langai, durys per kambarį. The math runs **backend-side** — `frontend/src/lib/interiorCalc.js` is only the legacy-blob fallback.
 - **Window fallback** — when Vision returns 0 windows, warns + suggests standard sizes per room type.
 - **PDF viewer Phase C-1 / C-2 / C-4** — polygon editor (sienos/grindys redagavimas), trust signals (provenance popovers), visual polish (theme tokens, toolbar grouping, thumbnails, status bar).
-- **Project type selection** — Automatinis / Interjero projektas / KŽ.
+- **AI Takeoff Viewer** — `TakeoffViewer` on **EmbedPDF/PDFium** is the DEFAULT viewer; room zones (red-ring model), measurement tools (distance/perimeter/area/count + calibration), click-to-fill. The old react-pdf `PlanViewer` survives behind `?viewer=legacy`. See `docs/ARCHITECTURE.md` § "The viewer stack".
+- **Project type selection** — **Interjero projektas is the only default choice**; Automatinis / KŽ / Fasadai / Stogas / Žemės / Betonas sit behind the "kitas tipas" advanced disclosure in `NewProject.jsx`.
 
 ## What we tried — worked
 
@@ -52,14 +55,17 @@ I do not want a yes-man. The single most valuable thing you can do is push back 
 
 Full bake-off: `detector_bench/README.md` + `results/2026-05-03-bakeoff.md`.
 
+⚠️ **The bake-off harness no longer runs.** `detector_bench/benchmark.py` still imports `p3_template_match`, `p4_hybrid`, `p5_grounding_dino` and `p6_claude_tool_orch`, but only `p1_baseline_vision.py` and `p2_text_driven.py` remain in `detector_bench/detectors/` — the import fails at module load. The numbers above are historical; fix the imports (or drop the dead detectors) before quoting any *new* number from it.
+
 ## Open / next
 
-- **Ground truth is AI-seeded**, not human-confirmed. All accuracy numbers measure agreement-with-Claude, not absolute correctness. Highest-leverage work in the project right now: write `detector_bench/build_ground_truth.py` (the README points at it but it doesn't exist yet) and run the ~1h interactive flow.
-- **No count-correction UI on top of Pipeline 1.** The bake-off conclusion: ship 50% AI + a fast manual-correction tool, don't chase a perfect detector. This UI doesn't exist — it's the next concrete build.
-- **Phase C-3 click-to-fill walls** — plan complete (`docs/superpowers/plans/2026-05-02-phase-c-3-click-to-fill.md`), 12 tasks, not implemented.
-- **No auth / DB** — projects in `localStorage` only.
-- **No facade / roof / earthworks / concrete modules** — formulas exist below, code doesn't.
-- **No F2/F3 export, no Sistela integration.**
+- **Ground truth is still mostly AI-seeded.** The tooling question is *solved*: `scripts/build_ground_truth.py` exists and harvests **human-confirmed** signals straight out of the project blobs in SQLite (polygons with `polygon_source ∈ {corrected, manual}`, quantities with `manual_override` / `user_verified`). No separate 1-hour interactive flow — the corrections *are* the corpus. **The corpus is nearly empty** (~1 confirmed polygon + 1 confirmed quantity across the 21 dev projects), so accuracy numbers still largely measure agreement-with-Claude. The highest-leverage act is therefore **using the correction workspace on real projects**, not writing more harness code. (The old `detector_bench/build_ground_truth.py` referenced by `detector_bench/README.md` was never written and is superseded — ignore it.)
+- **Count-correction UI — SHIPPED.** Viewer count tool with user-defined types + `CountLegendPanel` (`frontend/src/components/viewer/`) + the **Matavimai** list in `WorkspacePanel.jsx` (CSV/JSON export). The bake-off conclusion (ship 50% AI + a fast manual-correction tool, don't chase a perfect detector) is implemented; what's missing is *usage volume*, see the ground-truth bullet above.
+- **Phase C-3 click-to-fill walls — SHIPPED and maintained.** `POST /api/click-to-fill` + the label-seeded auto-polygon path in `backend/main.py`, driven by the viewer's **Taisyti zoną** flow (`TakeoffViewer.jsx`, `PlanViewer.jsx`). The plan doc (`docs/superpowers/plans/2026-05-02-phase-c-3-click-to-fill.md`) is history, not a TODO.
+- **Auth + DB exist.** Session auth (email + password via bcrypt work-factor 12, plus Google OAuth) and SQLite (`backend/db.py`, 10 tables: users, projects, extractions, usage_events, corrections, consumed_trials, billing_usage, webhook_events, invoices, admin_audit_log). `localStorage` is a **write-through cache** — the backend is source of truth (`frontend/src/lib/projectStore.js`).
+- **Facade / roof / earthworks / concrete — endpoints exist but are thin.** `/extract-facade`, `/extract-roof`, `/extract-earthworks`, `/extract-concrete` in `main.py` run a single Vision pass + a small formula block. They are **not** at interior-module quality: e.g. `_calculate_roof_quantities` silently falls back to `pitch_degrees = 30` when the drawing gives no pitch, which quietly fabricates the slope factor. **2026-07-25 founder decision: all four are hidden from the launch UI** (`NewProject.jsx` keeps them in `ADVANCED_PROJECT_TYPES`, behind the "kitas tipas" disclosure). The validated `backend/extractor/roof/` package (geometry, evidence, page_authority, constraint_check, strategies) exists but **is not wired to `/extract-roof`** — wiring it is the real roof-module task.
+- **F2/F3 export: backend-only, no UI by choice.** `backend/extractor/f2_export.py` + `backend/api/exports_v2.py` serve `/f2/{id}.json|.csv` and `/f3/{id}.json` and work. The UI buttons were **removed 2026-04-29 per founder feedback** (`ExportDropdown.jsx` §FIX-9) — absence of a button is a product decision, not a missing feature.
+- **No Sistela integration.**
 
 ## Research index — read before re-googling
 
@@ -80,7 +86,7 @@ Full bake-off: `detector_bench/README.md` + `results/2026-05-03-bakeoff.md`.
 ## Operational rules
 
 - All **UI text in Lithuanian**. Code identifiers and comments in English.
-- shadcn/ui, dark theme (`bg-gray-900/950`).
+- shadcn/ui, **light "Nordic Slate" theme** — parchment page + white panels + slate ink + ONE muted evergreen accent, sharp 2px radius, IBM Plex Sans/Mono. Tokens live in `:root` in `frontend/src/index.css`; there is **no `dark` class on `<html>`** (the `.dark` block there is inert compat). Never reach for `bg-gray-900/950` — use the theme tokens.
 - Currency **EUR €**, always **21% PVM**. Renovation: reverse VAT.
 - Metric only: **m, m², m³, kg, l, vnt.**
 - Every calculation must show its assumptions to the user (and let them override → recalc live).

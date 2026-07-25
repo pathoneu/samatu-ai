@@ -1,6 +1,6 @@
 # Pathon — Architecture & Traps
 
-The real data flow, a **"which file is canonical"** map so you don't edit a stale copy, and the known fragilities. Written 2026-07-06 (Fable 5 handoff). Pairs with [`DEVELOPING.md`](DEVELOPING.md).
+The real data flow, a **"which file is canonical"** map so you don't edit a stale copy, and the known fragilities. Written 2026-07-06 (Fable 5 handoff); revised 2026-07-25 (viewer stack added; `interiorCalc.js` and the recompute callers corrected). Pairs with [`DEVELOPING.md`](DEVELOPING.md).
 
 ## Data flow (the happy path)
 
@@ -15,7 +15,7 @@ The real data flow, a **"which file is canonical"** map so you don't edit a stal
 
 There are **two live recompute endpoints** for different edit surfaces — don't assume either is dead:
 - **`POST /api/recompute-quantities`** (`backend/api/recompute_quantities.py`) — the **AssumptionsPanel** path. `AssumptionsPanel` edit → `frontend/src/lib/recomputeApi.js` → `_apply_assumption_edits` mutates rooms (ceiling height, `walls_paint_override`) → `_build_pozicijos_from_rooms` rebuild → `darbu_sarasas`.
-- **`POST /recompute-interior`** (`backend/main.py`) — the **room/polygon-edit** path, via `handleRoomsChange` in `InteriorProject.jsx` (fires when the user edits a room primitive — plotas, perimetras, lubų aukštis, paskirtis — or on the `samatu:project-recompute` event). Rebuilds `darbu_sarasas` + santrauka deterministically from the edited rooms; no Vision call. (The old `RulesOverridePanel` also called this endpoint but was removed from the UI 2026-05-06 — the endpoint itself is live and reachable.)
+- **`POST /recompute-interior`** (`backend/main.py`) — the **room/polygon-edit** path, and today its **only** live caller: `handleRoomsChange` in `InteriorProject.jsx` (fires when the user edits a room primitive — plotas, perimetras, lubų aukštis, paskirtis — or on the `samatu:project-recompute` event dispatched by `projectStore.updateRoomPolygon`, i.e. viewer zone edits). Rebuilds `darbu_sarasas` + santrauka deterministically from the edited rooms; no Vision call. (`RulesOverridePanel` also called this endpoint, but that component was **removed from the UI 2026-05-06** and is now an orphan file — don't cite it as the caller.)
 
 Both run `calc_room_quantities` → `_build_pozicijos_from_rooms`. Frontend `onRecomputed` → **`mergeDarbuSarasasEdits`** re-attaches the user's prices to the rebuilt lines by label.
 
@@ -23,14 +23,27 @@ Both run `calc_room_quantities` → `_build_pozicijos_from_rooms`. Frontend `onR
 
 `ExportModal` builds `{projektas, eilutes, prielaidos, patalpos}` (maps `darbu_sarasas → eilutes`) → `POST /export/excel` | `/export/pdf` → `generate_excel` / `generate_pdf` (`main.py`). Excel uses **live formulas** (`=SUBTOTAL`, `=ROUND(...*0.21)`) so the contractor can edit quantities/prices in Excel and totals recompute.
 
+## The viewer stack (three viewers exist — know which one you're in)
+
+- **`TakeoffViewer`** (`frontend/src/components/viewer/TakeoffViewer.jsx`) — **the default.** Built on **EmbedPDF / PDFium** (`@embedpdf/*` 2.14.x). This is the commercial takeoff surface: room zones, measurement tools, click-to-fill.
+- **`PageOverlayHost`** — mounted once per page by `TakeoffViewer`'s `renderPage`. It is the **single rotation wrapper**: base render + tiling + search layers **and** our overlays rotate together inside it. Never rotate one layer alone — that's how overlays slide off their rooms. Clicks arrive already un-rotated and un-zoomed, in **PDF-point space**; `makeEmbedAdapter` is the only coordinate boundary.
+- **`RoomZoneLayer`** — the **red-ring** model (founder decision 2026-07-14): at rest the drawing is clean; selecting a room draws ONE red ring on that room's own printed number. Filled polygon zones still exist behind the toolbar Layers toggle (QA view). Synthesized/bbox geometry renders dashed + "apytikslė".
+- **`MeasureLayer`** — distance / perimeter / area / count + calibration, in PDF-point space. Page scale auto-seeds from the extractor's own data (`autoPageScalesFromRooms` → median m² per point from `polygon_pct` + eksplikacija `plotas_m2`); the user can override via `CalibrateDialog`. Durable per-page scale rides the project blob (`lib/durableScale.js`), so it survives a cache clear.
+- **`PlanViewer`** (`components/project/PlanViewer.jsx`) — the legacy react-pdf viewer, reachable with **`?viewer=legacy`** (or `localStorage.samatu_viewer_engine = 'legacy'`). It keeps room overlays and Taisyti zoną but has **no `MeasureLayer`** — no measurement authoring. Don't send a user there to measure.
+- **`Annotator`** (`/project/:id/annotator`, `pages/Annotator.jsx` + `components/annotator/`) — a **third**, older react-pdf measurement UI. Routed but unlinked from the app nav: dev-only, not part of the product surface. Don't build on it.
+
 ## ⚠️ CANONICAL vs STALE — edit the RIGHT file
 
 | Concern | CANONICAL (edit this) | STALE / DEAD (do NOT build on) |
 |---|---|---|
-| Accuracy formulas | `backend/extractor/universal_rules.py::calc_room_quantities` + `line_items.py` (spec: `CLAUDE.md §1`) | `frontend/src/lib/interiorCalc.js` (old FE copy of the math — backend is source of truth); legacy math paths in `main.py` |
-| Live recompute | BOTH `backend/api/recompute_quantities.py` (AssumptionsPanel) and `/recompute-interior` in `main.py` (RulesOverridePanel) — different edit surfaces, both live | — |
+| Accuracy formulas | `backend/extractor/universal_rules.py::calc_room_quantities` + `line_items.py` (spec: `CLAUDE.md §1`) | legacy math paths in `main.py` |
+| Live recompute | BOTH `backend/api/recompute_quantities.py` (AssumptionsPanel) and `/recompute-interior` in `main.py` (room/polygon edits) — different edit surfaces, both live | — |
 | Line items shown/exported | `darbu_sarasas` (from `_emit_v8_compat_fields`) | — |
 | Prices | user-entered on `darbu_sarasas`, carried by `mergeDarbuSarasasEdits` (`frontend/src/pages/InteriorProject.jsx`) | — |
+
+⚠️ **`frontend/src/lib/interiorCalc.js` is LIVE, not stale.** It used to be listed here as a dead FE copy — it isn't. `InteriorProject.jsx` imports it (line 26) and calls `calculateInteriorQuantities(rawData, assumptions)` (~line 695) as the **fallback for legacy project blobs** whose `skaiciavimai.dazomas_plotas.viso_m2` is missing or zero. So: the backend engine is still the source of truth and **all new math goes into `universal_rules.py`** — but **do not delete `interiorCalc.js`**, and don't extend it either. Deleting it silently zeroes old projects.
+
+`frontend/src/components/project/RulesOverridePanel.jsx` **is** the genuinely orphaned file — removed from the UI 2026-05-06, no longer rendered by anything. Its endpoint (`/recompute-interior`) is very much alive; the component is not.
 
 Also: **gap-analysis docs go stale fast.** The `gap-analysis.md` under a fixture may predate an engine change — always confirm against the *current* code before trusting a "TODO" in it. (This exact trap wasted time: the 2026-05-27 gap doc listed an aggregation refactor as pending that had already shipped 2026-06-06.)
 
@@ -38,7 +51,7 @@ Also: **gap-analysis docs go stale fast.** The `gap-analysis.md` under a fixture
 
 - **Price-label matching.** Prices carry across a recompute by lowercased `aprasymas`. If a line's label changes on rebuild (paint flips iki↔virš-3m when a ceiling height crosses 3.0 m), the price can silently drop. Patched with a **normalized-key pass-2** on both FE (`mergeDarbuSarasasEdits`) and BE (`_merge_user_edits`). The *correct permanent fix* is **stable line IDs** (hash of room + line-type + base description) — a queued task.
 - **Stale-static demo.** The sample project's numbers are **hand-authored** (they don't derive from its rooms), so any recompute shifts them. That's why the sample is now **locked read-only** (`AssumptionsPanel` gates on `rawData.is_demo`). Real projects don't have this.
-- **Project persistence.** Projects sync backend ↔ localStorage; a project that exists **only** in localStorage is dropped on a backend pull. Moving to a durable per-user store is a queued task (also the audit's #1 architectural pilot risk).
+- **Project persistence.** The durable per-user store **shipped** — SQLite (`backend/db.py`), per-`user_id`, write-through: every mutation writes localStorage (instant) *and* `POST /api/projects` (durable, cross-device). Backend is the source of truth; localStorage is the offline cache, purged on logout. Residual edge: `pullProjectsFromBackend` **replaces the cache wholesale**, so a project that only ever existed in localStorage (created while the backend write was failing/offline) is dropped on the next pull. Rare, but real — it is not a merge.
 - **Vite module cache.** In a long dev session, `seedDemoProject`'s dynamic `import('@/demoData')` can return a stale module — a fresh browser is fine.
 - **No backend `--reload`** — see `DEVELOPING.md`.
 
