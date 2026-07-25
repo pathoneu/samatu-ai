@@ -85,3 +85,12 @@ eval_runs/
 
 # Vision call cache (sha256-keyed JSON responses)
 .vision_cache/
+
+# Session screenshots / debug dumps at repo root (regenerable QA artifacts)
+/*.jpeg
+/*.jpg
+/page2-mainimg.json
+# Playwright artifacts
+frontend/test-results/
+# Runtime CV capture (siblings corrections/legends/predictions already ignored)
+data/symbol_training/

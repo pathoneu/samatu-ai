@@ -41,4 +41,25 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
+# Census refresh 2026-07-06 — retrieval/user-fetch bots added, per official
+# docs (Meta web-crawlers page, docs.mistral.ai/robots, DuckDuckGo
+# DuckAssistBot help, developer.amazon.com/amazonbot). Deliberately NOT
+# added: xAI/Grok (no official UA; retrieval traffic spoofs browser UAs) and
+# Bytespider (training-only, ignores robots.txt). Note: cohere-ai above was
+# never officially documented by Cohere — kept, harmless.
+User-agent: meta-externalfetcher
+Allow: /
+User-agent: meta-webindexer
+Allow: /
+User-agent: MistralAI-User
+Allow: /
+User-agent: MistralAI-Index
+Allow: /
+User-agent: DuckAssistBot
+Allow: /
+User-agent: Amzn-SearchBot
+Allow: /
+User-agent: Amzn-User
+Allow: /
+
 Sitemap: https://pathon.eu/sitemap.xml

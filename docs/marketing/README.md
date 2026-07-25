@@ -30,7 +30,12 @@ hand-sell itself.
 **Pending build (task-chipped):** prerender of public routes (the #1 AI-SEO
 blocker — AI crawlers don't run JS), 4 BoFu landing pages, public /kainos page.
 
-**[VERIFY] markers:** live-web research was blocked by session limits when this
-was written — facts marked [VERIFY] (crawler UA list currency, FB group names
-and sizes, LT CPC benchmarks) need one verification pass before money is spent
-against them.
+**[VERIFY] markers — resolved 2026-07-06:** a live-web verification pass
+replaced every marker with verified facts + source URLs and dates (crawler UA
+census + per-crawler JS behavior, llms.txt adoption reality, LT media
+contacts, FB groups, LT CPC benchmarks + low-search-volume mechanics, Meta EU
+targeting post-DSA/DMA, live google.lt SERP check). robots.txt gained 7
+retrieval-relevant UAs the same day. Two things stayed explicitly
+unverifiable without logins: FB group member counts (founder: 15-min
+logged-in pass, URLs ready in social-ads-playbook §1) and exact LT keyword
+volumes (pull from Keyword Planner once the Ads account exists).

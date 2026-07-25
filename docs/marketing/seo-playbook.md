@@ -39,6 +39,41 @@
 
 ## 2. Keyword map [VERIFY volumes via GSC + Keyword Planner after 2 wks of ads]
 
+**Volumes (checked 2026-07-06):** no public non-interactive tool exposes LT
+volume/CPC for these terms — Ahrefs/KeywordTool.io/Ubersuggest are gated or
+paid, WordStream's free tool lacks Lithuania; only SE Ranking's free checker
+includes LT (seranking.com/keyword-search-volume-checker.html). Cheapest real
+numbers: **Google Keyword Planner, free with the Ads account we're creating
+anyway** — pull LT ranges there before launch, then verify against GSC after
+2 wks of ads.
+
+### Live SERP check (google.lt, logged-out, Kaunas IP, 2026-07-06, via Playwright)
+
+- **"sąmatų programa"** — contested but soft. Top 5 = legacy-vendor *homepages*
+  (sistela.lt #1, astera.lt #2 — also the only ad bidder seen, ses.lt,
+  dimetris.lt, prosama.lt); the only dedicated landing pages for the exact term
+  sit at #8–9, incl. **buildiq.lt/samatu-programa-rangovams — a live AI-sąmatų
+  competitor** ("sugeneruoja sąmatą iš tekstinio aprašymo") already doing
+  landing-page SEO. A modern dedicated commercial page can realistically break
+  top 5.
+- **"kiekių žiniaraštis"** — **wide-open first-mover gap.** Entire top 10 =
+  statyboszurnalas.lt help-desk articles + ministry/utility PDF/XLS templates
+  (eso.lt, zum.lrv.lt, kaunas.lt). Zero commercial pages rank. Google triggered
+  an **AI Overview** on this query → prime GEO citation target. Argues for
+  building BoFu-2 first.
+- **"sąmatininko paslaugos"** — directory sprawl (paslaugos.lt ×2, skelbiu.lt,
+  skelbimai.lt, alio.lt); the only dedicated service site is a dated http://
+  one-man page (samatininkas.lt, #4). No strong owner — clear opening for the
+  BoFu-1 price-anchor page, but intent is partly hire-a-human/job-seeking, so
+  expect intercept conversion, not exact-fit.
+- pathon.eu appeared in none of the three top-10s (expected — site is new).
+  Gap-size priority: kiekių žiniaraštis > sąmatininko paslaugos > sąmatų
+  programa.
+- Caveats: single logged-out session; no ads shown on kw 2–3 is not proof
+  nobody bids; the Kaunas IP likely inflated one geo result (paslaugos.lt
+  "Kaune" at #2).
+
+
 | Keyword (LT) | Intent | Target page |
 |---|---|---|
 | sąmatų programa / sąmatos programa | buy | `/` + ads |

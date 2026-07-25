@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="utf-8" />
+<title>LLM Council — Stogo Extraction Accuracy</title>
+<style>
+  :root {
+    --paper: #f6f5f2;
+    --ink: #1a1a1a;
+    --muted: #666;
+    --border: #d8d4cc;
+    --accent: #2a6fb5;
+    --hi: #2d6a3e;
+    --lo: #a93234;
+    --warn: #b7791f;
+  }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55; font-size: 16px; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .question { background: #fff; border: 1px solid var(--border); padding: 20px 24px; border-radius: 6px;
+    margin: 20px 0 28px; font-size: 15px; }
+  .question h2 { margin-top: 0; font-size: 16px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.05em; font-weight: 600; }
+  .verdict { background: #fff; border: 2px solid var(--accent); padding: 24px 28px; border-radius: 6px;
+    margin-bottom: 32px; }
+  .verdict h2 { margin-top: 0; color: var(--accent); font-size: 20px; }
+  .verdict h3 { margin: 22px 0 8px; font-size: 15px; color: var(--ink); border-left: 3px solid var(--accent); padding-left: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0 24px; }
+  .advisor-card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 12px;
+    font-size: 12px; }
+  .advisor-card .name { font-weight: 600; margin-bottom: 4px; color: var(--ink); }
+  .advisor-card .stance { color: var(--muted); font-size: 11px; }
+  .agree { border-left: 3px solid var(--hi); }
+  .clash { border-left: 3px solid var(--lo); }
+  .partial { border-left: 3px solid var(--warn); }
+  details { background: #fff; border: 1px solid var(--border); border-radius: 6px;
+    margin-bottom: 12px; padding: 0 20px; }
+  details > summary { font-weight: 600; padding: 14px 0; cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸"; color: var(--accent); margin-right: 8px; }
+  details[open] > summary::before { content: "▾"; }
+  details .body { padding-bottom: 18px; font-size: 14.5px; color: #222; }
+  details .body p { margin: 8px 0; }
+  .blind-spots ul, .recommendation ol { margin: 10px 0; padding-left: 22px; }
+  .blind-spots li, .recommendation li { margin-bottom: 8px; }
+  .one-thing { background: #fff8e1; border: 1px solid var(--warn); padding: 18px 22px;
+    border-radius: 6px; margin-top: 24px; }
+  .one-thing h3 { margin: 0 0 8px; color: var(--warn); font-size: 16px; }
+  code { background: #efece6; padding: 1px 5px; border-radius: 3px; font-size: 13.5px; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 40px; padding-top: 16px;
+    border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>LLM Council — Stogo Extraction Accuracy</h1>
+    <div class="meta">2026-05-14 · Sąmatų AI / stogai V1 · branch <code>week1-canonical-execution</code></div>
+  </header>
+
+  <div class="question">
+    <h2>The Question</h2>
+    <p>Push roof PDF extraction accuracy from <strong>±10%</strong> to <strong>±2% per line item</strong>. Current state: A LAIDA (keturslaitis, clean PDF) at max -2.8%, 0039 (dvislaitis, SK-only raster CID-garbled) at max -8.7% on <em>sienos</em>. Root cause of -8.7%: vision read <code>axis_width=7.12</code> from a floor plan vs expected 7.2 (the SK stogo page only shows partial rafter detail). User mandate: roof has only 4-8 line items per project, so each error proportionally matters more than in interior estimation. Is user-in-the-loop a cop-out?</p>
+  </div>
+
+  <div class="verdict">
+    <h2>Chairman's Verdict</h2>
+
+    <h3>Where the Council Agrees</h3>
+    <p><strong>N=2 is the bottleneck</strong> — 5/5 advisors and 5/5 reviewers converged. You cannot validate ±2% per line against two projects. A LAIDA at 2.8% and 0039 at 8.7% is a 3× spread, not a trendline.</p>
+    <p><strong>The -8.7% on 0039 is a page-authority bug, not a model bug.</strong> Vision pulled width from a partial-rafter page when a floor plan exists. Ensemble (#4), multi-shot (#7), and higher DPI (#6) are all answers to a different question.</p>
+    <p><strong>User-in-the-loop is NOT a cop-out</strong> when framed correctly: system commits to a number, surfaces the 3 most-uncertain dims with page crops, asks for confirmation. Same pattern as tax software, CAD, surveying.</p>
+    <p><strong>Geometric cross-validation (#3) is free signal worth taking.</strong> Floor area × slope_factor constrains roof width independently — the only proposed strategy that adds non-correlated information.</p>
+    <p><strong>Skip #4 ensemble, #6 DPI, #7 multi-shot</strong> — voting on a model you haven't measured wastes budget.</p>
+
+    <h3>Where the Council Clashes</h3>
+    <p><strong>Is ±2% the right target at all?</strong> Executor + Contrarian accept it. First Principles says ±2% autonomous is information-theoretically impossible from a single-source PDF. Expansionist calls it a vanity metric. Reviewers added: roofing waste factors are 5-10% — ±2% extraction is below the noise floor of the downstream material order.</p>
+    <p><strong>Is the flywheel real?</strong> Expansionist's "N=2 → N=200 via corrections" got rejected 4/5 reviewers — Claude Vision via API isn't fine-tunable, no storage/structure exists, roofers under time pressure rubber-stamp wrong numbers.</p>
+    <p><strong>Inter-page / inter-rater disagreement.</strong> Outsider + three reviewers caught what 4 of 5 advisors missed: "expected 7.2m" might just be another page's opinion. The two sąmatos are different roofers' guesses, not absolute truth — same AI-seeded-ground-truth trap CLAUDE.md flags for <code>detector_bench/</code>.</p>
+
+    <h3>Blind Spots the Council Caught (in peer review)</h3>
+    <div class="blind-spots">
+      <ul>
+        <li><strong>Inter-page consistency is unmeasured.</strong> Drawings round to 100mm and disagree across sheets. Before claiming an accuracy target, measure variance.</li>
+        <li><strong>Waste factors swamp extraction error.</strong> Roofing 5-10% waste vs 2% extraction precision is false precision.</li>
+        <li><strong>The flywheel needs infrastructure that doesn't exist.</strong> Storing structured corrections + retrieval/few-shot prompting is its own project.</li>
+        <li><strong>Ground truth is contractor opinion, not truth.</strong> Same trap CLAUDE.md names for <code>detector_bench/</code>.</li>
+        <li><strong>Roofers rubber-stamp under time pressure.</strong> HITL only produces clean signal if UI forces engagement (page crop, anomaly highlight, two-click confirm on flagged dims).</li>
+      </ul>
+    </div>
+
+    <h3>The Recommendation</h3>
+    <p>Adopt the Executor's plan, with three corrections from peer review:</p>
+    <div class="recommendation">
+      <ol>
+        <li><strong>Build N=8-10 ground truth — AND measure inter-page variance per project.</strong> Record per-dimension <em>per-page</em> values, not one number per project. Tells you the floor of achievable accuracy from the artifact itself.</li>
+        <li><strong>Fix the page-authority bug</strong> (#1 with "prefer floor_plan for axis dims" rule). One afternoon in <code>vision_extractor.py</code>. Re-run 0039, confirm sienos drops under 2%.</li>
+        <li><strong>Ship #5 + #3 together, with friction.</strong> Patikrinkite panel surfaces every dim with its page crop + the cross-validation result. Flag mismatches as 🟡. Two-click confirm on flagged dims, no "accept all" button.</li>
+      </ol>
+    </div>
+    <p><strong>Drop the ±2% per-line-item target. Adopt "±2% on the total quote, with every assumption surfaced and confirmable."</strong> Information-theoretically achievable, matches CLAUDE.md operational rule that every calculation must show its assumptions.</p>
+    <p><strong>Reject the Expansionist's pricing/moat framing</strong> until N&gt;10 and the flywheel infrastructure exists. Charging €99 with "verified accuracy" at 8.7% on N=2 is exactly the "honest disclosure beats clever fixes" violation CLAUDE.md prohibits.</p>
+
+    <div class="one-thing">
+      <h3>The One Thing to Do First</h3>
+      <p>Write <code>backend/extractor/roof/build_roof_ground_truth.py</code> and run it on 8-10 projects this week, recording per-dimension <em>per-page</em> values, not one number per project. Without this, every accuracy conversation — yours, the next council's, anyone's — is fiction. With it, you'll know within a week whether ±2% is even achievable from the artifact.</p>
+    </div>
+  </div>
+
+  <h2 style="font-size: 18px; margin-top: 40px;">Advisor Stances at a Glance</h2>
+  <div class="grid">
+    <div class="advisor-card clash"><div class="name">Contrarian</div><div class="stance">N=10 first. Skip #4/#6/#7. HITL useful if "3 uncertain dims + crop + one click."</div></div>
+    <div class="advisor-card partial"><div class="name">First Principles</div><div class="stance">Wrong question. ±2% autonomous is info-theoretic fantasy. Ship collaborative ±2%.</div></div>
+    <div class="advisor-card clash"><div class="name">Expansionist</div><div class="stance">±2% is vanity. Build flywheel + price premium. (Rejected 4/5 in peer review.)</div></div>
+    <div class="advisor-card agree"><div class="name">Outsider</div><div class="stance">Page-authority hierarchy beats ensembles. Also: is your ground truth even real?</div></div>
+    <div class="advisor-card agree"><div class="name">Executor</div><div class="stance">Stop. Build ground truth, fix named bug, ship patikrinkite panel. In that order. (Strongest 5/5.)</div></div>
+  </div>
+
+  <details>
+    <summary>The Contrarian — full response</summary>
+    <div class="body">
+      <p>Your N=2 ground truth is the fatal flaw and nobody at this table is naming it. You cannot validate "±2% per line item" against two projects. Hitting ±2% on N=2 is a coin flip — the -8.7% you "explained" on 0039 is a post-hoc story. <strong>Build N=10 before you tune anything.</strong></p>
+      <p>User-in-the-loop is not a cop-out — but the framing is. Useful HITL: the system commits to a number, shows the three dimensions it's most uncertain about with the page + crop, asks for one click of confirmation. Calibrated confidence, not abdication.</p>
+      <p>#4 ensemble and #7 multi-shot will kill you — two wrong LLMs agreeing isn't signal, vision models share failure modes. False confidence.</p>
+      <p>Priority: (a) N=10 ground truth — non-negotiable; (b) #3 geometric cross-validation — only one with an independent signal; (c) #1 multi-page orchestration as fix for the SK-only failure. Skip #4, #6, #7.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The First Principles Thinker — full response</summary>
+    <div class="body">
+      <p>You're asking the wrong question entirely. The bottleneck isn't the model — it's information-theoretic. A single number on a single page determines the answer, with no redundancy in the artifact. No amount of Opus calls extracts certainty that isn't in the PDF.</p>
+      <p>A roofer needs a quote they trust. ±2% is a proxy — the real goal is "the roofer doesn't get burned." That doesn't require AI ±2% autonomously, just the FINAL number to be ±2%. HITL is the only honest answer when N=2, 4-8 line items, source ambiguity exists.</p>
+      <p>The cop-out is pretending autonomy is achievable. Vanity engineering. Priority: #3 cross-validation, then #5. Stop chasing ±2% autonomous. Ship ±2% collaborative, and be honest that's what it is.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Expansionist — full response</summary>
+    <div class="body">
+      <p>±2% on 4-8 line items is a vanity metric. HITL is the moat — every correction becomes labeled LT-raster training data that doesn't exist anywhere else. Frame each fix as "teach Sąmatų" and N=2 becomes N=200 in six months.</p>
+      <p>Bigger play: multi-page orchestration generalizes to facades/earthworks/concrete — every CLAUDE.md Section 1 module. Roof is the cheapest testbed for the architecture that unlocks 10 construction types.</p>
+      <p>Ensemble at €15 vs €15-40k roofer quotes is invisible. Charge €99 with a "verified accuracy" badge. Ship #1+#5 as Pro tier. The ±2% target is the trojan horse — the dataset and orchestrator are the actual company.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Outsider — full response</summary>
+    <div class="body">
+      <p>Wait — "expected 7.2m" — where does that come from? Is that the actual roof, or just another page someone decided is truth? If your ground truth is "what a different page says," you're measuring agreement between two documents, not accuracy.</p>
+      <p>You have TWO projects. How do you even know ±2% is achievable? Maybe drawings themselves disagree by more than 2%.</p>
+      <p>HITL is not a cop-out. A roofer about to order €15,000 of materials wants to see the number that drives the bill and confirm it. That's how every professional tool works — tax software, CAD, surveying. Hiding the dim and hoping IS the cop-out.</p>
+      <p>The gable error came from reading width off the wrong page. That's a which-page-is-authoritative problem, not vision. Encode a hierarchy of which page wins for which measurement.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Executor — full response</summary>
+    <div class="body">
+      <p>Stop. N=2 means you cannot tell strategy #1 from #4 from cosmic rays. Every ±2% conversation at this sample size is theater.</p>
+      <p>Monday morning: <strong>(1)</strong> Collect 8-10 more projects with hand-measured truth. Mix keturslaitis/dvislaitis, clean/CID-garbled, full/structural. Without this, overfitting to two PDFs. <strong>(2)</strong> Fix the named bug — -8.7% on 0039 has a specific cause (width pulled from partial-rafter page). Strategy #1 with "prefer floor_plan for axis dims" rule. One afternoon. Re-run, confirm sienos under 2%. <strong>(3)</strong> Surface every dim in a "patikrinkite" panel. Roofer fixes 7.12→7.20 in 3 seconds. Log overrides as training signal. Ship week 1.</p>
+      <p>Skip #4 ensemble and #7 multi-shot until ground truth exists. Skip #6 DPI unless DPI-bound. Concrete Monday task: write <code>build_roof_ground_truth.py</code>. Then floor-plan-width pull. Then override UI. In that order.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Peer Review Highlights</summary>
+    <div class="body">
+      <p><strong>Strongest (unanimous):</strong> Executor. Only response with a sequenced Monday plan grounded in actual codebase. Absorbs Contrarian's N-problem and First Principles' information-theoretic insight while pointing at concrete files (<code>vision_extractor.py</code>, <code>build_roof_ground_truth.py</code>).</p>
+      <p><strong>Biggest blind spot (unanimous):</strong> Expansionist. Treats accuracy as marketing problem while N=2 means accuracy is unmeasured. Charging €99 with "verified accuracy" badging before measurement = explicit CLAUDE.md "honest disclosure" violation. Also: Claude Vision via API isn't fine-tunable, so the "flywheel" produces a spreadsheet not a better detector unless paired with infrastructure that doesn't exist. Also: roofers under time pressure rubber-stamp wrong numbers, poisoning the dataset.</p>
+      <p><strong>What ALL five missed</strong> (3 reviewers converged):</p>
+      <ul>
+        <li>Drawings themselves may not be ±2% internally consistent. Architectural plans round to 100mm; pages disagree.</li>
+        <li>Waste factors are 5-10% (CLAUDE.md §3) — ±2% extraction is below the noise floor of the downstream decision.</li>
+        <li>The two sąmatos are different roofers' opinions, not ground truth — same AI-seeded-ground-truth trap as <code>detector_bench/</code>.</li>
+        <li>Right target may be "±2% on total quote, with every assumption surfaced" — not "±2% per line autonomous".</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    Generated 2026-05-14 · LLM Council methodology adapted from Andrej Karpathy · Sąmatų AI
+  </footer>
+</div>
+</body>
+</html>

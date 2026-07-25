@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Council Verdict — Sąmatų AI landing prompt (2026-05-12)</title>
+<style>
+  :root {
+    --paper: #faf9f6;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --ink-soft: #4b5563;
+    --ink-muted: #6b7280;
+    --rule: #e5e1d8;
+    --accent: #2a6fb5;
+    --accent-soft: #dceaf7;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --code-bg: #f3f1ec;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); color: var(--ink); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 32px 20px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; line-height: 1.15; }
+  h2 { font-size: 22px; margin: 36px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 24px 0 8px; color: var(--ink); }
+  p { margin: 0 0 12px; }
+  .meta { color: var(--ink-muted); font-size: 13px; margin-bottom: 28px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin: 20px 0;
+    box-shadow: 0 2px 6px rgba(31,41,55,0.04);
+  }
+  .card.accent {
+    background: var(--accent-soft);
+    border-color: rgba(42,111,181,0.25);
+  }
+  .card.green { border-left: 4px solid var(--green); }
+  .card.amber { border-left: 4px solid var(--amber); }
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-right: 6px;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--ink-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  details { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; margin: 10px 0; }
+  details summary {
+    cursor: pointer;
+    padding: 12px 16px;
+    font-weight: 600;
+    list-style: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "▸"; color: var(--accent); display: inline-block; margin-right: 8px; transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details .body { padding: 0 20px 16px; color: var(--ink-soft); font-size: 14px; }
+  code, pre {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 13px;
+  }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+  pre {
+    background: #fefcf6;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .grid-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin: 14px 0 20px;
+  }
+  @media (max-width: 720px) { .grid-5 { grid-template-columns: repeat(2, 1fr); } }
+  .advisor-chip {
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--card);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .advisor-chip strong { display: block; font-size: 13px; margin-bottom: 3px; }
+  .strongest { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.35); }
+  .blindspot { background: rgba(220,38,38,0.06); border-color: rgba(220,38,38,0.35); }
+  .verdict-num { color: var(--accent); font-weight: 600; margin-right: 5px; }
+  .key {
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    background: var(--accent-soft);
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14.5px;
+  }
+  ul { margin: 8px 0 12px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .copy-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .copy-btn:hover { background: #1e5a99; }
+  .prompt-wrap { position: relative; }
+  footer { color: var(--ink-muted); font-size: 12px; text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--rule); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <span class="pill">LLM Council</span>
+  <h1>Sąmatų AI landing — Claude Code prompt verdict</h1>
+  <div class="meta">2026-05-12 · 5 advisors, 5 peer reviewers, chairman synthesis · Run from <code>/Users/ignasgaldikas/samatu-ai</code></div>
+
+  <div class="card">
+    <h3 style="margin-top:0">The question</h3>
+    <p>Compose a Claude Code prompt that fixes the existing <code>Sąmatų AI Landing.html</code> (single-file React + Tailwind + Babel CDN, ~1206 lines, generated via claude.ai/design). The pivot: hero currently climaxes on "14 359 €", but the AI extracts <em>quantities</em>, not prices — the contractor enters their own kainynas. The prompt must also fix 12 concrete review bugs and make the page feel distinctive without falling into generic SaaS tropes.</p>
+  </div>
+
+  <h2>Council scoreboard</h2>
+  <p style="color:var(--ink-soft); font-size:14px;">Five reviewers voted on the strongest response and the biggest blind spot. The Contrarian's failure-mode prediction (hallucinated kiekiai will replace the EUR lie) was most often picked as strongest. The Expansionist's "Bring Your Own Kainynas" sandbox was almost unanimously flagged as overreach for a pre-revenue beta.</p>
+
+  <table>
+    <thead>
+      <tr><th>Reviewer</th><th>Strongest</th><th>Biggest blind spot</th><th>What ALL missed</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>First Principles</strong> — only one refusing the premise</td>
+        <td><strong>Expansionist</strong> — sandbox inverts the funnel</td>
+        <td>Recruitment funnel ≠ conversion funnel; Calendly may beat animation</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Expansionist</strong> — turns "AI doesn't price" caveat into a feature</td>
+        <td><strong>Executor</strong> — treats this as refactor when pivot itself is unvalidated</td>
+        <td>Owner may not have a real PDF + real extraction output to anchor on</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Outsider</strong> — only one speaking the customer's language</td>
+        <td><strong>Expansionist</strong> — sandbox ignores Babel CDN + single-file constraint</td>
+        <td>Whether hero animation should exist at all on mobile-in-van</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>Contrarian</strong> — only one engaging with actual failure mode of running this prompt</td>
+        <td><strong>Expansionist</strong> — 2-week product feature, not a landing fix</td>
+        <td>File state in repo not checked; line anchors may drift</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>Contrarian</strong> — catches hallucinated-numbers failure mode</td>
+        <td><strong>Expansionist</strong> — static sandbox = demo of a demo</td>
+        <td>5 contractor calls should precede landing optimization</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid-5">
+    <div class="advisor-chip strongest"><strong>Contrarian</strong>2× strongest. 0× blind spot.</div>
+    <div class="advisor-chip"><strong>First Principles</strong>1× strongest. 0× blind spot.</div>
+    <div class="advisor-chip"><strong>Outsider</strong>1× strongest. 0× blind spot.</div>
+    <div class="advisor-chip blindspot"><strong>Executor</strong>0× strongest. 1× blind spot.</div>
+    <div class="advisor-chip blindspot"><strong>Expansionist</strong>1× strongest. 4× blind spot.</div>
+  </div>
+
+  <h2>Where the council agrees</h2>
+  <div class="card green">
+    <ul>
+      <li>The EUR climax must die, but its replacement <strong>cannot be hallucinated kiekiai</strong>. Pin the example numbers in the prompt itself.</li>
+      <li>The current <code>ROWS</code> constant fails the project's own <code>CLAUDE.md</code> §6 validation (lubos 148.6 m² on a 72 m² butas; walls 5.4× floor area).</li>
+      <li>The medium constrains the message. Babel-CDN + single-file = no room for gradient meshes, blob SVGs, or 600-line Tailwind soup.</li>
+      <li>Discipline beats creativity: allowlist + exact-string fix table + grep-based self-audit.</li>
+    </ul>
+  </div>
+
+  <h2>Where the council clashes</h2>
+  <div class="card amber">
+    <p><strong>Expansionist vs. everyone else.</strong> The "Bring Your Own Kainynas" sandbox is rejected 4-of-5 by reviewers: inverts the funnel, demands ground truth the project doesn't have, 60% effort on an unvalidated interaction = wrong sprint.</p>
+    <p><strong>First Principles vs. tactical advisors.</strong> Should we ship the prompt at all before 5 contractor calls? The chairman overrides the strict reading: a landing that <em>honestly</em> says "AI counts, you price" is shippable, but the promises (60 sekundžių, 14 359 €) that the product can't keep must go.</p>
+    <p><strong>Outsider vs. Expansionist on jargon.</strong> "Kiekiai" itself is insider accounting language. The climax should be a work-outcome (<em>"pasiūlymą iki vakaro, ne iki ketvirtadienio"</em>), with kiekiai as proof beneath.</p>
+  </div>
+
+  <h2>Blind spots peer review caught</h2>
+  <div class="card">
+    <ul>
+      <li>Nobody verified the file's path / git state before writing line-anchored instructions. Anchors drift, fixes silently fail.</li>
+      <li>Cherry-picked kiekiai from a real PDF would be the same lie as the EUR climax — numbers must come from §6's known-good ranges, not from any specific real run.</li>
+      <li>No advisor questioned whether the hero animation should exist at all on a phone in a van.</li>
+      <li>The phone/email placeholders trap: tell a model to "fix" a <code>tel:#</code> and it invents a number. Must be explicitly forbidden.</li>
+    </ul>
+  </div>
+
+  <h2>The recommendation</h2>
+  <div class="card accent">
+    <p><strong>Ship the prompt</strong> with three guardrails. Ignore the sandbox.</p>
+    <ol>
+      <li><strong>Discipline over creativity.</strong> Allowlist + exact-string fix table + grep self-audit.</li>
+      <li><strong>Numbers come from the prompt, never from the model.</strong> Hard-coded 72 m² butas ledger that passes CLAUDE.md §6.</li>
+      <li><strong>The new headline is a work-outcome.</strong> "Pasiūlymą tu turi iki vakaro. Ne iki ketvirtadienio." Kiekiai are supporting evidence, not the promise itself.</li>
+    </ol>
+    <p>The risk isn't shipping a landing — it's shipping a <em>promise</em> the product can't keep. Strip the promises, keep the page, get the contractor calls.</p>
+  </div>
+
+  <h2>The one thing to do first</h2>
+  <div class="key">
+    Run <code>ls "Sąmatų AI Landing.html"</code> and <code>wc -l "Sąmatų AI Landing.html"</code> to confirm the file exists at ~1206 lines <em>before</em> pasting the prompt. If the file drifted, the line anchors are wrong and the agent will silently fail.
+  </div>
+
+  <h2>The ready-to-paste Claude Code prompt</h2>
+  <p style="color:var(--ink-soft); font-size:14px;">Copy the block below into a new Claude Code session at the repo root.</p>
+
+  <div class="prompt-wrap">
+    <button class="copy-btn" id="copy-prompt">Copy</button>
+    <pre id="prompt-block">Tu esi Claude Code, dirbi /Users/ignasgaldikas/samatu-ai repe.
+
+Failas, su kuriuo dirbi:
+  /Users/ignasgaldikas/samatu-ai/Sąmatų AI Landing.html
+  (~1206 eilučių, single-file React + Tailwind + Babel via CDN)
+
+==============================================================================
+MISSION
+==============================================================================
+
+This is the pre-revenue beta landing page for Sąmatų AI — a Lithuanian
+construction quantity-extraction app. The current draft has 12 concrete bugs
+and one strategic miss: the hero animation climaxes on "14 359 €", but the
+product does NOT compute prices. The contractor enters their own kainynas;
+the app multiplies kiekiai × the user's kainos.
+
+Your job: surgical find-and-replace. Not a rewrite. Not a redesign. Not
+"make it pop." Preserve the existing structure, components, CSS tokens, and
+visual rhythm. Fix the 12 named bugs verbatim. Pivot the hero from a euro
+climax to a work-outcome climax with a quantity ledger underneath.
+
+==============================================================================
+BEFORE YOU TOUCH ANYTHING
+==============================================================================
+
+1. Run: ls -la "/Users/ignasgaldikas/samatu-ai/Sąmatų AI Landing.html"
+2. Run: wc -l "/Users/ignasgaldikas/samatu-ai/Sąmatų AI Landing.html"
+   Expected: ~1206 lines. If wildly different, STOP and report.
+3. Run: git log -1 --oneline -- "Sąmatų AI Landing.html"
+4. Read the file fully once before editing.
+
+==============================================================================
+DO NOT TOUCH
+==============================================================================
+
+Preserve unchanged unless explicitly listed in the FIX TABLE below:
+
+  - &lt;head&gt; structure beyond the additions listed in BUG 11
+  - All CDN &lt;script&gt; tags. Do NOT add libraries.
+  - The &lt;style&gt; block — only modify the keyframes / rules named in the
+    FIX TABLE; do not refactor or "tidy" CSS.
+  - Components: Nav, Footer, Honesty, HowItWorks, UploadVignette,
+    ExtractVignette
+  - Color tokens, font stacks, spacing scale, border-radius values
+
+Do not introduce: new components beyond what's needed, new dependencies,
+gradient meshes, blob SVGs, glassmorphism, or any animation longer than
+600ms or with more than 3 simultaneous transforms.
+
+==============================================================================
+HERO PIVOT — THE ONE CREATIVE INSTRUCTION
+==============================================================================
+
+The hero must climax on a WORK-OUTCOME line, not on a euro number, and not
+on the word "kiekiai" by itself (insider accounting jargon).
+
+New hero headline (replaces whatever is at the H1 level):
+
+  Pasiūlymą tu turi iki vakaro.
+  Ne iki ketvirtadienio.
+
+New hero subhead:
+
+  Įkeli brėžinį PDF — gauni kambarius, plotus, perimetrus ir angas
+  paruoštus sąmatai. Kainas suvedi tu.
+
+Hero artifact (right side / under headline on mobile):
+  A static, layered raster mimicking a Lithuanian aukšto planas — light
+  paper background, thin black lines, room labels in IBM Plex Mono
+  ("MIEGAMASIS 14,2 m²", "VIRTUVĖ 11,8 m²", "VONIA 4,6 m²"), a scale-bar
+  and a faint stamp shape in a corner. Use plain inline SVG. NO photo,
+  NO 3D, NO neon.
+
+  Floating measurement chips attach to walls/rooms one at a time with a
+  restrained slide-and-fade (180–240ms each, staggered 350ms apart). Five
+  chips total. Loop after a 4s rest. Respect prefers-reduced-motion.
+
+==============================================================================
+NEW ROWS CONSTANT — HARD-CODED, DO NOT RECOMPUTE
+==============================================================================
+
+Replace the existing ROWS constant block (~lines 812–820) with EXACTLY:
+
+const ROWS = [
+  { kambarys: "Svetainė + virtuvė", plotas: 28.4, perimetras: 22.1, lubos: 2.65, langai: 2, durys: 1 },
+  { kambarys: "Miegamasis",          plotas: 14.2, perimetras: 15.3, lubos: 2.65, langai: 1, durys: 1 },
+  { kambarys: "Vaiko kambarys",      plotas: 11.8, perimetras: 13.8, lubos: 2.65, langai: 1, durys: 1 },
+  { kambarys: "Vonia",                plotas:  4.6, perimetras:  8.8, lubos: 2.65, langai: 0, durys: 1 },
+  { kambarys: "WC",                   plotas:  2.1, perimetras:  5.9, lubos: 2.65, langai: 0, durys: 1 },
+  { kambarys: "Koridorius",           plotas: 10.9, perimetras: 14.4, lubos: 2.65, langai: 0, durys: 4 },
+];
+
+// Totals (displayed as summary row):
+//   Plotas grindų:     72.0 m²
+//   Perimetras viso:   80.3 m
+//   Sienų plotas:     213.0 m²
+//   Langai:             4 vnt.
+//   Durys:              9 vnt.
+
+Validation (do not include in page, just verify):
+  walls/floor = 213/72 = 2.96   → inside §6 range 2.5–4   ✓
+  ceiling ≈ floor                → 72 ≈ 72                 ✓
+
+==============================================================================
+ESTIMATE PREVIEW — KAINYNAS INPUTS (LIGHTWEIGHT)
+==============================================================================
+
+Below the kiekiai ledger, make the kainynas step visible. NOT a full
+sandbox. A small inline 4-row table with pre-filled defaults the visitor
+can override:
+
+  | Pozicija                | Kiekis      | €/vnt. (tavo) | Suma €     |
+  | Dažomas sienų plotas    | 213.0 m²    | [12.00]       | 2 556.00   |
+  | Lubų dažymas             |  72.0 m²    | [10.00]       |   720.00   |
+  | Grindų danga             |  72.0 m²    | [28.00]       | 2 016.00   |
+  | Vidaus durys (montavimas)|   5 vnt.    | [85.00]       |   425.00   |
+
+  Viso (be PVM):                            5 717.00 €
+  PVM 21%:                                  1 200.57 €
+  Iš viso:                                  6 917.57 €
+
+The €/vnt. cells are &lt;input type="number"&gt; with greyed defaults. Suma
+and totals recompute live. Controlled React state, no external libs.
+Above the table:
+
+  Kainas suvedi tu — tai tavo kainynas, ne mūsų. Mes pateikiame tik kiekius.
+
+Note under the table:
+
+  Pavyzdys — 72 m² 3-kambarių butas. Tavo projekto sumos priklauso nuo
+  tavo kainyno.
+
+NO "Kopijuoti į Excel". NO download. NO email-gate.
+
+==============================================================================
+THE 12-BUG FIX TABLE
+==============================================================================
+
+BUG 1 — Hero microcopy is a false privacy claim (~line 586)
+old:  Brėžinys lieka tavo kompiuteryje — neperduodamas tretiesiems
+new:  Brėžinį siunčiame į Anthropic Claude API skaičiavimui ir nesaugome
+      jo serveryje po analizės
+
+BUG 2 — ROWS pavyzdys fails §6 validation (~lines 812–820)
+Replace entire ROWS block per "NEW ROWS CONSTANT" above.
+
+BUG 3 — Placeholder constants + footer href
+Keep PHONE_TEL shape "+3706XXXXXXX" with TODO[owner] comment.
+Keep WA_LINK shape "https://wa.me/3706XXXXXXX" with TODO comment.
+EMAIL → "mailto:solutions@pathon.eu".
+Footer privacy link (~line 1141): href="#" → href="/privatumas"
+DO NOT invent a real phone number.
+
+BUG 4 — BigStatement breaks "no time promises" rule (~line 1158)
+old:  Brėžinys → kiekiai per 60 sekundžių
+new:  Pasiūlymą tu turi iki vakaro. Ne iki ketvirtadienio.
+
+BUG 5 — Sticky 64px nav overlaps anchored sections
+Append inside existing &lt;style&gt;:
+  section[id] { scroll-margin-top: 80px; }
+
+BUG 6 — .anim-status flips color but text doesn't change
+Replace static "AI analizuoja" span with two crossfading spans:
+"AI analizuoja…" and "Kiekiai paruošti". 4s loop, respects
+prefers-reduced-motion. Delete the old .anim-status keyframe.
+
+BUG 7 — "Rasta brėžinyje 11" but only 5 chips (~line 432)
+old:  Rasta brėžinyje 11
+new:  Rasta brėžinyje 5
+
+BUG 8 — BigStatement has aria-hidden on section root (~line 1161)
+old:  &lt;section aria-hidden="true"
+new:  &lt;section
+
+BUG 9 — Lithuanian diacritic in id/href (~lines 580 and 830)
+href="#sąmata" → href="#samata"
+id="sąmata"   → id="samata"
+
+BUG 10 — MultiType tiles are non-clickable &lt;div&gt;s (~lines 643–660)
+Convert each tile &lt;div&gt; to &lt;button type="button"&gt;, keep className,
+add disabled, aria-disabled="true", cursor-not-allowed.
+Above tiles add one line:
+  Šios sritys jau projektuojamos — pranešime, kai bus pasiekiamos.
+
+BUG 11 — &lt;head&gt; missing meta description, OG tags, favicon
+Insert after &lt;title&gt;:
+  &lt;meta name="description" content="Sąmatų AI — iš PDF brėžinio gauk
+    kambarius, plotus, perimetrus ir angas, paruoštus sąmatai. Kainas
+    suvedi tu."&gt;
+  &lt;meta property="og:title" content="Sąmatų AI — kiekiai iš brėžinio"&gt;
+  &lt;meta property="og:description" content="Įkeli PDF brėžinį — gauni
+    kiekius, paruoštus sąmatai. Tavo kainynas, tavo pasiūlymas."&gt;
+  &lt;meta property="og:type" content="website"&gt;
+  &lt;meta property="og:locale" content="lt_LT"&gt;
+  &lt;meta name="twitter:card" content="summary_large_image"&gt;
+  &lt;link rel="icon" type="image/svg+xml" href="data:image/svg+xml,..."&gt;
+
+BUG 12 — Waitlist inputs lack labels (~lines 1086–1089)
+Wrap each &lt;input&gt; with &lt;label className="sr-only" htmlFor="wl-..."&gt;.
+Add wl-name / wl-email / wl-company ids. If .sr-only is not defined,
+add it to &lt;style&gt;.
+
+==============================================================================
+THINGS YOU MUST NOT DO
+==============================================================================
+
+  - Do NOT invent a phone number, WhatsApp link, or email beyond what's
+    specified above. Placeholder shape stays placeholder.
+  - Do NOT add new dependencies, fonts beyond IBM Plex Mono, icon libs.
+  - Do NOT regenerate or "improve" the ROWS numbers.
+  - Do NOT introduce a sandbox where visitors upload PDFs.
+  - Do NOT add a "Kopijuoti į Excel" or "Atsisiųsti pavyzdį" button.
+  - Do NOT rewrite Nav / Footer / Honesty / HowItWorks copy.
+  - Do NOT add gradient meshes, blob SVGs, glass cards, marquees.
+  - Do NOT exceed 600ms for any single animation.
+
+==============================================================================
+SELF-VERIFICATION — RUN BEFORE DECLARING DONE
+==============================================================================
+
+cd /Users/ignasgaldikas/samatu-ai
+F="Sąmatų AI Landing.html"
+
+grep -n "14 359" "$F"               # expect: no output
+grep -n "lieka tavo kompiuteryje" "$F"   # expect: no output
+grep -n "60 sekundži" "$F"          # expect: no output
+grep -n "iki vakaro" "$F"           # expect: ≥1 match
+grep -n "Ne iki ketvirtadienio" "$F"  # expect: ≥1 match
+grep -n "148.6" "$F"                # expect: no output
+grep -n "386.2" "$F"                # expect: no output
+grep -n "213.0" "$F"                # expect: ≥1 match
+grep -n "Anthropic Claude API" "$F" # expect: ≥1 match
+grep -nE 'id="sąmata"|href="#sąmata"' "$F"  # no output
+grep -nE 'id="samata"|href="#samata"' "$F"  # ≥2 matches
+grep -n "scroll-margin-top" "$F"    # ≥1 match
+grep -nE "tel:\+3706[0-9]{7}" "$F"  # no output
+grep -n "6XXXXXXX" "$F"             # ≥1 match
+grep -n 'name="description"' "$F"   # ≥1 match
+grep -n 'property="og:title"' "$F"  # ≥1 match
+grep -n 'rel="icon"' "$F"           # ≥1 match
+grep -nE 'htmlFor="wl-' "$F"        # ≥2 matches
+grep -n 'aria-disabled="true"' "$F" # ≥1 match
+grep -n "Rasta brėžinyje 5" "$F"    # ≥1 match
+grep -n "Rasta brėžinyje 11" "$F"   # no output
+wc -l "$F"                          # within ±50 of original
+grep -nE 'react@|tailwindcss|@babel/standalone' "$F"  # ≥3
+
+==============================================================================
+WHEN DONE
+==============================================================================
+
+Output, in order:
+  1. One-line summary of what changed.
+  2. Output of every grep above.
+  3. Any bug you could NOT fix and the reason. Do not silently skip.
+  4. The first 25 lines of the new ROWS constant.
+  5. Open in browser if possible (Playwright MCP is registered) and report:
+     does the hero render, do the chips animate, does the kainynas table
+     recompute on input change. If you cannot open it, say so.
+
+No commit unless explicitly asked. End with: "Done — ready for review."</pre>
+  </div>
+
+  <h2>Full advisor responses</h2>
+
+  <details>
+    <summary>The Contrarian — 2× strongest pick, 0× blind spot</summary>
+    <div class="body">
+      <p>The single fatal flaw I'd bet money on: the prompt asks Claude Code to fix a 12-item checklist on a CDN-Babel single-file HTML, and the model will dutifully patch all 12 — while regenerating the pavyzdys numbers from training-data intuition instead of running them through the actual CLAUDE.md validation formulas. You'll trade an EUR-climax lie for a kiekiai-climax lie.</p>
+      <p>Concrete traps: (1) Hallucinated kiekiai are worse than the EUR bug — hard-code the numbers. (2) "Fix privacy microcopy" → model writes a new false claim; force exact wording. (3) Single-file + Babel CDN + "distinctive" → gradient meshes, blob SVGs, 600-line Tailwind soup; cap it. (4) No acceptance test — require literal grep/assertion at the end. (5) Dead tel:/WhatsApp — the model will invent a number; forbid placeholders explicitly.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The First Principles Thinker — 1× strongest pick</summary>
+    <div class="body">
+      <p>You're solving the wrong problem. The unit of work isn't the HTML — it's a single demonstrable claim a tired contractor believes in 8 seconds on a phone in a van. "Pivot from EUR to kiekiai" is a correction, not a claim. A samatininkas with 20 years of intuition does not wake up wanting a quantities extractor. He wakes up wanting the 3 hours he loses every Sunday counting rooms back, or not losing the job because he quoted slow.</p>
+      <p>The first-principles question: what specific pain, in the contractor's own language, does this app remove on Monday morning — and what is the smallest piece of evidence on the page that proves we actually remove it? If you don't know yet, the right move isn't a Claude Code prompt — it's five 20-minute calls with beta candidates this week. Fix the promise. Then prompt.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Expansionist — 1× strongest, 4× biggest blind spot</summary>
+    <div class="body">
+      <p>The asymmetric upside: the landing IS the product's killer demo. Every LT competitor's landing is a feature list with a CTA. None dare let a visitor do the thing before signing up. Build a "Bring Your Own Kainynas" sandbox as the page's centerpiece: a pre-extracted kiekių žiniaraštis with chips filling one by one, an inline kainynas table the visitor types into (greyed defaults), a small "Kopijuoti į Excel" button. Trust loop made tangible: we do the boring counting, you own the pricing.</p>
+      <p>Tell Claude Code: invest 60% of build effort in this one interaction. Spreadsheet-cell feel, tab navigation, € auto-format. The sandbox is the moat. No LT competitor will copy it.</p>
+      <p style="color:var(--red); margin-top:10px;"><strong>Peer review verdict:</strong> 4 of 5 reviewers flagged this as overreach. Sandbox inverts the funnel (asks Vytas to type prices before he trusts the tool), demands ground truth the project doesn't have (per 2026-05-07 prod test, ceiling-height detection still fails), and is a 2-week product feature rewritten as a landing fix. Rejected by the chairman.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Outsider (Vytas, 52) — 1× strongest pick</summary>
+    <div class="body">
+      <p>I'm Vytas. 52. Truck smells like coffee and OSB. Phone in one hand. First thing I see: "14 359 €". Then somebody tells me the AI didn't make that — I did, with my kainynas. So what did the AI do? "Kiekiai." Quantities. The boring part. My žmona's cousin does that in Excel for €15/hr. "60 sekundžių." Bullshit. Close tab.</p>
+      <p>Nobody in my trade wakes up thinking "I wish someone would extract my quantities faster." We wake up thinking "I lost another tender because my pasiūlymas was three days late and Marius from Kaunas got it in by Tuesday."</p>
+      <p>The climax shouldn't be a number. The climax should be: <strong>"Tu turi pasiūlymą iki vakaro, ne iki ketvirtadienio."</strong></p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The Executor — 0× strongest, 1× blind spot</summary>
+    <div class="body">
+      <p>Three structural elements: (1) "DO NOT TOUCH" allowlist at the top — literal list of preserved components/CSS. (2) Numbered FIX TABLE with line anchors and exact replacement strings — find-and-replace, not creative writing. (3) Self-verification checklist with concrete greps. Plus one render check. Cut: brand voice essay, palette philosophy, rationale for why EUR-climax is wrong. The agent doesn't need to be convinced. Smallest sharp version: allowlist + fix table + verify-greps. Three sections.</p>
+      <p style="color:var(--amber); margin-top:10px;"><strong>Peer review caveat:</strong> Reviewer 2 flagged that this treats the task as refactor when the pivot itself is unvalidated. Mechanically excellent but assumes the right answer is known. The chairman folded the discipline in while still applying the Outsider's strategic reframe to the headline.</p>
+    </div>
+  </details>
+
+  <footer>
+    Generated 2026-05-12 · LLM Council adapted from <a href="https://x.com/karpathy" style="color:var(--accent)">Karpathy</a>'s methodology · Transcript: <code>council-transcript-2026-05-12-landing-prompt.md</code>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('copy-prompt').addEventListener('click', async () => {
+    const pre = document.getElementById('prompt-block');
+    // Decode HTML entities back to literal characters when copying
+    const text = pre.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copy-prompt');
+      const original = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.textContent = original; }, 1800);
+    } catch (e) {
+      alert('Copy failed — select the text manually.');
+    }
+  });
+</script>
+</body>
+</html>

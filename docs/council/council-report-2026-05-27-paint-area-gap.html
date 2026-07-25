@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>LLM Council — Paint Area Gap Closure (2026-05-27)</title>
+<style>
+:root {
+  --bg: #f6f5f2;
+  --paper: #ffffff;
+  --ink: #14110d;
+  --muted: #6b665c;
+  --line: #d9d4c7;
+  --accent: #2a6fb5;
+  --warn: #b7791f;
+  --good: #2f7a4a;
+  --clash: #a3431d;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  margin: 0;
+  padding: 40px 24px 80px;
+  line-height: 1.55;
+}
+main { max-width: 880px; margin: 0 auto; }
+header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+.question {
+  background: var(--paper);
+  border-left: 3px solid var(--accent);
+  padding: 16px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.question strong { color: var(--ink); }
+
+.verdict {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 28px 32px;
+  margin: 32px 0;
+}
+.verdict h2 {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+.verdict .headline {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 20px;
+  line-height: 1.3;
+}
+.verdict-section { margin: 20px 0; }
+.verdict-section h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.verdict-section h3 .marker {
+  font-weight: 400;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.verdict-section p { margin: 8px 0; font-size: 15px; }
+.verdict-section ul { padding-left: 22px; margin: 8px 0; }
+.verdict-section li { margin: 6px 0; }
+
+.do-first {
+  background: #fff8e7;
+  border: 1px solid #e6cf99;
+  border-left: 4px solid var(--warn);
+  padding: 18px 22px;
+  border-radius: 4px;
+  margin-top: 24px;
+}
+.do-first h3 {
+  border: none;
+  color: var(--warn);
+  margin-top: 0;
+}
+.do-first .ask {
+  background: var(--paper);
+  border-left: 3px solid var(--ink);
+  padding: 12px 16px;
+  font-style: italic;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 24px 0;
+}
+.advisor-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 16px;
+  font-size: 13px;
+}
+.advisor-card .name {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.advisor-card .stance {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.advisor-card .verdict-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-right: 6px;
+}
+.tag-stop { background: #fce8e0; color: var(--clash); }
+.tag-product { background: #e1eaf5; color: var(--accent); }
+.tag-ship { background: #e5efe9; color: var(--good); }
+
+details {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin: 12px 0;
+}
+details summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  user-select: none;
+}
+details summary:hover { background: #faf9f5; }
+details[open] summary { border-bottom: 1px solid var(--line); }
+details .body {
+  padding: 16px 22px 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+details .body strong { color: var(--ink); }
+details .body p { margin: 8px 0; }
+details .body ol, details .body ul { padding-left: 20px; }
+
+.peer-review {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.peer-review .lead { font-weight: 700; margin-bottom: 6px; }
+.peer-review .body { color: var(--muted); }
+.peer-review .body strong { color: var(--ink); }
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.blindspot {
+  background: #fce8e0;
+  border-left: 4px solid var(--clash);
+  padding: 14px 18px;
+  border-radius: 4px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.blindspot .lead {
+  font-weight: 700;
+  color: var(--clash);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.formula {
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+  background: #f1efe8;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <div class="eyebrow">LLM Council Session · 2026-05-27</div>
+  <h1>Closing the paint-area gap on Berzas project</h1>
+  <div class="question">
+    <strong>The question:</strong> How do I make Vision-extracted per-room perimeters from rasterized LT construction PDFs deterministic enough to close the remaining <strong>-0.78%</strong> gap on combined paint area? Current: 580.24 m². Contractor truth: 584.81 m². Or is this already noise-floor and should I ship?
+  </div>
+</header>
+
+<section class="verdict">
+  <h2>Chairman's Verdict</h2>
+  <p class="headline">Stop chasing -0.78%. Verify the formula match first — the gap may not exist.</p>
+
+  <div class="verdict-section">
+    <h3><span class="marker">▸</span> Where the council agrees</h3>
+    <ul>
+      <li><strong>-0.78% on N=1 is statistical noise, not signal.</strong> Vision noise floor (±2-3%) > the gap. You can't detect a 0.78% improvement with a ±2.5% instrument.</li>
+      <li><strong>Ground truth itself is uncertain.</strong> Different contractor → different number. Same contractor on a different day → different number. Paint sold in discrete buckets.</li>
+      <li><strong>Bottleneck is sample size, not algorithm.</strong> N=1 cannot distinguish systematic bias from a lucky outcome.</li>
+      <li><strong>CLAUDE.md §7 already prescribes confidence indicators (🟢🟡🔴)</strong> — quantified uncertainty is the closest thing to a real product extension.</li>
+    </ul>
+  </div>
+
+  <div class="verdict-section">
+    <h3><span class="marker">▸</span> Where the council clashes</h3>
+    <p><strong>Productize variance vs. ship one number.</strong></p>
+    <p><em>Expansionist:</em> variance = product. Ship Konservatyvus/Tikėtinas/Optimistinis columns, confidence intervals, click-to-verify UI. Build a moat from uncertainty.</p>
+    <p><em>Executor + Outsider + 4 of 5 reviewers:</em> LT contractors want ONE number to bid with. Range columns look like a refusal to commit and = liability against fixed-price competitors. Honest disclosure ≠ confidence intervals — it's a single number + ±3% badge.</p>
+  </div>
+
+  <div class="verdict-section">
+    <h3><span class="marker">▸</span> Blind spots the peer review caught</h3>
+    <div class="blindspot">
+      <div class="lead">Critical — flagged by 4 of 5 reviewers</div>
+      No advisor pursued the <strong>door-deduction formula match check</strong>. If contractor's 584.81 was computed with door_area = 1.89 m² (full opening), and we use 1.125 m² (opening − reveal at 0.15m), the 4.57 m² "gap" is purely a definitional mismatch:
+      <p style="margin: 8px 0;"><span class="formula">14 × (1.89 − 1.125) = 10.71 m² of formula difference</span></p>
+      That's MORE than the 4.57 m² residual. The "gap" might not exist at all — or might be larger once normalized.
+    </div>
+    <ul>
+      <li><strong>Roof V1.5 has <span class="formula">--use-gt-inputs</span> analog</strong> (commit 8e97f23) — already separates merger correctness from Vision drift in your own codebase. Adopt the same eval split for interior paint BEFORE any optimization.</li>
+      <li><strong>Stability test on Berzas alone</strong> — re-run the existing pipeline 5× on Berzas (~$2). Reveals whether 580.24 is a stable point estimate or itself wobbles ±2%. Determines if the gap is even measurable.</li>
+    </ul>
+  </div>
+
+  <div class="verdict-section">
+    <h3><span class="marker">▸</span> The recommendation</h3>
+    <p><strong>Stop optimizing toward Berzas.</strong> The path forward:</p>
+    <ol>
+      <li><strong>Verify formula definition with contractor</strong> — non-negotiable, before anything else.</li>
+      <li><strong>Re-run Berzas 5×</strong> as a stability test (~$2). Measures actual variance of point estimate.</li>
+      <li><strong>Adopt the roof pipeline's <span class="formula">--use-gt-inputs</span> eval split</strong> for interior paint.</li>
+      <li><strong>Get N=4</strong> contractor-validated LT PDFs.</li>
+      <li><strong>Ship 580.24 with "tikrumas: ±3%" badge</strong> (CLAUDE.md §7 compliant).</li>
+      <li><strong>Approach #8</strong> (Vision enumerates mm-dimensions → deterministic perim) ONLY IF systematic bias remains after N=4.</li>
+    </ol>
+    <p>Do NOT productize variance ranges. LT contractors bid with single numbers.</p>
+  </div>
+
+  <div class="do-first">
+    <h3>▸ The ONE thing to do first</h3>
+    <p><strong>Ask Rangovas A (Rangovas A) to confirm one specific thing:</strong></p>
+    <div class="ask">
+      Tomai, kai apskaičiavai item 16/17 "Sienų, lubų glaistymas/dažymas" = 584.81 m², kokia formule deductinai duris? Kiekviena duris × 0.9 × 2.1 = 1.89 m² pilna anga? Ar deducti tik plotą atimant angokraščius? Ar naudoji STR / RICS NRM2 / kažkokią kitą konvenciją?
+    </div>
+    <p>This single question either <strong>closes the gap entirely</strong> (spec mismatch, not extraction error) or <strong>validates -0.78% as real signal</strong> (justifying the rest of the plan). Either outcome saves days of misdirected work.</p>
+  </div>
+</section>
+
+<h2 style="margin-top: 48px; font-size: 18px; font-weight: 700;">Advisor Positions</h2>
+
+<div class="grid">
+  <div class="advisor-card">
+    <div class="name">The Contrarian</div>
+    <div class="stance"><span class="verdict-tag tag-stop">Stop</span> p-hacking with LLMs</div>
+    <div>You cannot detect 0.78% with a ±2.5% instrument. Freeze pipeline. Run on 5-10 PDFs. Report mean + σ.</div>
+  </div>
+  <div class="advisor-card">
+    <div class="name">The First Principles Thinker</div>
+    <div class="stance"><span class="verdict-tag tag-stop">Stop</span> the wrong question</div>
+    <div>"What does 584.81 actually mean?" Paint sold in discrete buckets. Nobody buys 0.78% more paint. Get N=10.</div>
+  </div>
+  <div class="advisor-card">
+    <div class="name">The Expansionist</div>
+    <div class="stance"><span class="verdict-tag tag-product">Productize</span> the variance</div>
+    <div>Variance = product. Konservatyvus/Tikėtinas/Optimistinis columns. Confidence interval per room. Click-to-verify flywheel.</div>
+  </div>
+  <div class="advisor-card">
+    <div class="name">The Outsider</div>
+    <div class="stance"><span class="verdict-tag tag-ship">Ship</span> measuring own ruler</div>
+    <div>You're measuring the wobble of your own ruler. Inter-contractor variance probably 3-5%. Customer experiences trust, not %.</div>
+  </div>
+  <div class="advisor-card" style="grid-column: 1 / -1; border-color: var(--accent); border-width: 2px;">
+    <div class="name">The Executor <span style="color: var(--good); font-weight: 700;">— strongest, picked by 4/5 reviewers</span></div>
+    <div class="stance"><span class="verdict-tag tag-ship">Ship</span> with Monday plan</div>
+    <div>Ship 580.24 as PASS at ±3% acceptance. Run on 3 more LT PDFs (N=4). Add "tikrumas: ±3%" badge. Approach #8 ONLY if variance persists after N=4. Do NOT spend another week on Berzas — bottleneck is sample size.</div>
+  </div>
+</div>
+
+<h2 style="margin-top: 48px; font-size: 18px; font-weight: 700;">Full advisor responses</h2>
+
+<details>
+  <summary>The Contrarian — "p-hacking with LLMs"</summary>
+  <div class="body">
+    <p><strong>-0.78% on ONE PDF is not a signal. It's noise that happens to look like a target.</strong></p>
+    <p>Where's the rest of the test set? You have <em>one</em> contractor-validated project (Berzas). Your "584.81 m² truth" itself has uncertainty — did the contractor measure to the millimeter, or eyeball it? What's <em>his</em> run-to-run variance if you asked him to remeasure?</p>
+    <p>The fatal flaw: you're optimizing against a single point estimate as if it were ground truth, when your measurement instrument (Vision) has ±2-3% variance. <strong>You cannot detect a 0.78% improvement with a ±2.5% instrument.</strong> This is p-hacking with LLMs.</p>
+    <p>Worse questions avoided:</p>
+    <ol>
+      <li>What's variance on the <em>next</em> PDF? Approach #8 might score 580 on Berzas and 540 elsewhere.</li>
+      <li>Is the contractor's 584.81 even right? Did he use the same door deduction formula (1.125 m²)? If 1.89, your "gap" is a definition mismatch.</li>
+      <li>What does the customer pay for being wrong by 5 m²? Probably nothing — they re-quote on site anyway.</li>
+    </ol>
+    <p><strong>Push:</strong> freeze the pipeline. Run on 5-10 more contractor-validated PDFs. Report mean error AND σ. Customer-acceptable is almost certainly ±5%, not ±1%.</p>
+  </div>
+</details>
+
+<details>
+  <summary>The First Principles Thinker — "what does 584.81 actually mean?"</summary>
+  <div class="body">
+    <p>The question isn't "how do I close -0.78%." The question is: <strong>what does 584.81 m² actually mean?</strong></p>
+    <p>Your "contractor-validated truth" is one human's measurement. Ask the same contractor next week → 581 or 588. Different contractor → different again. Paint coverage itself varies ±15% by surface roughness, primer absorption, applicator technique. Paint is sold in 2.5L / 5L / 10L increments. Nobody buys 0.78% more paint.</p>
+    <p>You're tuning a deterministic pipeline to match a stochastic human measurement of an ambiguous physical reality, then declaring the residual a "gap." That's not a gap. That's noise you've labeled as signal because you have one data point.</p>
+    <ol>
+      <li><strong>What decision changes at 580 vs 584?</strong> If nothing — same paint order, same quote, same crew — then -0.78% is a vanity metric.</li>
+      <li><strong>Where's your N?</strong> Cannot distinguish "0.78% bias" from "this PDF happened to land here" with N=1.</li>
+      <li><strong>What's the customer's tolerance?</strong> Probably 5%, not 0.78%.</li>
+    </ol>
+    <p>Stop. Ship. Get N=10. Then re-ask this question with actual data.</p>
+  </div>
+</details>
+
+<details>
+  <summary>The Expansionist — "the variance is the product"</summary>
+  <div class="body">
+    <p>You've hit the noise floor of your <em>ground truth</em>, not your system. Your 580.24 is statistically indistinguishable from his 584.81. A second contractor would give 587.2. A third, 578.9.</p>
+    <p>What you're missing: <strong>the variance is the product.</strong></p>
+    <p>Run Vision 5x at higher DPI. Don't take the median to hide it — <em>expose it.</em> Ship "Svetainė: 30.5–32.5m (±0.5m)" as a first-class UI element. Now you have:</p>
+    <ol>
+      <li><strong>Confidence interval per room.</strong> Competitors ship single numbers and lie. You ship error bars and tell the truth. That's a moat, not a bug.</li>
+      <li><strong>Targeted correction surface.</strong> Wobbly room → "tap to verify" badge → user draws polygon → variance collapses to 0.</li>
+      <li><strong>Pricing leverage.</strong> Konservatyvus / Tikėtinas / Optimistinis columns. Contractors quote high, win low.</li>
+      <li><strong>Data flywheel.</strong> Every user correction trains priors per room-type. In 6 months Berzas becomes irrelevant.</li>
+    </ol>
+    <p><strong>Quantified uncertainty + one-click correction is a category.</strong> Stop closing the gap. Productize it.</p>
+  </div>
+</details>
+
+<details>
+  <summary>The Outsider — "you're measuring the wobble of your own ruler"</summary>
+  <div class="body">
+    <p>-0.78% isn't a gap. It's noise. You're measuring the wobble of your own ruler.</p>
+    <ol>
+      <li><strong>One data point isn't a target, it's an anecdote.</strong> Inter-contractor variance on same PDF is likely 3-5%. You're chasing a precision your reference can't support.</li>
+      <li><strong>Customer experiences trust, not percentages.</strong> Spend next sprint on showing the work (per-room confidence, which rooms are shaky), not shrinking the residual.</li>
+      <li><strong>N-run median is the only rational approach</strong> — but only because it's diagnostic: which rooms are stable vs wobble. Flag wobbly ones as 🟡 for review.</li>
+    </ol>
+    <p>Ship it. Move on. The next 0.78% costs more than the next feature is worth.</p>
+  </div>
+</details>
+
+<details open>
+  <summary>The Executor — Monday plan ✓ STRONGEST, 4/5 reviewers</summary>
+  <div class="body">
+    <p>You are at -0.78% inside ±2-3% Vision noise floor. Already inside the noise band. Can't measure your way out — next run could put you at +1.2%.</p>
+    <p><strong>Monday morning:</strong></p>
+    <ol>
+      <li><strong>Ship it.</strong> Lock 580.24 m² as PASS for Berzas. Acceptance criterion: ±3%, not ±0%.</li>
+      <li><strong>Run pipeline on 3 more real LT PDFs</strong> (not Berzas variants). N=1 → N=4. You don't know if -0.78% is the gap or lucky cancellation of +2%/-2.8% across rooms.</li>
+      <li><strong>Add "tikrumas: ±3%" badge</strong> next to combined paint. Honest disclosure beats clever fixes — your own CLAUDE.md says so.</li>
+      <li><strong>If after step 2 variance persists:</strong> approach #8 (Vision enumerates mm-dimensions → deterministic perim) is the only one with a clear Monday task. But do it AFTER N=4 data, not before.</li>
+    </ol>
+    <p>What you do NOT do: spend another week on Berzas. Bottleneck is sample size, not algorithm.</p>
+  </div>
+</details>
+
+<h2 style="margin-top: 48px; font-size: 18px; font-weight: 700;">Peer review highlights</h2>
+
+<div class="peer-review">
+  <div class="lead">Convergence (4/5 reviewers picked Executor as strongest)</div>
+  <div class="body">Only response with a concrete Monday-actionable sequence plus a fallback if data later justifies algorithmic work. Cites CLAUDE.md correctly. Gates further optimization on sample size.</div>
+</div>
+
+<div class="peer-review">
+  <div class="lead">Strongest blind spot (4/5 reviewers identified Expansionist)</div>
+  <div class="body">"Productize the variance" sounds clever but ignores that LT contractors want ONE number to bid with. Confidence ranges look like a refusal to commit. Building a moat from N=1 confidence intervals = same flaw it accuses the user of.</div>
+</div>
+
+<div class="peer-review">
+  <div class="lead">Critical miss flagged by 4/5 reviewers</div>
+  <div class="body"><strong>Door-deduction formula match check.</strong> Contrarian gestured at it then moved on. Berzas's 584.81 may have been computed with 1.89 m² per door (full opening) while we use 1.125 m² (opening − reveal at 0.15m wall). 14 × (1.89 − 1.125) = 10.71 m² difference — MORE than the residual 4.57 m². The "gap" might literally be a spec mismatch, not extraction error.</div>
+</div>
+
+<div class="peer-review">
+  <div class="lead">Other misses (1 reviewer each)</div>
+  <div class="body"><strong>Roof V1.5 <span class="formula">--use-gt-inputs</span> analog</strong> already separates merger correctness from Vision drift in your own codebase (commit 8e97f23). Interior paint should adopt the same eval split BEFORE any further work. Also: re-running Berzas 5× costs ~$2 and immediately tells you if 580.24 is stable or wobbles ±2%.</div>
+</div>
+
+<footer>
+  Council convened 2026-05-27 · 5 advisors · 5 peer reviews · 1 chairman synthesis<br>
+  Methodology: Karpathy LLM Council pattern. Full transcript: <span class="formula">council-transcript-2026-05-27-paint-area-gap.md</span>
+</footer>
+
+</main>
+</body>
+</html>
