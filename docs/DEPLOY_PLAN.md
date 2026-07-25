@@ -253,13 +253,13 @@ ENV                          production
 SAMATU_CORS_ORIGINS          https://samatu.pathon.eu
 SAMATU_USER_DAILY_SPEND_EUR  0.50
 SAMATU_USER_HOURLY_EXTRACTS  10
-SAMATU_DB_PATH               /var/data/samatu.db
+SAMATU_DB_PATH               /data/samatu.db
 GOOGLE_CLIENT_ID             <vėliau, jei naudosi>
 GOOGLE_CLIENT_SECRET         <vėliau>
 GOOGLE_REDIRECT_URI          https://samatu-api.pathon.eu/api/auth/google/callback
 ```
 
-**Persistencija:** Render → **Disks** → Add Disk `/var/data` 1 GB ($0.25/GB/mėn. = $0.25). Ten gulės SQLite. Jei vėliau migruosim į Postgres, šis diskas tampa nereikalingas.
+**Persistencija:** Render → **Disks** → Add Disk `/data` 1 GB ($0.25/GB/mėn. = $0.25) — kelias privalo sutapti su `render.yaml` disko `mountPath` ir `SAMATU_DB_PATH`. Ten gulės SQLite. Jei vėliau migruosim į Postgres, šis diskas tampa nereikalingas.
 
 **Frontend env (Static Site → Environment):**
 ```

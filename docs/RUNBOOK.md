@@ -46,37 +46,39 @@ to the branch you want live before deploying, or Render will happily ship
 months-old code and report a green deploy.
 
 1. Sign up at render.com using your Pathon Google account.
-2. Click **New → Web Service** (or point Render at `render.yaml` as a Blueprint).
+2. Click **New → Web Service** (or point Render at `render.yaml` as a Blueprint —
+   the blueprint already declares everything in steps 3–8).
 3. Connect this GitHub repo (or push from local — Render supports both).
-4. **Root directory:** repo root — the blueprint does its own `cd backend` in
-   the start command, and the build installs `backend/requirements.txt`.
-5. **Build command:**
+4. **Runtime: Docker.** The repo ships `backend/Dockerfile` (build context =
+   repo root; the blueprint wires `dockerfilePath` + `dockerContext`). Do NOT
+   pick the native Python runtime — it cannot install the native libs
+   extraction hard-depends on (see the ⚠️ below).
+5. **Build/start commands: none to enter** — the Dockerfile bakes both. The
+   baked start command is:
    ```
-   pip install -r backend/requirements.txt
-   ```
-6. **Start command** — must match `render.yaml`, flags included:
-   ```
-   cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+   uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
    ```
    `--proxy-headers --forwarded-allow-ips='*'` is **not optional**: the per-IP
    login/register rate limiter keys on the **rightmost `X-Forwarded-For` hop**
    (2026-07-15 hardening). Drop the flags and every request looks like it came
    from Render's proxy — one abuser then locks out everyone's auth. `'*'` is
-   safe here because the service is only reachable via Render's edge.
-7. **Region:** Frankfurt (closest EU).
-8. **Instance type:** Starter ($7/mo).
-9. **Attach a persistent disk and mount it over `backend/data`** — see §2a.
-   Skipping this is the single most destructive mistake available: every
-   deploy silently wipes all users and projects.
-10. Add the env vars (see §4).
+   safe here because the service is only reachable via Render's edge. If you
+   ever override the start command in the dashboard, carry the flags with you.
+6. **Region:** Frankfurt (closest EU).
+7. **Instance type:** Starter ($7/mo).
+8. **Persistent disk** — the blueprint declares a 1 GB disk mounted at `/data`
+   with `SAMATU_DB_PATH=/data/samatu.db`; on a manual (non-blueprint) setup
+   you must attach it yourself — see §2a. Skipping this is the single most
+   destructive mistake available: every deploy silently wipes all users and
+   projects.
+9. Add the env vars (see §4).
 
 ⚠️ **System packages.** `pdf2image` needs the **poppler** binaries and
-`opencv-python-headless` needs **libGL + libglib2** at runtime. Railway's
-`nixpacks.toml` declares these explicitly (`poppler_utils`, `libgl1`,
-`libglib2.0-0`). `render.yaml`'s build is a plain
-`pip install -r backend/requirements.txt` with **no apt/native package step** —
-so on Render you must supply them yourself (a custom Docker runtime, or
-Render's native-dependency mechanism). The failure mode is loud but late:
+`opencv-python-headless` needs **libglib2** (plus `libgl1` for parity with
+Railway) at runtime. This is WHY the blueprint uses the Docker runtime:
+`backend/Dockerfile` apt-installs `poppler-utils`, `libglib2.0-0` and
+`libgl1` — the same set Railway's `nixpacks.toml` declares. A native-Python
+Render service has no apt step, and the failure mode is loud but late:
 extraction returns *"Nepavyko konvertuoti PDF — įdiekite poppler (pdf2image)"*
 at the first upload, long after the deploy went green. Verify with a real PDF
 upload in the §5 smoke test, not with `/health`.
@@ -164,8 +166,9 @@ SAMATU_USER_HOURLY_EXTRACTS=10
 # CORS — exact frontend origin(s), comma-separated. Must match reality.
 SAMATU_CORS_ORIGINS=https://pathon.eu
 
-# Database — SQLite file. Point at the PERSISTENT DISK mount (§2a).
-SAMATU_DB_PATH=/var/data/samatu.db
+# Database — SQLite file. Point at the PERSISTENT DISK mount (§2a). Must
+# match the disk mountPath the blueprint declares (/data in render.yaml).
+SAMATU_DB_PATH=/data/samatu.db
 
 # Storage + backups (Cloudflare R2). All four required, or PDFs fall back to
 # local disk and the nightly DB backup never runs.
@@ -187,8 +190,10 @@ GOOGLE_REDIRECT_URI=https://<api-host>/api/auth/google/callback
   `SAMATU_AUTH_DISABLED` is a dev-only bypass; it must never reach prod.
 
 CRITICAL: never commit `.env`. Render's secret manager handles this safely.
-Note `render.yaml` does **not** yet declare `SAMATU_ADMIN_EMAIL`,
-`SAMATU_DB_PATH` or the `R2_*` vars — add them in the dashboard.
+`render.yaml` declares every key above — `SAMATU_DB_PATH` ships its value
+(`/data/samatu.db`, matching the blueprint's disk mount); the rest are
+`sync: false`, so a Blueprint sync prompts for their values in the dashboard
+(no secret ever lives in the repo).
 
 ## 5. Smoke test (after first deploy)
 

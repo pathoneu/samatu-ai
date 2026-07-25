@@ -1,0 +1,28 @@
+# Docker build context = repo root (render.yaml dockerContext: .). The image
+# COPYs only backend/ + prompts/, so everything else is either context bloat
+# (.git, node_modules, venv) or data that must NEVER reach an image built
+# locally: the dev SQLite DB and the UNTRACKED client PDF fixtures. Render
+# builds from a git checkout, so untracked files are absent there — this file
+# protects local `docker build` runs (and keeps their context upload small).
+.git
+.claude
+**/__pycache__
+**/node_modules
+**/.env
+**/.env.*
+**/*.db
+venv
+frontend
+docs
+detector_bench
+
+# Untracked runtime/dev data under backend/. Tracked runtime files stay in:
+# backend/data/email_templates/ and backend/data/lt_unit_prices.json.
+backend/data/samatu.db
+backend/data/pdf_store
+backend/data/cv_cache
+backend/data/annotations
+backend/data/calibrations
+backend/data/demo-berzu-24-snapshot-20260714.json
+backend/test_pdfs
+backend/logs
