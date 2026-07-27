@@ -8,7 +8,7 @@
  * All auth logic/handlers/validation are unchanged — styling only.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/authContext';
@@ -21,6 +21,19 @@ import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 import LanguageToggle from '@/components/LanguageToggle';
 
+// The Google callback bounces failures back to /login?oauth_error=<code>.
+// Codes come from backend main.py (api_google_callback) plus whatever Google
+// itself returns in `error` (access_denied etc.). Anything unmapped falls back
+// to the generic message — never show a raw code to the user.
+const OAUTH_ERROR_KEYS = {
+  invalid_state: 'invalidState',
+  missing_code: 'missingCode',
+  token_exchange_failed: 'tokenExchangeFailed',
+  incomplete_userinfo: 'incompleteUserinfo',
+  account_disabled: 'accountDisabled',
+  access_denied: 'accessDenied',
+};
+
 export default function Login() {
   const { t } = useTranslation();
   const { login } = useAuth();
@@ -32,6 +45,14 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Surface a failed Google sign-in in the existing error banner. Before this
+  // the redirect landed on a pristine login form and the user had no idea why.
+  useEffect(() => {
+    const code = new URLSearchParams(location.search).get('oauth_error');
+    if (!code) return;
+    setError(t(`login.oauthErr.${OAUTH_ERROR_KEYS[code] || 'generic'}`));
+  }, [location.search, t]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

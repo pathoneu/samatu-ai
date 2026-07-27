@@ -342,7 +342,16 @@
     "brandHeadlineAccent": "per minutes",
     "brandHeadlineB": ", ne per dienas.",
     "brandSub": "Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams.",
-    "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis"
+    "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis",
+    "oauthErr": {
+      "invalidState": "Prisijungimo sesija nebegalioja. Pradėkite prisijungimą per Google iš naujo.",
+      "missingCode": "Google negrąžino patvirtinimo kodo. Bandykite prisijungti dar kartą.",
+      "tokenExchangeFailed": "Nepavyko susisiekti su Google. Pabandykite po kelių minučių arba prisijunkite el. paštu.",
+      "incompleteUserinfo": "Google nepateikė el. pašto adreso. Prisijunkite el. paštu ir slaptažodžiu.",
+      "accountDisabled": "Ši paskyra išjungta. Susisiekite: solutions@pathon.eu",
+      "accessDenied": "Prisijungimas per Google atšauktas.",
+      "generic": "Prisijungti per Google nepavyko. Bandykite dar kartą."
+    }
   },
   "register": {
     "backHome": "Į pradžią",
@@ -979,7 +988,8 @@
       "priceListRows": "{{count}} eil.",
       "manualPricesKept": "Rankomis įvestos kainos lieka nepakeistos. Žemo pasitikėjimo atitikmenys praleidžiami.",
       "toastApplyFail": "Iš kainyno „{{name}}\" nepavyko pritaikyti nė vienos eilutės. Patikrinkite, ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).",
-      "toastApplied": "Pritaikyta: {{applied}} eilučių iš kainyno „{{name}}\". Praleista: {{skipped}}."
+      "toastApplied": "Pritaikyta: {{applied}} eilučių iš kainyno „{{name}}\". Praleista: {{skipped}}.",
+      "toastInvalidNumber": "Neteisingas skaičius. Naudokite kablelį arba tašką, pvz. 12,5."
     },
     "assumptions": {
       "widthPlaceholder": "plotis",
@@ -1012,7 +1022,8 @@
       "doorsCount": "({{count}} vnt.)",
       "doorLabel": "duris",
       "recomputing": "Perskaičiuojama...",
-      "toastRecomputeErr": "Klaida perskaičiuojant: {{msg}}"
+      "toastRecomputeErr": "Klaida perskaičiuojant: {{msg}}",
+      "heightRangeErr": "Lubų aukštis turi būti nuo {{min}} iki {{max}} m."
     },
     "roomCard": {
       "confHigh": "Nuskaityta tiesiai iš brėžinio",

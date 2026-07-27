@@ -29,7 +29,7 @@ import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
-import { updateProject } from '@/lib/projectStore';
+import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 
@@ -37,15 +37,20 @@ const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_neede
 
 // Apply a per-room field patch (keyed by nr) to BOTH patalpos and v8_rooms so
 // the two room arrays the app reads (`v8_rooms || patalpos`) never diverge.
-function applyRoomPatch(project, patchByNr) {
+//
+// Returns ONLY the room arrays — field-scoped by design (2026-07-27 audit).
+// The previous version returned a whole `{...project}` spread, so an async
+// continuation (polygon auto-detect, click-to-fill) republished the project as
+// it looked when the work STARTED and silently reverted every price edit,
+// measurement and second-tab write that landed in the meantime.
+function roomPatchFields(source, patchByNr) {
   const patch = (arr) => (arr || []).map((r) => {
     const p = patchByNr[String(r.nr)];
     return p ? { ...r, ...p } : r;
   });
   return {
-    ...project,
-    patalpos: patch(project.patalpos),
-    ...(Array.isArray(project.v8_rooms) && { v8_rooms: patch(project.v8_rooms) }),
+    patalpos: patch(source.patalpos),
+    ...(Array.isArray(source.v8_rooms) && { v8_rooms: patch(source.v8_rooms) }),
   };
 }
 
@@ -253,9 +258,11 @@ export default function InteriorWorkspace({
               marker_source: res.marker_source ?? null,
             };
         }
-        const updated = applyRoomPatch(project, patchByNr);
-        updateProject(project.id, updated);
-        onProjectChange?.(updated);
+        // Re-read the CURRENT stored project — detection takes seconds and the
+        // user keeps working while it runs.
+        const fresh = getProject(project.id) || project;
+        const updated = updateProject(project.id, roomPatchFields(fresh, patchByNr));
+        if (updated) onProjectChange?.(updated);
       } catch (e) {
         console.warn('[detect-room-polygons] failed:', e?.message);
       } finally {
@@ -291,9 +298,9 @@ export default function InteriorWorkspace({
       polygon_confidence: fill.confidence || 'high',
       polygon_corrected_at: new Date().toISOString(),
     };
-    const updated = applyRoomPatch(project, { [String(roomNr)]: patch });
-    updateProject(project.id, updated);
-    onProjectChange?.(updated);
+    const fresh = getProject(project.id) || project;
+    const updated = updateProject(project.id, roomPatchFields(fresh, { [String(roomNr)]: patch }));
+    if (updated) onProjectChange?.(updated);
   };
 
   // Persist measurements + per-page calibration scales from the viewer's local
@@ -428,7 +435,12 @@ export default function InteriorWorkspace({
                 : t('project.interiorWorkspace.otherWorks');
               const kiekis = result?.count || (result?.matches?.length ?? 0);
               if (!kiekis) return;
-              const darbai = [...(project.darbu_sarasas || [])];
+              // Fresh read + field-scoped write: the counting round-trip is
+              // async, and the old `{...project, darbu_sarasas}` blob write
+              // also skipped onProjectChange — so React kept the pre-count
+              // list and the next edit wiped the new line. (2026-07-27 audit.)
+              const fresh = getProject(project.id) || project;
+              const darbai = [...(fresh.darbu_sarasas || [])];
               const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
               // Tikrinam ar tokia eilutė jau egzistuoja — jei taip, atnaujiname kiekį
               const existingIdx = darbai.findIndex(d =>
@@ -455,7 +467,8 @@ export default function InteriorWorkspace({
                   confidence: 'medium',
                 });
               }
-              updateProject(project.id, { ...project, darbu_sarasas: darbai });
+              const updated = updateProject(project.id, { darbu_sarasas: darbai });
+              if (updated) onProjectChange?.(updated);
             }}
           />
           )
@@ -486,7 +499,12 @@ export default function InteriorWorkspace({
                     setPdfUrl(u);
                     setPdfBlob(b);
                     setPdfMissing(!u);
-                    onProjectChange?.({ ...project, pdf_name: file.name, has_pdf: true });
+                    // Field-scoped (same class as the writes above): the await
+                    // above means `project` is a pre-upload snapshot.
+                    const updated = updateProject(project.id, {
+                      pdf_name: file.name, has_pdf: true,
+                    });
+                    if (updated) onProjectChange?.(updated);
                   } finally {
                     setAttachingPdf(false);
                     event.target.value = '';

@@ -6,23 +6,30 @@
  * localStorage'e per projektą, kad nereikėtų kiekvieną kartą tikrinti.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import {
+  exportSelectionKey,
+  parseExcludedSections,
+  serializeExcludedSections,
+  selectedFor,
+  toggleSection,
+} from '@/lib/exportSectionSelection';
 
-const STORAGE_KEY = (projectId) => `samatu_export_skyriai_${projectId}`;
-
-function loadSelection(projectId) {
+// The persisted value is the set of EXPLICITLY EXCLUDED skyriai, so a skyrius
+// that shows up later (re-extraction, recompute, a new Matavimai line) is
+// included by default instead of being silently dropped from the export.
+function loadExcluded(projectId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY(projectId));
-    return raw ? new Set(JSON.parse(raw)) : null;
+    return parseExcludedSections(localStorage.getItem(exportSelectionKey(projectId)));
   } catch {
-    return null;
+    return new Set();
   }
 }
 
-function saveSelection(projectId, selected) {
+function saveExcluded(projectId, excluded) {
   try {
-    localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify([...selected]));
+    localStorage.setItem(exportSelectionKey(projectId), serializeExcludedSections(excluded));
   } catch {
     // ignored — non-critical
   }
@@ -50,21 +57,14 @@ export default function ExportFilterModal({
       .sort((a, b) => a.name.localeCompare(b.name, 'lt'));
   }, [project.darbu_sarasas]);
 
-  // Persisted selection wins; otherwise default = all.
-  const [selected, setSelected] = useState(() => {
-    const saved = loadSelection(project.id);
-    if (saved) return new Set(saved);
-    return new Set(sections.map(s => s.name));
-  });
-
-  // If sections list changes (rare — recompute), top up selection with new ones.
-  useEffect(() => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      for (const s of sections) if (!next.has(s.name) && prev.size === 0) next.add(s.name);
-      return next;
-    });
-  }, [sections]);
+  // State = what the user explicitly UNCHECKED. The checked set is derived from
+  // the sections that exist right now, so no reconciliation effect is needed and
+  // a newly-appearing skyrius can never arrive pre-unchecked.
+  const [excluded, setExcluded] = useState(() => loadExcluded(project.id));
+  const selected = useMemo(
+    () => selectedFor(sections.map(s => s.name), excluded),
+    [sections, excluded],
+  );
 
   // Per-export client/objektas (2026-06-19) — rendered into the PDF/Excel header
   // so the deliverable reads as a real pasiūlymas. Defaults from the project.
@@ -75,19 +75,20 @@ export default function ExportFilterModal({
   const noneChecked = selected.size === 0;
 
   const toggle = (name) => {
-    setSelected(prev => {
+    setExcluded(prev => toggleSection(prev, name));
+  };
+
+  const toggleAll = () => {
+    setExcluded(prev => {
+      if (!allChecked) return new Set([...prev].filter(n => !sections.some(s => s.name === n)));
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
+      for (const s of sections) next.add(s.name);
       return next;
     });
   };
 
-  const toggleAll = () => {
-    setSelected(allChecked ? new Set() : new Set(sections.map(s => s.name)));
-  };
-
   const handleConfirm = () => {
-    saveSelection(project.id, selected);
+    saveExcluded(project.id, excluded);
     onConfirm({
       skyriai: selected,
       format,

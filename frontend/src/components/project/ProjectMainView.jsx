@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { getPriceLists } from '@/lib/projectStore';
 import { applyPriceListToPositions } from '@/lib/applyPriceList';
+import { parseLtNumber } from '@/lib/parseLtNumber';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
@@ -89,7 +90,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
     kaina: item.kaina || 0,
   });
 
-  const suma = (Number(draft.kiekis) || 0) * (Number(draft.kaina) || 0);
+  const suma = (parseLtNumber(draft.kiekis) || 0) * (parseLtNumber(draft.kaina) || 0);
   const itemSuma = (item.kiekis || 0) * (item.kaina || 0);
   const isManualQty = item.manual_override === true || item.quantity_source === 'manual_override';
   const sourceKind = getQuantitySourceKind(item);
@@ -106,12 +107,20 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   const isCountUnit = String(item.mato_vnt || '').toLowerCase().includes('vnt');
 
   const handleSave = () => {
+    // LT decimal comma: parseFloat('12,5') silently returned 12 and an empty
+    // field silently became 0. Reject bad input loudly instead. (2026-07-27.)
+    const kiekis = parseLtNumber(draft.kiekis);
+    const kaina = parseLtNumber(draft.kaina);
+    if (!Number.isFinite(kiekis) || kiekis < 0 || !Number.isFinite(kaina) || kaina < 0) {
+      toast.error(t('project.mainView.toastInvalidNumber'));
+      return;
+    }
     onChange({
       ...item,
       aprasymas: draft.aprasymas,
-      kiekis: parseFloat(draft.kiekis) || 0,
-      kaina: parseFloat(draft.kaina) || 0,
-      suma: (parseFloat(draft.kiekis) || 0) * (parseFloat(draft.kaina) || 0),
+      kiekis,
+      kaina,
+      suma: kiekis * kaina,
     });
     setEditing(false);
   };
@@ -131,10 +140,12 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   };
 
   const commitQty = () => {
-    const num = parseFloat(String(draftQty).replace(',', '.'));
-    if (!isNaN(num) && num >= 0) {
-      onChange(updatePositionQuantity([item], rowId, num)[0]);
+    const num = parseLtNumber(draftQty);
+    if (!Number.isFinite(num) || num < 0) {
+      toast.error(t('project.mainView.toastInvalidNumber'));
+      return;   // keep the editor open so the typed value isn't lost
     }
+    onChange(updatePositionQuantity([item], rowId, num)[0]);
     setEditingQty(false);
   };
 
@@ -152,13 +163,15 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
             className="w-full px-2 py-1 border border-border bg-background rounded text-sm" />
         </td>
         <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
+        {/* type="text" + inputMode: a LT decimal comma makes type="number"
+            report an EMPTY value, so "12,5" was read as 0. */}
         <td className="px-3 py-2">
-          <input type="number" step="0.01" value={draft.kiekis}
+          <input type="text" inputMode="decimal" value={draft.kiekis}
             onChange={e => setDraft({...draft, kiekis: e.target.value})}
             className="w-20 px-2 py-1 border border-border bg-background rounded text-sm text-right tabular-nums" />
         </td>
         <td className="px-3 py-2">
-          <input type="number" step="0.01" value={draft.kaina}
+          <input type="text" inputMode="decimal" value={draft.kaina}
             onChange={e => setDraft({...draft, kaina: e.target.value})}
             className="w-20 px-2 py-1 border border-border bg-background rounded text-sm text-right tabular-nums" />
         </td>
@@ -208,8 +221,8 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
         {editingQty ? (
           <input
             autoFocus
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={draftQty}
             onChange={e => setDraftQty(e.target.value)}
             onBlur={commitQty}
@@ -298,6 +311,17 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
+
+  // P0 (2026-07-27): "Pritaikyti kainyną" / re-extract push a NEW darbu_sarasas
+  // up through onProjectChange, but this local mirror stayed frozen on the
+  // array captured at mount — applied prices never appeared, exports sent
+  // 0,00 €, and the next row edit wrote the stale array back over the priced
+  // one. Re-sync whenever the parent's array identity changes. No loop: our own
+  // handlers hand the SAME array reference up, the parent stores it unchanged,
+  // and setState bails out on Object.is equality.
+  useEffect(() => {
+    setDarbai(project.darbu_sarasas || []);
+  }, [project.darbu_sarasas]);
 
   // Sprint 0 Fix 6: session telemetry — track time-on-task per project view
   const sessionRef = useRef(null);
@@ -404,6 +428,16 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
 
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
   const reviewTargetPage = currentReview ? getRowTargetPage(currentReview, project) : null;
+
+  // Review-queue quantity fix — LT comma / spaced thousands aware.
+  const applyReviewQty = () => {
+    const qty = parseLtNumber(reviewDraftQty);
+    if (!Number.isFinite(qty) || qty < 0) {
+      toast.error(t('project.mainView.toastInvalidNumber'));
+      return;
+    }
+    updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
+  };
 
   const filterButtons = [
     { mode: TAKEOFF_FILTER_MODES.all, label: t('project.mainView.filterAll'), count: darbai.length },
@@ -612,14 +646,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
           <input
             value={reviewDraftQty}
             onChange={e => setReviewDraftQty(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                const qty = parseFloat(String(reviewDraftQty).replace(',', '.'));
-                if (!isNaN(qty) && qty >= 0) {
-                  updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
-                }
-              }
-            }}
+            onKeyDown={e => { if (e.key === 'Enter') applyReviewQty(); }}
             className="w-24 h-8 px-2 border border-border bg-background rounded text-sm text-right tabular-nums"
             title={t('project.mainView.fixQtyTitle')}
           />
@@ -627,12 +654,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             variant="outline"
             size="sm"
             className="border-border"
-            onClick={() => {
-              const qty = parseFloat(String(reviewDraftQty).replace(',', '.'));
-              if (!isNaN(qty) && qty >= 0) {
-                updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
-              }
-            }}
+            onClick={applyReviewQty}
           >
             {t('project.mainView.fix')}
           </Button>

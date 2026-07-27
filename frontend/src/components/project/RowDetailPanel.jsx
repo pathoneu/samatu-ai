@@ -65,7 +65,7 @@ export default function RowDetailPanel({ row, onClose }) {
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Suma</p>
                 <p className="font-mono text-sm font-semibold text-primary">
-                  {row.suma ? `${row.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €` : '—'}
+                  {row.suma ? `${row.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}
                 </p>
               </div>
             </div>

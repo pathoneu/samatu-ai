@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -54,17 +54,41 @@ export default function ProjectDetail() {
     }
   }, [project]);
 
-  // Auto-save with debounce
+  // Auto-save with debounce.
+  //
+  // 2026-07-27 audit: the debounce cleanup only CANCELLED the pending timer, so
+  // leaving the page (back arrow, tab switch, closing the tab) within 1.5 s of
+  // the last price keystroke silently threw that edit away. The latest rows now
+  // live in a ref and `flushSave` is called from the unmount cleanup and from
+  // `pagehide` as well as from the timer.
+  const pendingRef = useRef({ dirty: false, rows: [], id });
+  useEffect(() => {
+    pendingRef.current = { dirty: hasUnsaved, rows: localRows, id };
+  }, [hasUnsaved, localRows, id]);
+
+  const flushSave = useCallback(() => {
+    const { dirty, rows, id: pid } = pendingRef.current;
+    if (!dirty || !pid || rows.length === 0) return;
+    pendingRef.current = { ...pendingRef.current, dirty: false };
+    const totalValue = rows.reduce((sum, r) => sum + (r.suma || 0), 0);
+    updateProject(pid, { rows, total_value: totalValue });
+    setHasUnsaved(false);
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+  }, [queryClient]);
+
   useEffect(() => {
     if (!hasUnsaved || localRows.length === 0) return;
-    const timer = setTimeout(() => {
-      const totalValue = localRows.reduce((sum, r) => sum + (r.suma || 0), 0);
-      updateProject(id, { rows: localRows, total_value: totalValue });
-      setHasUnsaved(false);
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    }, 1500);
+    const timer = setTimeout(flushSave, 1500);
     return () => clearTimeout(timer);
-  }, [localRows, hasUnsaved, id, queryClient]);
+  }, [localRows, hasUnsaved, flushSave]);
+
+  useEffect(() => {
+    window.addEventListener('pagehide', flushSave);
+    return () => {
+      window.removeEventListener('pagehide', flushSave);
+      flushSave();
+    };
+  }, [flushSave]);
 
   const handlePriceChange = useCallback((index, price) => {
     setLocalRows(prev => {

@@ -15,7 +15,10 @@
  * localStorage still works and sync resumes when online.
  */
 
-import { API_BASE as API } from './apiBase';
+// Explicit .js extension so this module also resolves under plain `node --test`
+// (the unit tests below import it directly, without the vite resolver).
+import { API_BASE as API } from './apiBase.js';
+import { toast } from 'sonner';
 
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
@@ -79,7 +82,67 @@ function _migrateProject(p) {
   return migrated;
 }
 
+// ── Quota-safe localStorage writes ────────────────────────────────────────────
+// A project blob with polygons + measurements is easily 1-2 MB; a handful of
+// them plus a base64 logo hits the ~5 MB origin quota. setItem then throws
+// QuotaExceededError and, before this helper, that exception escaped through
+// updateProject into the React handler — the click looked like a no-op and the
+// user lost the edit with no explanation. Now: warn ONCE per session, keep the
+// backend write-through (which is the real source of truth) running.
+
+let _storageNoticeShown = false;
+
+// Test hook — lets the unit test assert the "warned once" behaviour.
+export function _hasStorageNotice() {
+  return _storageNoticeShown;
+}
+
+function _persist(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    console.warn('[projectStore] localStorage write failed:', e);
+    if (!_storageNoticeShown) {
+      _storageNoticeShown = true;
+      toast.error(
+        'Naršyklės atmintis pilna — pakeitimai neišsaugoti šioje naršyklėje. '
+        + 'Ištrinkite senus projektus arba logotipą.',
+        { id: 'projectstore-quota' },
+      );
+    }
+    return false;
+  }
+}
+
 // ── Backend sync helpers (fire-and-forget) ────────────────────────────────────
+
+// Classify a write-through response and tell the user when the save did NOT
+// reach the backend. Before this, `_syncToBackend` only caught network errors —
+// an expired session (401) or a 500 was swallowed, so the user kept editing
+// against a backend that had stopped accepting the writes and lost everything
+// on the next device / after a cache clear.
+// Returns 'ok' | 'unauthorized' | 'failed' (return value exists for the tests).
+export function _handleSyncResponse(res) {
+  if (res?.status === 401) {
+    toast.error('Sesija baigėsi — prisijunkite iš naujo. '
+      + 'Paskutinis pakeitimas neišsaugotas serveryje.');
+    if (typeof window !== 'undefined') window.location.assign('/login');
+    return 'unauthorized';
+  }
+  if (!res?.ok) {
+    toast.error(`Nepavyko išsaugoti serveryje (${res?.status ?? '—'}). `
+      + 'Pakeitimai išliks šioje naršyklėje.', { id: 'projectstore-sync' });
+    return 'failed';
+  }
+  return 'ok';
+}
+
+function _handleSyncError(e) {
+  console.warn('[projectStore] backend sync failed:', e);
+  toast.error('Nepavyko pasiekti serverio — pakeitimai išsaugoti tik šioje naršyklėje.',
+    { id: 'projectstore-sync' });
+}
 
 const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
   if (!project?.id) return;
@@ -97,12 +160,13 @@ const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(persisted),
-  }).catch((e) => console.warn('[projectStore] backend sync failed:', e));
+  }).then(_handleSyncResponse).catch(_handleSyncError);
 };
 
 const _deleteFromBackend = (id) => {
   fetch(`${API}/api/projects/${id}`, { method: 'DELETE', credentials: 'include' })
-    .catch((e) => console.warn('[projectStore] backend delete failed:', e));
+    .then(_handleSyncResponse)
+    .catch(_handleSyncError);
 };
 
 // ── One-way pull (backend → localStorage) on app load ─────────────────────────
@@ -138,7 +202,7 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     // resurrected "deleted" projects after logout or on a second device.
 
     if (list.length === 0) {
-      localStorage.setItem(PROJECTS_KEY, JSON.stringify([]));
+      _persist(PROJECTS_KEY, JSON.stringify([]));
       return [];
     }
 
@@ -150,7 +214,7 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     const valid = fulls.filter(Boolean).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(valid));
+    _persist(PROJECTS_KEY, JSON.stringify(valid));
     return valid;
   } catch (e) {
     console.warn('[projectStore] pull from backend failed:', e);
@@ -185,7 +249,7 @@ export async function seedDemoProject() {
   const { DEMO_PROJECT } = await import('@/demoData');
   const demo = { ...DEMO_PROJECT, updated_at: new Date().toISOString() };
   projects.unshift(demo);
-  try { localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); } catch { /* ignore */ }
+  _persist(PROJECTS_KEY, JSON.stringify(projects));
   return demo;
 }
 
@@ -198,7 +262,7 @@ export function createProject(data) {
   };
   const projects = getProjects();
   projects.unshift(project); // newest first
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  _persist(PROJECTS_KEY, JSON.stringify(projects));
   _syncToBackend(project);
   return project;
 }
@@ -208,7 +272,7 @@ export function updateProject(id, updates) {
   const idx = projects.findIndex(p => p.id === id);
   if (idx < 0) return null;
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  _persist(PROJECTS_KEY, JSON.stringify(projects));
   _syncToBackend(projects[idx]);
   return projects[idx];
 }
@@ -230,7 +294,7 @@ export function archiveProject(id) {
   if (!target) return;
   target._archived = true;
   target._archived_at = new Date().toISOString();
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
+  _persist(PROJECTS_KEY, JSON.stringify(all));
   // Soft-delete is durable: persist the flags server-side so the project stays
   // deleted after logout / on another device (data itself is preserved until
   // the purge window expires — restore stays possible from Šiukšliadėžė).
@@ -243,7 +307,7 @@ export function restoreProject(id) {
   if (!target) return;
   delete target._archived;
   delete target._archived_at;
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(all));
+  _persist(PROJECTS_KEY, JSON.stringify(all));
   // PUT replaces the whole blob → syncing the flag-less object un-archives
   // server-side as well.
   _syncToBackend(target);
@@ -251,7 +315,7 @@ export function restoreProject(id) {
 
 export function permanentlyDeleteProject(id) {
   const projects = getProjects().filter(p => p.id !== id);
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  _persist(PROJECTS_KEY, JSON.stringify(projects));
   _deleteFromBackend(id);
 }
 
@@ -442,13 +506,13 @@ export function createPriceList(data) {
   };
   const lists = getPriceLists();
   lists.unshift(pl);
-  localStorage.setItem(PRICE_LISTS_KEY, JSON.stringify(lists));
+  _persist(PRICE_LISTS_KEY, JSON.stringify(lists));
   return pl;
 }
 
 export function deletePriceList(id) {
   const lists = getPriceLists().filter(p => p.id !== id);
-  localStorage.setItem(PRICE_LISTS_KEY, JSON.stringify(lists));
+  _persist(PRICE_LISTS_KEY, JSON.stringify(lists));
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -462,7 +526,7 @@ export function getSettings() {
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  _persist(SETTINGS_KEY, JSON.stringify(settings));
   return settings;
 }
 
@@ -549,7 +613,7 @@ export function importProjectsBackup(jsonText, opts = {}) {
   } else {
     final = incoming;
   }
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(final));
+  _persist(PROJECTS_KEY, JSON.stringify(final));
 
   if (parsed.settings && typeof parsed.settings === 'object') {
     saveSettings({ ...getSettings(), ...parsed.settings });

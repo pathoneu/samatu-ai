@@ -13,19 +13,19 @@ export default function SummaryBar({ rows, vatRate = 21 }) {
         <div className="text-right">
           <p className="text-xs text-muted-foreground">{t('project.summary.sumNoVat')}</p>
           <p className="font-mono text-sm font-semibold text-foreground">
-            {subtotal.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €
+            {subtotal.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">{t('project.summary.vat', { rate: vatRate })}</p>
           <p className="font-mono text-sm font-semibold text-foreground">
-            {vat.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €
+            {vat.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </p>
         </div>
         <div className="text-right pl-4 border-l border-border">
           <p className="text-xs text-primary font-medium">{t('project.summary.totalWithVat')}</p>
           <p className="font-mono text-lg font-bold text-primary">
-            {total.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €
+            {total.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </p>
         </div>
       </div>

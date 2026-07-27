@@ -60,8 +60,16 @@ export function AuthProvider({ children }) {
   // user's Dashboard actually fetches their OWN data — otherwise, on a shared
   // browser or after a silent session expiry, the next person sees (and can
   // export) the prior user's projects from localStorage. Mirrors logout().
+  // 2026-07-27 audit: samatu_settings (company name, logo, default prices) and
+  // samatu_price_lists (the contractor's own kainynai) are localStorage-only —
+  // they used to survive a user switch, so the next person on a shared browser
+  // inherited them and could apply another company's prices to their sąmata.
+  const USER_SCOPED_KEYS = ['samatu_projects', 'samatu_settings', 'samatu_price_lists'];
+
   const purgeLocalUserData = async () => {
-    try { localStorage.removeItem('samatu_projects'); } catch { /* ignore */ }
+    for (const key of USER_SCOPED_KEYS) {
+      try { localStorage.removeItem(key); } catch { /* ignore */ }
+    }
     try {
       const { resetPullCache } = await import('@/lib/projectStore');
       resetPullCache();
@@ -91,13 +99,10 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try { await apiCall('/api/auth/logout', { method: 'POST' }); } catch {}
     setUser(null);
-    try { localStorage.removeItem('samatu_projects'); } catch {}
-    // Sprint §AUDIT (2026-04-29): clear pull cache so next user's first
-    // request actually fetches from backend (was stuck on previous user's pull).
-    try {
-      const { resetPullCache } = await import('@/lib/projectStore');
-      resetPullCache();
-    } catch { /* ignore */ }
+    // Same purge as login/register (projects + settings + price lists) and the
+    // pull cache, so the next user's first request actually fetches from the
+    // backend instead of reusing the previous user's pull.
+    await purgeLocalUserData();
   };
 
   const value = {

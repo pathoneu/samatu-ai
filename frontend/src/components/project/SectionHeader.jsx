@@ -25,7 +25,7 @@ export default function SectionHeader({ name, rowCount, subtotal, isCollapsed, o
       </td>
       <td className="px-4 py-3 text-right" colSpan={2}>
         <span className="font-mono text-sm font-semibold text-foreground">
-          {subtotal > 0 ? `${subtotal.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €` : '—'}
+          {subtotal > 0 ? `${subtotal.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}
         </span>
       </td>
     </tr>

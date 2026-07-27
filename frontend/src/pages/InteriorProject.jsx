@@ -73,7 +73,7 @@ function ConfidenceDot({ level }) {
 // company (11 muted) · Interjeras pill · spacer · Be PVM (13) | Su PVM (18 bold) ·
 // Prielaidos button · Eksportuoti button. Always visible above tab bar.
 
-function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false }) {
+function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false }) {
   const { t } = useTranslation();
   // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
   // creation — no rename control existed anywhere in the UI).
@@ -166,7 +166,9 @@ function ProjectTopBar({ project, totalNet, totalGross, onPrielaidos, onEksportu
           </span>
         </div>
         <div className="flex items-baseline" style={{ gap: 6 }}>
-          <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.suVat')}</span>
+          <span className="skyrius-header" style={{ fontSize: 10 }}>
+            {reverseVat ? t('project.mainView.totalReverse') : t('project.interior.suVat')}
+          </span>
           <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
             {totalGross.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
           </span>
@@ -822,7 +824,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   const totalNet = (project.darbu_sarasas || []).reduce(
     (s, it) => s + (it.kiekis || 0) * (it.kaina || 0), 0,
   );
-  const vatRate = project.vat_rate || 21;
+  // Reverse-VAT (renovacija): no output VAT. The top bar used to add 21%
+  // unconditionally, so it disagreed with the Kiekiai tab, the Excel and the
+  // PDF — all of which already respect vat_mode. (2026-07-27 audit; mirrors
+  // ProjectMainView's condition.)
+  const reverseVat = (project.vat_mode || '').toLowerCase() === 'reverse_vat'
+    || (project.archetipas || '').toLowerCase() === 'renovacija';
+  const vatRate = reverseVat ? 0 : (project.vat_rate || 21);
   const totalGross = totalNet * (1 + vatRate / 100);
 
   return (
@@ -831,6 +839,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         project={project}
         totalNet={totalNet}
         totalGross={totalGross}
+        reverseVat={reverseVat}
         onPrielaidos={() => setTab('rules')}
         onEksportuoti={() => setTab('eksport')}
         onDelete={onDelete}
@@ -858,7 +867,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           onProjectChange={(updated) => {
             updateProject(project.id, updated);
             setProject(updated);
-            getPdfUrl(project.id).then((url) => setPdfUrl(url));
+            // pdfUrl is only ever used as a boolean here (tab gating), so mint a
+            // blob URL ONLY when we don't have one. Doing it on every project
+            // change leaked an object URL per edit — the old one was never
+            // revoked and the effect's cleanup only knows about the first.
+            if (!pdfUrl) getPdfUrl(project.id).then((url) => setPdfUrl(url));
           }}
         />
       )}

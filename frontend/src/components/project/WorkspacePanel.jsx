@@ -15,6 +15,8 @@ import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import { exportCSVFile, exportJSONFile } from '@/lib/measureExport';
+import { buildMeasureExportDoc } from '@/lib/measureExportDoc';
+import { parseLtNumber } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
@@ -283,10 +285,11 @@ export default function WorkspacePanel({
   // a fresh fn each time, defeating memo).
   const handlePriceChange = useCallback((rowId, newPrice) => {
     if (!onProjectChange) return;
+    const kaina = parseLtNumber(newPrice);
+    if (!Number.isFinite(kaina) || kaina < 0) return;   // never write NaN into a sąmata
     const updated = (project.darbu_sarasas || []).map(it => {
       const id = it._id || `${it.eil_nr}-${it.aprasymas}`;
       if (id !== rowId) return it;
-      const kaina = parseFloat(String(newPrice).replace(',', '.')) || 0;
       return { ...it, kaina, suma: (it.kiekis || 0) * kaina };
     });
     onProjectChange({ ...project, darbu_sarasas: updated });
@@ -541,7 +544,7 @@ export default function WorkspacePanel({
                   type="button"
                   className="text-primary hover:underline"
                   onClick={() => exportCSVFile(
-                    { measurements: projMeasurements, measureScales: project.pageScalesDurable || {}, countTypes: project.countTypes || [] },
+                    buildMeasureExportDoc(project),
                     `${(project?.name || 'projektas').trim()} - matavimai.csv`,
                   )}
                 >CSV</button>
@@ -549,7 +552,7 @@ export default function WorkspacePanel({
                   type="button"
                   className="text-primary hover:underline"
                   onClick={() => exportJSONFile(
-                    { measurements: projMeasurements, measureScales: project.pageScalesDurable || {}, countTypes: project.countTypes || [] },
+                    buildMeasureExportDoc(project),
                     `${(project?.name || 'projektas').trim()} - matavimai.json`,
                   )}
                 >JSON</button>
@@ -902,19 +905,20 @@ const PositionRow = memo(function PositionRow({
     setEditingQty(true);
   };
 
+  // parseLtNumber: the old `.replace(',', '.')` only swapped the FIRST comma
+  // and left spaced thousands intact, so "1 234,56" parsed as 1. Invalid input
+  // now keeps the editor open instead of silently discarding what was typed.
   const commitQty = () => {
-    const num = parseFloat(String(draftQty).replace(',', '.'));
-    if (!isNaN(num) && num >= 0) {
-      onQuantityChange(num);
-    }
+    const num = parseLtNumber(draftQty);
+    if (!Number.isFinite(num) || num < 0) return;
+    onQuantityChange(num);
     setEditingQty(false);
   };
 
   const commit = () => {
-    const num = parseFloat(String(draftPrice).replace(',', '.'));
-    if (!isNaN(num) && num >= 0) {
-      onPriceChange(num);
-    }
+    const num = parseLtNumber(draftPrice);
+    if (!Number.isFinite(num) || num < 0) return;
+    onPriceChange(num);
     setEditing(false);
   };
 

@@ -1,10 +1,19 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { recompute } from '../../lib/recomputeApi';
+import { parseLtNumber } from '@/lib/parseLtNumber';
+
+// Every assumption edit triggers a backend recompute. Without a debounce each
+// keystroke fired its own request and the answers raced (2026-07-27 audit).
+const RECOMPUTE_DEBOUNCE_MS = 400;
+
+// Plausible LT ceiling-height window (soviet 2.50 … double-height voids ~5.7).
+const H_MIN_M = 2.0;
+const H_MAX_M = 6.0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -13,17 +22,55 @@ function fmtM(val) {
   return `${Number(val).toFixed(2)} m`;
 }
 
-function NumberInput({ value, onChange, min, max, step = 0.01, unit }) {
+/**
+ * NumberInput — commits ONLY a finite, in-range number.
+ *
+ * The old version did `parseFloat(e.target.value) || value`, which meant:
+ * 0 could never be entered, an empty field silently re-committed the previous
+ * value, and a LT decimal comma was read as an integer. Now the field keeps a
+ * local draft: an empty or out-of-range draft is shown with a subtle error
+ * border and commits NOTHING (so no recompute fires until the number is valid).
+ */
+function NumberInput({ value, onChange, min, max, step = 0.01, unit, className }) {
+  const [draft, setDraft] = useState(value ?? '');
+  const [invalid, setInvalid] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  // Re-sync from the committed value only while the user isn't typing —
+  // otherwise a mid-typing "3." would be rewritten to "3".
+  useEffect(() => {
+    if (!focused) {
+      setDraft(value ?? '');
+      setInvalid(false);
+    }
+  }, [value, focused]);
+
+  const handleChange = (e) => {
+    const raw = e.target.value;
+    setDraft(raw);
+    if (raw.trim() === '') { setInvalid(false); return; }  // wait for a number
+    const n = parseLtNumber(raw);
+    const outOfRange = (min != null && n < min) || (max != null && n > max);
+    if (!Number.isFinite(n) || outOfRange) { setInvalid(true); return; }
+    setInvalid(false);
+    onChange(n);
+  };
+
   return (
     <div className="flex items-center gap-1.5">
       <Input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
+        type="text"
+        inputMode="decimal"
+        value={draft}
         step={step}
-        onChange={e => onChange(parseFloat(e.target.value) || value)}
-        className="h-7 w-20 text-xs bg-card border-border text-right tabular-nums"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={handleChange}
+        aria-invalid={invalid || undefined}
+        title={invalid && min != null && max != null ? `${min}–${max}` : undefined}
+        className={`${className || 'h-7 w-20'} text-xs bg-card text-right tabular-nums ${
+          invalid ? 'border-destructive text-destructive' : 'border-border'
+        }`}
       />
       {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
     </div>
@@ -135,35 +182,63 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
   const setField = (field, val) => onChange({ ...safeAssumptions, [field]: val });
 
-  const handleRecompute = useCallback(async (field, newValue) => {
+  // Debounced + request-ordered recompute (2026-07-27 audit):
+  //  - timerRef collapses a burst of keystrokes into ONE backend call
+  //  - reqIdRef makes stale answers unusable, so a slow first response can no
+  //    longer overwrite the quantities produced by a newer edit
+  //  - revertRef holds the assumptions as they were BEFORE the burst; on
+  //    failure we roll back, because otherwise the panel kept showing the new
+  //    assumption next to the OLD quantities (a silently wrong sąmata).
+  const recomputeTimerRef = useRef(null);
+  const reqIdRef = useRef(0);
+  const revertRef = useRef(null);
+
+  useEffect(() => () => {
+    if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
+  }, []);
+
+  const handleRecompute = useCallback((field, newValue) => {
     if (!onRecomputed || isDemo) return;  // Skip if parent won't accept results, or on the view-only sample
+    // Keep the OLDEST pre-edit snapshot of the burst as the rollback target.
+    if (revertRef.current === null) revertRef.current = assumptions || {};
+    if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
     setRecomputing(true);
-    try {
-      const result = await recompute({
-        rooms: rawData?.patalpos || [],
-        pozicijos: pozicijos || [],
-        edits: [{ field, new_value: newValue }],
-        current_assumptions: assumptions || {},
-        // Reader/extraction context so a ceiling-height edit rebuilds the
-        // canonical pozicijos (paint iki/virš split, kampai…) without losing
-        // the door/fixture/symbol lines. (2026-06-17 recompute fix.)
-        context: {
-          _door_types: rawData?._door_types,
-          detected_symbols_summary: rawData?.detected_symbols_summary,
-          _plyteliu_specs: rawData?._plyteliu_specs,
-          bendras_plotas_m2: rawData?.bendras_plotas_m2,
-          v9_meta: rawData?.v9_meta,
-          _overrides: rawData?._overrides,
-        },
-      });
-      onRecomputed(result);
-    } catch (err) {
-      console.error('Recompute failed:', err);
-      toast.error(t('project.assumptions.toastRecomputeErr', { msg: err.message }));
-    } finally {
-      setRecomputing(false);
-    }
-  }, [rawData?.patalpos, pozicijos, assumptions, onRecomputed, t]);
+    recomputeTimerRef.current = setTimeout(async () => {
+      recomputeTimerRef.current = null;
+      const reqId = ++reqIdRef.current;
+      try {
+        const result = await recompute({
+          rooms: rawData?.patalpos || [],
+          pozicijos: pozicijos || [],
+          edits: [{ field, new_value: newValue }],
+          current_assumptions: assumptions || {},
+          // Reader/extraction context so a ceiling-height edit rebuilds the
+          // canonical pozicijos (paint iki/virš split, kampai…) without losing
+          // the door/fixture/symbol lines. (2026-06-17 recompute fix.)
+          context: {
+            _door_types: rawData?._door_types,
+            detected_symbols_summary: rawData?.detected_symbols_summary,
+            _plyteliu_specs: rawData?._plyteliu_specs,
+            bendras_plotas_m2: rawData?.bendras_plotas_m2,
+            v9_meta: rawData?.v9_meta,
+            _overrides: rawData?._overrides,
+          },
+        });
+        if (reqId !== reqIdRef.current) return;  // superseded by a newer edit
+        revertRef.current = null;
+        onRecomputed(result);
+      } catch (err) {
+        if (reqId !== reqIdRef.current) return;
+        console.error('Recompute failed:', err);
+        const revertTo = revertRef.current;
+        revertRef.current = null;
+        if (revertTo) onChange(revertTo);
+        toast.error(t('project.assumptions.toastRecomputeErr', { msg: err.message }));
+      } finally {
+        if (reqId === reqIdRef.current) setRecomputing(false);
+      }
+    }, RECOMPUTE_DEBOUNCE_MS);
+  }, [rawData, pozicijos, assumptions, onRecomputed, onChange, isDemo, t]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
@@ -307,16 +382,23 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                   {t('project.assumptions.allRooms')}
                 </span>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   defaultValue=""
                   placeholder={avgH.toFixed(2)}
-                  min={2.0} max={6.0} step={0.05}
+                  step={0.05}
                   onBlur={e => {
-                    const v = parseFloat(e.target.value);
-                    if (Number.isFinite(v) && v >= 1.5 && v <= 8.0) {
-                      setLubuAukstisAll(v);
-                      e.target.value = '';
+                    const raw = e.target.value.trim();
+                    if (!raw) return;                       // nothing typed — no-op
+                    const v = parseLtNumber(raw);
+                    // Same 2.0–6.0 window the per-room inputs enforce; out of
+                    // range is reported, not silently clamped or ignored.
+                    if (!Number.isFinite(v) || v < H_MIN_M || v > H_MAX_M) {
+                      toast.error(t('project.assumptions.heightRangeErr', { min: H_MIN_M.toFixed(2), max: H_MAX_M.toFixed(2) }));
+                      return;
                     }
+                    setLubuAukstisAll(v);
+                    e.target.value = '';
                   }}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
@@ -335,14 +417,15 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     <span className="text-xs text-muted-foreground truncate flex-1" title={room.pavadinimas}>
                       {room.pavadinimas || room.nr}
                     </span>
-                    <Input
-                      type="number"
+                    {/* Blanking this field used to commit 2.8 m and fire a
+                        recompute; NumberInput now waits for a valid number. */}
+                    <NumberInput
                       value={lubu_auksciai[room.nr] ?? (Number(room.lubu_aukstis_m) || 2.80)}
-                      min={2.0} max={6.0} step={0.05}
-                      onChange={e => setLubuAukstis(room.nr, parseFloat(e.target.value) || 2.8)}
-                      className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
+                      min={H_MIN_M} max={H_MAX_M} step={0.05}
+                      unit="m"
+                      className="h-6 w-16"
+                      onChange={v => setLubuAukstis(room.nr, v)}
                     />
-                    <span className="text-xs text-muted-foreground">m</span>
                   </div>
                 ))}
               </div>

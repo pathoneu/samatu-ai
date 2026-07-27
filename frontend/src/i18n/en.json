@@ -342,7 +342,16 @@
     "brandHeadlineAccent": "in minutes",
     "brandHeadlineB": ", not days.",
     "brandSub": "Interior, facades, roofing, structures — one tool for all quantity types.",
-    "forgotPassword": "Forgot your password? Contact us"
+    "forgotPassword": "Forgot your password? Contact us",
+    "oauthErr": {
+      "invalidState": "The sign-in session has expired. Start the Google sign-in again.",
+      "missingCode": "Google did not return an authorisation code. Please try again.",
+      "tokenExchangeFailed": "Could not reach Google. Try again in a few minutes, or sign in with your email.",
+      "incompleteUserinfo": "Google did not provide an email address. Sign in with your email and password.",
+      "accountDisabled": "This account is disabled. Contact solutions@pathon.eu",
+      "accessDenied": "Google sign-in was cancelled.",
+      "generic": "Google sign-in failed. Please try again."
+    }
   },
   "register": {
     "backHome": "Home",
@@ -975,7 +984,8 @@
       "priceListRows": "{{count}} rows",
       "manualPricesKept": "Manually entered prices stay unchanged. Low-confidence matches are skipped.",
       "toastApplyFail": "Could not apply a single row from price list „{{name}}\". Check that descriptions are similar and units match (m² / m / pcs).",
-      "toastApplied": "Applied: {{applied}} rows from price list „{{name}}\". Skipped: {{skipped}}."
+      "toastApplied": "Applied: {{applied}} rows from price list „{{name}}\". Skipped: {{skipped}}.",
+      "toastInvalidNumber": "Invalid number. Use a comma or a dot, e.g. 12.5."
     },
     "assumptions": {
       "widthPlaceholder": "width",
@@ -1008,7 +1018,8 @@
       "doorsCount": "({{count}} pcs.)",
       "doorLabel": "a door",
       "recomputing": "Recalculating...",
-      "toastRecomputeErr": "Error recalculating: {{msg}}"
+      "toastRecomputeErr": "Error recalculating: {{msg}}",
+      "heightRangeErr": "Ceiling height must be between {{min}} and {{max}} m."
     },
     "roomCard": {
       "confHigh": "Read directly from the drawing",

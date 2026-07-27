@@ -1,12 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { parseLtNumber } from '@/lib/parseLtNumber';
 
 export default function EstimationRow({ row, index, onPriceChange, onRowClick }) {
+  // LT decimal comma: `type="number"` reports an EMPTY value for "12,5", so the
+  // price silently became 0. Text input + a local draft (so the parent echoing
+  // the parsed number back can't eat the character being typed). 2026-07-27.
+  const [draft, setDraft] = useState(row.kaina ?? '');
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setDraft(row.kaina ?? ''); }, [row.kaina, focused]);
+
   const handlePriceChange = (e) => {
-    const price = parseFloat(e.target.value) || 0;
+    const raw = e.target.value;
+    setDraft(raw);
+    if (raw.trim() === '') { onPriceChange(index, 0); return; }
+    const price = parseLtNumber(raw);
+    if (!Number.isFinite(price) || price < 0) return;   // wait for a valid number
     onPriceChange(index, price);
   };
 
@@ -57,18 +69,19 @@ export default function EstimationRow({ row, index, onPriceChange, onRowClick })
       </td>
       <td className="px-3 py-1.5 w-28">
         <Input
-          type="number"
-          step="0.01"
-          min="0"
-          value={row.kaina || ''}
+          type="text"
+          inputMode="decimal"
+          value={draft}
           onChange={handlePriceChange}
-          placeholder="0.00"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="0,00"
           className="h-8 text-right font-mono text-sm bg-background border-border w-full"
         />
       </td>
       <td className="px-4 py-2.5 text-right">
         <span className={cn("font-mono text-sm font-medium", row.suma > 0 ? 'text-foreground' : 'text-muted-foreground')}>
-          {row.suma > 0 ? `${row.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2 })} €` : '—'}
+          {row.suma > 0 ? `${row.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}
         </span>
       </td>
     </tr>
