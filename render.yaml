@@ -36,6 +36,11 @@ services:
       # SQLite lives on the persistent disk (see STORAGE TRUTH above).
       - key: SAMATU_DB_PATH
         value: /data/samatu.db
+      # One-knob root for the OTHER durable files (annotations, calibrations,
+      # exports_v2, local pdf_store fallback) — without it they land in the
+      # ephemeral container FS and vanish on every deploy (storage.py).
+      - key: SAMATU_DATA_DIR
+        value: /data
       - key: ANTHROPIC_API_KEY
         sync: false   # set manually in Render dashboard
       - key: SAMATU_SECRET_KEY
@@ -53,8 +58,11 @@ services:
         sync: false
       - key: R2_BUCKET
         sync: false
+      # Per-user daily Claude spend cap. A single real interior project costs
+      # ~€1-2 in vision calls — 0.50 would block a contractor's FIRST project.
+      # €15 ≈ 5-10 projects/day headroom while billing is off (beta).
       - key: SAMATU_USER_DAILY_SPEND_EUR
-        value: "0.50"
+        value: "15.00"
       - key: SAMATU_USER_HOURLY_EXTRACTS
         value: "10"
       # Must equal the real frontend origin (canonical apex: https://pathon.eu).
