@@ -27,6 +27,24 @@ export function detectPaywall(errLike) {
   return { reason, message: body?.message };
 }
 
+/**
+ * Find a plan in the /api/billing/v2/status payload by its ID.
+ *
+ * The payload carries BOTH `id` ('pro' | 'studio' | 'oneoff') and `name`, where
+ * `name` is the human display label ("Pro", "Studio", "Vienkartinis"). Matching
+ * on `name` silently resolves nothing and the paywall renders with zero
+ * purchasable options — the bug fixed in Pricing.jsx (175a206) and again in
+ * UpgradeDialog.jsx (2026-07-27). Shared here so it can't drift a third time.
+ *
+ * @param {Array<{id?: string}>} plans
+ * @param {string} id
+ * @returns {object | undefined}
+ */
+export function planById(plans, id) {
+  if (!Array.isArray(plans)) return undefined;
+  return plans.find((p) => p?.id === id);
+}
+
 /** Build a paywall-carrying Error from a raw {status, json} (non-SSE path). */
 export function paywallErrorFrom(status, json) {
   const err = new Error(json?.message || json?.error || `HTTP ${status}`);

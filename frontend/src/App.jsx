@@ -36,7 +36,11 @@ const KiekiaiIsBrezinio = lazy(() => import('@/pages/bofu/KiekiaiIsBrezinio'));
 const VidausApdailosSamata = lazy(() => import('@/pages/bofu/VidausApdailosSamata'));
 const ApvaRenovacijosKiekiai = lazy(() => import('@/pages/bofu/ApvaRenovacijosKiekiai'));
 // Phase 7 / Annotator MVP — interactive PDF measurement viewer (2026-05-31).
-const Annotator = lazy(() => import('@/pages/Annotator'));
+// DEV-ONLY (2026-07-27): a third viewer with no link anywhere in the UI. The
+// import.meta.env.DEV guard is statically replaced with `false` by Vite in a
+// production build, so the dynamic import is dead code there and the page is
+// not emitted into dist/ at all — not merely unrouted.
+const Annotator = import.meta.env.DEV ? lazy(() => import('@/pages/Annotator')) : null;
 // Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
 const Pricing = lazy(() => import('@/pages/Pricing'));
 const BillingResult = lazy(() => import('@/pages/BillingResult'));
@@ -122,7 +126,11 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
-              <Route path="/project/:id/annotator" element={<Annotator />} />
+                {/* Dev-only (see the Annotator import above). React Router
+                    ignores non-element children, so this vanishes in prod. */}
+                {import.meta.env.DEV && Annotator && (
+                  <Route path="/project/:id/annotator" element={<Annotator />} />
+                )}
                 <Route path="/price-lists" element={<PriceLists />} />
                 {/* Phase 7 billing — result pages self-gate via useBilling()
                     and bounce back when the flag is off. (/pricing is public,

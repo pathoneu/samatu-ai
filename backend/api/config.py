@@ -1,13 +1,15 @@
 """GET /api/config — exposes feature flags + active model IDs to frontend."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from extractor.feature_flags import get_flags
 from models_config import model_for, resolved_models
+
+import auth as _auth
 
 router = APIRouter(prefix="/api", tags=["config"])
 
 
 @router.get("/config")
-def get_config() -> dict:
+def get_config(request: Request) -> dict:
     """Return feature flag state and active model IDs.
 
     Used by frontend to:
@@ -29,6 +31,12 @@ def get_config() -> dict:
             }
         }
     """
+    # 2026-07-27 (pre-prod audit): this was unauthenticated. It hands any
+    # anonymous caller our internal feature-flag map and the exact model IDs in
+    # production — free reconnaissance for probing flag-gated code paths, and a
+    # competitive tell. There are zero frontend callers, so gating it costs
+    # nothing; matches the require_user convention of every other /api router.
+    _auth.require_user(request)
     models = resolved_models()
     return {
         "flags": get_flags(),

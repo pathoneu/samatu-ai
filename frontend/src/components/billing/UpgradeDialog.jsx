@@ -24,6 +24,7 @@ import { Building2, Sparkles, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBilling } from '@/hooks/useBilling';
 import { startCheckout, saveCompanyCode } from '@/lib/billingApi';
+import { planById } from '@/lib/paywall';
 
 const eur = (n) => `${Number(n).toFixed(0)} €`;
 
@@ -45,10 +46,14 @@ export default function UpgradeDialog({ reason, message, onClose, onRetry }) {
   const open = reason != null;
   const isCompanyCode = reason === 'company_code_required';
 
-  const planByName = (name) => plans.find((p) => p.name === name);
-  const pro = planByName('pro');
-  const studio = planByName('studio');
-  const oneoff = planByName('oneoff');
+  // Match on plan `id` ('pro'/'studio'/'oneoff'), NOT `name` — the backend
+  // emits `name` as the display label ("Pro"/"Studio"/"Vienkartinis"), so the
+  // old name-match resolved nothing and this dialog rendered with zero
+  // purchasable options the moment billing flipped on (2026-07-27; same bug
+  // fixed in Pricing.jsx by 175a206).
+  const pro = planById(plans, 'pro');
+  const studio = planById(plans, 'studio');
+  const oneoff = planById(plans, 'oneoff');
 
   const handleSaveCode = async () => {
     if (!companyCode.trim()) {

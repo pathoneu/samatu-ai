@@ -9,6 +9,16 @@ These tests REPLAY the PoC: user A, logged in with a valid cookie, targets a
 project owned by user B → 404 (existence not leaked), and the Vision shim is
 never invoked.
 
+UPDATE 2026-07-27 (pre-prod audit): both endpoints are now UNMOUNTED in main.py
+— they were Sprint-2 stubs returning fabricated/empty data with no frontend
+callers. The PoC therefore now dies on route absence rather than on the
+ownership check, and every caller (attacker, anonymous, even the legitimate
+owner) gets 404. That is strictly stronger, so these tests keep asserting 404
+and keep asserting the paid Vision call never fires. The ownership gate itself
+still lives in api/vision_fill.py / api/lasso_rerun.py — if either router is
+ever re-included, restore the finer-grained assertions (owner → 200,
+attacker → 404, anonymous → 401) from git history.
+
 Import main BEFORE auth so load_dotenv() runs first; force real auth so the dev
 bypass doesn't mask the gate.
 """
@@ -68,7 +78,7 @@ def test_f3_vision_fill_blocks_cross_user(tmp_path, monkeypatch):
         r = att.post("/api/vision-fill", json={
             "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
         })
-    assert r.status_code == 404, r.text
+    assert r.status_code == 404, r.text  # route unmounted (was: ownership 404)
     spy.assert_not_called()  # the paid Vision call must never fire
 
 
@@ -89,17 +99,21 @@ def test_f3_vision_fill_rejects_anonymous(tmp_path, monkeypatch):
     r = TestClient(app).post("/api/vision-fill", json={
         "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
     })
-    assert r.status_code == 401, r.text
+    # 404 since the 2026-07-27 unmount (was 401 from require_billable_user).
+    assert r.status_code == 404, r.text
 
 
-def test_f3_owner_can_run_vision_fill(tmp_path, monkeypatch):
+def test_f3_vision_fill_unmounted_even_for_owner(tmp_path, monkeypatch):
+    """The stub is gone for everyone — the project's legitimate owner included.
+
+    Until 2026-07-27 this asserted 200 + a mocked polygon; that "success" was a
+    hardcoded 20%-of-page square, so nobody should be able to reach it.
+    """
     _seed(tmp_path, monkeypatch)
     owner_c = _login("owner@x.lt")
-    fake = {"polygon_pct": [[0.3, 0.3], [0.3, 0.5], [0.5, 0.5]],
-            "room_name_guess": "Vonia", "confidence": "medium"}
-    with patch("api.vision_fill.call_vision_for_polygon", return_value=fake):
+    with patch("api.vision_fill.call_vision_for_polygon") as spy:
         r = owner_c.post("/api/vision-fill", json={
             "project_id": "proj-B", "page_idx": 0, "click_xy_pct": [0.5, 0.5],
         })
-    assert r.status_code == 200, r.text
-    assert r.json()["confidence"] == "medium"
+    assert r.status_code == 404, r.text
+    spy.assert_not_called()

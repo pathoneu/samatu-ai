@@ -318,8 +318,15 @@ from dotenv import load_dotenv
 from api.config import router as config_router
 from api.recompute_quantities import router as recompute_router
 from api.telemetry import router as telemetry_router
-from api.vision_fill import router as vision_fill_router
-from api.lasso_rerun import router as lasso_rerun_router
+# UNMOUNTED 2026-07-27 (pre-prod audit): /api/vision-fill and /api/lasso-rerun
+# were Sprint-2 stubs that never got their Sprint-4 implementation. vision-fill
+# returned a hardcoded square covering 20% of the page (a fabricated "room
+# polygon" a user could unknowingly save as their contour) and lasso-rerun
+# always returned {symbols: [], polygons: []}. Zero frontend callers. The
+# modules are kept — re-import + re-include below to revive them once the real
+# Vision crop pipeline is wired.
+# from api.vision_fill import router as vision_fill_router
+# from api.lasso_rerun import router as lasso_rerun_router
 # Week 5 Task 5.4 (canonical plan): legends D4
 from api.legends import router as legends_router
 # Week 7 (canonical plan): F2/F3 export + billing gate stub
@@ -561,8 +568,10 @@ async def _global_exception_handler(request, exc):
 app.include_router(config_router)
 app.include_router(recompute_router)
 app.include_router(telemetry_router)
-app.include_router(vision_fill_router)
-app.include_router(lasso_rerun_router)
+# Unmounted 2026-07-27 — fabricated/empty stub responses, no callers.
+# See the commented imports near the top of this file for the full rationale.
+# app.include_router(vision_fill_router)
+# app.include_router(lasso_rerun_router)
 app.include_router(legends_router)
 app.include_router(exports_v2_router)
 app.include_router(billing_v2_router)

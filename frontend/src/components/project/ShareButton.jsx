@@ -12,12 +12,23 @@ import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { API_BASE as API } from '@/lib/apiBase';
 
+// `expires_at` is a UTC ISO string ("2026-08-26T09:12:33.441+00:00") or null
+// when the link was issued with expires_in_days: 0 (= never expires). Slice the
+// date part instead of going through Date, so the viewer's timezone can never
+// shift the displayed day off the day the backend will actually enforce.
+const shareExpiryDate = (iso) =>
+  (typeof iso === 'string' && iso.length >= 10 ? iso.slice(0, 10) : null);
+
 export default function ShareButton({ project }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
+  // Backend defaults links to a 30-day life and returns expires_at on both
+  // GET and POST. Not showing it meant links died silently in the client's
+  // inbox with no warning anywhere in the UI (2026-07-27 fix).
+  const [expiresAt, setExpiresAt] = useState(null);
 
   // Load the EXISTING share state when the dialog opens (pre-prod audit
   // 2026-07-25: token always started null, so the dialog always offered
@@ -31,7 +42,10 @@ export default function ShareButton({ project }) {
         const res = await fetch(`${API}/api/projects/${project.id}/share`, { credentials: 'include' });
         if (!res.ok) return;
         const body = await res.json();
-        if (!dead && body?.token) setToken(body.token);
+        if (!dead && body?.token) {
+          setToken(body.token);
+          setExpiresAt(body.expires_at || null);
+        }
       } catch { /* offline — dialog still allows generating */ }
     })();
     return () => { dead = true; };
@@ -53,6 +67,7 @@ export default function ShareButton({ project }) {
       }
       const body = await res.json();
       setToken(body.token);
+      setExpiresAt(body.expires_at || null);
       toast.success(t('project.share.toastGenerated'));
     } catch (e) {
       toast.error(t('project.share.toastError', { msg: e.message }));
@@ -79,6 +94,7 @@ export default function ShareButton({ project }) {
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
       setToken(null);
+      setExpiresAt(null);
       toast.success(t('project.share.toastRevoked'));
     } catch (e) {
       toast.error(t('project.share.toastError', { msg: e.message }));
@@ -164,6 +180,11 @@ export default function ShareButton({ project }) {
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
+                {shareExpiryDate(expiresAt) && (
+                  <p className="text-[11px] text-muted-foreground -mt-1.5">
+                    Galioja iki {shareExpiryDate(expiresAt)}
+                  </p>
+                )}
                 <button
                   onClick={revoke}
                   disabled={loading}

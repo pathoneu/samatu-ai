@@ -93,6 +93,24 @@ const SYMBOL_CATEGORIES = {
 // the legacy react-pdf PlanViewer with ?viewer=legacy (or localStorage
 // samatu_viewer_engine=legacy) — kept as a one-flag safety net until the remaining
 // tools (click-to-fill, symbol-count) are re-homed and parity is confirmed.
+//
+// ⚠️ ?viewer=legacy is a RENDER-ONLY escape hatch ("the new viewer won't draw
+// my PDF"), NOT a feature-equivalent alternative. Verified against
+// PlanViewer.jsx 2026-07-27 — compared with TakeoffViewer it has NO:
+//   - measurement authoring at all: no distance/perimeter/area/count tools, no
+//     scale calibration, no user-defined count types / CountLegendPanel, and
+//     no initialMeasurements/onMeasureDataChange wiring, so nothing it does can
+//     reach the Matavimai list or its CSV/JSON export
+//   - fillRequest arming — the review-queue pencil ("Taisyti zoną",
+//     handleEditRoomZone below) is consumed only by TakeoffViewer, so in legacy
+//     mode that button focuses the room and then silently does nothing. Legacy
+//     has its own separate in-toolbar click-to-fill; it is not the same path.
+//   - hidden-room / hovered-room sync with the workspace panel
+//     (hiddenRoomNrs + hoveredRoomNrExternal are TakeoffViewer-only props)
+//   - the room-zone fill toggle (zoneFillsVisible)
+// It does keep PDF render, room-zone click→focus and AI symbol counting
+// (onSymbolCountResult). Treat any bug report from this mode as "reproduce on
+// the default viewer first".
 function viewerEngineIsEmbed() {
   try {
     const q = new URLSearchParams(window.location.search).get('viewer');
