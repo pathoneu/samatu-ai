@@ -236,8 +236,17 @@ export function spreadOverlappingMarkers(items, minGap = 30) {
   return out;
 }
 
-function roomPage(room) {
-  return room?.page_nr ?? room?.puslapio_nr ?? null;
+/**
+ * roomPageOf — THE page-field precedence for a room, shared by every consumer.
+ *
+ * AUDIT P2: this file used `page_nr ?? puslapio_nr` while FocusScroller and
+ * durableScale used `puslapio_nr ?? page_nr`. A room carrying BOTH (they
+ * disagree on re-extracted projects) drew its zone on one page while the viewer
+ * scrolled to another. `puslapio_nr` wins — it is the extraction-native field
+ * and the majority reading.
+ */
+export function roomPageOf(room) {
+  return room?.puslapio_nr ?? room?.page_nr ?? null;
 }
 
 // ── Geometry helpers (screen-space [[x,y], …] rings) ────────────────────────
@@ -356,7 +365,7 @@ const DUP_IOU = 0.85;
 export function duplicatePolygonLosers(rooms, page) {
   const losers = new Set();
   const traced = (Array.isArray(rooms) ? rooms : [])
-    .filter((r) => roomPage(r) === page)
+    .filter((r) => roomPageOf(r) === page)
     .filter((r) => r.polygon_pct && !NON_TRACED_SOURCES.has(r.polygon_source))
     .map((r) => {
       const pts = pctPoints(r);
@@ -407,7 +416,7 @@ export function buildPageRoomZones(rooms, { renderedWidth, renderedHeight, page 
   if (!Array.isArray(rooms)) return [];
   const losers = duplicatePolygonLosers(rooms, page);
   return rooms
-    .filter((r) => roomPage(r) === page)
+    .filter((r) => roomPageOf(r) === page)
     .filter((r) => !losers.has(String(r.nr)))
     .map((r) => buildRoomZone(r, { renderedWidth, renderedHeight }))
     .filter(Boolean);
@@ -421,7 +430,7 @@ export function countRoomsMissingGeometry(rooms, { renderedWidth, renderedHeight
   if (!Array.isArray(rooms)) return 0;
   const losers = duplicatePolygonLosers(rooms, page);
   return rooms
-    .filter((r) => roomPage(r) === page)
+    .filter((r) => roomPageOf(r) === page)
     .filter((r) => losers.has(String(r.nr)) || !buildRoomZone(r, { renderedWidth, renderedHeight }))
     .length;
 }

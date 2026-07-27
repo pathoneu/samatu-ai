@@ -75,6 +75,12 @@ export default function PageOverlayHost({
   onMeasureCalibrate = null,
   onMeasureSelect = null,
   onMeasureDelete = null,
+  // Draft + first calibration point are owned by TakeoffViewer (this page host
+  // unmounts when the page scrolls out of the virtualization buffer).
+  measureDraft = null,
+  onMeasureDraftAction = null,
+  measureCalibA = null,
+  onMeasureCalibAChange = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -182,6 +188,10 @@ export default function PageOverlayHost({
             onSelect={onMeasureSelect}
             onDelete={onMeasureDelete}
             selectedId={selectedMeasureId}
+            draft={measureDraft}
+            onDraftAction={onMeasureDraftAction}
+            calibA={measureCalibA}
+            onCalibAChange={onMeasureCalibAChange}
           />
           {deleteAt && onMeasureDelete && (
             <button

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { buildMeasureExportDoc } from './measureExportDoc.js';
 import { toMeasurementsCSV } from './measureExport.js';
 
-// Two traced rooms on page 2 → autoPageScalesFromRooms yields a page scale.
+// Three traced rooms on page 2 → autoPageScalesFromRooms yields a page scale.
+// (THREE, not two: autoPageScalesFromRooms requires ≥3 samples per page since
+// the 2026-07-27 robustness fix — a 2-sample "median" was really a mean.)
 // Each polygon covers 1% of the page and is 10 m², page is 1000x1000 pt:
 //   m2/frac = 1000 ; mpp = sqrt(1000 / 1_000_000) = 0.0316227766 m/pt
 const square = (x, y, s) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
@@ -18,7 +20,7 @@ const room = (nr, x) => ({
 });
 
 const project = {
-  patalpos: [room(1, 0.1), room(2, 0.3)],
+  patalpos: [room(1, 0.1), room(2, 0.3), room(3, 0.5)],
   measurements: [
     { id: 'm1', kind: 'distance', page: 2, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
   ],

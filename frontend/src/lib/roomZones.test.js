@@ -326,3 +326,44 @@ test('spreadOverlappingMarkers: fanned markers stay inside their own polygon', (
   const a = out.get('A'), b = out.get('B');
   assert.ok(Math.hypot(a.cx - b.cx, a.cy - b.cy) >= 29, 'markers still overlap');
 });
+
+// ── Shared page-field precedence (audit P2, 2026-07-27) ─────────────────────
+import { roomPageOf } from './roomZones.js';
+
+test('roomPageOf: puslapio_nr wins — it is the extraction-native field', () => {
+  assert.equal(roomPageOf({ puslapio_nr: 2, page_nr: 5 }), 2);
+});
+
+test('roomPageOf: falls back to page_nr, then null', () => {
+  assert.equal(roomPageOf({ page_nr: 5 }), 5);
+  assert.equal(roomPageOf({}), null);
+  assert.equal(roomPageOf(null), null);
+});
+
+test('roomPageOf: a disagreeing room lands on the SAME page as its zone', () => {
+  // Regression guard for the split precedence: buildPageRoomZones used
+  // page_nr-first while the viewer's FocusScroller used puslapio_nr-first, so
+  // the zone was drawn on one page while the viewer scrolled to another.
+  const room = {
+    nr: '7', puslapio_nr: 2, page_nr: 5,
+    polygon_pct: [[0, 0], [0.5, 0], [0.5, 0.5], [0, 0.5]],
+    polygon_source: 'auto_floodfill', plotas_m2: 12,
+  };
+  const size = { renderedWidth: 100, renderedHeight: 100 };
+  assert.equal(buildPageRoomZones([room], { ...size, page: 2 }).length, 1);
+  assert.equal(buildPageRoomZones([room], { ...size, page: 5 }).length, 0);
+  assert.equal(roomPageOf(room), 2);
+});
+
+test('countRoomsMissingGeometry: a room with no polygon and no anchor feeds the chip', () => {
+  // The "N patalpų be vietos plane" disclosure now renders in BOTH presentation
+  // modes (RoomZoneLayer simple + fills); this is the count it renders.
+  const rooms = [
+    { nr: '1', puslapio_nr: 2, polygon_pct: [[0, 0], [0.4, 0], [0.4, 0.4], [0, 0.4]],
+      polygon_source: 'auto_floodfill', plotas_m2: 10 },
+    { nr: '2', puslapio_nr: 2, polygon_source: 'manual_needed', plotas_m2: 8 },  // no anchor
+  ];
+  const size = { renderedWidth: 100, renderedHeight: 100, page: 2 };
+  assert.equal(buildPageRoomZones(rooms, size).length, 1);
+  assert.equal(countRoomsMissingGeometry(rooms, size), 1);
+});

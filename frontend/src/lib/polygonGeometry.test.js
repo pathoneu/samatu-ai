@@ -162,3 +162,37 @@ test('polygonCentroid: square center is at 5,5', () => {
 test('polygonCentroid: degenerate polygon (< 3 pts) returns null', () => {
   assert.equal(polygonCentroid([{x:0,y:0},{x:1,y:1}]), null);
 });
+
+// ── Open polylines (audit P2, 2026-07-27) ───────────────────────────────────
+// distance / perimeter measurements have NO closing segment: the span between
+// their last and first vertex is empty space and must not attract a snap or
+// answer a select hit-test.
+
+test('nearestEdge: open polyline does NOT expose a phantom closing edge', () => {
+  // L-shaped polyline: (0,0) → (10,0) → (10,10). The phantom closing edge would
+  // run (10,10) → (0,0); a probe near its midpoint (5,5) must find nothing.
+  const open = [{ id: 'l', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10}], open: true }];
+  assert.equal(nearestEdge({x:5,y:5}, open, 4), null);
+});
+
+test('nearestEdge: the SAME points as a closed ring do expose that edge', () => {
+  const closed = [{ id: 'l', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10}] }];
+  const hit = nearestEdge({x:5,y:5}, closed, 4);
+  assert.ok(hit);
+  assert.equal(hit.edgeIndex, 2);   // the wrapping last→first edge
+});
+
+test('nearestEdge: an open polyline still snaps to its REAL edges', () => {
+  const open = [{ id: 'l', points: [{x:0,y:0},{x:10,y:0},{x:10,y:10}], open: true }];
+  const hit = nearestEdge({x:5,y:2}, open, 8);
+  assert.deepEqual(hit.point, {x:5,y:0});
+  assert.equal(hit.edgeIndex, 0);
+});
+
+test('nearestEdge: a 2-point open segment has exactly one edge', () => {
+  const seg = [{ id: 'd', points: [{x:0,y:0},{x:10,y:0}], open: true }];
+  assert.ok(nearestEdge({x:5,y:1}, seg, 4));         // on the real edge
+  // Without the open flag the return leg is a duplicate of the same segment —
+  // harmless there, but the flag must not break the single-edge case.
+  assert.equal(nearestEdge({x:5,y:20}, seg, 4), null);
+});

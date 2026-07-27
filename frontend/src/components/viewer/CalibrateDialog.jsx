@@ -12,6 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Ruler, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,7 +28,11 @@ import {
   calibrateUniform,
   calibrateAxis,
   formatNumberLT,
+  storedAxisForDisplayAxis,
+  axisSpanShare,
+  AXIS_SPAN_MIN_SHARE,
 } from '@/lib/measureGeometry';
+import { displayRotationFor } from '@/lib/viewerEngine/pageRotation';
 
 const UNITS = [
   { value: 'mm', label: 'mm' },
@@ -48,6 +53,9 @@ export default function CalibrateDialog({
   request,        // { pageNr, a, b } | null — a/b are PDF points; null = closed
   numPages,
   currentScale,
+  // The page's /Rotate. a/b are UNROTATED mediabox points, but the axis labels
+  // describe what the user SEES — on a 90°/270° page the two are swapped.
+  pageRotation = 0,
   onConfirm,      // (pageScale, applyToPages) => void   applyToPages: number[]|null
   onClose,        // () => void
 }) {
@@ -83,10 +91,25 @@ export default function CalibrateDialog({
   const handleConfirm = () => {
     if (!canConfirm) return;
     let scale;
-    if (axis === 'uniform') {
-      scale = calibrateUniform(request.a, request.b, parsedLength, unit);
-    } else {
-      scale = calibrateAxis(request.a, request.b, parsedLength, unit, currentScale, axis);
+    try {
+      if (axis === 'uniform') {
+        scale = calibrateUniform(request.a, request.b, parsedLength, unit);
+      } else {
+        // 'x' = what the user sees as horizontal → the STORED axis it maps to.
+        const storedAxis = storedAxisForDisplayAxis(axis, displayRotationFor(pageRotation));
+        // A line almost perpendicular to the chosen axis has a span of a few
+        // points — dividing metres by it mis-scales the page wildly (audit P1).
+        if (axisSpanShare(request.a, request.b, storedAxis) < AXIS_SPAN_MIN_SHARE) {
+          toast.error('Pasirinkta ašis beveik statmena linijai — naudokite bendrą kalibravimą');
+          return;
+        }
+        scale = calibrateAxis(request.a, request.b, parsedLength, unit, currentScale, storedAxis);
+      }
+    } catch (e) {
+      // Geometry rejects degenerate picks by throwing — surface the reason
+      // instead of leaving a dead Patvirtinti button (audit P1).
+      toast.error(e?.message || 'Nepavyko kalibruoti mastelio');
+      return;
     }
     const pages = applyTo === 'all'
       ? Array.from({ length: numPages || 1 }, (_, i) => i + 1)

@@ -135,8 +135,10 @@ export default function RoomZoneLayer({
   // around its printed number. Entirely pointer-transparent, so it can never
   // swallow measure or fill clicks.
   if (!zoneFillsVisible) {
-    const active = zones.filter((z) => isFocusedZone(z) || isHoveredZone(z));
-    if (active.length === 0) return null;
+    // visibleZones, not zones: a room hidden with the panel's eye must not draw
+    // its focus/hover ring either (audit P2).
+    const active = visibleZones.filter((z) => isFocusedZone(z) || isHoveredZone(z));
+    if (active.length === 0 && missingCount === 0) return null;
     // Ring sized to enclose the printed label plate; scales with the render.
     const ringR = Math.min(44, Math.max(16, width * 0.02));
     const RED = '#dc2626';
@@ -190,6 +192,10 @@ export default function RoomZoneLayer({
             </g>
           );
         })}
+        {/* Same honest "we could not place these" chip as fills mode — the
+            simple branch used to return before it, so the default view hid the
+            disclosure entirely (audit P2). */}
+        {missingCount > 0 && <MissingRoomsChip count={missingCount} />}
       </svg>
     );
   }
@@ -314,15 +320,20 @@ export default function RoomZoneLayer({
 
       {/* Honest "we could not place these" chip (spec §9) — unaffected by
           per-room visibility. */}
-      {missingCount > 0 && (
-        <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }}>
-          <rect x={0} y={0} width={250} height={24} rx={5}
-            fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
-          <text x={10} y={16} fontSize={11} fill="#b45309">
-            {missingCount} patalpų be vietos plane — žr. „Peržiūra“
-          </text>
-        </g>
-      )}
+      {missingCount > 0 && <MissingRoomsChip count={missingCount} />}
     </svg>
+  );
+}
+
+// Honest disclosure chip, identical in both presentation modes.
+function MissingRoomsChip({ count }) {
+  return (
+    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }}>
+      <rect x={0} y={0} width={250} height={24} rx={5}
+        fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
+      <text x={10} y={16} fontSize={11} fill="#b45309">
+        {count} patalpų be vietos plane — žr. „Peržiūra“
+      </text>
+    </g>
   );
 }

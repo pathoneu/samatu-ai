@@ -8,7 +8,7 @@
  * Deferred (Phase 3): measurement/symbol/click-to-fill re-home, thumbnail rail,
  *           layer toggles, then flip to default + delete PlanViewer.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
@@ -21,10 +21,11 @@ import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
-import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE } from '@/lib/roomZones';
+import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
+import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import PageOverlayHost from './PageOverlayHost';
@@ -43,6 +44,9 @@ const MEASURE_TOOLS = [
   { id: 'count', Icon: Hash, label: 'Kiekis', title: 'Skaičiuoti vienetus (6)' },
   { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Kalibruoti mastelį — spustelėkite 2 taškus, tarp kurių žinote atstumą' },
 ];
+
+// Empty measurement draft (shape of measureOverlayReducer's state).
+const EMPTY_DRAFT = { points: [], committed: false };
 
 // One-line instruction per armed tool (status bar) — the tools LOOK similar,
 // the hint says what each one is doing right now.
@@ -469,7 +473,9 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
 // only when the focus object itself changes (clicking a room again re-jumps).
 function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   const { provides: scrollApi } = useScroll(documentId);
-  const targetPage = focusedRoom?.puslapio_nr ?? focusedRoom?.page_nr ?? focusedPage ?? null;
+  // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
+  // zone layer and this scroller must never disagree about a room's page.
+  const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
   const doneRef = useRef(null);
   useEffect(() => { doneRef.current = null; }, [focusedRoom, focusedPage]);
   useEffect(() => {
@@ -529,11 +535,46 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   const [selectedMeasureId, setSelectedMeasureId] = useState(null);
-  // Pending 2-point calibration pick: { pageNr, a, b } | null → CalibrateDialog.
+  // Pending 2-point calibration pick: { pageNr, a, b, rotation } | null → CalibrateDialog.
   const [calibRequest, setCalibRequest] = useState(null);
+
+  // ---- Draft ownership (audit P1) -----------------------------------------
+  // The in-progress measurement and the first calibration click live HERE, not
+  // in MeasureLayer: pages unmount when they leave the scroll virtualization
+  // buffer (±2 pages), which used to destroy the drawing the user was in the
+  // middle of. Exactly one draft exists at a time, so one {pageNr, draft} slot
+  // is enough; MeasureLayer is controlled for both pieces and keeps its reducer.
+  const [draftSlot, setDraftSlot] = useState({ pageNr: null, draft: EMPTY_DRAFT });
+  const [calibSlot, setCalibSlot] = useState({ pageNr: null, point: null });
+  const dispatchDraft = useCallback((pageNr, action) => {
+    setDraftSlot((cur) => {
+      const base = cur.pageNr === pageNr ? cur.draft : EMPTY_DRAFT;
+      const next = draftReducer(base, action);
+      return { pageNr: next.points.length ? pageNr : null, draft: next };
+    });
+  }, []);
+  const draftPoints = draftSlot.draft.points.length;
+  // A tool change always abandons the draft (MeasureLayer used to do this per
+  // page; with the state lifted the owner must).
+  useEffect(() => {
+    setDraftSlot({ pageNr: null, draft: EMPTY_DRAFT });
+    setCalibSlot({ pageNr: null, point: null });
+  }, [measureTool]);
+
   // Fill-mode and measure tools are mutually exclusive pointer owners.
   const armMeasureTool = (tool) => {
+    // Toggling the ACTIVE tool off mid-draft silently threw the drawing away
+    // (audit P2) — keep it armed and point at the on-canvas exits instead.
+    // Esc still cancels through the existing chain.
+    if (measureTool === tool && draftPoints > 0) {
+      toast.info('Pirmiausia užbaikite arba atšaukite braižomą matavimą (Baigti / Atšaukti)');
+      return;
+    }
     setFillFor(null);
+    // Arming the count tool with no types yet would be a silent no-op (clicks
+    // do nothing without an active type) — make the "Sukurkite tipą" hint
+    // visible even if the legend was left collapsed.
+    if (tool === 'count' && countTypes.length === 0) setCountLegendCollapsed(false);
     setMeasureTool((cur) => {
       const next = cur === tool ? null : tool;
       if (next == null) setSelectedMeasureId(null);
@@ -590,11 +631,22 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
     }, 600);
     return () => clearTimeout(t);
   }, [measurements, measureScales, countTypes]);
-  useEffect(() => () => {
-    if (pendingMeasureSaveRef.current) {
-      onMeasureDataChangeRef.current?.(pendingMeasureSaveRef.current);
-    }
+  // Flush the pending payload synchronously. onMeasureDataChange writes through
+  // to localStorage synchronously (the backend PUT is fire-and-forget), so a
+  // plain call is enough — no sendBeacon needed.
+  const flushMeasureSave = useCallback(() => {
+    if (!pendingMeasureSaveRef.current) return;
+    const payload = pendingMeasureSaveRef.current;
+    pendingMeasureSaveRef.current = null;
+    onMeasureDataChangeRef.current?.(payload);
   }, []);
+  useEffect(() => () => flushMeasureSave(), [flushMeasureSave]);
+  // Closing / reloading the tab inside the 600 ms debounce window dropped the
+  // last measurement (audit P2) — unmount was the only flush point.
+  useEffect(() => {
+    window.addEventListener('beforeunload', flushMeasureSave);
+    return () => window.removeEventListener('beforeunload', flushMeasureSave);
+  }, [flushMeasureSave]);
   // Thumbnail rail preference: null = "no explicit choice yet" → default OPEN
   // when the document has more than one page (resolved where pageCount is known).
   const [thumbsPref, setThumbsPref] = useState(() => {
@@ -800,9 +852,20 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                           });
                         }
                       }}
-                      onMeasureCalibrate={(pageNr, a, b) => setCalibRequest({ pageNr, a, b })}
+                      onMeasureCalibrate={(pageNr, a, b) => setCalibRequest({
+                        pageNr, a, b,
+                        // The page's /Rotate travels with the pick: the dialog's
+                        // axis labels describe what the user SEES, while a/b are
+                        // unrotated mediabox points (audit P1).
+                        rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
+                      })}
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureDelete={deleteMeasurement}
+                      measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}
+                      onMeasureDraftAction={(action) => dispatchDraft(layout.pageNumber, action)}
+                      measureCalibA={calibSlot.pageNr === layout.pageNumber ? calibSlot.point : null}
+                      onMeasureCalibAChange={(point) => setCalibSlot(
+                        point ? { pageNr: layout.pageNumber, point } : { pageNr: null, point: null })}
                     />
                   )}
                 />
@@ -848,6 +911,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
           />
           <CalibrateDialog
             request={calibRequest}
+            pageRotation={calibRequest?.rotation ?? 0}
             numPages={totalPages}
             currentScale={calibRequest ? (effectiveScales[calibRequest.pageNr] || uncalibratedScale()) : null}
             onConfirm={(scale, pages) => {

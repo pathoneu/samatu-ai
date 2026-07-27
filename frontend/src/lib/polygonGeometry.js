@@ -152,6 +152,12 @@ export function nearestVertex(point, polygons, tolerance, opts = {}) {
 /**
  * Find the nearest perpendicular-foot on any polygon edge within tolerance.
  *
+ * A shape carrying `open: true` is an OPEN polyline (distance / perimeter
+ * measurements): its last→first segment does not exist, so it must not attract
+ * snaps or answer hit-tests (audit P2 "phantom snap edge"). Closed rings (areas,
+ * room polygons) keep the wrapping edge.
+ *
+ * @param polygons {id, points, open?}[]
  * @returns {point, polygonId, edgeIndex} | null
  */
 export function nearestEdge(point, polygons, tolerance, opts = {}) {
@@ -160,7 +166,8 @@ export function nearestEdge(point, polygons, tolerance, opts = {}) {
   for (const poly of polygons) {
     if (opts.excludePolygonId && poly.id === opts.excludePolygonId) continue;
     const n = poly.points.length;
-    for (let i = 0; i < n; i++) {
+    const edgeCount = poly.open ? n - 1 : n;
+    for (let i = 0; i < edgeCount; i++) {
       const a = poly.points[i];
       const b = poly.points[(i + 1) % n];
       const foot = perpFoot(point, a, b);

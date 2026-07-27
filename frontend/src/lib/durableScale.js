@@ -1,6 +1,7 @@
 // Durable, zoom-invariant per-page scale stored in project.data.pageScalesDurable[pageNr].
 // Canonical unit: metres of reality per PDF point. Survives cache-clear (rides project JSON).
 import { uncalibratedScale } from './measureGeometry.js';
+import { roomPageOf } from './roomZones.js';
 
 export function getPageScaleDurable(project, pageNr) {
   const map = (project && project.pageScalesDurable) || {};
@@ -34,6 +35,27 @@ export function durableFromPxPerMeter(pixelsPerMeter, renderScale) {
 // a user calibration always overrides (merge order in the viewer).
 const AUTO_SCALE_SOURCES = ['auto_floodfill', 'corrected', 'manual'];
 
+// Robustness gates (audit P2). An auto scale silently drives every measurement
+// on the page, so it must be hard to fool:
+//   · ≥3 samples per page (2 samples had no majority — their "median" was a mean
+//     of the two, so one leaked polygon dragged the page's scale halfway);
+//   · samples outside [0.25×, 4×] of the median are discarded as leaks/slivers;
+//   · a polygon smaller than MIN_POLYGON_FRAC of the page is float noise, whose
+//     m²/frac blows up into a 1:∞ scale;
+//   · rooms that disagree about the page size cannot be normalised together.
+export const AUTO_SCALE_MIN_SAMPLES = 3;
+const AUTO_SCALE_OUTLIER_LO = 0.25;
+const AUTO_SCALE_OUTLIER_HI = 4;
+const MIN_POLYGON_FRAC = 1e-6;
+
+// True median (ascending input). The old code called the mean of two samples a
+// "median" — with n=2 that is exactly what it was.
+function medianOfSorted(sorted) {
+  const n = sorted.length;
+  if (n === 0) return NaN;
+  return n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+}
+
 export function autoPageScalesFromRooms(rooms = []) {
   const byPage = new Map();
   for (const r of rooms || []) {
@@ -41,7 +63,7 @@ export function autoPageScalesFromRooms(rooms = []) {
     const m2 = Number(r?.plotas_m2);
     const W = Number(r?.page_width_pdf);
     const H = Number(r?.page_height_pdf);
-    const page = r?.puslapio_nr ?? r?.page_nr;
+    const page = roomPageOf(r);
     if (!Array.isArray(poly) || poly.length < 3) continue;
     if (!(m2 > 0) || !(W > 0) || !(H > 0) || !page) continue;
     if (!AUTO_SCALE_SOURCES.includes(r?.polygon_source)) continue;
@@ -52,20 +74,23 @@ export function autoPageScalesFromRooms(rooms = []) {
       sum += x1 * y2 - x2 * y1;
     }
     const frac = Math.abs(sum) / 2;  // fraction of the page area
-    if (!(frac > 0)) continue;
+    if (!(frac > MIN_POLYGON_FRAC)) continue;
     let entry = byPage.get(page);
-    if (!entry) { entry = { samples: [], pageAreaPt2: W * H }; byPage.set(page, entry); }
+    if (!entry) { entry = { samples: [], W, H, conflict: false }; byPage.set(page, entry); }
+    else if (entry.W !== W || entry.H !== H) entry.conflict = true;
     entry.samples.push(m2 / frac);
   }
   const out = {};
-  for (const [page, { samples, pageAreaPt2 }] of byPage) {
-    // A single sample could be a leaked polygon setting the whole page's
-    // scale — require 2+ and take the median.
-    if (samples.length < 2) continue;
-    samples.sort((a, b) => a - b);
-    const n = samples.length;
-    const medM2 = n % 2 ? samples[(n - 1) / 2] : (samples[n / 2 - 1] + samples[n / 2]) / 2;
-    const mpp = Math.sqrt(medM2 / pageAreaPt2);
+  for (const [page, { samples, W, H, conflict }] of byPage) {
+    if (conflict) continue;                              // ambiguous page size → no auto scale
+    if (samples.length < AUTO_SCALE_MIN_SAMPLES) continue;
+    const sorted = [...samples].sort((a, b) => a - b);
+    const rough = medianOfSorted(sorted);
+    const kept = sorted.filter((s) => s >= rough * AUTO_SCALE_OUTLIER_LO
+                                   && s <= rough * AUTO_SCALE_OUTLIER_HI);
+    if (kept.length < AUTO_SCALE_MIN_SAMPLES) continue;  // too few survivors → stay honest
+    const medM2 = medianOfSorted(kept);                  // kept is still ascending
+    const mpp = Math.sqrt(medM2 / (W * H));
     if (!Number.isFinite(mpp) || mpp <= 0) continue;
     out[page] = { metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true, source: 'auto' };
   }

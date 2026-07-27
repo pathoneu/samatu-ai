@@ -1,7 +1,10 @@
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { draftReducer } from '@/lib/measureOverlayReducer.js';
 import { makeMeasurement, measurementValue } from '@/lib/measurements.js';
-import { realPathLengthM, shoelaceAreaM2, formatNumberLT, uncalibratedScale } from '@/lib/measureGeometry.js';
+import {
+  realPathLengthM, shoelaceAreaM2, formatNumberLT, uncalibratedScale, draftCommitPoints,
+} from '@/lib/measureGeometry.js';
 import {
   nearestVertex,
   nearestEdge,
@@ -16,11 +19,20 @@ const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
 // Pixel tolerance (screen px) for vertex/edge snap, poly-close, and select hit-testing.
 const SNAP_TOL_PX = 8;
 
+const EMPTY_DRAFT = { points: [], committed: false };
+
 /**
  * MeasureLayer (ported verbatim from backup MeasureOverlay) — standalone, fully props-driven SVG overlay for the measurement
- * tools (distance / perimeter / area / count). It owns only the in-progress draft;
- * committed measurements live upstream and arrive via props. All geometry is in
- * PDF-point space — the adapter is the single screen<->PDF boundary.
+ * tools (distance / perimeter / area / count). Committed measurements live
+ * upstream and arrive via props. All geometry is in PDF-point space — the
+ * adapter is the single screen<->PDF boundary.
+ *
+ * DRAFT OWNERSHIP (audit P1): this component is mounted PER PAGE and unmounts
+ * as soon as the page leaves the scroll virtualization buffer (±2 pages) — an
+ * in-progress draft (and the first calibration click) used to die with it. Both
+ * are therefore CONTROLLED by TakeoffViewer when it passes `onDraftAction` /
+ * `onCalibAChange`; without those props the component keeps its own state so it
+ * stays usable standalone (test harness).
  *
  * It does NOT import PlanViewer so it can be mounted in a test harness.
  */
@@ -40,31 +52,46 @@ export default function MeasureLayer({
   onDelete,
   selectedId = null,
   display = { decimals: 2 },
+  // Controlled draft / calibration-A (lifted to TakeoffViewer, see above).
+  draft: draftProp = null,
+  onDraftAction = null,
+  calibA: calibAProp = null,
+  onCalibAChange = null,
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
 
-  const [draft, dispatch] = useReducer(draftReducer, { points: [], committed: false });
+  const [localDraft, localDispatch] = useReducer(draftReducer, EMPTY_DRAFT);
+  const [localCalibA, setLocalCalibA] = useState(null);
+  const controlled = typeof onDraftAction === 'function';
+  const draft = controlled ? (draftProp || EMPTY_DRAFT) : localDraft;
+  const dispatch = controlled ? onDraftAction : localDispatch;
+  const calibA = onCalibAChange ? calibAProp : localCalibA;   // first calibration point (PDF space)
+  const setCalibA = onCalibAChange || setLocalCalibA;
   const [cursor, setCursor] = useState(null);   // snapped PDF point under the pointer
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
-  const [calibA, setCalibA] = useState(null);    // first calibration point (PDF space), null = not started
 
-  // Reset the draft whenever the active tool changes.
+  // Reset the draft whenever the active tool changes. In controlled mode the
+  // OWNER resets (this component re-mounts on every scroll-back, and resetting
+  // here would wipe the very draft the lift is meant to preserve).
   useEffect(() => {
-    dispatch({ type: 'reset' });
+    if (!controlled) {
+      localDispatch({ type: 'reset' });
+      setLocalCalibA(null);
+    }
     setCursor(null);
     setSnapPt(null);
-    setCalibA(null);
   }, [tool]);
 
   // ---- coordinate + snapping helpers -------------------------------------
 
   // Committed line/area measurements on THIS page, in the {id, points} shape the
-  // polygonGeometry snap helpers expect.
+  // polygonGeometry snap helpers expect. `open` marks polylines so their
+  // non-existent closing edge never attracts a snap (audit P2).
   const snapPolygons = useMemo(
     () => measurements
       .filter((m) => m.page === pageNr && (m.kind === 'distance' || m.kind === 'perimeter' || m.kind === 'area'))
-      .map((m) => ({ id: m.id, points: m.points })),
+      .map((m) => ({ id: m.id, points: m.points, open: m.kind !== 'area' })),
     [measurements, pageNr],
   );
 
@@ -107,16 +134,14 @@ export default function MeasureLayer({
 
   const commitDraft = useCallback((points) => {
     if (!onCommit) return;
-    // Drop consecutive coincident vertices — the double-click commit path
-    // appends the terminal point twice (audit P1: stored junk vertices made
-    // the label read the zero-length last segment).
-    const pts = points.filter((p, i) =>
-      i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 0.5);
-    if (pts.length >= 2) onCommit(makeMeasurement(tool, pageNr, pts));
+    // Dedupe coincident vertices, then enforce the PER-KIND minimum: a 2-click
+    // 'area' must not commit as a degenerate 0,00 m² polygon (audit P2).
+    const pts = draftCommitPoints(points, tool);
+    if (pts) onCommit(makeMeasurement(tool, pageNr, pts));
     dispatch({ type: 'reset' });
     setCursor(null);
     setSnapPt(null);
-  }, [onCommit, tool, pageNr]);
+  }, [onCommit, tool, pageNr, dispatch]);
 
   const handlePointerMove = useCallback((e) => {
     if (tool === 'pan' || tool === 'select') {
@@ -143,6 +168,11 @@ export default function MeasureLayer({
     if (tool === 'calibrate') {
       if (!calibA) {
         setCalibA(point);
+      } else if (Math.hypot(point.x - calibA.x, point.y - calibA.y) <= SNAP_TOL_PX / (adapter?.scale || 1)) {
+        // Second click landed ON the first one (audit P1: a double-click armed
+        // the dialog with a zero-length line, whose Patvirtinti then threw and
+        // did nothing). Ignore it and keep waiting for a real B point.
+        return;
       } else {
         onCalibrate?.(pageNr, calibA, point);
         setCalibA(null);
@@ -158,13 +188,15 @@ export default function MeasureLayer({
       // clicking ON an existing count dot removes THAT dot instead of stacking
       // a new one next to it — no separate eraser or select-tool detour needed.
       // Hit-test against the RAW (unsnapped) click, like the select tool.
+      // ONLY marks of the ACTIVE type are eligible: deleting a neighbouring
+      // rozetė while counting jungikliai was silent data loss (audit P1).
       const hitId = hitTest(
         eventToPdf(e),
-        measurements.filter((m) => m.kind === 'count'),
+        measurements.filter((m) => m.kind === 'count' && m.typeId === activeCountTypeId),
         pageNr,
         SNAP_TOL_PX / adapter.scale,
       );
-      if (hitId) { onDelete?.(hitId); return; }
+      if (hitId) { onDelete?.(hitId); toast.info('Žymė pašalinta'); return; }
       const type = countTypes.find((t) => t.id === activeCountTypeId) || {};
       onCommit?.(makeMeasurement('count', pageNr, [point], {
         typeId: activeCountTypeId,
@@ -183,7 +215,7 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, draft, commitDraft]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;
@@ -203,14 +235,17 @@ export default function MeasureLayer({
     dispatch({ type: 'reset' });
     setCursor(null);
     setSnapPt(null);
-  }, []);
+  }, [dispatch]);
   const draftMinPoints = tool === 'area' ? 3 : 2;
   const draftFinishable = POLY_TOOLS.has(tool) && draft.points.length >= draftMinPoints;
 
   // Keyboard: Enter = finish, Escape = reset, z = undo. Bound to window while a
   // poly tool is active so the user need not focus the SVG.
+  // Bound ONLY on the page that owns a non-empty draft: this component is
+  // mounted once per virtualized page, and with the draft lifted upstream every
+  // mounted copy would otherwise apply the same undo/finish (5 pages = 5 undos).
   useEffect(() => {
-    if (!POLY_TOOLS.has(tool)) return undefined;
+    if (!POLY_TOOLS.has(tool) || draft.points.length === 0) return undefined;
     const onKey = (e) => {
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
       if (e.key === 'Enter') {
@@ -229,11 +264,12 @@ export default function MeasureLayer({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tool, draft, commitDraft]);
+  }, [tool, draft, dispatch, commitDraft]);
 
   // Keyboard for the calibrate tool: Escape cancels an in-progress calibration.
+  // Same one-owner rule as the draft listener above.
   useEffect(() => {
-    if (tool !== 'calibrate') return undefined;
+    if (tool !== 'calibrate' || !calibA) return undefined;
     const onKey = (e) => {
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
       if (e.key === 'Escape') {
@@ -244,7 +280,7 @@ export default function MeasureLayer({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tool]);
+  }, [tool, calibA, setCalibA]);
 
   // ---- render -------------------------------------------------------------
 
@@ -367,10 +403,11 @@ function hitTest(raw, measurements, pageNr, tol) {
   for (const m of page) {
     if (m.kind === 'area' && pointInPolygon(raw, m.points)) return m.id;
   }
-  // Lines: nearest edge.
+  // Lines: nearest edge. `open` — a polyline has no closing segment, so a click
+  // in the empty span between its last and first vertex must not select it.
   const lines = page
     .filter((m) => m.kind === 'distance' || m.kind === 'perimeter')
-    .map((m) => ({ id: m.id, points: m.points }));
+    .map((m) => ({ id: m.id, points: m.points, open: true }));
   const edge = nearestEdge(raw, lines, tol);
   if (edge) return edge.polygonId;
   return null;

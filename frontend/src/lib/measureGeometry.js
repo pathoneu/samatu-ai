@@ -20,14 +20,86 @@ export function calibrateAxis(a, b, knownLength, unit, base, axis) {
   const span = useAxis === 'x' ? dx : dy;
   if (span <= 1e-9) throw new Error('Kalibravimo ašis per trumpa');
   const mpp = (knownLength * TO_M[unit]) / span;
-  const prev = base || { metersPerPointX: mpp, metersPerPointY: mpp, calibrated: false, source: 'user' };
-  const next = { ...prev, calibrated: true, source: 'user',
-    metersPerPointX: useAxis === 'x' ? mpp : prev.metersPerPointX,
-    metersPerPointY: useAxis === 'y' ? mpp : prev.metersPerPointY };
+  // AUDIT P0: a per-axis calibration on an UNCALIBRATED base has no other-axis
+  // value to preserve — it used to leave that axis at 0 while flagging
+  // calibrated:true, so every area on the page read 0,00 m² (and "apply to all
+  // pages" poisoned the whole document). On a virgin page an axis calibration
+  // therefore behaves exactly like a uniform one; the per-axis override only
+  // makes sense once BOTH axes already carry a real ratio.
+  const baseUsable = !!(base && base.calibrated
+    && base.metersPerPointX > 0 && base.metersPerPointY > 0);
+  if (!baseUsable) {
+    return { metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true,
+             source: 'user', anisotropic: false };
+  }
+  const next = { ...base, calibrated: true, source: 'user',
+    metersPerPointX: useAxis === 'x' ? mpp : base.metersPerPointX,
+    metersPerPointY: useAxis === 'y' ? mpp : base.metersPerPointY };
   next.anisotropic =
     Math.abs(next.metersPerPointX - next.metersPerPointY) /
       Math.max(next.metersPerPointX, next.metersPerPointY) > 0.02;
   return next;
+}
+
+/**
+ * storedAxisForDisplayAxis — which STORED (unrotated mediabox) axis the user's
+ * on-screen "horizontal"/"vertical" choice refers to.
+ *
+ * AUDIT P1: measurements and calibration points live in unrotated mediabox
+ * space, but the calibration dialog's labels describe what the user SEES. On a
+ * page displayed at 90° or 270° the two are swapped, so "Tik horizontali" used
+ * to calibrate the vertical ratio. Pure decision function — no rotation math
+ * leaks into the dialog.
+ *
+ * @param displayAxis 'x' | 'y' | 'uniform'
+ * @param displayRotation degrees the page is DISPLAYED at (0/90/180/270)
+ */
+export function storedAxisForDisplayAxis(displayAxis, displayRotation) {
+  if (displayAxis !== 'x' && displayAxis !== 'y') return displayAxis;
+  const rot = (((Number(displayRotation) || 0) % 360) + 360) % 360;
+  const swapped = rot === 90 || rot === 270;
+  if (!swapped) return displayAxis;
+  return displayAxis === 'x' ? 'y' : 'x';
+}
+
+/**
+ * axisSpanShare — |axis component| / |segment length| for a calibration pick.
+ * Near 0 means the line is almost perpendicular to the chosen axis, where the
+ * axis ratio is numerically meaningless (a 2 px span standing in for metres).
+ * Callers reject below AXIS_SPAN_MIN_SHARE instead of silently mis-scaling.
+ */
+export const AXIS_SPAN_MIN_SHARE = 0.2;
+
+export function axisSpanShare(a, b, axis) {
+  const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+  const len = Math.hypot(dx, dy);
+  if (!(len > 0)) return 0;
+  return (axis === 'y' ? dy : dx) / len;
+}
+
+// ── Draft commit hygiene ────────────────────────────────────────────────────
+// Minimum vertices a committed measurement needs, per kind.
+export const MIN_DRAFT_POINTS = { distance: 2, perimeter: 2, area: 3 };
+
+/** Drop consecutive coincident vertices (the dbl-click commit path appends the
+ *  terminal point twice — stored junk vertices made labels read a zero-length
+ *  last segment). */
+export function dedupeDraftPoints(points, eps = 0.5) {
+  const pts = Array.isArray(points) ? points : [];
+  return pts.filter((p, i) => i === 0
+    || Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) > eps);
+}
+
+/**
+ * draftCommitPoints — dedupe, then enforce the per-kind minimum. Returns null
+ * when the draft must NOT commit. AUDIT P2: the old guard checked `>= 2` for
+ * every tool AFTER dedupe, so a 2-click 'area' (click + double-click on the
+ * same spot) committed a degenerate polygon that rendered as a 0,00 m² artifact.
+ */
+export function draftCommitPoints(points, kind, eps = 0.5) {
+  const pts = dedupeDraftPoints(points, eps);
+  const min = MIN_DRAFT_POINTS[kind] ?? 2;
+  return pts.length >= min ? pts : null;
 }
 
 export function scaleFromRatio(ratio, label) {
