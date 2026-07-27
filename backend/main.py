@@ -874,12 +874,33 @@ async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         db.set_user_company(user["id"], code, pvm_code=payload.pvm_code)
-    with db._conn() as c:
-        c.execute(
-            "UPDATE users SET name = ?, company_name = ? WHERE id = ?",
-            (payload.name, payload.company_name, user["id"]),
-        )
-    return {"user": db.get_user_by_id(user["id"]) or {}}
+    # Only SET the fields the caller actually sent. The old unconditional
+    # `SET name = ?, company_name = ?` wiped both to NULL on any partial update
+    # (e.g. a company_code-only PUT), and company_name prints on every export.
+    # (audit 2026-07-27)
+    _sets: list[str] = []
+    _vals: list = []
+    if payload.name is not None:
+        _sets.append("name = ?")
+        _vals.append(payload.name)
+    if payload.company_name is not None:
+        _sets.append("company_name = ?")
+        _vals.append(payload.company_name)
+    if _sets:
+        with db._conn() as c:
+            c.execute(
+                f"UPDATE users SET {', '.join(_sets)} WHERE id = ?",
+                (*_vals, user["id"]),
+            )
+    # Never echo the auth/billing internals back to the browser: password_hash
+    # is the bcrypt digest (offline-crackable if the response is logged/cached),
+    # google_sub + stripe_customer_id are cross-system identifiers and
+    # session_version is the session-invalidation nonce. (audit 2026-07-27)
+    _u = dict(db.get_user_by_id(user["id"]) or {})
+    for _k in ("password_hash", "google_sub", "stripe_customer_id",
+               "session_version"):
+        _u.pop(_k, None)
+    return {"user": _u}
 
 
 # ── M4: Google OAuth (2026-05-06) ──────────────────────────────────────
@@ -958,10 +979,17 @@ async def api_google_callback(request: Request, code: str | None = None,
         raise HTTPException(status_code=503, detail="Google OAuth not configured")
     expected_state = request.session.pop("google_oauth_state", None)
     next_url = request.session.pop("google_oauth_next", "/")
+    # This route is a TOP-LEVEL BROWSER NAVIGATION target, so an HTTPException
+    # renders raw JSON ({"detail": ...}) in the address bar — a dead end with no
+    # way back to the app. Redirect to /login with a short machine code instead,
+    # exactly like the `error` and `account_disabled` paths already do.
+    # (audit 2026-07-27)
     if not state or state != expected_state:
-        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+        return RedirectResponse(url="/login?oauth_error=invalid_state",
+                                status_code=302)
     if not code:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
+        return RedirectResponse(url="/login?oauth_error=missing_code",
+                                status_code=302)
 
     import httpx  # lazy import — only loaded when OAuth is used
     async with httpx.AsyncClient(timeout=10) as client:
@@ -977,16 +1005,21 @@ async def api_google_callback(request: Request, code: str | None = None,
         )
         if token_resp.status_code != 200:
             log.error("Google token exchange failed: %s", token_resp.text[:300])
-            raise HTTPException(status_code=502, detail="Token exchange failed")
+            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
+                                    status_code=302)
         access_token = token_resp.json().get("access_token")
         if not access_token:
-            raise HTTPException(status_code=502, detail="No access token returned")
+            log.error("Google token exchange returned no access_token")
+            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
+                                    status_code=302)
         userinfo = await client.get(
             "https://openidconnect.googleapis.com/v1/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if userinfo.status_code != 200:
-            raise HTTPException(status_code=502, detail="Failed to fetch userinfo")
+            log.error("Google userinfo fetch failed: HTTP %s", userinfo.status_code)
+            return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
+                                    status_code=302)
         info = userinfo.json()
 
     google_sub = info.get("sub")
@@ -994,7 +1027,9 @@ async def api_google_callback(request: Request, code: str | None = None,
     name = info.get("name")
     avatar = info.get("picture")
     if not google_sub or not email:
-        raise HTTPException(status_code=502, detail="Incomplete userinfo")
+        log.error("Google userinfo missing sub/email")
+        return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
+                                status_code=302)
 
     # Match priority: existing google_sub → existing email → create new user.
     user = db.get_user_by_google_sub(google_sub)
@@ -1233,19 +1268,23 @@ async def api_extract_room_material_specs(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    data = project.get("data") or {}
-    rooms = data.get("patalpos") or []
+    # db.get_project FLATTENS the JSON blob onto the row dict — there is no
+    # nested "data" key, so the old `project.get("data")` was always {} and this
+    # route 404'd on every existing room (and, on save, wrote a self-nesting
+    # {"data": {...}} wrapper into the blob). Read the blob fields directly.
+    # (audit 2026-07-27)
+    rooms = project.get("patalpos") or []
     target_room = next((r for r in rooms if r.get("nr") == room_nr), None)
     if not target_room:
         raise HTTPException(status_code=404, detail=f"Room {room_nr} not found")
 
     # Cache check
-    cached = (data.get("_material_specs") or {}).get(room_nr)
+    cached = (project.get("_material_specs") or {}).get(room_nr)
     if cached and not cached.get("_error"):
         return {**cached, "_cached": True}
 
     # Pick relevant pages
-    puslapiai = data.get("puslapiai") or []
+    puslapiai = project.get("puslapiai") or []
     spec_pages = _pick_spec_pages_for_room(target_room, puslapiai)
     if not spec_pages:
         return {
@@ -1265,10 +1304,12 @@ async def api_extract_room_material_specs(
         target_room.get("pavadinimas") or room_nr,
     )
 
-    # Cache in project data
+    # Cache on the project blob itself (same convention as api/revalidate.py:
+    # mutate the flattened project dict and upsert it whole).
     try:
-        data.setdefault("_material_specs", {})[room_nr] = result
-        db.upsert_project(project_id, {**project, "data": data},
+        specs = dict(project.get("_material_specs") or {})
+        specs[room_nr] = result
+        db.upsert_project(project_id, {**project, "_material_specs": specs},
                            user_id=user["id"])
     except Exception as exc:
         log.warning("material specs cache failed: %s", exc)
@@ -1291,7 +1332,9 @@ async def api_revoke_share(request: Request, project_id: str):
 async def api_get_shared(token: str):
     """Public — return read-only project payload by share token. No auth needed.
 
-    Strips owner-internal fields (_meta cost data, user_id) before returning.
+    Builds the payload from an explicit ALLOW-list of the fields
+    frontend/src/pages/SharedProject.jsx renders. Anything not listed below —
+    including every future extractor field — stays private by default.
     """
     project = db.get_project_by_share_token(token)
     if not project:
@@ -1301,27 +1344,38 @@ async def api_get_shared(token: str):
         db.increment_share_view(token)
     except Exception as exc:
         log.warning("share view counter bump failed: %s", exc)
-    import copy as _copy
     raw = project.get("data") or {}
-    vat_mode = raw.get("vat_mode") if isinstance(raw, dict) else None
-    # Deep-copy so we never mutate the cached project dict, then strip ALL
-    # owner-internal / debug fields. The old code only popped cost keys from
-    # _meta and returned the raw blob, leaking the owner's user_id (account UUID),
-    # _overrides, extraction internals and per-room traces to any link holder —
-    # contradicting this endpoint's own "strips owner-internal fields" docstring.
-    # (2026-06-19 deliverable hunt.)
-    data = _copy.deepcopy(raw) if isinstance(raw, dict) else {}
-    if isinstance(data, dict):
-        for k in ("user_id", "_overrides", "_meta", "_material_specs",
-                  "_plyteliu_specs", "puslapiai", "_eksplikacija", "_door_types",
-                  "detected_symbols_summary", "v9_meta"):
-            data.pop(k, None)
-        for r in (data.get("patalpos") or []):
-            if isinstance(r, dict):
-                for k in ("calculation_trace", "_zoom", "_zoom_changes", "_vote",
-                          "polygon_pdf", "polygon_pct", "bbox_pct",
-                          "page_width_pdf", "page_height_pdf"):
-                    r.pop(k, None)
+    if not isinstance(raw, dict):
+        raw = {}
+    vat_mode = raw.get("vat_mode")
+    # ALLOW-list, not deny-list (audit 2026-07-27). The previous code popped a
+    # fixed set of known-internal keys and shipped whatever else the blob
+    # happened to carry — so every new extractor field (pdf_name, measurements,
+    # annotations, warnings/_lt_warnings/lt_sanity, per-room pastabos /
+    # marker_pct / polygon_source …) leaked to any link holder by default. Now
+    # ONLY the fields SharedProject.jsx actually renders are copied out; a new
+    # internal field is private unless someone deliberately adds it here.
+    _ROOM_KEYS = ("nr", "pavadinimas", "paskirtis", "plotas_m2", "lubu_aukstis_m")
+    # SharedProject.jsx reads d.mato_vnt || d.vnt and d.skyrius || d.kategorija,
+    # so both spellings of each pair stay in.
+    _WORK_KEYS = ("eil_nr", "aprasymas", "kiekis", "mato_vnt", "vnt", "kaina",
+                  "suma", "skyrius", "kategorija")
+
+    def _pick(src, keys):
+        return {k: src.get(k) for k in keys if k in src}
+
+    def _rooms(key):
+        return [_pick(r, _ROOM_KEYS) for r in (raw.get(key) or [])
+                if isinstance(r, dict)]
+
+    data = {
+        "patalpos": _rooms("patalpos"),
+        # the page falls back to data.v8_rooms when patalpos is absent
+        "v8_rooms": _rooms("v8_rooms"),
+        "darbu_sarasas": [_pick(d, _WORK_KEYS)
+                          for d in (raw.get("darbu_sarasas") or [])
+                          if isinstance(d, dict)],
+    }
     return {
         "id": project["id"],
         "name": project.get("name"),
@@ -1465,15 +1519,31 @@ _FOOTER_SKIP = re.compile(
 
 
 def _parse_qty(s: str):
-    """Convert '17,90' → 17.9  or  '1' → 1.0.  Returns None for invalid/blank/dash."""
+    """Convert '17,90' -> 17.9, '1 234,56' -> 1234.56, '0' -> 0.0.
+
+    Returns None only for blank / dash / unparseable / negative values.
+
+    Two fixes (audit 2026-07-27):
+      * LT thousands separators were never stripped, so '1 234,56' hit float(),
+        raised, and returned None — the row was silently DROPPED from the
+        žiniaraštis. All three separators a PDF can carry are removed now:
+        ASCII space, U+00A0 NBSP (what pdfplumber usually yields) and U+202F
+        narrow NBSP. They are spelled as escapes on purpose -- as literal
+        characters they are indistinguishable from a plain space in an editor.
+      * A genuine zero ('0', '0,00') also returned None via `v if v > 0`, again
+        dropping the row instead of keeping a legitimate 0-quantity line.
+    """
     if not s:
         return None
-    s = str(s).strip().replace(',', '.')
+    s = str(s).strip()
+    for _sep in ("\u0020", "\u00a0", "\u202f"):   # ASCII / NBSP / narrow NBSP
+        s = s.replace(_sep, "")
+    s = s.replace(",", ".")
     if s in ('---', '--', '-', ''):
         return None
     try:
         v = float(s)
-        return v if v > 0 else None
+        return v if v >= 0 else None
     except ValueError:
         return None
 
@@ -2208,6 +2278,13 @@ async def extract(request: Request, file: UploadFile = File(...)):
             # 2 etapas – kiekvieną chunk į Claude
             all_eilutes: list = []
             chunks_with_data = 0
+            # A per-window Claude failure used to be swallowed by a bare
+            # `continue`, so an API outage returned a PARTIAL (or empty) KŽ with
+            # HTTP 200 and no signal at all — the estimator had no way to know
+            # rows were missing. Count them, report them in meta, and refuse the
+            # response outright when nothing survived. (audit 2026-07-27)
+            windows_total = 0
+            windows_failed = 0
             prev_tail = ""          # last ~1000 chars of previous chunk for cross-boundary context
 
             MAX_CHARS  = 16000
@@ -2252,6 +2329,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
                         pos += advance
 
                 for send_text, pg in windows:
+                    windows_total += 1
                     prompt = (
                         CHUNK_PROMPT
                         .replace("{pages}", pg)
@@ -2264,7 +2342,19 @@ async def extract(request: Request, file: UploadFile = File(...)):
                             all_eilutes.extend(eilutes)
                             chunks_with_data += 1
                     except Exception:
-                        continue  # šiame chunk'e duomenų nėra arba API klaida
+                        # šiame chunk'e duomenų nėra arba API klaida
+                        windows_failed += 1
+                        log.warning("/extract window %s failed", pg, exc_info=True)
+                        continue
+
+            # Every single Claude call failed → this is an outage, not an empty
+            # PDF. Returning 200 with `eilutes: []` would look like "the drawing
+            # has no quantities". Fail loudly so the UI can offer a retry.
+            if windows_total and windows_failed == windows_total:
+                raise HTTPException(
+                    status_code=502,
+                    detail="AI tarnyba laikinai nepasiekiama — bandykite dar kartą",
+                )
 
             # ── Post-process ──────────────────────────────────────────────
             all_eilutes = _enrich_eilutes(_postprocess_eilutes(all_eilutes))
@@ -2276,6 +2366,8 @@ async def extract(request: Request, file: UploadFile = File(...)):
                     "total_pages": total_pages,
                     "chunks_processed": len(chunks),
                     "chunks_with_data": chunks_with_data,
+                    "windows_total": windows_total,
+                    "failed_windows": windows_failed,
                     "extraction_method": "claude",
                     "extraction_model": model_for("extraction"),
                 },
@@ -3896,7 +3988,20 @@ def _calculate_facade_quantities(facades: list[dict]) -> dict:
 # ── Roof calculations ─────────────────────────────────────────────────────────
 
 def _calculate_roof_quantities(roof_data: dict) -> dict:
-    pitch_deg = float(roof_data.get("pitch_degrees") or 30)
+    # `or 30` also swallowed a legitimately-read FLAT roof (pitch 0), silently
+    # inflating its area by the 30° slope factor (×1.155). Only a genuinely
+    # missing pitch falls back — and when it does, say so via pitch_fallback so
+    # the number is never mistaken for a reading. Clamp to a physical range: an
+    # AI-misread 90 would divide by cos(90°)≈0 and explode the area.
+    # (audit 2026-07-27)
+    _p = roof_data.get("pitch_degrees")
+    _fallback = _p is None
+    try:
+        pitch_deg = 30.0 if _fallback else float(_p)
+    except (TypeError, ValueError):
+        pitch_deg = 30.0
+        _fallback = True
+    pitch_deg = max(0.0, min(60.0, pitch_deg))
     slope_factor = 1 / math.cos(math.radians(pitch_deg))
 
     plan_l = (roof_data.get("plan_length_mm") or 0) / 1000
@@ -3913,6 +4018,7 @@ def _calculate_roof_quantities(roof_data: dict) -> dict:
         "slope_factor":       round(slope_factor, 3),
         "tikrasis_plotas_m2": round(actual_area, 1),
         "kampas_laipsniais":  pitch_deg,
+        "pitch_fallback":     _fallback,
         "kraigo_ilgis_m":     round(ridge_l, 1),
         "latakų_perimetras_m": round(eaves_perim, 1),
         "medžiagos": {
@@ -4023,7 +4129,10 @@ def _calculate_concrete_quantities(data: dict) -> dict:
             fw_u = math.pi * (c["diameter_mm"] / 1000)
         else:
             cw   = (c.get("width_mm")  or 0) / 1000
-            cd   = (c.get("depth_mm")  or cw) / 1000
+            # cw is ALREADY metres — the old `(depth_mm or cw) / 1000` divided
+            # the width fallback a second time, so a square column came out
+            # 1000× too small in both volume and formwork. (audit 2026-07-27)
+            cd   = (c["depth_mm"] / 1000) if c.get("depth_mm") else cw
             area = cw * cd
             fw_u = 2 * (cw + cd)
         vol = area * ch * n
@@ -4145,8 +4254,17 @@ async def extract_facade(request: Request, file: UploadFile = File(...)):
             }
     except asyncio.TimeoutError:
         return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
-    except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+    except HTTPException:
+        # Same class as F5/N5 on /extract: let the 400/413 raised by
+        # _validate_pdf_upload (invalid PDF, oversized upload) propagate as the
+        # real HTTP status instead of being flattened into a 200 body by the
+        # generic handler below. (audit 2026-07-27)
+        raise
+    except Exception:
+        # Never echo the internal exception to the client (leaks library
+        # internals); log it server-side and return a generic LT message.
+        log.exception("construction extraction failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── /extract-roof ─────────────────────────────────────────────────────────────
@@ -4186,8 +4304,17 @@ async def extract_roof(request: Request, file: UploadFile = File(...)):
             }
     except asyncio.TimeoutError:
         return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
-    except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+    except HTTPException:
+        # Same class as F5/N5 on /extract: let the 400/413 raised by
+        # _validate_pdf_upload (invalid PDF, oversized upload) propagate as the
+        # real HTTP status instead of being flattened into a 200 body by the
+        # generic handler below. (audit 2026-07-27)
+        raise
+    except Exception:
+        # Never echo the internal exception to the client (leaks library
+        # internals); log it server-side and return a generic LT message.
+        log.exception("construction extraction failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── /extract-earthworks ───────────────────────────────────────────────────────
@@ -4230,8 +4357,17 @@ async def extract_earthworks(request: Request, file: UploadFile = File(...)):
             }
     except asyncio.TimeoutError:
         return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
-    except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+    except HTTPException:
+        # Same class as F5/N5 on /extract: let the 400/413 raised by
+        # _validate_pdf_upload (invalid PDF, oversized upload) propagate as the
+        # real HTTP status instead of being flattened into a 200 body by the
+        # generic handler below. (audit 2026-07-27)
+        raise
+    except Exception:
+        # Never echo the internal exception to the client (leaks library
+        # internals); log it server-side and return a generic LT message.
+        log.exception("construction extraction failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── /extract-concrete ─────────────────────────────────────────────────────────
@@ -4275,8 +4411,17 @@ async def extract_concrete(request: Request, file: UploadFile = File(...)):
             }
     except asyncio.TimeoutError:
         return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
-    except Exception as e:
-        return {"error": f"Nenumatyta klaida: {type(e).__name__}: {e}"}
+    except HTTPException:
+        # Same class as F5/N5 on /extract: let the 400/413 raised by
+        # _validate_pdf_upload (invalid PDF, oversized upload) propagate as the
+        # real HTTP status instead of being flattened into a 200 body by the
+        # generic handler below. (audit 2026-07-27)
+        raise
+    except Exception:
+        # Never echo the internal exception to the client (leaks library
+        # internals); log it server-side and return a generic LT message.
+        log.exception("construction extraction failed")
+        return {"error": "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."}
 
 
 # ── Task 7: update /extract to add kategorija + improve auto-detection ─────────
@@ -4653,8 +4798,21 @@ async def generate_excel(request: Request, data: dict):
             # Rooms store lubu_aukstis_m (meters) — the old lubu_aukstis_mm
             # key never existed, so every room printed the 2.80 m fallback
             # even when the project carried 3.4/3.0 m overrides (QA 2026-07-15).
-            h_m = room.get("lubu_aukstis_m") or ((room.get("lubu_aukstis_mm") or 2800) / 1000)
-            h_str = f"{float(h_m):.2f} m"
+            # LT comma-decimals ('2,8') reach here from legacy/manually-edited
+            # project blobs; float('2,8') raised ValueError and 500'd the whole
+            # Excel export. Coerce like /recompute-interior does, and fall back
+            # to the 2800 mm default when the value is unusable. (audit 2026-07-27)
+            _H_DEFAULT_M = 2.8   # 2800 mm — the standard-height fallback
+            h_m = room.get("lubu_aukstis_m")
+            if not h_m:
+                _mm = room.get("lubu_aukstis_mm")
+                h_m = (_mm / 1000) if isinstance(_mm, (int, float)) else _H_DEFAULT_M
+            if isinstance(h_m, str):
+                h_m = h_m.replace(",", ".").strip()
+            try:
+                h_str = f"{float(h_m):.2f} m"
+            except (TypeError, ValueError):
+                h_str = f"{_H_DEFAULT_M:.2f} m"
             for ci, val in enumerate([
                 room.get("nr", ""),
                 room.get("pavadinimas", ""),
@@ -5057,7 +5215,13 @@ async def generate_pdf(request: Request, data: dict):
         ]
         if isinstance(suma_val, (int, float)) and suma_val > 0:
             style_cmds.append(("TEXTCOLOR", (5, ri), (5, ri), GREEN))
-            _section_sum += suma_val
+        # Accumulate the ROUNDED value of EVERY numeric line, exactly like the
+        # grand total (viso_be_pvm = round-then-sum over all rows). The old
+        # `_section_sum += suma_val` gated on `> 0` summed raw floats and
+        # skipped negative/credit lines, so Σ(section subtotals) drifted from
+        # the printed "Suma be PVM". (audit 2026-07-27)
+        if isinstance(suma_val, (int, float)):
+            _section_sum += round(suma_val, 2)
         _section_rows = True
         data_idx += 1
 
@@ -5370,10 +5534,17 @@ async def extract_interior_stream_endpoint(
                         break
                     except asyncio.TimeoutError:
                         yield b": heartbeat\n\n"
-            except Exception as exc:
-                yield _format_sse({"event": "error", "message": str(exc)})
+            except Exception:
+                # Do NOT echo the internal exception to the browser — it leaks
+                # library/stack internals into the SSE stream. Log server-side,
+                # send the same generic LT message /extract uses. The event
+                # SHAPE (error → done{status:error,_error}) is unchanged so the
+                # frontend contract holds. (audit 2026-07-27)
+                log.exception("/extract-interior-stream failed")
+                _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
+                yield _format_sse({"event": "error", "message": _msg})
                 yield _format_sse({"event": "done", "result": {
-                    "status": "error", "_error": str(exc),
+                    "status": "error", "_error": _msg,
                 }})
                 return
             if ev is sentinel:
@@ -5384,11 +5555,25 @@ async def extract_interior_stream_endpoint(
             if ev.get("event") == "done" and isinstance(ev.get("result"), dict):
                 result = ev["result"]
                 # Billing parity: count the successful extraction against the
-                # monthly quota / trial credit exactly like the non-stream twin
-                # (no-op while BILLING_ENABLED != '1'). Never break the stream.
+                # monthly quota / trial credit exactly like the non-stream twin.
+                # The earlier version called record_extract_and_maybe_consume_credit
+                # UNGUARDED — it wrote billing_usage rows even with the flag OFF
+                # (proven in the live DB) — and never consumed the company trial,
+                # so a free user's 2nd project was not blocked. Mirror the
+                # /extract-interior block exactly: guard on billing_enabled() and
+                # consume the trial. Hard no-op while BILLING_ENABLED != '1'.
+                # (audit 2026-07-27)
                 if result.get("status") != "error":
                     try:
-                        db.record_extract_and_maybe_consume_credit(_user["id"])
+                        from billing.flag import billing_enabled
+                        if billing_enabled() and _user and _user.get("id"):
+                            db.record_extract_and_maybe_consume_credit(_user["id"])
+                            _bu = db.get_user_by_id(_user["id"])
+                            if (_bu and (_bu.get("plan") or "free") == "free"
+                                    and db.credits_balance(_user["id"]) == 0
+                                    and _bu.get("company_code")):
+                                from billing.trial import consume_trial
+                                consume_trial(_bu["company_code"], _user["id"])
                     except Exception:
                         log.warning("stream: credit increment failed", exc_info=True)
                 if validation.get("warning"):
@@ -5471,12 +5656,18 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     per_room = payload.per_room_overrides or {}
 
     out_rooms: list[dict] = []
+    # Degradation is no longer silent (audit 2026-07-27): a room whose calc
+    # throws keeps its OLD numbers, and a pozicijos-build failure returns an
+    # empty list — both previously with status "ok" and only a server log, so
+    # the UI showed stale/empty results as if they were freshly computed.
+    _failed_rooms: list[str] = []
     for room in payload.patalpos:
         # Defensively coerce client-supplied numerics (LT comma-decimals like
         # "12,5", stray strings from corrupted/legacy projects) to floats so one
         # bad field can't crash the calc OR the downstream plotas sums and 500 the
         # whole recompute. (2026-06-19 hunt.) Comma-decimal recovers the real
         # value; anything else degrades to 0.
+        _room_failed = False
         for _k in ("plotas_m2", "perimetras_m", "lubu_aukstis_m"):
             _v = room.get(_k)
             if isinstance(_v, str):
@@ -5484,6 +5675,16 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
                     room[_k] = float(_v.replace(",", ".").strip())
                 except (ValueError, AttributeError):
                     room[_k] = 0.0
+                    _room_failed = True
+            elif _v is not None and not isinstance(_v, (int, float)):
+                # A dict/list here (deeply corrupted blob) used to be left in
+                # place: the per-room try/except below caught the calc error,
+                # but the SAME value then reached _recompute_santrauka →
+                # calc_totals → float(dict) and 500'd the whole request — the
+                # exact outcome this guard exists to prevent. Degrade to 0 and
+                # report the room as failed. (audit 2026-07-27)
+                room[_k] = 0.0
+                _room_failed = True
         # Preserve Vision-emitted fields we don't recompute
         preserved = {
             "nr": room.get("nr"),
@@ -5528,6 +5729,9 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
             log.warning("[recompute-interior] room %s calc failed: %s",
                         room.get('nr'), exc)
             recalc = {}
+            _room_failed = True
+        if _room_failed:
+            _failed_rooms.append(str(room.get("nr") or ""))
 
         merged = {**room, **recalc, **preserved}
         out_rooms.append(merged)
@@ -5590,12 +5794,54 @@ async def recompute_interior(payload: RecomputePayload, request: Request):
     # _build_pozicijos_from_rooms() reads parsed["_overrides"] (set above) for
     # NRM2/VOB/LT deduction standard + Q-level + paint class.
     from extractor.vision_call import _build_pozicijos_from_rooms
+    _pozicijos_failed = False
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
     except Exception as exc:
         log.warning("[recompute-interior] pozicijos build failed: %s", exc)
         parsed["pozicijos"] = parsed.get("pozicijos") or []
+        _pozicijos_failed = True
     parsed = _emit_v8_compat_fields(parsed)
+
+    # Surface partial failures instead of returning stale/empty numbers as if
+    # they were fresh. Status stays 200/"ok" (frontend contract) — the signal
+    # rides in _recompute_failures plus a WARNING in the lt_sanity list the
+    # SanityWarningsBanner already renders. (audit 2026-07-27)
+    if _failed_rooms or _pozicijos_failed:
+        parsed["_recompute_failures"] = {
+            "rooms": _failed_rooms,
+            "pozicijos_build": _pozicijos_failed,
+        }
+        _msgs = []
+        if _failed_rooms:
+            _msgs.append(
+                "Nepavyko perskaičiuoti patalpų: "
+                + ", ".join(n or "—" for n in _failed_rooms)
+                + " — rodomi ankstesni skaičiai."
+            )
+        if _pozicijos_failed:
+            _msgs.append(
+                "Nepavyko sugeneruoti darbų pozicijų sąrašo — jis gali būti "
+                "tuščias arba nepilnas."
+            )
+        _ls = parsed.get("lt_sanity")
+        if not isinstance(_ls, dict):
+            _ls = {}
+            parsed["lt_sanity"] = _ls
+        if not isinstance(_ls.get("warnings"), list):
+            _ls["warnings"] = []
+        if not isinstance(_ls.get("summary"), dict):
+            _ls["summary"] = {}
+        for _m in _msgs:
+            _ls["warnings"].append({
+                "level": "WARNING", "room": "", "field": "recompute",
+                "value": None, "expected": None, "message": _m,
+            })
+        _ls["summary"]["warnings_count"] = (
+            _ls["summary"].get("warnings_count", 0) + len(_msgs))
+        _ls["summary"]["warnings"] = (
+            _ls["summary"].get("warnings", 0) + len(_msgs))
+
     parsed["status"] = "ok"
     parsed["_recomputed"] = True
     return parsed
@@ -5787,7 +6033,21 @@ def _build_chat_context(project: dict) -> dict:
     darbai = project.get("darbu_sarasas") or []
     sanity = project.get("lt_sanity") or {}
 
-    return {
+    # The slices below are silent caps. On a big project the prompt still told
+    # the assistant to "sum across rooms" over a TRUNCATED list, so it would
+    # confidently state a total that is missing rows. Record what got cut so the
+    # system prompt can force a partial-data disclaimer. (audit 2026-07-27)
+    _darbai_src = darbai or pozicijos
+    _truncated = {
+        k: v for k, v in (
+            ("rooms", max(0, len(rooms) - 50)),
+            ("pozicijos", max(0, len(pozicijos) - 100)),
+            ("darbai", max(0, len(_darbai_src) - 100)),
+            ("warnings", max(0, len(sanity.get("warnings") or []) - 30)),
+        ) if v
+    }
+
+    ctx = {
         "projektas": {
             "pavadinimas": project.get("name") or project.get("projektas"),
             "archetipas": project.get("archetipas"),
@@ -5847,7 +6107,7 @@ def _build_chat_context(project: dict) -> dict:
                 "vnt": it.get("mato_vnt") or it.get("vnt"),
                 "kiekis": it.get("kiekis"),
             }
-            for it in (darbai or pozicijos)[:100]
+            for it in _darbai_src[:100]
         ],
         "warnings": [
             {"level": w.get("level"), "room": w.get("room"), "message": w.get("message")}
@@ -5866,6 +6126,10 @@ def _build_chat_context(project: dict) -> dict:
         },
         "_overrides": project.get("_overrides") or {},
     }
+    if _truncated:
+        # {list_name: how_many_rows_were_cut}
+        ctx["_truncated"] = _truncated
+    return ctx
 
 
 _CHAT_SYSTEM_PROMPT = """Tu esi profesionalaus LT vidaus apdailos sąmatininko AI padėjėjas.
@@ -5886,6 +6150,11 @@ Atsakymo principai:
   `dažai_litrai = plotas × 1.8 / 9 m²/L` (pirmas sluoksnis × 1.8, ne 2.0)
 - Warnings: jei klausia "kokie warning'ai?" arba "ar yra problemų?", paimk
   iš `warnings` array. Jei jų 0 — pasakyk "warning'ų nerasta".
+- NEPILNI DUOMENYS: jei kontekste yra `_truncated` laukas, duomenys pateikti
+  TIK IŠ DALIES (jis rodo, kiek eilučių nukirsta). Tokiu atveju VISADA pasakyk,
+  kad matai tik dalį projekto, ir ATSISAKYK nurodyti tikslias bendras sumas ar
+  sudėtis per visas patalpas/pozicijas — pateik tik tai, kas matoma, ir pasiūlyk
+  bendras sumas imti iš santraukos arba eksporto.
 - Patalpu rūšiavimas: paskirtis enum'as: gyvenamoji, miegamoji, virtuve, vonia,
   wc, san, koridorius, holas, drabuzine, katiline, skalbykla, valgomasis,
   tamburas, garazas, sandeliukas, kabinetas, terasa, lodzija
@@ -6084,8 +6353,12 @@ async def detect_scale_hint(payload: DetectScalePayload, request: Request):
                             }
     except HTTPException:
         raise  # let the page-cap 400 propagate, don't swallow into {found:false}
-    except Exception as e:
-        return {"found": False, "error": str(e)}
+    except Exception:
+        # Generic message only — str(e) leaked pdfminer/pdfplumber internals
+        # ("No /Root object!", file paths) straight to the client. (audit 2026-07-27)
+        log.exception("/detect-scale-hint failed")
+        return {"found": False,
+                "error": "Nepavyko nuskaityti PDF mastelio. Patikrinkite failą."}
     return {"found": False, "page": None, "scale_ratio": None, "scale_text": None, "confidence": "low"}
 
 
@@ -6148,9 +6421,11 @@ async def click_to_fill_endpoint(
 
     try:
         raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
-    except Exception as e:
+    except Exception:
         log.exception("click-to-fill page render failed")
-        raise HTTPException(status_code=500, detail=f"page render failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Nepavyko atvaizduoti PDF puslapio. Bandykite dar kartą.")
 
     try:
         result = click_to_fill_pipeline(
@@ -6242,8 +6517,11 @@ async def detect_room_polygons_endpoint(
 
     try:
         raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"page render failed: {e}")
+    except Exception:
+        log.exception("detect-room-polygons page render failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Nepavyko atvaizduoti PDF puslapio. Bandykite dar kartą.")
     h, w = raster.shape[:2]
     px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
     page_w_pt, page_h_pt = float(w) * px_to_pt, float(h) * px_to_pt
