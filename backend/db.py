@@ -1129,8 +1129,14 @@ def get_project_by_share_token(token: str) -> dict | None:
                 exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00") if expires.endswith("Z") else expires)
                 if exp_dt < datetime.now(exp_dt.tzinfo):
                     return None  # expired
-            except (ValueError, TypeError):
-                pass  # malformed expiry — treat as non-expiring
+            except (ValueError, TypeError, AttributeError):
+                # 2026-07-27 audit (finding 9): a malformed expiry used to FAIL
+                # OPEN — the share link kept working forever. An unreadable
+                # expiry means we cannot prove the link is still valid, so the
+                # only safe reading is EXPIRED.
+                log.warning("share token %s… has unparseable share_expires_at %r "
+                            "— treating as expired", str(token)[:8], expires)
+                return None
         d = dict(row)
         # Inflate data JSON blob
         try:

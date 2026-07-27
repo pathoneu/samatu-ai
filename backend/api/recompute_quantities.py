@@ -67,18 +67,73 @@ _GESTURE_FIELDS = {
 }
 _VALID_FIELDS = _ASSUMPTION_FIELDS | _GESTURE_FIELDS
 
+# Sentinel for "key absent" — an absent assumption falls back silently, a
+# SUPPLIED but unparseable one is recorded in _degradations (audit fix 3).
+_MISSING = object()
 
-def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
+
+def _num(v, default: float) -> float:
+    """Tolerant float coercion — a malformed assumption/room field must degrade,
+    never 500 the whole recompute (2026-07-27 audit, finding 3)."""
+    try:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return float(default)
+        return float(v)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _num_field(raw, default: float, degradations: list, field: str,
+               room: str | None = None) -> float:
+    """_num + a visible _degradations entry when a value WAS supplied but is
+    unusable. Pass `_MISSING` when the key is absent (no degradation then)."""
+    if raw is _MISSING:
+        return float(default)
+    try:
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            raise ValueError("empty")
+        return float(raw)
+    except (TypeError, ValueError):
+        entry = {"field": field, "reason": "not_numeric",
+                 "value": ("" if raw is None else str(raw))[:40],
+                 "fallback": default}
+        if room is not None:
+            entry["room"] = room
+        degradations.append(entry)
+        return float(default)
+
+
+def _degrade(degradations: list, room: str | None, field: str, reason: str,
+             **extra) -> None:
+    """Append one machine-readable degradation entry. Silent drops/excepts in the
+    recompute used to return HTTP 200 with quietly-wrong numbers (audit 2/3/4)."""
+    entry = {"field": field, "reason": reason}
+    if room is not None:
+        entry["room"] = room
+    entry.update(extra)
+    degradations.append(entry)
+
+
+def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
+                            degradations: list | None = None) -> list[dict]:
     """Sprint 0: paint formula recompute from class.
     2026-05-06: per-room aukštis (lubu_auksciai dict) triggers full
     walls_paintable_m2 + ceiling_paintable_m2 recompute via calc_room_quantities.
+    2026-07-27: every rejected override / swallowed exception appends to
+    `degradations` so a silently-ignored input is visible in the response.
     """
-    paint_class = int(assumptions.get("paint_class", 1))
+    if degradations is None:
+        degradations = []
+    paint_class = int(_num_field(
+        assumptions.get("paint_class", _MISSING), 1,
+        degradations, "paint_class"))
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
     absorption = float(UNIVERSAL_RULES["first_coat_factor"])
     per_room_h = assumptions.get("lubu_auksciai") or {}
     per_room_paint = assumptions.get("walls_paint_override") or {}
-    default_h = float(assumptions.get("lubu_aukstis") or 2.82)
+    default_h = _num_field(
+        assumptions.get("lubu_aukstis") or _MISSING, 2.82,
+        degradations, "lubu_aukstis")  # noqa: F841 — kept for call-site parity
 
     out = []
     for r in rooms:
@@ -86,41 +141,51 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
         # If user overrode this room's ceiling, swap it in BEFORE the calc.
         nr = str(r.get("nr") or "")
         if isinstance(per_room_h, dict) and nr in per_room_h:
+            raw_h = per_room_h[nr]
             try:
-                new_h = float(per_room_h[nr])
-                if 1.5 <= new_h <= 8.0:
-                    room["lubu_aukstis_m"] = round(new_h, 2)
-                    room["lubu_aukstis_saltinis"] = "user_override"
-                    # Recompute geometry-derived fields with the new height.
-                    try:
-                        from extractor.universal_rules import calc_room_quantities
-                        recalc = calc_room_quantities(room, ceiling_height_m=new_h)
-                        # Carry forward the recomputed wall/ceiling/cornice fields.
-                        for k in ("walls_gross_m2", "walls_paintable_m2",
-                                  "ceiling_paintable_m2", "dazymo_plotas_m2",
-                                  "kampai_m", "kampu_metrai", "lubu_karnizo_m",
-                                  "glaistas_kg", "gruntas_l"):
-                            if k in recalc:
-                                room[k] = recalc[k]
-                        # Regenerate the human-readable trace so it matches
-                        # the new H (Playwright regression 2026-05-10).
-                        existing = room.get("elementai") or []
-                        n_doors = sum(int(e.get("kiekis") or 1) for e in existing
-                                      if (e.get("tipas") or "").lower().startswith("dur"))
-                        n_windows = sum(int(e.get("kiekis") or 1) for e in existing
-                                        if (e.get("tipas") or "").lower().startswith("lang"))
-                        perim = float(room.get("perimetras_m") or 0)
-                        room["calculation_trace"] = (
-                            f"perim({perim:.2f}) × H({new_h:.2f}) = "
-                            f"{perim * new_h:.2f} m² "
-                            f"− {n_windows} lang./{n_doors} dur. atimimai → "
-                            f"dažymas {room.get('dazymo_plotas_m2', 0):.2f} m². "
-                            f"Skaičiavo Python (deterministinis)."
-                        )
-                    except Exception:
-                        pass
-            except (ValueError, TypeError):
-                pass
+                new_h = float(raw_h)
+            except (TypeError, ValueError):
+                # Was silently dropped with HTTP 200 before 2026-07-27 (audit 2).
+                new_h = None
+                _degrade(degradations, nr, "lubu_aukstis", "not_numeric",
+                         value=str(raw_h)[:40])
+            if new_h is not None and not (1.5 <= new_h <= 8.0):
+                _degrade(degradations, nr, "lubu_aukstis", "out_of_range",
+                         value=new_h, allowed="1.5–8.0 m")
+                new_h = None
+            if new_h is not None:
+                room["lubu_aukstis_m"] = round(new_h, 2)
+                room["lubu_aukstis_saltinis"] = "user_override"
+                # Recompute geometry-derived fields with the new height.
+                try:
+                    from extractor.universal_rules import calc_room_quantities
+                    recalc = calc_room_quantities(room, ceiling_height_m=new_h)
+                    # Carry forward the recomputed wall/ceiling/cornice fields.
+                    for k in ("walls_gross_m2", "walls_paintable_m2",
+                              "ceiling_paintable_m2", "dazymo_plotas_m2",
+                              "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                              "glaistas_kg", "gruntas_l"):
+                        if k in recalc:
+                            room[k] = recalc[k]
+                    # Regenerate the human-readable trace so it matches
+                    # the new H (Playwright regression 2026-05-10).
+                    existing = room.get("elementai") or []
+                    n_doors = sum(int(e.get("kiekis") or 1) for e in existing
+                                  if (e.get("tipas") or "").lower().startswith("dur"))
+                    n_windows = sum(int(e.get("kiekis") or 1) for e in existing
+                                    if (e.get("tipas") or "").lower().startswith("lang"))
+                    perim = _num(room.get("perimetras_m"), 0)
+                    room["calculation_trace"] = (
+                        f"perim({perim:.2f}) × H({new_h:.2f}) = "
+                        f"{perim * new_h:.2f} m² "
+                        f"− {n_windows} lang./{n_doors} dur. atimimai → "
+                        f"dažymas {_num(room.get('dazymo_plotas_m2'), 0):.2f} m². "
+                        f"Skaičiavo Python (deterministinis)."
+                    )
+                except Exception as exc:  # noqa: BLE001 — degrade, never 500
+                    _degrade(degradations, nr, "lubu_aukstis",
+                             "recompute_failed", stage="calc_room_quantities",
+                             error=str(exc)[:120])
         # Per-room finishing override (2026-07-05): flip walls_paint (raw↔painted)
         # and recompute the paint geometry. Runs AFTER the height block so a room
         # with BOTH overrides gets the combined result (calc reads the already-set
@@ -143,10 +208,16 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                           "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2"):
                     if k in recalc:
                         room[k] = recalc[k]
-            except (ValueError, TypeError):
-                pass
-        walls = float(room.get("dazomas_plotas_m2", 0) or room.get("walls_paintable_m2", 0) or 0)
-        ceiling = float(room.get("lubu_dazomas_plotas_m2", 0) or room.get("ceiling_paintable_m2", 0) or 0)
+            except (ValueError, TypeError) as exc:
+                _degrade(degradations, nr, "walls_paint_override",
+                         "recompute_failed", stage="walls_paint_override",
+                         error=str(exc)[:120])
+        walls = _num_field(
+            room.get("dazomas_plotas_m2") or room.get("walls_paintable_m2") or _MISSING,
+            0.0, degradations, "dazomas_plotas_m2", room=nr)
+        ceiling = _num_field(
+            room.get("lubu_dazomas_plotas_m2") or room.get("ceiling_paintable_m2") or _MISSING,
+            0.0, degradations, "lubu_dazomas_plotas_m2", room=nr)
         room["dazai_l"] = round(walls * absorption / cov_walls, 2) if walls else 0.0
         room["dazai_luboms_l"] = round(ceiling * absorption / cov_ceil, 2) if ceiling else 0.0
 
@@ -159,13 +230,14 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
         if q_level:
             try:
                 from extractor.vision_call import _calc_glaistas_kg
-                dazymo = float(room.get("dazymo_plotas_m2") or 0)
+                dazymo = _num(room.get("dazymo_plotas_m2"), 0)
                 if dazymo > 0:
                     room["glaistas_kg"] = _calc_glaistas_kg(dazymo, str(q_level))
-            except Exception:
+            except Exception as exc:  # noqa: BLE001
                 # Recompute is best-effort — leave the prior value rather than
-                # raise during a UI-driven assumption tweak.
-                pass
+                # raise during a UI-driven assumption tweak, but SAY SO (audit 4).
+                _degrade(degradations, nr, "glaistimo_lygis", "recompute_failed",
+                         stage="glaistas_kg", error=str(exc)[:120])
 
         # Wire Week 2 line_items helpers (angokraščiai_m², hidden door frames,
         # real hidroizoliacija m²) into the response so the recompute path
@@ -177,8 +249,12 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
                 opening_reveal_lm, opening_reveal_area_m2,
                 hidden_door_count, hidden_door_frame_lm,
             )
-            wall_thickness = float(assumptions.get("sienos_storis_m") or 0.10)
-            window_sides = int(assumptions.get("window_sides") or 3)
+            wall_thickness = _num_field(
+                assumptions.get("sienos_storis_m") or _MISSING, 0.10,
+                degradations, "sienos_storis_m")
+            window_sides = int(_num_field(
+                assumptions.get("window_sides") or _MISSING, 3,
+                degradations, "window_sides"))
             openings = room.get("elementai") or []
             room["angokrasciai_lm"] = opening_reveal_lm(openings, window_sides=window_sides)
             room["angokrasciai_m2"] = opening_reveal_area_m2(
@@ -186,9 +262,10 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
             )
             room["pasleptu_duru_kompl"] = hidden_door_count(openings)
             room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings)
-        except Exception:
-            # Don't block the recompute on a helper hiccup.
-            pass
+        except Exception as exc:  # noqa: BLE001
+            # Don't block the recompute on a helper hiccup — but record it.
+            _degrade(degradations, nr, "angokrasciai", "recompute_failed",
+                     stage="line_items", error=str(exc)[:120])
 
         out.append(room)
 
@@ -201,8 +278,9 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict) -> list[dict]:
             r["_project_hidroizoliacija_m2"] = hidro_total
             if hidro_warns:
                 r["_project_hidroizoliacija_warnings"] = hidro_warns
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _degrade(degradations, None, "hidroizoliacija", "recompute_failed",
+                 stage="hidroizoliacija_m2", error=str(exc)[:120])
 
     return out
 
@@ -291,11 +369,23 @@ _TIER_SUFFIX_RE = re.compile(
 )
 
 
+# The canonical builder folds 'LED nišų glaistymas' + 'LED nišų dažymas' into one
+# 'LED nišų glaistymas/dažymas' line (vision_call._consolidate_led_niche_pozicijos).
+# A project priced BEFORE that consolidation carries the two separate lines, so map
+# both onto the consolidated key or the rebuild loses their prices (2026-07-27 audit).
+_LED_PAIR_RE = re.compile(r"^led\s+niš[ųu]\s+(glaistymas|dažymas)$", re.IGNORECASE)
+_LED_CONSOLIDATED = "led nišų glaistymas/dažymas"
+
+
 def _norm_label(s: str | None) -> str:
     """Height/Q-level-independent label key: strip the tier suffixes whose text
     flips when a ceiling crosses 3 m or the glaistymo lygis changes, so a priced
-    line can be matched to its post-rebuild sibling."""
-    return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+    line can be matched to its post-rebuild sibling. Also collapses the LED
+    glaistymas/dažymas pair onto its consolidated label."""
+    base = _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+    if _LED_PAIR_RE.match(base):
+        return _LED_CONSOLIDATED
+    return base
 
 
 def _has_user_edit(p: dict) -> bool:
@@ -338,10 +428,17 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
          iki/virš tier pair in mixed-height projects (no collision).
       2. HEIGHT-INDEPENDENT fallback for any prior edited line left unmatched
          (its label flipped across the 3 m / Q-level boundary, e.g. a priced
-         '… (virš 3m aukščio)' line that became '… (iki 3m aukščio)'). Applied
-         ONLY when unambiguous — exactly one unmatched edited prior line and one
-         unmatched rebuilt line share the normalized key — so it can never
-         mis-assign a price between the two co-existing tier lines.
+         '… (virš 3m aukščio)' line that became '… (iki 3m aukščio)'; or the
+         LED pair that got consolidated). Applied only when the target is
+         unambiguous — exactly ONE unmatched rebuilt line carries the normalized
+         key — so it can never mis-assign a price between the two co-existing
+         tier lines. N prior → 1 rebuilt: the first prior wins the line, the
+         rest fall through to pass 3.
+      3. ORPHAN CARRY (2026-07-27 audit fix 1): every prior line that still has a
+         user edit and matched nothing is APPENDED to the rebuilt list, flagged
+         `_orphaned_after_rebuild`. Before this, a priced/manually-corrected line
+         whose label no longer exists after the rebuild was silently DELETED —
+         the user's money/quantity edit vanished with HTTP 200.
 
     Preserved: kaina/suma (prices), manual count overrides, gesture locks.
     Formula/geometry quantities are otherwise recomputed (the point of the rebuild).
@@ -377,8 +474,17 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
             leftover_rebuilt_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
         for norm, priors in leftover_prior_by_norm.items():
             cands = leftover_rebuilt_by_norm.get(norm, [])
-            if len(priors) == 1 and len(cands) == 1:  # unambiguous → safe to carry
+            if len(cands) == 1:  # unambiguous target → safe to carry the first
                 _carry_edit(priors[0], cands[0])
+                matched_prior.add(id(priors[0]))
+                matched_rebuilt.add(id(cands[0]))
+
+    # Pass 3 — carry (don't delete) any still-unmatched prior line that holds a
+    # user edit. Flagged so the UI/QA can tell a carried line from a rebuilt one.
+    for p in prior:
+        if id(p) in matched_prior or not _has_user_edit(p):
+            continue
+        rebuilt.append({**p, "_orphaned_after_rebuild": True})
     return rebuilt
 
 
@@ -401,8 +507,11 @@ def recompute(
         if e.field in _ASSUMPTION_FIELDS:
             assumptions[e.field] = e.new_value
 
-    # 3. Recompute paint per room (Sprint 0 logic)
-    rooms = _apply_assumption_edits(list(req.rooms), assumptions)
+    # 3. Recompute paint per room (Sprint 0 logic). `degradations` collects every
+    # rejected override / swallowed failure so the 200 response is honest about
+    # what was silently ignored (2026-07-27 audit findings 2/3/4).
+    degradations: list = []
+    rooms = _apply_assumption_edits(list(req.rooms), assumptions, degradations)
 
     # 4. Apply gesture edits (Sprint 2)
     rooms, pozicijos = _apply_gesture_edits(rooms, list(req.pozicijos), req.edits)
@@ -414,7 +523,6 @@ def recompute(
     # the canonical builder, carrying the reader context so door/fixture/symbol
     # lines survive. Gesture-only edits keep the in-place pozicijos above.
     assumption_edited = any(e.field in _ASSUMPTION_FIELDS for e in req.edits)
-    degradations: list[str] = []
     if assumption_edited and req.context:
         try:
             from extractor.vision_call import _build_pozicijos_from_rooms

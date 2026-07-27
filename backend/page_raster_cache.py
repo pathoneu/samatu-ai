@@ -112,14 +112,26 @@ from collections import OrderedDict
 import hashlib
 import time
 
-MAX_PDF_CACHE_ENTRIES = 8  # ~8 × 50 MB = 400 MB worst case
+MAX_PDF_CACHE_ENTRIES = 8  # entry count only — see MAX_PDF_CACHE_BYTES below
 PDF_CACHE_TTL_S = 60 * 60  # 1 hour
+
+# 2026-07-27 audit (finding 8): an ENTRY cap alone bounds nothing useful — 8
+# entries × a 200 MB upload (the /extract limit) is 1.6 GB of resident RAM, i.e.
+# an OOM-kill of the whole web service. Cap the SUM of cached bytes too and evict
+# LRU-first until under budget. The just-stored entry is never evicted (a single
+# oversize PDF degrades to a cache of one, not to an empty cache in a loop).
+MAX_PDF_CACHE_BYTES = 512 * 1024 * 1024
 
 _PDF_CACHE: OrderedDict[str, dict] = OrderedDict()
 
 
+def _cache_bytes() -> int:
+    return sum(len(e["bytes"]) for e in _PDF_CACHE.values())
+
+
 def store_pdf(project_id: str, pdf_bytes: bytes) -> None:
-    """Cache PDF bytes for later click-to-fill calls. Evicts oldest if full."""
+    """Cache PDF bytes for later click-to-fill calls. Evicts LRU-first until both
+    the entry cap AND the total-bytes budget are satisfied."""
     if not project_id or not pdf_bytes:
         return
     digest = hashlib.sha256(pdf_bytes).hexdigest()[:16]
@@ -131,6 +143,10 @@ def store_pdf(project_id: str, pdf_bytes: bytes) -> None:
     _PDF_CACHE.move_to_end(project_id)
     while len(_PDF_CACHE) > MAX_PDF_CACHE_ENTRIES:
         _PDF_CACHE.popitem(last=False)
+    while len(_PDF_CACHE) > 1 and _cache_bytes() > MAX_PDF_CACHE_BYTES:
+        evicted, _ = _PDF_CACHE.popitem(last=False)   # oldest first
+        log.info("pdf cache: evicted %s to stay under %d MB budget",
+                 evicted, MAX_PDF_CACHE_BYTES // (1024 * 1024))
 
 
 def get_pdf(project_id: str) -> bytes | None:
@@ -150,6 +166,8 @@ def pdf_cache_info() -> dict:
         "entries": len(_PDF_CACHE),
         "max": MAX_PDF_CACHE_ENTRIES,
         "ttl_s": PDF_CACHE_TTL_S,
+        "bytes": _cache_bytes(),
+        "max_bytes": MAX_PDF_CACHE_BYTES,
     }
 
 

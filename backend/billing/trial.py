@@ -11,6 +11,8 @@ matches the rest of the billing layer (db.py owns the schema + _conn).
 """
 from __future__ import annotations
 
+import re
+
 import db
 
 # LT įmonės kodas is numeric, typically 9 digits. Accept 5–11 to be lenient
@@ -19,9 +21,20 @@ import db
 _MIN_LEN = 5
 _MAX_LEN = 11
 
+# str.isdigit() is True for NON-ASCII digits ('１２３４５６７８９' fullwidth, '١٢٣'
+# Arabic-Indic, superscripts…), so the old check let through codes that are a
+# different byte string but the same company to a human — a second free trial per
+# script variant. Require plain ASCII 0-9 (2026-07-27 audit, finding 11).
+_ASCII_DIGITS_RE = re.compile(r"^[0-9]+$")
+
 
 def normalize_company_code(raw) -> str:
-    """Strip whitespace, keep digits, validate plausible LT company-code length.
+    """Strip whitespace, keep ASCII digits, drop leading zeros, validate a
+    plausible LT company-code length.
+
+    Leading zeros are stripped because '0123456789' and '123456789' are the same
+    company to the registry but were two different rows in `consumed_trials` —
+    i.e. a free extra trial for anyone who padded their code (2026-07-27 audit).
 
     Raises ValueError on empty / non-numeric / implausible length so callers
     (the capture endpoint) can reject a bad code with a 400 rather than storing
@@ -31,8 +44,9 @@ def normalize_company_code(raw) -> str:
     digits = "".join(ch for ch in str(raw) if not ch.isspace())
     if not digits:
         raise ValueError("Įmonės kodas privalomas")
-    if not digits.isdigit():
+    if not _ASCII_DIGITS_RE.match(digits):
         raise ValueError("Įmonės kodas turi būti sudarytas tik iš skaitmenų")
+    digits = digits.lstrip("0")
     if not (_MIN_LEN <= len(digits) <= _MAX_LEN):
         raise ValueError("Neteisingas įmonės kodo ilgis")
     return digits

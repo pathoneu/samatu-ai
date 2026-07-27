@@ -16,10 +16,17 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 import db as _db
 import auth as _auth
+import storage as _storage
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ANNOTATIONS_ROOT = Path(__file__).resolve().parents[1] / "data" / "annotations"
-CALIB_ROOT = Path(__file__).resolve().parents[1] / "data" / "calibrations"
+# READ side of the annotations/calibrations files — must follow the SAME
+# SAMATU_DATA_DIR root as the writers (api/annotations.py, api/calibrate.py),
+# otherwise a prod pointed at the persistent disk would write there and read
+# from the (empty) image path. 2026-07-27 audit, finding 6.
+ANNOTATIONS_ROOT = _storage.data_path(
+    "annotations", Path(__file__).resolve().parents[1] / "data" / "annotations")
+CALIB_ROOT = _storage.data_path(
+    "calibrations", Path(__file__).resolve().parents[1] / "data" / "calibrations")
 
 FIXTURES = {
     "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",

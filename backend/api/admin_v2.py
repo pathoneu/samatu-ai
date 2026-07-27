@@ -179,11 +179,34 @@ def system_health(request: Request) -> dict:
         recent = db.admin_recent_activity()
     except Exception:
         recent = {}
+    # 2026-07-27 audit (finding 7): durability was invisible from the cockpit —
+    # a prod silently on local disk, or a nightly backup that has been failing for
+    # a week, looked identical to a healthy one. Both are now first-class fields.
+    try:
+        import storage as _storage
+        storage_backend = _storage.selected_backend_name()
+    except Exception:
+        storage_backend = "unknown"
+    try:
+        import backup_scheduler as _bs
+        outcome = _bs.last_outcome()
+        backup_status = {
+            "enabled": bool(outcome.get("enabled")),
+            "last_ok_at": outcome.get("last_ok_at"),
+            "last_error": outcome.get("last_error"),
+            "last_error_at": outcome.get("last_error_at"),
+            "last_key": outcome.get("last_key"),
+        }
+    except Exception:
+        backup_status = {"enabled": False, "last_ok_at": None,
+                         "last_error": "backup_scheduler unavailable"}
     return {
         "totals": totals,
         "events_by_kind": events_by_kind,
         "db_size_bytes": db.admin_db_size_bytes(),
         "recent_activity": recent,
+        "storage_backend": storage_backend,
+        "backup": backup_status,
         # No persisted error log in this app (see note) → always [].
         "error_log_tail": [],
         "note": _ERROR_LOG_NOTE,

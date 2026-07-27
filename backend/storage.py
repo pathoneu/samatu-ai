@@ -17,13 +17,30 @@ Keys are namespaced, e.g. "projects/<project_id>.pdf".
 """
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import threading
 
+log = logging.getLogger("samatu.storage")
+
 
 class StorageError(Exception):
     """Raised on a hard storage failure (callers may degrade gracefully)."""
+
+
+def data_path(subdir: str, legacy: pathlib.Path | str) -> pathlib.Path:
+    """Root a server-writable data directory.
+
+    2026-07-27 audit (finding 6): annotations / calibrations / F2-F3 project
+    lines / the local PDF store all wrote INSIDE the container image, so on
+    Render every one of them died with the container. They now share ONE knob —
+    set SAMATU_DATA_DIR to the persistent disk mount and all four follow.
+
+    Unset (dev, tests, CI) → the legacy in-repo path, byte-for-byte unchanged.
+    """
+    base = os.environ.get("SAMATU_DATA_DIR")
+    return (pathlib.Path(base) / subdir) if base else pathlib.Path(legacy)
 
 
 class _Backend:
@@ -134,8 +151,22 @@ _lock = threading.Lock()
 _instance: _Backend | None = None
 
 
+_R2_VARS = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
+
+
+def selected_backend_name() -> str:
+    """'r2' | 'local' — what get_storage() would pick (cheap, no side effects).
+    Surfaced by /api/admin/v2/system-health so a misconfigured prod is visible."""
+    return "r2" if all(os.environ.get(v) for v in _R2_VARS) else "local"
+
+
 def get_storage() -> _Backend:
-    """Process-wide storage backend. R2 when configured, else local disk."""
+    """Process-wide storage backend. R2 when configured, else local disk.
+
+    2026-07-27 audit (finding 7): the fallback to local disk was SILENT — a prod
+    deploy missing one R2_* var kept "working" while every uploaded PDF went to
+    ephemeral container disk. It now says which backend it picked, and shouts
+    (ERROR) when production lands on local disk."""
     global _instance
     with _lock:
         if _instance is not None:
@@ -146,11 +177,18 @@ def get_storage() -> _Backend:
         bucket = os.environ.get("R2_BUCKET")
         if acct and ak and sk and bucket:
             _instance = R2Storage(acct, ak, sk, bucket)
+            log.info("storage backend: R2 (bucket=%s)", bucket)
         else:
             root = os.environ.get("LOCAL_STORAGE_DIR") or str(
-                pathlib.Path(__file__).parent / "data" / "pdf_store"
+                data_path("pdf_store", pathlib.Path(__file__).parent / "data" / "pdf_store")
             )
             _instance = LocalDiskStorage(root)
+            missing = [v for v in _R2_VARS if not os.environ.get(v)]
+            msg = "storage backend: LOCAL DISK at %s — R2 disabled, missing: %s"
+            if os.environ.get("ENV") == "production":
+                log.error(msg + " | PRODUCTION uploads are NOT durable", root, missing)
+            else:
+                log.warning(msg, root, missing)
         return _instance
 
 

@@ -29,9 +29,15 @@ from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 import db as _db
 import auth as _auth
+import storage as _storage
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CALIB_ROOT = Path(__file__).resolve().parents[1] / "data" / "calibrations"
+# 2026-07-27 audit (finding 6): default lives inside the container image, so a
+# contractor's calibration vanished on every Render deploy. SAMATU_DATA_DIR
+# re-roots it (and project_stats/export_excel, which READ these same files) at
+# the persistent disk. Unset → unchanged legacy path.
+CALIB_ROOT = _storage.data_path(
+    "calibrations", Path(__file__).resolve().parents[1] / "data" / "calibrations")
 CALIB_ROOT.mkdir(parents=True, exist_ok=True)
 
 FIXTURES = {

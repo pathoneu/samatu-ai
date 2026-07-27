@@ -43,6 +43,45 @@ def _require_owned_project(user: dict, project_id: str) -> None:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
 
+# 2026-07-27 audit (finding 8): /api/cv/upload-pdf read the whole upload into RAM
+# with NO size cap — main.py's /extract path enforces MAX_PDF_SIZE_BYTES, this one
+# didn't, so an authenticated user could push arbitrarily large bodies through it
+# and into the process-wide PDF cache. Same limit, read in chunks so an oversize
+# body is rejected BEFORE it is fully buffered.
+_UPLOAD_CHUNK = 1024 * 1024
+_MAX_PDF_BYTES_FALLBACK = 200 * 1024 * 1024  # mirrors main.MAX_PDF_SIZE_BYTES
+
+
+def _max_pdf_bytes() -> int:
+    """main.MAX_PDF_SIZE_BYTES, imported lazily (main includes this router, so a
+    module-level import would be circular). Falls back to the same constant."""
+    try:
+        from main import MAX_PDF_SIZE_BYTES
+        return int(MAX_PDF_SIZE_BYTES)
+    except Exception:  # noqa: BLE001
+        return _MAX_PDF_BYTES_FALLBACK
+
+
+async def _read_capped(pdf_file: UploadFile) -> bytes:
+    cap = _max_pdf_bytes()
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await pdf_file.read(_UPLOAD_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > cap:
+            raise HTTPException(
+                status_code=413,
+                detail=(f"PDF failas per didelis (daugiau nei "
+                        f"{cap // (1024 * 1024)} MB). Maksimumas "
+                        f"{cap // (1024 * 1024)} MB."),
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def _rate_limit(request: Request, endpoint: str) -> None:
     """F4 (2026-07-04 pentest): the /api/cv/* endpoints render pages via OpenCV
     (CPU) and were fully unauthenticated — a DoS lever. They now require a
@@ -96,7 +135,7 @@ async def upload_pdf(
     reuse the cached bytes. Same pattern as /v9/click-to-fill."""
     _rate_limit(request, "upload-pdf")
     _require_owned_project(user, project_id)  # N6: ownership BEFORE store_pdf
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await _read_capped(pdf_file)   # 413 before the bytes are buffered
     if not pdf_bytes or not pdf_bytes[:4].startswith(b"%PDF"):
         raise HTTPException(400, "pdf_file is not a valid PDF")
     _pdf_cache.store_pdf(project_id, pdf_bytes)

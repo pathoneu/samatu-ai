@@ -30,6 +30,7 @@ from fastapi.responses import Response
 
 import auth as _auth
 import db
+import storage as _storage
 from extractor.audit_trail import audit_trail_rows
 from extractor.f2_export import (
     build_f2_export,
@@ -38,7 +39,11 @@ from extractor.f2_export import (
 
 router = APIRouter(prefix="/api/export/v2", tags=["export"])
 
-PROJECTS_DIR = Path(__file__).resolve().parents[2] / "data" / "projects"
+# 2026-07-27 audit (finding 6): repo-root/data/projects is inside the container
+# image on Render. SAMATU_DATA_DIR re-roots it at the persistent disk; unset →
+# the legacy path, unchanged.
+PROJECTS_DIR = _storage.data_path(
+    "projects", Path(__file__).resolve().parents[2] / "data" / "projects")
 
 
 def _require_project_access(request: Request, project_id: str) -> dict:

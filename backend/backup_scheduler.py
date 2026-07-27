@@ -26,6 +26,31 @@ log = logging.getLogger("samatu.backup")
 
 _task: "asyncio.Task | None" = None
 
+# 2026-07-27 audit (finding 7): a failing nightly backup logged an exception into
+# stdout and nothing else — nobody would notice until a restore was needed. The
+# last outcome is now held in-process and surfaced by /api/admin/v2/system-health.
+# In-process only (resets on restart) — that is enough to answer "did last night's
+# backup run?" without adding a table.
+_last: dict = {"last_ok_at": None, "last_error": None, "last_error_at": None,
+               "last_key": None}
+
+
+def last_outcome() -> dict:
+    """Snapshot of the most recent backup attempt (see _last)."""
+    return {**_last, "enabled": is_enabled()}
+
+
+def _record_ok(res: dict) -> None:
+    _last["last_ok_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    _last["last_key"] = res.get("key")
+    _last["last_error"] = None
+    _last["last_error_at"] = None
+
+
+def _record_error(exc: BaseException) -> None:
+    _last["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
+    _last["last_error_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
 
 def is_enabled() -> bool:
     flag = os.environ.get("SAMATU_NIGHTLY_BACKUP")
@@ -51,12 +76,14 @@ async def _run_forever() -> None:
             await asyncio.sleep(_seconds_until(hour, minute))
             # backup_db() blocks (sqlite VACUUM + network put) — keep the loop free.
             res = await asyncio.to_thread(backup.backup_db)
+            _record_ok(res)
             log.info("nightly backup ok: %s (%s bytes, %s)",
                      res["key"], res["size"], res["backend"])
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001 — one bad night must not kill the schedule
-            log.exception("nightly backup failed; retrying tomorrow")
+        except Exception as exc:  # noqa: BLE001 — one bad night must not kill the schedule
+            _record_error(exc)
+            log.error("nightly backup FAILED; retrying tomorrow: %s", exc, exc_info=True)
 
 
 def start() -> bool:

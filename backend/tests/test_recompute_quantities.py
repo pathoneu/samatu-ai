@@ -150,7 +150,11 @@ def test_merge_does_not_cross_contaminate_mixed_tier_pair():
 
 def test_merge_ambiguous_tier_fallback_is_skipped():
     """One priced prior line, but two rebuilt lines share the normalized base →
-    ambiguous → the fallback must NOT guess (no mis-assigned price)."""
+    ambiguous → the fallback must NOT guess (no mis-assigned price).
+
+    2026-07-27 (audit fix 1): the price is no longer DELETED either — the prior
+    line is carried as `_orphaned_after_rebuild`. The invariant under test is
+    unchanged: no REBUILT line may inherit a price it can't be proven to own."""
     from api.recompute_quantities import _merge_user_edits
     prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 40, "kaina": 5.0}]
     rebuilt = [
@@ -158,7 +162,10 @@ def test_merge_ambiguous_tier_fallback_is_skipped():
         {"aprasymas": "Sienų, lubų glaistymas/dažymas (standartinis aukštis)", "kiekis": 30},
     ]
     out = _merge_user_edits(rebuilt, prior)
-    assert all(p.get("kaina") in (None, 0) for p in out)
+    assert all(p.get("kaina") in (None, 0)
+               for p in out if not p.get("_orphaned_after_rebuild"))
+    carried = [p for p in out if p.get("_orphaned_after_rebuild")]
+    assert len(carried) == 1 and carried[0]["kaina"] == 5.0, out
 
 
 def test_q4_level_edit_emits_q4_sanding_line():

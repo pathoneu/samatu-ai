@@ -25,6 +25,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 import db as _db
 import auth as _auth
+import storage as _storage
 from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -32,7 +33,9 @@ FIXTURES = {
     "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
 }
 
-CALIB_ROOT = Path(__file__).resolve().parents[1] / "data" / "calibrations"
+# Same SAMATU_DATA_DIR root as api/calibrate.py writes to (2026-07-27 audit, 6).
+CALIB_ROOT = _storage.data_path(
+    "calibrations", Path(__file__).resolve().parents[1] / "data" / "calibrations")
 
 
 # Headline KŽ rows for the Excel summary. (label, santrauka_field, unit)

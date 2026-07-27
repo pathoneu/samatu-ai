@@ -28,10 +28,15 @@ from fastapi import APIRouter, Body, HTTPException, Request
 
 import auth as _auth
 import db as _db
+import storage as _storage
 
-# Storage root. Lives under backend/data so it inherits the existing
+# Storage root. Defaults under backend/data so it inherits the existing
 # .gitignore rule (backend/data/*.db) without polluting source control.
-DATA_ROOT = Path(__file__).resolve().parents[1] / "data" / "annotations"
+# 2026-07-27 audit (finding 6): that default lives INSIDE the container image on
+# Render, so annotations died with every deploy. Set SAMATU_DATA_DIR to the
+# persistent disk and this (plus calibrations / exports / pdf_store) follows.
+DATA_ROOT = _storage.data_path(
+    "annotations", Path(__file__).resolve().parents[1] / "data" / "annotations")
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
 SCHEMA_VERSION = 1

@@ -138,11 +138,29 @@ def validate_email(email: str) -> str:
     return e
 
 
+# bcrypt truncates at 72 BYTES; bcrypt 5.x raises ValueError instead of silently
+# truncating, so a longer password reached hash_password and 500'd the register /
+# change-password endpoints (2026-07-27 audit, finding 5). Reject it here, in the
+# same 400-with-LT-detail pattern the length check already uses.
+MAX_PASSWORD_BYTES = 72
+
+
 def validate_password(pw: str) -> None:
     if not pw or len(pw) < MIN_PASSWORD_LEN:
         raise HTTPException(
             status_code=400,
             detail=f"Slaptažodis turi būti ne trumpesnis nei {MIN_PASSWORD_LEN} simbolių",
+        )
+    if not pw.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Slaptažodis negali būti sudarytas vien iš tarpų",
+        )
+    if len(pw.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Slaptažodis per ilgas (daugiausia {MAX_PASSWORD_BYTES} baitai — "
+                    "apie 35–72 simboliai)"),
         )
 
 

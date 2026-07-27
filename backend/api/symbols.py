@@ -11,6 +11,7 @@ without DB lookup. The endpoint requires auth in non-fixture mode.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,12 @@ def _resolve_pdf_bytes(
     project_id: str,
     fixture: str | None,
 ) -> bytes:
-    if fixture:
+    # SECURITY (2026-07-27 audit, finding 10): the fixture branch is NOT
+    # ownership-gated — any logged-in user could run Vision detection against the
+    # committed contractor fixture under ANY project_id. Same convention as
+    # api/room_graph.py: allowed in dev/demo, ignored in production, where the
+    # request falls through to the normal owner-scoped DB path below.
+    if fixture and os.environ.get("ENV") != "production":
         p = FIXTURES.get(fixture)
         if not p or not p.exists():
             raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")
@@ -71,6 +77,9 @@ async def detect_symbols_endpoint(
     image_b64 = pages[page - 1]["image_b64"]
     out = detect_symbols(image_b64=image_b64)
     response = out.to_dict()
-    response["project_id"] = project_id if not fixture else f"fixture:{fixture}"
+    # Only claim fixture provenance when the fixture branch actually ran (in
+    # production it is ignored and real project bytes are used).
+    used_fixture = bool(fixture) and os.environ.get("ENV") != "production"
+    response["project_id"] = f"fixture:{fixture}" if used_fixture else project_id
     response["page"] = page
     return response
