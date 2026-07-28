@@ -166,6 +166,33 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
   return { json: finalResult, projType: 'interior' };
 }
 
+/**
+ * waitForRecoveredProject — poll for a project the SERVER is still finishing.
+ *
+ * The extraction outlives its SSE connection (backend drains it detached and
+ * saves under the announced id), so a dropped socket is a WAIT, not a failure.
+ * Polls every 10 s for up to 15 min — comfortably past the longest observed
+ * extraction (~21 min total, of which the drop happens near the end) — and
+ * gives up quietly, leaving the on-screen message that the analysis continues.
+ */
+async function waitForRecoveredProject(projectId, { onTick, isCancelled } = {}) {
+  const started = Date.now();
+  const LIMIT_MS = 15 * 60 * 1000;
+  while (Date.now() - started < LIMIT_MS) {
+    if (isCancelled?.()) return null;
+    try {
+      const res = await fetch(`${API}/api/projects/${projectId}`, { credentials: 'include' });
+      if (res.ok) {
+        const p = await res.json();
+        if (p && (p.patalpos?.length || p.darbu_sarasas?.length)) return p;
+      }
+    } catch { /* offline blip — keep waiting, the server does not care */ }
+    onTick?.(Math.round((Date.now() - started) / 1000));
+    await new Promise(r => setTimeout(r, 10000));
+  }
+  return null;
+}
+
 export default function NewProject() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -195,6 +222,9 @@ export default function NewProject() {
   // True once the SSE stream has begun — read in the catch block, where the
   // `streamPhase` STATE is stale (captured at click time). See the assignment.
   const streamStartedRef = useRef(false);
+  // Project id the server announces at stream start; used to WAIT for the
+  // result when the connection drops mid-extraction instead of erroring out.
+  const recoveryIdRef = useRef(null);
 
   const handleCreate = async () => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
@@ -252,6 +282,7 @@ export default function NewProject() {
           // `streamPhase` is frozen at null there forever and a mid-run drop
           // would report "check your connection" instead of the truth.
           streamStartedRef.current = true;
+          recoveryIdRef.current = null;
           setStreamPhase('rendering');
           bumpIdle();  // arm the stall detector before the first event arrives
           ({ json, projType } = await streamInteriorExtract(
@@ -259,6 +290,12 @@ export default function NewProject() {
             { interiorSubtype },
             (ev) => {
               bumpIdle();  // every progress event resets the stall timer
+              // First event of every stream: the id the server will save under
+              // if this connection dies. Held so the catch block can wait for
+              // the project instead of dead-ending the user. (2026-07-28)
+              if (ev.event === 'recovery_id' && ev.project_id) {
+                recoveryIdRef.current = ev.project_id;
+              }
               if (ev.event === 'started') {
                 setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
               } else if (ev.event === 'pass1_started') {
@@ -484,6 +521,25 @@ export default function NewProject() {
         userMessage = streamStartedRef.current
           ? t('newProject.errStreamLostButRunning')
           : t('newProject.errNetwork');
+        // THE CONNECTION DIED, NOT THE WORK. The server finishes the extraction
+        // detached and saves it under the id it announced at stream start, so
+        // instead of dead-ending the user we WAIT for that project to appear,
+        // attach the PDF the browser still holds, and land them in the
+        // workspace — the pre-prod experience, over a connection that dropped.
+        // (2026-07-28: Railway's edge cut two consecutive 17-page runs.)
+        if (streamStartedRef.current && recoveryIdRef.current) {
+          const ok = await waitForRecoveredProject(recoveryIdRef.current, {
+            onTick: (s) => setStatus(t('newProject.statusRecovering', { s })),
+            isCancelled: () => abortReasonRef.current === 'user',
+          });
+          if (ok) {
+            try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
+            uploadPdfToBackend(ok.id, file).catch(() => {});
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            navigate(`/project/${ok.id}`);
+            return;
+          }
+        }
       } else {
         userMessage = e.message || t('newProject.errUnknown');
       }

@@ -230,8 +230,16 @@ function TabBar({ tab, setTab, hasPdf }) {
   // `title` per tab: the labels are single nouns, so a first-time user cannot
   // tell that Brėžinys is where measuring happens or that Kiekiai is the
   // priceable sąmata. (2026-07-28 explainability pass.)
+  // The Brėžinys tab is ALWAYS present. Hiding it when a project has no PDF
+  // was a dead end: the "prisegti brėžinį" affordance lives INSIDE that tab, so
+  // a project that lost its drawing (or a recovered one, whose PDF the vanished
+  // browser never uploaded) could never get one back. Without a PDF the tab
+  // shows that recovery screen instead of the viewer. (2026-07-28, founder:
+  // "brezinys tab does not exist".)
   const tabs = [
-    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), title: t('project.interior.tabBrezinysTitle'), Icon: MapIcon }] : []),
+    { id: 'brezinys', label: t('project.interior.tabBrezinys'),
+      title: hasPdf ? t('project.interior.tabBrezinysTitle')
+                    : t('project.interior.tabBrezinysAttachTitle'), Icon: MapIcon },
     { id: 'main',     label: t('project.interior.tabKiekiai'), title: t('project.interior.tabKiekiaiTitle'),  Icon: ListChecks },
     { id: 'aichat',   label: t('project.interior.tabAiChat'),  title: t('project.interior.tabAiChatTitle'),  Icon: MessageSquare },
   ];

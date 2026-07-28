@@ -122,7 +122,13 @@ def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
         f = UploadFile(filename="berzu.pdf", file=io.BytesIO(b"%PDF-1.4\n" + b"x" * 400))
         resp = await main.extract_interior_stream_endpoint(req, files=[f], rules_override=None)
         it = resp.body_iterator
-        await it.__anext__()                       # client receives one event…
+        # 1st event is the recovery id (announced before any work begins), 2nd
+        # is the extractor's first real event — only THEN is a step in flight,
+        # which is the disconnect that must be survivable. Dropping at the very
+        # first yield deliberately saves nothing: no extraction has happened.
+        first = await it.__anext__()
+        assert b"recovery_id" in first
+        await it.__anext__()
         try:
             await it.athrow(asyncio.CancelledError())   # …then the socket dies
         except (asyncio.CancelledError, StopAsyncIteration):

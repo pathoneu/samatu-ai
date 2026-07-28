@@ -690,7 +690,7 @@
       "tabKiekiaiTitle": "Calculated quantities and the estimate — enter prices and export here",
       "tabAiChatTitle": "Ask about this project's rooms, areas and quantities",
       "prielaidosTitle": "Change assumptions: ceiling height, wall thickness, skim level (Q1–Q4), windows and doors. Quantities recalculate immediately.",
-      "exportTitle": "Download the estimate (Excel or PDF) or create a read-only link for the client",
+      "exportTitle": "Export the bid",
       "recomputeErr": "Recompute error",
       "toastRecomputed": "Quantities recalculated",
       "toastOrphansCarried": "{{n}} item(s) were not recalculated under the new assumptions — originals kept: {{labels}}",
@@ -698,7 +698,6 @@
       "assumptionsTitle": "Ceiling height and putty level",
       "aiTitle": "AI questions about the project",
       "aiDesc": "Ask about this project's rooms, areas and estimate rows. E.g.: “Which room is the largest?”, “Are there any rooms over 3 m high?”",
-      "exportTitle": "Export the bid",
       "exportDesc": "Download the finished bid as Excel or PDF. All quantities and prices are taken from the „Quantities\" tab.",
       "exportCount": "{{positions}} items · {{rooms}} rooms",
       "exportExcelBold": "Excel",
@@ -813,7 +812,8 @@
       "feedbackOk": "Correct",
       "feedbackBad": "Incorrect / review",
       "renameLabel": "Rename project",
-      "renameDemoLocked": "The sample project cannot be renamed"
+      "renameDemoLocked": "The sample project cannot be renamed",
+      "tabBrezinysAttachTitle": "No drawing attached — open to upload a PDF and start measuring"
     },
     "share": {
       "toastGenerated": "Link generated",
@@ -1468,7 +1468,8 @@
     "startAnalysisHint": "Analysis takes 2 to 20 min depending on drawing size. You can leave this tab open.",
     "cancelTitle": "The analysis will stop and the PDF will have to be uploaded again",
     "errStalled": "The analysis stalled (no server response for 7 min). Please retry — if it repeats, let us know.",
-    "errTimeout": "The analysis exceeded the 45 min limit. Try a smaller PDF or let us know."
+    "errTimeout": "The analysis exceeded the 45 min limit. Try a smaller PDF or let us know.",
+    "statusRecovering": "Connection lost, but the analysis continues on the server. Waiting for the result… ({{s}} s) — do not re-upload."
   },
   "upload": {
     "zone": {

@@ -5853,7 +5853,9 @@ def _is_done_event(ev) -> bool:
             and isinstance(ev.get("result"), dict))
 
 
-def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str) -> None:
+def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
+                          pdf_bytes: bytes | None = None,
+                          project_id: str | None = None) -> None:
     """Persist a finished extraction whose CLIENT vanished mid-stream.
 
     Mirrors what NewProject.jsx's createProject() builds from the done event
@@ -5870,7 +5872,9 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str) -> Non
     import uuid as _uuid
     from datetime import timezone as _tz
     stem = (pdf_name or "").rsplit(".", 1)[0].strip() or "Interjero projektas"
-    project_id = str(_uuid.uuid4())
+    # The id was announced to the client in the stream's first event, so a
+    # browser that lost the connection knows exactly which project to wait for.
+    project_id = project_id or str(_uuid.uuid4())
     now = datetime.now(_tz.utc).isoformat().replace("+00:00", "Z")
     blob = {
         **result,
@@ -5887,9 +5891,22 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str) -> Non
         # Honest provenance: the UI/user can tell this arrived via recovery.
         "_saved_by": "stream_disconnect_recovery",
     }
+    # THE DRAWING TOO (2026-07-28, found on the first recovery): normally the
+    # BROWSER uploads the PDF right after createProject — but on this path the
+    # browser is gone, so a recovered project arrived with quantities and no
+    # brėžinys, and the viewer tab hides itself when a project has no PDF. We
+    # still hold the exact bytes we extracted from, so store them here and mark
+    # has_pdf, making the recovered project indistinguishable from a healthy one.
+    if pdf_bytes:
+        try:
+            from storage import get_storage, pdf_key
+            get_storage().put(pdf_key(project_id), pdf_bytes, "application/pdf")
+            blob["has_pdf"] = True
+        except Exception:  # noqa: BLE001 — quantities matter more than the PDF
+            log.exception("stream orphan drain: PDF persist failed for %s", project_id)
     db.upsert_project(project_id, blob, user_id=user["id"])
-    log.info("stream orphan drain: saved project %s (%d rooms) for user %s",
-             project_id, blob["total_rows"], user["id"])
+    log.info("stream orphan drain: saved project %s (%d rooms, pdf=%s) for user %s",
+             project_id, blob["total_rows"], bool(blob.get("has_pdf")), user["id"])
 
 
 @app.post("/extract-interior-stream")
@@ -5929,7 +5946,18 @@ async def extract_interior_stream_endpoint(
     def _format_sse(ev: dict) -> bytes:
         return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8")
 
+    # RECOVERY HANDLE (2026-07-28): announced to the client in the very first
+    # SSE event. If the connection dies mid-extraction — Railway's edge drops
+    # these streams around the 15-20 min mark, twice observed on a 17-page
+    # project — the browser knows which project id to poll for instead of
+    # showing an error and making the user hunt through the project list. Only
+    # the disconnect path ever uses it; a healthy stream still lets the client
+    # create the project itself, so there is exactly one project either way.
+    import uuid as _uuid_mod
+    recovery_id = str(_uuid_mod.uuid4())
+
     async def event_source():
+        yield _format_sse({"event": "recovery_id", "project_id": recovery_id})
         # Push file-validation warning early so the UI can show it before pass-1.
         if validation.get("warning"):
             yield _format_sse({
@@ -5999,7 +6027,8 @@ async def extract_interior_stream_endpoint(
                         _augment_done_event(result)
                     except Exception:  # noqa: BLE001 — bookkeeping stays best-effort
                         log.exception("stream orphan drain: augmentation failed")
-                    _save_orphaned_result(result, _user, pdf_name)
+                    _save_orphaned_result(result, _user, pdf_name, pdf_bytes,
+                                          project_id=recovery_id)
                 except Exception:  # noqa: BLE001 — never let the drain thread blow up
                     log.exception("stream orphan drain failed")
                 finally:

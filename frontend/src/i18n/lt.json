@@ -694,7 +694,7 @@
       "tabKiekiaiTitle": "Apskaičiuoti kiekiai ir sąmata — čia suvedate kainas ir eksportuojate",
       "tabAiChatTitle": "Klauskite apie šio projekto patalpas, plotus ir kiekius",
       "prielaidosTitle": "Keisti prielaidas: lubų aukštis, sienos storis, glaistymo lygis (Q1–Q4), langai ir durys. Kiekiai persiskaičiuoja iš karto.",
-      "exportTitle": "Atsisiųsti sąmatą (Excel arba PDF) arba sukurti peržiūros nuorodą klientui",
+      "exportTitle": "Eksportuoti pasiūlymą",
       "recomputeErr": "Perskaičiavimo klaida",
       "toastRecomputed": "Kiekiai perskaičiuoti",
       "toastOrphansCarried": "{{n}} pozicijų nebuvo perskaičiuotos pagal naujas prielaidas — paliktos originalios: {{labels}}",
@@ -702,7 +702,6 @@
       "assumptionsTitle": "Lubų aukštis ir glaistymo lygis",
       "aiTitle": "AI klausimai apie projektą",
       "aiDesc": "Užduokite klausimą apie šio projekto patalpas, plotus ir sąmatos eilutes. Pvz.: „Kuris kambarys didžiausias?\", „Ar yra patalpų aukštesnių nei 3 m?\"",
-      "exportTitle": "Eksportuoti pasiūlymą",
       "exportDesc": "Atsisiųskite užbaigtą pasiūlymą Excel arba PDF formatu. Visi kiekiai ir kainos įtraukiami iš skirtuko „Kiekiai\".",
       "exportCount": "{{positions}} pozicijų · {{rooms}} patalpų",
       "exportExcelBold": "Excel",
@@ -817,7 +816,8 @@
       "feedbackOk": "Teisingai",
       "feedbackBad": "Neteisingai / peržiūrėti",
       "renameLabel": "Pervadinti projektą",
-      "renameDemoLocked": "Pavyzdinio projekto pervadinti negalima"
+      "renameDemoLocked": "Pavyzdinio projekto pervadinti negalima",
+      "tabBrezinysAttachTitle": "Brėžinys neprisegtas — atidarykite, kad įkeltumėte PDF ir galėtumėte matuoti"
     },
     "share": {
       "toastGenerated": "Nuoroda sugeneruota",
@@ -1472,7 +1472,8 @@
     "startAnalysisHint": "Analizė trunka nuo 2 iki 20 min. — priklauso nuo brėžinio dydžio. Langą galite palikti atvirą.",
     "cancelTitle": "Analizė bus nutraukta, o PDF teks įkelti iš naujo",
     "errStalled": "Analizė sustojo (7 min be atsako iš serverio). Pabandykite dar kartą — jei kartojasi, praneškite mums.",
-    "errTimeout": "Analizė viršijo 45 min limitą. Pabandykite mažesnį PDF arba praneškite mums."
+    "errTimeout": "Analizė viršijo 45 min limitą. Pabandykite mažesnį PDF arba praneškite mums.",
+    "statusRecovering": "Ryšys nutrūko, bet analizė tęsiasi serveryje. Laukiame rezultato… ({{s}} s) — nekartokite įkėlimo."
   },
   "upload": {
     "zone": {
