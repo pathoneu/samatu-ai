@@ -43,6 +43,12 @@ class RecomputeRequest(BaseModel):
     # (e.g. ceiling height) can rebuild the CANONICAL pozicijos from the
     # recomputed rooms without losing the door/fixture/symbol lines.
     context: dict = Field(default_factory=dict)
+    # 2026-07-28 (P0): the user's PRICES live in `darbu_sarasas`, not in
+    # `pozicijos` — the demo snapshot and every real project blob carry
+    # pozicijos 0/73 priced vs darbu_sarasas 73/73 priced. Optional: when the
+    # caller forwards it, the merge treats a position priced there as
+    # user-edited, so tier-flip rescue + price carry-forward see the real money.
+    darbu_sarasas: list[dict] = Field(default_factory=list)
 
 
 # Sprint 0: assumption-class fields. Sprint 2 adds gesture fields below.
@@ -377,12 +383,25 @@ _LED_PAIR_RE = re.compile(r"^led\s+niš[ųu]\s+(glaistymas|dažymas)$", re.IGNOR
 _LED_CONSOLIDATED = "led nišų glaistymas/dažymas"
 
 
+def _tier_key(s: str | None) -> str:
+    """Label with ONLY the height/Q-level tier suffixes stripped.
+
+    Two labels sharing a tier key describe the same work at different ceiling
+    tiers ('… (iki 3m aukščio)' vs '… (virš 3m aukščio)' vs '… (standartinis
+    aukštis)'). Used by the orphan pass to tell a legitimately RE-TIERED line
+    (the work is still in the list, under the sibling label) from a line the
+    rebuild simply cannot produce (corner beads, whole electrical sections).
+    Deliberately does NOT fold the LED pair — 'LED nišų dažymas' is a distinct
+    work item from the consolidated line, so it must still be carried."""
+    return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+
+
 def _norm_label(s: str | None) -> str:
     """Height/Q-level-independent label key: strip the tier suffixes whose text
     flips when a ceiling crosses 3 m or the glaistymo lygis changes, so a priced
     line can be matched to its post-rebuild sibling. Also collapses the LED
     glaistymas/dažymas pair onto its consolidated label."""
-    base = _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+    base = _tier_key(s)
     if _LED_PAIR_RE.match(base):
         return _LED_CONSOLIDATED
     return base
@@ -393,6 +412,72 @@ def _has_user_edit(p: dict) -> bool:
             or p.get("manual_override") is True
             or p.get("quantity_source") == "manual_override"
             or bool(p.get("override_locked")))
+
+
+_TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
+
+
+def _price_index(darbu_sarasas: list[dict]) -> dict[str, dict]:
+    """label-key → priced/edited darbu_sarasas row.
+
+    Indexed three ways because the same line appears under slightly different
+    text in the two lists: exact lowercased label, the height-independent
+    `_norm_label`, and the label with a trailing parenthetical removed
+    (`_emit_v8_compat_fields` appends `(pastaba)` to the darbu_sarasas label,
+    e.g. tile size, so its text is LONGER than the pozicija's)."""
+    idx: dict[str, dict] = {}
+    for row in darbu_sarasas or []:
+        if not isinstance(row, dict) or not _has_user_edit(row):
+            continue
+        lab = (row.get("aprasymas") or row.get("pavadinimas") or "").strip()
+        if not lab:
+            continue
+        for key in (lab.lower(), _norm_label(lab),
+                    _TRAILING_PAREN_RE.sub("", lab).strip().lower()):
+            if key:
+                idx.setdefault(key, row)
+    return idx
+
+
+def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
+                                       darbu_sarasas: list[dict]) -> int:
+    """Copy the user's kaina onto prior `pozicijos` that don't carry one.
+
+    THE P0 (2026-07-28): `_has_user_edit` keyed on `pozicijos[].kaina`, but in
+    every real project blob prices live ONLY in `darbu_sarasas` — so the merge
+    saw zero user edits and the rescue passes never fired. Mutates `prior` in
+    place and returns how many positions gained a price."""
+    if not darbu_sarasas:
+        return 0
+    idx = _price_index(darbu_sarasas)
+    if not idx:
+        return 0
+    n = 0
+    for p in prior:
+        if not isinstance(p, dict) or _has_user_edit(p):
+            continue
+        lab = (p.get("aprasymas") or "").strip()
+        if not lab:
+            continue
+        row = (idx.get(lab.lower()) or idx.get(_norm_label(lab))
+               or idx.get(_TRAILING_PAREN_RE.sub("", lab).strip().lower()))
+        if row is None:
+            continue
+        kaina = row.get("kaina")
+        if kaina not in (None, 0):
+            p["kaina"] = kaina
+            kiekis = p.get("kiekis")
+            if isinstance(kiekis, (int, float)):
+                p["suma"] = round(float(kiekis) * float(kaina), 2)
+            n += 1
+        if row.get("manual_override") is True:
+            p["manual_override"] = True
+            p.setdefault("quantity_source", "manual_override")
+            if row.get("kiekis") is not None:
+                p["kiekis"] = row["kiekis"]
+            if row.get("ai_kiekis_original") is not None:
+                p["ai_kiekis_original"] = row["ai_kiekis_original"]
+    return n
 
 
 def _carry_edit(prev: dict, p: dict) -> None:
@@ -418,7 +503,8 @@ def _carry_edit(prev: dict, p: dict) -> None:
                      if isinstance(kiekis, (int, float)) else prev.get("suma"))
 
 
-def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
+def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
+                      notes: list | None = None) -> list[dict]:
     """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
     user's manual edits forward from the prior pozicijos so the rebuild doesn't
     silently revert them.
@@ -434,15 +520,29 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
          key — so it can never mis-assign a price between the two co-existing
          tier lines. N prior → 1 rebuilt: the first prior wins the line, the
          rest fall through to pass 3.
-      3. ORPHAN CARRY (2026-07-27 audit fix 1): every prior line that still has a
-         user edit and matched nothing is APPENDED to the rebuilt list, flagged
-         `_orphaned_after_rebuild`. Before this, a priced/manually-corrected line
-         whose label no longer exists after the rebuild was silently DELETED —
-         the user's money/quantity edit vanished with HTTP 200.
+      3. ORPHAN CARRY (2026-07-27 audit fix 1, widened 2026-07-28): EVERY prior
+         line that matched nothing is APPENDED to the rebuilt list, flagged
+         `_orphaned_after_rebuild` — not just the ones carrying a visible user
+         edit. The 2026-07-27 version gated this on `_has_user_edit`, which
+         reads `pozicijos[].kaina`; real blobs keep prices in `darbu_sarasas`,
+         so the net never fired in production and a ceiling-height round-trip
+         deleted 12-15 rows (whole 'Elektros instaliacijos' / 'Ventiliacijos'
+         sections, both 'Glaistymo kampai' lines) with HTTP 200 and an empty
+         `_degradations`. The ONLY prior line still dropped is an un-edited one
+         whose work is demonstrably still in the list under a sibling TIER label
+         (`_tier_key` hit) — that is the rebuild legitimately re-tiering a line
+         (… (virš 3m) → … (iki 3m)), not a deletion. A line carrying real user
+         money/edits is carried even then, because guessing that its price is
+         obsolete is not ours to make silently.
 
     Preserved: kaina/suma (prices), manual count overrides, gesture locks.
     Formula/geometry quantities are otherwise recomputed (the point of the rebuild).
+
+    `notes` (optional, out-param): appended with one dict per carried orphan /
+    suppressed line so the endpoint can DISCLOSE what wasn't recomputed.
     """
+    if notes is None:
+        notes = []
     if not prior:
         return rebuilt
     prior_by_label: dict[str, dict] = {}
@@ -460,12 +560,26 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
             matched_prior.add(id(prev))
             matched_rebuilt.add(id(p))
 
-    # Pass 2 — rescue user edits on prior lines whose label changed on rebuild.
+    # Pass 2 — reunite prior lines with their renamed post-rebuild sibling.
+    # STILL gated on `_has_user_edit`, and that gate is load-bearing in a way
+    # worth spelling out (measured live, 2026-07-28): consuming a prior line in
+    # favour of its renamed successor only preserves the money if we can SEE the
+    # money to carry it. Un-gated, the LED pair collapses onto the consolidated
+    # line and 320 € evaporates whenever the caller didn't forward
+    # `darbu_sarasas` — the frontend's own merge can't recover it either,
+    # because its JS `_normLabel` doesn't fold the LED pair. So: price visible
+    # (natively or hydrated from darbu_sarasas) → clean rename with the price
+    # carried; price invisible → fall through to pass 3 and keep the original
+    # line. Never trade a row for a rename we can't pay for.
     leftover_prior_by_norm: dict[str, list[dict]] = {}
     for p in prior:
         if id(p) in matched_prior or not _has_user_edit(p):
             continue
         leftover_prior_by_norm.setdefault(_norm_label(p.get("aprasymas")), []).append(p)
+    # When several priors collapse onto one line, the one carrying real money
+    # wins it.
+    for _priors in leftover_prior_by_norm.values():
+        _priors.sort(key=lambda p: not _has_user_edit(p))
     if leftover_prior_by_norm:
         leftover_rebuilt_by_norm: dict[str, list[dict]] = {}
         for p in rebuilt:
@@ -478,13 +592,34 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict]) -> list[dict]:
                 _carry_edit(priors[0], cands[0])
                 matched_prior.add(id(priors[0]))
                 matched_rebuilt.add(id(cands[0]))
+                # A rename is not a deletion — but the label the user priced is
+                # gone from their sąmata, so say where its money went.
+                if ((priors[0].get("aprasymas") or "").strip()
+                        != (cands[0].get("aprasymas") or "").strip()):
+                    notes.append({"aprasymas": priors[0].get("aprasymas"),
+                                  "reason": "relabeled",
+                                  "into": cands[0].get("aprasymas"),
+                                  "kaina": cands[0].get("kaina")})
 
-    # Pass 3 — carry (don't delete) any still-unmatched prior line that holds a
-    # user edit. Flagged so the UI/QA can tell a carried line from a rebuilt one.
+    # Pass 3 — carry (don't delete) every still-unmatched prior line. Flagged so
+    # the UI/QA can tell a carried line from a rebuilt one. Computed BEFORE the
+    # appends below so a carried orphan can never suppress a later one.
+    rebuilt_tier_keys = {_tier_key(p.get("aprasymas")) for p in rebuilt}
+    rebuilt_tier_keys.discard("")
     for p in prior:
-        if id(p) in matched_prior or not _has_user_edit(p):
+        if id(p) in matched_prior:
+            continue
+        edited = _has_user_edit(p)
+        if not edited and _tier_key(p.get("aprasymas")) in rebuilt_tier_keys:
+            # Un-edited line whose work is still listed under a sibling tier
+            # label — the rebuild re-tiered it, nothing was lost.
+            notes.append({"aprasymas": p.get("aprasymas"),
+                          "reason": "superseded_by_tier"})
             continue
         rebuilt.append({**p, "_orphaned_after_rebuild": True})
+        notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
+                      "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),
+                      "user_edit": edited})
     return rebuilt
 
 
@@ -523,6 +658,7 @@ def recompute(
     # the canonical builder, carrying the reader context so door/fixture/symbol
     # lines survive. Gesture-only edits keep the in-place pozicijos above.
     assumption_edited = any(e.field in _ASSUMPTION_FIELDS for e in req.edits)
+    merge_notes: list = []
     if assumption_edited and req.context:
         try:
             from extractor.vision_call import _build_pozicijos_from_rooms
@@ -541,7 +677,12 @@ def recompute(
             if rebuilt.get("pozicijos"):
                 # Carry the user's manual edits (prices, corrected counts,
                 # locks) forward so the rebuild doesn't silently revert them.
-                pozicijos = _merge_user_edits(rebuilt["pozicijos"], list(req.pozicijos))
+                prior = [dict(p) for p in req.pozicijos]
+                # The prices live in darbu_sarasas — lift them onto the prior
+                # positions first, otherwise the merge sees zero user edits.
+                _hydrate_prices_from_darbu_sarasas(prior, req.darbu_sarasas)
+                pozicijos = _merge_user_edits(
+                    rebuilt["pozicijos"], prior, merge_notes)
         except Exception as exc:  # noqa: BLE001 — never break the recompute
             log.warning("canonical pozicijos rebuild failed: %s", exc, exc_info=True)
             degradations.append(
@@ -565,10 +706,58 @@ def recompute(
             "Nepavyko atnaujinti kiekių lentelės — gali būti rodomi seni kiekiai."
         )
 
+    # `_emit_v8_compat_fields` builds a fresh row per pozicija with a fixed key
+    # set — it drops kaina/suma and the orphan flag. The lists are 1:1 and in the
+    # same order by construction, so carry the money + the provenance markers
+    # across; without this the response's darbu_sarasas (what the Kiekiai table
+    # and the exports read) is silently price-free. (2026-07-28 P0.)
+    if len(darbu_sarasas) == len(pozicijos):
+        for row, poz in zip(darbu_sarasas, pozicijos):
+            for key in ("kaina", "suma", "manual_override", "quantity_source",
+                        "ai_kiekis_original", "override_locked",
+                        "_orphaned_after_rebuild"):
+                if poz.get(key) is not None:
+                    row[key] = poz[key]
+
+    # DISCLOSE what wasn't recomputed. Carried lines keep their ORIGINAL numbers
+    # under the new assumptions — the user must know which ones so they can
+    # re-check or delete them. Silence here is what made the row loss invisible.
+    carried = [n for n in merge_notes if n.get("reason") == "orphan_carried"]
+    lt_warnings: list[dict] = []
+    if carried:
+        msg = (f"{len(carried)} pozicijų nebuvo perskaičiuotos pagal naujas "
+               f"prielaidas — paliktos originalios: "
+               + ", ".join(str(n.get("aprasymas") or "—") for n in carried[:8])
+               + ("…" if len(carried) > 8 else ""))
+        degradations.append({
+            "field": "pozicijos",
+            "reason": "orphans_carried",
+            "count": len(carried),
+            "positions": [n.get("aprasymas") for n in carried],
+            "message": msg,
+        })
+        lt_warnings.append({
+            "level": "WARNING", "room": "", "field": "recompute",
+            "value": len(carried), "expected": None, "message": msg,
+        })
+
     return {
         "rooms": rooms,
         "pozicijos": pozicijos,
         "darbu_sarasas": darbu_sarasas,
         "assumptions": assumptions,
         "_degradations": degradations,
+        # Same shape /recompute-interior emits, so SanityWarningsBanner can
+        # render it once the frontend forwards it.
+        "lt_sanity": {
+            "warnings": lt_warnings,
+            "summary": {
+                "warnings_count": len(lt_warnings),
+                "errors": 0,
+                "warnings": len(lt_warnings),
+                "info": 0,
+                "pozicijos_carried": len(carried),
+            },
+        },
+        "_merge_notes": merge_notes,
     }

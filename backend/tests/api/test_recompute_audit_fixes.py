@@ -91,14 +91,73 @@ def test_manual_override_line_always_survives_rebuild():
     assert carried[0]["manual_override"] is True
 
 
-def test_unedited_lines_are_not_carried():
-    """Only USER-EDITED prior lines are rescued — a plain recomputed line that
-    disappeared is supposed to disappear (that's the point of the rebuild)."""
+def test_unedited_lines_are_carried_too():
+    """POLICY CHANGE 2026-07-28 (P0). This test previously asserted the OPPOSITE
+    — that an un-edited vanished line is 'supposed to disappear'. Production
+    proved that wrong: prices live in `darbu_sarasas`, so from `pozicijos` alone
+    almost every priced line looks un-edited, and a ceiling round-trip deleted
+    12-15 fully-priced rows (−5 281,85 €) with HTTP 200 and no degradations.
+    Nothing may be dropped just because this endpoint can't see the money."""
     from api.recompute_quantities import _merge_user_edits
-    prior = [{"aprasymas": "Senas AI kiekis", "kiekis": 7}]      # no edit
+    prior = [{"aprasymas": "Senas AI kiekis", "kiekis": 7}]      # no visible edit
     rebuilt = [{"aprasymas": "Sienų dažymas", "kiekis": 10}]
     out = _merge_user_edits(rebuilt, prior)
-    assert len(out) == 1 and out[0]["aprasymas"] == "Sienų dažymas"
+    assert len(out) == 2, out
+    carried = [p for p in out if p.get("_orphaned_after_rebuild")]
+    assert len(carried) == 1 and carried[0]["aprasymas"] == "Senas AI kiekis"
+    assert carried[0]["kiekis"] == 7
+
+
+def test_retiered_unedited_line_is_still_dropped():
+    """The ONE legitimate removal survives the policy change: an un-edited line
+    whose work is still listed under a sibling TIER label was re-tiered by the
+    rebuild (… (virš 3m) → … (iki 3m)), not deleted — carrying it would pin a
+    stale duplicate of a quantity that legitimately moved."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)",
+              "kiekis": 40}]                                     # no price, no override
+    rebuilt = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)",
+                "kiekis": 120}]
+    notes: list = []
+    out = _merge_user_edits(rebuilt, prior, notes)
+    assert len(out) == 1 and out[0]["aprasymas"].endswith("(iki 3m aukščio)")
+    assert [n["reason"] for n in notes] == ["superseded_by_tier"]
+
+
+def test_retiered_line_dropped_when_its_sibling_was_already_matched():
+    """Same idea, the shape that actually occurs on a height revert: the '(iki
+    3m)' line exists in BOTH lists (so pass 2 has no candidate left) and the
+    '(virš 3m)' line simply has no work behind it any more. Un-edited → dropped,
+    with the reason recorded."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 80},
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 40},
+    ]
+    rebuilt = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)",
+                "kiekis": 120}]
+    notes: list = []
+    out = _merge_user_edits(rebuilt, prior, notes)
+    assert len(out) == 1, out
+    assert [n["reason"] for n in notes] == ["superseded_by_tier"]
+
+
+def test_retiered_PRICED_line_is_carried_not_dropped():
+    """…but the moment real money rides on it, the tier heuristic stops being
+    allowed to delete it. Obsolete-or-not is the user's call, not ours."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)",
+         "kiekis": 120, "kaina": 3.0, "suma": 360.0},
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)",
+         "kiekis": 40, "kaina": 5.0, "suma": 200.0},
+    ]
+    rebuilt = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (iki 3m aukščio)",
+                "kiekis": 120}]
+    out = _merge_user_edits(rebuilt, prior)
+    carried = [p for p in out if p.get("_orphaned_after_rebuild")]
+    assert len(carried) == 1 and carried[0]["kaina"] == 5.0, out
+    assert round(sum(float(p.get("suma") or 0) for p in out), 2) == 560.0
 
 
 def test_norm_label_collapses_led_pair():
