@@ -102,3 +102,17 @@ def test_no_temperature_rule_documented():
     guard against someone re-adding a param that 400s on Opus 4.8/Fable 5."""
     doc = models_config.__doc__ or ""
     assert "temperature" in doc and "top_p" in doc and "top_k" in doc
+
+
+def test_every_configured_model_has_a_pricing_rate():
+    """A model without a pricing.RATES row extracts fine but is NEVER metered:
+    db.record_usage raises, the caller logs a warning, and the euro vanishes.
+    Production hit exactly this on 2026-07-28 — the Opus 5 cutover shipped
+    without a rate and the first real extraction went uncosted. Any future
+    model flip fails HERE instead of in a silent prod log line."""
+    import pricing
+    for role, model in resolved_models().items():
+        assert model in pricing.RATES, (
+            f"role {role!r} resolves to {model!r} which has no pricing.RATES row "
+            f"(known: {', '.join(sorted(pricing.RATES))}) — its cost would be lost"
+        )

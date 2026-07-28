@@ -43,9 +43,18 @@ for — add the rate here instead.
 
 # USD per 1M tokens.
 RATES: dict[str, dict[str, float]] = {
-    "claude-opus-4-8": {"in": 5.0, "out": 25.0},
+    "claude-opus-5": {"in": 5.0, "out": 25.0},      # champion since 2026-07-28
+    "claude-opus-4-8": {"in": 5.0, "out": 25.0},    # previous champion / rollback
     "claude-fable-5": {"in": 10.0, "out": 50.0},
+    "claude-sonnet-5": {"in": 3.0, "out": 15.0},    # evaluated, not used for vision
 }
+
+# EVERY model reachable via models_config must have a rate here: record_usage
+# RAISES on an unknown model, and its caller only logs the warning — so the
+# extraction succeeds while its cost silently never lands in usage_events.
+# That happened in production on 2026-07-28: the Opus 5 cutover shipped without
+# this row and the first real extraction went unmetered. test_models_config's
+# rate-coverage test now fails the build instead.
 
 CACHE_READ_MULT = 0.1                       # × input rate
 CACHE_WRITE_MULT = {"1h": 2.0, "5m": 1.25}  # × input rate, by TTL

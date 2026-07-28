@@ -192,6 +192,9 @@ export default function NewProject() {
   const [streamElapsed, setStreamElapsed] = useState(0);
   const elapsedTimerRef = useRef(null);
   const abortReasonRef = useRef(null);
+  // True once the SSE stream has begun — read in the catch block, where the
+  // `streamPhase` STATE is stale (captured at click time). See the assignment.
+  const streamStartedRef = useRef(false);
 
   const handleCreate = async () => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
@@ -199,6 +202,7 @@ export default function NewProject() {
     setStatus(t('newProject.statusUploading'));
     setIsProcessing(true);
     setStreamPhase(null);
+    streamStartedRef.current = false;
     setStreamProgress({ rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null });
     setStreamElapsed(0);
 
@@ -243,6 +247,11 @@ export default function NewProject() {
       try {
         if (projTypeChoice === 'interior') {
           // SM01: stream the extraction so user sees progress in real time.
+          // The REF (not the state) is what the catch block below reads: this
+          // async function closes over the render in which the user clicked, so
+          // `streamPhase` is frozen at null there forever and a mid-run drop
+          // would report "check your connection" instead of the truth.
+          streamStartedRef.current = true;
           setStreamPhase('rendering');
           bumpIdle();  // arm the stall detector before the first event arrives
           ({ json, projType } = await streamInteriorExtract(
@@ -472,7 +481,7 @@ export default function NewProject() {
         // 2026-07-28 — Railway's edge cut a live prod stream ~10 min in).
         // Tell the truth instead of "check your connection": the work is
         // continuing and the project will appear in the list.
-        userMessage = streamPhase != null
+        userMessage = streamStartedRef.current
           ? t('newProject.errStreamLostButRunning')
           : t('newProject.errNetwork');
       } else {
