@@ -5853,6 +5853,30 @@ def _is_done_event(ev) -> bool:
             and isinstance(ev.get("result"), dict))
 
 
+_UPLOAD_PREFIX_RE = re.compile(r"^[0-9a-f]{6,12}-")
+
+
+def _clean_pdf_stem(pdf_name: str) -> str:
+    """Human project name from an uploaded filename.
+
+    Browsers and upload pipelines prepend an opaque handle
+    ("8a9591f6-Visi techniversal 01.28.pdf") and encode spaces as "20" when a
+    name round-trips through a URL. A recovered project inherited that raw
+    string as its title — the founder's first recovered project was literally
+    named "8a9591f6-Visi20techniniai2001.28". Only the CLIENT normally names
+    projects, so this path never had to. (2026-07-28)"""
+    stem = (pdf_name or "").rsplit(".", 1)[0]
+    stem = _UPLOAD_PREFIX_RE.sub("", stem.strip())
+    # "%20" that lost its "%" somewhere in the upload chain. Decoded ONLY when
+    # the whole stem is space-free AND carries at least two letter-anchored
+    # "20"s — the signature of a mangled encoding. A single one is far more
+    # likely a year ("Butas2024" must not become "Butas 24").
+    if " " not in stem and len(re.findall(r"(?<=[^\W\d_])20", stem)) >= 2:
+        stem = re.sub(r"(?<=[^\W\d_])20", " ", stem)
+    stem = re.sub(r"\s{2,}", " ", stem).strip(" -_")
+    return stem or "Interjero projektas"
+
+
 def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
                           pdf_bytes: bytes | None = None,
                           project_id: str | None = None) -> None:
@@ -5871,7 +5895,7 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
         return
     import uuid as _uuid
     from datetime import timezone as _tz
-    stem = (pdf_name or "").rsplit(".", 1)[0].strip() or "Interjero projektas"
+    stem = _clean_pdf_stem(pdf_name)
     # The id was announced to the client in the stream's first event, so a
     # browser that lost the connection knows exactly which project to wait for.
     project_id = project_id or str(_uuid.uuid4())

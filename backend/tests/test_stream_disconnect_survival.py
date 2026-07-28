@@ -143,3 +143,30 @@ def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
     assert saved["blob"]["_saved_by"] == "stream_disconnect_recovery"
     assert saved["blob"]["name"] == "berzu"        # PDF stem, like the frontend
     assert saved["blob"]["total_rows"] == 1
+
+
+# ── Project naming on the recovery path ─────────────────────────────────────
+# Normally the CLIENT names the project, so this path never had to. The
+# founder's first recovered project was titled "8a9591f6-Visi20techniniai2001.28"
+# — an upload handle plus a "%20" that lost its "%". (2026-07-28)
+import pytest
+
+
+@pytest.mark.parametrize("filename,expected", [
+    # the real production case: upload prefix + de-percented spaces
+    ("8a9591f6-Visi20techniniai2001.28.pdf", "Visi techniniai 01.28"),
+    ("89603f43-Visi20techniniai2001.28.pdf", "Visi techniniai 01.28"),
+    # already clean names survive untouched, diacritics included
+    ("Visi techniniai 01.28.pdf", "Visi techniniai 01.28"),
+    ("Beržų g. 24.pdf", "Beržų g. 24"),
+    ("ab12cd34-Beržų g. 24.pdf", "Beržų g. 24"),
+    # YEARS MUST SURVIVE: one letter-anchored "20" is not an encoded space
+    ("Butas2024.pdf", "Butas2024"),
+    ("Namas2020metai.pdf", "Namas2020metai"),
+    # a leading date is not an upload handle (not hex-and-dash shaped)
+    ("2026-05-26-planas.pdf", "2026-05-26-planas"),
+    ("", "Interjero projektas"),
+    ("   .pdf", "Interjero projektas"),
+])
+def test_recovered_project_name_is_human(filename, expected):
+    assert main._clean_pdf_stem(filename) == expected
