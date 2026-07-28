@@ -18,7 +18,7 @@ const STEPS = [
   {
     id: 'pdf',
     title: '1. Brėžinys ir patalpos',
-    body: 'Centre — projekto PDF. Kairėje — visų puslapių miniatiūros (spustelėkite, kad atidarytumėte). Dešinėje — patalpų sąrašas iš eksplikacijos lentelės. Spustelėkite patalpą — jos numeris brėžinyje paryškinamas raudonu ratu. Klavišai: [ / ] keičia puslapius, + / − / F valdo mastelį.',
+    body: 'Centre — projekto PDF. Kairėje — visų puslapių miniatiūros (spustelėkite, kad atidarytumėte). Dešinėje — patalpų sąrašas iš eksplikacijos lentelės. Spustelėkite patalpą — jos numeris brėžinyje paryškinamas raudonu ratu. Viršuje esančioje juostoje — matavimo įrankiai: Atstumas, Plotas, Perimetras, Kiekis. Pasirinkus įrankį, apačioje visada parašyta, ką daryti toliau. Klavišai: [ / ] keičia puslapius, + / − / F valdo mastelį.',
     targetSel: null,
     side: 'top',
   },

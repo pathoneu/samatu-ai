@@ -145,6 +145,7 @@ export default function ShareButton({ project }) {
               <button
                 onClick={generate}
                 disabled={loading}
+                title="Sukurti peržiūros nuorodą — galios 30 dienų"
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-foreground text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {loading
@@ -158,13 +159,16 @@ export default function ShareButton({ project }) {
                   <input
                     readOnly
                     value={url}
+                    aria-label="Peržiūros nuoroda"
+                    title="Nusiųskite šią nuorodą klientui — spustelėjus tekstas pažymimas"
                     className="flex-1 px-3 py-2 bg-background border border-border rounded text-xs font-mono"
                     onFocus={e => e.target.select()}
                   />
                   <button
                     onClick={copy}
                     className="px-2.5 rounded border border-border hover:bg-muted/40"
-                    title="Kopijuoti"
+                    title="Kopijuoti nuorodą į iškarpinę"
+                    aria-label="Kopijuoti nuorodą"
                   >
                     {copied
                       ? <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -175,7 +179,8 @@ export default function ShareButton({ project }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-2.5 flex items-center rounded border border-border hover:bg-muted/40"
-                    title="Atidaryti naujame skirtuke"
+                    title="Atidaryti naujame skirtuke — pamatysite tai, ką matys klientas"
+                    aria-label="Atidaryti nuorodą naujame skirtuke"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
@@ -188,6 +193,7 @@ export default function ShareButton({ project }) {
                 <button
                   onClick={revoke}
                   disabled={loading}
+                  title="Nuoroda nustos veikti — klientas sąmatos nebematys"
                   className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-destructive/50 text-destructive rounded text-sm hover:bg-destructive/10 disabled:opacity-50"
                 >
                   {loading
@@ -201,6 +207,7 @@ export default function ShareButton({ project }) {
             <button
               onClick={() => !loading && setOpen(false)}
               disabled={loading}
+              title="Užverti langą — nuoroda lieka galioti"
               className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
               Užverti

@@ -44,6 +44,7 @@ export default function EmptyState() {
           variant="outline"
           onClick={openDemo}
           disabled={loadingDemo}
+          title={t('dashboard.empty.viewDemoTitle')}
           className="font-medium px-6"
         >
           {loadingDemo

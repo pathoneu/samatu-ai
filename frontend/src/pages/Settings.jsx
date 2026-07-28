@@ -192,7 +192,11 @@ export default function Settings() {
             <div>
               <Label className="text-sm text-muted-foreground">{t('settings.company.vatRate')}</Label>
               <Select value={vatRate} onValueChange={setVatRate}>
-                <SelectTrigger className="mt-1.5 bg-background border-border">
+                <SelectTrigger
+                  className="mt-1.5 bg-background border-border"
+                  aria-label={t('settings.company.vatRate')}
+                  title={t('settings.company.vatRateTitle')}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -214,10 +218,14 @@ export default function Settings() {
                 <div className="flex flex-col gap-1">
                   <label className="inline-flex items-center px-3 py-1.5 text-xs rounded border border-border bg-background hover:bg-muted/40 cursor-pointer">
                     {t('settings.company.upload')}
-                    <input type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
+                    <input
+                      type="file" accept="image/*" onChange={handleLogoFile} className="hidden"
+                      aria-label={t('settings.company.logo')}
+                      title={t('settings.company.logoHint')}
+                    />
                   </label>
                   {companyLogo && (
-                    <button type="button" onClick={() => setCompanyLogo('')} className="text-[11px] text-muted-foreground hover:text-destructive text-left">
+                    <button type="button" onClick={() => setCompanyLogo('')} title={t('settings.company.removeLogoTitle')} className="text-[11px] text-muted-foreground hover:text-destructive text-left">
                       {t('settings.company.remove')}
                     </button>
                   )}
@@ -410,7 +418,7 @@ function TrashSection() {
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{p.name || t('settings.trash.untitled')}</div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-[11px] text-muted-foreground" title={t('settings.trash.leftTitle')}>
                   {t('settings.trash.deletedLabel')} {p._archived_at ? new Date(p._archived_at).toISOString().slice(0, 10) : '—'}
                   {' · '}{t('settings.trash.leftLabel')} {fmtDaysLeft(p._archived_at)}
                 </div>
@@ -419,13 +427,18 @@ function TrashSection() {
                 onClick={() => handleRestore(p.id)}
                 variant="outline"
                 size="sm"
+                title={t('settings.trash.restoreTitle')}
               >
                 {t('settings.trash.restore')}
               </Button>
+              {/* The only irreversible action in the product, sitting 8 px from
+                  „Atkurti" in an identical outline button. The confirm dialog
+                  is honest; the button itself said nothing. (2026-07-28.) */}
               <Button
                 onClick={() => handlePermanent(p.id, p.name)}
                 variant="outline"
                 size="sm"
+                title={t('settings.trash.deleteNowTitle')}
                 style={{ color: 'hsl(var(--source-ai))' }}
               >
                 {t('settings.trash.deleteNow')}

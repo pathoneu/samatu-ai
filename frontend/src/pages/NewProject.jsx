@@ -486,6 +486,7 @@ export default function NewProject() {
             <Button
               variant="outline"
               size="sm"
+              title={t('newProject.cancelTitle')}
               onClick={() => {
                 abortController.abort();
                 setError(t('newProject.abortedByUser'));
@@ -549,6 +550,8 @@ export default function NewProject() {
               <button
                 key={pt.id}
                 onClick={() => setProjType(pt.id)}
+                title={t(`newProject.typeTitles.${pt.id}`, { defaultValue: t(`newProject.types.${pt.id}.desc`) })}
+                aria-pressed={projTypeChoice === pt.id}
                 className={`p-3 rounded-lg border text-left transition-colors ${
                   projTypeChoice === pt.id
                     ? 'border-primary bg-primary/5 text-foreground'
@@ -565,6 +568,8 @@ export default function NewProject() {
           <button
             type="button"
             onClick={() => setShowAdvancedTypes(v => !v)}
+            title={t('newProject.otherTypesTitle')}
+            aria-expanded={showAdvancedTypes}
             className="mt-2 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
           >
             {showAdvancedTypes ? t('newProject.hideOtherTypes') : t('newProject.showOtherTypes')}
@@ -576,6 +581,8 @@ export default function NewProject() {
                 <button
                   key={pt.id}
                   onClick={() => setProjType(pt.id)}
+                  title={t(`newProject.typeTitles.${pt.id}`, { defaultValue: t(`newProject.types.${pt.id}.desc`) })}
+                  aria-pressed={projTypeChoice === pt.id}
                   className={`p-2.5 rounded-lg border text-left transition-colors ${
                     projTypeChoice === pt.id
                       ? 'border-primary bg-primary/5 text-foreground'
@@ -596,6 +603,7 @@ export default function NewProject() {
             <Input
               id="project-name"
               placeholder={t('newProject.namePlaceholder')}
+              title={t('newProject.nameTitle')}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               className="mt-1.5 bg-card border-border"
@@ -606,6 +614,7 @@ export default function NewProject() {
             <Input
               id="company-name"
               placeholder={t('newProject.companyPlaceholder')}
+              title={t('newProject.companyTitle')}
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="mt-1.5 bg-card border-border"
@@ -618,14 +627,24 @@ export default function NewProject() {
           <UploadZone onFileSelect={setFile} accept=".pdf" label={t('newProject.uploadLabel')} />
         </div>
 
-        <Button
-          onClick={handleCreate}
-          disabled={!file}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12"
-        >
-          <Rocket className="w-5 h-5 mr-2" />
-          {t('newProject.startAnalysis')}
-        </Button>
+        <div>
+          <Button
+            onClick={handleCreate}
+            disabled={!file}
+            title={file ? t('newProject.startAnalysisTitle') : t('newProject.startAnalysisDisabledTitle')}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12"
+          >
+            <Rocket className="w-5 h-5 mr-2" />
+            {t('newProject.startAnalysis')}
+          </Button>
+          {/* Time expectation. Extraction is minutes, not seconds (a Beržų-class
+              drawing runs ~19 min — see IDLE_ABORT_MS above). A bare "Pradėti
+              analizę" + rocket reads as instant, so contractors closed the tab.
+              (2026-07-28 explainability pass.) */}
+          <p className="mt-2 text-xs text-muted-foreground text-center">
+            {t('newProject.startAnalysisHint')}
+          </p>
+        </div>
       </div>
     </div>
   );

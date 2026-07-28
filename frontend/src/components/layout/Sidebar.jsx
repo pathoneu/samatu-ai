@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   { path: '/price-lists', icon: Sliders, labelKey: 'layout.nav.kainynai' },
 ];
 
-function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
+function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled, disabledLabel }) {
   const className = 'relative flex items-center justify-center w-9 h-9 rounded-md transition-colors';
   const activeStyle = {
     background: 'hsl(var(--sidebar-accent))',
@@ -56,10 +56,20 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
       <Icon style={{ width: 16, height: 16 }} />
     </>
   );
+  // A greyed-out glyph with no name and no reason. The Tooltip below can only
+  // fire on hover for a <span>, so carry a title= too and say WHY it is off.
+  // (2026-07-28 explainability pass.)
+  const tipText = disabled ? (disabledLabel || label) : label;
   let trigger;
   if (disabled) {
     trigger = (
-      <span className={className} style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}>
+      <span
+        className={className}
+        aria-label={tipText}
+        aria-disabled="true"
+        title={tipText}
+        style={{ ...idleStyle, opacity: 0.4, cursor: 'not-allowed' }}
+      >
         {inner}
       </span>
     );
@@ -86,7 +96,7 @@ function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side="right">{tipText}</TooltipContent>
     </Tooltip>
   );
 }
@@ -150,6 +160,7 @@ export default function Sidebar({ onNavigate = null }) {
               label={t(it.labelKey)}
               isActive={isActive}
               disabled={it.requiresProject && !isActiveProjectRoute}
+              disabledLabel={t('layout.nav.noActiveProject')}
               onClick={onNavigate}
             />
           );
@@ -190,7 +201,7 @@ export default function Sidebar({ onNavigate = null }) {
         />
         {user && (
           <div
-            title={user.email}
+            title={t('layout.nav.signedInAs', { email: user.email })}
             className="flex items-center justify-center text-[10px] font-semibold border"
             style={{
               width: 28, height: 28, borderRadius: 6,

@@ -15,18 +15,17 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
 import { API_BASE } from '@/lib/apiBase';
 
-// Sprint §15 (2026-04-29): suggestions atnaujintos po naujų schema laukų
-// (paint_class, NRM2 standard, _wall_elevations, plytelių specifikacija).
-// Pirmieji 4 — visada relevantūs; toliau — kontekstiniai.
+// Pavyzdiniai klausimai. 2026-07-28 explainability pass: the previous list
+// advertised questions the chat CANNOT answer — tile specifications, per-room
+// scale and paint class are not in the context sent to /chat-project, and
+// `pozicijos` ships empty, so "kiek pozicijų peržiūrai" was always wrong.
+// Every entry below is backed by a field that is actually transmitted
+// (plotas_m2, lubu_aukstis_m, dazymo_plotas_m2, kainu_suvestine).
 const SUGGESTED_QUESTIONS = [
   'Kuris kambarys didžiausias?',
-  'Koks visas dažomas plotas su NRM2 standartu?',
-  'Kiek pozicijų peržiūrai (žemo pasitikėjimo)?',
-  'Ar yra patalpų virš 3 m aukščio?',
-  'Kiek hidroizoliacijos zonų ir kokie metrai?',
-  'Kokios plytelių specifikacijos rastos brėžinyje?',
-  'Ar visiems kambariams nustatytas mastelis?',
-  'Kiek dažų litrų reikės, jei pereisiu į 3 klasę?',
+  'Ar yra patalpų aukštesnių nei 3 m?',
+  'Koks bendras dažomas plotas?',
+  'Kiek eilučių dar be kainos?',
 ];
 
 export default function AiChat({ project, inline = false }) {
@@ -126,12 +125,19 @@ export default function AiChat({ project, inline = false }) {
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-4">
             <Sparkles className="w-6 h-6 mx-auto mb-2 text-muted-foreground/60" />
-            <p className="mb-3">Užduokite klausimą apie projektą</p>
+            <p className="mb-1">Užduokite klausimą apie projektą</p>
+            {/* Scope line: the chat only sees THIS project's rooms, areas and
+                sąmata rows — not the PDF and not other projects. Saying so up
+                front stops the "why doesn't it know" dead end. */}
+            <p className="mb-3 text-xs text-muted-foreground/80">
+              Matau šio projekto patalpas, plotus ir sąmatos eilutes.
+            </p>
             <div className="space-y-1.5">
               {SUGGESTED_QUESTIONS.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => ask(q)}
+                  title="Paspauskite — klausimas bus išsiųstas iš karto"
                   className="block w-full text-left text-xs px-3 py-1.5 bg-card border border-border rounded-lg hover:border-foreground/30 hover:bg-muted/50 transition-colors text-foreground"
                 >
                   {q}
@@ -177,13 +183,17 @@ export default function AiChat({ project, inline = false }) {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Kiek dušų projekte?"
+            placeholder="Pvz., kuris kambarys didžiausias?"
+            aria-label="Klausimas apie projektą"
+            title="Klauskite apie šio projekto patalpas, plotus ir sąmatos eilutes"
             disabled={loading}
             className="flex-1 px-3 py-2 border border-border bg-background rounded-lg text-sm focus:outline-none focus:border-foreground/40 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
+            title={input.trim() ? 'Siųsti klausimą' : 'Pirmiausia įrašykite klausimą'}
+            aria-label="Siųsti klausimą"
             className="px-3 py-2 bg-foreground text-background hover:opacity-90 disabled:opacity-30 rounded-lg"
           >
             <Send className="w-4 h-4" />

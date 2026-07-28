@@ -162,19 +162,30 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
         <td className="px-3 py-2">
           <input type="text" value={draft.aprasymas}
             onChange={e => setDraft({...draft, aprasymas: e.target.value})}
+            placeholder={t('project.mainView.descPlaceholder')}
+            aria-label={t('project.mainView.descAria')}
+            title={t('project.mainView.descAria')}
             className="w-full px-2 py-1 border border-border bg-background rounded text-sm" />
         </td>
         <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
         {/* type="text" + inputMode: a LT decimal comma makes type="number"
-            report an EMPTY value, so "12,5" was read as 0. */}
+            report an EMPTY value, so "12,5" was read as 0. The placeholder now
+            says the comma is welcome — it was the only unwritten rule in the
+            whole table. (2026-07-28 explainability pass.) */}
         <td className="px-3 py-2">
           <input type="text" inputMode="decimal" value={draft.kiekis}
             onChange={e => setDraft({...draft, kiekis: e.target.value})}
+            placeholder="0,00"
+            aria-label={t('project.mainView.qtyAria')}
+            title={t('project.mainView.numberHint')}
             className="w-20 px-2 py-1 border border-border bg-background rounded text-sm text-right tabular-nums" />
         </td>
         <td className="px-3 py-2">
           <input type="text" inputMode="decimal" value={draft.kaina}
             onChange={e => setDraft({...draft, kaina: e.target.value})}
+            placeholder="0,00"
+            aria-label={t('project.mainView.priceAria')}
+            title={t('project.mainView.priceHint')}
             className="w-20 px-2 py-1 border border-border bg-background rounded text-sm text-right tabular-nums" />
         </td>
         <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums">
@@ -182,10 +193,12 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
         </td>
         <td className="px-3 py-2 text-right">
           <button onClick={handleSave}
+            title={t('project.mainView.saveRow')} aria-label={t('project.mainView.saveRow')}
             className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded mr-1">
             <Check className="w-3.5 h-3.5" />
           </button>
           <button onClick={handleCancel}
+            title={t('project.mainView.cancelRow')} aria-label={t('project.mainView.cancelRow')}
             className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
             <X className="w-3.5 h-3.5" />
           </button>
@@ -232,6 +245,8 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
               if (e.key === 'Enter') commitQty();
               if (e.key === 'Escape') setEditingQty(false);
             }}
+            aria-label={t('project.mainView.qtyAria')}
+            title={t('project.mainView.qtyEditHint')}
             className="w-24 px-2 py-1 border border-primary bg-background rounded text-sm text-right tabular-nums"
           />
         ) : (
@@ -254,7 +269,10 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
             >
               <span>{fmt(item.kiekis)}</span>
               {isManualQty && (
-                <span className="text-[9px] uppercase font-semibold text-emerald-500 border border-emerald-500/30 rounded px-1">
+                <span
+                  className="text-[9px] uppercase font-semibold text-emerald-500 border border-emerald-500/30 rounded px-1"
+                  title={t('project.mainView.manualShortTitle')}
+                >
                   {t('project.mainView.manualShort')}
                 </span>
               )}
@@ -280,7 +298,13 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
       <td className="px-3 py-2 text-sm text-right tabular-nums">
         {item.kaina
           ? fmtEur(item.kaina)
-          : <span className="text-muted-foreground italic">{t('project.mainView.enterPrice')}</span>}
+          : (
+            /* Looks clickable, isn't — the price is edited through the pencil.
+               Say where to go instead of leaving a dead italic hint. */
+            <span className="text-muted-foreground italic" title={t('project.mainView.enterPriceTitle')}>
+              {t('project.mainView.enterPrice')}
+            </span>
+          )}
       </td>
       <td className="px-3 py-2 text-sm font-semibold text-right tabular-nums">
         {item.kaina ? fmtEur(itemSuma) : '—'}
@@ -297,8 +321,12 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
           <Edit2 className="w-3.5 h-3.5" />
         </button>
         {onRemove && (
+          /* The delete is recoverable for 6 s via the toast — say so on the
+             control itself, otherwise a one-click delete of a priced position
+             reads as permanent. (2026-07-28 explainability pass.) */
           <button onClick={() => onRemove(item)}
-            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1" title={t('project.mainView.remove')}>
+            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1"
+            title={t('project.mainView.removeTitle')} aria-label={t('project.mainView.removeTitle')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
@@ -577,6 +605,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <button
               type="button"
               onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.review)}
+              title={t('project.mainView.cardReviewTitle')}
               className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -588,6 +617,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <button
               type="button"
               onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.missing_price)}
+              title={t('project.mainView.cardMissingPriceTitle')}
               className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -599,6 +629,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             <button
               type="button"
               onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.manual)}
+              title={t('project.mainView.cardManualTitle')}
               className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-emerald-400 transition-colors"
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -611,6 +642,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               type="button"
               onClick={onShowDrawing || undefined}
               disabled={!onShowDrawing}
+              title={onShowDrawing ? t('project.mainView.cardDrawingTitle') : t('project.mainView.cardDrawingDisabledTitle')}
               className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-primary transition-colors disabled:opacity-50 disabled:hover:border-border"
             >
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -630,6 +662,8 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 value={takeoffQuery}
                 onChange={e => setTakeoffQuery(e.target.value)}
                 placeholder={t('project.mainView.searchPositions')}
+                aria-label={t('project.mainView.searchPositions')}
+                title={t('project.mainView.searchPositionsTitle')}
                 className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none focus:border-primary"
               />
             </div>
@@ -639,6 +673,8 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                   key={btn.mode}
                   type="button"
                   onClick={() => setTakeoffMode(btn.mode)}
+                  title={t(`project.mainView.filterTitles.${btn.mode}`, { defaultValue: t('project.mainView.filterFallbackTitle') })}
+                  aria-pressed={takeoffMode === btn.mode}
                   className={`h-8 px-2.5 rounded-md border text-xs transition-colors ${
                     takeoffMode === btn.mode
                       ? 'border-primary bg-primary/10 text-primary'
@@ -677,18 +713,21 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
             onChange={e => setReviewDraftQty(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') applyReviewQty(); }}
             className="w-24 h-8 px-2 border border-border bg-background rounded text-sm text-right tabular-nums"
-            title={t('project.mainView.fixQtyTitle')}
+            aria-label={t('project.mainView.fixQtyTitle')}
+            title={t('project.mainView.fixQtyHint')}
           />
           <Button
             variant="outline"
             size="sm"
             className="border-border"
+            title={t('project.mainView.fixTitle')}
             onClick={applyReviewQty}
           >
             {t('project.mainView.fix')}
           </Button>
           <Button
             size="sm"
+            title={t('project.mainView.confirmTitle')}
             onClick={() => updateRowsById(acceptPositionQuantity, currentReview)}
           >
             {t('project.mainView.confirm')}
@@ -698,6 +737,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               variant="outline"
               size="sm"
               className="border-border"
+              title={t('project.mainView.sourceTitle', { page: reviewTargetPage })}
               onClick={() => onJumpToPage(reviewTargetPage, currentReview)}
             >
               {t('project.mainView.source')}
@@ -873,7 +913,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
               {t('project.mainView.worksBadge', { count: darbai.length })}
             </Badge>
           </h2>
-          <Button variant="outline" size="sm" onClick={handleAddRow} className="gap-1.5 h-8 text-xs">
+          <Button variant="outline" size="sm" onClick={handleAddRow} title={t('project.mainView.addRowTitle')} className="gap-1.5 h-8 text-xs">
             <Plus className="w-3.5 h-3.5" />
             {t('project.mainView.addRow')}
           </Button>
@@ -1048,6 +1088,9 @@ function ApplyPriceListButton({ project, onProjectChange }) {
               key={pl.id}
               type="button"
               onClick={() => handleApply(pl)}
+              /* Applies immediately, no confirm, no undo — say so before the
+                 click, not in the toast after it. (2026-07-28.) */
+              title={t('project.mainView.priceListItemTitle', { name: pl.name })}
               className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between gap-3"
             >
               <span className="truncate">{pl.name}</span>

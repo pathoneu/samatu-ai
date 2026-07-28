@@ -37,12 +37,12 @@ import CountLegendPanel from './CountLegendPanel';
 // Labeled: founder 2026-07-14 — unlabeled icons read as "all of these do the
 // same thing". label renders next to the icon; title keeps the hotkey hint.
 const MEASURE_TOOLS = [
-  { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Žymėti / trinti matavimą' },
-  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: 'Matuoti atstumą (2)' },
-  { id: 'area', Icon: Pentagon, label: 'Plotas', title: 'Matuoti plotą (3)' },
-  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: 'Matuoti perimetrą (4)' },
-  { id: 'count', Icon: Hash, label: 'Kiekis', title: 'Skaičiuoti vienetus (6)' },
-  { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Kalibruoti mastelį — spustelėkite 2 taškus, tarp kurių žinote atstumą' },
+  { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Pažymėti jau nubrėžtą matavimą — po to Delete jį ištrina' },
+  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: 'Matuoti atstumą tarp dviejų taškų, rezultatas metrais (2)' },
+  { id: 'area', Icon: Pentagon, label: 'Plotas', title: 'Matuoti plotą apvedant kontūrą, rezultatas m² (3)' },
+  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: 'Matuoti kontūro ilgį, rezultatas metrais (4)' },
+  { id: 'count', Icon: Hash, label: 'Kiekis', title: 'Skaičiuoti vienetus (rozetes, šviestuvus) spustelint kiekvieną (6)' },
+  { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Nustatyti brėžinio mastelį: pažymėkite atkarpą, kurios tikrą ilgį žinote, ir jį įrašykite' },
 ];
 
 // Empty measurement draft (shape of measureOverlayReducer's state).
@@ -50,13 +50,17 @@ const EMPTY_DRAFT = { points: [], committed: false };
 
 // One-line instruction per armed tool (status bar) — the tools LOOK similar,
 // the hint says what each one is doing right now.
+// 2026-07-28 explainability pass: every draft has a „Baigti" / „Atšaukti"
+// button next to the last point, but the hints only advertised double-click —
+// so the visible exit was the one nobody was told about. Multi-step flows
+// (kalibravimas, kiekis) now number their steps.
 const MEASURE_HINTS = {
-  select: 'Spustelėkite matavimą jam pažymėti · Delete — ištrinti',
-  distance: 'Atstumas: spustelėkite taškus · dukart spustelėkite — baigti',
-  area: 'Plotas: apveskite kontūrą taškais · dukart spustelėkite — uždaryti',
-  perimeter: 'Perimetras: spustelėkite kampus · dukart spustelėkite — baigti',
-  count: 'Kiekis: spustelėkite kiekvieną elementą · spustelėjimas ant žymės — pašalinti',
-  calibrate: 'Kalibravimas: spustelėkite 2 taškus, tarp kurių žinote tikrą atstumą',
+  select: 'Spustelėkite matavimą jam pažymėti · Delete — ištrinti pažymėtą',
+  distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
+  area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
+  perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
+  count: 'Kiekis: 1) pasirinkite tipą dešinėje 2) spustelėkite elementus · ant žymės — pašalinti',
+  calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
 };
 
 // The page the user is actually LOOKING at. The scroll plugin's `currentPage`
@@ -127,6 +131,7 @@ function SearchBox({ documentId, onClose }) {
         }}
         placeholder="Ieškoti brėžinyje…"
         aria-label="Paieška dokumente"
+        title="Ieško teksto brėžinyje (patalpų pavadinimų, žymėjimų). Skenuotuose PDF teksto nėra — nerasta nieko."
         className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-[12px] text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
       />
       {hasQuery && (
@@ -138,7 +143,7 @@ function SearchBox({ documentId, onClose }) {
       <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
       {noHits && (
         <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
-          Rezultatų nėra — PDF gali neturėti teksto sluoksnio
+          Rezultatų nėra — šis PDF greičiausiai skenuotas (be teksto)
         </span>
       )}
     </span>
@@ -182,16 +187,22 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       <span className="mono tabular w-11 text-center">{pct}%</span>
       <button className={btn} title="Artinti (+)" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Pritaikyti plotį (1)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
-      <button className={btn} title="Visas puslapis (0)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
+      <button className={btn} title="Sutalpinti per visą plotį (1)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
+      <button className={btn} title="Sutalpinti visą puslapį (0)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
       {onToggleZoneFills && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
           {/* Zone-fill layer toggle. Founder decision 2026-07-11: markers are the
-              default; this re-enables the filled room polygons. */}
+              default; this re-enables the filled room polygons.
+              2026-07-28: the old title named the CURRENT state and then the
+              OTHER state's action in one breath ("užpildai: įjungta (rodyti
+              žymeklius)") — both readings were wrong. Say only what the click
+              will do, and say what a "zona" is. */}
           <button
             className={zoneFillsVisible ? pressed : btn}
-            title={zoneFillsVisible ? 'Patalpų zonų užpildai: įjungta (rodyti žymeklius)' : 'Patalpų zonų užpildai: išjungta (rodyti užpildus)'}
+            title={zoneFillsVisible
+              ? 'Rodyti tik patalpų numerių žymeklius (dabar matomos nuspalvintos patalpų zonos)'
+              : 'Nuspalvinti patalpų zonas brėžinyje (dabar matomi tik numerių žymekliai)'}
             aria-pressed={!!zoneFillsVisible}
             onClick={onToggleZoneFills}
           ><Layers className="w-4 h-4" /></button>
@@ -220,7 +231,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           {fillFor == null ? (
             <button
               className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
-              title={`Taisyti patalpos ${focusedRoomNr} zoną`}
+              title={`Perbrėžti patalpos ${focusedRoomNr} zoną: paspaudus — spustelėkite patalpos viduje brėžinyje, kontūras bus surastas automatiškai`}
               onClick={() => onStartFill(focusedRoomNr)}
             >
               <SquarePen className="w-3.5 h-3.5" />
@@ -231,7 +242,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             <span className="inline-flex items-center gap-1">
               <button
                 className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))]"
-                title={`Taisyti patalpos ${fillFor} zoną — spustelėkite plane`}
+                title={`Laukiama spustelėjimo patalpos ${fillFor} viduje. Paspauskite čia arba Esc — atšaukti.`}
                 onClick={onCancelFill}
               >
                 <SquarePen className="w-3.5 h-3.5" />
@@ -258,8 +269,10 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           onClick={onToggleSearch}
         ><Search className="w-4 h-4" /></button>
         <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-        <button className={btn} title="Spausdinti (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
-        <button className={btn} title="Atsisiųsti PDF" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
+        <button className={btn} title="Spausdinti brėžinį (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
+        {/* Honest title: this hands back the ORIGINAL uploaded PDF — the
+            measurements and zones are not burned into it. (2026-07-28.) */}
+        <button className={btn} title="Atsisiųsti originalų PDF (be matavimų ir zonų)" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -292,6 +305,20 @@ function scaleStatusText(pageScale) {
   if (ratio <= 0) return 'Mastelis: kalibruotas';
   // Auto scale is derived from the eksplikacija areas — honest ~ + disclosure.
   return pageScale.source === 'auto' ? `Mastelis: ~1:${ratio} (automatinis)` : `Mastelis: 1:${ratio}`;
+}
+
+// Tooltip for the scale readout. The whole viewer's numbers depend on the
+// scale, but nothing explained what "automatinis" or the "~" meant, or why
+// 1:105 is not a drafting scale. Say it in one line per state.
+// (2026-07-28 explainability pass.)
+function scaleStatusTitle(pageScale) {
+  if (!pageScale?.calibrated) {
+    return 'Mastelis dar nenustatytas — matavimai bus be metrų. Spustelėkite ir pažymėkite atkarpą, kurios tikrą ilgį žinote.';
+  }
+  if (pageScale.source === 'auto') {
+    return 'Mastelį AI apskaičiavo pagal patalpų plotus eksplikacijoje — todėl apytikslis (~). Norėdami tikslesnio, spustelėkite ir kalibruokite pagal žinomą atstumą.';
+  }
+  return 'Mastelis kalibruotas rankiniu būdu pagal jūsų nurodytą atstumą. Spustelėkite, jei norite kalibruoti iš naujo.';
 }
 
 /**
@@ -329,7 +356,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
         <button
           type="button"
           onClick={onCalibrateClick || undefined}
-          title="Kalibruoti mastelį"
+          title={scaleStatusTitle(pageScale)}
           className={`ml-auto whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
         >
           {scaleText}

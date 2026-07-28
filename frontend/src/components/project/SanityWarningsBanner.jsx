@@ -70,6 +70,7 @@ export default function SanityWarningsBanner({ sanity, projectId, onRevalidated 
         {t('project.sanity.allHiddenA')}{warnings.length}{t('project.sanity.allHiddenB')}
         <button
           onClick={() => { setDismissed(new Set()); saveDismissed(new Set()); }}
+          title={t('project.sanity.resetTitle')}
           className="underline hover:text-foreground"
         >
           {t('project.sanity.reset')}

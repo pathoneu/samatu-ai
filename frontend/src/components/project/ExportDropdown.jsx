@@ -236,6 +236,9 @@ export default function ExportDropdown({ project }) {
       <button
         onClick={() => setOpen(v => !v)}
         disabled={loading != null}
+        title="Pasirinkti eksporto formatą — Excel sąmata arba PDF pasiūlymas klientui"
+        aria-expanded={open}
+        aria-haspopup="menu"
         className="inline-flex items-center gap-2 px-3.5 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
       >
         {loading
@@ -249,6 +252,7 @@ export default function ExportDropdown({ project }) {
         <div className="absolute right-0 top-full mt-1.5 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-20">
           <button
             onClick={() => handle('excel')}
+            title="Excel byla su visomis eilutėmis, kiekiais, kainomis ir suvestine — galėsite toliau redaguoti"
             className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted text-left text-sm transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
@@ -259,6 +263,7 @@ export default function ExportDropdown({ project }) {
           </button>
           <button
             onClick={() => handle('pdf')}
+            title="Spausdintinas pasiūlymas su jūsų įmonės duomenimis ir logotipu iš Nustatymų"
             className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted text-left text-sm border-t border-border transition-colors"
           >
             <FileText className="w-4 h-4 text-muted-foreground" />

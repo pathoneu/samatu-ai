@@ -39,7 +39,7 @@ function ltDecimal(val) {
  * local draft: an empty or out-of-range draft is shown with a subtle error
  * border and commits NOTHING (so no recompute fires until the number is valid).
  */
-function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, errorMessage }) {
+function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, errorMessage, label, hint }) {
   const [draft, setDraft] = useState(() => ltDecimal(value ?? ''));
   const [invalid, setInvalid] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -76,7 +76,16 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
           onBlur={() => setFocused(false)}
           onChange={handleChange}
           aria-invalid={invalid || undefined}
-          title={invalid && min != null && max != null ? `${min}–${max}` : undefined}
+          aria-label={label || undefined}
+          /* Naked number boxes: a grid of identical fields with no accessible
+             name and a tooltip that only appeared once you were already wrong.
+             `hint` says what the field is for BEFORE the mistake; the range is
+             appended while invalid. (2026-07-28 explainability pass.) */
+          title={
+            invalid && min != null && max != null
+              ? `${hint ? hint + ' — ' : ''}${ltDecimal(min)}–${ltDecimal(max)}${unit ? ' ' + unit : ''}`
+              : (hint || undefined)
+          }
           className={`${className || 'h-7 w-20'} text-xs bg-card text-right tabular-nums ${
             invalid ? 'border-destructive text-destructive' : 'border-border'
           }`}
@@ -136,6 +145,8 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             onChange={e => handleChange(i, 'width_mm', e.target.value)}
             className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
             placeholder={t('project.assumptions.widthPlaceholder')}
+            title={t('project.assumptions.openingWidthTitle', { label })}
+            aria-label={t('project.assumptions.openingWidthTitle', { label })}
           />
           <span className="text-muted-foreground">×</span>
           <Input
@@ -144,12 +155,26 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             onChange={e => handleChange(i, 'height_mm', e.target.value)}
             className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
             placeholder={t('project.assumptions.heightPlaceholder')}
+            title={t('project.assumptions.openingHeightTitle', { label })}
+            aria-label={t('project.assumptions.openingHeightTitle', { label })}
           />
           <span className="text-muted-foreground">mm</span>
           {item.suggested && (
-            <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 py-0 px-1">est.</Badge>
+            <Badge
+              variant="outline"
+              title={t('project.assumptions.estimatedTitle')}
+              className="text-[10px] border-amber-400/50 text-amber-600 py-0 px-1"
+            >
+              {t('project.assumptions.estimatedBadge')}
+            </Badge>
           )}
-          <button onClick={() => handleRemove(i)} className="ml-auto text-muted-foreground hover:text-destructive">
+          <button
+            type="button"
+            onClick={() => handleRemove(i)}
+            title={t('project.assumptions.removeOpening', { label: label.toLowerCase() })}
+            aria-label={t('project.assumptions.removeOpening', { label: label.toLowerCase() })}
+            className="ml-auto text-muted-foreground hover:text-destructive"
+          >
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
@@ -308,6 +333,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/40 transition-colors"
         onClick={() => setOpen(v => !v)}
+        title={t('project.assumptions.headerTitle')}
+        aria-expanded={open}
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Info className="w-4 h-4 text-muted-foreground" />
@@ -337,6 +364,12 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           ) : (
             <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
               {t('project.assumptions.intro')}
+              {' '}
+              {/* Not every row survives a recompute — rows the backend cannot
+                  rebuild are carried over with their ORIGINAL numbers and a
+                  warning toast. Say so here so the toast isn't a surprise.
+                  (2026-07-28 explainability pass.) */}
+              {t('project.assumptions.introOrphans')}
             </p>
           )}
 
@@ -362,6 +395,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
               value={sienos_storis_m}
               onChange={v => { setField('sienos_storis_m', v); handleRecompute('sienos_storis_m', v); }}
               min={0.05} max={0.50} step={0.01} unit="m"
+              label={t('project.assumptions.wallThickness')}
+              hint={t('project.assumptions.wallThicknessHint')}
+              errorMessage={t('project.assumptions.wallThicknessRangeErr', {
+                min: ltDecimal('0.05'), max: ltDecimal('0.50'),
+              })}
             />
           </Row>
 
@@ -375,6 +413,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                 <button
                   key={q}
                   onClick={() => { setField('glaistimo_lygis', q); handleRecompute('glaistimo_lygis', q); }}
+                  title={t(`project.assumptions.puttyLevelTitles.${q}`)}
+                  aria-pressed={glaistimo_lygis === q}
                   className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                     glaistimo_lygis === q
                       ? 'bg-primary text-primary-foreground border-primary'
@@ -450,6 +490,12 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                       min={H_MIN_M} max={H_MAX_M} step={0.05}
                       unit="m"
                       className="h-6 w-16"
+                      label={t('project.assumptions.roomHeightAria', {
+                        room: room.pavadinimas || room.nr,
+                      })}
+                      hint={t('project.assumptions.roomHeightHint', {
+                        room: room.pavadinimas || room.nr,
+                      })}
                       errorMessage={t('project.assumptions.heightRangeErr', {
                         min: ltDecimal(H_MIN_M.toFixed(2)),
                         max: ltDecimal(H_MAX_M.toFixed(2)),
@@ -480,7 +526,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     <button
                       key={room.nr}
                       onClick={() => setWallsPaint(room.nr, !painted)}
-                      title={room.pavadinimas}
+                      title={t(painted ? 'project.assumptions.wallsPaintOffTitle' : 'project.assumptions.wallsPaintOnTitle', {
+                        room: room.pavadinimas || room.nr,
+                      })}
+                      aria-pressed={painted}
                       className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${
                         painted
                           ? 'bg-primary/10 border-primary/40 text-foreground'
@@ -503,6 +552,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             <button
               className="flex items-center justify-between w-full mb-2"
               onClick={() => setWindowsExpanded(v => !v)}
+              title={t('project.assumptions.windowsTitle')}
+              aria-expanded={windowsExpanded}
             >
               <span className="text-sm text-foreground">
                 {t('project.assumptions.windows')}
@@ -531,6 +582,8 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             <button
               className="flex items-center justify-between w-full mb-2"
               onClick={() => setDoorsExpanded(v => !v)}
+              title={t('project.assumptions.doorsTitle')}
+              aria-expanded={doorsExpanded}
             >
               <span className="text-sm text-foreground">
                 {t('project.assumptions.doors')}

@@ -337,6 +337,8 @@ export default function WorkspacePanel({
           <input
             type="text"
             placeholder="Filtruoti pozicijas, patalpas…"
+            aria-label="Filtruoti pozicijas ir patalpas"
+            title="Įrašykite dalį pavadinimo — sąrašas bus sutrumpintas"
             value={filter}
             onChange={e => setFilter(e.target.value)}
             className="w-full pl-7 pr-2.5 text-foreground bg-card border border-border rounded outline-none focus:border-primary"
@@ -345,7 +347,12 @@ export default function WorkspacePanel({
         </div>
         <button
           onClick={() => setShowProvenance(v => !v)}
-          title={showProvenance ? 'Slėpti šaltinio taškus' : 'Rodyti šaltinio taškus'}
+          /* "šaltinio taškai" meant nothing outside the team — name what the
+             dots actually tell you. (2026-07-28 explainability pass.) */
+          title={showProvenance
+            ? 'Slėpti spalvotus ženkliukus, rodančius, iš kur paimtas kiekvienas skaičius'
+            : 'Rodyti spalvotus ženkliukus, iš kur paimtas kiekvienas skaičius (eksplikacija, formulė, prielaida)'}
+          aria-pressed={showProvenance}
           className="rounded border flex items-center justify-center transition-colors"
           style={{
             height: 28, width: 28,
@@ -541,9 +548,12 @@ export default function WorkspacePanel({
                  tested export lib had no UI since the legacy toolbar died). */
               <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 text-[11px] text-muted-foreground">
                 <span className="flex-1">Eksportuoti matavimus</span>
+                {/* Bare "CSV" / "JSON" told a contractor nothing about what
+                    lands on disk. Name the file and its use. (2026-07-28.) */}
                 <button
                   type="button"
                   className="text-primary hover:underline"
+                  title="Atsisiųsti matavimų lentelę CSV formatu — atsidarys Excel'iu"
                   onClick={() => exportCSVFile(
                     buildMeasureExportDoc(project),
                     `${(project?.name || 'projektas').trim()} - matavimai.csv`,
@@ -552,6 +562,7 @@ export default function WorkspacePanel({
                 <button
                   type="button"
                   className="text-primary hover:underline"
+                  title="Atsisiųsti matavimus JSON formatu — skirta perkelti į kitą programą"
                   onClick={() => exportJSONFile(
                     buildMeasureExportDoc(project),
                     `${(project?.name || 'projektas').trim()} - matavimai.json`,
@@ -972,6 +983,9 @@ const PositionRow = memo(function PositionRow({
             if (e.key === 'Escape') setEditingQty(false);
           }}
           onClick={e => e.stopPropagation()}
+          placeholder="0,00"
+          aria-label="Kiekis"
+          title="Kiekis; kablelis arba taškas — abu tinka. Enter — įrašyti, Esc — atsisakyti."
           className="mono tabular bg-card border border-primary rounded outline-none text-right"
           style={{ fontSize: 11, height: 22, padding: '2px 6px' }}
         />
@@ -1006,6 +1020,7 @@ const PositionRow = memo(function PositionRow({
                   color: 'hsl(var(--source-table))',
                   background: 'hsl(var(--source-table) / 0.08)',
                 }}
+                title="Kiekį įrašėte rankiniu būdu — AI reikšmė pakeista"
               >
                 rank.
               </span>
@@ -1034,6 +1049,9 @@ const PositionRow = memo(function PositionRow({
             if (e.key === 'Escape') setEditing(false);
           }}
           onClick={e => e.stopPropagation()}
+          placeholder="0,00"
+          aria-label="Vieneto kaina, €"
+          title="Vieneto kaina eurais be PVM; kablelis arba taškas — abu tinka. Enter — įrašyti, Esc — atsisakyti."
           className="mono tabular bg-card border border-primary rounded outline-none text-right"
           style={{ fontSize: 11, height: 22, padding: '2px 6px' }}
         />

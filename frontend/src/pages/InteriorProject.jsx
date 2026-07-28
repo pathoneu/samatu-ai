@@ -177,6 +177,7 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
       </div>
       <button
         onClick={onPrielaidos}
+        title={t('project.interior.prielaidosTitle')}
         className="flex items-center gap-1.5 rounded transition-colors hover:bg-muted/50"
         style={{
           height: 30, padding: '0 12px',
@@ -190,6 +191,7 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
       </button>
       <button
         onClick={onEksportuoti}
+        title={t('project.interior.exportTitle')}
         className="flex items-center gap-1.5 rounded transition-colors"
         style={{
           height: 30, padding: '0 12px',
@@ -225,10 +227,13 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
 
 function TabBar({ tab, setTab, hasPdf }) {
   const { t } = useTranslation();
+  // `title` per tab: the labels are single nouns, so a first-time user cannot
+  // tell that Brėžinys is where measuring happens or that Kiekiai is the
+  // priceable sąmata. (2026-07-28 explainability pass.)
   const tabs = [
-    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), Icon: MapIcon }] : []),
-    { id: 'main',     label: t('project.interior.tabKiekiai'),   Icon: ListChecks },
-    { id: 'aichat',   label: t('project.interior.tabAiChat'),   Icon: MessageSquare },
+    ...(hasPdf ? [{ id: 'brezinys', label: t('project.interior.tabBrezinys'), title: t('project.interior.tabBrezinysTitle'), Icon: MapIcon }] : []),
+    { id: 'main',     label: t('project.interior.tabKiekiai'), title: t('project.interior.tabKiekiaiTitle'),  Icon: ListChecks },
+    { id: 'aichat',   label: t('project.interior.tabAiChat'),  title: t('project.interior.tabAiChatTitle'),  Icon: MessageSquare },
   ];
   return (
     <div className="flex items-center gap-0 border-b border-border overflow-x-auto" style={{ paddingLeft: 16 }}>
@@ -239,6 +244,8 @@ function TabBar({ tab, setTab, hasPdf }) {
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
+            title={tb.title}
+            aria-current={isActive ? 'page' : undefined}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 shrink-0 whitespace-nowrap ${
               isActive
                 ? 'border-foreground text-foreground'

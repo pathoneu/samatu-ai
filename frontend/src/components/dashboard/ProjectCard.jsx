@@ -48,10 +48,20 @@ export default function ProjectCard({ project }) {
   const dateStr = fmtDate(project.created_date || project.created_at || project.updated_at);
   const rowCount = project.darbu_sarasas?.length || project.total_rows || 0;
 
+  // The card is the ONLY affordance — no open/rename/delete buttons exist on
+  // it — and nothing said it was clickable, or why a non-ready card is not.
+  // (2026-07-28 explainability pass.)
+  const cardTitle = isReady
+    ? t('dashboard.card.openTitle', { name: project.name || t('dashboard.card.untitled') })
+    : isProcessing
+      ? t('dashboard.card.processingTitle')
+      : t('dashboard.card.errorTitle');
+
   const card = (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      title={cardTitle}
       className="flex flex-col gap-3.5 transition-all"
       style={{
         background: 'hsl(var(--card))',
@@ -77,6 +87,7 @@ export default function ProjectCard({ project }) {
         </div>
         <span
           className="font-medium uppercase tracking-wide whitespace-nowrap"
+          title={isReady ? t('dashboard.card.statusReadyTitle') : isProcessing ? t('dashboard.card.processingTitle') : t('dashboard.card.errorTitle')}
           style={{
             fontSize: 10, padding: '2px 7px', borderRadius: 2,
             border: '1px solid ' + (isReady
@@ -108,7 +119,7 @@ export default function ProjectCard({ project }) {
           </span>
         </div>
       ) : (
-        <div className="text-muted-foreground" style={{ fontSize: 11, height: 32, lineHeight: '32px' }}>
+        <div className="text-muted-foreground" style={{ fontSize: 11, height: 32, lineHeight: '32px' }} title={t('dashboard.card.noPricesTitle')}>
           {t('dashboard.card.noPrices')}
         </div>
       )}
@@ -120,8 +131,8 @@ export default function ProjectCard({ project }) {
           borderTop: '1px solid hsl(var(--border) / 0.6)',
         }}
       >
-        <span className="tabular">{t('dashboard.card.rows', { count: rowCount })}</span>
-        <span className="tabular">{dateStr}</span>
+        <span className="tabular" title={t('dashboard.card.rowsTitle')}>{t('dashboard.card.rows', { count: rowCount })}</span>
+        <span className="tabular" title={t('dashboard.card.dateTitle')}>{dateStr}</span>
       </div>
     </div>
   );

@@ -362,14 +362,21 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
   const x = Math.min(Math.max(lastPt.x + 14, 4), Math.max(4, width - W - 4));
   const y = Math.min(Math.max(lastPt.y - H - 12, 4), Math.max(4, height - H - 4));
   const stop = (e) => { e.stopPropagation(); };
-  const btn = (bx, bw, label, enabled, onClick, primary) => (
+  const btn = (bx, bw, label, enabled, onClick, primary, hint) => (
     <g
       transform={`translate(${bx}, 0)`}
       style={{ cursor: enabled ? 'pointer' : 'not-allowed', pointerEvents: 'auto' }}
       onPointerDown={stop}
       onDoubleClick={stop}
       onClick={(e) => { stop(e); if (enabled) onClick(); }}
+      role="button"
+      aria-label={label}
+      aria-disabled={!enabled}
     >
+      {/* SVG <title> is the native tooltip inside an <svg>. "Baigti" greys out
+          until the shape has enough points and said nothing about why —
+          the hint now names the missing step. (2026-07-28.) */}
+      <title>{hint}</title>
       <rect width={bw} height={H} rx={6}
         fill={primary ? (enabled ? '#1d4ed8' : '#93a8e8') : '#ffffff'}
         stroke={primary ? 'none' : '#cbd5e1'} strokeWidth={1} />
@@ -383,8 +390,12 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
     <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
       <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={8}
         fill="#ffffff" fillOpacity={0.92} stroke="#e2e8f0" strokeWidth={1} />
-      {btn(0, 84, 'Baigti', finishable, onFinish, true)}
-      {btn(92, 76, 'Atšaukti', true, onCancel, false)}
+      {btn(0, 84, 'Baigti', finishable, onFinish, true,
+        finishable
+          ? 'Užbaigti matavimą ir įrašyti rezultatą (arba dukart spustelėkite)'
+          : 'Pažymėkite dar bent vieną tašką, tada galėsite baigti')}
+      {btn(92, 76, 'Atšaukti', true, onCancel, false,
+        'Atsisakyti šio matavimo — nubrėžti taškai bus ištrinti (Esc)')}
     </g>
   );
 }
@@ -501,7 +512,9 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, decimals }) {
   if (livePts.length >= 1 && cursor) {
     const len = realPathLengthM(livePts, scale, false);
     if (!scale.calibrated) {
-      chip = 'Mastelis nekalibruotas';
+      // Dead-end message → tell them the fix. The Mastelis tool is one click
+      // away in the same palette. (2026-07-28 explainability pass.)
+      chip = 'Mastelis nenustatytas — pasirinkite įrankį „Mastelis"';
     } else if (closed) {
       const area = shoelaceAreaM2(livePts, scale);
       chip = `Plotas: ${formatNumberLT(area, decimals)} m² · Perimetras: ${formatNumberLT(len, decimals)} m`;

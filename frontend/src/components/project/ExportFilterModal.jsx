@@ -110,6 +110,7 @@ export default function ExportFilterModal({
             </h2>
           </div>
           <button onClick={onCancel} disabled={loading}
+            title="Užverti neeksportavus" aria-label="Užverti"
             className="text-muted-foreground hover:text-foreground disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
@@ -122,6 +123,8 @@ export default function ExportFilterModal({
               value={uzsakovas}
               onChange={e => setUzsakovas(e.target.value)}
               placeholder="UAB Klientas"
+              aria-label="Užsakovas"
+              title="Kam skirtas pasiūlymas — bus atspausdinta dokumento antraštėje"
               className="mt-0.5 w-full h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
@@ -131,6 +134,8 @@ export default function ExportFilterModal({
               value={objektas}
               onChange={e => setObjektas(e.target.value)}
               placeholder="Objekto pavadinimas / adresas"
+              aria-label="Objektas"
+              title="Statybos objektas — bus atspausdinta dokumento antraštėje"
               className="mt-0.5 w-full h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
@@ -139,6 +144,7 @@ export default function ExportFilterModal({
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <button
             onClick={toggleAll}
+            title="Pažymėti arba nužymėti visus skyrius iš karto"
             className="text-xs text-foreground hover:underline"
           >
             {allChecked ? 'Nužymėti visus' : 'Pažymėti visus'}
@@ -182,6 +188,7 @@ export default function ExportFilterModal({
           <button
             onClick={onCancel}
             disabled={loading}
+            title="Grįžti neatsisiuntus failo"
             className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             Atšaukti
@@ -189,6 +196,9 @@ export default function ExportFilterModal({
           <button
             onClick={handleConfirm}
             disabled={loading || noneChecked}
+            title={noneChecked
+              ? 'Pažymėkite bent vieną skyrių'
+              : `Sugeneruoti ir atsisiųsti ${format === 'excel' ? 'Excel' : 'PDF'} failą su pažymėtais skyriais`}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-foreground text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             {loading

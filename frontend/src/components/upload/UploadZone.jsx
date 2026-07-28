@@ -98,7 +98,13 @@ export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', l
               </p>
             </div>
           </div>
-          <button onClick={clearFile} className="p-2 hover:bg-secondary rounded-lg transition-colors">
+          <button
+            type="button"
+            onClick={clearFile}
+            title={t('upload.zone.clearFile')}
+            aria-label={t('upload.zone.clearFile')}
+            className="p-2 hover:bg-secondary rounded-lg transition-colors"
+          >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>

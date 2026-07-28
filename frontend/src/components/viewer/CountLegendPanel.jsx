@@ -78,7 +78,10 @@ export default function CountLegendPanel({
       data-testid="count-legend-panel"
     >
       <div className="flex items-center px-1 pb-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex-1">
+        <h3
+          className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex-1"
+          title="Vienetų skaičiavimas: sukurkite tipą (pvz., rozetės), pažymėkite jį ir spustelėkite kiekvieną elementą brėžinyje"
+        >
           Skaičiavimas (vnt.)
         </h3>
         {onToggleCollapse && (
@@ -86,7 +89,7 @@ export default function CountLegendPanel({
             type="button"
             onClick={onToggleCollapse}
             aria-expanded={!collapsed}
-            title={collapsed ? 'Išskleisti' : 'Suskleisti (netrukdo žymėti)'}
+            title={collapsed ? 'Išskleisti tipų sąrašą' : 'Suskleisti sąrašą — žymėti brėžinyje galėsite toliau'}
             className="p-0.5 rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <svg width={12} height={12} viewBox="0 0 12 12" aria-hidden="true">
@@ -111,6 +114,12 @@ export default function CountLegendPanel({
               onClick={() => onSelectType?.(type.id)}
               data-testid={`clegend-${type.id}`}
               aria-pressed={active}
+              /* Selecting a type is what makes clicks on the drawing land —
+                 nothing said so, and the colour/shape are auto-assigned, which
+                 users read as a picker. (2026-07-28.) */
+              title={active
+                ? `„${type.label}" pažymėtas — spustelėkite elementus brėžinyje. Pažymėta: ${tally} vnt.`
+                : `Skaičiuoti „${type.label}" — spalvą ir formą programa priskiria automatiškai`}
               className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${
                 active
                   ? 'bg-primary/10 text-primary font-medium'
@@ -119,7 +128,10 @@ export default function CountLegendPanel({
             >
               <Glyph shape={type.shape} color={type.color} />
               <span className="flex-1 min-w-0 truncate">{type.label}</span>
-              <span className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right">
+              <span
+                className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right"
+                title={`Pažymėta ${tally} vnt.`}
+              >
                 {tally}
               </span>
               {onRemoveType && tally === 0 && (
@@ -127,7 +139,10 @@ export default function CountLegendPanel({
                   role="button"
                   tabIndex={0}
                   data-testid={`clegend-remove-${type.id}`}
-                  title={`Pašalinti tipą „${type.label}"`}
+                  /* Same × glyph as the clear-all below. Disambiguate in words:
+                     this one removes an EMPTY type, that one wipes N marks. */
+                  title={`Pašalinti tipą „${type.label}" iš sąrašo (žymėjimų nėra)`}
+                  aria-label={`Pašalinti tipą ${type.label}`}
                   onClick={(e) => { e.stopPropagation(); onRemoveType(type.id); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onRemoveType(type.id); }
@@ -144,7 +159,8 @@ export default function CountLegendPanel({
                   role="button"
                   tabIndex={0}
                   data-testid={`clegend-clear-${type.id}`}
-                  title={`Ištrinti visus „${type.label}" žymėjimus (${tally})`}
+                  title={`Ištrinti visus „${type.label}" žymėjimus brėžinyje (${tally} vnt.) — atstatyti negalėsite`}
+                  aria-label={`Ištrinti visus ${type.label} žymėjimus, ${tally} vnt.`}
                   onClick={(e) => { e.stopPropagation(); onClearType(type.id); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClearType(type.id); }
@@ -177,6 +193,7 @@ export default function CountLegendPanel({
             onBlur={submitNew}
             placeholder="Tipo pavadinimas…"
             aria-label="Naujo tipo pavadinimas"
+            title="Įrašykite, ką skaičiuosite (pvz., Rozetės), ir paspauskite Enter · Esc — atsisakyti"
             data-testid="clegend-new-type-input"
             className="mx-1 mb-1 px-2 py-1 rounded border border-border bg-background text-sm focus:outline-none focus:border-primary"
           />
@@ -185,6 +202,7 @@ export default function CountLegendPanel({
             type="button"
             data-testid="clegend-add-type"
             onClick={() => setAdding(true)}
+            title="Sukurti naują skaičiuojamų elementų tipą (pvz., Rozetės, Šviestuvai)"
             className="flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left text-primary hover:bg-accent"
           >
             <span className="text-base leading-none">＋</span>

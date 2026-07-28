@@ -156,8 +156,14 @@ export default function CalibrateDialog({
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="text-sm text-foreground">
-            Pažymėta linija — <strong className="font-mono">{formatNumberLT(pdfLen, 1)} PDF taškų</strong>.
+          {/* "PDF taškų" is a rendering unit that means nothing on site. Lead
+              with the instruction instead; keep the raw number as a hover
+              detail. (2026-07-28 explainability pass.) */}
+          <div
+            className="text-sm text-foreground"
+            title={`Pažymėtos linijos ilgis brėžinio vienetais: ${formatNumberLT(pdfLen, 1)} PDF taškų`}
+          >
+            Įrašykite, koks yra <strong>tikras</strong> ką tik pažymėtos atkarpos ilgis — pagal jį bus nustatytas viso brėžinio mastelis.
           </div>
 
           {/* Real length + unit */}
@@ -178,10 +184,17 @@ export default function CalibrateDialog({
                 placeholder="Pvz. 3,45"
                 autoFocus
                 data-testid="calib-length"
+                aria-label="Realus pažymėtos atkarpos atstumas"
+                title="Tikras atstumas, pvz. iš brėžinio matmenų linijos. Kablelis arba taškas — abu tinka."
                 className="flex-1 font-mono"
               />
               <Select value={unit} onValueChange={setUnit}>
-                <SelectTrigger className="w-[84px]" data-testid="calib-unit">
+                <SelectTrigger
+                  className="w-[84px]"
+                  data-testid="calib-unit"
+                  aria-label="Atstumo matavimo vienetas"
+                  title="Kuriais vienetais įrašėte atstumą"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,7 +210,11 @@ export default function CalibrateDialog({
           <div>
             <label className="text-sm font-medium text-foreground block mb-1.5">Ašis</label>
             <Select value={axis} onValueChange={setAxis}>
-              <SelectTrigger data-testid="calib-axis">
+              <SelectTrigger
+                data-testid="calib-axis"
+                aria-label="Kuriai krypčiai taikyti mastelį"
+                title="Beveik visada palikite „Vienoda“. Atskirai horizontalią ar vertikalią rinkitės tik tada, jei skenuotas brėžinys ištemptas į vieną pusę."
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -212,7 +229,11 @@ export default function CalibrateDialog({
           <div>
             <label className="text-sm font-medium text-foreground block mb-1.5">Taikyti</label>
             <Select value={applyTo} onValueChange={setApplyTo}>
-              <SelectTrigger data-testid="calib-apply">
+              <SelectTrigger
+                data-testid="calib-apply"
+                aria-label="Kuriems lapams taikyti mastelį"
+                title="„Visiems lapams“ perrašo ir tuos lapus, kuriems mastelis jau nustatytas — rinkitės, jei visi brėžiniai to paties mastelio."
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -230,13 +251,21 @@ export default function CalibrateDialog({
           )}
 
           {/* Anisotropy tip */}
+          {/* The tip said "X/Y" while the control right above it says
+              „Vienoda / Tik horizontali / Tik vertikali" — match the words the
+              user can actually click. (2026-07-28.) */}
           <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-            Perskenuoti PDF dažnai ištempti — kalibruokite atskirai X/Y jei reikia.
+            Skenuoti brėžiniai dažnai būna ištempti į vieną pusę. Tokiu atveju ašyje rinkitės „Tik horizontali" arba „Tik vertikali" ir kalibruokite du kartus.
           </div>
 
           {/* Actions */}
           <div className="flex items-center justify-between gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              title="Uždaryti nenustačius mastelio — matavimai liks be metrų"
+            >
               Atšaukti
             </Button>
             <Button
@@ -244,6 +273,9 @@ export default function CalibrateDialog({
               onClick={handleConfirm}
               disabled={!canConfirm}
               data-testid="calib-confirm"
+              title={canConfirm
+                ? 'Nustatyti mastelį — visi matavimai bus perskaičiuoti metrais'
+                : 'Pirmiausia įrašykite realų atstumą (skaičių didesnį už 0)'}
               className="gap-1.5"
             >
               <Check className="w-4 h-4" />
