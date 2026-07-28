@@ -746,7 +746,12 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
         pdfBlob,
       });
       onRoomPolygonFill?.(fillFor, data);
-      toast.success(`Patalpos ${fillFor} kontūras pažymėtas`);
+      // The AREA stays table-read (eksplikacija beats a traced polygon for
+      // accuracy) — say so, or redrawing "because the area looked wrong"
+      // reads as a silent no-op. (final-regression finding 2, 2026-07-28)
+      toast.success(`Patalpos ${fillFor} kontūras pažymėtas`, {
+        description: 'Plotas ir kiekiai lieka iš eksplikacijos — kontūro pataisymas naudojamas žymėjimui ir tikslumo mokymui.',
+      });
       setFillFor(null);
     } catch (e) {
       // Audit P0 (2026-07-12): failure used to be console-only + silent disarm

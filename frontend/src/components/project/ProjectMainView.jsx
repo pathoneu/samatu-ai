@@ -31,7 +31,15 @@ import {
 } from 'lucide-react';
 import { getPriceLists } from '@/lib/projectStore';
 import { applyPriceListToPositions } from '@/lib/applyPriceList';
-import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
+import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
+
+// A well-formed number over the cap gets magnitude advice, not format advice —
+// "naudokite kablelį" is misleading when the problem is 100 000 000.
+// (final-regression finding 6, 2026-07-28)
+const invalidAmountKey = (n) =>
+  Number.isFinite(n) && n > MAX_AMOUNT
+    ? 'project.mainView.toastTooLarge'
+    : 'project.mainView.toastInvalidNumber';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
@@ -114,7 +122,8 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
     const kiekis = parseLtNumber(draft.kiekis);
     const kaina = parseLtNumber(draft.kaina);
     if (!isValidAmount(kiekis) || !isValidAmount(kaina)) {
-      toast.error(t('project.mainView.toastInvalidNumber'));
+      const bad = !isValidAmount(kiekis) ? kiekis : kaina;
+      toast.error(t(invalidAmountKey(bad)));
       return;
     }
     onChange({
@@ -144,7 +153,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   const commitQty = () => {
     const num = parseLtNumber(draftQty);
     if (!isValidAmount(num)) {
-      toast.error(t('project.mainView.toastInvalidNumber'));
+      toast.error(t(invalidAmountKey(num)));
       return;   // keep the editor open so the typed value isn't lost
     }
     onChange(updatePositionQuantity([item], rowId, num)[0]);
@@ -490,7 +499,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   const applyReviewQty = () => {
     const qty = parseLtNumber(reviewDraftQty);
     if (!isValidAmount(qty)) {
-      toast.error(t('project.mainView.toastInvalidNumber'));
+      toast.error(t(invalidAmountKey(qty)));
       return;
     }
     updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
