@@ -4,7 +4,8 @@ All tests run offline ($0): _run_pass1_once is stubbed, adjacency disabled.
 Covers: env parsing, cache-friendly same-model grouping, per-round model
 resolution through the voting loop, per-round token/cost split in
 _meta.voting_models, calc_meta_cost_usd aggregation (per-round rates), and
-default-OFF regression (no env → no voting_models key, behaviour unchanged).
+default-OFF behaviour (no env → per-round telemetry still recorded since the
+2026-07-28 T4 fix, but no `experiment` block and an unchanged billed amount).
 """
 from __future__ import annotations
 
@@ -130,8 +131,16 @@ def test_voted_mixed_unknown_model_cost_is_none_not_crash(monkeypatch, no_adjace
     assert out["_meta"]["voting_cost_usd"] is None
 
 
-def test_voted_default_off_has_no_voting_models(monkeypatch, no_adjacency):
-    """Regression: env unset → identical meta shape to before (no experiment)."""
+def test_voted_default_off_still_records_per_round_telemetry(monkeypatch, no_adjacency):
+    """T4 (2026-07-28 telemetry audit) — CONTRACT CHANGE, deliberate.
+
+    This test previously asserted `"voting_models" not in meta` when the env
+    var is unset. That was the bug: production never sets SAMATU_VOTING_MODELS,
+    so the per-round cache-hit/miss split — the only way to tell a prompt-cache
+    regression from a genuine token increase — was unreachable in prod.
+
+    What must NOT change: the experiment-only provenance block stays gated, and
+    the billed amount is identical (asserted below)."""
     monkeypatch.delenv("SAMATU_VOTING_MODELS", raising=False)
     monkeypatch.setattr(vc, "_run_pass1_once",
                         lambda *a, **k: _fake_run("claude-opus-4-8"))
@@ -139,9 +148,24 @@ def test_voted_default_off_has_no_voting_models(monkeypatch, no_adjacency):
                               pages=[{"image_b64": "x"}], n=3,
                               _emit=lambda e: None)
     meta = out["_meta"]
-    assert "voting_models" not in meta
-    assert "experiment" not in meta
     assert meta["voting_runs"] == 3
+
+    rounds = meta["voting_models"]
+    assert len(rounds) == 3
+    assert [r["round"] for r in rounds] == [1, 2, 3]
+    assert all(r["model"] == "claude-opus-4-8" for r in rounds)
+    assert all(r["cache_read_tokens"] == 200 for r in rounds)
+    assert all(r["cache_write_tokens"] == 100 for r in rounds)
+
+    # Experiment-only provenance stays experiment-only.
+    assert "mixed_vote" not in (meta.get("experiment") or {})
+
+    # And the money is unchanged: with one model, pricing the per-round split
+    # equals pricing the summed tokens (calc_claude_cost_usd is linear).
+    assert calc_meta_cost_usd(meta) == pytest.approx(calc_claude_cost_usd(
+        input_tokens=3 * 1000, output_tokens=3 * 500,
+        cache_read_tokens=3 * 200, cache_write_tokens=3 * 100,
+        model="claude-opus-4-8"))
 
 
 # ── cost aggregation (calc_meta_cost_usd) ─────────────────────────────────────
