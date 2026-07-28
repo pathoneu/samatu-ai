@@ -675,6 +675,7 @@
       "tabAiChat": "AI Chat",
       "recomputeErr": "Perskaičiavimo klaida",
       "toastRecomputed": "Kiekiai perskaičiuoti",
+      "toastOrphansCarried": "{{n}} pozicijų nebuvo perskaičiuotos pagal naujas prielaidas — paliktos originalios: {{labels}}",
       "toastRecomputeErr": "Klaida persiskaičiuojant: {{msg}}",
       "assumptionsTitle": "Lubų aukštis ir glaistymo lygis",
       "aiTitle": "AI klausimai apie projektą",

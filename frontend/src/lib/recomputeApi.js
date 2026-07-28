@@ -7,7 +7,9 @@
 
 import { API_BASE } from './apiBase.js';
 
-export async function recompute({ rooms, edits, current_assumptions, pozicijos, context }) {
+export async function recompute({
+  rooms, edits, current_assumptions, pozicijos, context, darbu_sarasas,
+}) {
   const body = { rooms, edits, current_assumptions };
   // Sprint 2: pozicijos optional — assumption-class edits don't need it,
   // but G2/G3/G4/G7 gesture edits do. Forward when caller provides.
@@ -15,6 +17,11 @@ export async function recompute({ rooms, edits, current_assumptions, pozicijos, 
   // 2026-06-17: reader/extraction context so an assumption edit (ceiling height)
   // rebuilds the canonical pozicijos without losing door/fixture/symbol lines.
   if (context !== undefined) body.context = context;
+  // 2026-07-28 (P0): the user's PRICES live in darbu_sarasas, not in pozicijos
+  // (real blobs: pozicijos 0/73 priced, darbu_sarasas 73/73). Without this the
+  // backend merge can't tell a priced row from a throwaway one, so its
+  // price-carry and tier-rescue passes never fire on real projects.
+  if (darbu_sarasas !== undefined) body.darbu_sarasas = darbu_sarasas;
   const res = await fetch(`${API_BASE}/api/recompute-quantities`, {
     method: 'POST',
     credentials: 'include',

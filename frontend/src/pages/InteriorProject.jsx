@@ -24,6 +24,7 @@ import ShareButton from '@/components/project/ShareButton';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject, getProject } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
+import { mergeDarbuSarasasEdits, carriedOrphans } from '@/lib/mergeDarbuSarasas';
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
 
@@ -403,90 +404,34 @@ function RoomCard({ room }) {
 
 // ── Detalus darbų sąrašas (Rangovo-stiliaus sąmatos pozicijos) ───────────────────
 
-// Merge the user's manual edits onto a freshly-rebuilt darbu_sarasas (matched by
-// aprasymas), mirroring the backend _merge_user_edits. Preserves: entered prices
-// (kaina/suma), manual COUNT overrides (manual_override kiekis + markers), and
-// carries forward user-added rows the deterministic rebuild can't reproduce
-// (drawing symbol-count lines tagged source:'Pažymėjus brėžinyje'). Without this a
-// recompute reverted count corrections to the AI value and dropped symbol-count
-// lines + their prices. (2026-06-19 hunt.)
-const _lc = (s) => (s || '').toLowerCase();
-// Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
-// and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
-// paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Mirrors
-// the backend's _merge_user_edits fallback so frontend/backend agree. (audit 2026-07-05)
-function _normLabel(s) {
-  return _lc(s)
-    .normalize('NFKD').replace(/[̀-ͯ]/g, '')           // drop accents
-    .replace(/\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')             // drop 3m tier suffix
-    .replace(/\bq[1-4]\b/g, '')                                   // drop Q-level
-    .replace(/\(\s*\d+\s*sluoksn[^)]*\)/g, '')                    // drop '(N sluoksnis)'
-    .replace(/\s+/g, ' ').trim();
+// mergeDarbuSarasasEdits + its normalizers now live in lib/mergeDarbuSarasas.js
+// (extracted 2026-07-28 so the merge is unit-testable — the rule that decides
+// whether a priced row survives a rebuild had no tests and deleted 5 281,85 €).
+
+/**
+ * Tell the user which rows the rebuild could NOT recompute. They're still in the
+ * sąmata with their original numbers (and prices) — that's the point — but they
+ * no longer follow the new assumptions, so silence would be a lie. Transient
+ * toast on purpose: merging this into project.lt_sanity would stack a duplicate
+ * banner entry on every recompute.
+ */
+/** Positions /api/recompute-quantities reports it carried without recomputing. */
+function backendCarriedPositions(result) {
+  const deg = (result?._degradations || []).find(
+    (d) => d && typeof d === 'object' && d.reason === 'orphans_carried',
+  );
+  return deg?.positions || [];
 }
 
-function mergeDarbuSarasasEdits(rebuilt, old) {
-  if (!Array.isArray(rebuilt)) return old || [];
-  const oldList = old || [];
-  const oldByLabel = new Map();
-  for (const o of oldList) {
-    const k = _lc(o.aprasymas);
-    if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
-  }
-  const matchedOld = new Set();  // old items already consumed (by object identity)
-  const carry = (newItem, oldItem) => {
-    const keepQty = oldItem.manual_override === true
-      || oldItem.quantity_source === 'manual_override';
-    const kiekis = keepQty ? oldItem.kiekis : newItem.kiekis;
-    const kaina = oldItem.kaina ?? newItem.kaina;
-    const out = { ...newItem };
-    if (keepQty) {
-      out.kiekis = kiekis;
-      out.manual_override = true;
-      out.quantity_source = 'manual_override';
-      if (oldItem.ai_kiekis_original != null) out.ai_kiekis_original = oldItem.ai_kiekis_original;
-    }
-    if (kaina != null) {
-      out.kaina = kaina;
-      out.suma = (kiekis || 0) * kaina;
-    }
-    return out;
-  };
-  // Pass 1 — exact lowercased-label match (unchanged behaviour).
-  const merged = rebuilt.map((newItem) => {
-    const oldItem = oldByLabel.get(_lc(newItem.aprasymas));
-    if (!oldItem) return newItem;
-    matchedOld.add(oldItem);
-    return carry(newItem, oldItem);
-  });
-  // Pass 2 — rescue prices for lines whose label changed on rebuild. Match
-  // still-unpriced rebuilt lines to unconsumed old PRICED/edited lines by the
-  // normalized key, applied ONLY when unambiguous (one-to-one) so it can never
-  // mis-assign a price between two co-existing tier lines.
-  const push = (m, k, v) => { const a = m.get(k) || []; a.push(v); m.set(k, a); };
-  const oldByNorm = new Map();
-  for (const o of oldList) {
-    if (matchedOld.has(o)) continue;
-    if (o.kaina == null && o.manual_override !== true) continue;
-    const k = _normLabel(o.aprasymas); if (k) push(oldByNorm, k, o);
-  }
-  const newByNorm = new Map();
-  merged.forEach((m, i) => {
-    if (m.kaina != null) return;
-    const k = _normLabel(m.aprasymas); if (k) push(newByNorm, k, i);
-  });
-  for (const [k, idxs] of newByNorm) {
-    const cands = oldByNorm.get(k) || [];
-    if (idxs.length === 1 && cands.length === 1) {
-      merged[idxs[0]] = carry(merged[idxs[0]], cands[0]);
-      matchedOld.add(cands[0]);
-    }
-  }
-  // Carry forward unmatched old lines the user manually added/edited.
-  for (const o of oldList) {
-    if (matchedOld.has(o)) continue;
-    if (o.source === 'Pažymėjus brėžinyje' || o.manual_override === true) merged.push(o);
-  }
-  return merged;
+function notifyCarriedOrphans(labels, t) {
+  const unique = [...new Set((labels || []).filter(Boolean))];
+  if (unique.length === 0) return;
+  // `n`, not `count` — `count` would make i18next resolve Lithuanian plural
+  // forms (one/few/other) that this single-string key doesn't define.
+  toast.warning(t('project.interior.toastOrphansCarried', {
+    n: unique.length,
+    labels: unique.slice(0, 3).join(', ') + (unique.length > 3 ? '…' : ''),
+  }));
 }
 
 function DarbuSarasas({ items }) {
@@ -787,6 +732,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         throw new Error(result._error || t('project.interior.recomputeErr'));
       }
       // Merge — preserve user fields (name, kainos, etc.) — overwrite computed.
+      // `notes` records every row the rebuild couldn't reproduce so we can TELL
+      // the user instead of quietly shipping a shorter sąmata. /recompute-interior
+      // sends no prior list, so this merge is the ONLY thing standing between a
+      // room edit and 15 deleted priced rows. (P0 2026-07-28.)
+      const notes = [];
       const merged = {
         ...project,
         ...result,
@@ -796,11 +746,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         vat_rate: project.vat_rate,
         // Carry the user's prices + manual count overrides forward, and keep
         // drawing symbol-count lines (the rebuild can't reproduce them).
-        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
+        darbu_sarasas: mergeDarbuSarasasEdits(
+          result.darbu_sarasas, project.darbu_sarasas, notes),
       };
       updateProject(project.id, merged);
       setProject(merged);
       toast.success(t('project.interior.toastRecomputed'));
+      notifyCarriedOrphans(carriedOrphans(notes).map((n) => n.aprasymas), t);
     } catch (e) {
       console.error('Edit cascade failed:', e);
       toast.error(t('project.interior.toastRecomputeErr', { msg: e.message }));
@@ -923,7 +875,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             prielaidos={project.prielaidos || {}}
             rawData={project}
             pozicijos={project.pozicijos || []}
+            darbuSarasas={project.darbu_sarasas || []}
             onRecomputed={(result) => {
+              const notes = [];
               const nextProject = {
                 ...project,
                 patalpos: result.rooms || project.patalpos,
@@ -933,11 +887,24 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 // preserving prices + manual count overrides + drawing symbol
                 // lines. (2026-06-19 hunt: recompute updated pozicijos only and
                 // wiped count overrides / symbol lines.)
-                darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, project.darbu_sarasas),
+                darbu_sarasas: mergeDarbuSarasasEdits(
+                  result.darbu_sarasas, project.darbu_sarasas, notes,
+                  // Rows the backend folded into a renamed sibling are already
+                  // represented (with their price) in result.darbu_sarasas —
+                  // without this they'd ALSO be carried here and their money
+                  // would be counted twice.
+                  (result._merge_notes || []).filter((n) => n.reason === 'relabeled')),
                 _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
               };
               setProject(nextProject);
               updateProject(project.id, nextProject);
+              // On this path the BACKEND already carried the orphans (it holds the
+              // prior pozicijos), so its degradation entry is the authoritative
+              // list; the local merge only adds rows the backend never saw.
+              notifyCarriedOrphans([
+                ...backendCarriedPositions(result),
+                ...carriedOrphans(notes).map((n) => n.aprasymas),
+              ], t);
             }}
           />
         </div>

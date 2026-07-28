@@ -671,6 +671,7 @@
       "tabAiChat": "AI Chat",
       "recomputeErr": "Recompute error",
       "toastRecomputed": "Quantities recalculated",
+      "toastOrphansCarried": "{{n}} item(s) were not recalculated under the new assumptions — originals kept: {{labels}}",
       "toastRecomputeErr": "Error recalculating: {{msg}}",
       "assumptionsTitle": "Ceiling height and putty level",
       "aiTitle": "AI questions about the project",

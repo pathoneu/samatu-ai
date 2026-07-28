@@ -166,7 +166,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, onRecomputed, defaultOpen = false, title }) {
+export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, darbuSarasas, onRecomputed, defaultOpen = false, title }) {
   const { t } = useTranslation();
   const resolvedTitle = title ?? t('project.assumptions.defaultTitle');
   const [open, setOpen] = useState(defaultOpen);
@@ -229,6 +229,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
         const result = await recompute({
           rooms: rawData?.patalpos || [],
           pozicijos: pozicijos || [],
+          // The prices the user actually entered live here, NOT in pozicijos —
+          // without them the backend merge can't tell which rows carry money.
+          // (P0 2026-07-28.)
+          darbu_sarasas: darbuSarasas || rawData?.darbu_sarasas || [],
           edits: [{ field, new_value: newValue }],
           current_assumptions: assumptions || {},
           // Reader/extraction context so a ceiling-height edit rebuilds the
@@ -257,7 +261,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
         if (reqId === reqIdRef.current) setRecomputing(false);
       }
     }, RECOMPUTE_DEBOUNCE_MS);
-  }, [rawData, pozicijos, assumptions, onRecomputed, onChange, isDemo, t]);
+  }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, isDemo, t]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };

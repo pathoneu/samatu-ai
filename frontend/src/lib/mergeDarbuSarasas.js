@@ -1,0 +1,205 @@
+/**
+ * mergeDarbuSarasas — carry the user's manual edits onto a freshly-rebuilt
+ * darbu_sarasas. The JS twin of backend `api/recompute_quantities._merge_user_edits`.
+ *
+ * Extracted from InteriorProject.jsx 2026-07-28 so the merge is unit-testable
+ * (this codebase's convention: testable logic lives in lib/, the page keeps a
+ * thin call).
+ *
+ * WHY IT MATTERS (P0, 2026-07-28): the old pass 3 carried an unmatched prior row
+ * only when it was tagged `source: 'Pažymėjus brėžinyje'` or `manual_override`.
+ * Measured against the real demo blob on the /recompute-interior path, that
+ * deleted 15 fully-priced rows worth 5 281,85 € — whole 'Elektros instaliacijos'
+ * and 'Ventiliacijos' sections plus both 'Glaistymo kampai' lines — on a plain
+ * room edit, silently. Now EVERY unmatched prior row is carried and flagged
+ * `_orphaned_after_rebuild`.
+ *
+ * The single exception mirrors the backend: an un-edited row whose work is still
+ * in the list under a sibling HEIGHT-TIER label ('… (virš 3m aukščio)' →
+ * '… (iki 3m aukščio)') was re-tiered by the rebuild, not deleted — carrying it
+ * would pin a stale duplicate of a quantity that legitimately moved. A row
+ * carrying real money is carried even then: deciding that a user's priced line
+ * is obsolete is not a call this merge gets to make silently.
+ */
+
+const _lc = (s) => (s || '').toLowerCase();
+
+/**
+ * Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
+ * and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
+ * paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Used by
+ * pass 2. Mirrors the backend's `_norm_label` fallback. (audit 2026-07-05)
+ *
+ * NOTE: deliberately does NOT fold the LED glaistymas/dažymas pair the way the
+ * backend's `_norm_label` does — folding it here would let pass 2 consume a
+ * priced 'LED nišų glaistymas' in favour of the consolidated line WITHOUT being
+ * able to prove the price transferred. Verified 2026-07-28: un-folding is what
+ * keeps 320 € on the books when the backend can't see the money.
+ */
+export function normLabel(s) {
+  // Built on tierKey so both sides recognise the SAME tier vocabulary. Before
+  // 2026-07-28 this stripped only the 'iki/virš 3m' suffix, so a rebuilt
+  // '… (standartinis aukštis)' line kept a distinct key while the backend
+  // folded it — the two normalizers disagreed and pass 2 assigned a price the
+  // backend deliberately refuses to guess at (two rebuilt lines could own it).
+  return tierKey(s)
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')             // drop accents
+    .replace(/\bq[1-4]\b/g, '')                                    // drop Q-level
+    .replace(/\(\s*\d+\s*sluoksn[^)]*\)/g, '')                     // drop '(N sluoksnis)'
+    .replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Label with ONLY the height/Q-level tier suffixes stripped — a 1:1 port of the
+ * backend `_tier_key` / `_TIER_SUFFIX_RE`. Two labels sharing a tier key are the
+ * same work at different ceiling tiers. Used by pass 3 to tell a re-tiered line
+ * from one the rebuild simply cannot produce.
+ */
+export function tierKey(s) {
+  return _lc(s)
+    .replace(/\s*\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')           // (iki|virš 3m …)
+    .replace(/\s*\(standartinis aukštis\)/g, '')                   // GKP tier label
+    .replace(/\s*—\s*papildomas darbas dėl aukščio/g, '')          // height premium
+    .replace(/\s*q4\s*\([^)]*\)/g, '')                             // Q4 sanding suffix
+    .trim();
+}
+
+/** Does this row carry something of the user's that a rebuild must not destroy? */
+export function hasUserEdit(p) {
+  if (!p) return false;
+  return (p.kaina != null && p.kaina !== 0)
+    || p.manual_override === true
+    || p.quantity_source === 'manual_override'
+    || !!p.override_locked
+    || p.source === 'Pažymėjus brėžinyje';   // user-added, drawing-marked line
+}
+
+/**
+ * @param {Array}  rebuilt  freshly-computed rows from the backend
+ * @param {Array}  old      the rows currently in the project (user's prices etc.)
+ * @param {Array} [notes]   optional out-param: one entry per carried/suppressed
+ *                          row, so the caller can DISCLOSE what wasn't recomputed
+ * @param {Array} [serverRelabeled] labels the BACKEND already folded into a
+ *                          rebuilt row (its `_merge_notes` reason:'relabeled').
+ *                          Without this the row looks unmatched here and gets
+ *                          carried ALONGSIDE the line it was folded into —
+ *                          measured 2026-07-28: 320 € counted twice on the LED
+ *                          consolidation. Only honoured when the target row is
+ *                          actually present, so a bogus note can't eat money.
+ * @returns {Array} merged rows
+ */
+export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
+  if (!Array.isArray(notes)) notes = [];
+  if (!Array.isArray(rebuilt)) return old || [];
+  const oldList = old || [];
+  const oldByLabel = new Map();
+  for (const o of oldList) {
+    const k = _lc(o.aprasymas);
+    if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
+  }
+  const matchedOld = new Set();  // old items already consumed (by object identity)
+  // Rows the server folded into another line are already represented (with
+  // their price) in `rebuilt` — consume them so neither pass re-uses them.
+  if (Array.isArray(serverRelabeled) && serverRelabeled.length) {
+    const rebuiltLabels = new Set(rebuilt.map((r) => _lc(r.aprasymas)));
+    for (const n of serverRelabeled) {
+      const from = _lc(typeof n === 'string' ? n : n?.aprasymas);
+      const into = _lc(typeof n === 'string' ? null : n?.into);
+      if (!from) continue;
+      if (into && !rebuiltLabels.has(into)) continue;   // target missing → keep the row
+      const o = oldByLabel.get(from);
+      if (o && !rebuiltLabels.has(from)) {
+        matchedOld.add(o);
+        notes.push({ reason: 'relabeled_by_server', aprasymas: o.aprasymas });
+      }
+    }
+  }
+  const carry = (newItem, oldItem) => {
+    const keepQty = oldItem.manual_override === true
+      || oldItem.quantity_source === 'manual_override';
+    const kiekis = keepQty ? oldItem.kiekis : newItem.kiekis;
+    const kaina = oldItem.kaina ?? newItem.kaina;
+    const out = { ...newItem };
+    if (keepQty) {
+      out.kiekis = kiekis;
+      out.manual_override = true;
+      out.quantity_source = 'manual_override';
+      if (oldItem.ai_kiekis_original != null) out.ai_kiekis_original = oldItem.ai_kiekis_original;
+    }
+    if (kaina != null) {
+      out.kaina = kaina;
+      out.suma = (kiekis || 0) * kaina;
+    }
+    return out;
+  };
+  // Pass 1 — exact lowercased-label match (unchanged behaviour).
+  const merged = rebuilt.map((newItem) => {
+    const oldItem = oldByLabel.get(_lc(newItem.aprasymas));
+    if (!oldItem) return newItem;
+    matchedOld.add(oldItem);
+    return carry(newItem, oldItem);
+  });
+  // Pass 2 — rescue prices for lines whose label changed on rebuild. Match
+  // still-unpriced rebuilt lines to unconsumed old PRICED/edited lines by the
+  // normalized key, applied ONLY when unambiguous (one-to-one) so it can never
+  // mis-assign a price between two co-existing tier lines.
+  const push = (m, k, v) => { const a = m.get(k) || []; a.push(v); m.set(k, a); };
+  const oldByNorm = new Map();
+  for (const o of oldList) {
+    if (matchedOld.has(o)) continue;
+    if (o.kaina == null && o.manual_override !== true) continue;
+    const k = normLabel(o.aprasymas); if (k) push(oldByNorm, k, o);
+  }
+  const newByNorm = new Map();
+  merged.forEach((m, i) => {
+    if (m.kaina != null) return;
+    const k = normLabel(m.aprasymas); if (k) push(newByNorm, k, i);
+  });
+  for (const [k, idxs] of newByNorm) {
+    const cands = oldByNorm.get(k) || [];
+    if (idxs.length === 1 && cands.length === 1) {
+      merged[idxs[0]] = carry(merged[idxs[0]], cands[0]);
+      matchedOld.add(cands[0]);
+      if (_lc(cands[0].aprasymas) !== _lc(merged[idxs[0]].aprasymas)) {
+        notes.push({
+          reason: 'relabeled',
+          aprasymas: cands[0].aprasymas,
+          into: merged[idxs[0]].aprasymas,
+        });
+      }
+    }
+  }
+  // Pass 3 — carry (don't delete) every still-unmatched prior row. Computed from
+  // the ORIGINAL rebuilt list so a carried orphan can never suppress a later one.
+  const rebuiltTierKeys = new Set();
+  for (const r of rebuilt) {
+    const k = tierKey(r.aprasymas);
+    if (k) rebuiltTierKeys.add(k);
+  }
+  for (const o of oldList) {
+    if (matchedOld.has(o)) continue;
+    const edited = hasUserEdit(o);
+    if (!edited && rebuiltTierKeys.has(tierKey(o.aprasymas))) {
+      // Un-edited line whose work is still listed under a sibling tier label —
+      // the rebuild re-tiered it, nothing was lost.
+      notes.push({ reason: 'superseded_by_tier', aprasymas: o.aprasymas });
+      continue;
+    }
+    merged.push({ ...o, _orphaned_after_rebuild: true });
+    notes.push({
+      reason: 'orphan_carried',
+      aprasymas: o.aprasymas,
+      kiekis: o.kiekis,
+      kaina: o.kaina,
+      user_edit: edited,
+    });
+  }
+  return merged;
+}
+
+/** Rows the rebuild could not reproduce — the ones the user must be told about. */
+export function carriedOrphans(notes) {
+  return (notes || []).filter((n) => n && n.reason === 'orphan_carried');
+}
+
+export default mergeDarbuSarasasEdits;
