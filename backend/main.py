@@ -4436,6 +4436,38 @@ def _enrich_eilutes(eilutes: list[dict]) -> list[dict]:
     return eilutes
 
 
+# ── Export-time row numbering ─────────────────────────────────────────────────
+
+_PLAIN_INT_NR = re.compile(r"[0-9]+")
+
+
+def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
+    """Return EXPORT COPIES of `eilutes` whose Nr. column runs 1..N with no gaps.
+
+    E2 (pre-prod walkthrough 2026-07-27): the app drops placeholder rows
+    ("suveskite kiekį" — no quantity) from the deliverable, which is right, but
+    every surviving row kept its ORIGINAL eil_nr, so the client read 55 → 58 and
+    concluded positions had been withheld. The same gap appears whenever the
+    export skyrius filter drops a section.
+
+    This is PRESENTATION ONLY. The rows are shallow-copied, so the stored project
+    (and the caller's request dict) keeps its original numbering — nothing here
+    writes back.
+
+    Guard: only OUR own plain-integer scheme is ours to rewrite. A KŽ parsed from
+    a tender document carries hierarchical / coded positions ("1.1", "2.14",
+    "A.3") that the client cross-references against their own žiniaraštis;
+    renumbering those would break the reference, so they pass through verbatim.
+    """
+    rows = [dict(e) for e in eilutes]
+    nrs = [str(e.get("nr") or "").strip() for e in rows]
+    if any(nr and not _PLAIN_INT_NR.fullmatch(nr) for nr in nrs):
+        return rows
+    for i, e in enumerate(rows, 1):
+        e["nr"] = str(i)
+    return rows
+
+
 # ── /generate-excel ───────────────────────────────────────────────────────────
 
 @app.post("/generate-excel")
@@ -4467,7 +4499,10 @@ async def generate_excel(request: Request, data: dict):
 
     projektas    = data.get("projektas", "Projektas")
     imone        = (data.get("imone") or data.get("company_name") or "").strip()
-    eilutes      = data.get("eilutes", [])
+    # E2: renumber the exported rows 1..N so dropped placeholder rows don't leave
+    # a visible gap in the client's Nr. column. Copies — the stored project keeps
+    # its own numbering (see _sequential_export_nr).
+    eilutes      = _sequential_export_nr(data.get("eilutes", []))
     prielaidos   = data.get("prielaidos") or {}
     patalpos     = data.get("patalpos") or []
     perspejimani = data.get("perspejimani") or []
@@ -4956,7 +4991,10 @@ async def generate_pdf(request: Request, data: dict):
     projektas    = data.get("projektas", "Projektas")
     imone        = _esc((data.get("imone") or data.get("company_name") or "").strip())
     doc_date     = _date.today().strftime("%Y-%m-%d")
-    eilutes      = data.get("eilutes", [])
+    # E2: renumber the exported rows 1..N so dropped placeholder rows don't leave
+    # a visible gap in the client's Nr. column. Copies — the stored project keeps
+    # its own numbering (see _sequential_export_nr).
+    eilutes      = _sequential_export_nr(data.get("eilutes", []))
     # Backfill a missing `suma` from kiekis×kaina so the PDF total, the section
     # subtotals and the printed line amounts all agree — and never diverge from
     # the Excel export, which always computes kiekis×kaina. (audit 2026-07-05)
@@ -5009,10 +5047,25 @@ async def generate_pdf(request: Request, data: dict):
         from datetime import timedelta as _timedelta
         galioja_iki = (_date.today() + _timedelta(days=30)).strftime("%Y-%m-%d")
 
+    # LT money: space thousands separator + decimal comma ("131 126,15").
+    # The separator MUST be U+00A0 NBSP, not U+202F NARROW NO-BREAK SPACE:
+    # reportlab's word splitter (platypus/paragraph.py `_wsc`) deliberately
+    # EXCLUDES \xa0 but LISTS \u202f as breakable whitespace, so a U+202F-joined
+    # amount is three separate words and reportlab happily wraps it mid-number —
+    # "131" on one line, "126,15 €" on the next. (E1, walkthrough 2026-07-27.)
+    # NBSP alone is not enough: a cell too narrow for the whole string makes
+    # reportlab split it character-wise instead, so the Suma column is ALSO
+    # sized from the real string widths below.
+    _NB = "\u00a0"          # NO-BREAK SPACE — reportlab never breaks on it
+
     def _n(v):
         if not isinstance(v, (int, float)):
             return str(v)
-        return f"{v:,.2f}".replace(",", "\u202f").replace(".", ",")
+        return f"{v:,.2f}".replace(",", _NB).replace(".", ",")
+
+    def _money(v):
+        """Amount + € as ONE unbreakable token ("131 126,15 €")."""
+        return _n(v) + _NB + "\u20ac"
 
     story = []
 
@@ -5113,7 +5166,72 @@ async def generate_pdf(request: Request, data: dict):
     story.append(Spacer(1, 0.4*cm))
 
     # ── Table ─────────────────────────────────────────────────────────────────
-    COL_W = [1.1*cm, 8.3*cm, 1.5*cm, 1.7*cm, 2.0*cm, 2.7*cm]
+    # E1 (walkthrough 2026-07-27): the Suma column was a hardcoded 2.7 cm — wide
+    # enough for a 9 pt line amount, NOT for the bold 11 pt "IŠ VISO su PVM". From
+    # €100 000 up the headline number of the pasiūlymas therefore broke across two
+    # lines ("131" / "126,15 €"), i.e. the client read a different, smaller total.
+    #
+    # Fix: size the amount column from the widest string the document actually
+    # prints, measured in the font+size that prints it. The data table and the
+    # totals block get DIFFERENT amount widths (the totals print 2 pt larger) but
+    # the SAME outer width, so their right edges still line up; the totals label
+    # spans cols 0-4 over one flat background, so the different internal split is
+    # invisible in the rendered document. The whole table now uses the full frame
+    # width, so Aprašymas gets more room than before, not less.
+    _FS_TOT = 11   # bold "IŠ VISO su PVM" / "IŠ VISO (be PVM)" row
+    _FS_SUB = 9    # Suma be PVM · PVM 21% · Skyriaus suma
+    _FS_ROW = 8    # per-line Kiekis / Kaina / Suma cells
+    _CELL_PAD = 8  # LEFTPADDING + RIGHTPADDING applied to every cell below
+    _TABLE_W  = 17.95*cm   # ≤ PAGE_W (18 cm) — never overflows the frame
+
+    def _amount_w(txt: str, fs: float) -> float:
+        # measured BOLD: the heaviest weight any of these cells is printed in
+        return pdfmetrics.stringWidth(txt, _FONT_BOLD, fs) + _CELL_PAD
+
+    def _col_w(values, fs, floor, cap):
+        """Width that fits every value in `values`, clamped to [floor, cap].
+
+        Width grows monotonically with digit count, so the extremes bound the
+        set. The floors are the widths this table has always used, so a normal
+        sąmata renders exactly as before — the probe only ever grows a column
+        for an outlier that would otherwise break mid-number."""
+        nums = [v for v in values if isinstance(v, (int, float))]
+        if not nums:
+            return floor
+        widest = max(_amount_w(_n(v), fs) for v in (max(nums), min(nums)))
+        return min(max(floor, widest), cap)
+
+    # Kiekis / Kaina: same defect class in a different column — at the old fixed
+    # 1.7 / 2.0 cm a 7-digit quantity or unit price broke ("8 264 462,8" / "0").
+    _kiekis_w = _col_w([e.get("kiekis", 0) for e in eilutes], _FS_ROW, 1.7*cm, 2.8*cm)
+    _kaina_w  = _col_w([e.get("kaina",  0) for e in eilutes], _FS_ROW, 2.0*cm, 3.0*cm)
+
+    # Suma inside the data table: a line amount (8 pt) or a section subtotal
+    # (9 pt). Section subtotals are round-then-sum per skyrius, exactly like the
+    # printed "Skyriaus suma" rows below. 3.0 cm already holds "9 999 999,99 €".
+    _sec_sums: dict[str, float] = {}
+    for _e in eilutes:
+        _s = _e.get("suma", 0)
+        if isinstance(_s, (int, float)):
+            _k = (_e.get("skyrius") or "").strip()
+            _sec_sums[_k] = _sec_sums.get(_k, 0.0) + round(_s, 2)
+    _sub_w  = max([_amount_w(_money(round(v, 2)), _FS_SUB)      # Skyriaus suma
+                   for v in _sec_sums.values()] or [0.0])
+    _line_w = _col_w([e.get("suma", 0) for e in eilutes], _FS_ROW, 3.0*cm, 4.6*cm)
+    _suma_w = min(max(_line_w, _sub_w), 4.6*cm)
+    # Totals block: the bold 11 pt grand total is the widest string in the whole
+    # document. 4.0 cm holds "-9 999 999,99 €" at 11 pt bold with ~9 pt to spare.
+    _tot_w = min(max(4.0*cm, max(
+        _amount_w(_money(viso_su_pvm), _FS_TOT),
+        _amount_w(_money(viso_be_pvm), _FS_SUB),
+        _amount_w(_money(pvm),         _FS_SUB),
+    )), 6.0*cm)
+
+    _fixed_w = 1.1*cm + 1.5*cm + _kiekis_w + _kaina_w   # every column but Aprašymas/Suma
+    COL_W     = [1.1*cm, _TABLE_W - _fixed_w - _suma_w,
+                 1.5*cm, _kiekis_w, _kaina_w, _suma_w]
+    TOT_COL_W = [1.1*cm, _TABLE_W - _fixed_w - _tot_w,
+                 1.5*cm, _kiekis_w, _kaina_w, _tot_w]
 
     hdr_l = ParagraphStyle("hl", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white)
     hdr_c = ParagraphStyle("hc", fontName=_FONT_BOLD, fontSize=8, textColor=colors.white, alignment=TA_CENTER)
@@ -5154,7 +5272,7 @@ async def generate_pdf(request: Request, data: dict):
         table_data.append([
             Paragraph("Skyriaus suma:", b_r),
             "", "", "", "",
-            Paragraph(_n(round(_section_sum, 2)) + " €", b_r),
+            Paragraph(_money(round(_section_sum, 2)), b_r),   # E1: unbreakable
         ])
         style_cmds.extend([
             ("SPAN",         (0, sri), (4, sri)),
@@ -5252,7 +5370,8 @@ async def generate_pdf(request: Request, data: dict):
             alignment=TA_RIGHT,
         )
         ri = len(totals_data)
-        totals_data.append([Paragraph(label, ls), "", "", "", "", Paragraph(_n(value) + "\u202f€", vs)])
+        totals_data.append([Paragraph(label, ls), "", "", "", "",
+                            Paragraph(_money(value), vs)])   # E1: unbreakable
         totals_style.extend([
             ("BACKGROUND",   (0, ri), (-1, ri), TOTBG),
             ("TOPPADDING",   (0, ri), (-1, ri), 5 if not bold else 7),
@@ -5286,7 +5405,9 @@ async def generate_pdf(request: Request, data: dict):
 
     # Totals + reverse-VAT note + signatures kept together so they never split
     # across a page break (a VISO stranded from its qualifier reads as an error).
-    totals_tbl = Table(totals_data, colWidths=COL_W)
+    # TOT_COL_W, not COL_W: same outer width (right edges align) but a wider
+    # amount column, because these rows print at 11 pt bold. (E1.)
+    totals_tbl = Table(totals_data, colWidths=TOT_COL_W)
     totals_tbl.setStyle(TableStyle(totals_style))
     _totals_group: list = [totals_tbl]
 
