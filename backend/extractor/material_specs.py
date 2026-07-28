@@ -115,7 +115,7 @@ def extract_room_material_specs(
                 "_meta": {"elapsed_s": 0, "pages_inspected": []}}
 
     if client is None:
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(max_retries=1)
 
     t0 = time.time()
     # Render only requested pages at high DPI (300) for clean OCR of small spec text
@@ -196,7 +196,7 @@ def extract_room_material_specs(
         try:
             with client.messages.stream(
                 model=model,
-                max_tokens=2048,
+                max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
                 system=system,
                 messages=[{"role": "user", "content": user_content}],
                 output_config={"effort": "medium"},

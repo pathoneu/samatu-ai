@@ -241,10 +241,10 @@ def _call_haiku(
     at call time. Production callers pass their own client; tests inject
     a fake.
     """
-    client = client or anthropic.Anthropic()
+    client = client or anthropic.Anthropic(max_retries=1)
     resp = client.messages.create(
         model=model or model_for("page_classifier"),
-        max_tokens=200,
+        max_tokens=4096,  # raised at Opus 5 cutover: thinking-on-by-default counts against the cap — 200 truncated instantly (caps are free; billing is by actuals)
         system=[{
             "type": "text",
             "text": _CLASSIFIER_SYSTEM,

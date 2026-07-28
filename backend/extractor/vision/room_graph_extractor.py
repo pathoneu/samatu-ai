@@ -300,7 +300,7 @@ def extract_room_graph(
 
     if client is None:
         import anthropic
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(max_retries=1)
 
     from .dimension_extractor import _detect_image_media_type
     media_type = _detect_image_media_type(img_bytes)

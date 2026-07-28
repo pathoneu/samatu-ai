@@ -195,7 +195,7 @@ def read_apdailos_finishes(
     content.append({"type": "text", "text": user_text})
     try:
         model = model_for("apdailos")  # call-time resolution (MODEL_OVERRIDE etc.)
-        client = client or anthropic.Anthropic()
+        client = client or anthropic.Anthropic(max_retries=1)
         resp = client.messages.create(
             model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT,

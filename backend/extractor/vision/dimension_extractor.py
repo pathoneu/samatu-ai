@@ -230,7 +230,7 @@ def extract_dimensions(
     # Live API call ────────────────────────────────────────────────────────────
     if client is None:
         import anthropic  # local import: tests don't need anthropic installed
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(max_retries=1)
 
     # pdf_to_b64_images emits JPEG; auto-detect to stay flexible.
     media_type = _detect_image_media_type(img_bytes)

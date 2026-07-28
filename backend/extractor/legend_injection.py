@@ -73,11 +73,11 @@ _SCHEMA = {
 def extract_legend(legend_image_b64: str, client: anthropic.Anthropic | None = None) -> dict:
     """Run the legend-role model over a legend page; return canonical mapping
     (plus a `_meta` block with model + token usage for cost telemetry)."""
-    client = client or anthropic.Anthropic()
+    client = client or anthropic.Anthropic(max_retries=1)
     model = model_for("legend")  # call-time resolution (MODEL_OVERRIDE etc.)
     resp = client.messages.create(
         model=model,
-        max_tokens=2000,
+        max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
         system=[{
             "type": "text",
             "text": _LEGEND_SYSTEM,

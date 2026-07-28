@@ -156,7 +156,7 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
     content.append({"type": "text", "text": build_user_text(rooms)})
     try:
         model = model_for("doors")  # call-time resolution (MODEL_OVERRIDE etc.)
-        client = client or anthropic.Anthropic()
+        client = client or anthropic.Anthropic(max_retries=1)
         resp = client.messages.create(
             model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],

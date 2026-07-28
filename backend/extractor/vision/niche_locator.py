@@ -151,7 +151,7 @@ def extract_niches(
 
     if client is None:
         import anthropic
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(max_retries=1)
 
     media_type = _detect_image_media_type(img_bytes)
     with client.messages.stream(

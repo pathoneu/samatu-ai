@@ -941,7 +941,11 @@ def _extra_calls_breakdown(meta: dict) -> dict:
     by it so the run report can attribute the true-cost premium to the exact
     sub-Vision calls that drove it. Untagged calls fall into ``"unknown"``.
     Priced per-call at its OWN model (calc_claude_cost_usd), mirroring
-    pricing._calc_extra_calls_cost_usd so the breakdown sums to the same total.
+    pricing.calc_extra_calls_cost_usd so the breakdown sums to the same total.
+    The cache_ttl is left at the pricing default ("5m" since the 2026-07-28
+    telemetry audit) precisely so this stays in lockstep — hard-coding "1h"
+    here made the breakdown over-count cache writes by 60% relative to the
+    total it was supposed to decompose.
     """
     from pricing import calc_claude_cost_usd, USD_TO_EUR  # backend/ on sys.path
     groups: dict[str, dict] = {}
@@ -953,7 +957,7 @@ def _extra_calls_breakdown(meta: dict) -> dict:
             output_tokens=int(c.get("output_tokens") or 0),
             cache_read_tokens=int(c.get("cache_read_tokens") or 0),
             cache_write_tokens=int(c.get("cache_write_tokens") or 0),
-            model=model, cache_ttl="1h",
+            model=model,
         )
         g = groups.setdefault(reader, {"n_calls": 0, "cost_usd": 0.0,
                                        "models": set()})

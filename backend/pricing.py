@@ -3,20 +3,38 @@
 Single source of truth for cost calculation across backend.
 Frontend mirror: frontend/src/lib/pricing.js (still Opus-only as of
 2026-07-03 — update it when the model flip lands).
+⚠️ KNOWN DRIFT (2026-07-28): that mirror still defaults ``cache_ttl = '1h'``
+and falls back to '1h' for an unknown TTL, so it over-states cache-write cost
+by 60% relative to this module. Latent, not user-visible — nothing in
+frontend/src imports it today except its own test — but fix it in the same
+change that wires it up.
 
 Rates (USD per MTok) from the claude-api reference, verified 2026-07-03:
   claude-opus-4-8:  $5 in / $25 out
   claude-fable-5:   $10 in / $50 out
 Cache READ  = 0.1× the model's input rate.
 Cache WRITE = 2.0× input rate for 1-hour TTL, 1.25× for 5-minute TTL.
-(Our vision path uses explicit ``ttl: "1h"`` — see vision_call_v2.py.)
+
+TTL DEFAULT = "5m" (2026-07-28 telemetry audit, T1). The previous "1h" default
+cited ``vision_call_v2.py`` — a module with ZERO production callers (only its
+own test imports it). The LIVE Pass-1 breakpoints all send a bare
+``{"type": "ephemeral"}``, which the Anthropic API defaults to a 5-minute TTL:
+  * ``vision_call.py``  system prompt      (extract_interior)
+  * ``prompt.py:981``   last image block   (build_user_content)
+  * ``prompt.py:1014``  document block     (build_user_content_pdf_native)
+So every stored ``cost_eur`` was charging cache writes at $10/MTok when the API
+billed $6.25/MTok — a 60% over-count on the write component.
+CAVEAT: four sub-readers DO send explicit ``ttl: "1h"`` (page_classifier,
+legend_injection, roof/vision_extractor ×2). All four put the breakpoint on a
+SHORT system prompt only — never on images — so the residual mispricing is
+small; a per-call ttl field would be the fix if that ever changes.
 
 BUG FIX (2026-07-03): the previous formula charged cache reads at
 MINUS $4.50/MTok (it subtracted a "discount" from an input total that never
 included the cached tokens — Anthropic's ``usage.input_tokens`` is the
 UNCACHED remainder only) and billed cache writes at $0. Correct is
-+$0.50/MTok for reads (0.1×) and +$10/MTok for 1h-TTL writes (2×). Every
-cache-heavy extraction was under-metered by $5/MTok-read + $10/MTok-written;
++$0.50/MTok for reads (0.1×) and +$6.25/MTok for 5m-TTL writes (1.25×). Every
+cache-heavy extraction was under-metered by $5/MTok-read + $6.25/MTok-written;
 a big cached call could even record a negative cost.
 
 Unknown model → ValueError. Never silently price a model we have no rate
@@ -39,7 +57,7 @@ def calc_claude_cost_usd(
     cache_read_tokens: int = 0,
     cache_write_tokens: int = 0,
     model: str = "claude-opus-4-8",
-    cache_ttl: str = "1h",
+    cache_ttl: str = "5m",
 ) -> float:
     """Compute total USD cost for a Claude API call.
 
@@ -51,7 +69,8 @@ def calc_claude_cost_usd(
         cache_write_tokens: ``usage.cache_creation_input_tokens``
             (2× in-rate for "1h" TTL, 1.25× for "5m").
         model: exact model ID; must exist in RATES.
-        cache_ttl: "1h" (our vision default) or "5m".
+        cache_ttl: "5m" (the live Pass-1 default — bare ``{"type":
+            "ephemeral"}`` blocks) or "1h" (explicit ``ttl`` breakpoints).
 
     Raises:
         ValueError: unknown model or cache_ttl — never silently price wrong.
@@ -77,7 +96,7 @@ def calc_claude_cost_usd(
     )
 
 
-def _calc_extra_calls_cost_usd(meta: dict, cache_ttl: str) -> float:
+def calc_extra_calls_cost_usd(meta: dict, cache_ttl: str = "5m") -> float:
     """Price ``meta["extra_calls"]`` — the sub-Vision calls the extraction
     pipeline makes beyond Pass-1 (eksplikacija Vision fallback, apdailos,
     doors, door_type ×N voted rounds, zoom fixed-crop, agentic zoom, sanitary
@@ -103,10 +122,15 @@ def _calc_extra_calls_cost_usd(meta: dict, cache_ttl: str) -> float:
     return total
 
 
+# Back-compat alias — this was private until the 2026-07-28 telemetry audit made
+# it public so db.record_usage can store the extra-calls share of each event.
+_calc_extra_calls_cost_usd = calc_extra_calls_cost_usd
+
+
 def calc_meta_cost_usd(
     meta: dict,
     default_model: str = "claude-opus-4-8",
-    cache_ttl: str = "1h",
+    cache_ttl: str = "5m",
 ) -> float:
     """Price a pipeline ``_meta`` block, mixed-model-voting + sub-call aware.
 
@@ -130,7 +154,7 @@ def calc_meta_cost_usd(
     round, OR an extra_call — same as calc_claude_cost_usd; never silently
     price wrong.
     """
-    extra = _calc_extra_calls_cost_usd(meta, cache_ttl)
+    extra = calc_extra_calls_cost_usd(meta, cache_ttl)
 
     rounds = [r for r in (meta.get("voting_models") or [])
               if r.get("model") and not r.get("error")]

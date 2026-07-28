@@ -282,6 +282,17 @@ def _build_user_content(pages: list[dict]) -> list[dict]:
                 "data": p["image_b64"],
             },
         })
+    # T5c (2026-07-28 telemetry audit): breakpoint on the image prefix, mirroring
+    # prompt.build_user_content. The system prompt already had one, but the heavy
+    # part — the page images — did not, so a retry (JSON-decode failure, or a
+    # transient 5xx) re-sent byte-identical images at FULL price. With the
+    # breakpoint a retry reads them at ~0.1x instead.
+    # Tradeoff, stated honestly: a cache write costs 1.25x, so the no-retry case
+    # pays +25% on the image tokens. Break-even is a ~38% retry rate on this
+    # reader; revert this hunk if the new cache_write telemetry shows retries are
+    # rarer than that. Zero accuracy impact either way.
+    if content and content[-1].get("type") == "image":
+        content[-1]["cache_control"] = {"type": "ephemeral"}
     return content
 
 
@@ -381,12 +392,17 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
             ) as stream:
                 resp = stream.get_final_message()
 
+            # T5b (2026-07-28 telemetry audit): `refusal` and `max_tokens` are
+            # DETERMINISTIC given an unchanged payload — the retry re-sent
+            # byte-identical input and re-paid for it three times to get the
+            # same answer. Fail immediately, matching _run_pass1_once in
+            # vision_call.py, which returns on both stop reasons. The
+            # network/5xx retries in the except block below are untouched —
+            # those are genuinely transient.
             if resp.stop_reason in ("refusal", "max_tokens"):
-                last_err = Exception(f"stop_reason={resp.stop_reason}")
-                if attempt == 2:
-                    break
-                time.sleep(1.5 ** attempt)
-                continue
+                last_err = Exception(
+                    f"stop_reason={resp.stop_reason} (deterministic — not retried)")
+                break
 
             text = "".join(
                 b.text for b in resp.content if getattr(b, "type", None) == "text"

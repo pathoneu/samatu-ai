@@ -144,10 +144,10 @@ def extract_stogo_planas_dims(
     responsible for deriving `eaves_overhang_from_outer_wall_m`
     (= axis − wall_thickness/2) and merging into a `RoofInput`.
     """
-    client = client or anthropic.Anthropic()
+    client = client or anthropic.Anthropic(max_retries=1)
     resp = client.messages.create(
         model=model or model_for("vision_pass1"),
-        max_tokens=600,
+        max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
         system=[{
             "type": "text",
             "text": _STOGO_PLANAS_SYSTEM,
@@ -528,10 +528,10 @@ def extract_pjuvis_dims(
 
     Returns the raw JSON dict per `_PJUVIS_SCHEMA`.
     """
-    client = client or anthropic.Anthropic()
+    client = client or anthropic.Anthropic(max_retries=1)
     resp = client.messages.create(
         model=model or model_for("vision_pass1"),
-        max_tokens=400,
+        max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
         system=[{
             "type": "text",
             "text": _PJUVIS_SYSTEM,

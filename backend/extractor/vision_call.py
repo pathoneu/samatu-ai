@@ -2579,6 +2579,17 @@ def _run_pass1_once(client, system, pages, *,
     max_attempts = 3
     attempt = 0
     doc_failures = 0
+    # T5a (2026-07-28 telemetry audit). MEASURED, so the comment doesn't
+    # overclaim: the worst case here is 5 API attempts (2 document + 3 image),
+    # not 6. The `attempt = 0` reset below was ALREADY effectively one-shot,
+    # because _flip_to_image_fallback sets `using_document = False` and so makes
+    # the reset branch unreachable a second time. This explicit flag changes no
+    # behaviour — it makes that one-shot property local and obvious instead of
+    # an emergent side effect of a nonlocal mutated inside a nested function,
+    # so a future edit to _flip_to_image_fallback can't quietly uncap the loop.
+    # The actual reduction came from the client's max_retries=1 (see
+    # extract_interior): 5 attempts × 3 HTTP → 5 × 2 = 10 HTTP per round.
+    doc_fallback_spent = False
     while attempt < max_attempts:
         try:
             with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
@@ -2623,14 +2634,15 @@ def _run_pass1_once(client, system, pages, *,
         except Exception as exc:
             last_err = exc
             print(f"[extractor] attempt {attempt + 1} failed: {exc}")
-            if using_document:
+            if using_document and not doc_fallback_spent:
                 doc_failures += 1
                 if isinstance(exc, anthropic.BadRequestError) or doc_failures >= 2:
                     print("[experiment:native_pdf] API rejected the document "
                           f"payload ({type(exc).__name__}) → retrying this and "
                           "all remaining rounds as raster images")
+                    doc_fallback_spent = True   # one-shot — never reset twice
                     _flip_to_image_fallback("api_rejected_document")
-                    attempt = 0  # fresh retry budget for the image path
+                    attempt = 0  # image branch gets its own 3-attempt budget
                     continue
             attempt += 1
             if attempt >= max_attempts:
@@ -2721,22 +2733,26 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         if p.get("status") == "error":
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
-            if mixed_models:
-                per_round_meta.append({"round": i + 1, "model": round_models[i],
-                                       "error": p.get("_error")})
+            per_round_meta.append({"round": i + 1, "model": round_models[i],
+                                   "error": p.get("_error")})
             continue
         runs.append(p)
-        if mixed_models:
-            _rm = p.get("_meta") or {}
-            per_round_meta.append({
-                "round": i + 1,
-                "model": _rm.get("model") or round_models[i],
-                "input_tokens": int(_rm.get("input_tokens") or 0),
-                "output_tokens": int(_rm.get("output_tokens") or 0),
-                "cache_read_tokens": int(_rm.get("cache_read_tokens") or 0),
-                "cache_write_tokens": int(_rm.get("cache_write_tokens") or 0),
-                "cost_usd": _round_cost_usd(_rm),
-            })
+        # T4 (2026-07-28 telemetry audit): populated UNCONDITIONALLY. This used
+        # to be gated behind `if mixed_models:` (the SAMATU_VOTING_MODELS
+        # experiment), so production — which never sets that env var — could
+        # never see which voting round hit the prompt cache and which re-paid
+        # the full image prefix. That is exactly the signal needed to tell a
+        # cache regression from a genuine token increase.
+        _rm = p.get("_meta") or {}
+        per_round_meta.append({
+            "round": i + 1,
+            "model": _rm.get("model") or round_models[i],
+            "input_tokens": int(_rm.get("input_tokens") or 0),
+            "output_tokens": int(_rm.get("output_tokens") or 0),
+            "cache_read_tokens": int(_rm.get("cache_read_tokens") or 0),
+            "cache_write_tokens": int(_rm.get("cache_write_tokens") or 0),
+            "cost_usd": _round_cost_usd(_rm),
+        })
         _emit({"event": "voting_round_completed", "round": i + 1,
                "rooms": len(p.get("patalpos") or [])})
 
@@ -2752,6 +2768,17 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         try:
             from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
             adj = extract_adjacency(image_b64=floor_b64, client=client)
+            # T3 (2026-07-28 telemetry audit): this pass is a real, paid Vision
+            # call made once per extraction, and its usage was captured on the
+            # result but never merged into extra_calls — so every stored
+            # cost_eur silently omitted it. Appending to runs[0]["_meta"] is
+            # deliberate: the voted meta is built as {**runs[0]["_meta"], ...}
+            # below, and the 1-run path returns runs[0] itself, so a single
+            # append reaches BOTH exit paths exactly once. A cache-hit adjacency
+            # carries no tokens and _append_extra_call no-ops on it (correct —
+            # a cache hit costs nothing).
+            _append_extra_call(runs[0], getattr(adj, "_meta", None),
+                               reader="adjacency")
             n_set = 0
             for p in runs:
                 summary = apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
@@ -2761,16 +2788,23 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         except Exception as exc:
             print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
 
-    def _attach_mixed_vote_meta(meta: dict) -> None:
-        """Record mixed-model provenance: per-round model/tokens/cost split
-        (each round priced at ITS OWN model's rates — pricing per-model caches
-        and rates differ) + the run order. Consumed by
-        pricing.calc_meta_cost_usd so cost aggregation stays correct."""
-        if not mixed_models:
-            return
+    def _attach_vote_meta(meta: dict) -> None:
+        """Record per-round provenance: model/tokens/cost split (each round
+        priced at ITS OWN model's rates — per-model caches and rates differ)
+        + the run order. Consumed by pricing.calc_meta_cost_usd so cost
+        aggregation stays correct.
+
+        T4 (2026-07-28): attached UNCONDITIONALLY, not just under the
+        SAMATU_VOTING_MODELS experiment. Cost is provably unchanged for the
+        single-model case: calc_claude_cost_usd is linear in tokens and every
+        round shares one model, so summing per-round costs equals pricing the
+        summed tokens — the same _tok_sum the non-voting_models branch used.
+        Only ``experiment.mixed_vote`` stays experiment-gated."""
         meta["voting_models"] = per_round_meta
         costs = [r["cost_usd"] for r in per_round_meta if r.get("cost_usd") is not None]
         meta["voting_cost_usd"] = round(sum(costs), 4) if costs else None
+        if not mixed_models:
+            return
         meta.setdefault("experiment", {})["mixed_vote"] = {
             "models_requested": mixed_models,
             "models_run_order": [m for m in round_models],
@@ -2779,7 +2813,7 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
     if len(runs) == 1:
         runs[0]["_voting"] = {"n_runs": 1, "degraded": True,
                               "note": "only 1 of N runs succeeded — unvoted"}
-        _attach_mixed_vote_meta(runs[0].setdefault("_meta", {}))
+        _attach_vote_meta(runs[0].setdefault("_meta", {}))
         return runs[0]
 
     voted = vote_extraction(runs, min_votes=2)
@@ -2790,7 +2824,7 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
     for _k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
         _tok_sum[_k] = sum(int((r.get("_meta") or {}).get(_k) or 0) for r in runs)
     voted["_meta"] = {**runs[0].get("_meta", {}), **_tok_sum, "voting_runs": len(runs)}
-    _attach_mixed_vote_meta(voted["_meta"])
+    _attach_vote_meta(voted["_meta"])
     return voted
 
 
@@ -2813,7 +2847,11 @@ def extract_interior(
              On success returns {..., "status": "ok", "_meta": {...}}.
     """
     t0 = time.time()
-    client = anthropic.Anthropic()
+    # max_retries=1 (T5a, 2026-07-28): the SDK default is 2, which multiplies
+    # with the app-level retry loop in _run_pass1_once (3 attempts) and every
+    # sub-reader that shares this client. One SDK-level retry still absorbs a
+    # transient 429/5xx; the app loop handles anything more persistent.
+    client = anthropic.Anthropic(max_retries=1)
 
     def _emit(ev: dict) -> None:
         if not progress_cb:

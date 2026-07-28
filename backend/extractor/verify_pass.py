@@ -64,7 +64,7 @@ def _call_opus(prompt: str) -> dict:
         raise RuntimeError(
             "ANTHROPIC_API_KEY not set; cannot run verify_pass live."
         )
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(max_retries=1)
     resp = client.messages.create(
         model=model_for("vision_pass2"),
         max_tokens=4096,

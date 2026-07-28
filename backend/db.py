@@ -111,15 +111,23 @@ def init_schema() -> None:
             -- the extraction returns), so the extractions table (project_id FK)
             -- can never be written at extract time. This ledger CAN. (2026-06-19)
             CREATE TABLE IF NOT EXISTS usage_events (
-                id                TEXT PRIMARY KEY,
-                user_id           TEXT NOT NULL,
-                kind              TEXT,
-                input_tokens      INTEGER,
-                output_tokens     INTEGER,
-                cache_read_tokens INTEGER,
-                cost_eur          REAL,
-                model             TEXT,                -- W1.1 (2026-07-03)
-                created_at        TEXT NOT NULL
+                id                 TEXT PRIMARY KEY,
+                user_id            TEXT NOT NULL,
+                kind               TEXT,
+                input_tokens       INTEGER,
+                output_tokens      INTEGER,
+                cache_read_tokens  INTEGER,
+                -- T2 (2026-07-28 telemetry audit): cache WRITES were priced into
+                -- cost_eur but stored nowhere, so a cache regression (breakpoint
+                -- moved, prefix invalidated, TTL expiring between voting rounds)
+                -- was invisible — the bill rose with no column to explain it.
+                cache_write_tokens INTEGER,
+                -- The extra_calls (sub-Vision) share of cost_eur. 65-74% of a
+                -- typical extraction's cost lives here and was unattributable.
+                extra_calls_cost_eur REAL,
+                cost_eur           REAL,
+                model              TEXT,               -- W1.1 (2026-07-03)
+                created_at         TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_usage_user_time ON usage_events(user_id, created_at);
 
@@ -303,16 +311,59 @@ def get_project(project_id: str, user_id: str | None = None) -> dict | None:
         return {**data, **{k: v for k, v in d.items() if v is not None}}
 
 
-def upsert_project(project_id: str, payload: dict, user_id: str | None = None) -> dict:
+def project_exists(project_id: str, user_id: str | None = None) -> bool:
+    """Cheap existence + ownership check — no data blob read.
+
+    get_project() pulls and json.loads()es the whole ~175 KB blob; callers that
+    only need "does this exist and is it mine?" (the PDF stream endpoint) paid
+    that for nothing. SELECT 1 with the same ownership semantics.
+    """
+    with _conn() as c:
+        if user_id:
+            row = c.execute("SELECT 1 FROM projects WHERE id = ? AND user_id = ?",
+                            (project_id, user_id)).fetchone()
+        else:
+            row = c.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone()
+        return row is not None
+
+
+class ProjectConflictError(Exception):
+    """Raised by upsert_project when base_updated_at does not match the row.
+
+    Carries the CURRENT server timestamp so the caller can tell the client what
+    it is now out of date against.
+    """
+
+    def __init__(self, project_id: str, current_updated_at: str | None):
+        super().__init__(
+            f"Project {project_id} was modified since base_updated_at="
+            f"{current_updated_at!r}"
+        )
+        self.project_id = project_id
+        self.current_updated_at = current_updated_at
+
+
+def upsert_project(project_id: str, payload: dict, user_id: str | None = None,
+                   base_updated_at: str | None = None) -> dict:
     """Insert or full-replace. user_id stored on create; on update, ownership
-    is checked first (raises if mismatch)."""
+    is checked first (raises if mismatch).
+
+    `base_updated_at` (optional) is the updated_at the client last SAW. When
+    given and the stored row has moved on, raise ProjectConflictError instead of
+    silently destroying the other writer's changes (two tabs on one project used
+    to lose whichever save landed first, with no warning). Omitted → the check
+    is skipped entirely, so legacy clients, scripts and restore flows behave
+    exactly as before. The comparison happens INSIDE the _conn() block, which
+    holds the global _DB_LOCK, so check-and-write is atomic.
+    """
     now = _now_iso()
     name = payload.get("name") or "Naujas projektas"
     tipas = payload.get("tipas") or "interjeras"
     blob = json.dumps(payload, ensure_ascii=False)
     with _conn() as c:
         existing = c.execute(
-            "SELECT created_at, user_id FROM projects WHERE id = ?", (project_id,)
+            "SELECT created_at, user_id, updated_at FROM projects WHERE id = ?",
+            (project_id,),
         ).fetchone()
         if existing:
             # Ownership barrier (2026-06-19 security hunt): when the caller is
@@ -325,6 +376,10 @@ def upsert_project(project_id: str, payload: dict, user_id: str | None = None) -
             # SAMATU_AUTH_DISABLED single-tenant mode, where ownership doesn't apply.
             if user_id and existing["user_id"] != user_id:
                 raise PermissionError(f"User {user_id} does not own project {project_id}")
+            # Lost-update detection (2026-07-28 sweep). Ownership is checked
+            # first on purpose: a cross-user write is a 403, not a 409.
+            if base_updated_at is not None and existing["updated_at"] != base_updated_at:
+                raise ProjectConflictError(project_id, existing["updated_at"])
             created_at = existing["created_at"]
             owner = existing["user_id"] or user_id
         else:
@@ -446,7 +501,7 @@ def record_usage(user_id: str | None, response: dict | None,
     against the user instead. (2026-06-19 commercial level-up.)"""
     if not user_id:
         return 0.0
-    from pricing import calc_meta_cost_usd
+    from pricing import calc_meta_cost_usd, calc_extra_calls_cost_usd, USD_TO_EUR
     import uuid as _uuid
     meta = (response or {}).get("_meta") or {}
     in_t = int(meta.get("input_tokens") or 0)
@@ -459,13 +514,25 @@ def record_usage(user_id: str | None, response: dict | None,
     # 2026-07-04: voting_models-aware — mixed-model rounds priced per-round
     # at each round's model rates; identical result when the key is absent.
     cost_eur = calc_meta_cost_usd(meta, default_model="claude-opus-4-8") * 0.93
+    # T2 (2026-07-28): the sub-Vision (extra_calls) share of that same total —
+    # the dominant, previously unattributable slice. Priced by the SAME helper
+    # calc_meta_cost_usd uses internally, so it is always <= cost_eur and never
+    # a second, independently-drifting estimate. Best-effort: an unpriceable
+    # entry must not lose the whole usage_event.
+    try:
+        extra_eur = calc_extra_calls_cost_usd(meta) * USD_TO_EUR
+    except Exception as exc:
+        print(f"[usage] extra_calls pricing failed ({exc}) — storing NULL")
+        extra_eur = None
     with _conn() as c:
         c.execute("""
             INSERT INTO usage_events
                 (id, user_id, kind, input_tokens, output_tokens,
-                 cache_read_tokens, cost_eur, model, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (_uuid.uuid4().hex, user_id, kind, in_t, out_t, cache_t,
+                 cache_read_tokens, cache_write_tokens, extra_calls_cost_eur,
+                 cost_eur, model, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (_uuid.uuid4().hex, user_id, kind, in_t, out_t, cache_t, cache_w,
+              None if extra_eur is None else round(extra_eur, 4),
               round(cost_eur, 4), model, _now_iso()))
     return cost_eur
 
@@ -832,6 +899,14 @@ def _migrate_schema() -> None:
         uecols = {row["name"] for row in c.execute("PRAGMA table_info(usage_events)").fetchall()}
         if uecols and "model" not in uecols:
             c.execute("ALTER TABLE usage_events ADD COLUMN model TEXT")
+        # T2 (2026-07-28 telemetry audit): cache-write volume + the extra_calls
+        # share of cost_eur. Both NULL on pre-migration rows — that is the honest
+        # value (we never captured them), NOT zero, so readers must treat NULL as
+        # "unknown" rather than "no cache writes happened".
+        if uecols and "cache_write_tokens" not in uecols:
+            c.execute("ALTER TABLE usage_events ADD COLUMN cache_write_tokens INTEGER")
+        if uecols and "extra_calls_cost_eur" not in uecols:
+            c.execute("ALTER TABLE usage_events ADD COLUMN extra_calls_cost_eur REAL")
         # F2 (2026-07-04 pentest): session-version nonce for logout /
         # change-password invalidation. Every session cookie stores the value it
         # was minted against; require_user rejects when it no longer matches, so

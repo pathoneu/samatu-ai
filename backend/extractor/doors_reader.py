@@ -159,7 +159,7 @@ def read_doors_from_plan(
     user_text = build_user_text(rooms_summary)
     try:
         model = model_for("doors")  # call-time resolution (MODEL_OVERRIDE etc.)
-        client = client or anthropic.Anthropic()
+        client = client or anthropic.Anthropic(max_retries=1)
         resp = client.messages.create(
             model=model, max_tokens=MAX_TOKENS,
             system=[{"type": "text", "text": SYSTEM_PROMPT,
