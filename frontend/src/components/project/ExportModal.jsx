@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, FileText, AlertCircle, FileCode, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { API_BASE as API } from '@/lib/apiBase';
+import { sanitizeExportFilename } from '@/lib/exportFilename';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -204,7 +205,9 @@ export default function ExportModal({ open, onClose, project }) {
     if (action === 'xml') return;
     setLoading(action);
     try {
-      const safeName = (project.name || 'projektas').replace(/[^\w\s-]/g, '').trim();
+      // Unicode-aware — the old ASCII \w stripped Lithuanian letters
+      // ("Beržų g. 24" → "Ber g 24"). Same sanitizer as ExportDropdown.
+      const safeName = sanitizeExportFilename(project.name);
       if (action === 'excel') {
         await downloadFromBackend('generate-excel', project, `${safeName}.xlsx`);
       } else if (action === 'pdf') {

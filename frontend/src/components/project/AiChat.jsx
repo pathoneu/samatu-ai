@@ -58,7 +58,10 @@ export default function AiChat({ project, inline = false }) {
           question,
           project_context: {
             name: project?.name,
-            v8_rooms: project?.v8_rooms,
+            // Legacy blobs carry rooms only under `patalpos` — without the
+            // fallback the AI gets ZERO rooms while its prompt forbids saying
+            // it lacks data, so it confabulates. (4A finding, 2026-07-28)
+            v8_rooms: project?.v8_rooms?.length ? project.v8_rooms : project?.patalpos,
             v8_totals: project?.v8_totals,
             darbu_sarasas: project?.darbu_sarasas,
           },
