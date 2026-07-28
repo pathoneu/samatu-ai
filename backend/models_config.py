@@ -6,13 +6,23 @@ every invocation) so a harness that sets ``MODEL_OVERRIDE`` before running
 the pipeline steers every reader without re-imports.
 
 Exact model IDs (authoritative — never append date suffixes):
-  - ``claude-opus-4-8``  — current production default for every role.
-  - ``claude-fable-5``   — W1 benchmark candidate. Fable 5 API facts:
-      thinking is always on (send NO ``thinking`` param — an explicit
-      ``disabled`` 400s), no assistant prefill, 128K max output, same
-      tokenizer as Opus 4.8, requires 30-day data retention, safety
-      classifiers may return ``stop_reason="refusal"`` (HTTP 200) — check
-      ``stop_reason`` before reading content.
+  - ``claude-opus-5``    — production default for every role since
+      2026-07-28, chosen by paid bake-off on the ground-truth fixtures:
+      Beržų headline MAE 6.12% vs 7.03% (opus-4-8), category 10.49% vs
+      13.41%; objektas_b headline 39.34% vs 51.23%, category ~tied.
+      Same $5/$25 pricing and SAME TOKENIZER as opus-4-8 (cost baselines
+      carry over). API facts: thinking ON BY DEFAULT (never send an
+      explicit ``thinking`` param; ``max_tokens`` caps thinking+answer,
+      so snug caps truncate — floors were raised at the cutover), safety
+      classifiers may return ``stop_reason="refusal"`` (HTTP 200) — the
+      call sites check ``stop_reason`` before reading content; prompt-
+      cache minimum drops to 512 tokens (short system prompts now cache).
+  - ``claude-opus-4-8``  — previous champion; kept as the known-good
+      rollback (set MODEL_OVERRIDE=claude-opus-4-8 to restore instantly).
+  - ``claude-fable-5``   — evaluated twice (2026-07-03, 2026-07-28),
+      lost both times on headline MAE at 2× the price. Not used.
+  - ``claude-sonnet-5``  — evaluated 2026-07-28: 24.3%/46.1% MAE on
+      Beržų, unusable for LT drawings. Never route vision roles here.
 
 NO-TEMPERATURE RULE: never add ``temperature``, ``top_p``, or ``top_k`` to
 any Anthropic call anywhere in this codebase — all three return 400 on both
@@ -49,7 +59,7 @@ from __future__ import annotations
 
 import os
 
-DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_MODEL = "claude-opus-5"
 
 ROLES: dict[str, str] = {
     "vision_pass1": DEFAULT_MODEL,

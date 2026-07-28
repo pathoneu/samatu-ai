@@ -7,7 +7,7 @@ so eval_harness --model (which sets MODEL_OVERRIDE) steers every reader.
 import pytest
 
 import models_config
-from models_config import ROLES, model_for, resolved_models
+from models_config import DEFAULT_MODEL, ROLES, model_for, resolved_models
 
 _ENV_VARS = [
     "MODEL_OVERRIDE", "VISION_MODEL", "EXTRACTION_MODEL",
@@ -20,9 +20,13 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
 
-def test_default_is_opus_48_for_every_role():
+def test_default_is_opus_5_for_every_role():
+    """claude-opus-5 is the champion since the 2026-07-28 bake-off (Beržų
+    6.12%/10.49% vs opus-4-8's 7.03%/13.41%; objektas_b 39.34% vs 51.23%).
+    If this fails because someone flipped the default: any model change must
+    be re-gated on the paid eval fixtures first (CLAUDE.md accuracy rule)."""
     for role in ROLES:
-        assert model_for(role) == "claude-opus-4-8"
+        assert model_for(role) == "claude-opus-5"
 
 
 def test_unknown_role_raises_keyerror():
@@ -57,26 +61,26 @@ def test_legacy_vision_model_applies_to_vision_roles_only(monkeypatch):
     assert model_for("vision_pass2") == "claude-fable-5"
     assert model_for("doors") == "claude-fable-5"
     assert model_for("symbols") == "claude-fable-5"
-    # extraction + chat are NOT vision roles
-    assert model_for("extraction") == "claude-opus-4-8"
-    assert model_for("chat") == "claude-opus-4-8"
+    # extraction + chat are NOT vision roles — they stay on the default
+    assert model_for("extraction") == DEFAULT_MODEL
+    assert model_for("chat") == DEFAULT_MODEL
 
 
 def test_legacy_extraction_model_applies_to_extraction_only(monkeypatch):
     monkeypatch.setenv("EXTRACTION_MODEL", "claude-fable-5")
     assert model_for("extraction") == "claude-fable-5"
-    assert model_for("vision_pass1") == "claude-opus-4-8"
-    assert model_for("chat") == "claude-opus-4-8"
+    assert model_for("vision_pass1") == DEFAULT_MODEL
+    assert model_for("chat") == DEFAULT_MODEL
 
 
 def test_resolution_is_call_time_not_import_time(monkeypatch):
     """Env changes AFTER import must apply — this is what lets the eval
     harness set MODEL_OVERRIDE and steer already-imported readers."""
-    assert model_for("vision_pass1") == "claude-opus-4-8"
+    assert model_for("vision_pass1") == DEFAULT_MODEL
     monkeypatch.setenv("MODEL_OVERRIDE", "claude-fable-5")
     assert model_for("vision_pass1") == "claude-fable-5"
     monkeypatch.delenv("MODEL_OVERRIDE")
-    assert model_for("vision_pass1") == "claude-opus-4-8"
+    assert model_for("vision_pass1") == DEFAULT_MODEL
 
 
 def test_resolved_models_returns_live_full_map(monkeypatch):
