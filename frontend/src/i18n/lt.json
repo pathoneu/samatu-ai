@@ -989,7 +989,9 @@
       "manualPricesKept": "Rankomis įvestos kainos lieka nepakeistos. Žemo pasitikėjimo atitikmenys praleidžiami.",
       "toastApplyFail": "Iš kainyno „{{name}}\" nepavyko pritaikyti nė vienos eilutės. Patikrinkite, ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).",
       "toastApplied": "Pritaikyta: {{applied}} eilučių iš kainyno „{{name}}\". Praleista: {{skipped}}.",
-      "toastInvalidNumber": "Neteisingas skaičius. Naudokite kablelį arba tašką, pvz. 12,5."
+      "toastInvalidNumber": "Neteisingas skaičius. Naudokite kablelį arba tašką, pvz. 12,5.",
+      "toastRowDeleted": "Eilutė ištrinta",
+      "undo": "Atšaukti"
     },
     "assumptions": {
       "widthPlaceholder": "plotis",

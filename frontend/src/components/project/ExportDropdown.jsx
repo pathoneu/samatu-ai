@@ -9,7 +9,17 @@ import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
 import { API_BASE as API } from '@/lib/apiBase';
+import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { useConfirm } from '@/components/ui/confirm-provider';
+
+// "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
+// warning doesn't read like machine output.
+function ltEilutes(n) {
+  const d10 = n % 10, d100 = n % 100;
+  if (d10 === 1 && d100 !== 11) return `${n} eilutė`;
+  if (d10 >= 2 && d10 <= 9 && (d100 < 10 || d100 > 20)) return `${n} eilutės`;
+  return `${n} eilučių`;
+}
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
@@ -183,9 +193,26 @@ export default function ExportDropdown({ project }) {
       });
       if (!ok) return;
     }
+    // Partial-price guard (2026-07-28 walkthrough): the check above only fires
+    // when EVERY line is unpriced, so a sąmata where 3 of 40 positions still sat
+    // at 0,00 € went to the client silently. Count on the payload actually being
+    // exported (skyriai filter applied, kiekis = 0 placeholder rows are dropped
+    // by buildPayload, so they can't inflate the warning).
+    const exportedRows = (buildPayload(project, skyriai).eilutes || [])
+      .filter((r) => (r.kiekis || 0) > 0);
+    const unpricedRows = exportedRows.filter((r) => !(Number(r.kaina) > 0));
+    if (unpricedRows.length > 0 && unpricedRows.length < exportedRows.length) {
+      const ok = await confirm({
+        title: `${ltEilutes(unpricedRows.length)} be kainos — eksportuoti vis tiek?`,
+        description: 'Šios pozicijos dokumente bus su 0,00 € suma. Galite grįžti ir įvesti kainas arba pritaikyti kainyną.',
+        confirmText: 'Eksportuoti',
+        cancelText: 'Atšaukti',
+      });
+      if (!ok) return;
+    }
     setLoading(format);
     try {
-      const safeName = (project.name || 'projektas').replace(/[^\w\s-]/g, '').trim();
+      const safeName = sanitizeExportFilename(project.name);
       const extra = { uzsakovas, objektas, pasiulymo_nr };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);

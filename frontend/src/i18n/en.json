@@ -985,7 +985,9 @@
       "manualPricesKept": "Manually entered prices stay unchanged. Low-confidence matches are skipped.",
       "toastApplyFail": "Could not apply a single row from price list „{{name}}\". Check that descriptions are similar and units match (m² / m / pcs).",
       "toastApplied": "Applied: {{applied}} rows from price list „{{name}}\". Skipped: {{skipped}}.",
-      "toastInvalidNumber": "Invalid number. Use a comma or a dot, e.g. 12.5."
+      "toastInvalidNumber": "Invalid number. Use a comma or a dot, e.g. 12.5.",
+      "toastRowDeleted": "Row deleted",
+      "undo": "Undo"
     },
     "assumptions": {
       "widthPlaceholder": "width",

@@ -16,7 +16,7 @@ import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import { exportCSVFile, exportJSONFile } from '@/lib/measureExport';
 import { buildMeasureExportDoc } from '@/lib/measureExportDoc';
-import { parseLtNumber } from '@/lib/parseLtNumber';
+import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
@@ -286,7 +286,8 @@ export default function WorkspacePanel({
   const handlePriceChange = useCallback((rowId, newPrice) => {
     if (!onProjectChange) return;
     const kaina = parseLtNumber(newPrice);
-    if (!Number.isFinite(kaina) || kaina < 0) return;   // never write NaN into a sąmata
+    // isValidAmount: never write NaN — nor an absurd 10^12 € — into a sąmata.
+    if (!isValidAmount(kaina)) return;
     const updated = (project.darbu_sarasas || []).map(it => {
       const id = it._id || `${it.eil_nr}-${it.aprasymas}`;
       if (id !== rowId) return it;
@@ -910,14 +911,14 @@ const PositionRow = memo(function PositionRow({
   // now keeps the editor open instead of silently discarding what was typed.
   const commitQty = () => {
     const num = parseLtNumber(draftQty);
-    if (!Number.isFinite(num) || num < 0) return;
+    if (!isValidAmount(num)) return;
     onQuantityChange(num);
     setEditingQty(false);
   };
 
   const commit = () => {
     const num = parseLtNumber(draftPrice);
-    if (!Number.isFinite(num) || num < 0) return;
+    if (!isValidAmount(num)) return;
     onPriceChange(num);
     setEditing(false);
   };

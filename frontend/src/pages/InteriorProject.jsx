@@ -674,6 +674,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       if (!revoked) {
         url = u;
         setPdfUrl(u);
+        // No stored PDF → TabBar drops the 'brezinys' tab, so the default tab
+        // pointed at a tab that isn't rendered: the user landed on "Brėžinys
+        // nepasiekiamas" with nothing highlighted. Fall back to the first
+        // VISIBLE tab. Also covers hasPdf turning false at runtime (project
+        // switch), because this effect re-runs per project.id.
+        // (2026-07-28 UX walkthrough.)
+        if (!u) setTab(cur => (cur === 'brezinys' ? 'main' : cur));
       } else if (u) {
         URL.revokeObjectURL(u);
       }

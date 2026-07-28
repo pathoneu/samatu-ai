@@ -19,7 +19,15 @@ const H_MAX_M = 6.0;
 
 function fmtM(val) {
   if (val == null) return '—';
-  return `${Number(val).toFixed(2)} m`;
+  return `${ltDecimal(Number(val).toFixed(2))} m`;
+}
+
+// LT decimal comma for DISPLAY. Input parsing accepts both (parseLtNumber), but
+// the field showed "2.8" while the rest of the app writes "2,8".
+// (2026-07-28 UX walkthrough.)
+function ltDecimal(val) {
+  if (val == null || val === '') return '';
+  return String(val).replace('.', ',');
 }
 
 /**
@@ -31,8 +39,8 @@ function fmtM(val) {
  * local draft: an empty or out-of-range draft is shown with a subtle error
  * border and commits NOTHING (so no recompute fires until the number is valid).
  */
-function NumberInput({ value, onChange, min, max, step = 0.01, unit, className }) {
-  const [draft, setDraft] = useState(value ?? '');
+function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, errorMessage }) {
+  const [draft, setDraft] = useState(() => ltDecimal(value ?? ''));
   const [invalid, setInvalid] = useState(false);
   const [focused, setFocused] = useState(false);
 
@@ -40,7 +48,7 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className }
   // otherwise a mid-typing "3." would be rewritten to "3".
   useEffect(() => {
     if (!focused) {
-      setDraft(value ?? '');
+      setDraft(ltDecimal(value ?? ''));
       setInvalid(false);
     }
   }, [value, focused]);
@@ -57,22 +65,33 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className }
   };
 
   return (
-    <div className="flex items-center gap-1.5">
-      <Input
-        type="text"
-        inputMode="decimal"
-        value={draft}
-        step={step}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onChange={handleChange}
-        aria-invalid={invalid || undefined}
-        title={invalid && min != null && max != null ? `${min}–${max}` : undefined}
-        className={`${className || 'h-7 w-20'} text-xs bg-card text-right tabular-nums ${
-          invalid ? 'border-destructive text-destructive' : 'border-border'
-        }`}
-      />
-      {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          step={step}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={handleChange}
+          aria-invalid={invalid || undefined}
+          title={invalid && min != null && max != null ? `${min}–${max}` : undefined}
+          className={`${className || 'h-7 w-20'} text-xs bg-card text-right tabular-nums ${
+            invalid ? 'border-destructive text-destructive' : 'border-border'
+          }`}
+        />
+        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+      </div>
+      {/* A red border + a title tooltip was the ONLY feedback for an
+          out-of-range value — invisible in practice. Say it out loud; the
+          commit behaviour (nothing is written, nothing is clamped) is
+          unchanged. (2026-07-28 UX walkthrough.) */}
+      {invalid && errorMessage && (
+        <p className="mt-0.5 text-[10px] leading-tight text-destructive" role="alert">
+          {errorMessage}
+        </p>
+      )}
     </div>
   );
 }
@@ -368,7 +387,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           {rooms.length > 0 && (
             <div className="py-2">
               <p className="text-sm text-foreground mb-1">
-                {t('project.assumptions.ceilingHeightLabel')}<span className="text-xs text-muted-foreground">{t('project.assumptions.ceilingHeightDefault', { avg: avgH.toFixed(2) })}</span>
+                {t('project.assumptions.ceilingHeightLabel')}<span className="text-xs text-muted-foreground">{t('project.assumptions.ceilingHeightDefault', { avg: ltDecimal(avgH.toFixed(2)) })}</span>
               </p>
               <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
                 {t('project.assumptions.ceilingHeightNote')}
@@ -385,7 +404,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                   type="text"
                   inputMode="decimal"
                   defaultValue=""
-                  placeholder={avgH.toFixed(2)}
+                  placeholder={ltDecimal(avgH.toFixed(2))}
                   step={0.05}
                   onBlur={e => {
                     const raw = e.target.value.trim();
@@ -394,7 +413,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                     // Same 2.0–6.0 window the per-room inputs enforce; out of
                     // range is reported, not silently clamped or ignored.
                     if (!Number.isFinite(v) || v < H_MIN_M || v > H_MAX_M) {
-                      toast.error(t('project.assumptions.heightRangeErr', { min: H_MIN_M.toFixed(2), max: H_MAX_M.toFixed(2) }));
+                      toast.error(t('project.assumptions.heightRangeErr', {
+                        min: ltDecimal(H_MIN_M.toFixed(2)),
+                        max: ltDecimal(H_MAX_M.toFixed(2)),
+                      }));
                       return;
                     }
                     setLubuAukstisAll(v);
@@ -424,6 +446,10 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                       min={H_MIN_M} max={H_MAX_M} step={0.05}
                       unit="m"
                       className="h-6 w-16"
+                      errorMessage={t('project.assumptions.heightRangeErr', {
+                        min: ltDecimal(H_MIN_M.toFixed(2)),
+                        max: ltDecimal(H_MAX_M.toFixed(2)),
+                      })}
                       onChange={v => setLubuAukstis(room.nr, v)}
                     />
                   </div>

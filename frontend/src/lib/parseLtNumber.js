@@ -43,4 +43,20 @@ export function parseLtNumber(input) {
   return Number(s);
 }
 
+/**
+ * Upper bound for a kiekis / kaina input (99 999 999).
+ *
+ * There was no ceiling at all: 999999999999 × 1000000 was accepted and the
+ * sąmata printed a nonsense 10^18 € total. Nothing in LT interior work is
+ * bigger than ~10^8 of anything, so treat a larger number as a typo (a missed
+ * decimal separator or a pasted phone number) and reject it like any other
+ * invalid input — never clamp silently. (2026-07-28 UX walkthrough.)
+ */
+export const MAX_AMOUNT = 99_999_999;
+
+/** True when `n` is a finite, non-negative amount within MAX_AMOUNT. */
+export function isValidAmount(n) {
+  return Number.isFinite(n) && n >= 0 && n <= MAX_AMOUNT;
+}
+
 export default parseLtNumber;

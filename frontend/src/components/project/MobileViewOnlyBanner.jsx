@@ -29,7 +29,10 @@ export default function MobileViewOnlyBanner() {
 
   if (!visible) return null;
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-md text-center"
+    // `fixed`, not `absolute` (2026-07-28): the workspace container is taller
+    // than a phone viewport, so an absolutely-placed banner sat ~90 px below
+    // the fold — mounted but unreadable. Pinned to the viewport it is seen.
+    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-[92vw] text-center"
       style={{
         background: 'rgba(15,23,42,0.95)', color: '#fef3c7',
         padding: '10px 16px', borderRadius: 8, fontSize: 12,

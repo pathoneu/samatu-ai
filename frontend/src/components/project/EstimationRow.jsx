@@ -3,7 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { parseLtNumber } from '@/lib/parseLtNumber';
+import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 
 export default function EstimationRow({ row, index, onPriceChange, onRowClick }) {
   // LT decimal comma: `type="number"` reports an EMPTY value for "12,5", so the
@@ -18,7 +18,9 @@ export default function EstimationRow({ row, index, onPriceChange, onRowClick })
     setDraft(raw);
     if (raw.trim() === '') { onPriceChange(index, 0); return; }
     const price = parseLtNumber(raw);
-    if (!Number.isFinite(price) || price < 0) return;   // wait for a valid number
+    // Also caps at 99 999 999 (2026-07-28): an absurd price is never committed,
+    // the draft stays on screen so the user can fix the typo.
+    if (!isValidAmount(price)) return;   // wait for a valid number
     onPriceChange(index, price);
   };
 

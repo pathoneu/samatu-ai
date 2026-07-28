@@ -28,6 +28,7 @@ import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
+import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
@@ -367,6 +368,13 @@ export default function InteriorWorkspace({
     <div className="flex flex-col md:flex-row h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
       {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
       <OnboardingTooltips />
+      {/* Phase C-1 Task 24: coarse-pointer (touch) view-only notice. It lived in
+          the Konva PdfViewer, which was deleted (dc9a230) — the component
+          survived with zero imports, so touch users got no warning at all.
+          Mounted on the workspace (the surface it warns about); it pins itself
+          to the viewport bottom and self-hides on a mouse pointer / after
+          dismissal. (Re-mounted 2026-07-28 UX walkthrough.) */}
+      <MobileViewOnlyBanner />
       {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (auto-count-style) */}
       <div
         className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"

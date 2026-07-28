@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { getPriceLists } from '@/lib/projectStore';
 import { applyPriceListToPositions } from '@/lib/applyPriceList';
-import { parseLtNumber } from '@/lib/parseLtNumber';
+import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
@@ -109,9 +109,11 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   const handleSave = () => {
     // LT decimal comma: parseFloat('12,5') silently returned 12 and an empty
     // field silently became 0. Reject bad input loudly instead. (2026-07-27.)
+    // isValidAmount also caps at 99 999 999 — a bigger number is a typo, not a
+    // sąmata, and used to sail through into the total. (2026-07-28.)
     const kiekis = parseLtNumber(draft.kiekis);
     const kaina = parseLtNumber(draft.kaina);
-    if (!Number.isFinite(kiekis) || kiekis < 0 || !Number.isFinite(kaina) || kaina < 0) {
+    if (!isValidAmount(kiekis) || !isValidAmount(kaina)) {
       toast.error(t('project.mainView.toastInvalidNumber'));
       return;
     }
@@ -141,7 +143,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
 
   const commitQty = () => {
     const num = parseLtNumber(draftQty);
-    if (!Number.isFinite(num) || num < 0) {
+    if (!isValidAmount(num)) {
       toast.error(t('project.mainView.toastInvalidNumber'));
       return;   // keep the editor open so the typed value isn't lost
     }
@@ -392,6 +394,11 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     return 0;
   }, [project]);
 
+  // Latest list + project, for callbacks that fire LATER than the render that
+  // created them (the delete-undo toast action).
+  const latestRef = useRef({ project, darbai });
+  useEffect(() => { latestRef.current = { project, darbai }; });
+
   const handleRowChange = (idx, newItem) => {
     const updated = [...darbai];
     updated[idx] = newItem;
@@ -406,17 +413,39 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
     onProjectChange?.({ ...project, darbu_sarasas: updated });
   };
 
+  // Toast-undo (Gmail pattern) instead of a confirm dialog: deleting a priced
+  // line stays ONE click, but for 6 s it is recoverable — a contractor who
+  // deletes a 3 000 € position by mistake had no way back. The reinsert goes
+  // through the SAME setDarbai → onProjectChange save path as the delete, so it
+  // survives a reload. (2026-07-28 UX walkthrough.)
   const handleRowRemove = (idx) => {
+    const removed = darbai[idx];
+    if (!removed) return;
     const updated = darbai.filter((_, i) => i !== idx);
     setDarbai(updated);
     onProjectChange?.({ ...project, darbu_sarasas: updated });
+    toast(t('project.mainView.toastRowDeleted'), {
+      duration: 6000,
+      action: {
+        label: t('project.mainView.undo'),
+        onClick: () => {
+          // Read the LATEST list/project from the ref — an edit made between
+          // the delete and the undo must not be reverted by this reinsert.
+          const { project: freshProject, darbai: current } = latestRef.current;
+          const at = Math.min(Math.max(idx, 0), current.length);
+          const restored = [...current.slice(0, at), removed, ...current.slice(at)];
+          setDarbai(restored);
+          onProjectChange?.({ ...freshProject, darbu_sarasas: restored });
+        },
+      },
+    });
   };
 
   const handleAddRow = () => {
     const next = {
       eil_nr: darbai.length + 1,
       aprasymas: t('project.mainView.newRow'),
-      mato_vnt: 'm2',
+      mato_vnt: 'm²',
       kiekis: 0,
       kaina: 0,
       skyrius: t('project.mainView.otherWorks'),
@@ -432,7 +461,7 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   // Review-queue quantity fix — LT comma / spaced thousands aware.
   const applyReviewQty = () => {
     const qty = parseLtNumber(reviewDraftQty);
-    if (!Number.isFinite(qty) || qty < 0) {
+    if (!isValidAmount(qty)) {
       toast.error(t('project.mainView.toastInvalidNumber'));
       return;
     }

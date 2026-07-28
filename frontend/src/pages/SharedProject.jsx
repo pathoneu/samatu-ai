@@ -12,12 +12,18 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Eye, ArrowLeft, Building2 } from 'lucide-react';
 import { API_BASE as API } from '../lib/apiBase';
 
+// LT number formatting — same idiom as ProjectMainView (space thousands, comma
+// decimals). The share link is what the CLIENT sees, and it was the one surface
+// still printing "131126.15 €". (2026-07-28 UX walkthrough.)
 function fmtEur(v) {
-  return v != null ? `${Number(v).toFixed(2)} €` : '—';
+  return v != null && Number.isFinite(Number(v))
+    ? `${Number(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+    : '—';
 }
 function fmtNum(v, digits = 1) {
   return v != null && Number.isFinite(Number(v))
-    ? Number(v).toFixed(digits) : '—';
+    ? Number(v).toLocaleString('lt-LT', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    : '—';
 }
 
 export default function SharedProject() {

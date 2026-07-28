@@ -64,6 +64,9 @@ export default defineConfig({
       '/openapi.json':     { target: BACKEND, changeOrigin: true },
       '/health':           { target: BACKEND, changeOrigin: true },
       '/recompute-interior': { target: BACKEND, changeOrigin: true },
+      // Viewer calibration pre-fill (main.py /detect-scale-hint) — the route
+      // existed but was missing here, so it 404'd in dev. (2026-07-28.)
+      '/detect-scale-hint': { target: BACKEND, changeOrigin: true },
       '/api':              { target: BACKEND, changeOrigin: true },
       '/v9':               { target: BACKEND, changeOrigin: true },
     },

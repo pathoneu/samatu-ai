@@ -920,6 +920,13 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                 for (const p of (pages || [calibRequest.pageNr])) next[p] = scale;
                 return next;
               });
+              // Calibration is a one-shot action: leaving the tool armed kept
+              // the Mastelis button lit and the hint bar asking for 2 more
+              // points, so the next click started ANOTHER calibration. Disarm
+              // (the [measureTool] effect clears the draft + calib slots).
+              // (2026-07-28 UX walkthrough.)
+              setMeasureTool(null);
+              setSelectedMeasureId(null);
             }}
             onClose={() => setCalibRequest(null)}
           />

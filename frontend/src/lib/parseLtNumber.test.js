@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLtNumber } from './parseLtNumber.js';
+import { parseLtNumber, isValidAmount, MAX_AMOUNT } from './parseLtNumber.js';
 
 test('parseLtNumber: comma decimal', () => {
   assert.equal(parseLtNumber('12,5'), 12.5);
@@ -44,4 +44,26 @@ test('parseLtNumber: numbers pass through', () => {
   assert.equal(parseLtNumber(12.5), 12.5);
   assert.ok(Number.isNaN(parseLtNumber(NaN)));
   assert.ok(Number.isNaN(parseLtNumber(Infinity)));
+});
+
+test('isValidAmount: accepts real kiekis/kaina values', () => {
+  assert.equal(isValidAmount(0), true);
+  assert.equal(isValidAmount(12.5), true);
+  assert.equal(isValidAmount(MAX_AMOUNT), true);
+});
+
+test('isValidAmount: rejects absurd, negative and non-finite values', () => {
+  assert.equal(MAX_AMOUNT, 99999999);
+  assert.equal(isValidAmount(MAX_AMOUNT + 1), false);
+  assert.equal(isValidAmount(999999999999), false);
+  assert.equal(isValidAmount(1000000 * 1000000), false);
+  assert.equal(isValidAmount(-1), false);
+  assert.equal(isValidAmount(NaN), false);
+  assert.equal(isValidAmount(Infinity), false);
+});
+
+test('isValidAmount: composes with parseLtNumber on typed input', () => {
+  assert.equal(isValidAmount(parseLtNumber('1 234,56')), true);
+  assert.equal(isValidAmount(parseLtNumber('999999999999')), false);
+  assert.equal(isValidAmount(parseLtNumber('abc')), false);
 });
