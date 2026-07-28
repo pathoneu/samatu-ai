@@ -6580,12 +6580,20 @@ async def chat_project(request: Request, payload: dict = Body(...)):
     grounded_ctx = _build_chat_context(full_project)
     ctx_json = json.dumps(grounded_ctx, ensure_ascii=False, indent=2)
 
-    # Build messages: project context as first user turn (cached if repeated),
-    # then prior history, then current question.
+    # Build messages: project context as first user turn, then prior history,
+    # then current question. The context block carries cache_control: without
+    # it EVERY question re-sent the full ~29k-token context at full price
+    # (~€0.14/question) — with the breakpoint, follow-up questions within the
+    # cache TTL read it at ~10%. History turns come AFTER the breakpoint on
+    # purpose (they change per turn, so they must not break the cached prefix).
     messages: list[dict] = [
         {
             "role": "user",
-            "content": f"Projekto duomenys:\n```json\n{ctx_json}\n```\n\n(Atsakyk į klausimą po šito.)",
+            "content": [{
+                "type": "text",
+                "text": f"Projekto duomenys:\n```json\n{ctx_json}\n```\n\n(Atsakyk į klausimą po šito.)",
+                "cache_control": {"type": "ephemeral"},
+            }],
         },
         {"role": "assistant", "content": "Suprantu projekto kontekstą. Klausk."},
     ]
@@ -6604,7 +6612,15 @@ async def chat_project(request: Request, payload: dict = Body(...)):
         return client.messages.create(
             model=model_for("chat"),
             max_tokens=2000,
-            system=_CHAT_SYSTEM_PROMPT,
+            # Block form so the (large, post-4B) system prompt is a cache
+            # breakpoint too — together with the context block above that's 2
+            # of the 4 allowed breakpoints; both far exceed the minimum
+            # cacheable length on Opus-tier models.
+            system=[{
+                "type": "text",
+                "text": _CHAT_SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }],
             messages=messages,
         )
 
