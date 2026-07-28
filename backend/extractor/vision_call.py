@@ -875,6 +875,28 @@ def _resolve_paint_class_from_prefs(rules_or_overrides: dict | None) -> int:
     return cls if cls in (1, 2, 3) else _PAINT_CLASS_DEFAULT
 
 
+def _warn_apdailos_degraded(parsed: dict, reason: str | None) -> None:
+    """Persist a user-visible WARN when the apdailos (išklotinių) reader did
+    not deliver per-room finish shares.
+
+    2026-07-28: this reader is a SEPARATE Vision call and it can fail
+    (network, no JSON, no išklotinių page). When it does, every room falls
+    back to the paskirtis standard — garažas/tambūras walls drop OUT of the
+    paint total (Beržų truth: 31.45 m² of garage wall paint), and wet-room
+    finishes are assumed rather than read. Before this warning, that swing
+    left NO trace in the saved project blob: two runs of the same PDF
+    produced per-room paint areas differing by 350% and both looked clean.
+    Failing loudly is the honest behavior (CLAUDE.md §"Honest disclosure").
+    """
+    msg = ("Apdailos/išklotinių lapas nenuskaitytas – sienų apdaila (dažoma / "
+           "plytelės / plokštė) nustatyta pagal patalpų paskirties standartus, "
+           "ne pagal projektą. Ypač patikrinkite garažo, tambūro ir drėgnų "
+           "patalpų dažomus plotus.")
+    if reason:
+        msg += f" (priežastis: {reason})"
+    parsed.setdefault("warnings", []).append({"level": "WARN", "message": msg})
+
+
 def _resolve_paint_class(user_default: int, inferred: int | None,
                          inferred_text: str | None) -> tuple[int, str]:
     """Sprint 0 Fix 5: prefer paint class inferred from spec text,
@@ -3480,11 +3502,14 @@ def extract_interior(
                 "page": apdailos_result.get("page"),
                 "rooms_updated": n_updated,
             })
+            if n_updated == 0:
+                _warn_apdailos_degraded(parsed, "apdailos lape neatpažinta nė viena patalpa")
         else:
             _emit({
                 "event": "apdailos_skipped",
                 "reason": apdailos_result.get("_error"),
             })
+            _warn_apdailos_degraded(parsed, apdailos_result.get("_error"))
     except ImportError as exc:
         # A missing reader module is a REGRESSION, not a benign runtime miss —
         # it silently drops per-room wall-finish recovery (walls_paint collapses
@@ -3492,9 +3517,11 @@ def extract_interior(
         # reader modules were lost from git and failed silently for weeks.)
         print(f"[extractor] ⚠️ APDAILOS READER MODULE MISSING — paint recovery DISABLED: {exc}")
         _emit({"event": "apdailos_error", "message": f"module_missing: {exc}", "severity": "regression"})
+        _warn_apdailos_degraded(parsed, f"modulis nerastas: {exc}")
     except Exception as exc:
         print(f"[extractor] apdailos read failed (non-fatal): {exc}")
         _emit({"event": "apdailos_error", "message": str(exc)})
+        _warn_apdailos_degraded(parsed, str(exc))
 
     # Step 2.86: DOORS READER (2026-05-27).
     # Focused Vision pass on floor_plan to count ALL doors including exterior

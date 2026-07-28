@@ -334,6 +334,35 @@ ROOM_TYPE_RULES = {
 }
 
 
+def default_paint_prefs() -> dict:
+    """The canonical DEFAULT Setup-Wizard answers for every preference that
+    changes a paint / tile quantity — derived from ROOM_TYPE_RULES so the two
+    can never drift.
+
+    2026-07-28: this exists because production and the eval harness disagreed
+    about what "no preferences" means. `NewProject.jsx` sends a 20-key
+    rules_override only when `prefs.setup_completed`; `eval_harness.py` passed
+    `rules_override=None` everywhere. The two happened to be numerically
+    equivalent, but nothing enforced it — so every eval number was measured
+    against a configuration nobody had verified matched the product.
+
+    Use this ANYWHERE a default is needed (harness, rescore, tests). The
+    frontend copy in `frontend/src/components/project/SetupWizard.jsx`
+    (DEFAULT_PREFS) is pinned to this by
+    `backend/tests/test_wall_finish_resolution.py`.
+    """
+    return {
+        "bathroom_tile_height_m": float(ROOM_TYPE_RULES["vonia"]["tile_walls_to_m"]),
+        "kitchen_backsplash_height_m": float(ROOM_TYPE_RULES["virtuve"]["tile_walls_to_m"]),
+        "drabuzine_painted": bool(ROOM_TYPE_RULES["drabuzine"]["walls_paint"]),
+        "rubine_painted": bool(ROOM_TYPE_RULES["rubine"]["walls_paint"]),
+        "sandeliukas_painted": bool(ROOM_TYPE_RULES["sandeliukas"]["walls_paint"]),
+        "katiline_painted": bool(ROOM_TYPE_RULES["katiline"]["walls_paint"]),
+        "garazas_painted": bool(ROOM_TYPE_RULES["garazas"]["walls_paint"]),
+        "tamburas_painted": bool(ROOM_TYPE_RULES["tamburas"]["walls_paint"]),
+    }
+
+
 def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     """Konvertuoja vartotojo Setup Wizard pasirinkimus (flat dict)
     į per-paskirtis ROOM_TYPE_RULES struktūrą.
@@ -653,6 +682,176 @@ _SYNTHETIC_AREA_SOURCES = ("wall_dim_calc", "default_fallback")
 _UNKNOWN_TILE_BAND_M = 2.0
 
 
+# ═════════════════════════════════════════════════════════════════════════
+# WALL FINISH RESOLUTION (2026-07-28 — paint determinism fix)
+# ═════════════════════════════════════════════════════════════════════════
+# DEFECT: `is_full_tile` — the rule that stops a floor-to-ceiling tiled wet
+# room from ALSO being billed as painted wall — lived ONLY inside the
+# `sienu_apdailos_breakdown` branch below. That breakdown is an OPTIONAL
+# Vision read (apdailos_reader = a separate API call that can fail, return
+# no JSON, or find no išklotinių page). Two byte-identical runs of the same
+# 17-page PDF therefore produced, for room 107 (tiled to 2.8 m of a 2.8 m
+# ceiling):
+#     apdailos present → dazymo_plotas 8.59 m² (ceiling only)      ← correct
+#     apdailos absent  → dazymo_plotas 39.62 m² (tiled walls painted
+#                        AND billed as 34.72 m² of tile)           ← double bill
+# and, symmetrically, flipped garažas/tambūras between "painted" and
+# "ceiling only" because the same branch also decides walls_paint_factor.
+#
+# Contractor truth (Rangovas A, Beržų g. 24 — contractor-notes-verbatim.md
+# §Dažymai) lists paint for "sienos žemos / aukštos / garažo sienos" and NO
+# paint line for the two bathrooms (107/111 appear only under §Plytelės).
+#
+# FIX: the tile read is resolved ONCE, from whatever evidence exists, by
+# `resolve_wall_tile_read()`. Every branch consumes the same `is_full_tile`,
+# so an absent optional Vision field can no longer silently switch the
+# double-billing rule on and off.
+FULL_TILE_SHARE_MIN = 0.8        # ≥80% of the perimeter = tile dominates
+FULL_TILE_HEIGHT_RATIO = 0.95    # band ≥95% of H = tiled to the ceiling
+FULL_TILE_AREA_RATIO = 0.95      # elevation path: tile m² ≥95% of wall m²
+WET_ROOM_PASKIRTYS = ("vonia", "wc", "san")
+
+
+def is_full_tile_walls(tile_share: float, tile_height_m: float,
+                       ceiling_height_m: float) -> bool:
+    """True when the walls are tiled floor-to-ceiling over (nearly) the whole
+    perimeter — i.e. there is NO paintable wall left.
+
+    Both conditions must hold: the tile must DOMINATE the perimeter
+    (share ≥ FULL_TILE_SHARE_MIN) AND reach the ceiling
+    (height ≥ FULL_TILE_HEIGHT_RATIO × H). A dominant share at an unknown or
+    low band height is a partial tile band — its walls still get
+    glaistymas/dažymas above the band per LT contractor convention.
+    """
+    if ceiling_height_m <= 0 or tile_height_m <= 0 or tile_share <= 0:
+        return False
+    return (tile_share >= FULL_TILE_SHARE_MIN
+            and tile_height_m >= ceiling_height_m * FULL_TILE_HEIGHT_RATIO)
+
+
+def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
+                           wall_area_available_m2: float = 0.0) -> dict:
+    """SINGLE SOURCE OF TRUTH for "how much of this room's wall is tiled".
+
+    Resolves, in documented priority order, from every evidence source the
+    pipeline can produce — so a missing optional Vision field degrades the
+    ANSWER's confidence, never the RULES applied to it.
+
+    Priority:
+      1. ``_tile_area_from_elevation_m2``  — exact mm-derived tile area from
+         the wall-elevation (išklotinė) extractor.                 [elevation]
+      2. ``sienu_apdailos_breakdown``      — per-room finish shares read off
+         the apdailos/išklotinių page.                              [apdailos]
+      3. ``plyteles_sienos_aukstis_m``     — Vision-read tile band height.
+         Per the Vision schema this is a PERIMETER-WIDE band (local splash
+         panels are emitted as 0), so share = 1.0.            [vision_height]
+      4. ``rt_rules["tile_walls_to_m"]``   — the paskirtis default band. This
+         is an ASSUMPTION, not a read: ``missing`` is set.  [paskirtis_default]
+      5. nothing at all → no tile.                                     [none]
+
+    Returns dict:
+      share       float 0..1  — fraction of the perimeter that is tiled
+      height_m    float       — tile band height in metres
+      source      str         — one of the labels above
+      is_full_tile bool       — walls tiled to ceiling ⇒ zero paintable wall
+      missing     bool        — no project-specific tile read was available
+      assumption  str | None  — LT text for the UI when `missing` (CLAUDE.md:
+                                every calculation shows its assumptions)
+    """
+    H = float(ceiling_height_m or 0)
+    paskirtis = normalize_paskirtis(room.get("paskirtis") or "")
+    is_wet = paskirtis in WET_ROOM_PASKIRTYS
+
+    vision_tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
+    default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
+    # Pipeline-set default for bathroom-family rooms in projects with NO
+    # wall_elevation pages (see calc_room_quantities). Counts as an explicit
+    # assumption, not a read.
+    bathroom_default_h = float(room.get("_bathroom_paint_above_tile_m") or 0)
+
+    elevation_tile_area = float(room.get("_tile_area_from_elevation_m2") or 0)
+    apdailos = room.get("sienu_apdailos_breakdown") or {}
+
+    out = {"share": 0.0, "height_m": 0.0, "source": "none",
+           "is_full_tile": False, "missing": False, "assumption": None,
+           "elevation_area_m2": elevation_tile_area}
+
+    if elevation_tile_area > 0:
+        out["source"] = "elevation"
+        out["height_m"] = vision_tile_h or H
+        if wall_area_available_m2 > 0:
+            out["share"] = min(1.0, elevation_tile_area / wall_area_available_m2)
+            # Exact-area evidence: "the elevation says tile covers (at least)
+            # the whole wall" is the full-tile signal — no share/height pair
+            # needed. An OVER-read (tile > wall, i.e. the extractor summed
+            # overlapping elevation strips) is even stronger evidence, not a
+            # reason to invent paint area from the overshoot.
+            out["is_full_tile"] = (
+                elevation_tile_area
+                >= wall_area_available_m2 * FULL_TILE_AREA_RATIO)
+        return out
+
+    if apdailos:
+        out["source"] = "apdailos"
+        out["share"] = float(apdailos.get("plyteles_share") or 0)
+        # 2026-07-05 audit fix (bug 1): floor an unknown tile height to a sane
+        # band instead of the full room height — a dominant SHARE of unknown
+        # height must not be mistaken for tiled-to-ceiling.
+        h = vision_tile_h if vision_tile_h > 0 else default_tile_h
+        out["height_m"] = h if h > 0 else _UNKNOWN_TILE_BAND_M
+        out["is_full_tile"] = is_full_tile_walls(out["share"], out["height_m"], H)
+        return out
+
+    if vision_tile_h > 0:
+        out["source"] = "vision_height"
+        out["share"] = 1.0
+        out["height_m"] = vision_tile_h
+        out["is_full_tile"] = is_full_tile_walls(1.0, vision_tile_h, H)
+        return out
+
+    if bathroom_default_h > 0:
+        # Pipeline-injected bathroom default (no elevation pages in project).
+        out["source"] = "paskirtis_default"
+        out["share"] = 1.0
+        out["height_m"] = bathroom_default_h
+        out["missing"] = True
+        out["assumption"] = (
+            f"Plytelių aukštis nenuskaitytas – priimta standartinė "
+            f"{bathroom_default_h:.2f} m juosta, sienos virš jos dažomos. "
+            f"Pakeiskite Prielaidų skydelyje.")
+        return out
+
+    if default_tile_h > 0:
+        out["source"] = "paskirtis_default"
+        out["share"] = 1.0
+        out["height_m"] = default_tile_h
+        out["missing"] = True
+        # NOTE the default band (0.6–2.4 m) is deliberately BELOW a typical
+        # ceiling, so `is_full_tile` stays False: without evidence we do not
+        # zero a room's paint. The assumption is disclosed instead — but only
+        # for wet rooms, where full-tile-vs-band moves tens of m² of paint. A
+        # kitchen backsplash default (0.6 m) is a low-stakes standard the user
+        # already edits directly in the Prielaidos panel; warning about every
+        # kitchen would bury the signal.
+        if is_wet:
+            out["assumption"] = (
+                f"Plytelių zona nenuskaityta iš projekto – priimta standartinė "
+                f"{default_tile_h:.2f} m juosta pagal patalpos paskirtį "
+                f"('{paskirtis}'), sienos virš juostos skaičiuojamos kaip "
+                f"dažomos. Patikrinkite Prielaidų skydelyje.")
+        return out
+
+    if is_wet:
+        # Wet room with NO tile evidence of any kind — the honest outcome is a
+        # loud assumption, not a silent "paint every wall".
+        out["missing"] = True
+        out["assumption"] = (
+            "Drėgnos patalpos plytelių zona nenuskaityta – plytelės "
+            "neskaičiuotos, visos sienos laikomos dažomomis. Patikrinkite "
+            "Prielaidų skydelyje.")
+    return out
+
+
 def _perimeter_floor_enabled() -> bool:
     """Feature-flag gate for the synthetic-perimeter wall floor (default ON)."""
     try:
@@ -732,29 +931,23 @@ def calc_room_quantities(room: dict,
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
 
     # Plytelinės sienos (vonia / virtuvė backsplash).
-    # Priority: Vision pass-2 zoom reads actual tile height from išklotinės
-    # (e.g. premium projects often go full-height, 2.4–2.8m). Fall back to
-    # room-type default only when Vision didn't detect the explicit height.
-    # 2026-05-10 benchmark Task 7.2 #1: prior code IGNORED
-    # plyteles_sienos_aukstis_m → undercount vs samatininkų 30-67% on
-    # vonios with full-wall tiles.
-    vision_tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
-    default_tile_h = float(rt_rules.get("tile_walls_to_m") or 0)
-    tile_height = vision_tile_h if vision_tile_h > 0 else default_tile_h
-
+    # 2026-07-28: the tile HEIGHT/SHARE priority chain moved into
+    # `resolve_wall_tile_read()` (called below) so that every branch resolves
+    # it identically. It still reads Vision's išklotinė height first (premium
+    # projects often go full-height 2.4–2.8 m) and falls back to the room-type
+    # default; see that function for the full order.
+    #
     # 2026-06-01 systemic fix — paint-above-tile default for projects without
     # wall_elevation pages. Set per-room by the pipeline (post-eksplikacija)
     # only when:
     #   • paskirtis ∈ bathroom-family AND
     #   • project has 0 wall_elevation pages (so we can't read exact tile zones)
     #   • room has no Vision-detected tile height
-    # Effect: tile_height is forced to the default (typically 1.2m) AND the
+    # Effect: the tile band is forced to the default (typically 1.2m) AND the
     # walls_paint_factor is forced to 1.0 so the area above the tile band
     # is counted as paint. Projects WITH elevation pages skip this default —
     # the calculator falls through to the existing apdailos / paskirtis path.
     bathroom_default_h = float(room.get("_bathroom_paint_above_tile_m") or 0)
-    if bathroom_default_h > 0 and vision_tile_h == 0:
-        tile_height = bathroom_default_h
 
     # 2026-05-27 Walls glaistymas/dažymas formula (Berzas calibration).
     #
@@ -801,33 +994,55 @@ def calc_room_quantities(room: dict,
 
     apdailos = room.get("sienu_apdailos_breakdown") or {}
     molio_tinko_m2 = 0.0  # set in the apdailos branch when molio/kita_danga share > 0
-    if elevation_tile_area > 0:
-        # Elevation-precision branch: tile area is exact mm-derived.
-        doors_deduction = n_doors * DOOR_NET_DEDUCTION
-        # CLAMP — when the Vision elevation extractor over-counts tile zones
-        # (sum > walls_gross), scale down proportionally instead of letting
-        # the max(0, ...) clip drop walls_paintable to 0. This recovers
-        # proportional paint-above-tile area for rooms where the elevation
-        # Vision was over-aggressive (e.g. berzas room 107). Documented in
-        # the audit trail.
-        wall_area_available = max(0, walls_gross - doors_deduction)
-        if elevation_tile_area > wall_area_available * 1.02 and wall_area_available > 0:
-            # Proportional clamp per Module 4 spec: scale BOTH width and
-            # height of every tile zone by (walls/tile), so the SUM of
-            # zone areas scales by (walls/tile)². Result: clamped tile =
-            # walls² / tile_original, leaving paint = walls × (1 − walls/tile).
-            # This recovers a positive paint-above-tile estimate from
-            # over-counted Vision extractions instead of clipping to 0.
-            raw_tile = elevation_tile_area
-            clamped_tile = (wall_area_available * wall_area_available) / raw_tile
-            scale_factor = wall_area_available / raw_tile  # linear scale
-            elevation_tile_area = clamped_tile
-            room["_tile_clamp_applied"] = round(scale_factor, 4)
-            room["_tile_clamp_reason"] = (
-                f"raw elevation tile {raw_tile:.2f}m² > wall_available "
-                f"{wall_area_available:.2f}m² → clamped to {clamped_tile:.2f}m² "
-                f"(linear scale {scale_factor:.3f})"
-            )
+
+    # ── Wall finish resolution (2026-07-28) ──────────────────────────────
+    # Resolve the tile read ONCE, from whatever evidence this room carries,
+    # BEFORE branching. Every branch below consumes the same `is_full_tile`,
+    # so the presence/absence of an optional Vision field can no longer flip
+    # the double-billing rule (a fully tiled wet room billed as tile AND as
+    # paint). See resolve_wall_tile_read() for the priority order.
+    doors_deduction = n_doors * DOOR_NET_DEDUCTION
+    wall_area_available = max(0.0, walls_gross - doors_deduction)
+    tile_read = resolve_wall_tile_read(room, rt_rules, H, wall_area_available)
+    is_full_tile = tile_read["is_full_tile"]
+    # Disclosure notes collected while resolving the wall finish. They ride on
+    # the room dict so lt_rules.apply_lt_sanity can surface them to the user
+    # (CLAUDE.md: every calculation must show its assumptions).
+    wall_finish_notes: list[str] = []
+    if tile_read["assumption"]:
+        wall_finish_notes.append(tile_read["assumption"])
+
+    if elevation_tile_area > 0 and is_full_tile:
+        # 2026-07-28: the elevation read itself says tile covers ≥95% of the
+        # available wall (often MORE than 100%, because the extractor sums
+        # overlapping išklotinė strips). That is the strongest possible
+        # full-tile evidence — an over-read is not a licence to invent paint
+        # area out of the overshoot. Bill the whole wall as tile, zero paint.
+        # (Beržų 107: elevation read 46.32 m² of tile in a room with 30.80 m²
+        # of wall; the old proportional clamp emitted 10.32 m² of "paint" on
+        # a bathroom the contractor never paints — see §Dažymai in
+        # contractor-notes-verbatim.md.)
+        walls_paint_factor = (
+            float(walls_paint_factor_override)
+            if walls_paint_factor_override is not None else 0.0)
+        walls_paintable = wall_area_available * walls_paint_factor
+        walls_net = walls_paintable
+        tile_walls_area = wall_area_available
+        room["_tile_clamp_applied"] = (
+            round(wall_area_available / elevation_tile_area, 4)
+            if elevation_tile_area else 1.0)
+        room["_tile_clamp_reason"] = (
+            f"elevation tile {elevation_tile_area:.2f}m² ≥ "
+            f"{FULL_TILE_AREA_RATIO:.0%} of wall {wall_area_available:.2f}m² "
+            f"→ full-tile room: 0 m² dažoma, {wall_area_available:.2f}m² plytelių")
+    elif elevation_tile_area > 0:
+        # Elevation-precision branch: tile area is exact mm-derived and covers
+        # LESS than FULL_TILE_AREA_RATIO of the wall — a genuinely mixed room
+        # (tile band + paint above). Paint = wall − doors − tile.
+        # (The pre-2026-07-28 proportional over-read clamp lived here; it is
+        # now unreachable — an over-read means tile ≥ wall, which the
+        # full-tile branch above handles as "no paint" instead of scaling the
+        # overshoot into invented paint area.)
         walls_paintable_gross = max(
             0, walls_gross - doors_deduction - elevation_tile_area
         )
@@ -839,26 +1054,25 @@ def calc_room_quantities(room: dict,
         walls_net = walls_paintable
         tile_walls_area = elevation_tile_area
     elif apdailos:
-        tile_share = float(apdailos.get("plyteles_share") or 0)
-        # 2026-07-05 audit fix (bug 1): floor unknown tile height to a sane band
-        # (see _UNKNOWN_TILE_BAND_M) instead of the full room height H. Full-
-        # height fallback over-quoted tiled area ~1.4× AND could flip
-        # is_full_tile→True (zeroing all paint) for a room that merely has a
-        # dominant tile SHARE of unknown height.
-        tile_h_eff = tile_height if tile_height > 0 else _UNKNOWN_TILE_BAND_M
-        # Full-tile criterion: tile dominates AND reaches ceiling (≥95% H)
-        is_full_tile = (tile_share >= 0.8 and tile_h_eff >= H * 0.95)
+        # `tile_share` / `tile_h_eff` now come from the shared resolver
+        # (source = "apdailos"), which applies the same 2026-07-05 audit fix:
+        # an unknown tile height is floored to _UNKNOWN_TILE_BAND_M instead of
+        # the full room height, so a dominant SHARE of unknown height is not
+        # mistaken for tiled-to-ceiling.
+        tile_share = tile_read["share"]
+        tile_h_eff = tile_read["height_m"]
         # Track tile area separately (used by Plytelių klijavimas line items)
         tile_walls_area = tile_share * perim * tile_h_eff
-        if is_full_tile:
+        # PRECEDENCE (same in every branch): explicit per-room override >
+        # full-tile evidence > apdailos-implied finish > paskirtis default.
+        if is_full_tile and walls_paint_factor_override is None:
             walls_paintable = 0.0
             walls_paint_factor = 0.0
         else:
             # Glaistytinos sienos = gross − standardized door deduction.
             # No window deduct (reveals cancel), no under-tile/tapetai/plokšte
             # deduct (those still get glaistymas underneath).
-            doors_deduction = n_doors * DOOR_NET_DEDUCTION
-            walls_paintable_gross = max(0, walls_gross - doors_deduction)
+            walls_paintable_gross = wall_area_available
             # When an apdailos breakdown is present, the room's walls receive
             # an interior finish (paint OR plokštė OR tapetai OR partial tile),
             # ALL of which require glaistymas underneath per LT convention.
@@ -889,6 +1103,17 @@ def calc_room_quantities(room: dict,
                 walls_paint_factor = 0.0
             else:
                 walls_paint_factor = 1.0
+                if rt_rules.get("walls_paint") == 0.0:
+                    # The apdailos read (project evidence) is overriding a
+                    # structural no-paint default (garažas / tambūras). That is
+                    # intentional — Beržų g. 24 contractor truth bills 31.45 m²
+                    # of garage wall paint — but the user must SEE it, because
+                    # it contradicts both the room-type standard and their own
+                    # Setup Wizard default.
+                    wall_finish_notes.append(
+                        f"Sienos dažomos pagal projekto apdailos duomenis "
+                        f"(standartinė prielaida šiai paskirčiai "
+                        f"'{paskirtis}' – nedažoma).")
             walls_paintable = walls_paintable_gross * walls_paint_factor
         # 2026-06-11 (Rangovas B experiment): molio tinkas / decor-coated walls
         # are a SEPARATE finish — the contractor bills them as their own m² line
@@ -907,9 +1132,22 @@ def calc_room_quantities(room: dict,
         walls_net = walls_paintable
     else:
         # Legacy heuristic path: paskirtis-based walls_paint factor.
-        tile_walls_area = perim * tile_height if tile_height > 0 else 0
+        # Tile area comes from the shared resolver (source = "vision_height"
+        # or "paskirtis_default", share 1.0 — the Vision schema treats
+        # plyteles_sienos_aukstis_m as a perimeter-wide band and emits 0 for
+        # local splashbacks), so it matches the apdailos branch's formula.
+        tile_walls_area = tile_read["share"] * perim * tile_read["height_m"]
+        # PRECEDENCE (same in every branch): explicit per-room override >
+        # full-tile evidence > pipeline bathroom default > paskirtis default.
         if walls_paint_factor_override is not None:
             walls_paint_factor = float(walls_paint_factor_override)
+        elif is_full_tile:
+            # 2026-07-28 — THE fix for the wet-room double bill. A room whose
+            # tile band reaches the ceiling has no paintable wall, whether the
+            # optional apdailos read happened to run or not. Without this, a
+            # bathroom tiled to 2.8 m was billed BOTH as 34.72 m² of tile and
+            # as 31.03 m² of paint.
+            walls_paint_factor = 0.0
         elif bathroom_default_h > 0:
             # Paint-above-tile default active for this room (set by the
             # pipeline because the project has no elevation pages). Force
@@ -918,6 +1156,17 @@ def calc_room_quantities(room: dict,
         else:
             walls_paint_factor = rt_rules.get("walls_paint")
             walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
+            if walls_paint_factor == 0.0:
+                # Mirror image of the apdailos-override note above: with NO
+                # project finish data we fall back to the room-type standard
+                # and quote ZERO wall paint. Beržų g. 24 shows what that costs
+                # when it is wrong — the contractor bills 31.45 m² of garage
+                # wall paint the standard says doesn't exist.
+                wall_finish_notes.append(
+                    f"Sienos neįtrauktos į dažomą plotą – standartinė "
+                    f"prielaida paskirčiai '{paskirtis}'; projekto apdailos "
+                    f"duomenų nerasta. Jei sienos dažomos, pažymėkite "
+                    f"Prielaidų skydelyje.")
         # 2026-07-05 audit fix (bug 3): do NOT subtract tile_walls_area from the
         # glaistymas/dažymas base. Walls under a partial tile band still get
         # glaistytas underneath (LT contractor convention), so the base is
@@ -1178,6 +1427,15 @@ def calc_room_quantities(room: dict,
         "ceiling_type": ceiling_type,
         "walls_gross_m2": round(walls_gross, 2),
         "walls_paintable_m2": round(walls_paintable, 2),
+        # ── Wall-finish provenance (2026-07-28) ──────────────────────────
+        # Which evidence decided the paint/tile split, whether it was a READ
+        # or an ASSUMPTION, and the LT text explaining it. Surfaced by
+        # lt_rules.apply_lt_sanity and available to the Prielaidos panel.
+        "_tile_read_source": tile_read["source"],
+        "_tile_read_missing": bool(tile_read["missing"]),
+        "_walls_full_tile": bool(is_full_tile),
+        "_walls_paint_factor": round(float(walls_paint_factor), 4),
+        "_wall_finish_assumptions": list(wall_finish_notes),
         "molio_tinko_m2": round(molio_tinko_m2, 2),
         "ceiling_paintable_m2": round(ceiling_paintable, 2),
         "dazymo_plotas_m2": round(dazymo_plotas, 2),

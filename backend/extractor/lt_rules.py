@@ -208,6 +208,24 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     ),
                 })
 
+        # Wall-finish assumptions (2026-07-28). calc_room_quantities records
+        # WHY a room's walls ended up painted / not painted / fully tiled in
+        # `_wall_finish_assumptions`. Those decisions move hundreds of m² of
+        # paint (Beržų garažas 31.45 m²; a full-tile bathroom ±31 m²), so they
+        # must reach the user instead of living in a debug field.
+        # WARN for the two materially risky cases — an ASSUMED tile zone in a
+        # wet room, and walls excluded from paint entirely (Beržų garažas:
+        # 31.45 m² of real work the standard says doesn't exist). Everything
+        # else is disclosure, not an alarm.
+        notes = r.get("_wall_finish_assumptions") or []
+        risky = bool(r.get("_tile_read_missing")) or r.get("_walls_paint_factor") == 0
+        for note in notes:
+            warnings.append({
+                "level": "WARN" if risky else "INFO",
+                "patalpa_nr": nr,
+                "message": f"{pavadinimas} (nr={nr}): {note}",
+            })
+
     # Total area sanity
     total_area = sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if total_area > 800:

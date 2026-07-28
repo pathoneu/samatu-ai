@@ -375,9 +375,28 @@ def run_pipeline_use_gt_inputs(
             "perimeter_correction_applied": perim_correction_applied,
         },
     }
-    parsed = _recompute_per_room(parsed, None)
+    parsed = _recompute_per_room(parsed, _harness_rules_override())
     parsed = _recompute_santrauka(parsed)
     return parsed
+
+
+def _harness_rules_override(parsed: dict | None = None) -> dict:
+    """The rules_override the harness feeds the deterministic engine.
+
+    2026-07-28: previously every harness entry point passed ``None`` while
+    production (`NewProject.jsx`) posts a Setup-Wizard prefs dict. The two
+    happened to agree numerically, but nothing enforced it — so the eval was
+    measuring a configuration no user could actually get. Now BOTH sides
+    start from the same backend-owned defaults
+    (`universal_rules.default_paint_prefs`), and a rescored run additionally
+    replays whatever overrides that run was actually produced with.
+    """
+    from extractor.universal_rules import default_paint_prefs
+    merged = default_paint_prefs()
+    stored = (parsed or {}).get("_overrides") if isinstance(parsed, dict) else None
+    if isinstance(stored, dict):
+        merged.update(stored)
+    return merged
 
 
 def run_pipeline_replay(extract_path: Path) -> dict:
@@ -394,7 +413,8 @@ def run_pipeline_vision(pdf_path: Path) -> dict:
     """Full Vision pipeline (Phase 2 stop condition)."""
     vc = importlib.import_module("extractor.vision_call")
     pdf_bytes = pdf_path.read_bytes()
-    return vc.extract_interior(pdf_bytes, rules_override=None)
+    # Same defaults a real user gets — see _harness_rules_override().
+    return vc.extract_interior(pdf_bytes, rules_override=_harness_rules_override())
 
 
 # ── Eval core ──────────────────────────────────────────────────────────────────
@@ -1440,7 +1460,7 @@ def _rerun_deterministic_tail(parsed: dict) -> dict:
     except Exception as exc:
         print(f"  ⚠ plausibility gate failed during rescore: {exc}")
 
-    parsed = vc._recompute_per_room_via_python(parsed, None)
+    parsed = vc._recompute_per_room_via_python(parsed, _harness_rules_override(parsed))
     parsed = vc._recompute_santrauka(parsed)
     parsed = vc._build_pozicijos_from_rooms(parsed)
     return parsed
