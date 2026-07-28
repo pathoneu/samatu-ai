@@ -1436,6 +1436,7 @@
     "warnMissingUnit": "Missing unit of measure",
     "errAborted": "Request canceled or timed out. Try a smaller PDF or retry.",
     "errNetwork": "Cannot reach the server. Check your connection.",
+    "errStreamLostButRunning": "The connection to the server was lost, but the analysis continues server-side. The project will appear in \"Projektai\" within a few minutes — refresh the page. Do not re-upload.",
     "errUnknown": "Unknown error",
     "abortedByUser": "Canceled by user. Try again.",
     "cancel": "Cancel",

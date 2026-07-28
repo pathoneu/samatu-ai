@@ -464,8 +464,17 @@ export default function NewProject() {
         userMessage = abortReasonRef.current === 'stalled' ? t('newProject.errStalled')
           : abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
           : t('newProject.errAborted');
-      } else if (/network|fetch/i.test(e.message)) {
-        userMessage = t('newProject.errNetwork');
+      } else if (/network|fetch/i.test(e.message) || e.name === 'TypeError'
+                 || /stream ended without result/i.test(e.message)) {
+        // Connection-level failure. If the stream had already STARTED (we saw
+        // progress events), the backend keeps extracting after a drop and
+        // saves the finished project server-side (disconnect survival,
+        // 2026-07-28 — Railway's edge cut a live prod stream ~10 min in).
+        // Tell the truth instead of "check your connection": the work is
+        // continuing and the project will appear in the list.
+        userMessage = streamPhase != null
+          ? t('newProject.errStreamLostButRunning')
+          : t('newProject.errNetwork');
       } else {
         userMessage = e.message || t('newProject.errUnknown');
       }

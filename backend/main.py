@@ -5847,6 +5847,51 @@ async def extract_interior_endpoint(
 # and forward queue items to the client as they appear. Heartbeat comments
 # every 10s keep proxies + browsers from closing the connection mid-extraction.
 
+def _is_done_event(ev) -> bool:
+    """A terminal SSE event carrying the finished extraction result."""
+    return (isinstance(ev, dict) and ev.get("event") == "done"
+            and isinstance(ev.get("result"), dict))
+
+
+def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str) -> None:
+    """Persist a finished extraction whose CLIENT vanished mid-stream.
+
+    Mirrors what NewProject.jsx's createProject() builds from the done event
+    (the result dict IS the project blob body + presentation fields), so the
+    project the user finds after a refresh is shaped exactly like one saved by
+    a healthy stream. Saves only real results — errors and zero-room reads are
+    dropped, matching the frontend's own guards. (2026-07-28 disconnect
+    survival; born from the first production run, where Railway's edge cut a
+    live stream ~10 min in and 20 minutes of paid Opus work evaporated.)"""
+    if not user or not user.get("id"):
+        return
+    if result.get("status") == "error" or not result.get("patalpos"):
+        return
+    import uuid as _uuid
+    from datetime import timezone as _tz
+    stem = (pdf_name or "").rsplit(".", 1)[0].strip() or "Interjero projektas"
+    project_id = str(_uuid.uuid4())
+    now = datetime.now(_tz.utc).isoformat().replace("+00:00", "Z")
+    blob = {
+        **result,
+        "id": project_id,
+        "name": stem,
+        "company_name": "",
+        "tipas": "interjeras",
+        "rows": [],
+        "total_rows": len(result.get("patalpos") or []),
+        "total_value": 0,
+        "status": "ready",
+        "created_at": now,
+        "updated_at": now,
+        # Honest provenance: the UI/user can tell this arrived via recovery.
+        "_saved_by": "stream_disconnect_recovery",
+    }
+    db.upsert_project(project_id, blob, user_id=user["id"])
+    log.info("stream orphan drain: saved project %s (%d rooms) for user %s",
+             project_id, blob["total_rows"], user["id"])
+
+
 @app.post("/extract-interior-stream")
 async def extract_interior_stream_endpoint(
     request: Request,
@@ -5875,8 +5920,9 @@ async def extract_interior_stream_endpoint(
         except json.JSONDecodeError as e:
             raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
 
+    pdf_name = files[0].filename or ""
     log.info("extract-interior-stream: ip=%s file=%s size=%dKB pages=%d",
-             client_ip, files[0].filename, len(pdf_bytes) // 1024,
+             client_ip, pdf_name, len(pdf_bytes) // 1024,
              validation.get("page_count", 0))
     from extractor import extract_interior_stream
 
@@ -5918,6 +5964,48 @@ async def extract_interior_stream_endpoint(
             except Exception:  # noqa: BLE001 — generator cleanup is best-effort
                 log.warning("extract-interior-stream: generator close failed",
                             exc_info=True)
+
+        def _drain_gen(first_future=None):
+            """DISCONNECT SURVIVAL (2026-07-28, first prod run): the browser's
+            SSE connection can die mid-extraction (Railway's edge dropped a
+            live, heartbeating stream ~10 min in) while the paid work is fine.
+            The old behavior closed the generator at the next step boundary —
+            burning the money already spent and saving NOTHING, because only
+            the CLIENT persisted the finished project. On client loss we now
+            finish the extraction in a detached thread and save the result
+            server-side; the user finds the project in their list on refresh.
+            Runs ONLY on the disconnect path — a connected client still saves
+            its own copy, so there is no duplicate."""
+            def _run():
+                try:
+                    ev0 = None
+                    if first_future is not None:
+                        try:
+                            ev0 = first_future.result()
+                        except Exception:  # noqa: BLE001 — step died with the client
+                            ev0 = None
+                    events = [] if ev0 is None or ev0 is sentinel else [ev0]
+                    if not (events and _is_done_event(events[0])):
+                        for ev in gen:
+                            if _is_done_event(ev):
+                                events.append(ev)
+                                break
+                    done = next((e for e in events if _is_done_event(e)), None)
+                    if done is None:
+                        log.warning("stream orphan drain: no done event (pipeline died)")
+                        return
+                    result = done["result"]
+                    try:
+                        _augment_done_event(result)
+                    except Exception:  # noqa: BLE001 — bookkeeping stays best-effort
+                        log.exception("stream orphan drain: augmentation failed")
+                    _save_orphaned_result(result, _user, pdf_name)
+                except Exception:  # noqa: BLE001 — never let the drain thread blow up
+                    log.exception("stream orphan drain failed")
+                finally:
+                    _close_gen()
+            _threading.Thread(target=_run, daemon=True,
+                              name="stream-orphan-drain").start()
 
         def _augment_done_event(result: dict) -> None:
             """Bookkeeping on a FINISHED extraction: billing, the page-count
@@ -5970,6 +6058,7 @@ async def extract_interior_stream_endpoint(
             except Exception as _exc:
                 log.warning("record_usage failed (stream): %r", _exc)
 
+        client_lost = False
         try:
           while True:
             future = loop.run_in_executor(None, lambda: next(gen, sentinel))
@@ -5980,6 +6069,11 @@ async def extract_interior_stream_endpoint(
                         break
                     except asyncio.TimeoutError:
                         yield b": heartbeat\n\n"
+            except (asyncio.CancelledError, GeneratorExit):
+                # Client disconnect (proxy drop, closed tab). The extraction is
+                # healthy — finish it detached and save server-side (_drain_gen).
+                client_lost = True
+                raise
             except Exception:
                 # Do NOT echo the internal exception to the browser — it leaks
                 # library/stack internals into the SSE stream. Log server-side,
@@ -6013,6 +6107,11 @@ async def extract_interior_stream_endpoint(
                         "/extract-interior-stream: done-event augmentation failed")
 
             yield _format_sse(ev)
+        except (asyncio.CancelledError, GeneratorExit):
+            # Disconnect at an OUTER yield (event or heartbeat already left the
+            # inner try) — same survival semantics as the inner handler.
+            client_lost = True
+            raise
         except Exception:   # noqa: BLE001 — a hung spinner is worse than an error
             # Belt-and-braces twin of the inner handler: anything unexpected in
             # the loop body (not just next(gen)) must still terminate the stream
@@ -6027,11 +6126,19 @@ async def extract_interior_stream_endpoint(
             }})
             return
         finally:
-            # Close the sync generator on every exit path (normal end, error,
-            # or client disconnect). If a worker thread is still executing
-            # next(gen), defer the close until it finishes — closing a running
-            # generator raises "generator already executing". Otherwise close now.
-            if future is not None and not future.done():
+            # Two exit families (2026-07-28 disconnect-survival rework):
+            # - CLIENT LOST (proxy drop / closed tab): finish the extraction in
+            #   a detached thread and save the result server-side — the paid
+            #   work must not die with the socket. Deferred to the in-flight
+            #   step's done-callback when one is running (closing/iterating a
+            #   generator mid-next() raises "generator already executing").
+            # - NORMAL END or PIPELINE ERROR: close the generator as before.
+            if client_lost:
+                if future is not None and not future.done():
+                    future.add_done_callback(_drain_gen)
+                else:
+                    _drain_gen(future)
+            elif future is not None and not future.done():
                 future.add_done_callback(_close_gen)
             else:
                 _close_gen()

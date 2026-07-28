@@ -1440,6 +1440,7 @@
     "warnMissingUnit": "Trūksta matavimo vieneto",
     "errAborted": "Užklausa atšaukta arba laiko limitas. Bandykite mažesnį PDF arba pakartokite.",
     "errNetwork": "Nepavyksta pasiekti serverio. Patikrinkite ryšį.",
+    "errStreamLostButRunning": "Ryšys su serveriu nutrūko, bet analizė tęsiasi serveryje. Projektas atsiras sąraše „Projektai“ po kelių minučių — atnaujinkite puslapį. Nekartokite įkėlimo.",
     "errUnknown": "Nežinoma klaida",
     "abortedByUser": "Atšaukta vartotojo. Bandykite dar kartą.",
     "cancel": "Atšaukti",
