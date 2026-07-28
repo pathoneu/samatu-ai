@@ -379,10 +379,19 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
     final_attempt = 0
 
     model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+    # F6 residual (2026-07-28): this module owns its OWN retry loop, and the
+    # shared client is built with max_retries=1 — the two MULTIPLY, so 3
+    # attempts became up to 6 HTTP calls (and 6 × the latency before we give
+    # up). The loop below is the retry policy; the SDK's must be off inside it.
+    # `with_options` is an alias of `copy` in anthropic 0.95.0: it preserves
+    # api_key, base_url, timeout, default_headers/query and REUSES the same
+    # httpx client (connection pool) — only max_retries changes.
+    _call_client = (client.with_options(max_retries=0)
+                    if hasattr(client, "with_options") else client)
     for attempt in range(3):
         final_attempt = attempt + 1
         try:
-            with client.messages.stream(
+            with _call_client.messages.stream(
                 model=model,
                 max_tokens=8192,  # tables are small vs full extract; 8k is ample
                 system=system,

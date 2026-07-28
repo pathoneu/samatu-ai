@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -45,20 +46,65 @@ def _load_fixture(name: str) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+# ASCII space / NBSP / narrow NBSP — the three thousands separators a LT number
+# can carry (spelled as escapes: literally they are indistinguishable in an editor).
+_LT_SEP_RE = re.compile("[\u0020\u00a0\u202f]")
+
+
+def _num(v: Any, default: float = 0.0) -> float:
+    """Tolerant float coercion — LT comma-decimals ("12,5") and stray strings
+    reach here straight out of saved project blobs, and a bare float() raised
+    ValueError → HTTP 500 for the whole room-graph. (2026-07-28 audit.)"""
+    if isinstance(v, bool) or v is None:
+        return float(default)
+    if isinstance(v, (int, float)):
+        return float(v) if v == v else float(default)   # NaN → default
+    try:
+        return float(_LT_SEP_RE.sub("", str(v)).replace(",", ".").strip())
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _int(v: Any, default: int) -> int:
+    """Tolerant int coercion (page numbers arrive as "3", 3.0, or junk)."""
+    n = _num(v, float(default))
+    try:
+        return int(n)
+    except (ValueError, OverflowError):
+        return int(default)
+
+
 def _room_polygon_from_patalpa(room: dict[str, Any]) -> list[dict[str, float]] | None:
     """Build a polygon vertex list in fractional page coords.
 
     Priority order:
-      1. ``polygon_pct`` — explicit [[x_pct, y_pct], …]
+      1. ``polygon_pct`` — accepts BOTH shapes (see below)
       2. ``bbox_pct``    — rectangle corners
       3. None            — no geometry available
+
+    THE SHAPE MISMATCH (2026-07-28 audit): this reader only understood
+    ``[[x, y], …]``, but it EMITS ``[{"x_pct": …, "y_pct": …}, …]`` — and the
+    frontend persists what it renders. So the app's own output could not be read
+    back: a project whose polygons had round-tripped through the Annotator hit
+    ``p[0]`` on a dict → KeyError → 500, or silently lost its geometry. Both
+    shapes are accepted now; the emitted shape is unchanged.
     """
     poly = room.get("polygon_pct")
     if isinstance(poly, list) and len(poly) >= 3:
-        return [{"x_pct": float(p[0]), "y_pct": float(p[1])} for p in poly]
+        out: list[dict[str, float]] = []
+        for p in poly:
+            if isinstance(p, dict):
+                if "x_pct" not in p or "y_pct" not in p:
+                    return None
+                out.append({"x_pct": _num(p["x_pct"]), "y_pct": _num(p["y_pct"])})
+            elif isinstance(p, (list, tuple)) and len(p) >= 2:
+                out.append({"x_pct": _num(p[0]), "y_pct": _num(p[1])})
+            else:
+                return None      # mixed / unknown vertex shape — no geometry
+        return out
     bb = room.get("bbox_pct")
     if isinstance(bb, dict) and "x" in bb and "y" in bb and "w" in bb and "h" in bb:
-        x, y, w, h = float(bb["x"]), float(bb["y"]), float(bb["w"]), float(bb["h"])
+        x, y, w, h = _num(bb["x"]), _num(bb["y"]), _num(bb["w"]), _num(bb["h"])
         return [
             {"x_pct": x,     "y_pct": y},
             {"x_pct": x + w, "y_pct": y},
@@ -92,15 +138,19 @@ def _build_room_graph(parsed: dict[str, Any]) -> dict[str, Any]:
             "nr": str(room.get("nr") or ""),
             "name": room.get("pavadinimas") or "",
             "paskirtis": room.get("paskirtis") or "",
-            "puslapio_nr": int(room.get("puslapio_nr") or page_nr),
+            # Every coercion below is _num/_int (2026-07-28 audit): these come
+            # from a saved blob, so a legacy comma-decimal ("12,5") or a room
+            # whose puslapio_nr is "3 a." used to raise ValueError and 500 the
+            # WHOLE room-graph — the Annotator lost every room over one field.
+            "puslapio_nr": _int(room.get("puslapio_nr"), page_nr),
             "polygon_pct": poly,
-            "perimeter_mm": int(round(float(room.get("perimetras_m") or 0) * 1000)),
-            "area_m2": float(room.get("plotas_m2") or 0),
-            "ceiling_height_m": float(room.get("lubu_aukstis_m") or 2.82),
+            "perimeter_mm": int(round(_num(room.get("perimetras_m")) * 1000)),
+            "area_m2": _num(room.get("plotas_m2")),
+            "ceiling_height_m": _num(room.get("lubu_aukstis_m") or 2.82, 2.82),
             "ceiling_type": room.get("lubu_tipas") or "gkp",
-            "walls_paintable_m2": float(room.get("walls_paintable_m2") or 0),
-            "ceiling_paintable_m2": float(room.get("ceiling_paintable_m2") or 0),
-            "dazymo_plotas_m2": float(room.get("dazymo_plotas_m2") or 0),
+            "walls_paintable_m2": _num(room.get("walls_paintable_m2")),
+            "ceiling_paintable_m2": _num(room.get("ceiling_paintable_m2")),
+            "dazymo_plotas_m2": _num(room.get("dazymo_plotas_m2")),
             "confidence": room.get("confidence") or "medium",
             "elementai_count": len(room.get("elementai") or []),
         })
@@ -111,7 +161,7 @@ def _build_room_graph(parsed: dict[str, Any]) -> dict[str, Any]:
         "page_scale_mm_per_pct": _extract_scale_factor(parsed),
         "rooms": rooms_out,
         "rooms_with_polygons": sum(1 for r in rooms_out if r["polygon_pct"]),
-        "total_floor_area_m2": float(parsed.get("bendras_plotas_m2") or 0),
+        "total_floor_area_m2": _num(parsed.get("bendras_plotas_m2")),
     }
 
 

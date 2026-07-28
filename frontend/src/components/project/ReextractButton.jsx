@@ -14,7 +14,7 @@ import React, { useState } from 'react';
 import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
-import { updateProject } from '@/lib/projectStore';
+import { getProject, updateProject } from '@/lib/projectStore';
 import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ReextractButton({ project, onComplete }) {
@@ -37,9 +37,13 @@ export default function ReextractButton({ project, onComplete }) {
       setProgress('AI analizuoja brėžinį (palaukite 3–8 min)...');
       const fd = new FormData();
       fd.append('files', blob, project.name + '.pdf');
-      // Forward existing rules_override so user's prefs aren't lost
-      if (project._overrides) {
-        fd.append('rules_override', JSON.stringify(project._overrides));
+      // Forward existing rules_override so user's prefs aren't lost. Read them
+      // from the STORE, not the render-time prop — a Prielaidos edit that
+      // didn't re-render this button would otherwise re-extract under the old
+      // assumptions.
+      const overrides = (getProject(project.id) || project)._overrides;
+      if (overrides) {
+        fd.append('rules_override', JSON.stringify(overrides));
       }
 
       const t0 = Date.now();
@@ -76,12 +80,21 @@ export default function ReextractButton({ project, onComplete }) {
         }
 
         // Replace project data — preserve user-edited fields (kainos, name, etc.)
+        //
+        // 2026-07-28 audit: the base of this spread used to be the `project`
+        // PROP — a render-time snapshot taken up to 10 minutes before the
+        // extraction returned. Everything the user changed while the AI worked
+        // (prices, measurements, polygons, per-room overrides, the name) was
+        // silently rolled back to that snapshot. Re-read the CURRENT stored
+        // project first; same idiom as InteriorWorkspace.jsx (`const fresh =
+        // getProject(project.id) || project`) after its async detect calls.
+        const base = getProject(project.id) || project;
         const merged = {
-          ...project,
+          ...base,
           ...result,
-          name: project.name,
-          company_name: project.company_name,
-          vat_rate: project.vat_rate,
+          name: base.name,
+          company_name: base.company_name,
+          vat_rate: base.vat_rate,
           _reextracted_at: new Date().toISOString(),
         };
         updateProject(project.id, merged);

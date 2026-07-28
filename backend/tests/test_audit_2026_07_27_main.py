@@ -86,6 +86,12 @@ _SPEC_PROJECT = {
 }
 
 
+# Big enough to clear MIN_PDF_SIZE_BYTES (the /material-specs route gained the
+# same _validate_pdf_upload guard as every other upload endpoint on 2026-07-28);
+# the extractor itself is stubbed, so the bytes only have to look like a PDF.
+_FAKE_PDF = b"%PDF-1.4\n" + b"% padding to clear the minimum size floor\n" * 4 + b"%%EOF\n"
+
+
 def _stub_specs(monkeypatch, result=None):
     import extractor.material_specs as ms
     monkeypatch.setattr(
@@ -100,7 +106,7 @@ def test_material_specs_finds_an_existing_room_and_saves_without_nesting(
 
     r = client.post("/api/projects/p-specs/material-specs",
                     data={"room_nr": "02"},
-                    files={"files": ("plan.pdf", b"%PDF-1.4 fake", "application/pdf")})
+                    files={"files": ("plan.pdf", _FAKE_PDF, "application/pdf")})
     assert r.status_code == 200, r.text
     assert r.json()["paint"] == "RAL 9010"
 
@@ -116,7 +122,7 @@ def test_material_specs_second_call_is_served_from_cache(tmp_path, monkeypatch):
     _stub_specs(monkeypatch)
     db.upsert_project("p-specs2", dict(_SPEC_PROJECT), user_id=auth._DEV_USER_ID)
     args = dict(data={"room_nr": "02"},
-                files={"files": ("plan.pdf", b"%PDF-1.4 fake", "application/pdf")})
+                files={"files": ("plan.pdf", _FAKE_PDF, "application/pdf")})
     assert client.post("/api/projects/p-specs2/material-specs", **args).status_code == 200
     r2 = client.post("/api/projects/p-specs2/material-specs", **args)
     assert r2.status_code == 200
@@ -128,7 +134,7 @@ def test_material_specs_unknown_room_still_404s(tmp_path, monkeypatch):
     db.upsert_project("p-specs3", dict(_SPEC_PROJECT), user_id=auth._DEV_USER_ID)
     r = client.post("/api/projects/p-specs3/material-specs",
                     data={"room_nr": "99"},
-                    files={"files": ("plan.pdf", b"%PDF-1.4 fake", "application/pdf")})
+                    files={"files": ("plan.pdf", _FAKE_PDF, "application/pdf")})
     assert r.status_code == 404
 
 

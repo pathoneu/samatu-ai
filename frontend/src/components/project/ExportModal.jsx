@@ -5,6 +5,7 @@ import { FileSpreadsheet, FileText, AlertCircle, FileCode, Loader2 } from 'lucid
 import { toast } from 'sonner';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
+import { triggerDownload } from '@/lib/downloadBlob';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -160,12 +161,7 @@ async function downloadFromBackend(endpoint, project, filename) {
   if (!res.ok) throw new Error(`Serverio klaida (${res.status})`);
 
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, filename);
 }
 
 function exportErrors(project) {
@@ -186,12 +182,7 @@ function exportErrors(project) {
 
   const bom = '\uFEFF';
   const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${project.name || 'projektas'}_klaidos.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, `${project.name || 'projektas'}_klaidos.csv`);
 }
 
 const exportOptions = [

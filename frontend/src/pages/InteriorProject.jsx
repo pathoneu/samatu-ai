@@ -441,6 +441,27 @@ function notifyCarriedOrphans(labels, t) {
   }));
 }
 
+/**
+ * Surface the OTHER backend degradations (2026-07-28 audit, B2/B3).
+ *
+ * `orphans_carried` had a dedicated toast; every other _degradations entry —
+ * a failed pozicijos rebuild, a failed compat emit, a darbu_sarasas that no
+ * longer lines up 1:1 with pozicijos — reached the browser and was dropped on
+ * the floor. Those are exactly the cases where the numbers on screen stopped
+ * following the assumptions the user just changed, so silence is a lie.
+ * The backend already writes the LT sentence; render it verbatim.
+ */
+function notifyBackendDegradations(result) {
+  const seen = new Set();
+  for (const d of result?._degradations || []) {
+    if (!d || typeof d !== 'object') continue;
+    if (d.reason === 'orphans_carried') continue;   // has its own toast
+    if (!d.message || seen.has(d.reason)) continue;
+    seen.add(d.reason);
+    toast.warning(d.message, { id: `recompute-degradation-${d.reason}` });
+  }
+}
+
 function DarbuSarasas({ items }) {
   const { t } = useTranslation();
   const [expandedReasoning, setExpandedReasoning] = useState(new Set());
@@ -641,6 +662,12 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       } else if (u) {
         URL.revokeObjectURL(u);
       }
+    }).catch((e) => {
+      // No .catch was a dead end (2026-07-28 audit): a rejected IndexedDB read
+      // left the user on an empty 'brezinys' tab with no way out. Treat a
+      // failure exactly like "no stored PDF" — fall back to a visible tab.
+      console.warn('[InteriorProject] PDF URL load failed:', e);
+      if (!revoked) setTab(cur => (cur === 'brezinys' ? 'main' : cur));
     });
     return () => {
       revoked = true;
@@ -842,7 +869,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             // blob URL ONLY when we don't have one. Doing it on every project
             // change leaked an object URL per edit — the old one was never
             // revoked and the effect's cleanup only knows about the first.
-            if (!pdfUrl) getPdfUrl(project.id).then((url) => setPdfUrl(url));
+            if (!pdfUrl) {
+              getPdfUrl(project.id).then((url) => setPdfUrl(url))
+                .catch((e) => console.warn('[InteriorProject] PDF URL refresh failed:', e));
+            }
           }}
         />
       )}
@@ -917,6 +947,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                 ...backendCarriedPositions(result),
                 ...carriedOrphans(notes).map((n) => n.aprasymas),
               ], t);
+              notifyBackendDegradations(result);
             }}
           />
         </div>

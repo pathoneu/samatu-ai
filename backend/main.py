@@ -432,6 +432,46 @@ async def _api_v1_rewrite(request, call_next):
         if raw is not None:
             scope["raw_path"] = new_path.encode("latin-1")
     return await call_next(request)
+
+
+# ── Unhandled-exception capture — INSIDE the CORS layer ──────────────────────
+#
+# 2026-07-28 audit. `@app.exception_handler(Exception)` (still registered below)
+# is lifted by Starlette into ServerErrorMiddleware, which is the OUTERMOST
+# middleware — outside CORSMiddleware. So its 500 body shipped with NO
+# access-control-allow-origin header, the browser rejected the response before
+# JS could read it, and the frontend's correct "Nepavyko išsaugoti serveryje
+# (500)" branch was unreachable: fetch() rejected with a TypeError and the user
+# was told it was a network problem while the server had logged a real bug.
+#
+# Registered HERE, before CORSMiddleware, on purpose: Starlette's add_middleware
+# inserts at position 0, so the FIRST-registered user middleware is the
+# INNERMOST one — this handler therefore runs beneath CORS and its response
+# passes back out through it. (Verified empirically with curl, not assumed.)
+@app.middleware("http")
+async def _error_capture(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:   # noqa: BLE001 — this IS the catch-all
+        return _error_response(request, exc)
+
+
+def _error_response(request, exc) -> JSONResponse:
+    """The one 500 body shape: generic LT message + a ref id that matches the
+    server log line. Shared by the middleware above and the exception_handler
+    below (which still covers anything raised OUTSIDE this middleware)."""
+    import traceback as _tb
+    tid = f"err-{int(_time.time())}-{hash(str(exc)) & 0xFFFF:04x}"
+    log.error("[%s] Unhandled %s on %s: %s\n%s",
+              tid, type(exc).__name__, request.url.path, exc, _tb.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "_error": f"Vidinė serverio klaida (ref: {tid})",
+            "ref": tid,
+        },
+    )
 import auth as _auth  # noqa: E402  imports + initializes
 import db as _db  # noqa: E402
 
@@ -611,20 +651,14 @@ async def _security_headers(request: Request, call_next):
 # Catches any unhandled exception in route handlers, logs with traceback, returns
 # generic 500 (no stack trace leak to client). Prevents the FastAPI default which
 # echoes back the exception type in debug mode.
+#
+# Starlette lifts this into ServerErrorMiddleware — the OUTERMOST layer, above
+# CORS. That is why _error_capture (registered above, inside CORS) exists and
+# does the real work for route exceptions; this stays as the last-resort net for
+# anything raised in the outer middleware themselves. Same body, same ref id.
 @app.exception_handler(Exception)
 async def _global_exception_handler(request, exc):
-    import traceback as _tb
-    tid = f"err-{int(_time.time())}-{hash(str(exc)) & 0xFFFF:04x}"
-    log.error("[%s] Unhandled %s on %s: %s\n%s",
-              tid, type(exc).__name__, request.url.path, exc, _tb.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={
-            "status": "error",
-            "_error": f"Vidinė serverio klaida (ref: {tid})",
-            "ref": tid,
-        },
-    )
+    return _error_response(request, exc)
 
 
 # ── Register routers (imports consolidated to top — Sprint 2 Task 21) ────────
@@ -1176,7 +1210,12 @@ async def api_put_project_pdf(request: Request, project_id: str,
         raise HTTPException(status_code=413, detail="Failas per didelis (max 200 MB)")
     try:
         from storage import get_storage, pdf_key
-        get_storage().put(pdf_key(project_id), data, "application/pdf")
+        # to_thread (2026-07-28 audit): in prod this is a boto3 upload of up to
+        # 200 MB to R2 — a blocking network write that ran ON the event loop, so
+        # every other request (including /health) queued behind it. The handler
+        # is async because of the await above; the storage call must not be.
+        _storage, _key = get_storage(), pdf_key(project_id)
+        await asyncio.to_thread(_storage.put, _key, data, "application/pdf")
     except Exception as exc:  # noqa: BLE001
         log.warning("pdf persist failed for %s: %r", project_id, exc)
         raise HTTPException(status_code=502, detail="Nepavyko išsaugoti brėžinio")
@@ -1205,7 +1244,15 @@ def api_get_project_pdf(request: Request, project_id: str):
     # every one of those re-downloaded several MB. stat() is a local os.stat or
     # an R2 HEAD — cheap enough to run before deciding to read the bytes, so a
     # 304 never touches the object body at all.
-    meta = storage.stat(key)
+    # A storage outage is a 502, not a 500 — mirrors the PUT twin above. Without
+    # this an R2 hiccup surfaced as "Vidinė serverio klaida", which sends the
+    # user looking for a bug in their project instead of retrying. Covers stat()
+    # AND get(): both are network calls in prod. (2026-07-28 audit.)
+    try:
+        meta = storage.stat(key)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pdf stat failed for %s: %r", project_id, exc)
+        raise HTTPException(status_code=502, detail="Nepavyko pasiekti brėžinio saugyklos")
     etag = None
     if meta:
         raw = meta.get("etag") or f'{meta.get("size", 0):x}-{int((meta.get("mtime") or 0) * 1000):x}'
@@ -1214,7 +1261,11 @@ def api_get_project_pdf(request: Request, project_id: str):
         if etag in [t.strip() for t in inm.split(",") if t.strip()]:
             return Response(status_code=304, headers=_pdf_cache_headers(etag))
 
-    data = storage.get(key)
+    try:
+        data = storage.get(key)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pdf fetch failed for %s: %r", project_id, exc)
+        raise HTTPException(status_code=502, detail="Nepavyko atsiųsti brėžinio")
     if data is None:
         raise HTTPException(status_code=404, detail="Brėžinys nerastas")
     headers = {"Content-Disposition": f'inline; filename="{project_id}.pdf"'}
@@ -1419,13 +1470,28 @@ async def api_extract_room_material_specs(
     if not files:
         raise HTTPException(status_code=400, detail="PDF file required")
     pdf_bytes = await files[0].read()
+    # Mirror every other upload endpoint (2026-07-28 audit): this one skipped
+    # _validate_pdf_upload entirely, so a non-PDF / 300 MB / 1000-page file went
+    # straight into pdf2image + a paid Vision call.
+    _validate_pdf_upload(pdf_bytes, files[0].filename or "")
 
     # Run extraction (sync — wrapped in to_thread)
     from extractor.material_specs import extract_room_material_specs
-    result = await asyncio.to_thread(
-        extract_room_material_specs, pdf_bytes, spec_pages,
-        target_room.get("pavadinimas") or room_nr,
-    )
+    try:
+        result = await asyncio.to_thread(
+            extract_room_material_specs, pdf_bytes, spec_pages,
+            target_room.get("pavadinimas") or room_nr,
+        )
+    except Exception:   # noqa: BLE001 — an Anthropic outage is not our 500
+        # Was unguarded: an API timeout / 529 surfaced as a bare 500 with the
+        # generic "Vidinė serverio klaida", which tells the user to blame us
+        # and offers no next step.
+        log.exception("material-specs extraction failed (project=%s room=%s)",
+                      project_id, room_nr)
+        raise HTTPException(
+            status_code=502,
+            detail="Nepavyko nuskaityti medžiagų specifikacijos — "
+                   "AI paslauga laikinai neprieinama. Bandykite dar kartą.")
 
     # Cache on the project blob itself (same convention as api/revalidate.py:
     # mutate the flattened project dict and upsert it whole).
@@ -1669,6 +1735,38 @@ def _parse_qty(s: str):
         return v if v >= 0 else None
     except ValueError:
         return None
+
+
+def _excel_number(v):
+    """Coerce an export cell value to a NUMBER for Excel/PDF. -> (value, is_numeric)
+
+    Excel will not do arithmetic on a text cell, and it fails LOUDLY in the
+    formula (#VALUE!) but SILENTLY in the aggregate: SUBTOTAL(9, …) just skips
+    the row, so the sąmata total comes out short and nobody notices until the
+    client adds the column by hand. LT decimals ("12,5") and NBSP-grouped
+    thousands ("1 234,56") are exactly what the KŽ reader and hand-edited JSON
+    produce, so they must land as floats.
+
+    Unparseable → the ORIGINAL value is returned with False, so the caller can
+    write it as text AND say so; blanks/None are numeric-safe (empty cell).
+    """
+    if isinstance(v, bool):          # bool is an int subclass — never a quantity
+        return v, False
+    if isinstance(v, (int, float)):
+        return float(v), True
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return v, True               # empty cell poisons nothing
+    parsed = _parse_qty(v)
+    if parsed is not None:
+        return parsed, True
+    # _parse_qty rejects negatives; a negative kaina (nuolaida) is legitimate.
+    s = str(v).strip()
+    for _sep in ("\u0020", "\u00a0", "\u202f"):   # ASCII / NBSP / narrow NBSP
+        s = s.replace(_sep, "")
+    try:
+        return float(s.replace(",", ".")), True
+    except ValueError:
+        return v, False
 
 
 def _is_dash_qty(s: str) -> bool:
@@ -4701,6 +4799,9 @@ def generate_excel(request: Request, data: dict):
     # Helper: write rows + totals block on a sheet starting at row `r`
     # Returns the next free row.
     # ─────────────────────────────────────────────────────────────────────────
+    # Rows already reported as non-numeric — this helper runs once per sheet.
+    _numeric_warned: set = set()
+
     def _write_rows(ws, rows: list[dict], start_row: int = 4,
                     section_subtotals: bool = False) -> int:
         # Section subtotals only make sense with >=2 sections, else the one
@@ -4757,8 +4858,33 @@ def generate_excel(request: Request, data: dict):
             bg   = "FFFFFF" if data_row_idx % 2 == 0 else C_GRAY
             fill = PatternFill("solid", fgColor=bg)
 
-            kiekis = e.get("kiekis", 0)
-            kaina  = e.get("kaina",  0)
+            # NUMBERS, not text (2026-07-28 audit). kiekis/kaina were written
+            # raw: an LT-decimal string like "12,5" (what the KŽ reader and
+            # hand-edited JSON produce) landed in the cell as TEXT, so
+            # =ROUND(D*E,2) evaluated to #VALUE!, SUBTOTAL(9,…) silently SKIPPED
+            # that row, and the client opened a sąmata whose total was short by
+            # the value of the line. Coerce through the same LT parser the KŽ
+            # reader uses; only a genuinely unparseable value stays text — and
+            # then it is named in the Pastabos sheet instead of failing quietly.
+            kiekis, _k_ok = _excel_number(e.get("kiekis", 0))
+            kaina,  _p_ok = _excel_number(e.get("kaina",  0))
+            if not _k_ok or not _p_ok:
+                _bad = "kiekis" if not _k_ok else "kaina"
+                _label = str(e.get("aprasymas") or e.get("nr") or "—")[:60]
+                # De-dupe: _write_rows runs once for the main sheet and again
+                # for each per-skyrius sheet, so the same bad row would warn N+1
+                # times in Pastabos.
+                _key = (_label, _bad, str(e.get(_bad)))
+                if _key not in _numeric_warned:
+                    _numeric_warned.add(_key)
+                    perspejimani.append({
+                        "tekstas": (
+                            f"Eilutė „{_label}“: {_bad} („{e.get(_bad)}“) nėra "
+                            f"skaičius — Excel eilutės suma neapskaičiuota, "
+                            f"patikrinkite rankiniu būdu."
+                        ),
+                        "kategorija": "Eksporto klaida",
+                    })
 
             # Sprint §FIX-3 (2026-04-29): user reported confidence dots in
             # Excel are noise — exported sąmata should look clean for clients.
@@ -5126,9 +5252,15 @@ def generate_pdf(request: Request, data: dict):
     # Backfill a missing `suma` from kiekis×kaina so the PDF total, the section
     # subtotals and the printed line amounts all agree — and never diverge from
     # the Excel export, which always computes kiekis×kaina. (audit 2026-07-05)
+    # LT-comma aware (2026-07-28 audit): bare float() raised ValueError on a
+    # "12,5" quantity — an unhandled 500 on the export button, with the same
+    # payload the Excel export happily rendered. Same coercion both sides.
     for _e in eilutes:
         if _e.get("suma") is None and _e.get("kaina") is not None:
-            _e["suma"] = round((float(_e.get("kiekis") or 0)) * (float(_e.get("kaina") or 0)), 2)
+            _q, _q_ok = _excel_number(_e.get("kiekis") or 0)
+            _p, _p_ok = _excel_number(_e.get("kaina") or 0)
+            _e["suma"] = (round(float(_q or 0) * float(_p or 0), 2)
+                          if _q_ok and _p_ok else None)
     prielaidos   = data.get("prielaidos") or {}
     perspejimani = data.get("perspejimani") or []
     tipas_pdf    = data.get("tipas", "kz")
@@ -5136,7 +5268,15 @@ def generate_pdf(request: Request, data: dict):
     # the document total always equals the sum of the printed line amounts — a
     # contractor adding the rows by hand gets the same number. (2026-06-19 hunt:
     # summing the raw floats could drift a cent from the visible lines.)
-    viso_be_pvm  = round(sum(round(e.get("suma", 0) or 0, 2) for e in eilutes), 2)
+    # `round(str)` is a TypeError — a suma that arrived as an LT-decimal string
+    # 500'd the whole export. _excel_number keeps it numeric; a genuinely
+    # unparseable one contributes 0 (and its row prints its own raw value)
+    # rather than taking the document down. (2026-07-28 audit.)
+    def _suma_num(e) -> float:
+        v, ok = _excel_number(e.get("suma", 0) or 0)
+        return round(float(v), 2) if ok and isinstance(v, (int, float)) else 0.0
+
+    viso_be_pvm  = round(sum(_suma_num(e) for e in eilutes), 2)
     # Reverse-VAT (atvirkštinis PVM) for renovation/modernizavimas: the contractor
     # must NOT add output VAT — the užsakovas self-accounts (PVMĮ 96 str.). Charging
     # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
@@ -5648,8 +5788,13 @@ async def extract_interior_endpoint(
             ls.setdefault("warnings", []).append({
                 "level": "WARNING", "message": validation["warning"], "room": ""
             })
-            ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
-            ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
+            # setdefault like the sibling line above: an lt_sanity dict without a
+            # "summary" key raised KeyError here AFTER the paid Vision call had
+            # already returned — a 500 that threw away a $1-2 extraction.
+            # (2026-07-28 audit; same class as the /extract-interior-stream one.)
+            _sum = ls.setdefault("summary", {})
+            _sum["warnings_count"] = _sum.get("warnings_count", 0) + 1
+            _sum["warnings"] = _sum.get("warnings", 0) + 1
         result["_pdf_page_count"] = validation.get("page_count", 0)
 
     # Meter Vision cost against the user so the per-user spend cap can fire
@@ -5773,6 +5918,58 @@ async def extract_interior_stream_endpoint(
             except Exception:  # noqa: BLE001 — generator cleanup is best-effort
                 log.warning("extract-interior-stream: generator close failed",
                             exc_info=True)
+
+        def _augment_done_event(result: dict) -> None:
+            """Bookkeeping on a FINISHED extraction: billing, the page-count
+            warning, cost metering. Extracted from the loop so the caller can
+            wrap it — see the call site."""
+            # Billing parity: count the successful extraction against the
+            # monthly quota / trial credit exactly like the non-stream twin.
+            # The earlier version called record_extract_and_maybe_consume_credit
+            # UNGUARDED — it wrote billing_usage rows even with the flag OFF
+            # (proven in the live DB) — and never consumed the company trial,
+            # so a free user's 2nd project was not blocked. Mirror the
+            # /extract-interior block exactly: guard on billing_enabled() and
+            # consume the trial. Hard no-op while BILLING_ENABLED != '1'.
+            # (audit 2026-07-27)
+            if result.get("status") != "error":
+                try:
+                    from billing.flag import billing_enabled
+                    if billing_enabled() and _user and _user.get("id"):
+                        db.record_extract_and_maybe_consume_credit(_user["id"])
+                        _bu = db.get_user_by_id(_user["id"])
+                        if (_bu and (_bu.get("plan") or "free") == "free"
+                                and db.credits_balance(_user["id"]) == 0
+                                and _bu.get("company_code")):
+                            from billing.trial import consume_trial
+                            consume_trial(_bu["company_code"], _user["id"])
+                except Exception:
+                    log.warning("stream: credit increment failed", exc_info=True)
+            if validation.get("warning"):
+                existing = result.get("warnings") or []
+                existing.append({"level": "WARN", "message": validation["warning"]})
+                result["warnings"] = existing
+                if isinstance(result.get("lt_sanity"), dict):
+                    ls = result["lt_sanity"]
+                    ls.setdefault("warnings", []).append({
+                        "level": "WARNING", "message": validation["warning"], "room": ""
+                    })
+                    # setdefault, NOT ls["summary"][...] — an lt_sanity without a
+                    # "summary" key used to raise KeyError here, OUTSIDE the try
+                    # that guards next(gen), and killed the stream before `done`.
+                    _sum = ls.setdefault("summary", {})
+                    _sum["warnings_count"] = _sum.get("warnings_count", 0) + 1
+                    _sum["warnings"] = _sum.get("warnings", 0) + 1
+                result["_pdf_page_count"] = validation.get("page_count", 0)
+            # Meter Vision cost against the user (best-effort) so the spend
+            # cap can fire. Only on a successful extraction with token usage.
+            try:
+                if _user and result.get("status") != "error":
+                    db.record_usage(_user.get("id"), result,
+                                    kind="extract-interior-stream")
+            except Exception as _exc:
+                log.warning("record_usage failed (stream): %r", _exc)
+
         try:
           while True:
             future = loop.run_in_executor(None, lambda: next(gen, sentinel))
@@ -5801,51 +5998,34 @@ async def extract_interior_stream_endpoint(
 
             # Augment terminal event with the page-count warning the same way
             # the non-streaming endpoint does, so the UI banner still fires.
+            #
+            # WRAPPED (2026-07-28 audit): every line below is bookkeeping on top
+            # of an extraction that ALREADY SUCCEEDED. Anything raising here used
+            # to escape the generator, so the client got a truncated stream with
+            # no `done` event — the spinner span forever on a result the server
+            # was holding in memory. The augmentation is best-effort now; the
+            # `done` event ships regardless.
             if ev.get("event") == "done" and isinstance(ev.get("result"), dict):
-                result = ev["result"]
-                # Billing parity: count the successful extraction against the
-                # monthly quota / trial credit exactly like the non-stream twin.
-                # The earlier version called record_extract_and_maybe_consume_credit
-                # UNGUARDED — it wrote billing_usage rows even with the flag OFF
-                # (proven in the live DB) — and never consumed the company trial,
-                # so a free user's 2nd project was not blocked. Mirror the
-                # /extract-interior block exactly: guard on billing_enabled() and
-                # consume the trial. Hard no-op while BILLING_ENABLED != '1'.
-                # (audit 2026-07-27)
-                if result.get("status") != "error":
-                    try:
-                        from billing.flag import billing_enabled
-                        if billing_enabled() and _user and _user.get("id"):
-                            db.record_extract_and_maybe_consume_credit(_user["id"])
-                            _bu = db.get_user_by_id(_user["id"])
-                            if (_bu and (_bu.get("plan") or "free") == "free"
-                                    and db.credits_balance(_user["id"]) == 0
-                                    and _bu.get("company_code")):
-                                from billing.trial import consume_trial
-                                consume_trial(_bu["company_code"], _user["id"])
-                    except Exception:
-                        log.warning("stream: credit increment failed", exc_info=True)
-                if validation.get("warning"):
-                    existing = result.get("warnings") or []
-                    existing.append({"level": "WARN", "message": validation["warning"]})
-                    result["warnings"] = existing
-                    if isinstance(result.get("lt_sanity"), dict):
-                        ls = result["lt_sanity"]
-                        ls.setdefault("warnings", []).append({
-                            "level": "WARNING", "message": validation["warning"], "room": ""
-                        })
-                        ls["summary"]["warnings_count"] = ls["summary"].get("warnings_count", 0) + 1
-                        ls["summary"]["warnings"] = ls["summary"].get("warnings", 0) + 1
-                    result["_pdf_page_count"] = validation.get("page_count", 0)
-                # Meter Vision cost against the user (best-effort) so the spend
-                # cap can fire. Only on a successful extraction with token usage.
                 try:
-                    if _user and result.get("status") != "error":
-                        db.record_usage(_user.get("id"), result, kind="extract-interior-stream")
-                except Exception as _exc:
-                    log.warning("record_usage failed (stream): %r", _exc)
+                    _augment_done_event(ev["result"])
+                except Exception:   # noqa: BLE001 — never lose the terminal event
+                    log.exception(
+                        "/extract-interior-stream: done-event augmentation failed")
 
             yield _format_sse(ev)
+        except Exception:   # noqa: BLE001 — a hung spinner is worse than an error
+            # Belt-and-braces twin of the inner handler: anything unexpected in
+            # the loop body (not just next(gen)) must still terminate the stream
+            # with the error/done pair the frontend contract expects. Note
+            # asyncio.CancelledError is a BaseException — a client disconnect
+            # still propagates untouched.
+            log.exception("/extract-interior-stream: stream loop failed")
+            _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
+            yield _format_sse({"event": "error", "message": _msg})
+            yield _format_sse({"event": "done", "result": {
+                "status": "error", "_error": _msg,
+            }})
+            return
         finally:
             # Close the sync generator on every exit path (normal end, error,
             # or client disconnect). If a worker thread is still executing
@@ -5964,8 +6144,6 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         # Per-room flags can flip floor type or paint
         if "tile_floor" in room_override:
             rt_rules["tile_floor"] = bool(room_override["tile_floor"])
-        if "walls_paint" in room_override:
-            rt_rules["walls_paint"] = float(room_override["walls_paint"])
 
         # Build a single-room rules dict that calc_room_quantities expects
         single_rules = {paskirtis: rt_rules}
@@ -5975,6 +6153,12 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         # a corrupted/legacy project) must degrade to the un-recomputed room, NOT
         # 500 the whole recompute and lose every other room. (2026-06-19 hunt.)
         try:
+            # walls_paint MOVED INSIDE the guard (2026-07-28 audit): it sits in
+            # per_room_overrides, i.e. user-supplied request data, so
+            # float("taip") raised ValueError OUTSIDE every try in the handler
+            # and 500'd the whole recompute — every other room lost with it.
+            if "walls_paint" in room_override:
+                rt_rules["walls_paint"] = float(room_override["walls_paint"])
             recalc = calc_room_quantities(room, rules=single_rules)
         except Exception as exc:  # noqa: BLE001
             log.warning("[recompute-interior] room %s calc failed: %s",
@@ -5990,8 +6174,14 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # Recompute santrauka + emit V8-compat + lt_sanity mirror
     parsed = {
         "archetipas": payload.archetipas or "standart",
+        # `r.get("plotas_m2", 0)` returns None for an EXPLICIT null (the shape a
+        # room with an unreadable area actually has in saved blobs), and
+        # sum([None]) is a TypeError → 500 for the whole recompute. `or 0` and a
+        # numeric check keep the rest of the project alive. (2026-07-28 audit.)
         "bendras_plotas_m2": payload.bendras_plotas_m2 or sum(
-            r.get("plotas_m2", 0) for r in out_rooms
+            (r.get("plotas_m2") or 0) if isinstance(r.get("plotas_m2"), (int, float))
+            else 0
+            for r in out_rooms
             if normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
         ),
         "patalpos": out_rooms,
@@ -6255,12 +6445,16 @@ async def pdf_lines(
     except ImportError as e:
         return {"status": "error", "error": str(e)}
 
+    # to_thread (2026-07-28 audit): pdfplumber vector extraction over up to 30
+    # pages is seconds of blocking CPU + I/O. On this `async` handler it held
+    # the event loop for the whole duration.
     if all_pages == "1":
-        result = extract_lines_all_pages(pdf_bytes, max_pages=30)
+        result = await asyncio.to_thread(extract_lines_all_pages, pdf_bytes,
+                                         max_pages=30)
         result["status"] = "ok"
         return result
 
-    result = extract_lines_for_page(pdf_bytes, page)
+    result = await asyncio.to_thread(extract_lines_for_page, pdf_bytes, page)
     result["status"] = "ok"
     return result
 
@@ -6814,16 +7008,34 @@ def detect_scale_hint(payload: DetectScalePayload, request: Request):
     confidence: 'high'|'medium'|'low'} after scanning PDF text layer for scale annotations."""
     # 2026-05-06 security audit: require auth (server CPU work).
     _auth.require_user(request)
+    # 2026-07-28 audit: this fires on EVERY project creation and does pdfplumber
+    # text extraction over up to 200 pages, with no rate limit and no size cap —
+    # an authenticated caller could pin a worker with a stream of 200 MB bodies.
+    # Both guards mirror what the upload endpoints already do.
+    _check_rate_limit(_client_key(request), "scale_hint")
     import re as _re_local
     import base64
     import pdfplumber
 
     raw = None
     if payload.pdf_b64:
+        # Reject on the ENCODED length first — decoding a 300 MB base64 blob to
+        # find out it is too big is exactly the work we're refusing to do.
+        # base64 is 4 chars per 3 bytes, so decoded ≈ len * 3/4.
+        if len(payload.pdf_b64) > (MAX_PDF_SIZE_BYTES // 3) * 4 + 16:
+            raise HTTPException(
+                status_code=413,
+                detail=f"PDF failas per didelis. Maksimumas "
+                       f"{MAX_PDF_SIZE_BYTES // (1024*1024)} MB.")
         try:
             raw = base64.b64decode(payload.pdf_b64)
         except Exception as e:
             return {"found": False, "error": f"base64 decode failed: {e}"}
+        if len(raw) > MAX_PDF_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"PDF failas per didelis ({len(raw) // (1024*1024)} MB). "
+                       f"Maksimumas {MAX_PDF_SIZE_BYTES // (1024*1024)} MB.")
     if not raw:
         return {"found": False, "error": "pdf_b64 required"}
 
@@ -6923,8 +7135,13 @@ async def click_to_fill_endpoint(
     if not pdf_bytes[:4].startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="pdf_file nėra galiojantis PDF")
 
+    # to_thread (2026-07-28 audit): poppler rasterization + the OpenCV flood-fill
+    # are hundreds of ms of pure blocking CPU. This handler is `async` (it awaits
+    # the upload), so they ran ON the event loop and stalled every concurrent
+    # request — including the viewer's own PDF fetches while the user clicks.
     try:
-        raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+        raster = await asyncio.to_thread(
+            _cache.render_grayscale_from_bytes, pdf_bytes, page_nr=page_nr)
     except Exception:
         log.exception("click-to-fill page render failed")
         raise HTTPException(
@@ -6932,7 +7149,8 @@ async def click_to_fill_endpoint(
             detail="Nepavyko atvaizduoti PDF puslapio. Bandykite dar kartą.")
 
     try:
-        result = click_to_fill_pipeline(
+        result = await asyncio.to_thread(
+            click_to_fill_pipeline,
             raster=raster,
             click_x_pct=click_x_pct,
             click_y_pct=click_y_pct,
@@ -7019,8 +7237,12 @@ async def detect_room_polygons_endpoint(
     if pdf_bytes is None:
         raise HTTPException(status_code=400, detail="PDF byte cache nerasta — pridėkite pdf_file")
 
+    # to_thread — same reasoning as /api/click-to-fill above (2026-07-28 audit):
+    # this is poppler rasterization on an `async` handler's event loop, and this
+    # route runs it for a whole page of rooms at project-open time.
     try:
-        raster = _cache.render_grayscale_from_bytes(pdf_bytes, page_nr=page_nr)
+        raster = await asyncio.to_thread(
+            _cache.render_grayscale_from_bytes, pdf_bytes, page_nr=page_nr)
     except Exception:
         log.exception("detect-room-polygons page render failed")
         raise HTTPException(

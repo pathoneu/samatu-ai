@@ -10,6 +10,7 @@ import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
+import { triggerDownload } from '@/lib/downloadBlob';
 import { useConfirm } from '@/components/ui/confirm-provider';
 
 // "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
@@ -147,12 +148,7 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   });
   if (!res.ok) throw new Error(`Klaida (${res.status})`);
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, filename);
 }
 
 export default function ExportDropdown({ project }) {

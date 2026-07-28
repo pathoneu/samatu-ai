@@ -366,3 +366,89 @@ def test_failed_rounds_are_recorded_but_never_billed(monkeypatch):
     assert rounds[0]["error"].startswith("vision_call_failed")
     priced = [r for r in rounds if r.get("model") and not r.get("error")]
     assert len(priced) == 1
+
+
+# ════════ T5e (2026-07-28 batch 2) — modules with their OWN retry loop ═════
+# The three readers below run their own attempt loop AND call through a client
+# built with max_retries=1, so the two policies MULTIPLIED: 3 attempts became
+# up to 6 HTTP calls (2 x 2 = 4 for material_specs). Each must now disable the
+# SDK retry for the duration of its loop via client.with_options(max_retries=0).
+
+class _OptionsRecordingClient:
+    """Records the max_retries passed to with_options and counts attempts."""
+
+    def __init__(self):
+        self.calls = 0
+        self.with_options_kwargs: list[dict] = []
+
+    def with_options(self, **kw):
+        self.with_options_kwargs.append(kw)
+        return self
+
+    @property
+    def messages(self):
+        return self
+
+    def stream(self, **_kw):
+        self.calls += 1
+        raise RuntimeError("boom")
+
+
+def test_eksplikacija_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
+    monkeypatch.setattr(eksplikacija_reader, "pdf_to_b64_images",
+                        lambda *a, **kw: [{"page_index": 0, "image_b64": "x"}])
+    c = _OptionsRecordingClient()
+    out = eksplikacija_reader.read_eksplikacija(b"%PDF-1.4 not really", c)
+    assert out.get("_error"), out                      # every attempt failed
+    assert c.with_options_kwargs, "read_eksplikacija never called with_options"
+    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
+    assert c.calls == 3, f"expected exactly 3 attempts, got {c.calls}"
+
+
+def test_wall_elevation_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
+    from extractor import wall_elevation as we
+    monkeypatch.setattr(we.time, "sleep", lambda *_a, **_k: None)
+    c = _OptionsRecordingClient()
+    assert we._extract_one_page("fakeb64", 0, c) is None    # all attempts failed
+    assert c.with_options_kwargs, "_extract_one_page never called with_options"
+    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
+    assert c.calls == 3, f"expected exactly 3 attempts, got {c.calls}"
+
+
+def test_material_specs_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
+    from extractor import material_specs as ms
+    monkeypatch.setattr(ms.time, "sleep", lambda *_a, **_k: None)
+    # Stub the renderer: this test is about the transport policy, not poppler.
+    import pdf2image
+
+    class _Img:
+        size = (100, 100)
+
+        def resize(self, *_a):
+            return self
+
+        def save(self, buf, **_kw):
+            buf.write(b"jpegbytes")
+    monkeypatch.setattr(pdf2image, "convert_from_bytes",
+                        lambda *a, **kw: [_Img()])
+
+    c = _OptionsRecordingClient()
+    out = ms.extract_room_material_specs(
+        b"%PDF-1.4 fake", [3], "Vonia", client=c)
+    assert out.get("_error"), out
+    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
+    assert c.calls == 2, f"expected exactly 2 attempts, got {c.calls}"
+
+
+def test_with_options_preserves_transport_settings_in_this_sdk():
+    """The fix relies on with_options being `copy` — verify against the INSTALLED
+    anthropic (0.95.0), not from memory: same base_url/timeout/default headers
+    and the same httpx client, only max_retries changed."""
+    c = anthropic.Anthropic(api_key="sk-ant-test", max_retries=1,
+                            default_headers={"x-pathon": "1"}, timeout=42.0)
+    c2 = c.with_options(max_retries=0)
+    assert c2.max_retries == 0 and c.max_retries == 1     # original untouched
+    assert c2.base_url == c.base_url
+    assert c2.timeout == c.timeout
+    assert c2.default_headers.get("x-pathon") == "1"
+    assert c2._client is c._client                        # shared connection pool

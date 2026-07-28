@@ -103,5 +103,12 @@ def test_revalidate_does_not_explode_when_validator_throws(monkeypatch):
     monkeypatch.setattr(cpv, "validate_consistency", _bad_validate)
     out = mod._revalidate_payload(_two_storey_lt_project())
     crashed = [w for w in out["warnings"]
-               if "validate_consistency raised" in (w.get("message", ""))]
+               if w.get("field") == "cross_page_validator"
+               and w.get("source") == "cross_page_validator"]
     assert crashed, "validator crash should surface as a soft warning, not raise"
+    # …in LITHUANIAN, with no Python internals (2026-07-28 audit): these strings
+    # render verbatim in SanityWarningsBanner, so str(exc) leaked stack-y text
+    # ("RuntimeError: …", file paths) into the estimator's UI.
+    assert "kryžminio puslapių patikrinimo" in crashed[0]["message"]
+    assert "simulated validator crash" not in crashed[0]["message"]
+    assert "RuntimeError" not in crashed[0]["message"]

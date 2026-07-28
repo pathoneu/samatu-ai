@@ -16,10 +16,14 @@ Auth: same as GET /api/projects — owner or admin.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 
 import auth as _auth
 import db
+
+log = logging.getLogger("samatu_ai")
 
 router = APIRouter(prefix="/api/projects", tags=["revalidate"])
 
@@ -79,12 +83,19 @@ def _revalidate_payload(payload: dict) -> dict:
     try:
         from extractor.cross_page_validator import validate_consistency
         cross_warnings = validate_consistency(parsed) or []
-    except Exception as exc:
-        # Don't fail the whole revalidate if one rule throws.
+    except Exception:
+        # Don't fail the whole revalidate if one rule throws — but do NOT put
+        # str(exc) in front of the user (2026-07-28 audit): these warnings render
+        # verbatim in SanityWarningsBanner, so a stack-y Python message ("KeyError:
+        # 'plotas_m2'", a file path) ended up in the estimator's UI — noise to
+        # them, internals leaked to anyone they share the screen with. Generic LT
+        # in the UI, full traceback in the log.
+        log.exception("revalidate: validate_consistency failed")
         cross_warnings = [{
             "level": "WARN",
             "field": "cross_page_validator",
-            "message": f"validate_consistency raised: {exc}",
+            "message": "Nepavyko atlikti kryžminio puslapių patikrinimo — "
+                       "kiekius patikrinkite rankiniu būdu.",
             "source": "revalidate",
         }]
 
@@ -112,11 +123,13 @@ def _revalidate_payload(payload: dict) -> dict:
     try:
         from extractor.lt_rules import apply_lt_sanity
         parsed = apply_lt_sanity(parsed)
-    except Exception as exc:
+    except Exception:
+        log.exception("revalidate: apply_lt_sanity failed")
         parsed.setdefault("warnings", []).append({
             "level": "WARN",
             "field": "lt_sanity",
-            "message": f"apply_lt_sanity raised: {exc}",
+            "message": "Nepavyko pritaikyti LT taisyklių patikros — "
+                       "kiekius patikrinkite rankiniu būdu.",
             "source": "revalidate",
         })
 

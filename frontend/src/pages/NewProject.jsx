@@ -17,6 +17,7 @@ import { API_BASE as API } from '@/lib/apiBase';
 import { useBilling } from '@/hooks/useBilling';
 import UpgradeDialog from '@/components/billing/UpgradeDialog';
 import { detectPaywall } from '@/lib/paywall';
+import { toast } from 'sonner';
 
 // Pirmoji versija: Interjero projektas yra DEFAULT. Kiti tipai (KŽ, Fasadai,
 // Stogas, Žemės, Betonas) — paslėpti į "Kitas tipas" advanced.
@@ -371,14 +372,24 @@ export default function NewProject() {
 
       // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad
       // brėžinys išliktų išvalius kešą / persijungus įrenginį. (2026-06-21)
+      let localPdfOk = true;
       try {
         await savePdf(project.id, file);
       } catch (pdfErr) {
+        localPdfOk = false;
         console.warn('Nepavyko išsaugoti PDF į IndexedDB:', pdfErr);
       }
       // Fire-and-forget — neblokuojam srauto; backendas yra durabli atsarginė kopija.
+      // 2026-07-28 audit: kai NEPAVYKSTA ABU (IndexedDB ir backendas), brėžinio
+      // nebelieka niekur — anksčiau tai matėsi tik console.warn'e, o vartotojas
+      // toliau dirbo manydamas, kad brėžinys išsaugotas. Neblokuojantis
+      // įspėjimas: eksportai veikia, bet peržiūra po perkrovimo — ne.
       uploadPdfToBackend(project.id, file).then((ok) => {
         if (!ok) console.warn('Nepavyko įkelti PDF į backendą (liks tik naršyklėje)');
+        if (!ok && !localPdfOk) toast.warning(t('newProject.warnPdfNotDurable'));
+      }).catch((e) => {
+        console.warn('Nepavyko įkelti PDF į backendą:', e);
+        if (!localPdfOk) toast.warning(t('newProject.warnPdfNotDurable'));
       });
 
       // Sprint §G5 (2026-04-29): scale auto-detect from PDF text layer

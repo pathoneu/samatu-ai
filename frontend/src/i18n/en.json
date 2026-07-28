@@ -902,7 +902,9 @@
       "pdfUnavailableDesc": "This project was created earlier and the PDF was not stored. Create a new project to use the drawing measurement tools.",
       "attaching": "Attaching…",
       "attachPdf": "Attach PDF to the project",
-      "loadingDrawing": "Loading the drawing…"
+      "loadingDrawing": "Loading the drawing…",
+      "pdfAttachFailed": "Could not attach the drawing. Check the file and try again.",
+      "pdfBackupFailed": "The drawing was saved in this browser only — the server upload failed."
     },
     "mainView": {
       "otherWorks": "Other works",
@@ -1429,6 +1431,7 @@
     "defaultNameConstruction": "Construction project",
     "defaultNameInterior": "Interior project",
     "defaultNameKz": "New project",
+    "warnPdfNotDurable": "The drawing was not stored durably — exports will work, but the drawing preview may disappear.",
     "warnLowConfidence": "Low AI confidence",
     "warnMissingUnit": "Missing unit of measure",
     "errAborted": "Request canceled or timed out. Try a smaller PDF or retry.",

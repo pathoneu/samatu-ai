@@ -21,6 +21,7 @@ review process (not implemented here — explicit guardrail).
 from __future__ import annotations
 
 import json
+import math
 import time
 from pathlib import Path
 from typing import Any
@@ -182,6 +183,19 @@ def compute_factors(
             }
             continue
         ai_val = float(meta["accessor"](parsed))
+        # NaN/inf guard (2026-07-28 audit). NaN fails EVERY comparison, so a
+        # NaN ai_val slipped past `<= 0`, produced a NaN factor, and json.dumps
+        # emitted the bare token NaN — which is not valid JSON: the browser's
+        # response.json() threw and the calibration screen died with a parse
+        # error instead of showing the metric as un-calibratable.
+        if not math.isfinite(ai_val) or not math.isfinite(float(user_val)):
+            out[key] = {
+                "ai_value": None, "user_value": None,
+                "factor": None, "applied": False,
+                "reason": "not_finite",
+                "label": meta["label"], "unit": meta["unit"],
+            }
+            continue
         if ai_val <= 0:
             out[key] = {
                 "ai_value": ai_val, "user_value": float(user_val),

@@ -906,7 +906,9 @@
       "pdfUnavailableDesc": "Šis projektas sukurtas anksčiau ir PDF nebuvo išsaugotas. Sukurkite naują projektą, kad galėtumėte naudoti brėžinio matavimo įrankius.",
       "attaching": "Prisegama…",
       "attachPdf": "Prisegti PDF prie projekto",
-      "loadingDrawing": "Krauname brėžinį…"
+      "loadingDrawing": "Krauname brėžinį…",
+      "pdfAttachFailed": "Nepavyko pridėti brėžinio. Patikrinkite failą ir bandykite dar kartą.",
+      "pdfBackupFailed": "Brėžinys išsaugotas tik šioje naršyklėje — nepavyko įkelti į serverį."
     },
     "mainView": {
       "otherWorks": "Kiti darbai",
@@ -1433,6 +1435,7 @@
     "defaultNameConstruction": "Statybos projektas",
     "defaultNameInterior": "Interjero projektas",
     "defaultNameKz": "Naujas projektas",
+    "warnPdfNotDurable": "Brėžinys neišsaugotas ilgalaikiam saugojimui — eksportai veiks, bet brėžinio peržiūra gali dingti.",
     "warnLowConfidence": "Žemas AI tikslumas",
     "warnMissingUnit": "Trūksta matavimo vieneto",
     "errAborted": "Užklausa atšaukta arba laiko limitas. Bandykite mažesnį PDF arba pakartokite.",

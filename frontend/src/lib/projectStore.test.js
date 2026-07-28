@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   _handleSyncResponse, _hasStorageNotice, _resetSaveState, _getServerVersion,
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
-  resetPullCache,
+  resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
+  pullProjectsFromBackend,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -78,6 +79,32 @@ test('updateProject survives a QuotaExceededError and warns once', () => {
   // The edit is NOT lost when localStorage refuses it: the in-memory snapshot
   // keeps it and the backend PUT (the real source of truth) still carries it.
   assert.equal(getProject('p1').name, 'Perrašyta');
+});
+
+test('a failing _persist cannot make edit N+1 revert edit N (A5 regression)', async () => {
+  // THE hazard this asserts against: with localStorage refusing writes (quota),
+  // the store used to re-read the STALE array for the next mutation, so edit
+  // N+1 was merged onto a blob that never had edit N — and the backend PUT
+  // shipped that regression as the new truth. The in-memory snapshot is what
+  // makes this safe; if someone removes it, this test fails.
+  _resetSaveState();
+  const ls = installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p1', name: 'A', kaina: 0 }]),
+  });
+  ls.setItem = () => { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; };
+  const puts = installFetchRecorder();
+
+  updateProject('p1', { kaina: 42 });        // edit N — localStorage refuses it
+  flushProjectSaves();
+  updateProject('p1', { name: 'B' });        // edit N+1 — must build on edit N
+  flushProjectSaves();
+  await tick(20);
+
+  assert.equal(getProject('p1').kaina, 42, 'edit N survives in the read path');
+  assert.equal(getProject('p1').name, 'B');
+  const lastBody = JSON.parse(puts[puts.length - 1].body);
+  assert.equal(lastBody.kaina, 42, 'the PUT still carries edit N');
+  assert.equal(lastBody.name, 'B');
 });
 
 // ── Debounced save layer (2026-07-28 perf sweep) ──────────────────────────────
@@ -191,4 +218,109 @@ test('a 409 does NOT advance the tracked server version', async () => {
   flushProjectSaves();
   await tick(20);
   assert.equal(_getServerVersion('p1'), undefined);
+});
+
+// ── C1 (2026-07-28 audit): backups must carry the localStorage-only data ─────
+// OLD: exportProjectsBackup() wrote projects + settings only. Price lists live
+// ONLY in localStorage (no backend mirror) and authContext purges them on
+// logout — so "Atsarginė kopija", the one feature whose whole job is surviving
+// a browser wipe, silently dropped the data with the most manual work in it.
+
+test('exportProjectsBackup includes price lists and settings', () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]),
+    samatu_price_lists: JSON.stringify([{ id: 'pl1', name: 'Mano kainos', items: [] }]),
+    samatu_settings: JSON.stringify({ company_name: 'UAB Testas' }),
+  });
+  const payload = JSON.parse(exportProjectsBackup());
+  assert.equal(payload.version, 2);
+  assert.equal(payload.price_lists.length, 1);
+  assert.equal(payload.price_lists[0].name, 'Mano kainos');
+  assert.equal(payload.settings.company_name, 'UAB Testas');
+});
+
+test('importProjectsBackup restores price lists without deleting existing ones', () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([]),
+    samatu_price_lists: JSON.stringify([{ id: 'local', name: 'Vietinis' }]),
+  });
+  installFetchRecorder();
+  const res = importProjectsBackup(JSON.stringify({
+    version: 2,
+    projects: [{ id: 'p1', name: 'Iš backupo' }],
+    price_lists: [{ id: 'pl1', name: 'Iš backupo kainos' }],
+  }));
+  assert.equal(res.price_lists_imported, 1);
+  const names = getPriceLists().map(p => p.name).sort();
+  assert.deepEqual(names, ['Iš backupo kainos', 'Vietinis']);
+});
+
+test('a v1 backup (no price_lists) leaves the existing lists untouched', () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([]),
+    samatu_price_lists: JSON.stringify([{ id: 'local', name: 'Vietinis' }]),
+  });
+  installFetchRecorder();
+  const res = importProjectsBackup(JSON.stringify({
+    version: 1, projects: [{ id: 'p1', name: 'Senas backupas' }],
+  }));
+  assert.equal(res.price_lists_imported, 0);
+  assert.equal(getPriceLists().length, 1, 'a v1 restore must not wipe price lists');
+  assert.equal(getProject('p1').name, 'Senas backupas');
+});
+
+// ── A4 (2026-07-28 audit): a partial pull must not shrink the cache ──────────
+
+test('pullProjectsFromBackend leaves the cache alone when one project fails', async () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([
+      { id: 'p1', name: 'Vietinis A' }, { id: 'p2', name: 'Vietinis B' },
+    ]),
+  });
+  globalThis.fetch = async (url) => {
+    if (url.endsWith('/api/projects')) {
+      return { ok: true, status: 200,
+               json: async () => ({ projects: [{ id: 'p1' }, { id: 'p2' }] }) };
+    }
+    if (url.endsWith('/p2')) return { ok: false, status: 500, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ id: 'p1', name: 'Serverio A' }) };
+  };
+
+  const out = await pullProjectsFromBackend({ force: true });
+  assert.equal(out, null, 'a partial pull reports failure');
+  // The cache still has BOTH projects — the old code replaced it with just p1.
+  assert.equal(getProjects().length, 2);
+  assert.equal(getProject('p2').name, 'Vietinis B');
+
+  // …and the guard was released, so a later attempt can complete.
+  globalThis.fetch = async (url) => {
+    if (url.endsWith('/api/projects')) {
+      return { ok: true, status: 200,
+               json: async () => ({ projects: [{ id: 'p1' }, { id: 'p2' }] }) };
+    }
+    const id = url.slice(url.lastIndexOf('/') + 1);
+    return { ok: true, status: 200, json: async () => ({ id, name: `Serverio ${id}` }) };
+  };
+  const out2 = await pullProjectsFromBackend();   // NOT forced
+  assert.equal(out2.length, 2, 'the retry must not be blocked by _hasPulled');
+});
+
+test('a project deleted between the list and the detail fetch (404) is not a failure', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([]) });
+  globalThis.fetch = async (url) => {
+    if (url.endsWith('/api/projects')) {
+      return { ok: true, status: 200,
+               json: async () => ({ projects: [{ id: 'p1' }, { id: 'gone' }] }) };
+    }
+    if (url.endsWith('/gone')) return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ id: 'p1', name: 'Liko' }) };
+  };
+  const out = await pullProjectsFromBackend({ force: true });
+  assert.equal(out.length, 1, 'a 404 must not block the pull forever');
+  assert.equal(out[0].name, 'Liko');
 });

@@ -685,9 +685,16 @@ def recompute(
                     rebuilt["pozicijos"], prior, merge_notes)
         except Exception as exc:  # noqa: BLE001 — never break the recompute
             log.warning("canonical pozicijos rebuild failed: %s", exc, exc_info=True)
-            degradations.append(
-                "Dalis kambarių nebuvo iki galo perskaičiuoti — kiekiai gali būti seni."
-            )
+            # OBJECT, not a bare string (2026-07-28 audit): the only consumer
+            # (InteriorProject.jsx) filters _degradations on `d.reason`, so a
+            # plain string was invisible — the user was told nothing and kept
+            # quoting stale quantities.
+            degradations.append({
+                "field": "pozicijos",
+                "reason": "partial_recompute",
+                "message": "Dalis kambarių nebuvo iki galo perskaičiuoti — "
+                           "kiekiai gali būti seni.",
+            })
 
     # Also emit the V8-compat darbu_sarasas from the final pozicijos. The Kiekiai
     # table, the top-bar totals AND the Excel/PDF export all read darbu_sarasas —
@@ -702,22 +709,69 @@ def recompute(
         ).get("darbu_sarasas", [])
     except Exception as exc:  # noqa: BLE001 — never break the recompute on compat emit
         log.warning("v8-compat emit failed: %s", exc, exc_info=True)
-        degradations.append(
-            "Nepavyko atnaujinti kiekių lentelės — gali būti rodomi seni kiekiai."
-        )
+        degradations.append({
+            "field": "darbu_sarasas",
+            "reason": "stale_quantities",
+            "message": "Nepavyko atnaujinti kiekių lentelės — gali būti rodomi "
+                       "seni kiekiai.",
+        })
 
     # `_emit_v8_compat_fields` builds a fresh row per pozicija with a fixed key
     # set — it drops kaina/suma and the orphan flag. The lists are 1:1 and in the
     # same order by construction, so carry the money + the provenance markers
     # across; without this the response's darbu_sarasas (what the Kiekiai table
     # and the exports read) is silently price-free. (2026-07-28 P0.)
+    _CARRY_KEYS = ("kaina", "suma", "manual_override", "quantity_source",
+                   "ai_kiekis_original", "override_locked",
+                   "_orphaned_after_rebuild")
     if len(darbu_sarasas) == len(pozicijos):
         for row, poz in zip(darbu_sarasas, pozicijos):
-            for key in ("kaina", "suma", "manual_override", "quantity_source",
-                        "ai_kiekis_original", "override_locked",
-                        "_orphaned_after_rebuild"):
+            for key in _CARRY_KEYS:
                 if poz.get(key) is not None:
                     row[key] = poz[key]
+    else:
+        # The 1:1 invariant broke (a compat-emit change, a dropped/merged row).
+        # There was NO else here: the response's darbu_sarasas silently came
+        # back price-free, and the frontend writes it straight onto the project
+        # — the user watched their entered kainos vanish with no explanation.
+        # (2026-07-28 audit, B3.)
+        #
+        # Fall back to an EXACT aprasymas match — no fuzzy matching, a
+        # mislabelled price is worse than a missing one — so the money survives
+        # wherever the labels still line up, and say what happened either way.
+        by_label: dict[str, dict] = {}
+        for poz in pozicijos:
+            label = str(poz.get("aprasymas") or "").strip()
+            if not label:
+                continue
+            # A duplicated label is ambiguous → carry nothing for it.
+            by_label[label] = None if label in by_label else poz
+        recovered = 0
+        for row in darbu_sarasas:
+            poz = by_label.get(str(row.get("aprasymas") or "").strip())
+            if not poz:
+                continue
+            for key in _CARRY_KEYS:
+                if poz.get(key) is not None:
+                    row[key] = poz[key]
+            recovered += 1
+        log.warning("compat emit length mismatch: %d rows vs %d pozicijos "
+                    "(%d recovered by label)",
+                    len(darbu_sarasas), len(pozicijos), recovered)
+        _lost = max(len(darbu_sarasas) - recovered, 0)
+        degradations.append({
+            "field": "darbu_sarasas",
+            "reason": "compat_emit_mismatch",
+            "rows": len(darbu_sarasas),
+            "pozicijos": len(pozicijos),
+            "recovered": recovered,
+            "message": (
+                f"Kiekių lentelė nesutapo su pozicijomis ({len(darbu_sarasas)} / "
+                f"{len(pozicijos)}). Kainos perkeltos pagal pavadinimą "
+                f"({recovered} eil.); patikrinkite "
+                + (f"{_lost} eilučių kainas." if _lost else "sumas.")
+            ),
+        })
 
     # DISCLOSE what wasn't recomputed. Carried lines keep their ORIGINAL numbers
     # under the new assumptions — the user must know which ones so they can

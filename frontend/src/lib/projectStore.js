@@ -270,8 +270,17 @@ function _scheduleSave(projects, id, opts) {
 
 function _doFlush() {
   if (_lsDirty && _memProjects) {
-    _lsDirty = false;
-    _persist(PROJECTS_KEY, JSON.stringify(_memProjects));
+    // QUOTA SAFETY (verified 2026-07-28 audit, item A5). Before the in-memory
+    // snapshot, a failed _persist left localStorage holding edit N-1 while the
+    // caller carried on: the NEXT edit re-read that stale array, merged onto it
+    // and PUT the result — silently reverting edit N on the server. That hazard
+    // is gone, because every read goes through _readProjectsRaw() → _memProjects
+    // whenever a save is pending, so the merge base is always the newest state
+    // regardless of what localStorage accepted. localStorage is a cache here;
+    // the backend PUT below still carries the full, correct blob.
+    // Keep the dirty flag set when the write was refused so a later flush
+    // retries it (e.g. after the user frees space by deleting a project).
+    _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(_memProjects));
   }
   if (_dirtyIds.size === 0) return;
   const ids = Array.from(_dirtyIds);
@@ -348,6 +357,9 @@ const _deleteFromBackend = (id) => {
 // from another tab/session.
 
 let _hasPulled = false;
+// Sentinel for "the backend says this project is GONE (404)" — distinct from
+// "the fetch for it failed", which must not shrink the cache. See the pull.
+const _GONE = Symbol('gone');
 // Sprint §AUDIT (2026-04-29): exported reset so authContext.logout() can
 // clear the once-per-session guard. Without this, user A's archived flag
 // would carry into user B's session in the same tab.
@@ -403,11 +415,30 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     }
 
     // Backend returns SUMMARIES — fetch full data per project.
+    // `.catch(() => null)`: without it ONE dropped connection rejected the whole
+    // Promise.all and aborted the pull; with it a failed project is just a null
+    // entry, handled by the completeness check below. A 404 is NOT a failure —
+    // the project was deleted between the list and the detail call, and
+    // treating it as one would block every future pull forever.
     const fulls = await Promise.all(
       list.map(p => fetch(`${API}/api/projects/${p.id}`, { credentials: 'include' })
-                     .then(r => r.ok ? r.json() : null))
+                     .then(r => r.ok ? r.json() : (r.status === 404 ? _GONE : null))
+                     .catch(() => null))
     );
-    const valid = fulls.filter(Boolean).sort((a, b) =>
+    // 2026-07-28 audit: `_replaceAll(valid)` on a PARTIAL fan-out SHRANK the
+    // cache — one 500 / flaky socket on a single project and it vanished from
+    // the dashboard, which to the user is indistinguishable from data loss. A
+    // partial pull now changes nothing: the cache keeps what it had and the
+    // once-per-session guard is released, so the next Dashboard focus/mount
+    // retries and can complete.
+    if (fulls.some(f => f === null)) {
+      const ok = fulls.filter(f => f && f !== _GONE).length;
+      console.warn('[projectStore] partial pull:'
+        + ` ${ok}/${list.length} projects loaded — cache left untouched`);
+      _hasPulled = false;
+      return null;
+    }
+    const valid = fulls.filter(f => f && f !== _GONE).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
     // Record the server's timestamp per project — the base for the next save's
@@ -420,6 +451,9 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     return valid;
   } catch (e) {
     console.warn('[projectStore] pull from backend failed:', e);
+    // Release the once-per-session guard: a pull that never landed must not
+    // pin the app to the localStorage cache until the next logout.
+    _hasPulled = false;
     return null;
   }
 }
@@ -470,7 +504,19 @@ export function createProject(data) {
 export function updateProject(id, updates) {
   const projects = getProjects();
   const idx = projects.findIndex(p => p.id === id);
-  if (idx < 0) return null;
+  if (idx < 0) {
+    // 2026-07-28 audit: this returned null SILENTLY and 18 call sites carried
+    // on as if the save had happened — the editor even cleared its "unsaved"
+    // flag. The id can go missing for real reasons (another tab deleted the
+    // project, a user switch wiped the cache, a stale route param), and every
+    // one of them ends with the user's edits going nowhere. Return null still
+    // (the call sites' contract) but SAY so. One toast id → a keystroke burst
+    // can't stack notifications.
+    console.warn('[projectStore] updateProject: project not found:', id);
+    toast.error('Nepavyko išsaugoti — projektas nerastas. Perkraukite puslapį.',
+      { id: 'projectstore-missing' });
+    return null;
+  }
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
   // THE hot path — debounced. Everything else in this module saves immediately.
   _scheduleSave(projects, id);
@@ -743,7 +789,12 @@ export function saveSettings(settings) {
 // (e.g. uncommitted price edits) the backend hasn't yet seen. Export gives
 // the user a portable JSON they can re-import on a fresh browser.
 
-const BACKUP_VERSION = 1;
+// v2 (2026-07-28 audit): the backup carried projects + settings only, so a
+// "Atsarginė kopija" taken before a browser wipe silently lost the user's PRICE
+// LISTS — which are localStorage-only (no backend mirror, see getPriceLists
+// above) and are the thing they spent the most manual work on. They are in the
+// payload now. Restoring a v1 backup still works: price_lists is simply absent.
+const BACKUP_VERSION = 2;
 
 export function exportProjectsBackup() {
   const projects = getProjects();
@@ -754,6 +805,9 @@ export function exportProjectsBackup() {
     projects_count: projects.length,
     projects,
     settings,
+    // localStorage-only data — the backend has NO copy of either, so if these
+    // aren't in the file they exist in exactly one browser profile.
+    price_lists: getPriceLists(),
   };
   return JSON.stringify(payload, null, 2);
 }
@@ -792,13 +846,15 @@ export function importProjectsBackup(jsonText, opts = {}) {
   // when format unknown. Each migration runs IN ORDER from incoming.version.
   const incomingVersion = Number(parsed.version) || 1;
   if (incomingVersion < BACKUP_VERSION) {
-    // Apply migrations in sequence. v1 → v2 example:
-    // for (let v = incomingVersion; v < BACKUP_VERSION; v++) {
-    //   if (v === 1) parsed.projects = migrateV1ToV2(parsed.projects);
-    // }
-    // For now BACKUP_VERSION = 1 so no migrations needed; this block is
-    // scaffolding for when we bump.
-    console.info(`[backup] migrating from v${incomingVersion} to v${BACKUP_VERSION} (no migrations registered yet)`);
+    // Apply migrations in sequence. Registered migrations:
+    //   v1 → v2 : `price_lists` added to the payload. Nothing to transform —
+    //             a v1 file simply has none, and the import below skips the
+    //             restore when the key is absent (it must NOT wipe the price
+    //             lists the browser already holds).
+    for (let v = incomingVersion; v < BACKUP_VERSION; v++) {
+      if (v === 1) parsed.price_lists = parsed.price_lists ?? null;
+    }
+    console.info(`[backup] migrating from v${incomingVersion} to v${BACKUP_VERSION}`);
   }
   // Run modern migrations on each project (skyrius normalize, etc.)
   parsed.projects = parsed.projects.map(_migrateProject);
@@ -829,9 +885,24 @@ export function importProjectsBackup(jsonText, opts = {}) {
     saveSettings({ ...getSettings(), ...parsed.settings });
   }
 
+  // Price lists (v2+). Merged by id, newest-file-wins per entry, so importing a
+  // backup on a browser that already has lists never deletes one. `null`/absent
+  // (a v1 backup) leaves the existing lists completely alone.
+  let priceListsImported = 0;
+  if (Array.isArray(parsed.price_lists)) {
+    const byId = new Map(getPriceLists().map(pl => [pl.id, pl]));
+    for (const pl of parsed.price_lists) {
+      if (!pl?.id) continue;
+      byId.set(pl.id, pl);
+      priceListsImported += 1;
+    }
+    _persist(PRICE_LISTS_KEY, JSON.stringify(Array.from(byId.values())));
+  }
+
   return {
     projects_imported: incoming.length,
     projects_total: final.length,
     settings_imported: !!parsed.settings,
+    price_lists_imported: priceListsImported,
   };
 }

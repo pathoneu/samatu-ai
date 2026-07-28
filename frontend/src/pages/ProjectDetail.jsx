@@ -71,7 +71,16 @@ export default function ProjectDetail() {
     if (!dirty || !pid || rows.length === 0) return;
     pendingRef.current = { ...pendingRef.current, dirty: false };
     const totalValue = rows.reduce((sum, r) => sum + (r.suma || 0), 0);
-    updateProject(pid, { rows, total_value: totalValue });
+    const saved = updateProject(pid, { rows, total_value: totalValue });
+    if (!saved) {
+      // The project is gone from the store (deleted in another tab, user
+      // switch, stale route id). updateProject has already told the user;
+      // do NOT clear the dirty flag — that would claim a save that never
+      // happened and drop the rows on the next render. Keep them pending so
+      // a later flush (or a reload onto a valid project) can still land.
+      pendingRef.current = { ...pendingRef.current, dirty: true };
+      return;
+    }
     // updateProject is itself debounced (400 ms) since the 2026-07-28 perf
     // sweep — this call site IS the flush, so it must not sit on that timer.
     flushProjectSaves();

@@ -29,7 +29,8 @@ import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import WorkspacePanel from './WorkspacePanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
-import { getPdfUrl, getPdfBlob, savePdf } from '@/lib/pdfStore';
+import { toast } from 'sonner';
+import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
@@ -181,6 +182,15 @@ export default function InteriorWorkspace({
         } else if (u) {
           URL.revokeObjectURL(u);
         }
+      })
+      .catch((e) => {
+        // NO .catch here was a blank-screen dead end (2026-07-28 audit): a
+        // rejected IndexedDB read / backend fetch left pdfMissing false, so the
+        // pane sat on "Kraunamas brėžinys…" forever and the "Įkelti brėžinį"
+        // recovery UI — which is exactly what the user needs then — was
+        // unreachable without a reload.
+        console.warn('[InteriorWorkspace] PDF load failed:', e);
+        if (!revoked) setPdfMissing(true);
       });
     return () => {
       revoked = true;
@@ -502,6 +512,9 @@ export default function InteriorWorkspace({
                   if (!file) return;
                   setAttachingPdf(true);
                   try {
+                    // Local cache first — has_pdf is only set once this
+                    // succeeded, so the flag can never claim a drawing the
+                    // browser doesn't have.
                     await savePdf(project.id, file);
                     const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
                     setPdfUrl(u);
@@ -513,6 +526,23 @@ export default function InteriorWorkspace({
                       pdf_name: file.name, has_pdf: true,
                     });
                     if (updated) onProjectChange?.(updated);
+                    // …then the DURABLE copy (2026-07-28 audit). Re-attach used
+                    // to write IndexedDB only, so the re-attached drawing was
+                    // lost again on the next cache clear / device switch —
+                    // unlike NewProject, which has always uploaded. Same
+                    // fire-and-forget idiom as NewProject.jsx.
+                    uploadPdfToBackend(project.id, file).then((ok) => {
+                      if (!ok) {
+                        console.warn('[InteriorWorkspace] backend PDF upload failed');
+                        toast.warning(t('project.interiorWorkspace.pdfBackupFailed'));
+                      }
+                    }).catch((e) => console.warn('[InteriorWorkspace] upload error:', e));
+                  } catch (e) {
+                    // No catch at all before this: the rejection surfaced as an
+                    // unhandled promise, the spinner cleared, and nothing told
+                    // the user their drawing had NOT been attached.
+                    console.error('[InteriorWorkspace] PDF attach failed:', e);
+                    toast.error(t('project.interiorWorkspace.pdfAttachFailed'));
                   } finally {
                     setAttachingPdf(false);
                     event.target.value = '';

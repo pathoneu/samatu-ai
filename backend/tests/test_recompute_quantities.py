@@ -282,3 +282,92 @@ def test_walls_paint_override_valid_field():
     from api.recompute_quantities import _ASSUMPTION_FIELDS, _VALID_FIELDS
     assert "walls_paint_override" in _ASSUMPTION_FIELDS
     assert "walls_paint_override" in _VALID_FIELDS
+
+
+# ── B3 (2026-07-28 audit): darbu_sarasas / pozicijos length mismatch ──────────
+# OLD: `if len(darbu_sarasas) == len(pozicijos):` had NO else. When the compat
+# emit returned a different number of rows (a reshape change, a merged/dropped
+# line), the response's darbu_sarasas came back with kaina/suma/override flags
+# STRIPPED — and the frontend writes that straight onto the project, so the
+# user's entered prices silently vanished with HTTP 200 and no warning.
+
+def _mismatch_payload():
+    """A recompute whose pozicijos carry real money."""
+    return {
+        "rooms": [_living_room()],
+        "pozicijos": [
+            {"aprasymas": "Sienų dažymas", "kiekis": 50.0, "mato_vnt": "m2",
+             "kaina": 7.5, "suma": 375.0},
+            {"aprasymas": "Lubų dažymas", "kiekis": 30.0, "mato_vnt": "m2",
+             "kaina": 6.0, "suma": 180.0},
+        ],
+        "edits": [{"field": "paint_class", "new_value": 2}],
+        "current_assumptions": {"paint_class": 1},
+    }
+
+
+def test_compat_emit_mismatch_is_disclosed_and_prices_survive(monkeypatch):
+    import extractor.vision_call as _vc
+
+    def _short_emit(parsed):
+        # One row fewer than pozicijos — the invariant break this guards.
+        rows = [{"aprasymas": p["aprasymas"], "kiekis": p["kiekis"],
+                 "mato_vnt": p.get("mato_vnt", "")}
+                for p in parsed["pozicijos"][:1]]
+        return {"darbu_sarasas": rows}
+    monkeypatch.setattr(_vc, "_emit_v8_compat_fields", _short_emit)
+
+    r = client.post("/api/recompute-quantities", json=_mismatch_payload())
+    assert r.status_code == 200, r.text
+    body = r.json()
+
+    # 1. The prices survive on the rows whose labels still line up.
+    ds = body["darbu_sarasas"]
+    assert len(ds) == 1
+    assert ds[0]["aprasymas"] == "Sienų dažymas"
+    assert ds[0]["kaina"] == 7.5
+    assert ds[0]["suma"] == 375.0
+
+    # 2. And the divergence is DISCLOSED, machine-readably, in LT.
+    deg = [d for d in body["_degradations"]
+           if isinstance(d, dict) and d.get("reason") == "compat_emit_mismatch"]
+    assert len(deg) == 1, body["_degradations"]
+    assert deg[0]["rows"] == 1 and deg[0]["pozicijos"] == 2
+    assert deg[0]["recovered"] == 1
+    assert "Kiekių lentelė nesutapo" in deg[0]["message"]
+
+
+def test_compat_emit_mismatch_does_not_guess_on_duplicate_labels(monkeypatch):
+    """EXACT label match only. A duplicated aprasymas is ambiguous, so no price
+    is carried for it — a wrong price is worse than a missing one."""
+    import extractor.vision_call as _vc
+
+    payload = _mismatch_payload()
+    payload["pozicijos"] = [
+        {"aprasymas": "Dažymas", "kiekis": 10.0, "kaina": 5.0, "suma": 50.0},
+        {"aprasymas": "Dažymas", "kiekis": 20.0, "kaina": 9.0, "suma": 180.0},
+        {"aprasymas": "Grindjuostės", "kiekis": 12.0, "kaina": 4.0, "suma": 48.0},
+    ]
+    monkeypatch.setattr(_vc, "_emit_v8_compat_fields", lambda parsed: {
+        "darbu_sarasas": [{"aprasymas": p["aprasymas"], "kiekis": p["kiekis"]}
+                          for p in parsed["pozicijos"][:2]]})
+
+    body = client.post("/api/recompute-quantities", json=payload).json()
+    by_label = {r["aprasymas"]: r for r in body["darbu_sarasas"]}
+    assert "kaina" not in by_label["Dažymas"], "ambiguous label must not be priced"
+
+
+def test_degradations_are_objects_not_bare_strings(monkeypatch):
+    """B2 — the frontend filters _degradations on `d.reason`; plain strings were
+    invisible, so a failed rebuild told the user nothing."""
+    import extractor.vision_call as _vc
+    monkeypatch.setattr(_vc, "_emit_v8_compat_fields",
+                        lambda parsed: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    body = client.post("/api/recompute-quantities", json=_mismatch_payload()).json()
+    degs = body["_degradations"]
+    assert degs, "a failed compat emit must be disclosed"
+    assert all(isinstance(d, dict) for d in degs), degs
+    stale = [d for d in degs if d.get("reason") == "stale_quantities"]
+    assert len(stale) == 1
+    assert "seni kiekiai" in stale[0]["message"]

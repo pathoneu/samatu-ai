@@ -192,9 +192,15 @@ def extract_room_material_specs(
     parsed_specs: dict | None = None
     last_err: Exception | None = None
     model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+    # F6 residual (2026-07-28): the SDK retry multiplies with this loop
+    # (max_retries=1 × 2 attempts = up to 4 HTTP calls). `with_options` is
+    # `copy` in anthropic 0.95.0 — preserves timeout/headers/pool, drops only
+    # the SDK-level retry so THIS loop is the single retry policy.
+    _call_client = (client.with_options(max_retries=0)
+                    if hasattr(client, "with_options") else client)
     for attempt in range(2):
         try:
-            with client.messages.stream(
+            with _call_client.messages.stream(
                 model=model,
                 max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
                 system=system,

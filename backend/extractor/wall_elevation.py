@@ -255,9 +255,15 @@ def _extract_one_page(
 
     last_err = None
     model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
+    # F6 residual (2026-07-28): the SDK's own retry multiplies with THIS loop
+    # (client is built with max_retries=1 → 3 attempts = up to 6 HTTP calls).
+    # `with_options` is `copy` in anthropic 0.95.0 — same api_key/base_url/
+    # timeout/default headers and the same httpx connection pool.
+    _call_client = (client.with_options(max_retries=0)
+                    if hasattr(client, "with_options") else client)
     for attempt in range(3):
         try:
-            with client.messages.stream(
+            with _call_client.messages.stream(
                 model=model,
                 max_tokens=8192,  # one page = small output
                 system=system,
