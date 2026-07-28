@@ -13,7 +13,7 @@ import RowDetailPanel from '@/components/project/RowDetailPanel';
 import ExportModal from '@/components/project/ExportModal';
 import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
-import { getProject, updateProject, deleteProject, pullProjectsFromBackend } from '@/lib/projectStore';
+import { getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves } from '@/lib/projectStore';
 import { useConfirm } from '@/components/ui/confirm-provider';
 
 export default function ProjectDetail() {
@@ -72,6 +72,9 @@ export default function ProjectDetail() {
     pendingRef.current = { ...pendingRef.current, dirty: false };
     const totalValue = rows.reduce((sum, r) => sum + (r.suma || 0), 0);
     updateProject(pid, { rows, total_value: totalValue });
+    // updateProject is itself debounced (400 ms) since the 2026-07-28 perf
+    // sweep — this call site IS the flush, so it must not sit on that timer.
+    flushProjectSaves();
     setHasUnsaved(false);
     queryClient.invalidateQueries({ queryKey: ['projects'] });
   }, [queryClient]);

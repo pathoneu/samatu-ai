@@ -22,7 +22,7 @@ import ProjectMainView from '@/components/project/ProjectMainView';
 import ExportDropdown from '@/components/project/ExportDropdown';
 import ShareButton from '@/components/project/ShareButton';
 import { getPdfUrl } from '@/lib/pdfStore';
-import { updateProject, getProject } from '@/lib/projectStore';
+import { updateProject, getProject, flushProjectSaves } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
 import { mergeDarbuSarasasEdits, carriedOrphans } from '@/lib/mergeDarbuSarasas';
 import { toast } from 'sonner';
@@ -591,6 +591,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   // so navigation between projects still works.
   const [projectState, setProjectState] = useState(projectProp);
   useEffect(() => { setProjectState(projectProp); }, [projectProp]);
+  // Saves are debounced 400 ms in projectStore (2026-07-28 perf sweep). Leaving
+  // this page — back arrow, project switch, tab close — must not strand the
+  // last edit on that timer. (The store also flushes on visibilitychange /
+  // pagehide; this covers in-app navigation, which fires neither.)
+  useEffect(() => () => flushProjectSaves(), []);
   const project = projectState;
   const setProject = setProjectState;
   const [tab, setTab]           = useState(() => 'brezinys');

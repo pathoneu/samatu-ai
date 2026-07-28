@@ -255,8 +255,11 @@ _GOOD_ROOM = {"nr": "01", "pavadinimas": "Vonia", "paskirtis": "vonia",
 def _recompute(rooms, monkeypatch):
     monkeypatch.setattr(main, "_billable_user", lambda request: {"id": "u1"})
     payload = main.RecomputePayload(patalpos=rooms, bendras_plotas_m2=8.0)
-    return asyncio.run(main.recompute_interior(payload=payload,
-                                               request=_FakeRequest()))
+    # /recompute-interior is a plain `def` since the 2026-07-28 perf sweep (its
+    # body is pure synchronous formula work with zero awaits, so FastAPI runs it
+    # in the threadpool instead of stalling the event loop). Call it directly —
+    # it is no longer a coroutine to hand to asyncio.run.
+    return main.recompute_interior(payload=payload, request=_FakeRequest())
 
 
 def test_recompute_reports_failed_rooms_and_pozicijos_build(monkeypatch):

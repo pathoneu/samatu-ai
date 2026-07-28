@@ -1,10 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 import logging
 import os
 import time as _time
+import threading as _threading
 from collections import defaultdict, deque
 
 # Logger setup — replaces scattered print() calls. Default INFO level.
@@ -233,6 +235,15 @@ def _client_key(request: "Request") -> str:
     return client.host if client else "unknown"
 
 
+# The limiter used to be touched only from the single event-loop thread. The
+# 2026-07-28 perf sweep moved the bcrypt auth handlers (its main callers) to
+# plain `def`, i.e. into the threadpool — so the janitor's
+# `for key in _RATE_BUCKET.items()` could now race an insert from another
+# thread and raise "dictionary changed size during iteration" (a 500 on LOGIN).
+# One lock, held for microseconds, makes the whole check atomic.
+_RATE_LOCK = _threading.Lock()
+
+
 def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     """Sliding-window rate limit. Raises 429 on overflow.
 
@@ -241,29 +252,35 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
     10 minutes; cheap O(n) scan over keys.
     """
     now = _time.time()
-    bucket = _RATE_BUCKET[f"{client_ip}:{endpoint}"]
-    # Drop entries older than 60s
-    while bucket and now - bucket[0] > 60:
-        bucket.popleft()
-    if len(bucket) >= _RATE_LIMIT_PER_MIN:
-        log.warning("rate limit hit: ip=%s endpoint=%s count=%d", client_ip, endpoint, len(bucket))
+    with _RATE_LOCK:
+        bucket = _RATE_BUCKET[f"{client_ip}:{endpoint}"]
+        # Drop entries older than 60s
+        while bucket and now - bucket[0] > 60:
+            bucket.popleft()
+        over = len(bucket) >= _RATE_LIMIT_PER_MIN
+        if not over:
+            bucket.append(now)
+        # Janitor: evict stale entries every 10 minutes. Cheap because most
+        # buckets already empty after a minute of inactivity.
+        if now - _RATE_BUCKET_LAST_GC[0] > 600:
+            _RATE_BUCKET_LAST_GC[0] = now
+            stale_keys = []
+            for key, deq in _RATE_BUCKET.items():
+                while deq and now - deq[0] > 60:
+                    deq.popleft()
+                if not deq:
+                    stale_keys.append(key)
+            for key in stale_keys:
+                del _RATE_BUCKET[key]
+            if stale_keys:
+                log.info("rate-limiter GC: evicted %d empty buckets, %d remaining",
+                         len(stale_keys), len(_RATE_BUCKET))
+        count = len(bucket)
+    # Raise OUTSIDE the lock — HTTPException construction is not part of the
+    # critical section.
+    if over:
+        log.warning("rate limit hit: ip=%s endpoint=%s count=%d", client_ip, endpoint, count)
         raise HTTPException(status_code=429, detail=f"Per daug užklausų. Palaukite minutę. (limitas: {_RATE_LIMIT_PER_MIN}/min)")
-    bucket.append(now)
-    # Janitor: evict stale entries every 10 minutes. Cheap because most buckets
-    # already empty after a minute of inactivity.
-    if now - _RATE_BUCKET_LAST_GC[0] > 600:
-        _RATE_BUCKET_LAST_GC[0] = now
-        stale_keys = []
-        for key, deq in _RATE_BUCKET.items():
-            while deq and now - deq[0] > 60:
-                deq.popleft()
-            if not deq:
-                stale_keys.append(key)
-        for key in stale_keys:
-            del _RATE_BUCKET[key]
-        if stale_keys:
-            log.info("rate-limiter GC: evicted %d empty buckets, %d remaining",
-                     len(stale_keys), len(_RATE_BUCKET))
 import pdfplumber
 import anthropic
 from models_config import model_for
@@ -511,6 +528,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Response compression (2026-07-28 perf sweep). A project blob GET is ~100 KB of
+# highly repetitive JSON and went over the wire uncompressed; gzip takes it to
+# ~12-17 KB (5.8-8.1x measured). minimum_size=1024 keeps the tiny JSON replies
+# (/health, auth pings) uncompressed — below that, the gzip header costs more
+# than it saves.
+#
+# SSE is SAFE: starlette 1.3.1 ships DEFAULT_EXCLUDED_CONTENT_TYPES =
+# ("text/event-stream",) and skips the responder entirely for that content type,
+# so /extract-interior-stream keeps flushing event-by-event. Verified against
+# THIS install, not assumed: a 5-event stream at a 0.4 s cadence arrived at
+# 0.018/0.419/0.821/1.224/1.626 s with no Content-Encoding header.
+
+
+class _SelectiveGZip(GZipMiddleware):
+    """GZip, minus the routes where compressing is waste or worse.
+
+    1. ALREADY-COMPRESSED CONTAINERS. PDF and .xlsx are zip/flate: measured on
+       the demo files, gzip -9 buys 1.09x on a PDF and 1.06x on an .xlsx while
+       costing ~12 ms of CPU per MB — pure waste on the drawing the viewer
+       re-fetches constantly, and on every export download.
+    2. /health. `minimum_size` is INERT in this app: the innermost user
+       middleware (the /api/v1 prefix rewrite) is a BaseHTTPMiddleware, which
+       hands every response downstream as a STREAM, and starlette's size check
+       only runs on the single-chunk path. So a 25-byte /health body would come
+       back gzipped — i.e. ~45 bytes, bigger than the original — on the endpoint
+       the load balancer polls hardest.
+
+    Starlette only lets a response opt out by content-type (text/event-stream),
+    so the skip is keyed on the request path; the list is deliberately tiny and
+    every entry returns one fixed, known payload shape.
+    """
+
+    _SKIP_EXACT = frozenset({"/generate-excel", "/generate-pdf", "/health", "/healthz"})
+    _SKIP_SUFFIX = ("/pdf",)   # /api/projects/{id}/pdf
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            if path in self._SKIP_EXACT or path.endswith(self._SKIP_SUFFIX):
+                await self.app(scope, receive, send)
+                return
+        await super().__call__(scope, receive, send)
+
+
+app.add_middleware(_SelectiveGZip, minimum_size=1024)
+
 
 # M5: Security response headers — defense-in-depth for clickjacking,
 # MIME-sniffing, and referrer leakage. CSP is intentionally relaxed during
@@ -741,7 +804,9 @@ def _is_admin_email(email: str) -> bool:
 
 
 @app.post("/api/auth/register")
-async def api_register(payload: RegisterPayload, request: Request):
+# Plain `def` (not async): bcrypt-12 hashing measured 181 ms of pure CPU —
+# as a coroutine it froze the whole event loop for that long on every signup.
+def api_register(payload: RegisterPayload, request: Request):
     """Register new user. Validates email + password, hashes password, creates DB row,
     starts session. Admin status via SAMATU_ADMIN_EMAIL allowlist, else first-user."""
     _check_rate_limit(_client_key(request), "register")
@@ -766,7 +831,10 @@ async def api_register(payload: RegisterPayload, request: Request):
 
 
 @app.post("/api/auth/login")
-async def api_login(payload: LoginPayload, request: Request):
+# Plain `def` (not async): verify_password + dummy_verify_password are
+# bcrypt-12, ~171 ms of CPU each. On the event loop one login stalled every
+# other request in flight; in the threadpool it stalls only itself.
+def api_login(payload: LoginPayload, request: Request):
     """Email + password → session cookie. Generic error message (avoid user enumeration)."""
     _check_rate_limit(_client_key(request), "login")
     email = _auth.validate_email(payload.email)
@@ -821,7 +889,8 @@ class PasswordChangePayload(BaseModel):
 
 
 @app.post("/api/auth/change-password")
-async def api_change_password(payload: PasswordChangePayload, request: Request):
+# Plain `def` (not async): verify + hash = two bcrypt-12 rounds (~350 ms CPU).
+def api_change_password(payload: PasswordChangePayload, request: Request):
     """Change user's password. Verifies current_password first.
     Generic error message on wrong current password (no enumeration helper)."""
     user = _auth.require_user(request)
@@ -1073,7 +1142,9 @@ async def api_list_projects(request: Request):
 
 
 @app.get("/api/projects/{project_id}")
-async def api_get_project(request: Request, project_id: str):
+# Plain `def` (not async): sqlite read + a ~1 ms JSON blob parse, and the
+# dashboard pull fans out one of these PER project.
+def api_get_project(request: Request, project_id: str):
     user = _auth.require_user(request)
     # Admin can read any; regular users only their own
     user_filter = None if user.get("is_admin") else user["id"]
@@ -1112,29 +1183,81 @@ async def api_put_project_pdf(request: Request, project_id: str,
     return {"status": "ok", "size": len(data)}
 
 
+# Deliberately `def`, not `async def` (2026-07-28 perf sweep): the body is 100%
+# synchronous (sqlite + object storage + bytes), so as a coroutine it ran ON the
+# event loop and every concurrent request queued behind it. Plain `def` hands it
+# to the threadpool. Same reasoning for /generate-excel, /generate-pdf,
+# /recompute-interior, /detect-scale-hint and the bcrypt auth handlers.
 @app.get("/api/projects/{project_id}/pdf")
-async def api_get_project_pdf(request: Request, project_id: str):
+def api_get_project_pdf(request: Request, project_id: str):
     user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
-    if not db.get_project(project_id, user_id=user_filter):
+    # project_exists, not get_project: this was parsing the whole ~175 KB JSON
+    # blob purely to answer "does it exist and is it mine?".
+    if not db.project_exists(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     from storage import get_storage, pdf_key
-    data = get_storage().get(pdf_key(project_id))
+    storage = get_storage()
+    key = pdf_key(project_id)
+
+    # Conditional GET. The drawing is immutable for the life of an upload, and
+    # the viewer re-fetches it on every tab switch / reload; without a validator
+    # every one of those re-downloaded several MB. stat() is a local os.stat or
+    # an R2 HEAD — cheap enough to run before deciding to read the bytes, so a
+    # 304 never touches the object body at all.
+    meta = storage.stat(key)
+    etag = None
+    if meta:
+        raw = meta.get("etag") or f'{meta.get("size", 0):x}-{int((meta.get("mtime") or 0) * 1000):x}'
+        etag = f'"{raw}"'
+        inm = request.headers.get("if-none-match", "")
+        if etag in [t.strip() for t in inm.split(",") if t.strip()]:
+            return Response(status_code=304, headers=_pdf_cache_headers(etag))
+
+    data = storage.get(key)
     if data is None:
         raise HTTPException(status_code=404, detail="Brėžinys nerastas")
-    return Response(content=data, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{project_id}.pdf"'})
+    headers = {"Content-Disposition": f'inline; filename="{project_id}.pdf"'}
+    headers.update(_pdf_cache_headers(etag))
+    return Response(content=data, media_type="application/pdf", headers=headers)
+
+
+def _pdf_cache_headers(etag: str | None) -> dict:
+    """private (never a shared/CDN cache — these are owner-only drawings)."""
+    h = {"Cache-Control": "private, max-age=3600"}
+    if etag:
+        h["ETag"] = etag
+    return h
 
 
 @app.put("/api/projects/{project_id}")
-async def api_upsert_project(request: Request, project_id: str, payload: dict = Body(...)):
+def api_upsert_project(request: Request, project_id: str, payload: dict = Body(...)):
     user = _auth.require_user(request)
     if not payload:
         raise HTTPException(status_code=400, detail="Empty payload")
+    # Optimistic-concurrency token. It is a PROTOCOL field, not project data —
+    # pop it so it never lands in the stored blob. Absent (older clients, the
+    # demo-restore flow, scripts) → the check is skipped and behaviour is
+    # byte-for-byte what it was before.
+    base_updated_at = payload.pop("base_updated_at", None)
+    if base_updated_at is not None and not isinstance(base_updated_at, str):
+        base_updated_at = None
     try:
-        return db.upsert_project(project_id, payload, user_id=user["id"])
+        return db.upsert_project(project_id, payload, user_id=user["id"],
+                                 base_updated_at=base_updated_at)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except db.ProjectConflictError as e:
+        # 409, NOT a silent overwrite: another tab/device saved this project
+        # after the client loaded it. The client shows "reload" — we do not try
+        # to merge blobs server-side.
+        log.warning("upsert conflict: project=%s user=%s base=%s current=%s",
+                    project_id, user["id"], base_updated_at, e.current_updated_at)
+        return JSONResponse(status_code=409, content={
+            "error": "conflict",
+            "detail": "Projektas buvo atnaujintas kitame lange arba įrenginyje.",
+            "current_updated_at": e.current_updated_at,
+        })
 
 
 @app.delete("/api/projects/{project_id}")
@@ -4471,7 +4594,10 @@ def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
 # ── /generate-excel ───────────────────────────────────────────────────────────
 
 @app.post("/generate-excel")
-async def generate_excel(request: Request, data: dict):
+# Plain `def` (not async): openpyxl workbook build is 62-74 ms of pure CPU
+# with zero awaits. Sustained 8-way load pushed /health p95 to 150 ms and
+# max to 437 ms purely because this sat on the event loop.
+def generate_excel(request: Request, data: dict):
     # Sprint §AUDIT (2026-04-29): require auth — was open endpoint, vulnerable
     # to abuse (each call spins up openpyxl + heavy I/O).
     _auth.require_user(request)
@@ -4908,7 +5034,9 @@ async def generate_excel(request: Request, data: dict):
 # ── /generate-pdf ─────────────────────────────────────────────────────────────
 
 @app.post("/generate-pdf")
-async def generate_pdf(request: Request, data: dict):
+# Plain `def` (not async): reportlab document build, same reasoning as
+# /generate-excel above — synchronous CPU, zero awaits.
+def generate_pdf(request: Request, data: dict):
     # Sprint §AUDIT (2026-04-29): require auth — was open endpoint.
     _auth.require_user(request)
     from reportlab.platypus import HRFlowable
@@ -5754,7 +5882,9 @@ class RecomputePayload(BaseModel):
 
 
 @app.post("/recompute-interior")
-async def recompute_interior(payload: RecomputePayload, request: Request):
+# Plain `def` (not async): runs the whole universal_rules formula engine
+# over every room, synchronously.
+def recompute_interior(payload: RecomputePayload, request: Request):
     """Re-apply universal formulas + user overrides to already-extracted patalpos.
 
     Returns the same shape as /extract-interior (sans _meta zoom/cost stats).
@@ -6678,7 +6808,8 @@ class DetectScalePayload(BaseModel):
 
 
 @app.post("/detect-scale-hint")
-async def detect_scale_hint(payload: DetectScalePayload, request: Request):
+# Plain `def` (not async): pdfplumber text extraction over up to 200 pages.
+def detect_scale_hint(payload: DetectScalePayload, request: Request):
     """Returns {found: bool, page: int|null, scale_ratio: int|null, scale_text: str|null,
     confidence: 'high'|'medium'|'low'} after scanning PDF text layer for scale annotations."""
     # 2026-05-06 security audit: require auth (server CPU work).

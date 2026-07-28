@@ -142,7 +142,10 @@ async function downloadFromBackend(endpoint, project, filename) {
     pasiulymo_nr: project.pasiulymo_nr || '',
     eilutes:      rows,
     prielaidos:   project.prielaidos || {},
-    patalpos:     project.patalpos || [],
+    // Same convention as ExportDropdown/ProjectMainView — `patalpos` alone put
+    // a DIFFERENT room set (and different m²) into the client-facing PDF/Excel
+    // than the on-screen sąmata. (2026-07-28 improvement sweep, F3.)
+    patalpos:     project.v8_rooms || project.patalpos || [],
     perspejimani: project.perspejimani || [],
     tipas:        project.tipas || project.type || 'kz',
   };

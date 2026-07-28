@@ -53,6 +53,17 @@ class _Backend:
     def exists(self, key: str) -> bool:
         raise NotImplementedError
 
+    def stat(self, key: str) -> dict | None:
+        """Cheap metadata WITHOUT downloading the object.
+
+        Returns {"size": int, "mtime": float|None, "etag": str|None} or None when
+        the key is missing. Used to build an HTTP ETag so a conditional GET can
+        answer 304 without reading (or, on R2, paying egress for) the bytes.
+        Backends that can't answer cheaply may return None — callers must treat
+        that as "no cheap validator available", not as "missing".
+        """
+        raise NotImplementedError
+
     def delete(self, key: str) -> None:
         raise NotImplementedError
 
@@ -89,6 +100,14 @@ class LocalDiskStorage(_Backend):
 
     def exists(self, key: str) -> bool:
         return self._path(key).exists()
+
+    def stat(self, key: str) -> dict | None:
+        p = self._path(key)
+        try:
+            st = p.stat()
+        except OSError:
+            return None
+        return {"size": st.st_size, "mtime": st.st_mtime, "etag": None}
 
     def delete(self, key: str) -> None:
         p = self._path(key)
@@ -139,6 +158,19 @@ class R2Storage(_Backend):
             return True
         except Exception:  # noqa: BLE001
             return False
+
+    def stat(self, key: str) -> dict | None:
+        try:
+            resp = self._client.head_object(Bucket=self.bucket, Key=key)
+        except Exception:  # noqa: BLE001 — missing key or transient R2 error
+            return None
+        lm = resp.get("LastModified")
+        return {
+            "size": int(resp.get("ContentLength") or 0),
+            "mtime": lm.timestamp() if lm is not None else None,
+            # R2/S3 already computed a content hash — reuse it verbatim.
+            "etag": str(resp.get("ETag") or "").strip('"') or None,
+        }
 
     def delete(self, key: str) -> None:
         try:

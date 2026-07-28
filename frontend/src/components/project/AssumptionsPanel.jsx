@@ -17,6 +17,23 @@ const H_MAX_M = 6.0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * The room array every other surface reads (ProjectMainView, WorkspacePanel,
+ * ExportDropdown, ExportModal, AiChat): `v8_rooms` when it has rooms, else the
+ * legacy `patalpos`.
+ *
+ * This panel used to read `patalpos` unconditionally. The two arrays DO diverge
+ * — on the Beržų g. 24 demo, patalpos totals 607.11 m² of dažomas plotas while
+ * v8_rooms totals 561.54 (3 of 23 dev projects diverge) — so the panel showed
+ * one set of numbers while the Kiekiai table and the export showed another.
+ * Worse, it SEEDED /api/recompute-quantities from the stale array, so a single
+ * assumption edit migrated the whole project onto the wrong numbers.
+ * (2026-07-28 improvement sweep, F2.)
+ */
+function panelRooms(rawData) {
+  return rawData?.v8_rooms?.length ? rawData.v8_rooms : (rawData?.patalpos || []);
+}
+
 function fmtM(val) {
   if (val == null) return '—';
   return `${ltDecimal(Number(val).toFixed(2))} m`;
@@ -252,7 +269,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       const reqId = ++reqIdRef.current;
       try {
         const result = await recompute({
-          rooms: rawData?.patalpos || [],
+          rooms: panelRooms(rawData),
           pozicijos: pozicijos || [],
           // The prices the user actually entered live here, NOT in pozicijos —
           // without them the backend merge can't tell which rows carry money.
@@ -298,7 +315,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   // the house has uniform ceilings and the user doesn't want to edit each
   // row individually.
   const setLubuAukstisAll = (val) => {
-    const rooms = rawData?.patalpos || [];
+    const rooms = panelRooms(rawData);
     const next_lubu = {};
     rooms.forEach(r => { if (r.nr != null) next_lubu[String(r.nr)] = val; });
     const next = { ...safeAssumptions, lubu_auksciai: next_lubu };
@@ -323,7 +340,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     return Number(room.walls_paintable_m2 || 0) > 0;
   };
 
-  const rooms = rawData?.patalpos || [];
+  const rooms = panelRooms(rawData);
   const avgH  = rooms.length > 0
     ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
     : 2.80;

@@ -122,13 +122,24 @@ function _persist(key, value) {
 // an expired session (401) or a 500 was swallowed, so the user kept editing
 // against a backend that had stopped accepting the writes and lost everything
 // on the next device / after a cache clear.
-// Returns 'ok' | 'unauthorized' | 'failed' (return value exists for the tests).
+// Returns 'ok' | 'unauthorized' | 'conflict' | 'failed' (return value exists
+// for the tests).
 export function _handleSyncResponse(res) {
   if (res?.status === 401) {
     toast.error('Sesija baigėsi — prisijunkite iš naujo. '
       + 'Paskutinis pakeitimas neišsaugotas serveryje.');
     if (typeof window !== 'undefined') window.location.assign('/login');
     return 'unauthorized';
+  }
+  if (res?.status === 409) {
+    // Lost-update guard (2026-07-28). The backend refused the write because
+    // the project moved on since we loaded it — another tab or device saved
+    // first. Overwriting would silently destroy their work, so we say so and
+    // keep OUR unsaved copy in this tab (the user can copy values out before
+    // reloading). One toast id → a burst of saves can't stack notifications.
+    toast.error('Projektas atnaujintas kitame lange — perkraukite puslapį '
+      + '(pakeitimai neįrašyti)', { id: 'projectstore-conflict' });
+    return 'conflict';
   }
   if (!res?.ok) {
     toast.error(`Nepavyko išsaugoti serveryje (${res?.status ?? '—'}). `
@@ -144,8 +155,27 @@ function _handleSyncError(e) {
     { id: 'projectstore-sync' });
 }
 
+// ── Optimistic-concurrency bookkeeping ────────────────────────────────────────
+// The updated_at the SERVER last told us about, per project id. It is NOT
+// project.updated_at — updateProject() stamps that optimistically on every local
+// edit, so it drifts ahead of the server immediately. Populated from the backend
+// pull and from each successful PUT response; sent back as `base_updated_at` so
+// the backend can refuse a write that would clobber another tab.
+const _serverVersions = new Map();
+
+export function _getServerVersion(id) {   // test hook
+  return _serverVersions.get(id);
+}
+
+// In-flight PUT per project id — used to supersede a slow earlier request so a
+// PUT can never land after a newer one for the same project on a lossy link.
+const _inflight = new Map();   // id -> AbortController
+const _lastSeq = new Map();    // id -> monotonically increasing sequence number
+let _seqCounter = 0;
+
 const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
   if (!project?.id) return;
+  const id = project.id;
   // Archive flags are persisted server-side SINCE 2026-07-15 (pre-prod QA:
   // localStorage-only soft-delete meant "deleted" projects resurrected after
   // logout / on a second device). archiveProject syncs WITH the flags;
@@ -155,13 +185,156 @@ const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
   // flag-less object clears them server-side too.)
   const { _archived, _archived_at, ...stripped } = project;
   const persisted = keepArchiveFlags ? project : stripped;
-  fetch(`${API}/api/projects/${project.id}`, {
+  const base = _serverVersions.get(id);
+  const body = base ? { ...persisted, base_updated_at: base } : persisted;
+
+  // Supersede any PUT still in flight for THIS project. Two overlapping saves
+  // on a slow connection could otherwise arrive out of order and resurrect the
+  // older blob; aborting means the newer request is always the last one the
+  // server sees.
+  const prev = _inflight.get(id);
+  if (prev) { try { prev.abort(); } catch { /* already settled */ } }
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  if (controller) _inflight.set(id, controller);
+  const seq = ++_seqCounter;
+  _lastSeq.set(id, seq);
+
+  return fetch(`${API}/api/projects/${id}`, {
     method: 'PUT',
     credentials: 'include',
+    ...(controller ? { signal: controller.signal } : {}),
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(persisted),
-  }).then(_handleSyncResponse).catch(_handleSyncError);
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (_lastSeq.get(id) !== seq) return 'superseded';   // a newer PUT started
+    _inflight.delete(id);
+    const verdict = _handleSyncResponse(res);
+    if (verdict === 'ok') {
+      // Track what the server now holds so the NEXT save carries a fresh base.
+      try {
+        const saved = await res.json();
+        if (saved?.updated_at) _serverVersions.set(id, saved.updated_at);
+      } catch { /* body not JSON — leave the old base, worst case a false 409 */ }
+    }
+    return verdict;
+  }).catch((e) => {
+    if (e?.name === 'AbortError' || _lastSeq.get(id) !== seq) return 'superseded';
+    _inflight.delete(id);
+    _handleSyncError(e);
+    return 'failed';
+  });
 };
+
+// ── Debounced save layer (2026-07-28 perf sweep) ──────────────────────────────
+//
+// updateProject() used to do a full JSON.stringify of EVERY project into
+// localStorage (13.7 ms of main thread at 20 projects) plus a ~100-190 KB
+// backend PUT — synchronously, per call. A per-keystroke editor (room heights,
+// wall thickness in Prielaidos) therefore fired one of each per character.
+//
+// Now every updateProject writes to an in-memory snapshot immediately (so
+// getProjects() is always consistent — no read-your-writes hazard) and the
+// EXPENSIVE half (localStorage serialize + PUT) is coalesced onto a 400 ms
+// trailing timer. Last write wins per project id.
+//
+// One-shot user intents (create / archive / restore / delete / import / seed)
+// do NOT wait: they schedule and flush in the same tick, so their semantics are
+// unchanged.
+const SAVE_DEBOUNCE_MS = 400;
+
+let _memProjects = null;      // Array | null — authoritative once set
+let _lsDirty = false;         // localStorage behind _memProjects?
+let _saveTimer = null;
+const _dirtyIds = new Set();          // project ids with a pending backend PUT
+const _pendingOpts = new Map();       // id -> _syncToBackend options
+
+function _readProjectsRaw() {
+  if (_memProjects) return _memProjects;
+  try {
+    return JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function _scheduleSave(projects, id, opts) {
+  _memProjects = projects;
+  _lsDirty = true;
+  if (id) {
+    _dirtyIds.add(id);
+    if (opts) _pendingOpts.set(id, opts);
+  }
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => { _saveTimer = null; _doFlush(); }, SAVE_DEBOUNCE_MS);
+}
+
+function _doFlush() {
+  if (_lsDirty && _memProjects) {
+    _lsDirty = false;
+    _persist(PROJECTS_KEY, JSON.stringify(_memProjects));
+  }
+  if (_dirtyIds.size === 0) return;
+  const ids = Array.from(_dirtyIds);
+  _dirtyIds.clear();
+  for (const id of ids) {
+    const proj = (_memProjects || []).find(p => p.id === id);
+    if (!proj) continue;   // deleted before the flush — nothing to push
+    const opts = _pendingOpts.get(id);
+    _pendingOpts.delete(id);
+    _syncToBackend(proj, opts || {});
+  }
+}
+
+/**
+ * Force any pending save out NOW (localStorage + backend PUT).
+ *
+ * Call sites: page unload/hide, and project unmount — leaving the editor must
+ * never strand the last 400 ms of typing.
+ */
+export function flushProjectSaves() {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  _doFlush();
+}
+
+/** Write immediately — for one-shot intents that must not sit on a timer. */
+function _saveNow(projects, id, opts) {
+  _scheduleSave(projects, id, opts);
+  flushProjectSaves();
+}
+
+/** Replace the whole cache (backend pull / backup import) — no pending state. */
+function _replaceAll(projects) {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  _dirtyIds.clear();
+  _pendingOpts.clear();
+  _memProjects = projects;
+  _lsDirty = false;
+  _persist(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+// Test hook — lets a unit test start from a clean slate. Shares the production
+// teardown (resetPullCache) so a test can never pass against state the real
+// user-switch path leaves behind.
+export function _resetSaveState() {
+  resetPullCache();
+  _lastSeq.clear();
+  _seqCounter = 0;
+}
+
+if (typeof window !== 'undefined') {
+  // `visibilitychange → hidden` is the one that reliably fires on tab switch,
+  // app switch and close, while the page is still fully alive — it does the
+  // real work. pagehide/beforeunload are belt-and-braces for the paths it
+  // misses. The localStorage half of the flush is synchronous and therefore
+  // guaranteed; the PUT is best-effort at that point (a >64 KB body rules out
+  // fetch keepalive), which is exactly why the visibilitychange hook matters.
+  const flush = () => { try { flushProjectSaves(); } catch { /* never block unload */ } };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', flush);
+}
 
 const _deleteFromBackend = (id) => {
   fetch(`${API}/api/projects/${id}`, { method: 'DELETE', credentials: 'include' })
@@ -180,14 +353,37 @@ let _hasPulled = false;
 // would carry into user B's session in the same tab.
 export function resetPullCache() {
   _hasPulled = false;
+  // 2026-07-28: the debounced save layer keeps an IN-MEMORY snapshot of the
+  // projects array, and authContext.purgeLocalUserData() only clears
+  // localStorage — so on a user switch in the same tab, getProjects() would
+  // have kept serving user A's projects to user B. Drop it here, at the one
+  // call site the auth layer already uses.
+  //
+  // A pending save is deliberately DISCARDED rather than flushed: the session
+  // cookie now belongs to the new user, so pushing A's blob would either 403 on
+  // the ownership barrier or (worse) write under the wrong owner. Losing the
+  // last <400 ms of typing on an explicit logout is the safe trade — and the
+  // project page's unmount flush has usually already fired.
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  _memProjects = null;
+  _lsDirty = false;
+  _dirtyIds.clear();
+  _pendingOpts.clear();
+  for (const c of _inflight.values()) { try { c.abort(); } catch { /* settled */ } }
+  _inflight.clear();
+  _serverVersions.clear();
 }
 export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
   _hasPulled = true;
+  // The pull REPLACES the cache — anything still sitting on the debounce timer
+  // would be thrown away. Push it first.
+  flushProjectSaves();
   try {
     const res = await fetch(`${API}/api/projects`, { credentials: 'include' });
     if (res.status === 401) {
       // Not authenticated — caller (AuthProvider) handles redirect; clear cache.
+      _replaceAll([]);
       localStorage.removeItem(PROJECTS_KEY);
       return null;
     }
@@ -202,7 +398,7 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     // resurrected "deleted" projects after logout or on a second device.
 
     if (list.length === 0) {
-      _persist(PROJECTS_KEY, JSON.stringify([]));
+      _replaceAll([]);
       return [];
     }
 
@@ -214,7 +410,13 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     const valid = fulls.filter(Boolean).sort((a, b) =>
       (b.updated_at || b.created_date || '').localeCompare(a.updated_at || a.created_date || '')
     );
-    _persist(PROJECTS_KEY, JSON.stringify(valid));
+    // Record the server's timestamp per project — the base for the next save's
+    // conflict check. Without this the first PUT after a load carries no base
+    // and a two-tab overwrite would still go through unnoticed.
+    for (const p of valid) {
+      if (p?.id && p.updated_at) _serverVersions.set(p.id, p.updated_at);
+    }
+    _replaceAll(valid);
     return valid;
   } catch (e) {
     console.warn('[projectStore] pull from backend failed:', e);
@@ -225,14 +427,13 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 // ── Projects CRUD (sync API, async backend write-through) ─────────────────────
 
 export function getProjects() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]');
-    // P7 migration: legacy skyrius mojibake → modern LT names. Pure-function
-    // pass — doesn't write back, so old saves stay untouched until next save.
-    return raw.map(_migrateProject);
-  } catch {
-    return [];
-  }
+  // Reads the in-memory snapshot when a debounced save is pending, so a caller
+  // that mutates twice in a row (updateRoomPolygon → updateProject, or two
+  // keystrokes) never reads back a stale array and drops the first edit.
+  const raw = _readProjectsRaw();
+  // P7 migration: legacy skyrius mojibake → modern LT names. Pure-function
+  // pass — doesn't write back, so old saves stay untouched until next save.
+  return Array.isArray(raw) ? raw.map(_migrateProject) : [];
 }
 
 export function getProject(id) {
@@ -249,7 +450,7 @@ export async function seedDemoProject() {
   const { DEMO_PROJECT } = await import('@/demoData');
   const demo = { ...DEMO_PROJECT, updated_at: new Date().toISOString() };
   projects.unshift(demo);
-  _persist(PROJECTS_KEY, JSON.stringify(projects));
+  _saveNow(projects, null);   // local-only: no backend id to mark dirty
   return demo;
 }
 
@@ -262,8 +463,7 @@ export function createProject(data) {
   };
   const projects = getProjects();
   projects.unshift(project); // newest first
-  _persist(PROJECTS_KEY, JSON.stringify(projects));
-  _syncToBackend(project);
+  _saveNow(projects, project.id);
   return project;
 }
 
@@ -272,8 +472,8 @@ export function updateProject(id, updates) {
   const idx = projects.findIndex(p => p.id === id);
   if (idx < 0) return null;
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
-  _persist(PROJECTS_KEY, JSON.stringify(projects));
-  _syncToBackend(projects[idx]);
+  // THE hot path — debounced. Everything else in this module saves immediately.
+  _scheduleSave(projects, id);
   return projects[idx];
 }
 
@@ -294,11 +494,10 @@ export function archiveProject(id) {
   if (!target) return;
   target._archived = true;
   target._archived_at = new Date().toISOString();
-  _persist(PROJECTS_KEY, JSON.stringify(all));
   // Soft-delete is durable: persist the flags server-side so the project stays
   // deleted after logout / on another device (data itself is preserved until
   // the purge window expires — restore stays possible from Šiukšliadėžė).
-  _syncToBackend(target, { keepArchiveFlags: true });
+  _saveNow(all, id, { keepArchiveFlags: true });
 }
 
 export function restoreProject(id) {
@@ -307,15 +506,23 @@ export function restoreProject(id) {
   if (!target) return;
   delete target._archived;
   delete target._archived_at;
-  _persist(PROJECTS_KEY, JSON.stringify(all));
   // PUT replaces the whole blob → syncing the flag-less object un-archives
   // server-side as well.
-  _syncToBackend(target);
+  _saveNow(all, id);
 }
 
 export function permanentlyDeleteProject(id) {
   const projects = getProjects().filter(p => p.id !== id);
-  _persist(PROJECTS_KEY, JSON.stringify(projects));
+  // Drop any pending PUT for this id and abort one in flight — a save that
+  // landed AFTER the DELETE would resurrect the project server-side.
+  _dirtyIds.delete(id);
+  _pendingOpts.delete(id);
+  const inflight = _inflight.get(id);
+  if (inflight) { try { inflight.abort(); } catch { /* already settled */ } }
+  _inflight.delete(id);
+  _lastSeq.set(id, ++_seqCounter);   // invalidate any late response
+  _serverVersions.delete(id);
+  _saveNow(projects, null);
   _deleteFromBackend(id);
 }
 
@@ -613,7 +820,10 @@ export function importProjectsBackup(jsonText, opts = {}) {
   } else {
     final = incoming;
   }
-  _persist(PROJECTS_KEY, JSON.stringify(final));
+  // Wholesale cache replacement — same as the backend pull, so any debounced
+  // save is flushed and the pending state cleared before the swap.
+  flushProjectSaves();
+  _replaceAll(final);
 
   if (parsed.settings && typeof parsed.settings === 'object') {
     saveSettings({ ...getSettings(), ...parsed.settings });
