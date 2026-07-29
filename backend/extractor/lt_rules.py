@@ -226,6 +226,64 @@ def apply_lt_sanity(parsed: dict) -> dict:
                 "message": f"{pavadinimas} (nr={nr}): {note}",
             })
 
+    # ── Virš-3m tier is a LOWER BOUND (2026-07-29) ───────────────────────
+    # calc_room_quantities can only place surface above 3 m from a room's
+    # NOMINAL ceiling height (all-or-nothing at the 3.0 m boundary) or from
+    # the explicit `extra_walls_virs_3m_m2` / `high_ceiling_area_m2`
+    # primitives — and no Vision lane produces those two. So when a project
+    # bills an above-3m tier at all, every partial high zone inside a
+    # nominally ≤3 m room (coffer, soffit step, double-height slice) is
+    # missing from it, and so is the scaffolding it implies.
+    #
+    # Beržų g. 24 is the measured case: contractor "sienos aukštos" 150.59 +
+    # "lubos aukštos" 62.82 m² vs the 103.15 + 50.54 m² the one >3 m room on
+    # the drawings can account for. 59.72 m² of real above-3m work that the
+    # readers never see. This warning is the honest form of that gap — the
+    # alternative (inventing the geometry) is explicitly forbidden.
+    high_rooms = [r for r in rooms if (r.get("_virs_3m_source") == "nominal_height")]
+    explicit_rooms = [r for r in rooms if (r.get("_virs_3m_source") == "explicit_zone")]
+    if high_rooms and not explicit_rooms:
+        low_nrs = [
+            str(r.get("nr") or "?") for r in rooms
+            if r.get("_virs_3m_source") == "none"
+        ]
+        high_nrs = ", ".join(str(r.get("nr") or "?") for r in high_rooms)
+        low_txt = (
+            f" Patikrintini kambariai (nominaliai iki 3 m): {', '.join(low_nrs)}."
+            if low_nrs else ""
+        )
+        warnings.append({
+            "level": "WARN",
+            "patalpa_nr": None,
+            "message": (
+                f"Virš 3 m kiekis (dažymas, GKP lubos, pastolių poreikis) "
+                f"apskaičiuotas TIK iš kambarių, kurių nominalus lubų aukštis "
+                f"≥ 3 m (nr. {high_nrs}). Daliniai aukšti ruožai — karnizai, "
+                f"soffitai, dvigubo aukščio zonos žemesniuose kambariuose — "
+                f"automatiškai neaptinkami, todėl virš-3 m kiekis yra APATINĖ "
+                f"RIBA.{low_txt} Patikrinkite pjūvį ir lubų planą; rastą zoną "
+                f"įveskite Prielaidose."
+            ),
+        })
+
+    # ── Off-perimeter partitions are never counted (2026-07-29) ──────────
+    # walls_gross = perim × H. A paintable partition that does not lie on the
+    # room outline (Beržų room 110's 6.24 m² "pertvara miegamajam galvūgaliui")
+    # contributes nothing unless someone supplies `extra_walls_m2`. Disclose
+    # once per project rather than per room — the engine cannot say WHICH
+    # room hides one.
+    if rooms and all(r.get("_walls_lower_bound", True) for r in rooms):
+        warnings.append({
+            "level": "INFO",
+            "patalpa_nr": None,
+            "message": (
+                "Sienų plotas skaičiuotas kaip perimetras × aukštis − angos. "
+                "Vidinės pertvaros, nesiliečiančios su kambario perimetru "
+                "(pvz. lovos galvūgalio sienelė), į kiekį NEĮTRAUKTOS – jei "
+                "tokių yra, pridėkite jas Prielaidose."
+            ),
+        })
+
     # Total area sanity
     total_area = sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if total_area > 800:

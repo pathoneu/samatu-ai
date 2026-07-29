@@ -20,6 +20,7 @@ import anthropic
 import pdfplumber
 
 from models_config import model_for
+from .response_text import response_text
 
 # Model tiers — historically Haiku/Sonnet/Opus picked at call site; on
 # 2026-06-17 all tiers were promoted to Opus 4.8, and since W1.1
@@ -70,6 +71,74 @@ class PageType(str, Enum):
     EKSPLIKACIJA = "eksplikacija"
     LEGEND = "legend"
     UNKNOWN = "unknown"
+
+
+# ── ONE canonical page vocabulary ─────────────────────────────────────────
+#
+# Two vocabularies used to coexist and NOT line up: `PageType` above (this
+# module's classifier enum) and the `puslapiai[].tipas` enum in
+# `prompt.py` (what Pass-1 actually emits). Consequences we measured
+# (2026-07-29): `stogo_planas` / `legend` were unreachable from any
+# puslapiai-driven lookup, and `height_fusion.HEIGHT_SECTION_TIPAI`
+# listed `cross_section` / `detail`, which exist in NEITHER vocabulary —
+# two lookups that could never match.
+#
+# `prompt.py` wins: its names are what the extraction prompts emit and
+# what every stored extract carries. CANONICAL_TIPAI is that enum, plus
+# the two classifier-only tags that have no prompt counterpart
+# (`stogo_planas`, `legend`) so classifier output is representable
+# without a lossy squash. Pass-1's schema does not emit those two yet —
+# extending the prompt enum is a separate, prompt-affecting change.
+CANONICAL_TIPAI: frozenset[str] = frozenset({
+    # — prompt.py `puslapiai[].tipas` enum (source of truth) —
+    "floor_plan", "wall_elevation", "ceiling_plan", "section",
+    "eksplikacija", "door_window_schedule", "finish_schedule",
+    "site_plan", "facade", "structural", "electrical", "plumbing",
+    "specification", "title_page", "unknown", "non_relevant",
+    # — classifier-only tags with no prompt.py counterpart —
+    "stogo_planas", "legend",
+})
+
+# Explicit alias → canonical map. Covers this module's PageType values,
+# the dead `height_fusion` names, and the LT spellings that turn up in
+# hand-written fixtures. Anything unlisted and non-canonical resolves to
+# "unknown" — which every consumer must treat as "keep / don't route".
+_TIPAS_ALIASES: dict[str, str] = {
+    "cross_section": "section",   # was a dead lookup in height_fusion
+    "detail": "section",          # was a dead lookup in height_fusion
+    "pjuvis": "section",
+    "pjūvis": "section",
+    "roof_plan": "stogo_planas",
+    "stogo_plan": "stogo_planas",
+    "wall_development": "wall_elevation",
+    "isklotine": "wall_elevation",
+    "išklotinė": "wall_elevation",
+    "room_schedule": "eksplikacija",
+    "cover": "title_page",
+    "title": "title_page",
+    "sklypo_planas": "site_plan",
+    "visualization": "non_relevant",
+    "vizualizacija": "non_relevant",
+    "render": "non_relevant",
+    "": "unknown",
+}
+
+
+def canonical_tipas(raw: "str | PageType | None") -> str:
+    """Normalise any page-type label onto the ONE canonical vocabulary.
+
+    Accepts a `PageType`, a `puslapiai[].tipas` string, or a known alias.
+    Unrecognised input returns "unknown" — never raises, because every
+    caller is a page-routing decision that must fail OPEN (treat the page
+    as potentially relevant) rather than crash an extraction.
+    """
+    if raw is None:
+        return "unknown"
+    value = raw.value if isinstance(raw, PageType) else str(raw)
+    value = value.strip().lower()
+    if value in CANONICAL_TIPAI:
+        return value
+    return _TIPAS_ALIASES.get(value, "unknown")
 
 
 class Dalis(str, Enum):
@@ -271,7 +340,7 @@ def _call_haiku(
             },
         },
     )
-    payload = json.loads(resp.content[0].text)
+    payload = json.loads(response_text(resp))
     return parse_classification(payload)
 
 

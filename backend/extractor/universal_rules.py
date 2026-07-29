@@ -1251,6 +1251,45 @@ def calc_room_quantities(room: dict,
     if gkp_extra_area_m2 > 0:
         gkp_lubu_standart += gkp_extra_area_m2
 
+    # ── Virš-3m / off-perimeter disclosure (2026-07-29) ───────────────────
+    # The engine can only see above-3m surface two ways:
+    #   1. the room's NOMINAL ceiling height — all-or-nothing at the 3.0 m
+    #      boundary (`is_high_ceiling`), the whole room lands in one tier;
+    #   2. the explicit partial-zone primitives `extra_walls_virs_3m_m2` /
+    #      `high_ceiling_area_m2`.
+    # NO Vision lane produces (2). Those two keys only ever arrive from a
+    # contractor truth file or a human correction (see the PRIMITIVE_KEYS
+    # comment in vision_call.py). Consequence: a coffer, a soffit step or a
+    # double-height slice inside a nominally ≤3 m room is invisible, and so
+    # is any paintable partition that does not lie on the room outline
+    # (perim × H cannot see it).
+    #
+    # Measured case — Beržų g. 24: the contractor bills 150.59 m² "sienos
+    # aukštos" + 62.82 m² "lubos aukštos", while the only drawing-derived
+    # >3 m room (102, H=3.4) supplies 103.15 + 50.54. 59.72 m² is billed
+    # above 3 m that the drawings, as the readers see them, do not explain;
+    # a further 6.24 m² ("pertvaros miegamajam galvūgaliui") is a partition
+    # off room 110's perimeter. Both are real work. Neither is fabricated
+    # here — they are DISCLOSED as a lower bound instead.
+    has_explicit_high_zone = (extra_walls_virs_3m_m2 > 0 or high_ceiling_area_m2 > 0)
+    if has_explicit_high_zone:
+        virs_3m_source = "explicit_zone"
+    elif room_is_high:
+        virs_3m_source = "nominal_height"
+    else:
+        virs_3m_source = "none"
+    # True whenever the wall quantity came from perim × H with no explicit
+    # extra surface — i.e. off-perimeter partitions and partial high zones
+    # are not in the number. Both fields ride out on the returned dict.
+    walls_lower_bound = (extra_walls_m2 <= 0 and extra_walls_virs_3m_m2 <= 0)
+    if virs_3m_source == "nominal_height":
+        wall_finish_notes.append(
+            f"Virš 3 m kiekis apskaičiuotas iš viso kambario nominalaus lubų "
+            f"aukščio ({H:.2f} m) – visas kambarys priskirtas virš-3 m juostai. "
+            f"Daliniai aukšti ruožai (karnizai, soffitai, dvigubo aukščio "
+            f"zonos) automatiškai neaptinkami – jei tokių yra kituose "
+            f"kambariuose, įveskite juos Prielaidose.")
+
     # Dažymo plotas (sienos + lubos)
     dazymo_plotas = walls_paintable + ceiling_paintable
 
@@ -1436,6 +1475,15 @@ def calc_room_quantities(room: dict,
         "_walls_full_tile": bool(is_full_tile),
         "_walls_paint_factor": round(float(walls_paint_factor), 4),
         "_wall_finish_assumptions": list(wall_finish_notes),
+        # ── Virš-3m provenance (2026-07-29) ──────────────────────────────
+        # "explicit_zone" = a partial high zone was supplied for this room;
+        # "nominal_height" = the whole room landed in the virš-3m tier from
+        # its nominal H alone; "none" = the room contributes nothing above
+        # 3 m. `_walls_lower_bound` says the wall quantity carries no
+        # off-perimeter / partial-high surface. lt_rules.apply_lt_sanity
+        # turns these into the user-facing lower-bound disclosure.
+        "_virs_3m_source": virs_3m_source,
+        "_walls_lower_bound": bool(walls_lower_bound),
         "molio_tinko_m2": round(molio_tinko_m2, 2),
         "ceiling_paintable_m2": round(ceiling_paintable, 2),
         "dazymo_plotas_m2": round(dazymo_plotas, 2),

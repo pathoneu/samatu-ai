@@ -64,6 +64,14 @@ _ASSUMPTION_FIELDS = {
     # patalpa.nr → 0.0 (raw) / 1.0 (painted). Flips walls_paint in the room's
     # rules and recomputes the paint fields, same live path as ceiling height.
     "walls_paint_override",
+    # 2026-07-29: concealed-vs-surface mixer. The builder splits a POTINKINIS
+    # mixer into its rough-in + trim pair and says so as a disclosed assumption
+    # (nothing we read tells us which it is). CLAUDE.md's rule — every
+    # assumption must be overridable with a live recalc — means the answer has
+    # to be reachable through this endpoint. Accepts a bool (whole project) or
+    # {"praustuve"|"dusas"|"vonia"|"bide": bool}; both shapes land in
+    # `_overrides` verbatim and are read by `_resolve_san_concealment`.
+    "santechnika_potinkinis",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -383,6 +391,26 @@ _LED_PAIR_RE = re.compile(r"^led\s+niš[ųu]\s+(glaistymas|dažymas)$", re.IGNOR
 _LED_CONSOLIDATED = "led nišų glaistymas/dažymas"
 
 
+# 2026-07-29 sanitary pair split: a CONCEALED mixer is two jobs (in-wall body
+# before tiling, visible trim after), and the canonical builder now emits the
+# LT-conventional pair instead of one bundled line. A project priced BEFORE the
+# split carries the old single label, which pass 1 can no longer match — without
+# this map pass 3 would carry it as an orphan and the user would see the SAME
+# work twice: once as the legacy bundled line, once as the new pair. Maps the
+# legacy label onto the ROUGH-IN half (the half that inherits the original
+# work's price — it is the larger job and the one that happens first).
+#
+# NOTE the map is only consulted when the successor is actually in the rebuilt
+# list. With `santechnika_potinkinis` overridden to false the builder re-emits
+# the legacy label verbatim, pass 1 matches it exactly, and none of this fires.
+_SAN_LEGACY_SPLIT = {
+    "praustuvės maišytuvo montavimas":
+        "potinkinio praustuvės maišytuvo potinkinės dalies montavimas",
+    "dušo maišytuvo sistemos montavimas":
+        "potinkinio dušo maišytuvo potinkinės dalies montavimas",
+}
+
+
 def _tier_key(s: str | None) -> str:
     """Label with ONLY the height/Q-level tier suffixes stripped.
 
@@ -404,7 +432,7 @@ def _norm_label(s: str | None) -> str:
     base = _tier_key(s)
     if _LED_PAIR_RE.match(base):
         return _LED_CONSOLIDATED
-    return base
+    return _SAN_LEGACY_SPLIT.get(base, base)
 
 
 def _has_user_edit(p: dict) -> bool:
@@ -606,10 +634,22 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
     # appends below so a carried orphan can never suppress a later one.
     rebuilt_tier_keys = {_tier_key(p.get("aprasymas")) for p in rebuilt}
     rebuilt_tier_keys.discard("")
+    rebuilt_labels = {(p.get("aprasymas") or "").strip().lower() for p in rebuilt}
     for p in prior:
         if id(p) in matched_prior:
             continue
         edited = _has_user_edit(p)
+        # Legacy sanitary line the split replaced. Emitted as `relabeled` (not
+        # `superseded_by_tier`) on purpose: InteriorProject.jsx forwards exactly
+        # the `relabeled` notes to the frontend merge as `serverRelabeled`, and
+        # that is what stops the browser-side pass 3 from re-carrying the same
+        # row the backend just folded away.
+        _into = _SAN_LEGACY_SPLIT.get((p.get("aprasymas") or "").strip().lower())
+        if not edited and _into and _into in rebuilt_labels:
+            notes.append({"aprasymas": p.get("aprasymas"),
+                          "reason": "relabeled", "into": _into,
+                          "kaina": None})
+            continue
         if not edited and _tier_key(p.get("aprasymas")) in rebuilt_tier_keys:
             # Un-edited line whose work is still listed under a sibling tier
             # label — the rebuild re-tiered it, nothing was lost.

@@ -26,6 +26,7 @@ from models_config import model_for
 from extractor.roof.evidence import DimensionEvidence, HITLFlag, HITLFlagReason
 from extractor.roof.page_authority import PAGE_AUTHORITY, RoofInputField
 from extractor.roof.strategies import RoofInput
+from ..response_text import response_text
 
 
 _DEFAULT_WALL_THICKNESS_M = 0.25  # LT blokeliai typical (per CLAUDE.md §2)
@@ -174,7 +175,7 @@ def extract_stogo_planas_dims(
             },
         },
     )
-    return json.loads(resp.content[0].text)
+    return json.loads(response_text(resp))
 
 
 # ---------------------------------------------------------------------------
@@ -558,4 +559,4 @@ def extract_pjuvis_dims(
             },
         },
     )
-    return json.loads(resp.content[0].text)
+    return json.loads(response_text(resp))

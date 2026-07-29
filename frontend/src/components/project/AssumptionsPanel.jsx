@@ -444,6 +444,45 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             </div>
           </Row>
 
+          {/* Santechnika: potinkiniai ar virštinkiniai maišytuvai.
+              The backend defaults to CONCEALED (LT convention: an in-wall body
+              during rough-in + visible trim after tiling = two separate jobs,
+              two lines). Measured against four real sąmatos, 3 of 4 contractors
+              build concealed but only 2 of 4 BILL it as a pair — one bundles it
+              into a single line, and one project's own text says "(ne
+              potinkinės)". So this is a genuine per-project convention, and the
+              contractor must be able to flip it. (2026-07-29) */}
+          <Row
+            label={t('project.assumptions.concealedMixers')}
+            note={t('project.assumptions.concealedMixersNote')}
+          >
+            <div className="flex gap-1">
+              {[['true', t('project.assumptions.concealedYes')],
+                ['false', t('project.assumptions.concealedNo')]].map(([val, lbl]) => {
+                const on = String(safeAssumptions.santechnika_potinkinis ?? true) === val;
+                return (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      const v = val === 'true';
+                      setField('santechnika_potinkinis', v);
+                      handleRecompute('santechnika_potinkinis', v);
+                    }}
+                    title={t(`project.assumptions.concealedTitles.${val}`)}
+                    aria-pressed={on}
+                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                      on
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+
           {/* Lubų aukštis per kambarį */}
           {rooms.length > 0 && (
             <div className="py-2">

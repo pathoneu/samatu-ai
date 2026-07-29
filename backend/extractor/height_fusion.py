@@ -80,7 +80,12 @@ class HeightFusion:
 # fusion gate (high-confidence-only primary) and the per-room plausibility
 # band keep a misread from going project-wide.
 
-HEIGHT_SECTION_TIPAI = ("section", "cross_section", "detail")
+# "cross_section" / "detail" used to be listed here as if they were page
+# types. They are in NEITHER vocabulary (see page_classifier.CANONICAL_TIPAI),
+# so those two lookups could never match — a silent dead branch. They are now
+# ALIASES that canonical_tipas() folds onto "section", which means a fixture
+# or classifier that emits them finally routes here instead of being ignored.
+HEIGHT_SECTION_TIPAI = ("section",)
 MAX_WALL_ELEVATION_SAMPLES = 3
 DEFAULT_MAX_HEIGHT_PAGES = 6
 
@@ -106,6 +111,8 @@ def height_scan_pages(ai: dict, max_pages: int = DEFAULT_MAX_HEIGHT_PAGES) -> li
     """Ordered page list for the ceiling-height Vision pass, driven by the
     extract's own ``puslapiai[]`` classification. Falls back to [1] when
     the extract carries no classification at all."""
+    from .page_classifier import canonical_tipas
+
     by_tipas: dict[str, list[int]] = {}
     for p in (ai.get("puslapiai") or []):
         try:
@@ -114,7 +121,7 @@ def height_scan_pages(ai: dict, max_pages: int = DEFAULT_MAX_HEIGHT_PAGES) -> li
             continue
         if nr <= 0:
             continue
-        by_tipas.setdefault((p.get("tipas") or "").lower(), []).append(nr)
+        by_tipas.setdefault(canonical_tipas(p.get("tipas")), []).append(nr)
 
     order: list[int] = []
 

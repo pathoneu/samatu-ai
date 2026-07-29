@@ -31,6 +31,7 @@ import pdfplumber
 from pdf2image import convert_from_bytes
 
 from models_config import model_for  # role: "apdailos" — resolved at call time
+from .response_text import response_text
 MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = """Tu esi LT interjero brėžinio analizės agentas. Tau duotas vienas puslapis — IŠKLOTINIŲ IR APDAILŲ PLANAS (wall finishes plan).
@@ -207,7 +208,9 @@ def read_apdailos_finishes(
                 "_error": f"Vision call failed: {exc}",
                 "_elapsed_s": round(time.time() - t0, 2), "_meta": {}}
 
-    raw = resp.content[0].text if getattr(resp, "content", None) else ""
+    # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
+    # models, and reading .text off it killed this reader mid-run.
+    raw = response_text(resp)
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "page": page, "patalpos": [],

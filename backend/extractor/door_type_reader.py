@@ -38,6 +38,7 @@ MAX_TOKENS = 4096
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus
 # limit; staying at/below it guarantees no provider downscale.
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
+from .response_text import response_text
 MAX_DOOR_PAGES = 6
 
 _TAG_RE = re.compile(r"\b(?:LD|D)-?\d\b", re.IGNORECASE)
@@ -166,7 +167,9 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,
                 "_error": f"Vision call failed: {exc}", "_elapsed_s": round(time.time() - t0, 2)}
 
-    raw = resp.content[0].text if getattr(resp, "content", None) else ""
+    # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
+    # models, and reading .text off it killed this reader mid-run.
+    raw = response_text(resp)
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,

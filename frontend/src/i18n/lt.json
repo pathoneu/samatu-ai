@@ -1103,7 +1103,15 @@
       "openingHeightTitle": "Angos aukštis milimetrais",
       "estimatedBadge": "spėjama",
       "estimatedTitle": "Matmenys brėžinyje nerasti — įrašytas standartinis dydis. Patikrinkite.",
-      "removeOpening": "Pašalinti {{label}} iš sąrašo"
+      "removeOpening": "Pašalinti {{label}} iš sąrašo",
+      "concealedMixers": "Potinkiniai maišytuvai",
+      "concealedMixersNote": "Potinkinis maišytuvas montuojamas dukart: korpusas sienoje prieš plyteles ir matoma dalis po jų — todėl sąmatoje tai dvi eilutės. Jei rangovas šį darbą rašo viena eilute arba maišytuvai virštinkiniai, perjunkite į „Virštinkiniai“.",
+      "concealedYes": "Potinkiniai",
+      "concealedNo": "Virštinkiniai",
+      "concealedTitles": {
+        "true": "Dvi eilutės kiekvienam maišytuvui: potinkinė dalis + virštinkinė dalis",
+        "false": "Viena eilutė kiekvienam maišytuvui"
+      }
     },
     "roomCard": {
       "confHigh": "Nuskaityta tiesiai iš brėžinio",

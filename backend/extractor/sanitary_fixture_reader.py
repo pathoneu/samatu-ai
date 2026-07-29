@@ -30,6 +30,7 @@ from pdf2image import convert_from_bytes
 from models_config import model_for  # role: "sanitary" — resolved at call time
 MAX_TOKENS = 4096
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
+from .response_text import response_text
 _FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai")
 
 SYSTEM_PROMPT = """Tu skaitai LT santechnikos / vandentiekio brėžinį.
@@ -127,7 +128,9 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "_error": f"Vision call failed: {exc}",
                 "_elapsed_s": round(time.time() - t0, 2)}
-    raw = resp.content[0].text if getattr(resp, "content", None) else ""
+    # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
+    # models, and reading .text off it killed this reader mid-run.
+    raw = response_text(resp)
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "_error": "no JSON", "_raw": raw[:300],

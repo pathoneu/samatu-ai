@@ -1099,7 +1099,15 @@
       "openingHeightTitle": "Opening height in millimetres",
       "estimatedBadge": "estimated",
       "estimatedTitle": "Size not found on the drawing — a standard size was used. Please check.",
-      "removeOpening": "Remove {{label}} from the list"
+      "removeOpening": "Remove {{label}} from the list",
+      "concealedMixers": "Concealed mixers",
+      "concealedMixersNote": "A concealed mixer is installed twice: the in-wall body before tiling and the visible trim after — so the estimate carries two lines. Switch to “Surface” if the contractor bills it as one line or the mixers are surface-mounted.",
+      "concealedYes": "Concealed",
+      "concealedNo": "Surface",
+      "concealedTitles": {
+        "true": "Two lines per mixer: rough-in body + visible trim",
+        "false": "One line per mixer"
+      }
     },
     "roomCard": {
       "confHigh": "Read directly from the drawing",

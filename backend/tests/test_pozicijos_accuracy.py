@@ -49,8 +49,15 @@ def test_basin_count_uses_praustuves_symbol():
     parsed = _parsed(rooms)
     parsed["detected_symbols_summary"] = {"praustuves": 3}
     out = _build_pozicijos_from_rooms(parsed)
-    basin = [p for p in out["pozicijos"] if p["aprasymas"] == "Praustuvės maišytuvo montavimas"]
-    assert len(basin) == 1 and basin[0]["kiekis"] == 3, basin  # not 2 (n_wet_with_klozetas)
+    # Label-agnostic on purpose: the 2026-07-29 potinkinė/virštinkinė split
+    # renamed this line into a pair, but RC1's claim is about the COUNT SOURCE
+    # (symbol=3, not n_wet_with_klozetas=2) and holds for every basin-mixer
+    # line however many there are.
+    basin = [p for p in out["pozicijos"]
+             if "praustuv" in p["aprasymas"].lower()
+             and "maišytuv" in p["aprasymas"].lower()]
+    assert basin, [p["aprasymas"] for p in out["pozicijos"]]
+    assert all(p["kiekis"] == 3 for p in basin), basin  # not 2 (n_wet_with_klozetas)
 
 
 # ── RC4 ────────────────────────────────────────────────────────────────

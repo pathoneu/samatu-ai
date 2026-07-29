@@ -186,24 +186,35 @@ _PDF_NATIVE_MAX_B64_BYTES = 25 * 1024 * 1024
 _PDF_NATIVE_MIN_MEDIAN_CHARS = 10
 
 
-def _median_chars_per_page(pdf_bytes: bytes, page_indices: list[int]) -> float | None:
+def _median_chars_per_page(pdf_bytes: bytes, page_indices: list[int],
+                           page_texts: list[str] | None = None) -> float | None:
     """Median extractable-text length (chars) across the SELECTED 1-based
     pages, via pdfplumber (same text source page_filter.py uses; zero API
     cost). None → text layer unmeasurable (broken/unopenable PDF) — the
-    caller proceeds and lets the pypdf subset build decide the fallback."""
+    caller proceeds and lets the pypdf subset build decide the fallback.
+
+    `page_texts` (1-indexed by position) short-circuits the pdfplumber pass.
+    Page selection has already extracted every page's text by the time this
+    runs, and re-extracting cost a second full pass (~15 s on a 17-page LT
+    brėžinys) for bytes we already had."""
     try:
         import statistics
-        import pdfplumber
         counts: list[int] = []
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            n_src = len(pdf.pages)
+        if page_texts:
             for idx in page_indices:
-                if 1 <= int(idx) <= n_src:
-                    try:
-                        text = pdf.pages[int(idx) - 1].extract_text() or ""
-                    except Exception:
-                        text = ""
-                    counts.append(len(text.strip()))
+                if 1 <= int(idx) <= len(page_texts):
+                    counts.append(len((page_texts[int(idx) - 1] or "").strip()))
+        else:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                n_src = len(pdf.pages)
+                for idx in page_indices:
+                    if 1 <= int(idx) <= n_src:
+                        try:
+                            text = pdf.pages[int(idx) - 1].extract_text() or ""
+                        except Exception:
+                            text = ""
+                        counts.append(len(text.strip()))
         if not counts:
             return None
         return round(float(statistics.median(counts)), 1)
@@ -238,7 +249,8 @@ def build_pdf_subset_b64(pdf_bytes: bytes, page_indices: list[int]) -> dict:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
+def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict],
+                        page_texts: list[str] | None = None) -> dict:
     """Build the native-PDF payload for Pass-1 (SAMATU_PDF_NATIVE=1).
 
     Returns either {"b64", "n_pages", "page_indices", "b64_bytes",
@@ -251,7 +263,7 @@ def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict]) -> dict:
     native-vs-raster accuracy analysis."""
     indices = [int(p["page_index"]) for p in pages]
     # B-2: text-richness gate BEFORE building the document payload.
-    median_chars = _median_chars_per_page(pdf_bytes, indices)
+    median_chars = _median_chars_per_page(pdf_bytes, indices, page_texts)
     if median_chars is not None and median_chars < _PDF_NATIVE_MIN_MEDIAN_CHARS:
         print(f"[experiment:native_pdf] text-free PDF (median "
               f"{median_chars} chars/page < {_PDF_NATIVE_MIN_MEDIAN_CHARS}) "
@@ -307,10 +319,18 @@ if _env_file.exists() and not os.environ.get("ANTHROPIC_API_KEY"):
 def pdf_to_b64_images(pdf_bytes: bytes,
                        max_pages: int = MAX_PAGES,
                        dpi: int = DPI) -> list[dict]:
-    """Convert PDF → list of {page_index, image_b64} dicts (JPEG, capped at IMG_MAX_DIM)."""
+    """Convert PDF → list of {page_index, image_b64, render_signals} dicts
+    (JPEG, capped at IMG_MAX_DIM).
+
+    `render_signals` (whiteness/colourfulness — see page_filter.image_signals)
+    is computed from the image we already hold, so page selection needs no
+    second render and no model call. It is advisory: every consumer must
+    treat an empty dict as "unknown, keep the page"."""
     images = convert_from_bytes(pdf_bytes, dpi=dpi, fmt="jpeg")
+    from .page_filter import image_signals
     out: list[dict] = []
     for i, img in enumerate(images[:max_pages], start=1):
+        signals = image_signals(img)
         w, h = img.size
         scale = min(1.0, IMG_MAX_DIM / max(w, h))
         if scale < 1.0:
@@ -320,6 +340,7 @@ def pdf_to_b64_images(pdf_bytes: bytes,
         out.append({
             "page_index": i,
             "image_b64": base64.b64encode(buf.getvalue()).decode("ascii"),
+            "render_signals": signals,
         })
     return out
 
@@ -1463,6 +1484,177 @@ def _room_virs_3m_paint(room: dict) -> float:
     return min(xw + hc, total)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# SANTECHNIKA — potinkinių maišytuvų POROS (2026-07-29)
+# ══════════════════════════════════════════════════════════════════════════════
+# A CONCEALED (potinkinis) mixer is physically TWO jobs at two different times:
+# the in-wall body during rough-in (before tiling) and the visible trim after
+# tiling. LT contractors bill them as two lines. We emitted one — which prices
+# two site visits as one and silently under-bills the installer.
+#
+# EVIDENCE — 4 contractor sąmatos in ground_truth/ (all Rangovas A):
+#   berzas      nr 38-46  vonios / praustuvo / dušo / bidė maišytuvai — ALL
+#                         concealed, ALL split into potinkinė + virštinkinė
+#                         (1+1, 5+5, 2+2, 3+3 = 22 vnt; we emitted 5)
+#   objektas_b  nr 83-92  identical structure, identical line texts
+#   ciurliu     nr 1-2    "Potinkinės dušo/praustuvo sistemos įrengimas" —
+#                         concealed, but billed as ONE line each
+#   lazunu      nr 31     "Dušo maišytuvo sistemos montavimas ( ne potinkinės)"
+#                         — explicitly SURFACE-mounted, one line
+# → concealed is the LT default (3 of 4 projects) but NOT universal. So the
+#   split is ON by default, DISCLOSED as an assumption, and overridable per
+#   fixture family via _overrides["santechnika_potinkinis"].
+#
+# WE CANNOT READ CONCEALMENT. sanitary_fixture_reader enumerates fixture TYPES
+# (praustuvė/klozetas/vonia/dušas/bidė) and detected_symbols_summary counts
+# them, but neither carries a potinkinis/virštinkinis signal — no reader, no
+# prompt field, no symbol. Until one exists the split rides on the default
+# above. `_sanitary_evidence` below is the hook a future reader plugs into.
+#
+# Genuinely single-job items stay ONE line: klozeto montavimas, WC rėmas,
+# gyvatukas, praustuvės (the basin itself), plautuvė, skalbimo mašina, sifonas,
+# linijinis latakas — none of them has a two-visit rough-in/trim structure.
+
+_SAN_CONCEALED_DEFAULT = True
+
+# family → (potinkinė label, virštinkinė label, legacy/surface single label)
+_SAN_MIXER_LINES: dict[str, tuple[str, str, str]] = {
+    "praustuve": (
+        "Potinkinio praustuvės maišytuvo potinkinės dalies montavimas",
+        "Potinkinio praustuvės maišytuvo virštinkinės dalies montavimas",
+        "Praustuvės maišytuvo montavimas",
+    ),
+    "dusas": (
+        "Potinkinio dušo maišytuvo potinkinės dalies montavimas",
+        "Potinkinio dušo maišytuvo virštinkinės dalies montavimas",
+        "Dušo maišytuvo sistemos montavimas",
+    ),
+    "vonia": (
+        "Potinkinio vonios maišytuvo potinkinės dalies montavimas",
+        "Potinkinio vonios maišytuvo virštinkinės dalies montavimas",
+        "Vonios maišytuvo montavimas",
+    ),
+    "bide": (
+        "Bidė dušiuko potinkinės dalies įrengimas",
+        "Bidė dušiuko virštinkinės dalies montavimas",
+        "Bidė dušiuko montavimas",
+    ),
+}
+
+# Full LT noun phrase per family — a bidė sprayer is a "dušiukas", not a
+# "maišytuvas", and the disclosure text reads wrong if they share a suffix.
+_SAN_FAMILY_LT = {"praustuve": "praustuvės maišytuvas", "dusas": "dušo maišytuvas",
+                  "vonia": "vonios maišytuvas", "bide": "bidė dušiukas"}
+
+_SAN_ASSUMPTION_FIELD = "santechnika_potinkinis"
+
+
+def _resolve_san_concealment(parsed: dict) -> tuple[dict[str, bool], dict[str, str]]:
+    """Which mixer families are CONCEALED, and where did each answer come from?
+
+    Precedence (first hit wins, per family):
+      1. `_overrides["santechnika_potinkinis"]` — the user's explicit answer.
+         Accepts a bool (applies to every family) or a per-family dict
+         {"praustuve": True, "dusas": False, ...}.
+      2. `parsed["_sanitary_evidence"]` — {family: bool} read off the drawings.
+         NOTHING PRODUCES THIS TODAY; it is the hook a future reader fills so
+         evidence outranks the default without another code change here.
+      3. The documented LT default (concealed) — recorded as an ASSUMPTION.
+
+    Returns ({family: bool}, {family: "override"|"evidence"|"assumption"}).
+    """
+    ov = (parsed.get("_overrides") or {}).get(_SAN_ASSUMPTION_FIELD)
+    ev = parsed.get("_sanitary_evidence") or {}
+    concealed: dict[str, bool] = {}
+    source: dict[str, str] = {}
+    for fam in _SAN_MIXER_LINES:
+        if isinstance(ov, bool):
+            concealed[fam], source[fam] = ov, "override"
+        elif isinstance(ov, dict) and isinstance(ov.get(fam), bool):
+            concealed[fam], source[fam] = ov[fam], "override"
+        elif isinstance(ev, dict) and isinstance(ev.get(fam), bool):
+            concealed[fam], source[fam] = ev[fam], "evidence"
+        else:
+            concealed[fam], source[fam] = _SAN_CONCEALED_DEFAULT, "assumption"
+    return concealed, source
+
+
+def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
+                      concealed: bool, source: str,
+                      saltinis: str = "paskirtis_default",
+                      emitted: set | None = None) -> None:
+    """Emit the LT-conventional line(s) for ONE mixer family.
+
+    Concealed → the potinkinė + virštinkinė PAIR, both carrying the SAME
+    `kiekis` (the pair count is derived from one source and passed in once, so
+    the two halves can never drift apart). Surface-mounted → the single legacy
+    label, unchanged, so already-priced projects keep matching it.
+
+    `kiekis=None` emits the honesty-checklist form (KŽ rule: user fills in).
+    `emitted` (optional out-param) collects the families actually written, so
+    the caller discloses assumptions only for lines that exist.
+    """
+    if emitted is not None:
+        emitted.add(family)
+    potinkine, virstinkine, single = _SAN_MIXER_LINES[family]
+    lt = _SAN_FAMILY_LT[family]
+    checklist = kiekis is None
+    base = {"skyrius": skyrius, "vnt": "vnt", "kiekis": kiekis,
+            "saltinis": "checklist" if checklist else saltinis}
+    if checklist:
+        base["confidence"] = "low"
+    todo = " — suveskite kiekį" if checklist else ""
+    if not concealed:
+        pozicijos.append({**base, "aprasymas": single + todo, "_assumption": (
+            f"Virštinkinis {lt} — vienas darbas, viena eilutė "
+            f"({'nurodyta prielaidose' if source == 'override' else 'pagal brėžinį'})."
+        )})
+        return
+    note = (f"Potinkinis {lt} — LT konvencija: potinkinė dalis "
+            f"montuojama prieš plyteles, virštinkinė po jų, tad tai DU atskiri "
+            f"darbai. Kiekis abiem eilutėms tas pats.")
+    if source == "assumption":
+        note += (" PRIELAIDA: brėžinyje nenurodyta, ar maišytuvas potinkinis — "
+                 "priimta LT standartinė praktika. Jei virštinkinis, pakeisk "
+                 "prielaidose (santechnika_potinkinis).")
+    for label in (potinkine, virstinkine):
+        pozicijos.append({**base, "aprasymas": label + todo, "_assumption": note})
+
+
+def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
+    """Surface the concealment assumptions to the user.
+
+    Idempotent: this builder re-runs on every recompute, so prior entries
+    tagged `_SAN_ASSUMPTION_FIELD` are dropped before the new ones go in.
+
+    Three sinks because the two live paths build the lt_sanity mirror at
+    different points: /extract-interior builds it AFTER this builder (so
+    `warnings` reaches it), /recompute-interior builds it BEFORE (so the
+    already-materialised `lt_sanity.warnings` has to be appended to directly —
+    same post-hoc pattern as main.py's large-PDF warning).
+    """
+    parsed["_sanitary_assumptions"] = list(notes)
+    # Purge FIRST (even with nothing to add) — an override that turns the split
+    # off must also retract the note that justified it.
+    ws = [w for w in (parsed.get("warnings") or [])
+          if w.get("field") != _SAN_ASSUMPTION_FIELD]
+    for n in notes:
+        ws.append({"level": "INFO", "field": _SAN_ASSUMPTION_FIELD,
+                   "patalpa_nr": None, "message": n})
+    if ws or parsed.get("warnings") is not None:
+        parsed["warnings"] = ws
+    ls = parsed.get("lt_sanity")
+    if isinstance(ls, dict):
+        cur = [w for w in (ls.get("warnings") or [])
+               if w.get("field") != _SAN_ASSUMPTION_FIELD]
+        for n in notes:
+            cur.append({"level": "INFO", "field": _SAN_ASSUMPTION_FIELD,
+                        "room": "", "message": n})
+        ls["warnings"] = cur
+        summ = ls.setdefault("summary", {})
+        summ["info"] = sum(1 for w in cur if w.get("level") == "INFO")
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -2170,9 +2362,25 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # use the detected praustuvė symbol count when higher (Beržų: 3 vs 2).
     n_praustuves = max(n_wet_with_klozetas,
                        int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
+    # Bathtub mixer is a SEPARATE fixture from the shower mixer (contractor
+    # berzas 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
+    # maišytuvas"). Driven by the vonios symbol count — a fixture we already
+    # read but never emitted a position for. 0 symbols → no line, no invention.
+    n_vonios_sym = int((parsed.get("detected_symbols_summary") or {}).get("vonios") or 0)
+    # Bidė dušiukai: NO reader produces this count today (sanitary_fixture_reader
+    # enumerates the type but `_FIXTURE_KEYS` has no bide key, and the symbol
+    # summary has none either). Contractor truth: 3 vnt on berzas AND on
+    # objektas_b — a whole category we bill at zero. Honoured when a count
+    # appears; otherwise emitted as a kiekis=null checklist TODO so the miss is
+    # visible instead of silent. Never defaulted to 1-per-klozetas: berzas has
+    # 3 bidė against 2 klozetai, so that ratio would be wrong by construction.
+    n_bide = int((parsed.get("detected_symbols_summary") or {}).get("bide") or 0)
+
+    san_concealed, san_source = _resolve_san_concealment(parsed)
+    san_emitted: set[str] = set()
 
     if n_wet_with_klozetas > 0 or n_virtuve > 0 or n_skalbykla > 0:
-        # WC rėmas + Klozetas
+        # WC rėmas + Klozetas + praustuvė — single-visit jobs, one line each.
         if n_wet_with_klozetas > 0:
             pozicijos.extend([
                 {"skyrius": SK_SAN, "aprasymas": "WC rėmo montavimas",
@@ -2181,21 +2389,35 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                  "medziagos_kiekis": n_wet_with_klozetas, "medziagos_vnt": "vnt"},
                 {"skyrius": SK_SAN, "aprasymas": "Klozeto montavimas",
                  "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
-                {"skyrius": SK_SAN, "aprasymas": "Praustuvės maišytuvo montavimas",
-                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
-                {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
-                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"},
             ])
+            # Praustuvės MAIŠYTUVAS — potinkinis → pora; praustuvė pati (the
+            # basin) stays one line. Both consume the same n_praustuves.
+            _emit_mixer_lines(pozicijos, SK_SAN, "praustuve", n_praustuves,
+                              san_concealed["praustuve"], san_source["praustuve"],
+                              emitted=san_emitted)
+            pozicijos.append(
+                {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"})
+            # Bidė dušiukai — pair when counted, checklist TODO when not.
+            _emit_mixer_lines(pozicijos, SK_SAN, "bide", n_bide or None,
+                              san_concealed["bide"], san_source["bide"],
+                              saltinis="simboliai_brezinyje", emitted=san_emitted)
         # Pilna vonia — dušas + gyvatukas + linijinis latakas
         if n_full_bathroom > 0:
+            _emit_mixer_lines(pozicijos, SK_SAN, "dusas", n_full_bathroom,
+                              san_concealed["dusas"], san_source["dusas"],
+                              emitted=san_emitted)
             pozicijos.extend([
-                {"skyrius": SK_SAN, "aprasymas": "Dušo maišytuvo sistemos montavimas",
-                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Gyvatuko montavimas, teno pajungimas",
                  "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
                 {"skyrius": SK_SAN, "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
                  "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
             ])
+        # Vonios (bathtub) maišytuvas — only when a bathtub was actually read.
+        if n_vonios_sym > 0:
+            _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym,
+                              san_concealed["vonia"], san_source["vonia"],
+                              saltinis="simboliai_brezinyje", emitted=san_emitted)
         # Virtuvė — plautuvė + maišytuvas
         if n_virtuve > 0:
             pozicijos.extend([
@@ -2222,6 +2444,20 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_SAN, "aprasymas": "Santechnikos taškų koregavimas",
             "vnt": "kompl", "kiekis": 1, "saltinis": "baseline"})
+
+    # Disclose the concealment calls we had to GUESS — one note per family that
+    # was actually emitted on the LT default rather than on evidence/an override.
+    _record_san_assumptions(parsed, [
+        (f"Santechnika: {_SAN_FAMILY_LT[f]} priimtas POTINKINIU "
+         f"(LT standartinė praktika) — brėžinyje tai nenurodyta. Todėl darbas "
+         f"padalintas į potinkinės ir virštinkinės dalies eilutes. Jei "
+         f"virštinkinis, pakeisk prielaidą „santechnika_potinkinis“."
+         if san_concealed[f] else
+         f"Santechnika: {_SAN_FAMILY_LT[f]} priimtas VIRŠTINKINIU "
+         f"— viena montavimo eilutė.")
+        for f in _SAN_MIXER_LINES
+        if f in san_emitted and san_source[f] == "assumption"
+    ])
 
     # ════════════════════════════════════════════════════════════════════════
     # ELEKTROS INSTALIACIJOS DARBAI (placeholders — count po Vision symbol counter)
@@ -2905,27 +3141,40 @@ def extract_interior(
             "_error": "PDF has no renderable pages",
         }
 
-    # Step 1.1 (Sprint E1, 2026-04-28): cost-safe filter — drop vendor quote
-    # pages from Pass-1 input. Detected via pdfplumber text heuristics (zero
-    # API cost, zero accuracy risk — these pages have no room/dimension data,
-    # only supplier price catalogs that the designer stapled into the bundle).
-    # page_index field on each page preserves the ORIGINAL 1-based number so
-    # `room.puslapio_nr` references stay correct downstream.
+    # Step 1.1: cost-safe page selection — drop pages Pass-1 cannot read
+    # anything from. Two deterministic ($0, no model call) rules: vendor
+    # price catalogs (Sprint E1, 2026-04-28) and text-free photographic
+    # pages such as 3D vizualizacijos and photo covers (2026-07-29). Every
+    # voting round re-sends the page set, so each drop is saved N times.
+    #
+    # Fails OPEN by construction — see page_filter for the rules and the
+    # measured margins. page_index on each page preserves the ORIGINAL
+    # 1-based number so `room.puslapio_nr` references stay correct.
+    page_selection_meta: dict | None = None
+    page_texts: list[str] | None = None
     try:
-        from .page_filter import detect_vendor_quote_pages
-        vendor_pages = detect_vendor_quote_pages(pdf_bytes)
-        if vendor_pages:
-            original_count = len(pages)
-            pages = [p for p in pages if p["page_index"] not in vendor_pages]
-            print(f"[extractor] vendor filter: skipped {original_count - len(pages)} "
-                  f"pages (indices: {sorted(vendor_pages)}); {len(pages)} → Vision")
+        from .page_filter import select_pass1_pages
+        selection = select_pass1_pages(pdf_bytes, pages)
+        page_selection_meta = selection.meta()
+        page_texts = [s["text"] for s in selection.page_signals] or None
+        skipped = set(selection.skipped)
+        if skipped:
+            pages = [p for p in pages if p["page_index"] not in skipped]
+            print(f"[extractor] page selection: {page_selection_meta['pages_considered']} "
+                  f"considered → {len(pages)} sent; skipped "
+                  f"{page_selection_meta['skipped_by_reason']}")
     except Exception as exc:
-        # Non-fatal: if filter fails, fall through with all pages
-        print(f"[extractor] vendor page filter failed: {exc}")
-        vendor_pages = set()
+        # Non-fatal: if selection fails, fall through with ALL pages.
+        print(f"[extractor] page selection failed (sending all pages): {exc}")
+        skipped = set()
 
+    vendor_pages = {
+        d["page"] for d in (page_selection_meta or {}).get("pages_skipped", [])
+        if d.get("reason") == "vendor_quote"
+    }
     _emit({"event": "started", "page_count": len(pages),
-           "vendor_pages_skipped": sorted(vendor_pages) if vendor_pages else []})
+           "vendor_pages_skipped": sorted(vendor_pages) if vendor_pages else [],
+           "page_selection": page_selection_meta})
 
     # Step 1.5: Pre-pass — read eksplikacija + schedule tables for ground-truth anchoring.
     _emit({"event": "eksplikacija_started"})
@@ -2960,7 +3209,7 @@ def extract_interior(
           f"{'native_pdf' if _native_on else 'raster_images'} — {_native_why}")
     _native_pdf = None
     if _native_on:
-        _native_pdf = _prepare_native_pdf(pdf_bytes, pages)
+        _native_pdf = _prepare_native_pdf(pdf_bytes, pages, page_texts)
         _emit({"event": "native_pdf_prepared",
                "input": "document" if _native_pdf.get("b64") else "image_fallback",
                "fallback_reason": _native_pdf.get("fallback_reason"),
@@ -2981,6 +3230,12 @@ def extract_interior(
         err = (parsed or {}).get("_error", "Unknown error")
         _emit({"event": "error", "message": str(err)})
         return parsed or {"status": "error", "_error": "Unknown error"}
+
+    # `_meta.pages_sent` alone can't be audited — it says how many pages the
+    # model saw but not how many existed or what we withheld. Record the full
+    # decision next to it so a wrong sąmata can be traced to a dropped page.
+    if page_selection_meta:
+        parsed.setdefault("_meta", {})["page_selection"] = page_selection_meta
 
     # Roll the eksplikacija PRE-pass Vision-fallback tokens into extra_calls now
     # that `parsed` (and its Pass-1 _meta) exists. No-op on the pdfplumber path
