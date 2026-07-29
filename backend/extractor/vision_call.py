@@ -4322,6 +4322,79 @@ def extract_interior(
         print(f"[extractor] niche inference failed (non-fatal): {exc}")
         _emit({"event": "niche_inference_error", "message": str(exc)})
 
+    # ─── LAST DATA PRODUCERS — everything below Step 2.9 is math + validators ──
+    # ORDERING INVARIANT (2026-07-29): any step that WRITES a calculator input
+    # (tile areas, tile specs, room primitives) must run ABOVE Step 2.9. The run
+    # has exactly ONE per-room recompute; a producer placed after it silently
+    # misses that recompute, so its value first surfaces when something else
+    # triggers a recompute later (POST /recompute-interior, /api/recompute-
+    # quantities, eval_harness --rescore --recompute) — i.e. the same project
+    # shows different paint areas before and after the user touches an
+    # assumption. Steps 4.05–4.066 below are pure validators (they only append
+    # warnings, never mutate values), which is why they may stay after the math.
+
+    # Step 2.89: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
+    # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
+    # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].
+    # Per `parsed.puslapiai[].tipas` classification — limit scan to relevant
+    # pages so we don't false-match door dims on plan pages.
+    # Consumed by _build_pozicijos_from_rooms (Step 2.95) → must precede it.
+    try:
+        from .plyteliu_specifikacija import (
+            extract_plyteliu_specifikacija, RELEVANT_PAGE_TYPES,
+        )
+        relevant = [
+            p["nr"] for p in (parsed.get("puslapiai") or [])
+            if p.get("tipas") in RELEVANT_PAGE_TYPES
+        ]
+        plyt = extract_plyteliu_specifikacija(pdf_bytes, relevant_pages=relevant or None)
+        parsed["_plyteliu_specs"] = plyt.get("tile_specs", [])
+        if plyt.get("tile_specs"):
+            print(f"[extractor] plyteliu_specifikacija found {len(plyt['tile_specs'])} "
+                  f"size-specific tile mentions on {len(relevant)} relevant pages, "
+                  f"{plyt['_meta'].get('elapsed_s', 0)}s, $0 cost")
+    except Exception as exc:
+        print(f"[extractor] plyteliu_specifikacija failed (non-fatal): {exc}")
+
+    # Step 2.895: Wall elevation specialized Vision extractor. Opt-in via
+    # WALL_ELEVATION_EXTRACT=1 env var because each page costs ~$0.10-0.20.
+    # Output attached as parsed['_wall_elevations']; pozicijos generator and
+    # frontend can use exact tile_zones/paint_zones/niches mm boundaries
+    # instead of paskirtis-based approximations.
+    #
+    # `_apply_wall_elevation_tile_override` writes `_tile_area_from_elevation_m2`,
+    # which is the input that drives the ELEVATION branch of calc_room_quantities
+    # (walls_paintable = walls_gross − openings − tile, plus full-tile detection
+    # zeroing wall paint). It is therefore a data producer, not a post-pass, and
+    # must run before Step 2.9 — see the ordering invariant above.
+    if os.environ.get("WALL_ELEVATION_EXTRACT") == "1":
+        try:
+            from .wall_elevation import extract_wall_elevations
+            we_pages = [
+                p["nr"] for p in (parsed.get("puslapiai") or [])
+                if p.get("tipas") == "wall_elevation"
+            ]
+            if we_pages:
+                _emit({"event": "wall_elevation_started", "pages": len(we_pages)})
+                we_result = extract_wall_elevations(pdf_bytes, client, we_pages)
+                parsed["_wall_elevations"] = we_result.get("wall_elevations", [])
+                parsed.setdefault("_meta", {})["wall_elevation_meta"] = we_result.get("_meta", {})
+                _emit({
+                    "event": "wall_elevation_completed",
+                    "elevations": len(we_result.get("wall_elevations", [])),
+                    "pages_processed": we_result.get("_meta", {}).get("pages_processed", 0),
+                })
+                print(f"[extractor] wall_elevation: {len(we_result.get('wall_elevations', []))} "
+                      f"elevations from {we_result.get('_meta', {}).get('pages_processed', 0)} pages, "
+                      f"{we_result.get('_meta', {}).get('elapsed_s', 0)}s")
+
+                # Sprint §35 (2026-04-29): override paskirtis-based plyteles_sienos_m2
+                # with mm-precision sum from wall_elevations data. Per CLAUDE.md §1.7,
+                # tile zone area = (to_floor_mm − from_floor_mm) × wall_total_width_mm.
+                _apply_wall_elevation_tile_override(parsed)
+        except Exception as exc:
+            print(f"[extractor] wall_elevation failed (non-fatal): {exc}")
+
     _emit({"event": "post_processing"})
 
     # Step 2.9: PYTHON DETERMINISTIC MATH (2026-04-28 deterministic refactor).
@@ -4515,61 +4588,6 @@ def extract_interior(
                   f"{perim_report['n_total']} rooms within bounds")
     except Exception as exc:
         print(f"[extractor] perimeter_validator failed (non-fatal): {exc}")
-
-    # Step 4.07: P4 — Plytelių specifikacijos pdfplumber reader. Deterministic,
-    # $0 cost. Reads tile size mentions (e.g., 1200×1200×6) on
-    # finish_schedule / wall_elevation pages and attaches as parsed['_plyteliu_specs'].
-    # Per `parsed.puslapiai[].tipas` classification — limit scan to relevant
-    # pages so we don't false-match door dims on plan pages.
-    try:
-        from .plyteliu_specifikacija import (
-            extract_plyteliu_specifikacija, RELEVANT_PAGE_TYPES,
-        )
-        relevant = [
-            p["nr"] for p in (parsed.get("puslapiai") or [])
-            if p.get("tipas") in RELEVANT_PAGE_TYPES
-        ]
-        plyt = extract_plyteliu_specifikacija(pdf_bytes, relevant_pages=relevant or None)
-        parsed["_plyteliu_specs"] = plyt.get("tile_specs", [])
-        if plyt.get("tile_specs"):
-            print(f"[extractor] plyteliu_specifikacija found {len(plyt['tile_specs'])} "
-                  f"size-specific tile mentions on {len(relevant)} relevant pages, "
-                  f"{plyt['_meta'].get('elapsed_s', 0)}s, $0 cost")
-    except Exception as exc:
-        print(f"[extractor] plyteliu_specifikacija failed (non-fatal): {exc}")
-
-    # Step 4.08: Wall elevation specialized Vision extractor. Opt-in via
-    # WALL_ELEVATION_EXTRACT=1 env var because each page costs ~$0.10-0.20.
-    # Output attached as parsed['_wall_elevations']; pozicijos generator and
-    # frontend can use exact tile_zones/paint_zones/niches mm boundaries
-    # instead of paskirtis-based approximations.
-    if os.environ.get("WALL_ELEVATION_EXTRACT") == "1":
-        try:
-            from .wall_elevation import extract_wall_elevations
-            we_pages = [
-                p["nr"] for p in (parsed.get("puslapiai") or [])
-                if p.get("tipas") == "wall_elevation"
-            ]
-            if we_pages:
-                _emit({"event": "wall_elevation_started", "pages": len(we_pages)})
-                we_result = extract_wall_elevations(pdf_bytes, client, we_pages)
-                parsed["_wall_elevations"] = we_result.get("wall_elevations", [])
-                parsed.setdefault("_meta", {})["wall_elevation_meta"] = we_result.get("_meta", {})
-                _emit({
-                    "event": "wall_elevation_completed",
-                    "elevations": len(we_result.get("wall_elevations", [])),
-                    "pages_processed": we_result.get("_meta", {}).get("pages_processed", 0),
-                })
-                print(f"[extractor] wall_elevation: {len(we_result.get('wall_elevations', []))} "
-                      f"elevations from {we_result.get('_meta', {}).get('pages_processed', 0)} pages, "
-                      f"{we_result.get('_meta', {}).get('elapsed_s', 0)}s")
-
-                # Sprint §35 (2026-04-29): override paskirtis-based plyteles_sienos_m2
-                # with mm-precision sum from wall_elevations data. Per CLAUDE.md §1.7,
-                # tile zone area = (to_floor_mm − from_floor_mm) × wall_total_width_mm.
-                _apply_wall_elevation_tile_override(parsed)
-        except Exception as exc:
-            print(f"[extractor] wall_elevation failed (non-fatal): {exc}")
 
     # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
     # SanityWarningsBanner.jsx expects this V8 shape; new extractor uses flat
