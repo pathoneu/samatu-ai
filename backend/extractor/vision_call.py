@@ -3029,14 +3029,48 @@ def extract_interior(
     # Eksplikacija plotas/perimetras override Vision dimension-chain values when available.
     rooms = parsed.get("patalpos") or []
     try:
-        eks_by_name = {
-            (r.get("pavadinimas") or "").strip().lower(): r
-            for r in eks.get("patalpos", [])
-        }
+        # MATCH BY NUMBER FIRST (2026-07-29). The old lookup keyed a dict on the
+        # lowercased NAME, which broke two ways on real projects:
+        #   1. Duplicate names COLLAPSE. Beržų g. 24 has 108 and 109 both named
+        #      "Berniuko kambarys" — the dict kept one row and BOTH bedrooms
+        #      inherited that area, so one of them was silently wrong whenever
+        #      the twins differ.
+        #   2. One character of drift in how the table is read ("san. mazgas"
+        #      vs "san.mazgas") missed the row entirely and the room fell back
+        #      to the Vision dimension chain — a DIFFERENT number between two
+        #      runs of the same PDF.
+        # `nr` is printed in the eksplikacija and on the plan, and both readers
+        # emit it; it is the stable join key. Name matching remains as a
+        # fallback, now whitespace/punctuation-insensitive, and a name is only
+        # used when it identifies EXACTLY ONE unclaimed row.
+        eks_rows = list(eks.get("patalpos", []))
+
+        import unicodedata as _ud
+
+        def _nkey(s):
+            s = _ud.normalize("NFKD", (s or "").strip().lower())
+            s = "".join(c for c in s if not _ud.combining(c))
+            return _re.sub(r"[^a-z0-9]+", "", s)
+
+        eks_by_nr, eks_by_name = {}, {}
+        for r in eks_rows:
+            nr = str(r.get("nr") or "").strip()
+            if nr and nr not in eks_by_nr:
+                eks_by_nr[nr] = r
+            eks_by_name.setdefault(_nkey(r.get("pavadinimas")), []).append(r)
+
+        claimed = set()
         merged_count = 0
         for room in rooms:
-            name = (room.get("pavadinimas") or "").strip().lower()
-            eks_row = eks_by_name.get(name)
+            nr = str(room.get("nr") or "").strip()
+            eks_row = eks_by_nr.get(nr)
+            if eks_row is None:
+                cands = [r for r in eks_by_name.get(_nkey(room.get("pavadinimas")), [])
+                         if id(r) not in claimed]
+                eks_row = cands[0] if len(cands) == 1 else None
+            if eks_row is not None:
+                claimed.add(id(eks_row))
+                room["plotas_match"] = "nr" if eks_by_nr.get(nr) is eks_row else "pavadinimas"
             if eks_row:
                 if eks_row.get("plotas_m2"):
                     room["plotas_m2"] = eks_row["plotas_m2"]
