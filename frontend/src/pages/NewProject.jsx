@@ -171,13 +171,27 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
  *
  * The extraction outlives its SSE connection (backend drains it detached and
  * saves under the announced id), so a dropped socket is a WAIT, not a failure.
- * Polls every 10 s for up to 15 min — comfortably past the longest observed
- * extraction (~21 min total, of which the drop happens near the end) — and
- * gives up quietly, leaving the on-screen message that the analysis continues.
+ * Polls every 10 s and gives up quietly, leaving the on-screen message that the
+ * analysis continues.
+ *
+ * WINDOW SIZING (2026-07-29, measured on the first successful recovery). The
+ * old 15 min was justified by "comfortably past the longest observed extraction
+ * (~21 min)". That estimate was wrong: the real run took 26 min 53 s
+ * (16:55:00 → 17:21:53), of which 12 min 40 s fell AFTER the 840 s handoff — so
+ * it consumed 84% of the window and landed with 2 min 7 s to spare. Three
+ * slower minutes and the user would have watched the poller give up on a
+ * project that was about to exist.
+ *
+ * 40 min is sized off what the wait actually costs: an authenticated GET
+ * against an indexed lookup every 10 s, which stops the instant the project
+ * appears, the user navigates away, or isCancelled fires. Waiting too long is
+ * nearly free; giving up too early looks like data loss. Do not tighten this
+ * back toward the extraction time — it must clear the SLOWEST run, not the
+ * typical one.
  */
 async function waitForRecoveredProject(projectId, { onTick, isCancelled } = {}) {
   const started = Date.now();
-  const LIMIT_MS = 15 * 60 * 1000;
+  const LIMIT_MS = 40 * 60 * 1000;
   while (Date.now() - started < LIMIT_MS) {
     if (isCancelled?.()) return null;
     try {
