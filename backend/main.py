@@ -7541,6 +7541,15 @@ def health():
     except Exception as exc:  # noqa: BLE001
         log.warning("health check DB probe failed: %r", exc)
     body = {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "error"}
+    # WHICH COMMIT IS ACTUALLY LIVE (2026-07-29). Twice in one day a fix was
+    # pushed and then verified by guesswork, because nothing served by the API
+    # named its own build — and once that guess was wrong. Railway injects
+    # RAILWAY_GIT_COMMIT_SHA into the container; short it so
+    # `curl api.pathon.eu/health` answers the question directly. A local run
+    # has no such env, hence "dev".
+    sha = (os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+           or os.environ.get("GIT_COMMIT_SHA") or "")
+    body["commit"] = sha[:7] if sha else "dev"
     if not db_ok:
         return JSONResponse(status_code=503, content=body)
     return body
