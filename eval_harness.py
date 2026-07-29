@@ -68,6 +68,15 @@ def _merge_registry_yaml() -> None:
         }
         if entry.get("project_pdf"):
             merged["pdf_path"] = entry["project_pdf"]
+        # Carry the exclusion flags through. run_totals_only_multi reads them
+        # straight off the YAML, but the single-project paths (--rescore in
+        # particular) only see REGISTRY — which is how romainiai's
+        # registry-excluded score got hand-averaged into a "corpus MAE".
+        for flag in ("scope_mismatch", "scope_mismatch_reason",
+                     "blocked_for_vision_extraction", "blocked_partial_input",
+                     "blocked_reason"):
+            if entry.get(flag):
+                merged[flag] = entry[flag]
         REGISTRY[slug] = merged
 
 
@@ -111,6 +120,27 @@ def _pozicijos_sum(parsed: dict, substr: str) -> float | None:
             total += float(item.get("kiekis") or 0)
             found = True
     return round(total, 2) if found else None
+
+
+def _santrauka_else_pozicijos(parsed: dict, key: str,
+                              substr: str) -> float | None:
+    """Read a santrauka total, falling back to the matching pozicijos line
+    when that santrauka key is empty.
+
+    2026-07-29 (romainiai): ``pasleptu_duru_staktu_m_total`` is a DEAD
+    santrauka key — universal_rules only ever accumulates it from a per-room
+    ``pasleptu_duru_staktu_m`` field that nothing writes (prompt.py forbids
+    Vision from emitting it: it is a computed quantity). It reads 0.0 on all
+    five benchmark projects. The quantity itself is real and IS produced —
+    vision_call builds it project-wide from the ``pasleptos_duris`` elements
+    and emits it as the pozicija "Durų angų paruošimas beapvadinėms durims".
+    Scoring the santrauka key therefore guaranteed a −100% "collapse" on
+    every project that has this truth line, measuring nothing but the dead
+    key. Same class as the 2026-07-04 rotband mapping fix above."""
+    from_santrauka = _santrauka_get(parsed, key)
+    if from_santrauka:
+        return from_santrauka
+    return _pozicijos_sum(parsed, substr)
 
 
 METRICS: dict[str, dict[str, Any]] = {
@@ -225,7 +255,8 @@ METRICS: dict[str, dict[str, Any]] = {
     },
     "pasleptu_duru_staktos_m": {
         "label": "Paslėptų durų staktos",
-        "accessor": lambda p: _santrauka_get(p, "pasleptu_duru_staktu_m_total"),
+        "accessor": lambda p: _santrauka_else_pozicijos(
+            p, "pasleptu_duru_staktu_m_total", "beapvadinėms"),
         "unit": "m",
         "tier": "category",
     },
@@ -606,6 +637,19 @@ def print_report(project_id: str, mode: str, results: list[MetricResult],
             )
 
     summary = _summarize(results)
+    excluded = summary.get("excluded_incomplete_truth") or []
+    if excluded:
+        print()
+        print("  ⬛ EXCLUDED from MAE — truth documented as incomplete/partial")
+        print("  " + "─" * 92)
+        for e in excluded:
+            print(f"  {e['label'][:38]:<40} {_fmt_num(e['truth']):>10} "
+                  f"{_fmt_num(e['actual']):>10}   {'':>10}   "
+                  f"{_fmt_pct(e['pct_error']):>8}   {e['truth_confidence'][:11]:<11} "
+                  f"[{e['tier']}]")
+        print("    (these measure the truth's own documentation gap, not the "
+              "extractor — see _summarize)")
+
     print()
     print("  ── Summary ────────────────────────────────────────────────────────────────")
     print(f"    Headline MAE %:        {summary['headline_mae_pct']:6.3f}%")
@@ -615,15 +659,42 @@ def print_report(project_id: str, mode: str, results: list[MetricResult],
     print("═" * 96)
 
 
+def _incomplete_truth_rows(results: list[MetricResult]) -> list[MetricResult]:
+    """Rows whose TRUTH is documented as incomplete/partial but which still
+    produced a pct_error. Excluded from every MAE (see _summarize) and
+    reported separately so the exclusion is never silent."""
+    return [r for r in results
+            if r.status == "no_truth" and r.pct_error is not None]
+
+
 def _summarize(results: list[MetricResult]) -> dict:
+    """Aggregate the scored metrics.
+
+    2026-07-29 (romainiai): this used to select on ``pct_error is not None``
+    alone, which silently re-admitted the rows ``_classify`` had already
+    demoted to ``no_truth`` because their TRUTH carries
+    ``confidence: incomplete|partial``. That contradicted _classify's own
+    stated intent ("so they don't dominate the headline MAE") and — worse —
+    ``print_report`` skips no_truth rows, so the biggest contributor to the
+    number was invisible in the table above it.
+
+    Concretely: romainiai read 112.947% headline MAE, of which 79% came from
+    ``dazymo_walls_plus_ceilings_combined_m2`` (+178.18% against a truth its
+    own truth.json annotates "AI will over-extract vs this number — flagged
+    scope_mismatch in registry"). Nobody could reproduce the number from the
+    printed report because that row was never printed. Selection now keys on
+    status, and the excluded rows are printed as a footnote instead of
+    vanishing."""
+    scored = [r for r in results if r.pct_error is not None
+              and r.status != "no_truth"]
+
     def _pct_values(tier: str) -> list[float]:
-        return [abs(r.pct_error) for r in results
-                if r.tier == tier and r.pct_error is not None]
+        return [abs(r.pct_error) for r in scored if r.tier == tier]
 
     head_pcts = _pct_values("headline")
     cat_pcts = _pct_values("category")
     head_ok = sum(1 for r in results if r.tier == "headline" and r.status == "ok")
-    head_total = sum(1 for r in results if r.tier == "headline" and r.pct_error is not None)
+    head_total = sum(1 for r in scored if r.tier == "headline")
 
     return {
         "headline_mae_pct": (sum(head_pcts) / len(head_pcts)) if head_pcts else 0.0,
@@ -631,6 +702,12 @@ def _summarize(results: list[MetricResult]) -> dict:
         "headline_ok": head_ok,
         "headline_total": head_total,
         "category_mae_pct": (sum(cat_pcts) / len(cat_pcts)) if cat_pcts else 0.0,
+        "excluded_incomplete_truth": [
+            {"truth_key": r.truth_key, "label": r.label, "tier": r.tier,
+             "truth": r.truth_value, "actual": r.actual_value,
+             "pct_error": r.pct_error, "truth_confidence": r.truth_confidence}
+            for r in _incomplete_truth_rows(results)
+        ],
     }
 
 
@@ -1247,6 +1324,12 @@ def _partition_headline_metrics(results, ai_mode):
     for r in results:
         if r.tier != "headline" or r.pct_error is None:
             continue
+        # Same rule as _summarize: a truth marked incomplete/partial cannot
+        # measure the extractor, so it never enters an MAE. (No project in
+        # the current registry has an incomplete HEADLINE truth, so this is
+        # a guard against the next one, not a number change today.)
+        if r.status == "no_truth":
+            continue
         is_zero_vs_truth = (r.actual_value == 0.0
                             and r.truth_value and r.truth_value > 0.5)
         if is_zero_vs_truth and ai_mode == "replay":
@@ -1466,6 +1549,21 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
                     print(f"  · height-marker lane inactive: {lane.get('reason')}")
             except Exception as exc:
                 print(f"  ⚠ height-marker lane failed during rescore: {exc}")
+            # Same contract for the symbol-legend scan (2026-07-29): it reads
+            # the text layer only, runs in production right after the marker
+            # lane, and gates un-anchored symbol counts in the pozicijos
+            # rebuild below. Mirrored here so the free rescore measures the
+            # same pipeline production runs.
+            try:
+                from extractor.symbol_legend import scan_symbol_legend
+                parsed["_symbol_legend"] = scan_symbol_legend(
+                    pdf_path.read_bytes())
+                leg = parsed["_symbol_legend"]
+                print(f"  ⤴ symbol legend: text_layer_ok="
+                      f"{leg.get('text_layer_ok')} difuzoriai_defined="
+                      f"{(leg.get('difuzoriai') or {}).get('defined')}")
+            except Exception as exc:
+                print(f"  ⚠ symbol-legend scan failed during rescore: {exc}")
         else:
             print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
 
@@ -1495,6 +1593,41 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     return parsed
 
 
+def _print_registry_exclusion_banner(slug: str | None) -> None:
+    """Warn loudly when a single-project run scores a project the registry
+    excludes from the corpus MAE.
+
+    2026-07-29: run_totals_only_multi has always skipped scope_mismatch /
+    blocked projects, but --rescore never consulted the registry — so
+    romainiai's per-project headline MAE looked like a corpus member and got
+    hand-averaged in with the other four. Its own registry entry says not to."""
+    entry = REGISTRY.get(slug or "") or {}
+    reasons: list[tuple[str, str]] = []
+    if entry.get("scope_mismatch"):
+        reasons.append(("scope_mismatch",
+                        entry.get("scope_mismatch_reason")
+                        or "scope mismatch documented in registry"))
+    if entry.get("blocked_for_vision_extraction"):
+        reasons.append(("blocked_for_vision_extraction",
+                        entry.get("blocked_reason") or "missing input PDF"))
+    if entry.get("blocked_partial_input"):
+        reasons.append(("blocked_partial_input",
+                        entry.get("blocked_reason")
+                        or "input PDF lacks required pages"))
+    if not reasons:
+        return
+    print()
+    print("  " + "!" * 92)
+    print(f"  !! {slug} is EXCLUDED from the corpus MAE by ground_truth/registry.yaml.")
+    print("  !! The score below is diagnostic only — do NOT average it with the "
+          "other projects.")
+    for flag, reason in reasons:
+        print(f"  !!   {flag}:")
+        for line in str(reason).strip().splitlines():
+            print(f"  !!     {line.strip()}")
+    print("  " + "!" * 92)
+
+
 def run_rescore(path_arg: str, project_id: str | None, *,
                 recompute: bool = False) -> int:
     """Offline re-score of a SAVED run against the current truth mappings.
@@ -1519,6 +1652,8 @@ def run_rescore(path_arg: str, project_id: str | None, *,
         raise SystemExit(
             f"--rescore: cannot infer project slug from {run_dir.name!r}; "
             f"pass --project explicitly")
+
+    _print_registry_exclusion_banner(slug)
 
     truth = _load_truth(slug)
     parsed = json.loads(parsed_path.read_text(encoding="utf-8"))

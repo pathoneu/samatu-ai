@@ -593,6 +593,96 @@ def normalize_skyrius(skyrius: str | None) -> str:
     return SKYRIUS_LEGACY_MIGRATION.get(s, s)
 
 
+def _match_elevations_to_rooms(parsed: dict) -> dict[int, list[dict]]:
+    """Map ``id(room) → its wall_elevation entries``, using the SAME matching
+    rules as `_apply_wall_elevation_tile_override` (nr first, unambiguous
+    room_name second). Extracted so the tile-area override and the
+    evidence-of-absence annotation can never drift apart.
+
+    Rooms with no matched elevation are absent from the result.
+    """
+    elevations = parsed.get("_wall_elevations") or []
+    rooms = parsed.get("patalpos") or []
+    if not elevations or not rooms:
+        return {}
+
+    by_nr: dict[str, list[dict]] = {}
+    by_name: dict[str, list[dict]] = {}
+    for e in elevations:
+        nr_key = str(e.get("nr") or e.get("room_nr") or "").strip()
+        name_key = (e.get("room_name") or "").strip().lower()
+        if nr_key:
+            by_nr.setdefault(nr_key, []).append(e)
+        if name_key:
+            by_name.setdefault(name_key, []).append(e)
+
+    from collections import Counter
+    name_counts = Counter(
+        (r.get("pavadinimas") or "").strip().lower() for r in rooms)
+    ambiguous_names = {n for n, c in name_counts.items() if c > 1}
+
+    out: dict[int, list[dict]] = {}
+    for r in rooms:
+        nr_key = str(r.get("nr") or "").strip()
+        name = (r.get("pavadinimas") or "").strip().lower()
+        walls = by_nr.get(nr_key) if nr_key else None
+        if not walls and name and name not in ambiguous_names:
+            walls = by_name.get(name)
+        if walls:
+            out[id(r)] = walls
+    return out
+
+
+def annotate_tile_elevation_evidence(parsed: dict) -> int:
+    """Attach `_tile_elevation_evidence` to every room an išklotinė covers.
+
+    WHY (2026-07-29): `resolve_wall_tile_read` could tell "the elevation
+    measured 46 m² of tile" from "no elevation ran", but NOT from "the
+    elevation measured this room's walls and found no tile at all". The third
+    case looks identical to the second (`_tile_area_from_elevation_m2 == 0`),
+    so a room the išklotinė proves is untiled fell through to the apdailos
+    colour-trace — which on Beržų g. 24 mistook the neighbouring bathroom's
+    blue line for Skalbykla's and billed 20.58 m² of wall tile there.
+
+    Pure annotation: reads `_wall_elevations` (saved in every extract), writes
+    only the evidence dict, never a quantity. Runs on EVERY recompute, so the
+    signal survives cached extracts and user edits alike.
+
+    Returns the number of rooms annotated.
+    """
+    matched = _match_elevations_to_rooms(parsed)
+    if not matched:
+        return 0
+    n = 0
+    for r in parsed.get("patalpos") or []:
+        walls = matched.get(id(r))
+        if not walls:
+            # Elevations exist but none match this room any more (renamed /
+            # renumbered by the user). Stale evidence would keep asserting an
+            # absence nobody can check — drop it.
+            r.pop("_tile_elevation_evidence", None)
+            continue
+        walls_measured = 0
+        zones_seen = 0
+        zones_measured = 0
+        for w in walls:
+            has_width = float(w.get("wall_total_width_mm") or 0) > 0
+            if has_width:
+                walls_measured += 1
+            zones = w.get("tile_zones") or []
+            zones_seen += len(zones)
+            if has_width:
+                zones_measured += len(zones)
+        r["_tile_elevation_evidence"] = {
+            "walls_matched": len(walls),
+            "walls_measured": walls_measured,
+            "tile_zones_seen": zones_seen,
+            "tile_zones_measured": zones_measured,
+        }
+        n += 1
+    return n
+
+
 def _apply_wall_elevation_tile_override(parsed: dict) -> int:
     """Sprint §35 (2026-04-29): when _wall_elevations data exists with
     mm-precision tile zones, override paskirtis-based plyteles_sienos_m2
@@ -1044,6 +1134,15 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
 
     rules = translate_user_prefs_to_room_rules(rules_override or {})
     rooms = parsed.get("patalpos") or []
+    # Derive the išklotinė coverage signal BEFORE the per-room math: it is an
+    # INPUT to resolve_wall_tile_read (evidence that a room has no tiled wall),
+    # and it is re-derived from `_wall_elevations` on every recompute so cached
+    # extracts and user edits both get it. Never raises — a project with no
+    # elevations simply gets no annotation and the old ladder applies.
+    try:
+        annotate_tile_elevation_evidence(parsed)
+    except Exception as exc:
+        print(f"[extractor] tile elevation evidence annotation failed: {exc}")
     for room in rooms:
         # 1. Parse elementai → counts/areas the calc function understands
         counts = _elementai_to_counts(room.get("elementai") or [])
@@ -2638,6 +2737,20 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m", "kiekis": round(led_juostu_m, 2),
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
+    # 2026-07-29 — a symbol count is only worth billing when the drawing
+    # DEFINES the symbol. On Beržų g. 24 the reader returned 6 difuzoriai for a
+    # project whose legend has no diffuser glyph and whose only mention of the
+    # word says their positions are still to be agreed; those 6 also fabricated
+    # 30 m of Ø125 ortakiai below. `diffuser_count_is_anchored` reads the
+    # deterministic legend scan (extractor/symbol_legend.py) and is True
+    # whenever the scan is absent or inconclusive — so this can only ever
+    # downgrade an unanchored number to the honest checklist row.
+    from .symbol_legend import diffuser_count_is_anchored
+    difuzoriai_anchored = diffuser_count_is_anchored(parsed)
+    difuzoriai_unanchored_n = 0 if difuzoriai_anchored else difuzoriai_n
+    if not difuzoriai_anchored:
+        difuzoriai_n = 0
+
     if difuzoriai_n > 0:
         # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
         # (priglaistomas + glaistymo darbas — separate trade tasks)
@@ -2663,8 +2776,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "vnt", "kiekis": None,
             "saltinis": "checklist", "confidence": "low",
             "_assumption": (
-                "Kiekis neaptiktas automatiškai. Kur ieškoti: lubų / vėdinimo "
-                "planas — apvalūs ir plyšiniai priglaistomi difuzoriai. "
+                (
+                    f"Brėžinio sutartiniuose žymėjimuose difuzoriaus žymens "
+                    f"nėra, todėl automatinis skaičius ({difuzoriai_unanchored_n} "
+                    f"vnt.) nepatvirtintas ir neįtrauktas. Kur ieškoti: "
+                    f"vėdinimo (rekuperacijos) dalies brėžinys — jo šiame "
+                    f"komplekte nėra. "
+                ) if difuzoriai_unanchored_n else (
+                    "Kiekis neaptiktas automatiškai. Kur ieškoti: lubų / "
+                    "vėdinimo planas — apvalūs ir plyšiniai priglaistomi "
+                    "difuzoriai. "
+                )
+            ) + (
                 "Rangovas paprastai skaičiuoja DVI eilutes: montavimą ir "
                 "apdirbimą (priglaistymą)."
             ),
@@ -3777,6 +3900,20 @@ def extract_interior(
         parsed = apply_positioned_marker_heights(parsed, pdf_bytes, emit=_emit)
     except Exception as exc:
         print(f"[extractor] positioned height marker lane failed: {exc}")
+
+    # Step 2.42: symbol-LEGEND anchors (deterministic, $0). Records which
+    # symbol families the drawing actually DEFINES, so an un-anchored Vision
+    # count is downgraded to an honest checklist row instead of being billed.
+    # See extractor/symbol_legend.py for the evidence and the corpus check.
+    try:
+        from extractor.symbol_legend import scan_symbol_legend
+        parsed["_symbol_legend"] = scan_symbol_legend(pdf_bytes)
+        _leg = parsed["_symbol_legend"]
+        print(f"[extractor] symbol legend scan: text_layer_ok="
+              f"{_leg.get('text_layer_ok')} difuzoriai_defined="
+              f"{(_leg.get('difuzoriai') or {}).get('defined')}")
+    except Exception as exc:
+        print(f"[extractor] symbol legend scan failed (non-fatal): {exc}")
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).

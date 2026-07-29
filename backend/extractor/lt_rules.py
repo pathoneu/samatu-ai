@@ -226,6 +226,18 @@ def apply_lt_sanity(parsed: dict) -> dict:
                 "message": f"{pavadinimas} (nr={nr}): {note}",
             })
 
+        # Ceiling-finish assumptions (2026-07-29). Withholding a ceiling from
+        # the paint area is the same class of decision as withholding walls —
+        # objektas_b's garage is 44 m², a fifth of the project's floor. Always
+        # WARN: the area is real surface the engine chose not to bill, and the
+        # user is the only one who can confirm the raw slab stays raw.
+        for note in (r.get("_ceiling_finish_assumptions") or []):
+            warnings.append({
+                "level": "WARN",
+                "patalpa_nr": nr,
+                "message": f"{pavadinimas} (nr={nr}): {note}",
+            })
+
     # ── Where each room's ceiling height came from (2026-07-29) ──────────
     # The positioned-marker lane (`height_markers.assign_markers_to_rooms`)
     # reads the altitude PRINTED INSIDE each room on the lubų planas. Rooms it

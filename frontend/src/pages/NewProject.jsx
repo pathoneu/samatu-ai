@@ -262,6 +262,21 @@ export default function NewProject() {
         idleTimer = setTimeout(() => { abortReasonRef.current = 'stalled'; controller.abort(); }, IDLE_ABORT_MS);
       };
       const timeoutId = setTimeout(() => { abortReasonRef.current = 'timeout'; controller.abort(); }, HARD_ABORT_MS);
+      // EDGE DEADLINE (2026-07-29). Railway's edge terminates the HTTP request
+      // at exactly 900 s — measured three times on the same 17-page project,
+      // the last one failing at 899 s with a bare "TypeError: network error"
+      // while the SERVER kept extracting for another five minutes. Waiting for
+      // that cut means the user always eats a scary error on a healthy run.
+      // So we let go FIRST, at 840 s, and switch to polling for the project id
+      // the stream announced — same ending, no error, no lost work. Only armed
+      // once the stream is actually running and has given us an id to poll.
+      const EDGE_DEADLINE_MS = 840_000;   // 14 min < the 900 s edge cut
+      const edgeTimer = setTimeout(() => {
+        if (streamStartedRef.current && recoveryIdRef.current) {
+          abortReasonRef.current = 'edge_deadline';
+          controller.abort();
+        }
+      }, EDGE_DEADLINE_MS);
       let json, res, projType;
 
       // Status text fallback only when NOT streaming (KŽ + construction types).
@@ -335,6 +350,7 @@ export default function NewProject() {
         setStatus(t('newProject.statusSaving'));
       } finally {
         clearTimeout(timeoutId);
+        clearTimeout(edgeTimer);
         if (idleTimer) clearTimeout(idleTimer);
         if (statusTimer) clearInterval(statusTimer);
         if (elapsedTimerRef.current) {
@@ -506,10 +522,28 @@ export default function NewProject() {
       let userMessage;
       if (e.name === 'AbortError') {
         // Honest message per abort cause (pre-prod QA: a STALLED extraction
-        // used to read as if the USER cancelled it).
-        userMessage = abortReasonRef.current === 'stalled' ? t('newProject.errStalled')
+        // used to read as if the USER cancelled it). 'edge_deadline' is OUR
+        // deliberate hand-off before the proxy's 900 s cut — the extraction is
+        // healthy and continues server-side, so it must never read as an error.
+        userMessage = abortReasonRef.current === 'edge_deadline'
+            ? t('newProject.errStreamLostButRunning')
+          : abortReasonRef.current === 'stalled' ? t('newProject.errStalled')
           : abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
           : t('newProject.errAborted');
+        // Hand straight to the poller — same path a real drop takes.
+        if (abortReasonRef.current === 'edge_deadline' && recoveryIdRef.current) {
+          const ok = await waitForRecoveredProject(recoveryIdRef.current, {
+            onTick: (s) => setStatus(t('newProject.statusRecovering', { s })),
+            isCancelled: () => abortReasonRef.current === 'user',
+          });
+          if (ok) {
+            try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
+            uploadPdfToBackend(ok.id, file).catch(() => {});
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            navigate(`/project/${ok.id}`);
+            return;
+          }
+        }
       } else if (/network|fetch/i.test(e.message) || e.name === 'TypeError'
                  || /stream ended without result/i.test(e.message)) {
         // Connection-level failure. If the stream had already STARTED (we saw

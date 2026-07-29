@@ -729,6 +729,28 @@ def is_full_tile_walls(tile_share: float, tile_height_m: float,
             and tile_height_m >= ceiling_height_m * FULL_TILE_HEIGHT_RATIO)
 
 
+def elevation_says_no_tile(room: dict) -> bool:
+    """True when the wall-elevation (išklotinė) pass MEASURED this room's walls
+    and marked no tile zone on any of them.
+
+    Reads `_tile_elevation_evidence`, written by
+    `vision_call.annotate_tile_elevation_evidence()` from the saved
+    `_wall_elevations` — so it is available on every recompute, not only on the
+    Vision run that produced the elevations.
+
+    Requires `walls_measured > 0`: a matched elevation with no usable
+    `wall_total_width_mm` proves nothing about tile. Requires
+    `tile_zones_seen == 0`: an unmeasurable tile zone (zone present, width
+    missing) is still a tile zone, so it blocks the absence claim even though
+    it contributes 0 m².
+    """
+    ev = room.get("_tile_elevation_evidence")
+    if not isinstance(ev, dict):
+        return False
+    return (int(ev.get("walls_measured") or 0) > 0
+            and int(ev.get("tile_zones_seen") or 0) == 0)
+
+
 def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
                            wall_area_available_m2: float = 0.0) -> dict:
     """SINGLE SOURCE OF TRUTH for "how much of this room's wall is tiled".
@@ -740,6 +762,9 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
     Priority:
       1. ``_tile_area_from_elevation_m2``  — exact mm-derived tile area from
          the wall-elevation (išklotinė) extractor.                 [elevation]
+      1b. ``_tile_elevation_evidence``     — the išklotinė MEASURED this room's
+         walls and marked NO tile zone on any of them. That is evidence of
+         ABSENCE and outranks every lower source.                  [elevation]
       2. ``sienu_apdailos_breakdown``      — per-room finish shares read off
          the apdailos/išklotinių page.                              [apdailos]
       3. ``plyteles_sienos_aukstis_m``     — Vision-read tile band height.
@@ -789,6 +814,29 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
             out["is_full_tile"] = (
                 elevation_tile_area
                 >= wall_area_available_m2 * FULL_TILE_AREA_RATIO)
+        return out
+
+    if elevation_says_no_tile(room):
+        # 2026-07-29 (Beržų g. 24, room 106 Skalbykla). The apdailos reader
+        # traces COLOUR-CODED wall lines off the išklotinių žymėjimo plan, and
+        # on a shared partition the tiled neighbour's blue line sits ~2 mm from
+        # the painted room's magenta one. It gave Skalbykla plyteles_share=0.7
+        # → 20.58 m² of wall tile in a laundry room the contractor bills with
+        # floor tile + skirting and NO wall tile at all. The išklotinė for the
+        # same room (sheet c1–c4, 8775 mm of measured wall) carries ZERO tile
+        # zones, and the elevation is the measured drawing — the žymėjimo plan
+        # is a colour key.
+        #
+        # An elevation that measured the walls and found no tile is EVIDENCE OF
+        # ABSENCE and must not fall through to the weaker sources below. It is
+        # deliberately narrower than "area == 0": a room whose elevation shows a
+        # tile zone it could not measure (no wall_total_width_mm — e.g. the
+        # kitchen backsplash on sheet a6-a1) also sums to 0 m² but proves
+        # nothing, so it keeps falling through.
+        out["source"] = "elevation"
+        out["assumption"] = (
+            "Išklotinėse šios patalpos sienose plytelių zonų nepažymėta – "
+            "plytelės sienose neskaičiuojamos. Pakeiskite Prielaidų skydelyje.")
         return out
 
     if apdailos:
@@ -1011,6 +1059,10 @@ def calc_room_quantities(room: dict,
     wall_finish_notes: list[str] = []
     if tile_read["assumption"]:
         wall_finish_notes.append(tile_read["assumption"])
+    # Same contract for the ceiling side (2026-07-29): when the engine decides
+    # a ceiling is NOT painted it must say so in the room dict, not silently
+    # drop the area.
+    ceiling_finish_notes: list[str] = []
 
     if elevation_tile_area > 0 and is_full_tile:
         # 2026-07-28: the elevation read itself says tile covers ≥95% of the
@@ -1251,6 +1303,65 @@ def calc_room_quantities(room: dict,
     if gkp_extra_area_m2 > 0:
         gkp_lubu_standart += gkp_extra_area_m2
 
+    # ── Wholly-unfinished room → the ceiling is not painted either ────────
+    # (2026-07-29, Rangovas B / objektas_b)
+    #
+    # The 2026-05-27 Beržų note above ("all ceiling types get painted")
+    # anticipated its own exception: "the narrow case where ceiling is
+    # intentionally left raw (industrial garage, raw basement)". This is that
+    # case, and the engine already knows how to recognise it — it just wasn't
+    # asking. The wall branch refuses to paint a room whose paskirtis standard
+    # says "no interior finish" (garažas / tambūras) when the project supplies
+    # NO apdailos evidence to the contrary, and it emits a disclosure note
+    # saying so. The ceiling then went on being painted anyway, so objektas_b's
+    # garage came out with 0.00 m² of painted wall and 44.00 m² of painted
+    # ceiling — a split no estimator would write down.
+    #
+    # Contractor evidence (Rangovas B pasiūlymas 2026-04-13, 44 m² garage):
+    # zero garage paint lines, zero garage GKP ceiling, zero garage screed —
+    # the only garage ceiling work billed is item 3 "Laidų apsiuvimas garaže"
+    # (26.57 m², wire boxing). The ceiling-paint truths for this project
+    # (items 1+2 / 16+17) are garage-excluded by construction.
+    #
+    # The gate is deliberately narrow — EVERY condition must hold:
+    #   · the paskirtis standard says the room has no interior wall finish,
+    #   · nothing overrode it (no apdailos read, no walls_paint_factor_override
+    #     — Beržų's garage IS painted and keeps its ceiling paint through both
+    #     the cached-Vision factor 1.0 and the GT override 0.7988),
+    #   · the walls are unpainted because there is NO finish, not because they
+    #     are tiled to the ceiling (a full-tile bathroom still gets a painted
+    #     ceiling),
+    #   · the ceiling is a raw slab — no GKP / tempiamos / pakabinamos,
+    #   · and it carries no GKP soffit (gkp_extra_area_m2), which would mean
+    #     part of the ceiling IS finished.
+    # `ceiling_paint_override` (per-room bool) is the escape hatch, mirroring
+    # tile_floor_override / walls_paint_factor_override.
+    ceiling_paint_override = room.get("ceiling_paint_override")
+    ceiling_unfinished = (
+        ceiling_paint_override is None
+        and rt_rules.get("walls_paint") == 0.0
+        and walls_paint_factor == 0.0
+        and walls_paint_factor_override is None
+        and not is_full_tile
+        and ceiling_type == "betonas"
+        and gkp_extra_area_m2 <= 0
+    )
+    if ceiling_paint_override is not None and not bool(ceiling_paint_override):
+        ceiling_paintable = 0.0
+        ceiling_paint_source = "override_off"
+    elif ceiling_unfinished:
+        ceiling_paintable = 0.0
+        ceiling_paint_source = "unfinished_room_standard"
+        ceiling_finish_notes.append(
+            f"Lubos neįtrauktos į dažomą plotą – standartinė prielaida "
+            f"paskirčiai '{paskirtis}': neapdailinta betoninė perdanga, "
+            f"projekto apdailos duomenų nerasta (sienos taip pat nedažomos). "
+            f"Jei lubos glaistomos/dažomos, pažymėkite Prielaidų skydelyje.")
+    elif ceiling_paint_override is not None:
+        ceiling_paint_source = "override_on"
+    else:
+        ceiling_paint_source = "standard"
+
     # ── Virš-3m / off-perimeter disclosure (2026-07-29) ───────────────────
     # The engine can only see above-3m surface two ways:
     #   1. the room's NOMINAL ceiling height — all-or-nothing at the 3.0 m
@@ -1485,6 +1596,14 @@ def calc_room_quantities(room: dict,
         "_virs_3m_source": virs_3m_source,
         "_walls_lower_bound": bool(walls_lower_bound),
         "molio_tinko_m2": round(molio_tinko_m2, 2),
+        # ── Ceiling-finish provenance (2026-07-29) ───────────────────────
+        # "standard" = painted (every finished ceiling type is);
+        # "unfinished_room_standard" = raw slab in a room whose paskirtis
+        # standard finishes nothing and which carries no project apdailos
+        # evidence — area withheld and DISCLOSED, never silently dropped;
+        # "override_on"/"override_off" = the user's explicit call.
+        "_ceiling_paint_source": ceiling_paint_source,
+        "_ceiling_finish_assumptions": list(ceiling_finish_notes),
         "ceiling_paintable_m2": round(ceiling_paintable, 2),
         "dazymo_plotas_m2": round(dazymo_plotas, 2),
         "gkp_lubu_standart_m2": round(gkp_lubu_standart, 2),

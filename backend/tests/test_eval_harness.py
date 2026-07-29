@@ -122,6 +122,56 @@ def test_honest_filter_replay_zero_is_excluded(harness):
     assert collapsed == []
 
 
+def test_incomplete_truth_is_excluded_from_mae_but_still_reported(harness):
+    """A truth marked incomplete/partial cannot measure the extractor, so it
+    must not enter any MAE — and must not vanish either.
+
+    Regression guard for the 2026-07-29 romainiai audit: _summarize selected
+    on `pct_error is not None`, silently re-admitting the rows _classify had
+    already demoted to no_truth. print_report skips no_truth rows, so the
+    metric that supplied 79% of romainiai's 112.947% headline MAE was
+    invisible in the table above the number."""
+    good = _mk_metric(harness, "LED", 51.02, 34.54)          # +47.713%
+    bad = _mk_metric(harness, "CombinedPaint", 1168.58, 420.08)  # +178.18%
+    bad.truth_confidence = "incomplete"
+    bad.status = "no_truth"                                  # what _classify does
+
+    s = harness._summarize([good, bad])
+    assert round(s["headline_mae_pct"], 3) == 47.713, "incomplete truth leaked into MAE"
+    assert round(s["headline_max_pct"], 3) == 47.713
+    assert s["headline_total"] == 1
+    # ...but it is still surfaced, with its numbers, so nothing hides.
+    excluded = s["excluded_incomplete_truth"]
+    assert [e["label"] for e in excluded] == ["CombinedPaint"]
+    assert excluded[0]["pct_error"] == 178.18
+    assert excluded[0]["truth_confidence"] == "incomplete"
+
+    # The aggregate path applies the same rule.
+    scored, _, _ = harness._partition_headline_metrics([good, bad], "ai_extract")
+    assert [r.label for r in scored] == ["LED"]
+
+
+def test_hidden_door_metric_reads_pozicija_not_the_dead_santrauka_key(harness):
+    """`pasleptu_duru_staktu_m_total` is a dead santrauka key (0.0 on all five
+    benchmark projects — nothing writes the per-room field it sums). The real
+    quantity ships as the pozicija 'Durų angų paruošimas beapvadinėms durims',
+    so scoring the santrauka key guaranteed a fake -100% collapse."""
+    accessor = harness.METRICS["pasleptu_duru_staktos_m"]["accessor"]
+    parsed = {
+        "santrauka": {"pasleptu_duru_staktu_m_total": 0.0},
+        "pozicijos": [
+            {"aprasymas": "Durų angų paruošimas beapvadinėms durims",
+             "kiekis": 5.1, "vnt": "m"},
+            {"aprasymas": "Angokraščių glaistymas-dažymas", "kiekis": 64.0},
+        ],
+    }
+    assert accessor(parsed) == 5.1
+    # A populated santrauka key still wins, and a genuine absence stays None
+    # (scores "missing") rather than becoming a phantom 0.0.
+    assert accessor({**parsed, "santrauka": {"pasleptu_duru_staktu_m_total": 7.0}}) == 7.0
+    assert accessor({"santrauka": {}, "pozicijos": []}) is None
+
+
 def test_summary_shape(harness, berzas_truth):
     parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
     results = harness.evaluate(parsed, berzas_truth)

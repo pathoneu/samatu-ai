@@ -53,11 +53,37 @@ projects:
     has_cached_extract: false
     scope_mismatch: true
     scope_mismatch_reason: |
-      Contractor's pasiūlymas prices the 4.1-5.1 punktas subset of the project; the
-      project_pdf is the full 45-page interior design. AI extracts the whole document,
-      truth covers a subset → totals not directly comparable (AI 978.55 m² combined
-      paint vs truth 250.95 m² = +290%). Exclude from systematic error analysis.
-    notes: "Interior-only scope (no plytelės). Project PDF is 4.1-5.1 punktas subset; totals scoped accordingly."
+      REWRITTEN 2026-07-29 — the previous wording was factually wrong on both counts
+      and is preserved here for traceability:
+        "Contractor's pasiūlymas prices the 4.1-5.1 punktas subset of the project; the
+         project_pdf is the full 45-page interior design. AI extracts the whole document,
+         truth covers a subset → totals not directly comparable (AI 978.55 m² combined
+         paint vs truth 250.95 m² = +290%). Exclude from systematic error analysis."
+      (a) The project_pdf is not a superset: it is itself titled "4.1-5.1 punktas" and
+          IS the 45-page document. Both sides carry the same punktas label.
+      (b) The +290% arithmetic compared against 250.95 = truth key
+          dazymo_walls_plus_ceilings_combined_subset_m2 (contractor item 3 alone),
+          which the eval does not score. The scored key is
+          dazymo_walls_plus_ceilings_combined_m2 = 420.08.
+
+      The real, verified reason to exclude:
+      1. The samata is a QUOTE, not a takeoff. Its own footer states the quantities are
+         preliminary and will be re-measured from the work actually performed
+         ("Darbų kiekiai pasiūlyme yra preliminarūs ir bus tikslinami po darbų, pagal
+         atliktų darbų faktą"). It is not a measured measuring stick.
+      2. It is a ONE-SECTION document — "Skyrius Sienų lubų glaistymas dažymas",
+         15 lines, putty + paint only. It prices no tiling, no flooring, no baseboards,
+         no GKP walls. The app extracts the whole 2-storey, 20-room, 267.71 m² house
+         including 262 m² of wall tile. The two sides do not cover the same surfaces,
+         so a paint-area diff cannot separate scope from extraction error.
+      3. Cross-check: contractor paint (items 2+3+5) = 420.08 m² of walls+ceilings for
+         267.71 m² of floor = 1.57× floor. CLAUDE.md validation #1 puts paintable WALL
+         area alone at 2.5-4× floor. The contractor's total is below the floor of the
+         walls-only band, i.e. it demonstrably does not cover whole-house painting.
+      Consequence: excluded from the corpus MAE (run_totals_only_multi already skips it;
+      since 2026-07-29 --rescore also prints an exclusion banner). Its per-project
+      headline MAE must never be averaged with the other projects.
+    notes: "Interior-only scope (no plytelės). Contractor samata is a single-section preliminary quote; see scope_mismatch_reason."
 
   - slug: sernu
     name: "Šernų g. 18B, Kaunas"
