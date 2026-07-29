@@ -396,10 +396,12 @@ def scan_positioned_page_tokens(
                     value = _marker_value_m(text)
                     if value is not None:
                         markers.append({"page": pn, "raw": text, "value_m": value,
-                                        "x_pct": x_pct, "y_pct": y_pct})
+                                        "x_pct": x_pct, "y_pct": y_pct,
+                                        "page_w": width, "page_h": height})
                     elif _ROOM_NR_TOKEN_RE.match(text):
                         labels.append({"page": pn, "nr": text.lstrip("0") or "0",
-                                       "x_pct": x_pct, "y_pct": y_pct})
+                                       "x_pct": x_pct, "y_pct": y_pct,
+                                       "page_w": width, "page_h": height})
     except Exception:
         return {"markers": [], "labels": []}
     return {"markers": markers, "labels": labels}
@@ -585,3 +587,342 @@ def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
     if not out["ok"]:
         out["reason"] = "no_marker_fell_inside_any_room"
     return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LABEL-PROXIMITY fallback (2026-07-29)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# `assign_markers_to_rooms` above is the precise lane, and it stays the
+# preferred one — a traced outline states exactly which room a point is in.
+# But it needs outlines, and it refuses to run unless the room numbers print
+# inside their own outlines on the marker page. On Beržų g. 24 only 1 of 11
+# rooms carries any geometry at all, so `frame_agreement` scores 1/1, trips
+# MIN_AGREEING_ROOMS, and the corpus's richest marker sheet (14 altitudes
+# against 11 rooms) yields nothing. The lane has never once fired there.
+#
+# The drawing offers a second pairing that needs no polygons: the room NUMBER
+# is printed on the SAME sheet as the altitude, in the SAME coordinate system.
+# No cross-page frame assumption to check — the two tokens are a few
+# millimetres apart on one piece of paper.
+#
+# What it cannot do is see walls. A marker deep inside a narrow room can be
+# nearer to the neighbouring room's label than to its own (Beržų: the +3400
+# at (540,202) is 68 pt from 104's label and 81 pt from 101's, and it belongs
+# to 101). So proximity alone is not enough, and this lane refuses rather
+# than guesses in exactly that case:
+#
+#   • DISTANCE CAP — a marker must be printed near the room it labels.
+#     Calibrated on Beržų p6: every honest marker is within 121 pt of its
+#     room number (0.083 of the page diagonal); the `+3100` legend key in the
+#     "Sutartiniai žymėjimai" box is 209 pt (0.144) from anything. The cap
+#     sits between them and is expressed as a fraction of the page DIAGONAL
+#     so it survives A1-vs-A3 sheets.
+#   • AMBIGUITY MARGIN — if the second-nearest room is nearly as close, the
+#     drawing has not said which room owns the marker. Drop it and say so.
+#     This is what stops the +3400 above from raising 104 to 3.4.
+#
+# Both thresholds are calibrated on one project. That is stated, not hidden:
+# they are deliberately loose enough to keep every honest Beržų marker and
+# tight enough to reject its two known traps, and the lane is allowed only to
+# RAISE a height (see `vision_call`), so a miss costs coverage, never a
+# fabricated quantity.
+
+# Fractions of the page diagonal. Observed on Beržų p6: honest markers
+# ≤0.083, legend key 0.144; closest honest margin 0.020, the known
+# cross-wall steal 0.008.
+MAX_LABEL_DISTANCE_FRAC = 0.12
+MIN_AMBIGUITY_MARGIN_FRAC = 0.015
+
+
+def _norm_xy(tok: dict) -> tuple[float, float]:
+    """Token centre in a space normalised so the page diagonal is 1.
+
+    ``x_pct``/``y_pct`` are fractions of WIDTH and HEIGHT respectively, so
+    Euclidean distance between them is skewed by the sheet's aspect ratio
+    (1.41 on A-series). Scaling each axis back by its own dimension and
+    dividing by the diagonal makes a distance mean "this fraction of the
+    sheet", on any sheet size. Tokens without page dimensions (hand-built in
+    tests, or older cached runs) fall back to a unit square.
+    """
+    w = float(tok.get("page_w") or 1.0) or 1.0
+    h = float(tok.get("page_h") or 1.0) or 1.0
+    diag = ((w * w + h * h) ** 0.5) or 1.0
+    return (float(tok["x_pct"]) * w / diag, float(tok["y_pct"]) * h / diag)
+
+
+def assign_markers_by_label_proximity(markers: list[dict], labels: list[dict],
+                                      rooms: list[dict]) -> dict:
+    """Assign each positioned altitude to the room whose NUMBER is printed
+    nearest to it on the same sheet, refusing when the pairing is unclear.
+
+    Same contract as `assign_markers_to_rooms`: always returns ``ok`` and
+    ``reason``; when ``ok`` is False the caller keeps the heights it had.
+    ``unassigned`` carries a per-marker ``reason`` so the refusals are
+    inspectable rather than silent.
+    """
+    out: dict = {
+        "ok": False,
+        "reason": "",
+        "method": "label_proximity",
+        "by_nr": {},
+        "evidence": {},
+        "unassigned": [],
+        "rooms_without_marker": [],
+    }
+    if not markers:
+        out["reason"] = "no_positioned_markers"
+        return out
+    if not rooms:
+        out["reason"] = "no_rooms"
+        return out
+
+    # Only a token that matches a real room number may steer a marker.
+    # `_ROOM_NR_TOKEN_RE` ("2–4 digits") also matches dimension strings like
+    # "1200"/"3200" and stray sheet numbers, which are printed all over a plan.
+    known = {_norm_nr(r.get("nr")) for r in rooms if str(r.get("nr") or "").strip()}
+    known.discard("")
+    plan_labels = [l for l in labels if _norm_nr(l.get("nr")) in known]
+    if not plan_labels:
+        out["reason"] = "no_room_labels"
+        return out
+
+    # Group labels by room: a number is typically printed twice (once on the
+    # plan, once in the eksplikacija table down the margin). Taking the
+    # per-room MINIMUM distance means the table copy can never be mistaken
+    # for a second, competing room.
+    by_room: dict[str, list[dict]] = {}
+    for lbl in plan_labels:
+        by_room.setdefault(_norm_nr(lbl.get("nr")), []).append(lbl)
+
+    hits: dict[str, list[dict]] = {}
+    for marker in markers:
+        try:
+            mx, my = _norm_xy(marker)
+        except (KeyError, TypeError, ValueError):
+            continue
+        ranked: list[tuple[float, str]] = []
+        for nr, lbls in by_room.items():
+            best = min((((mx - lx) ** 2 + (my - ly) ** 2) ** 0.5
+                        for lx, ly in (_norm_xy(l) for l in lbls)),
+                       default=None)
+            if best is not None:
+                ranked.append((best, nr))
+        if not ranked:
+            continue
+        ranked.sort()
+        d0, nr0 = ranked[0]
+        d1 = ranked[1][0] if len(ranked) > 1 else float("inf")
+
+        note = {"raw": marker.get("raw"), "value_m": marker.get("value_m"),
+                "page": marker.get("page"), "nearest_nr": nr0,
+                "distance": round(d0, 4)}
+        if d0 > MAX_LABEL_DISTANCE_FRAC:
+            # Printed nowhere near a room — a legend key, a title-block
+            # sample, or an altitude belonging to a room we never read.
+            out["unassigned"].append({**note,
+                                      "reason": "too_far_from_any_room_label"})
+            continue
+        if (d1 - d0) < MIN_AMBIGUITY_MARGIN_FRAC:
+            out["unassigned"].append({**note, "runner_up_nr": ranked[1][1],
+                                      "reason": "ambiguous_between_rooms"})
+            continue
+        hits.setdefault(nr0, []).append({**marker, "_dist": d0})
+
+    # Same reduction as the polygon lane: the DOMINANT value, ties broken by
+    # the marker printed nearest the room's number.
+    for nr, ms in hits.items():
+        counts: dict[float, int] = {}
+        for m in ms:
+            counts[m["value_m"]] = counts.get(m["value_m"], 0) + 1
+        nearest_by_value: dict[float, float] = {}
+        for m in ms:
+            v = m["value_m"]
+            if v not in nearest_by_value or m["_dist"] < nearest_by_value[v]:
+                nearest_by_value[v] = m["_dist"]
+        chosen = min(counts, key=lambda v: (-counts[v], nearest_by_value[v]))
+        out["by_nr"][nr] = chosen
+        out["evidence"][nr] = {
+            "chosen_m": chosen,
+            "page": ms[0]["page"],
+            "method": "label_proximity",
+            "markers": sorted(str(m["raw"]) for m in ms),
+            "values_m": sorted(m["value_m"] for m in ms),
+        }
+
+    out["rooms_without_marker"] = [
+        str(r.get("nr") or "").strip() for r in rooms
+        if _norm_nr(r.get("nr")) not in out["by_nr"]
+    ]
+    out["ok"] = bool(out["by_nr"])
+    if not out["ok"]:
+        out["reason"] = "no_marker_matched_a_room"
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# The lane, end to end
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# One entry point so production (`vision_call`) and the eval harness's
+# deterministic tail run the SAME code. The harness measuring something the
+# app does not do is how a fix gets "proven" and then fails in front of a
+# customer; this is deterministic and costs no API call, so there is no
+# reason for the two to differ.
+
+# Below this gap a marker that reads LOWER than the room's existing height is
+# just a rounding/plane difference. At or above it, the plan is labelling one
+# ceiling plane of a split-level or double-height space (objektas_b's 5.7 m
+# svetainė) — taking the marker there would delete the tall zone and zero the
+# virš-3m tier with it. Keep the taller value and disclose.
+SPLIT_LEVEL_GAP_M = 0.5
+# Heights within this of each other are the same reading.
+_HEIGHT_EPS_M = 0.05
+
+
+def apply_positioned_marker_heights(parsed: dict, pdf_bytes: bytes,
+                                    emit=None) -> dict:
+    """Read the altitudes printed inside each room on the lubų planas and
+    RAISE that room's ceiling height to match. Mutates and returns ``parsed``.
+
+    Deterministic and zero-cost: text layer + geometry, no Vision call.
+
+    Direction is deliberately asymmetric — the lane may raise a height or
+    confirm one, never lower it. A marker labels ONE ceiling plane, so a
+    marker below the height already read is at best a lower plane of the same
+    room and at worst the collapse this lane exists to prevent. A miss
+    therefore costs coverage, never a fabricated quantity.
+
+    Rooms the lane could not reach keep whatever they had and are named in
+    the warnings (`lt_rules.apply_lt_sanity`).
+    """
+    def _emit(payload: dict) -> None:
+        if emit:
+            try:
+                emit(payload)
+            except Exception:
+                pass
+
+    rooms = parsed.get("patalpos") or []
+    if not rooms or not pdf_bytes:
+        return parsed
+    try:
+        from extractor.page_classifier import canonical_tipas
+    except Exception:
+        return parsed
+
+    pages = []
+    for p in (parsed.get("puslapiai") or []):
+        try:
+            if p.get("nr") and canonical_tipas(p.get("tipas")) == "ceiling_plan":
+                pages.append(int(p["nr"]))
+        except (TypeError, ValueError):
+            continue
+    if not pages:
+        return parsed
+
+    tokens = scan_positioned_page_tokens(pdf_bytes, tuple(pages))
+    # Polygon containment first — a traced outline states which room a point
+    # is in; proximity only infers it. The fallback exists because outlines
+    # are frequently absent (Beržų: 1 of 11 rooms).
+    assign = assign_markers_to_rooms(
+        tokens["markers"], tokens["labels"], rooms)
+    method = "polygon_containment"
+    polygon_reason = None
+    if not assign["ok"]:
+        polygon_reason = assign["reason"]
+        fallback = assign_markers_by_label_proximity(
+            tokens["markers"], tokens["labels"], rooms)
+        if fallback["ok"]:
+            assign, method = fallback, "label_proximity"
+
+    lane = {
+        "pages": pages,
+        "n_markers": len(tokens["markers"]),
+        "ok": assign["ok"],
+        "reason": assign["reason"],
+        "method": method if assign["ok"] else None,
+        "polygon_reason": polygon_reason,
+        "frame": assign.get("frame"),
+        "evidence": assign.get("evidence", {}),
+        "unassigned": assign.get("unassigned", []),
+        "rooms_without_marker": assign.get("rooms_without_marker", []),
+    }
+    parsed["_height_marker_lane"] = lane
+
+    if not assign["ok"]:
+        _emit({"event": "positioned_marker_lane_skipped",
+               "reason": assign["reason"], "pages": pages,
+               "polygon_reason": polygon_reason,
+               "n_markers": len(tokens["markers"])})
+        return parsed
+
+    by_nr = {_norm_nr(k): v for k, v in assign["by_nr"].items()}
+    evidence = {_norm_nr(k): v for k, v in assign.get("evidence", {}).items()}
+    by_name = dict(parsed.get("lubu_auksciai") or {})
+    by_nr_map = dict(parsed.get("lubu_auksciai_by_nr") or {})
+    changed, confirmed, kept_taller, kept_lower = [], [], [], []
+
+    for room in rooms:
+        nr_raw = str(room.get("nr") or "").strip()
+        marker_h = by_nr.get(_norm_nr(nr_raw))
+        if marker_h is None:
+            continue
+        try:
+            prev = float(room["lubu_aukstis_m"]) if room.get(
+                "lubu_aukstis_m") is not None else None
+        except (TypeError, ValueError):
+            prev = None
+
+        if prev is not None and prev - marker_h >= SPLIT_LEVEL_GAP_M:
+            room["_height_marker_conflict"] = {
+                "marker_m": marker_h, "kept_m": prev,
+                "reason": "split_level_suspected"}
+            kept_taller.append({"nr": nr_raw, "marker": marker_h, "kept": prev})
+            continue
+        if prev is not None and marker_h < prev - _HEIGHT_EPS_M:
+            # Raise-only: a lower marker is a lower plane, not a correction.
+            room["_height_marker_lower_ignored"] = {
+                "marker_m": marker_h, "kept_m": prev}
+            kept_lower.append({"nr": nr_raw, "marker": marker_h, "kept": prev})
+            continue
+
+        # Write BOTH maps — the merge downstream is name-keyed and a stale
+        # name entry would otherwise beat the marker.
+        by_nr_map[nr_raw] = marker_h
+        name = room.get("pavadinimas")
+        if name:
+            by_name[name] = marker_h
+        room["lubu_aukstis_m"] = marker_h
+        room["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
+        room["_height_source"] = "positioned_marker"
+        room["_height_marker_evidence"] = evidence.get(_norm_nr(nr_raw))
+        # Survives `_apply_per_room_heights`, which returns fresh dicts and is
+        # NAME-keyed — Beržų alone has two rooms called "Berniuko kambarys".
+        room["_height_marker_m"] = marker_h
+        if prev is None or abs(prev - marker_h) >= _HEIGHT_EPS_M:
+            changed.append({"nr": nr_raw, "from": prev, "to": marker_h})
+        else:
+            confirmed.append(nr_raw)
+
+    parsed["lubu_auksciai"] = by_name
+    parsed["lubu_auksciai_by_nr"] = by_nr_map
+    lane.update({"changed": changed, "confirmed": confirmed,
+                 "kept_taller": kept_taller, "kept_lower": kept_lower})
+
+    for room in rooms:
+        if room.get("_height_source"):
+            continue
+        nr_raw = str(room.get("nr") or "").strip()
+        room["_height_source"] = (
+            "vision_per_room"
+            if (nr_raw in by_nr_map or room.get("pavadinimas") in by_name)
+            else "global_fallback"
+        )
+
+    _emit({"event": "height_from_positioned_markers", "pages": pages,
+           "method": method, "assigned": len(by_nr), "changed": changed,
+           "confirmed": len(confirmed), "kept_taller": kept_taller,
+           "kept_lower": kept_lower, "frame": assign.get("frame"),
+           "without_marker": assign.get("rooms_without_marker", [])})
+    return parsed

@@ -3729,112 +3729,23 @@ def extract_interior(
     # states explicitly: each altitude is PRINTED INSIDE a room. Beržų room
     # 101 is bracketed by two `+3400` on the lubų planas; three production
     # Vision runs read it 2.8 / 2.8 / 3.4 — a coin flip on 42.5 m² of high
-    # wall. Point-in-polygon over the printed markers returns 3.4 on all
-    # three, deterministically, with no Vision call.
+    # wall. Reading the printed markers by position returns 3.4 on all three,
+    # deterministically, with no Vision call.
+    #
+    # Two lanes, in order: point-in-polygon when the rooms carry outlines,
+    # else proximity to the room NUMBER printed on the same sheet. The second
+    # exists because the first is often starved — on Beržų exactly 1 of 11
+    # rooms has any geometry, so the frame gate scored 1/1 and the lane sat
+    # inert on the corpus's richest marker sheet.
     #
     # Marker-sourced heights OUTRANK Vision's per-room map: the marker is
     # printed text at a position, read the same way every time; the model's
-    # holistic read of the same sheet demonstrably is not. Rooms with no
-    # marker keep whatever they had and are DISCLOSED (lt_rules.apply_lt_sanity).
+    # holistic read of the same sheet demonstrably is not. The lane may only
+    # RAISE or confirm a height, never lower one. Rooms with no marker keep
+    # whatever they had and are DISCLOSED (lt_rules.apply_lt_sanity).
     try:
-        from extractor.height_markers import (
-            assign_markers_to_rooms,
-            scan_positioned_page_tokens,
-        )
-        from extractor.page_classifier import canonical_tipas
-
-        _rooms_now = parsed.get("patalpos") or []
-        _ceiling_pages = [
-            int(p["nr"]) for p in (parsed.get("puslapiai") or [])
-            if p.get("nr") and canonical_tipas(p.get("tipas")) == "ceiling_plan"
-        ]
-        if _ceiling_pages and _rooms_now:
-            _tokens = scan_positioned_page_tokens(pdf_bytes, _ceiling_pages)
-            _assign = assign_markers_to_rooms(
-                _tokens["markers"], _tokens["labels"], _rooms_now)
-            parsed["_height_marker_lane"] = {
-                "pages": _ceiling_pages,
-                "n_markers": len(_tokens["markers"]),
-                "ok": _assign["ok"],
-                "reason": _assign["reason"],
-                "frame": _assign["frame"],
-                "evidence": _assign["evidence"],
-                "unassigned": _assign["unassigned"],
-                "rooms_without_marker": _assign["rooms_without_marker"],
-            }
-            if _assign["ok"]:
-                _by_name = dict(parsed.get("lubu_auksciai") or {})
-                _by_nr = dict(parsed.get("lubu_auksciai_by_nr") or {})
-                _changed = []
-                _kept_taller = []
-                for room in _rooms_now:
-                    nr = str(room.get("nr") or "").strip()
-                    marker_h = _assign["by_nr"].get(nr)
-                    if marker_h is None:
-                        continue
-                    prev = room.get("lubu_aukstis_m")
-                    # Split-level guard. A marker labels ONE ceiling plane. In a
-                    # double-height room (objektas_b's 5.7 m svetainė) the plan
-                    # prints the LOW plane's altitude inside the same outline, so
-                    # taking it would delete the tall zone — the exact collapse
-                    # commit 7d3cb39 was fixed for. When the existing per-room
-                    # read is a storey taller than the marker, that is a
-                    # split-level signal, not a correction: keep the taller
-                    # value and disclose the conflict.
-                    try:
-                        _prev_f = float(prev) if prev is not None else None
-                    except (TypeError, ValueError):
-                        _prev_f = None
-                    if _prev_f is not None and _prev_f - marker_h >= 0.5:
-                        room["_height_marker_conflict"] = {
-                            "marker_m": marker_h, "kept_m": _prev_f,
-                            "reason": "split_level_suspected"}
-                        _kept_taller.append({"nr": nr, "marker": marker_h,
-                                             "kept": _prev_f})
-                        continue
-                    # Write BOTH maps: the merge below is name-keyed and a
-                    # stale name entry would otherwise beat the marker.
-                    _by_nr[nr] = marker_h
-                    name = room.get("pavadinimas")
-                    if name:
-                        _by_name[name] = marker_h
-                    room["_height_source"] = "positioned_marker"
-                    room["_height_marker_evidence"] = _assign["evidence"].get(nr)
-                    # Kept for the post-merge re-assert below: `_apply_per_room_heights`
-                    # is NAME-keyed, and Beržų alone has two rooms called
-                    # "Berniuko kambarys". A marker is tied to a room NUMBER —
-                    # same reasoning as 264f085 (eksplikacija joined by nr).
-                    room["_height_marker_m"] = marker_h
-                    if prev is None or abs(float(prev) - marker_h) >= 0.05:
-                        _changed.append({"nr": nr, "from": prev, "to": marker_h})
-                parsed["lubu_auksciai"] = _by_name
-                parsed["lubu_auksciai_by_nr"] = _by_nr
-                parsed["_height_marker_lane"]["changed"] = _changed
-                parsed["_height_marker_lane"]["kept_taller"] = _kept_taller
-                for room in _rooms_now:
-                    if room.get("_height_source"):
-                        continue
-                    nr = str(room.get("nr") or "").strip()
-                    room["_height_source"] = (
-                        "vision_per_room"
-                        if (nr in (parsed.get("lubu_auksciai_by_nr") or {})
-                            or room.get("pavadinimas") in _by_name)
-                        else "global_fallback"
-                    )
-                _emit({
-                    "event": "height_from_positioned_markers",
-                    "pages": _ceiling_pages,
-                    "assigned": len(_assign["by_nr"]),
-                    "changed": _changed,
-                    "kept_taller": _kept_taller,
-                    "frame": _assign["frame"],
-                    "without_marker": _assign["rooms_without_marker"],
-                })
-            else:
-                _emit({"event": "positioned_marker_lane_skipped",
-                       "reason": _assign["reason"],
-                       "pages": _ceiling_pages,
-                       "n_markers": len(_tokens["markers"])})
+        from extractor.height_markers import apply_positioned_marker_heights
+        parsed = apply_positioned_marker_heights(parsed, pdf_bytes, emit=_emit)
     except Exception as exc:
         print(f"[extractor] positioned height marker lane failed: {exc}")
 

@@ -1423,22 +1423,51 @@ def _infer_slug_from_run_name(name: str) -> str | None:
     return max(hits, key=len) if hits else None
 
 
-def _rerun_deterministic_tail(parsed: dict) -> dict:
+def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     """Re-run the deterministic (zero-API) tail of the pipeline on a saved
     extract's primitives:
 
-      1. height salvage from warnings[] (same gate as production — only when
+      1. positioned ceiling-altitude markers → per-room heights (needs the
+         source PDF; skipped when it is not on disk),
+      2. height salvage from warnings[] (same gate as production — only when
          the model structured no per-room heights),
-      2. height plausibility gate,
-      3. per-room recompute (calc_room_quantities via primitives),
-      4. santrauka recompute,
-      5. pozicijos rebuild.
+      3. height plausibility gate,
+      4. per-room recompute (calc_room_quantities via primitives),
+      5. santrauka recompute,
+      6. pozicijos rebuild.
 
     This is exactly what a saved run would produce under the CURRENT
     formula code — the honest way to measure formula fixes against
     already-paid-for Vision reads without any API spend."""
     vc = importlib.import_module("extractor.vision_call")
     rooms = parsed.get("patalpos") or []
+
+    # Step 1 reads the text layer of the ceiling plan, so unlike the rest of
+    # the tail it needs the source PDF. The fixture PDFs are untracked (client
+    # names + pricing), so a checkout without them must still rescore — it
+    # just measures the other steps. Silence here would be dishonest, so the
+    # skip is printed.
+    pdf_rel = (REGISTRY.get(slug) or {}).get("pdf_path") if slug else None
+    if pdf_rel:
+        pdf_path = REPO_ROOT / pdf_rel
+        if pdf_path.exists():
+            try:
+                from extractor.height_markers import (
+                    apply_positioned_marker_heights)
+                parsed = apply_positioned_marker_heights(
+                    parsed, pdf_path.read_bytes())
+                lane = parsed.get("_height_marker_lane") or {}
+                if lane.get("ok"):
+                    ch = lane.get("changed") or []
+                    print(f"  ⤴ height markers ({lane.get('method')}): "
+                          f"{len(ch)} raised, {len(lane.get('confirmed') or [])} "
+                          f"confirmed" + (f" — {ch}" if ch else ""))
+                elif lane:
+                    print(f"  · height-marker lane inactive: {lane.get('reason')}")
+            except Exception as exc:
+                print(f"  ⚠ height-marker lane failed during rescore: {exc}")
+        else:
+            print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
 
     if rooms and not (parsed.get("lubu_auksciai") or {}):
         from extractor.height_markers import salvage_heights_from_warnings
@@ -1495,7 +1524,7 @@ def run_rescore(path_arg: str, project_id: str | None, *,
     parsed = json.loads(parsed_path.read_text(encoding="utf-8"))
     stage = "rescored_recomputed" if recompute else "rescored"
     if recompute:
-        parsed = _rerun_deterministic_tail(parsed)
+        parsed = _rerun_deterministic_tail(parsed, slug)
 
     results = evaluate(parsed, truth)
     per_room = evaluate_per_room(parsed, truth)
