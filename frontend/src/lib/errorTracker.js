@@ -22,6 +22,22 @@
 const KEY = 'samatu_error_log';
 const MAX_ENTRIES = 100;
 
+// Browser noise that is NOT an application error. "ResizeObserver loop
+// completed with undelivered notifications" is fired by the spec whenever a
+// resize callback dirties layout again in the same frame — every virtualised
+// list / auto-sizing panel does this. Chrome surfaces it on window.onerror
+// with no stack and no user-visible effect. During the 2026-07-27 production
+// run it was the ONLY thing in /api/log-error, which masked the real errors
+// we were hunting for. Filter at the source, not in the log reader.
+const BENIGN_ERROR_PATTERNS = [
+  /^ResizeObserver loop/i,
+];
+
+export function isBenignError(message) {
+  const msg = String(message || '');
+  return BENIGN_ERROR_PATTERNS.some((re) => re.test(msg));
+}
+
 function safeRead() {
   try {
     const raw = localStorage.getItem(KEY);
@@ -47,6 +63,7 @@ function projectIdFromUrl() {
 
 export function logError(type, message, stack = null, extra = {}) {
   if (typeof window === 'undefined') return;
+  if (isBenignError(message)) return;
   const entry = {
     ts: new Date().toISOString(),
     type,

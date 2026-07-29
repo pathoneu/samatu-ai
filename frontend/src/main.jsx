@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { initErrorTracker } from '@/lib/errorTracker'
+import { initErrorTracker, isBenignError } from '@/lib/errorTracker'
 import { initAnalytics } from '@/lib/analytics'
 import { API_BASE } from '@/lib/apiBase'
 import '@/i18n' // side-effect: initialise react-i18next (LT default, EN additive)
@@ -27,6 +27,7 @@ const ERROR_THROTTLE_MS = 5000;
 
 const reportError = (msg, stack, component) => {
   if (!msg) return;
+  if (isBenignError(msg)) return;
   const key = `${msg}|${(stack || '').slice(0, 200)}`;
   const now = Date.now();
   const prev = _errorSeen.get(key) || 0;
