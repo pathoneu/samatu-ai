@@ -410,6 +410,18 @@ _SAN_LEGACY_SPLIT = {
         "potinkinio dušo maišytuvo potinkinės dalies montavimas",
 }
 
+# 2026-07-29 line-coverage pass: same mechanism, plain RENAMES (one work item,
+# one successor — no split). A relabeled line must be listed here or the
+# rebuild shows the user the SAME work twice: once under the label they priced,
+# once under the new one. Keys and values are lowercase `_tier_key` form.
+_LEGACY_LABEL_RENAMES = {
+    "dėžučių iš gkp formavimas wc mechanizmams paslėpti":
+        "pertvaros sutvirtinimas wc mechanizmams montuoti (gkp dėžutė)",
+}
+
+# Every legacy label the canonical builder no longer emits → its successor.
+_LEGACY_LABEL_MAP = {**_SAN_LEGACY_SPLIT, **_LEGACY_LABEL_RENAMES}
+
 
 def _tier_key(s: str | None) -> str:
     """Label with ONLY the height/Q-level tier suffixes stripped.
@@ -432,7 +444,7 @@ def _norm_label(s: str | None) -> str:
     base = _tier_key(s)
     if _LED_PAIR_RE.match(base):
         return _LED_CONSOLIDATED
-    return _SAN_LEGACY_SPLIT.get(base, base)
+    return _LEGACY_LABEL_MAP.get(base, base)
 
 
 def _has_user_edit(p: dict) -> bool:
@@ -644,7 +656,7 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
         # the `relabeled` notes to the frontend merge as `serverRelabeled`, and
         # that is what stops the browser-side pass 3 from re-carrying the same
         # row the backend just folded away.
-        _into = _SAN_LEGACY_SPLIT.get((p.get("aprasymas") or "").strip().lower())
+        _into = _LEGACY_LABEL_MAP.get((p.get("aprasymas") or "").strip().lower())
         if not edited and _into and _into in rebuilt_labels:
             notes.append({"aprasymas": p.get("aprasymas"),
                           "reason": "relabeled", "into": _into,

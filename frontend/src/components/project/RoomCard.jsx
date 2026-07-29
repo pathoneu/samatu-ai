@@ -70,6 +70,9 @@ function getFieldConfidence(room, field) {
   if (field === 'lubu_aukstis_m' && room?.lubu_aukstis_saltinis) {
     const src = room.lubu_aukstis_saltinis;
     if (src === 'section_pjuvis') return 'high';
+    // Altitudė, atspausdinta PAČIOJE patalpoje lubų plane ir priskirta
+    // deterministiškai (point-in-polygon) — skaityta tiesiai iš brėžinio.
+    if (src === 'ceiling_plan_marker') return 'high';
     if (src === 'ceiling_plan_annotation') return backendConf || 'medium';
     if (src === 'default_fallback') return 'low';
   }

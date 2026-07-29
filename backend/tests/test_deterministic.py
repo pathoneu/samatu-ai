@@ -476,7 +476,12 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
 
 
 def test_pozicijos_p3_dezuciu_gkp_per_wet_room():
-    """Dėžučių iš GKP per wet room (vonia/wc/san). Rangovas P1=2, P2=2, P5=1."""
+    """Pertvaros sutvirtinimas WC mechanizmams, 1 per wet room (vonia/wc/san).
+
+    Rangovas P1=2, P2=2, P5=1. Relabeled 2026-07-29 from "Dėžučių iš GKP
+    formavimas WC mechanizmams paslėpti" to the contractor's own wording —
+    same driver, same quantity, a name his samata actually uses.
+    """
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
@@ -488,8 +493,11 @@ def test_pozicijos_p3_dezuciu_gkp_per_wet_room():
         ],
     }
     out = _run_full_pipeline(parsed)
-    line = [p for p in out["pozicijos"] if "dėžučių iš gkp" in p["aprasymas"].lower()]
+    line = [p for p in out["pozicijos"]
+            if "wc mechanizmams" in p["aprasymas"].lower()]
     assert len(line) == 1
+    assert line[0]["aprasymas"] == (
+        "Pertvaros sutvirtinimas WC mechanizmams montuoti (GKP dėžutė)")
     assert line[0]["kiekis"] == 2  # 1 vonia + 1 wc
     assert line[0]["skyrius"] == "GKP montavimas"
 

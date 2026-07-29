@@ -1604,10 +1604,15 @@ def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
     if checklist:
         base["confidence"] = "low"
     todo = " — suveskite kiekį" if checklist else ""
+    # Every checklist row states WHERE to look — an unfilled row is only useful
+    # if the user knows which sheet answers it (2026-07-29 uniform contract).
+    kur = (" Kur ieškoti: santechnikos planas / sienų išklotinės — "
+           f"{lt} taškai drėgnose patalpose." if checklist else "")
     if not concealed:
         pozicijos.append({**base, "aprasymas": single + todo, "_assumption": (
             f"Virštinkinis {lt} — vienas darbas, viena eilutė "
             f"({'nurodyta prielaidose' if source == 'override' else 'pagal brėžinį'})."
+            + kur
         )})
         return
     note = (f"Potinkinis {lt} — LT konvencija: potinkinė dalis "
@@ -1617,6 +1622,7 @@ def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
         note += (" PRIELAIDA: brėžinyje nenurodyta, ar maišytuvas potinkinis — "
                  "priimta LT standartinė praktika. Jei virštinkinis, pakeisk "
                  "prielaidose (santechnika_potinkinis).")
+    note += kur
     for label in (potinkine, virstinkine):
         pozicijos.append({**base, "aprasymas": label + todo, "_assumption": note})
 
@@ -2263,15 +2269,63 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "_assumption": f"{per_vonia} lentynėlės per vonią × {n_full_vonia} voniose.",
             })
 
-    # P3 NEW: Dėžučių iš GKP formavimas WC mechanizmams paslėpti — count of
-    # wet rooms with klozetas (rangovas P1=2, P2=2, P5=1; 3+/5 freq). 1 per
+        # PLYTELIŲ grindjuostės — the skirting CUT FROM TILES in tiled-floor
+        # rooms (tambūras, katilinė/skalbykla, koridorius su plytelėmis).
+        #
+        # 2026-07-29 gap: `calc_room_quantities` zeroes `grindjuosciu_m` on any
+        # tile_floor room, so those metres vanished from the sąmata entirely —
+        # this was NOT a taxonomy split of the MDF line (contractor berzas nr 35
+        # "Grindjuosčių supjovimas ir suklijavimas", 22.72 m, had NO counterpart
+        # at all). Wet rooms are correctly excluded: their walls are tiled to
+        # height, so there is no skirting — the contractor bills none either.
+        # Same primitives as the MDF line (perim − 0.85 m per door, +10% waste);
+        # gt_per_room agrees (101 = 10.32 m, 106 = 11.80 m → 22.12 vs our 23.59,
+        # +6.6%). The 0.65 m/m² ratio cap is deliberately NOT applied: it exists
+        # to remove interior walls double-counted across a whole flat, and these
+        # are 1-3 small rooms whose perimeter/area ratio is legitimately high.
+        plyteliu_gj = 0.0
+        for r in rooms:
+            if float(r.get("plyteles_grindys_m2") or 0) <= 0:
+                continue
+            if (r.get("paskirtis") or "").lower() in WET:
+                continue  # fully tiled walls → no skirting (contractor agrees)
+            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+                      if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+            plyteliu_gj += max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85)
+        plyteliu_gj = round(plyteliu_gj * 1.10, 2)
+        if plyteliu_gj > 0:
+            pozicijos.append({
+                "skyrius": SK_PL,
+                "aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas",
+                "vnt": "m", "kiekis": plyteliu_gj, "saltinis": SAL,
+                "confidence": "medium",
+                "_assumption": (
+                    "Patalpos su plytelių grindimis (be vonių/WC — ten sienos "
+                    "plytelėtos, grindjuosčių nėra): perimetras − 0,85 m durims "
+                    "+ 10% atliekų. Plytelės pjaunamos iš tos pačios dangos, "
+                    "todėl atskiros medžiagos eilutės nėra."
+                ),
+            })
+
+    # P3 NEW: pertvaros paruošimas potinkiniam WC rėmui — count of wet rooms
+    # with klozetas (rangovas P1=2, P2=2, P5=1; 3+/5 freq). 1 per
     # vonia/wc/san where klozetas exists.
+    #
+    # 2026-07-29 RELABEL: the line used to read "Dėžučių iš GKP formavimas WC
+    # mechanizmams paslėpti" — the same work, under a name no contractor
+    # samata uses, so a line-by-line reconciliation scored berzas nr 7
+    # ("Pertvaros sutvirtinimas WC mechanizmams montuoti", 2 vnt — identical
+    # driver, identical quantity) as MISSING. Renamed to his vocabulary with
+    # our clarifier kept in the parenthetical. Projects priced under the old
+    # label are re-united with this one by `_LEGACY_LABEL_RENAMES` in
+    # api/recompute_quantities.py — without that map the rebuild would show
+    # the user BOTH rows.
     n_wet_klozetas = sum(1 for r in rooms
                           if (r.get("paskirtis") or "").lower() in {"vonia", "wc", "san", "san_mazgas"})
     if n_wet_klozetas > 0:
         pozicijos.append({
             "skyrius": SK_GKP,
-            "aprasymas": "Dėžučių iš GKP formavimas WC mechanizmams paslėpti",
+            "aprasymas": "Pertvaros sutvirtinimas WC mechanizmams montuoti (GKP dėžutė)",
             "vnt": "vnt", "kiekis": n_wet_klozetas, "saltinis": "paskirtis_default",
             "medziagos_aprasymas": "GKP plokštė + profiliai",
             "medziagos_kiekis": n_wet_klozetas, "medziagos_vnt": "vnt",
@@ -2364,17 +2418,30 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                        int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
     # Bathtub mixer is a SEPARATE fixture from the shower mixer (contractor
     # berzas 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
-    # maišytuvas"). Driven by the vonios symbol count — a fixture we already
-    # read but never emitted a position for. 0 symbols → no line, no invention.
-    n_vonios_sym = int((parsed.get("detected_symbols_summary") or {}).get("vonios") or 0)
-    # Bidė dušiukai: NO reader produces this count today (sanitary_fixture_reader
-    # enumerates the type but `_FIXTURE_KEYS` has no bide key, and the symbol
-    # summary has none either). Contractor truth: 3 vnt on berzas AND on
-    # objektas_b — a whole category we bill at zero. Honoured when a count
-    # appears; otherwise emitted as a kiekis=null checklist TODO so the miss is
-    # visible instead of silent. Never defaulted to 1-per-klozetas: berzas has
-    # 3 bidė against 2 klozetai, so that ratio would be wrong by construction.
-    n_bide = int((parsed.get("detected_symbols_summary") or {}).get("bide") or 0)
+    # maišytuvas").
+    # 2026-07-29: it may NOT ride on `vonios`, whose main-prompt meaning is
+    # "Vonios + dušo padėklai" — bathtubs and shower TRAYS in one integer. On
+    # lazunu that key reads 1 while the contractor bills no bathtub mixer at
+    # all, only "Dušo maišytuvo sistemos montavimas (ne potinkinės)": the 1 is
+    # the shower tray. Billing the wrong fixture is worse than billing neither,
+    # so this line rides only on `vonios_kubilai` — the sanitary reader's
+    # tub-only count. No tub evidence but a conflated symbol > 0 → we know a
+    # wet fixture is there and not which, so emit the checklist TODO and let
+    # the user answer. 2 of 6 registry PDFs have no plumbing sheet at all, so
+    # "reader never ran" is a normal state, not an error.
+    _sym = parsed.get("detected_symbols_summary") or {}
+    _tubs_read = _sym.get("vonios_kubilai")
+    n_vonios_sym = int(_tubs_read or 0) if _tubs_read is not None else 0
+    vonia_unknown = _tubs_read is None and int(_sym.get("vonios") or 0) > 0
+    # Bidė dušiukai — counted by the sanitary reader since 2026-07-29 (the
+    # `bide` fixture key); the count lands in detected_symbols_summary via
+    # reconcile_fixture_counts. Contractor truth: 3 vnt on berzas AND on
+    # objektas_b — a whole category we used to bill at zero. When no count
+    # exists (reader skipped / no plumbing sheet) it stays a kiekis=null
+    # checklist TODO so the miss is visible instead of silent. Never defaulted
+    # to 1-per-klozetas: berzas is billed 3 bidė against 2 klozetai, so that
+    # ratio would be wrong by construction.
+    n_bide = int(_sym.get("bide") or 0)
 
     san_concealed, san_source = _resolve_san_concealment(parsed)
     san_emitted: set[str] = set()
@@ -2413,9 +2480,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_SAN, "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
                  "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
             ])
-        # Vonios (bathtub) maišytuvas — only when a bathtub was actually read.
-        if n_vonios_sym > 0:
-            _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym,
+        # Vonios (bathtub) maišytuvas — a real count only when a BATHTUB was
+        # read; a tub-or-tray symbol with no reader evidence becomes a TODO.
+        if n_vonios_sym > 0 or vonia_unknown:
+            _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym or None,
                               san_concealed["vonia"], san_source["vonia"],
                               saltinis="simboliai_brezinyje", emitted=san_emitted)
         # Virtuvė — plautuvė + maišytuvas
@@ -2534,6 +2602,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "aprasymas": "Difūzorių montavimas ir apdirbimas — suveskite kiekį (lubų planas)",
             "vnt": "vnt", "kiekis": None,
             "saltinis": "checklist", "confidence": "low",
+            "_assumption": (
+                "Kiekis neaptiktas automatiškai. Kur ieškoti: lubų / vėdinimo "
+                "planas — apvalūs ir plyšiniai priglaistomi difuzoriai. "
+                "Rangovas paprastai skaičiuoja DVI eilutes: montavimą ir "
+                "apdirbimą (priglaistymą)."
+            ),
         })
     # Termoreguliatoriai: no reader tracks them at all (truth: 8 vnt on the
     # reference project) — always a checklist TODO until a reader exists.
@@ -2542,6 +2616,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         "aprasymas": "Termoreguliatorių pajungimas — suveskite kiekį",
         "vnt": "vnt", "kiekis": None,
         "saltinis": "checklist", "confidence": "low",
+        "_assumption": (
+            "Kiekio skaitytuvo nėra. Kur ieškoti: šildymo / grindinio šildymo "
+            "planas — termostatų vietos patalpose (dažnai 1 vnt kiekvienai "
+            "patalpai su grindiniu šildymu)."
+        ),
     })
 
     # Sprint §40 (2026-04-29): HVAC ortakiai — rangovas audit v2 top gap.
@@ -2610,6 +2689,79 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
     pozicijos.extend(el_lines)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # HONESTY CHECKLIST — bespoke GKP carpentry + TRACK apšvietimas (2026-07-29)
+    #
+    # WHY these are checklist rows and not numbers: every item below is
+    # described in the interjero projekto TEKSTE / išklotinėse, never in a
+    # symbol legend and never as a dimension we can read. On the reference
+    # project (Beržų g. 24) they are SIX of the contractor's 53 priced lines —
+    # nr 4, 5, 6, 8, 11/21, 12 — and every one of them had no counterpart in
+    # our output at all, so a contractor quoting from our sąmata discovered the
+    # omission only after he had given the client a price.
+    #
+    # Per CLAUDE.md: a checklist row the contractor must fill is a feature; an
+    # invented quantity is a defect. `kiekis=None` + `saltinis="checklist"` +
+    # red confidence is the same shape the difūzoriai / termoreguliatoriai /
+    # bidė rows already use, and the export layer drops unfilled rows from the
+    # client-facing PDF/Excel (ExportModal.buildInteriorRows), so an ignored
+    # row can never reach the client as a silent 0,00 €.
+    #
+    # GATING is deliberate — an always-on block would be noise on a project
+    # with no GKP works and no lighting plan. Each row fires only on the
+    # cheapest evidence that its trade is even in scope.
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _checklist(skyrius: str, aprasymas: str, vnt: str, kur: str) -> dict:
+        return {"skyrius": skyrius, "aprasymas": aprasymas, "vnt": vnt,
+                "kiekis": None, "saltinis": "checklist", "confidence": "low",
+                "_assumption": (
+                    f"Kiekis neaptiktas automatiškai — šis darbas aprašomas "
+                    f"projekto tekste/išklotinėse, ne sutartiniuose ženkluose. "
+                    f"Kur ieškoti: {kur}. Neužpildyta eilutė į klientui "
+                    f"siunčiamą sąmatą nepatenka."
+                )}
+
+    if gkp_total > 0 or nisu_total > 0:
+        pozicijos.extend([
+            # berzas nr 4 — 11.16 m
+            _checklist(SK_GKP,
+                       "GKP „dėžučių“ montavimas ant lubų (žeminimas, aukštinimas) — suveskite ilgį",
+                       "m", "lubų planas — lubų lygių ribos (+2800 / +3400 žymos)"),
+            # berzas nr 5 — 9.11 m (ATSKIRA nuo LED nišų!)
+            _checklist(SK_GKP,
+                       "Nišų pertvarose įrengimas (dušo, dekoro) — suveskite ilgį",
+                       "m", "sienų išklotinės — įleistos nišos vonioje ir pertvarose"),
+            # berzas nr 6 — 6.24 m²
+            _checklist(SK_GKP,
+                       "Pertvarų storinimas (LED apšvietimui, galvūgaliui) — suveskite plotą",
+                       "m2", "pertvarų planas + interjero vizualizacijos (galvūgalio, LED sienelės)"),
+            # berzas nr 8 — 9.64 m²
+            _checklist(SK_GKP,
+                       "Gipso kartono klijavimas sienai išlyginti — suveskite plotą",
+                       "m2", "pertvarų planas / pjūviai — nelygios mūro sienos (katilinė, techninės patalpos)"),
+        ])
+        if ortakiai_total > 0:
+            # berzas nr 12 — 1 vnt
+            pozicijos.append(_checklist(
+                SK_GKP, "Dėžutės montavimas ortakiams paslėpti — suveskite kiekį",
+                "vnt", "vėdinimo planas — ortakių trasos po lubomis (garažas, techninės patalpos)"))
+
+    # berzas nr 11 + nr 21 — 20.06 m each. The rail IS drawn on the lubų planas,
+    # but as an unlabelled line, and no reader measures it; the pair (montavimas
+    # + apdirbimas) mirrors how the contractor bills every priglaistomas
+    # element. Gated on a ceiling-lighting read so it never appears on a
+    # project whose lighting plan we never saw.
+    if sviestuvai_n > 0 or pakabinami_n > 0 or led_juostu_m > 0:
+        pozicijos.extend([
+            _checklist(SK_EL,
+                       "Magnetinės TRACK apšvietimo sistemos montavimas — suveskite ilgį",
+                       "m", "lubų / apšvietimo planas — bėgelio linija (dažnai nežymėta simboliu)"),
+            _checklist(SK_EL,
+                       "Magnetinės TRACK apšvietimo sistemos apdirbimas — suveskite ilgį",
+                       "m", "tas pats bėgelio ilgis — priglaistymo darbas atskira eilutė"),
+        ])
 
     # ════════════════════════════════════════════════════════════════════════
     # PRIDĖTINIAI ELEMENTAI (~4-5 lines)
@@ -3538,6 +3690,123 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] height marker scan failed: {exc}")
 
+    # Step 2.4.6: POSITIONED ceiling-altitude markers (2026-07-29).
+    #
+    # Step 2.4.5 above reduces a whole sheet to ONE number (the largest
+    # plausible marker) and Vision reduces the same sheet the other way
+    # ("+2800 visos kitos patalpos"). Both throw away the pairing the drawing
+    # states explicitly: each altitude is PRINTED INSIDE a room. Beržų room
+    # 101 is bracketed by two `+3400` on the lubų planas; three production
+    # Vision runs read it 2.8 / 2.8 / 3.4 — a coin flip on 42.5 m² of high
+    # wall. Point-in-polygon over the printed markers returns 3.4 on all
+    # three, deterministically, with no Vision call.
+    #
+    # Marker-sourced heights OUTRANK Vision's per-room map: the marker is
+    # printed text at a position, read the same way every time; the model's
+    # holistic read of the same sheet demonstrably is not. Rooms with no
+    # marker keep whatever they had and are DISCLOSED (lt_rules.apply_lt_sanity).
+    try:
+        from extractor.height_markers import (
+            assign_markers_to_rooms,
+            scan_positioned_page_tokens,
+        )
+        from extractor.page_classifier import canonical_tipas
+
+        _rooms_now = parsed.get("patalpos") or []
+        _ceiling_pages = [
+            int(p["nr"]) for p in (parsed.get("puslapiai") or [])
+            if p.get("nr") and canonical_tipas(p.get("tipas")) == "ceiling_plan"
+        ]
+        if _ceiling_pages and _rooms_now:
+            _tokens = scan_positioned_page_tokens(pdf_bytes, _ceiling_pages)
+            _assign = assign_markers_to_rooms(
+                _tokens["markers"], _tokens["labels"], _rooms_now)
+            parsed["_height_marker_lane"] = {
+                "pages": _ceiling_pages,
+                "n_markers": len(_tokens["markers"]),
+                "ok": _assign["ok"],
+                "reason": _assign["reason"],
+                "frame": _assign["frame"],
+                "evidence": _assign["evidence"],
+                "unassigned": _assign["unassigned"],
+                "rooms_without_marker": _assign["rooms_without_marker"],
+            }
+            if _assign["ok"]:
+                _by_name = dict(parsed.get("lubu_auksciai") or {})
+                _by_nr = dict(parsed.get("lubu_auksciai_by_nr") or {})
+                _changed = []
+                _kept_taller = []
+                for room in _rooms_now:
+                    nr = str(room.get("nr") or "").strip()
+                    marker_h = _assign["by_nr"].get(nr)
+                    if marker_h is None:
+                        continue
+                    prev = room.get("lubu_aukstis_m")
+                    # Split-level guard. A marker labels ONE ceiling plane. In a
+                    # double-height room (objektas_b's 5.7 m svetainė) the plan
+                    # prints the LOW plane's altitude inside the same outline, so
+                    # taking it would delete the tall zone — the exact collapse
+                    # commit 7d3cb39 was fixed for. When the existing per-room
+                    # read is a storey taller than the marker, that is a
+                    # split-level signal, not a correction: keep the taller
+                    # value and disclose the conflict.
+                    try:
+                        _prev_f = float(prev) if prev is not None else None
+                    except (TypeError, ValueError):
+                        _prev_f = None
+                    if _prev_f is not None and _prev_f - marker_h >= 0.5:
+                        room["_height_marker_conflict"] = {
+                            "marker_m": marker_h, "kept_m": _prev_f,
+                            "reason": "split_level_suspected"}
+                        _kept_taller.append({"nr": nr, "marker": marker_h,
+                                             "kept": _prev_f})
+                        continue
+                    # Write BOTH maps: the merge below is name-keyed and a
+                    # stale name entry would otherwise beat the marker.
+                    _by_nr[nr] = marker_h
+                    name = room.get("pavadinimas")
+                    if name:
+                        _by_name[name] = marker_h
+                    room["_height_source"] = "positioned_marker"
+                    room["_height_marker_evidence"] = _assign["evidence"].get(nr)
+                    # Kept for the post-merge re-assert below: `_apply_per_room_heights`
+                    # is NAME-keyed, and Beržų alone has two rooms called
+                    # "Berniuko kambarys". A marker is tied to a room NUMBER —
+                    # same reasoning as 264f085 (eksplikacija joined by nr).
+                    room["_height_marker_m"] = marker_h
+                    if prev is None or abs(float(prev) - marker_h) >= 0.05:
+                        _changed.append({"nr": nr, "from": prev, "to": marker_h})
+                parsed["lubu_auksciai"] = _by_name
+                parsed["lubu_auksciai_by_nr"] = _by_nr
+                parsed["_height_marker_lane"]["changed"] = _changed
+                parsed["_height_marker_lane"]["kept_taller"] = _kept_taller
+                for room in _rooms_now:
+                    if room.get("_height_source"):
+                        continue
+                    nr = str(room.get("nr") or "").strip()
+                    room["_height_source"] = (
+                        "vision_per_room"
+                        if (nr in (parsed.get("lubu_auksciai_by_nr") or {})
+                            or room.get("pavadinimas") in _by_name)
+                        else "global_fallback"
+                    )
+                _emit({
+                    "event": "height_from_positioned_markers",
+                    "pages": _ceiling_pages,
+                    "assigned": len(_assign["by_nr"]),
+                    "changed": _changed,
+                    "kept_taller": _kept_taller,
+                    "frame": _assign["frame"],
+                    "without_marker": _assign["rooms_without_marker"],
+                })
+            else:
+                _emit({"event": "positioned_marker_lane_skipped",
+                       "reason": _assign["reason"],
+                       "pages": _ceiling_pages,
+                       "n_markers": len(_tokens["markers"])})
+    except Exception as exc:
+        print(f"[extractor] positioned height marker lane failed: {exc}")
+
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
     #
@@ -3592,6 +3861,21 @@ def extract_interior(
         rooms_raw = _apply_per_room_heights(
             rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
         )
+        # Re-assert the POSITIONED-marker heights and tag them, so the UI shows
+        # 🟢 (read directly off the drawing) rather than the generic per_room
+        # tag. This runs AFTER `_apply_per_room_heights` on purpose: that pass
+        # is name-keyed, so two rooms sharing a name (Beržų has two "Berniuko
+        # kambarys") would otherwise both take whichever value landed in the
+        # name map last. The marker is tied to a room NUMBER — re-asserting it
+        # here makes the lane immune to that collapse. It returns fresh dicts,
+        # but `_height_marker_m` survives the copy.
+        for room in rooms_raw:
+            if room.get("_height_source") != "positioned_marker":
+                continue
+            marker_h = room.get("_height_marker_m")
+            if marker_h is not None:
+                room["lubu_aukstis_m"] = float(marker_h)
+            room["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
         parsed["patalpos"] = rooms_raw
         _emit({
             "event": "per_room_ceiling_applied",
@@ -3920,9 +4204,15 @@ def extract_interior(
         from .sanitary_fixture_reader import (
             read_fixtures, read_fixtures_voted, reconcile_fixture_counts)
         _emit({"event": "fixtures_started"})
-        fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [])
+        # `puslapiai` (the main pass's page classification) steers the page
+        # picker onto the sheet labelled `plumbing` instead of the first page
+        # that happens to say "maišytuvas" — see _find_sanitary_pages.
+        _pages_meta = parsed.get("puslapiai") or []
+        fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [],
+                                  pages_meta=_pages_meta)
               if _voting_on else
-              read_fixtures(pdf_bytes, parsed.get("patalpos") or []))
+              read_fixtures(pdf_bytes, parsed.get("patalpos") or [],
+                            pages_meta=_pages_meta))
         # Roll fixture-reader tokens into cost (voted: per-round; single: one).
         for _rm in _reader_call_metas(fx):
             _append_extra_call(parsed, _rm, reader="fixtures")

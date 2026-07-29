@@ -277,3 +277,311 @@ def salvage_heights_from_warnings(
             result.setdefault(name, height)
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# POSITIONED ceiling-altitude markers (2026-07-29)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# The scanner above throws away the one thing that makes a lubų-plano marker
+# unambiguous: WHERE it is printed. `scan_page_height_markers` collapses a
+# whole sheet into "the largest plausible value", and Vision — asked to read
+# the same sheet holistically — collapses it the other way, into "+2800 visos
+# kitos patalpos". Both readings lose the room→value pairing that the drawing
+# states explicitly by placing each altitude inside a room outline.
+#
+# Measured case — Beržų g. 24, page 6 (LUBŲ PLANAS). Its legend literally
+# says "Lubų apačios altitudė, aukštis nuo grindų, mm", and the text layer
+# carries 14 positioned markers. Room 101 (Tambūras) is bracketed by two
+# `+3400`; the nearest `+2800` sits past the wall in 103/107. Three separate
+# production Vision runs read that room 2.8 / 2.8 / 3.4 — a coin flip on
+# 42.5 m² of high wall and 11.0 m² of high ceiling. Point-in-polygon over the
+# printed markers returns 3.4 on all three, from the same bytes, for free.
+#
+# Two deliberate limits:
+#   • ONLY pages the extract itself classified `ceiling_plan`. On a section
+#     a "+2800" is a level on a vertical drawing and the room polygons are
+#     floor-plan-frame percentages, so containment would be meaningless; on
+#     a floor plan a "+3.000" can be the slab level of the storey above.
+#     Widening this needs its own evidence.
+#   • A frame-agreement gate (below). Room polygons come from Vision looking
+#     at the FLOOR-plan page; using them on the ceiling-plan page assumes both
+#     sheets place the drawing in the same frame. That assumption is checked,
+#     not asserted — see `frame_agreement`.
+
+# A standalone marker token as `extract_words()` yields it: "+2800", "+3.400",
+# "±0.000". Anchored — "A+2800" or "2800" alone is not an altitude marker.
+_POSITIONED_MARKER_RE = re.compile(r'^[+±]\s*(\d+(?:[.,]\d{1,3})?)$')
+# A bare room number as printed on the plan: "101", "12". 2–4 digits.
+_ROOM_NR_TOKEN_RE = re.compile(r'^\d{2,4}$')
+
+# Positioned markers get the wider band the warnings salvage uses: a double
+# -height slice is real, and unlike a bare section marker this value is
+# geometrically tied to one room, so a stray ridge value cannot go project-wide.
+POSITIONED_MIN_M = MIN_CEILING_M
+POSITIONED_MAX_M = MAX_NARRATED_CEILING_M
+
+# Frame-agreement gate. Of the rooms that carry a polygon/bbox, this share
+# must have their own room-number label printed inside their own outline on
+# the marker page before we trust the two frames to be the same. Beržų scores
+# 10/11 and 11/11 across runs; a section page or a mismatched sheet scores ~0.
+MIN_FRAME_AGREEMENT = 0.6
+MIN_AGREEING_ROOMS = 3
+
+
+def _marker_value_m(raw: str) -> float | None:
+    """Parse a positioned marker token into metres, or None.
+
+    LT lubų planai print altitudes in mm (`+3400`); pjūviai print metres
+    (`+3.400`). Same >100 heuristic the warnings salvage uses.
+    """
+    m = _POSITIONED_MARKER_RE.match(raw.strip())
+    if not m:
+        return None
+    try:
+        val = float(m.group(1).replace(',', '.'))
+    except ValueError:
+        return None
+    if val > 100:            # bare mm integer
+        val = val / 1000.0
+    if not (POSITIONED_MIN_M <= val <= POSITIONED_MAX_M):
+        return None
+    return round(val, 3)
+
+
+def scan_positioned_page_tokens(
+    pdf_bytes: bytes,
+    page_nrs: tuple[int, ...] | list[int],
+) -> dict:
+    """Read altitude markers AND room-number labels off the given pages,
+    each with its centre expressed as a fraction of page width/height.
+
+    Percent coordinates (not points) because that is the space room
+    ``polygon_pct`` / ``bbox_pct`` already live in, and it survives the
+    A1-vs-A3 sheet-size differences across a project set.
+
+    Returns ``{"markers": [...], "labels": [...]}``; both lists are empty on
+    any pdfplumber failure (absence = "no signal", never a hard failure).
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return {"markers": [], "labels": []}
+
+    markers: list[dict] = []
+    labels: list[dict] = []
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for pn in page_nrs:
+                if pn < 1 or pn > len(pdf.pages):
+                    continue
+                page = pdf.pages[pn - 1]
+                width = float(page.width or 0)
+                height = float(page.height or 0)
+                if width <= 0 or height <= 0:
+                    continue
+                try:
+                    words = page.extract_words()
+                except Exception:
+                    continue
+                for w in words:
+                    text = str(w.get("text") or "").strip()
+                    if not text:
+                        continue
+                    try:
+                        x_pct = ((float(w["x0"]) + float(w["x1"])) / 2) / width
+                        y_pct = ((float(w["top"]) + float(w["bottom"])) / 2) / height
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    value = _marker_value_m(text)
+                    if value is not None:
+                        markers.append({"page": pn, "raw": text, "value_m": value,
+                                        "x_pct": x_pct, "y_pct": y_pct})
+                    elif _ROOM_NR_TOKEN_RE.match(text):
+                        labels.append({"page": pn, "nr": text.lstrip("0") or "0",
+                                       "x_pct": x_pct, "y_pct": y_pct})
+    except Exception:
+        return {"markers": [], "labels": []}
+    return {"markers": markers, "labels": labels}
+
+
+def _room_outline(room: dict) -> tuple[list[tuple[float, float]], float] | None:
+    """Return (polygon_points_pct, area_pct) for a room, or None.
+
+    Prefers ``polygon_pct`` (a real traced outline when the polygon lane
+    produced one); falls back to the ``bbox_pct`` rectangle.
+    """
+    poly = room.get("polygon_pct")
+    pts: list[tuple[float, float]] = []
+    if isinstance(poly, (list, tuple)) and len(poly) >= 3:
+        for p in poly:
+            try:
+                pts.append((float(p[0]), float(p[1])))
+            except (TypeError, ValueError, IndexError):
+                pts = []
+                break
+    if len(pts) < 3:
+        bb = room.get("bbox_pct")
+        if not isinstance(bb, dict):
+            return None
+        try:
+            x, y = float(bb["x"]), float(bb["y"])
+            w, h = float(bb["w"]), float(bb["h"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if w <= 0 or h <= 0:
+            return None
+        pts = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    # Shoelace area — the "most specific" tie-break when outlines overlap.
+    area = abs(sum(pts[i][0] * pts[(i + 1) % len(pts)][1]
+                   - pts[(i + 1) % len(pts)][0] * pts[i][1]
+                   for i in range(len(pts)))) / 2.0
+    return pts, area
+
+
+def _point_in_polygon(x: float, y: float,
+                      pts: list[tuple[float, float]]) -> bool:
+    """Ray-casting point-in-polygon. Boundary counts as inside-ish (a marker
+    printed exactly on a traced wall line belongs to that room)."""
+    inside = False
+    n = len(pts)
+    for i in range(n):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % n]
+        if (y1 > y) != (y2 > y):
+            x_cross = (x2 - x1) * (y - y1) / (y2 - y1) + x1
+            if x <= x_cross:
+                inside = not inside
+    return inside
+
+
+def _centroid(pts: list[tuple[float, float]]) -> tuple[float, float]:
+    return (sum(p[0] for p in pts) / len(pts),
+            sum(p[1] for p in pts) / len(pts))
+
+
+def _norm_nr(raw) -> str:
+    s = str(raw or "").strip()
+    return (s.lstrip("0") or "0") if s.isdigit() else s.lower()
+
+
+def frame_agreement(labels: list[dict], rooms: list[dict]) -> dict:
+    """How many rooms have their own number printed inside their own outline
+    on the marker page.
+
+    This is the honest check on the cross-page assumption: room outlines are
+    read off the FLOOR plan, markers off the CEILING plan. If both sheets
+    frame the drawing identically the labels land inside; if the sheets are
+    scaled/offset differently, or the page is a section, they do not — and
+    the caller declines to assign anything.
+    """
+    agree, total = 0, 0
+    for room in rooms:
+        outline = _room_outline(room)
+        if outline is None:
+            continue
+        pts, _ = outline
+        total += 1
+        nr = _norm_nr(room.get("nr"))
+        if not nr:
+            continue
+        if any(lbl.get("nr") == nr and _point_in_polygon(
+                float(lbl["x_pct"]), float(lbl["y_pct"]), pts)
+                for lbl in labels):
+            agree += 1
+    ratio = (agree / total) if total else 0.0
+    return {"agree": agree, "total": total, "ratio": round(ratio, 3)}
+
+
+def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
+                            rooms: list[dict]) -> dict:
+    """Assign each positioned altitude marker to the room whose outline
+    contains it, and reduce the per-room marker set to one height.
+
+    Reduction rule: the DOMINANT value (most markers), tie broken by the
+    marker printed nearest the room centroid — the most specific reading
+    the drawing offers for that room. A room bracketed by two `+3400` with
+    one `+2800` clipping its edge reads 3.4, which is what the drawing says.
+
+    Returns a dict that always carries ``ok`` and ``reason``; when ``ok`` is
+    False the caller must keep whatever heights it already had.
+    """
+    out: dict = {
+        "ok": False,
+        "reason": "",
+        "frame": {"agree": 0, "total": 0, "ratio": 0.0},
+        "by_nr": {},
+        "evidence": {},
+        "unassigned": [],
+        "rooms_without_marker": [],
+    }
+    if not markers:
+        out["reason"] = "no_positioned_markers"
+        return out
+    if not rooms:
+        out["reason"] = "no_rooms"
+        return out
+
+    outlines: list[tuple[str, list[tuple[float, float]], float]] = []
+    for room in rooms:
+        outline = _room_outline(room)
+        if outline is None:
+            continue
+        pts, area = outline
+        outlines.append((str(room.get("nr") or "").strip(), pts, area))
+    if not outlines:
+        out["reason"] = "no_room_outlines"
+        return out
+
+    frame = frame_agreement(labels, rooms)
+    out["frame"] = frame
+    if frame["agree"] < MIN_AGREEING_ROOMS or frame["ratio"] < MIN_FRAME_AGREEMENT:
+        out["reason"] = (f"frame_mismatch({frame['agree']}/{frame['total']}) — "
+                         f"room numbers are not printed inside their own "
+                         f"outlines on the marker page")
+        return out
+
+    hits: dict[str, list[dict]] = {}
+    for marker in markers:
+        mx, my = float(marker["x_pct"]), float(marker["y_pct"])
+        candidates = [(area, nr, pts) for nr, pts, area in outlines
+                      if nr and _point_in_polygon(mx, my, pts)]
+        if not candidates:
+            out["unassigned"].append({"raw": marker["raw"],
+                                      "value_m": marker["value_m"],
+                                      "page": marker["page"]})
+            continue
+        # Smallest containing outline wins — the most specific room.
+        area, nr, pts = min(candidates, key=lambda c: c[0])
+        cx, cy = _centroid(pts)
+        hits.setdefault(nr, []).append({
+            **marker,
+            "_dist": ((mx - cx) ** 2 + (my - cy) ** 2) ** 0.5,
+        })
+
+    for nr, ms in hits.items():
+        counts: dict[float, int] = {}
+        for m in ms:
+            counts[m["value_m"]] = counts.get(m["value_m"], 0) + 1
+        nearest_by_value: dict[float, float] = {}
+        for m in ms:
+            v = m["value_m"]
+            if v not in nearest_by_value or m["_dist"] < nearest_by_value[v]:
+                nearest_by_value[v] = m["_dist"]
+        chosen = min(counts, key=lambda v: (-counts[v], nearest_by_value[v]))
+        out["by_nr"][nr] = chosen
+        out["evidence"][nr] = {
+            "chosen_m": chosen,
+            "page": ms[0]["page"],
+            "markers": sorted(m["raw"] for m in ms),
+            "values_m": sorted(m["value_m"] for m in ms),
+        }
+
+    out["rooms_without_marker"] = [
+        str(r.get("nr") or "").strip() for r in rooms
+        if str(r.get("nr") or "").strip() not in out["by_nr"]
+    ]
+    out["ok"] = bool(out["by_nr"])
+    if not out["ok"]:
+        out["reason"] = "no_marker_fell_inside_any_room"
+    return out

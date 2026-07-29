@@ -31,13 +31,23 @@ from models_config import model_for  # role: "sanitary" — resolved at call tim
 MAX_TOKENS = 4096
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
 from .response_text import response_text
-_FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai")
+# `bide` added 2026-07-29: the contractor bills "Bide dušiukų potinkinės dalies
+# įrengimas" + "…virštinkinės dalies montavimas" on berzas AND objektas_b, and
+# no reader produced the count — the emit layer could only raise a kiekis=null
+# checklist row. It is enumerable (see the prompt below), so it is a fixture,
+# not a TODO.
+_FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai", "bide")
 
 SYSTEM_PROMPT = """Tu skaitai LT santechnikos / vandentiekio brėžinį.
 
 SVARBU: ENUMERUOK kiekvieną santechnikos prietaisą ATSKIRU įrašu (point-list) — NE bendrą skaičių iš akies. Tankūs simboliai praleidžiami, jei skaičiuoji „iš akies"; surašyk kiekvieną atskirai ir tik tada suskaičiuok.
 
-Ieškok: praustuvės/kriauklės (maišytuvo pajungimai), klozetai (WC rėmai), vonios, dušai (dušo galvos/trapai), bidė.
+Ieškok: praustuvės/kriauklės (maišytuvo pajungimai), klozetai (WC rėmai), vonios, dušai (dušo galvos/trapai), bidė dušiukai (higieniniai dušai).
+
+KAIP ATSKIRTI (čia daromos klaidos):
+· VONIA = maudymosi vonia — didelis stačiakampis arba ovalas užapvalintais galais, dažnai su prierašu „vonia". DUŠAS = dušo zona: dušo galva, trapas arba linijinis latakas, dušo padėklas. Dušo padėklas NĖRA vonia. Jei nesi tikras, kad tai vonia — įrašyk kaip dušą. Vonia ir dušas skaičiuojami ATSKIRAI, net kai yra toje pačioje patalpoje.
+· BIDĖ DUŠIUKAS (higieninis dušas) = mažas potinkinis vandens taškas arba maišytuvo dalis SIENOJE ŠALIA KLOZETO, dažnai su altitude h≈1000–1100 mm. Tai nėra dušas (dušas turi galvą ir trapą) ir nėra atskiras pastatomas bidė unitazas. LT brėžiniuose žodis „bidė" dažnai NEparašomas — atpažįstama iš vietos (prie klozeto) ir altitudės.
+· Bidė kiekio NIEKADA nespėk pagal klozetų kiekį — jie nesutampa. Skaičiuok tik tuos taškus, kuriuos MATAI brėžinyje; jei nė vieno nematai, rašyk 0.
 
 Grąžink TIK JSON, jokios prozos, be markdown fences."""
 
@@ -51,6 +61,7 @@ Output JSON:
   "vonios_count": number,
   "dusai_count": number,
   "wc_remai_count": number,
+  "bide_count": number,
   "pastabos": "trumpai"
 }"""
 
@@ -66,17 +77,67 @@ def build_user_text(rooms: list[dict]) -> str:
     return "\n".join(lines) + _USER_SCHEMA
 
 
-def _find_sanitary_pages(pdf_bytes: bytes) -> list[int]:
-    hits: list[int] = []
+# Roles a santechnikos planas can never have. Used only to VETO a text hit —
+# `floor_plan` is deliberately absent, because a combined plan legitimately
+# carries the plumbing layout.
+_NON_PLUMBING_TIPAI = frozenset({
+    "electrical", "ceiling_plan", "wall_elevation", "non_relevant", "title_page",
+    "finish_schedule", "specification", "section", "site_plan", "facade",
+    "structural",
+})
+# Title-block words — present on the sheet that IS the plumbing plan.
+_TITLE_HINTS = ("SANTECH", "VANDENTIEK")
+# An annotation any drawing may carry (every išklotinė that labels a mixer
+# matches it), so it only decides when no title-block hit exists.
+_WEAK_HINTS = ("MAIŠYTUV", "MAISYTUV")
+
+
+def _find_sanitary_pages(pdf_bytes: bytes, pages_meta: list[dict] | None = None,
+                         limit: int = 2) -> list[int]:
+    """Pick the santechnikos-plano page(s) to read, best evidence first.
+
+    1. pages the page classifier already labelled `plumbing` — the only
+       POSITIVE signal that a sheet is the plumbing plan;
+    2. pages whose text carries a title-block word (SANTECHNIKOS/VANDENTIEKIS);
+    3. pages that merely mention a maišytuvas.
+    Tiers 2-3 drop any page the classifier assigned to a different role.
+
+    WHY (2026-07-29 audit of all 6 registry PDFs): the old bare-text scan took
+    the first two hits in page order, so on romainiai it read two išklotinės
+    (pages 16-17, "maišytuvas" annotations) while the sheets naming SANTECHNIKA
+    sat at 23-24 — and those two are the apšvietimo planas, i.e. that project
+    has no plumbing sheet at all. On objektas_b it burned one of the two slots
+    on the baldų planas (page 2). Both cases count fixtures off a drawing that
+    is not a plumbing plan. berzas is unaffected (page 4 is classified
+    `plumbing` and is the only hit either way).
+    """
+    role: dict[int, str] = {}
+    for p in pages_meta or []:
+        try:
+            nr = int(p.get("nr"))
+        except (TypeError, ValueError):
+            continue
+        if nr >= 1:                       # a classifier can emit nr=0/null
+            role[nr] = (p.get("tipas") or "").lower()
+    classified = sorted(nr for nr, t in role.items() if t == "plumbing")
+    if classified:
+        return classified[:limit]
+    strong: list[int] = []
+    weak: list[int] = []
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for i, page in enumerate(pdf.pages):
+                nr = i + 1
+                if role.get(nr) in _NON_PLUMBING_TIPAI:
+                    continue
                 t = (page.extract_text() or "").upper()
-                if "SANTECH" in t or "MAIŠYTUV" in t or "MAISYTUV" in t or "VANDENTIEK" in t:
-                    hits.append(i + 1)
+                if any(h in t for h in _TITLE_HINTS):
+                    strong.append(nr)
+                elif any(h in t for h in _WEAK_HINTS):
+                    weak.append(nr)
     except Exception as exc:  # noqa: BLE001
         print(f"[sanitary_fixture_reader] scan failed: {exc}")
-    return hits[:2]
+    return (strong or weak)[:limit]
 
 
 def _render_page_b64(pdf_bytes: bytes, page_nr: int) -> Optional[str]:
@@ -96,11 +157,16 @@ def _render_page_b64(pdf_bytes: bytes, page_nr: int) -> Optional[str]:
         return None
 
 
-def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None) -> dict:
+def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None,
+                  pages_meta: list[dict] | None = None) -> dict:
     """Point-list-then-count of sanitary fixtures. Returns
-    {status, pages, counts:{praustuves,klozetai,...}, prietaisai, _elapsed_s, _meta}."""
+    {status, pages, counts:{praustuves,klozetai,...}, prietaisai, _elapsed_s, _meta}.
+
+    `pages_meta` is the main pass's `puslapiai` page classification; passing it
+    lets the page picker use the `plumbing` label instead of guessing from text.
+    """
     t0 = time.time()
-    pages = _find_sanitary_pages(pdf_bytes)
+    pages = _find_sanitary_pages(pdf_bytes, pages_meta)
     if not pages:
         return {"status": "skipped", "_error": "no santechnika page",
                 "_elapsed_s": round(time.time() - t0, 2)}
@@ -193,10 +259,11 @@ def _aggregate_fixture_votes(runs: list[dict]) -> dict:
     return out
 
 
-def read_fixtures_voted(pdf_bytes: bytes, rooms: list[dict], client=None, n: int = 3) -> dict:
+def read_fixtures_voted(pdf_bytes: bytes, rooms: list[dict], client=None, n: int = 3,
+                        pages_meta: list[dict] | None = None) -> dict:
     """Self-consistency wrapper: run read_fixtures n times, median/mode-vote each
     fixture count (the only stability lever on Opus 4.8 for this single-pass reader)."""
-    runs = [read_fixtures(pdf_bytes, rooms, client) for _ in range(max(1, n))]
+    runs = [read_fixtures(pdf_bytes, rooms, client, pages_meta) for _ in range(max(1, n))]
     return _aggregate_fixture_votes(runs)
 
 
@@ -217,4 +284,15 @@ def reconcile_fixture_counts(symbols: dict, reader_counts: dict) -> dict:
             raised.append(k)
         else:
             merged[k] = sym
+    # `vonios` in the MAIN prompt means "vonios + dušo padėklai" — bathtubs and
+    # shower trays in ONE integer (prompt.py). Merged with max() it stays
+    # conflated, which is fine for the consumers that want every wet fixture
+    # (skylių gręžimas), but it cannot decide whether a BATHTUB mixer exists:
+    # a shower-only flat would be billed a vonios maišytuvas it never gets.
+    # This reader counts tubs and showers separately, so publish its tub-only
+    # number under its own key and leave `vonios` untouched. Absent key ⇒ no
+    # tub evidence at all (reader skipped) — the emit layer must then ask,
+    # not guess.
+    if (reader_counts or {}).get("vonios") is not None:
+        merged["vonios_kubilai"] = _safe_count(reader_counts.get("vonios"))
     return {"merged": merged, "raised": raised, "any_raised": bool(raised)}

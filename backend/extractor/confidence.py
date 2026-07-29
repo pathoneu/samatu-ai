@@ -36,6 +36,19 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     ("lentynėlių", GELTONA, "Skaičius iš simbolių: −20%/+33% (2 projektai)"),
     ("praustuvės", GELTONA, "Simbolių skaičiavimas: ±40% (2 projektai)"),
     ("klozeto montavimas", GELTONA, "Simbolių/bide skaičiavimas: 0%/−40% (2 projektai)"),
+    # 2026-07-29: bidė is read for the first time. LT brėžiniuose the word
+    # „bidė" is usually absent — the reader identifies it by POSITION (next to
+    # the klozetas) and altitude (~1000-1100 mm), so the count is a genuine
+    # inference, not a label read. Never green.
+    ("bidė dušiuko", GELTONA,
+     "Bidė dušiukas atpažįstamas iš vietos prie klozeto ir altitudės — brėžinyje "
+     "žodis „bidė“ dažniausiai neparašytas; kiekį patikrinkite"),
+    # The bathtub mixer rides on the reader's tub-only count because the symbol
+    # summary lumps vonias with dušo padėklais; a mis-called tray bills the
+    # wrong fixture, so the line asks to be verified.
+    ("vonios maišytuvo", GELTONA,
+     "Vonia ir dušo padėklas brėžinyje atrodo panašiai — patikrinkite, ar patalpoje "
+     "tikrai yra vonia, ne dušas"),
     ("kampų montavimas", GELTONA,
      "Formulė kalibruota pagal 1 rangovo samatą (Beržų) — apima ginčytiną "
      "pusinių kampų ir perimetro dedamąją; tikslumas nepatvirtintas (reikia daugiau etalonų)"),

@@ -5327,6 +5327,17 @@ def generate_pdf(request: Request, data: dict):
     _NB = "\u00a0"          # NO-BREAK SPACE — reportlab never breaks on it
 
     def _n(v):
+        # A MISSING number prints as an empty cell, never the literal "None"
+        # (2026-07-29). Checklist rows ship with `kiekis=None` on purpose — the
+        # quantity is a TODO for the contractor, not a value — and the frontend
+        # drops them before POSTing, but any other caller (saved-blob replay,
+        # API consumer) used to put "None None None" in the Kiekis/Kaina/Suma
+        # columns of a client-facing PDF. Excel already writes a blank cell for
+        # the same input (`_excel_number(None) → (None, True)`); this makes the
+        # two exports agree. A non-numeric STRING still prints verbatim — that
+        # path is the deliberate "unparseable value, say so" behaviour.
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return ""
         if not isinstance(v, (int, float)):
             return str(v)
         return f"{v:,.2f}".replace(",", _NB).replace(".", ",")

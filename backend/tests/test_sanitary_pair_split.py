@@ -79,13 +79,37 @@ def test_concealed_project_emits_pairs_singles_and_matching_counts():
     assert _qty(out, "linijinio latako") == [2]
 
 
-def test_bathtub_mixer_pair_follows_the_vonios_symbol():
-    out = _build(symbols={"praustuves": 3, "vonios": 1})
+def test_bathtub_mixer_pair_follows_the_readers_tub_only_count():
+    """`vonios` in the symbol summary is "Vonios + dušo padėklai" — tubs AND
+    shower trays in one integer. Only the sanitary reader's tub-only count
+    (`vonios_kubilai`) may bill a BATHTUB mixer."""
+    out = _build(symbols={"praustuves": 3, "vonios": 3, "vonios_kubilai": 1})
     assert _qty(out, "vonios maišytuvo potinkinės") == [1]
     assert _qty(out, "vonios maišytuvo virštinkinės") == [1]
     # No bathtub read → no bathtub mixer invented.
     out0 = _build(symbols={"praustuves": 3})
     assert _qty(out0, "vonios maišytuvo") == []
+
+
+def test_shower_tray_read_as_a_tub_does_not_bill_a_bathtub_mixer():
+    """lazunu: the contractor bills only "Dušo maišytuvo sistemos montavimas
+    (ne potinkinės)" — no bathtub anywhere — yet the conflated symbol reads 1.
+    Reader says 0 tubs → the bathtub line must not appear at all."""
+    out = _build(symbols={"praustuves": 1, "vonios": 1, "vonios_kubilai": 0,
+                          "dusai": 1})
+    assert _qty(out, "vonios maišytuvo") == []
+
+
+def test_conflated_tub_symbol_without_reader_evidence_is_a_todo_not_a_guess():
+    """No reader ran (2 of 6 registry PDFs have no plumbing sheet), so the 1
+    could be a tub or a tray. Billing the wrong fixture is worse than billing
+    neither — ask, visibly."""
+    out = _build(symbols={"praustuves": 1, "vonios": 1})
+    vonia = [p for p in _san(out) if "vonios maišytuvo" in p["aprasymas"].lower()]
+    assert len(vonia) == 2                                   # still the pair
+    assert all(p["kiekis"] is None for p in vonia), vonia
+    assert all(p["saltinis"] == "checklist" for p in vonia), vonia
+    assert all("suveskite kiekį" in p["aprasymas"] for p in vonia), vonia
 
 
 def test_no_single_line_survives_alongside_its_pair():
@@ -159,6 +183,34 @@ def test_assumption_notes_do_not_accumulate_across_rebuilds():
     third = _build_pozicijos_from_rooms(second)
     assert not [w for w in third["warnings"]
                 if w.get("field") == _SAN_ASSUMPTION_FIELD]
+
+
+# ── bidė: a read count, not a TODO (2026-07-29) ──────────────────────────────
+def test_read_bide_count_becomes_a_real_pair_not_a_checklist():
+    out = _build(symbols={"praustuves": 3, "bide": 3})
+    bide = [p for p in _san(out) if "bidė dušiuko" in p["aprasymas"].lower()]
+    assert len(bide) == 2
+    assert [p["kiekis"] for p in bide] == [3, 3]          # pair halves agree
+    assert all(p["saltinis"] == "simboliai_brezinyje" for p in bide), bide
+    assert not any("suveskite kiekį" in p["aprasymas"] for p in bide), bide
+
+
+def test_bide_count_is_never_derived_from_the_klozetas_count():
+    """berzas is billed 3 bidė against 2 klozetai — a 1-per-WC default would be
+    wrong by construction. No bidė read ⇒ no bidė number, only the TODO."""
+    out = _build(symbols={"praustuves": 3, "klozetai": 2})
+    bide = [p for p in _san(out) if "bidė dušiuko" in p["aprasymas"].lower()]
+    assert all(p["kiekis"] is None for p in bide), bide
+
+
+def test_read_bide_line_is_never_a_confident_green():
+    """LT drawings rarely write "bidė" — the count is inferred from position +
+    altitude, so the line must carry a verify-me flag."""
+    from extractor.confidence import apply_confidence, ZALIA
+    out = apply_confidence(_build(symbols={"praustuves": 3, "bide": 3}))
+    bide = [p for p in _san(out) if "bidė dušiuko" in p["aprasymas"].lower()]
+    assert bide and all(p["confidence"] != ZALIA for p in bide), bide
+    assert all(p.get("_confidence_reason") for p in bide), bide
 
 
 # ── unread categories stay VISIBLE, never silently zero ──────────────────────

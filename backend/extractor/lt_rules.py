@@ -226,6 +226,64 @@ def apply_lt_sanity(parsed: dict) -> dict:
                 "message": f"{pavadinimas} (nr={nr}): {note}",
             })
 
+    # ── Where each room's ceiling height came from (2026-07-29) ──────────
+    # The positioned-marker lane (`height_markers.assign_markers_to_rooms`)
+    # reads the altitude PRINTED INSIDE each room on the lubų planas. Rooms it
+    # could not reach kept a project-wide reading — the exact generalisation
+    # ("+2800 visos kitos patalpos") that buried Beržų room 101's real 3.4 m
+    # through two production runs. Name both groups; the second is the list
+    # worth a human glance.
+    marker_rooms = [r for r in rooms
+                    if r.get("_height_source") == "positioned_marker"]
+    if marker_rooms:
+        marker_nrs = ", ".join(str(r.get("nr") or "?") for r in marker_rooms)
+        other = [r for r in rooms
+                 if r.get("_height_source") != "positioned_marker"]
+        if other:
+            other_nrs = ", ".join(str(r.get("nr") or "?") for r in other)
+            warnings.append({
+                "level": "WARN",
+                "patalpa_nr": None,
+                "message": (
+                    f"Lubų aukštis nuskaitytas iš lubų plano altitudžių, "
+                    f"pažymėtų PAČIOJE patalpoje (nr. {marker_nrs}). "
+                    f"Patalpoms nr. {other_nrs} altitudės ties jų kontūru "
+                    f"nerasta — joms taikytas bendras projekto aukštis. "
+                    f"Patikrinkite šias patalpas lubų plane ir, jei aukštis "
+                    f"kitoks, įveskite jį Prielaidose."
+                ),
+            })
+        else:
+            warnings.append({
+                "level": "INFO",
+                "patalpa_nr": None,
+                "message": (
+                    f"Visų patalpų (nr. {marker_nrs}) lubų aukštis nuskaitytas "
+                    f"iš lubų plano altitudžių, pažymėtų pačiose patalpose."
+                ),
+            })
+
+    # A room where the printed altitude is a storey BELOW what the readers
+    # measured is a split-level / double-height space: the plan labels one
+    # ceiling plane, not the whole room. We keep the taller value (deleting it
+    # would zero the virš-3m tier and the scaffolding with it) and say so.
+    for r in rooms:
+        conflict = r.get("_height_marker_conflict")
+        if not conflict:
+            continue
+        warnings.append({
+            "level": "WARN",
+            "patalpa_nr": r.get("nr"),
+            "message": (
+                f"{r.get('pavadinimas') or ''} (nr={r.get('nr')}): lubų plane "
+                f"pažymėta altitudė {float(conflict['marker_m']):.2f} m, bet "
+                f"nuskaitytas aukštis {float(conflict['kept_m']):.2f} m — "
+                f"galimai dviejų lygių / dvigubo aukščio patalpa. Paliktas "
+                f"didesnis aukštis. Patikrinkite pjūvį ir, jei zonos "
+                f"skirtingos, įveskite jas Prielaidose."
+            ),
+        })
+
     # ── Virš-3m tier is a LOWER BOUND (2026-07-29) ───────────────────────
     # calc_room_quantities can only place surface above 3 m from a room's
     # NOMINAL ceiling height (all-or-nothing at the 3.0 m boundary) or from
