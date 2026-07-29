@@ -1513,7 +1513,11 @@
       "roomsProgress": "{{done}} / {{total}} kambarių",
       "detectedRooms": "Aptiktos patalpos",
       "corrected": " · pataisyta",
-      "seconds": "{{count}}s"
+      "seconds": "{{count}}s",
+      "finishingOnServer": "Užbaigiame serveryje…",
+      "finishingFor": "dar {{s}} s — analizė tęsiasi",
+      "handoffNote": "Analizė tęsiasi serveryje",
+      "canLeave": "Šį langą galite uždaryti — projektas pats atsiras sąraše."
     }
   },
   "billing": {

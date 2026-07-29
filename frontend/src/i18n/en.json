@@ -1509,7 +1509,11 @@
       "roomsProgress": "{{done}} / {{total}} rooms",
       "detectedRooms": "Detected rooms",
       "corrected": " · corrected",
-      "seconds": "{{count}}s"
+      "seconds": "{{count}}s",
+      "finishingOnServer": "Finishing on the server…",
+      "finishingFor": "{{s}}s more — still analysing",
+      "handoffNote": "Analysis continues on the server",
+      "canLeave": "You can close this window — the project will appear in your list."
     }
   },
   "billing": {

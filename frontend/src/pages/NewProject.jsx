@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
@@ -226,12 +226,34 @@ export default function NewProject() {
   const [error, setError]               = useState(null);
   const [status, setStatus]             = useState('');
   // SM01 streaming progress state
-  const [streamPhase, setStreamPhase]     = useState(null); // null | 'rendering' | 'pass1' | 'zoom' | 'post'
+  // null | 'rendering' | 'pass1' | 'zoom' | 'post' | 'finishing'
+  // 'finishing' is the post-handoff phase: the socket is gone but the server is
+  // still extracting, so the UI must keep RUNNING rather than freeze.
+  const [streamPhase, setStreamPhase]     = useState(null);
   const [streamProgress, setStreamProgress] = useState({
     rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null,
   });
   const [streamElapsed, setStreamElapsed] = useState(0);
+  // Post-handoff view state: are we polling, and for how long.
+  const [recovering, setRecovering]       = useState(false);
+  const [recoverySec, setRecoverySec]     = useState(0);
   const elapsedTimerRef = useRef(null);
+
+  // ONE owner for stopping the clock. It used to be stopped in the request's
+  // `finally`, which runs BEFORE the catch that starts polling — so on a
+  // handed-off run the counter froze at 839 s and the user watched a dead
+  // number for the remaining ~13 minutes of a perfectly healthy extraction.
+  const stopElapsed = () => {
+    if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+    }
+  };
+  // Backstop: never leave an interval behind if the user navigates away
+  // mid-run (the timer now deliberately outlives the fetch).
+  useEffect(() => () => {
+    if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+  }, []);
   const abortReasonRef = useRef(null);
   // True once the SSE stream has begun — read in the catch block, where the
   // `streamPhase` STATE is stale (captured at click time). See the assignment.
@@ -249,6 +271,8 @@ export default function NewProject() {
     streamStartedRef.current = false;
     setStreamProgress({ rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null });
     setStreamElapsed(0);
+    setRecovering(false);
+    setRecoverySec(0);
 
     // Naujas controller — vartotojas gali atšaukti su mygtuku
     const controller = new AbortController();
@@ -367,9 +391,15 @@ export default function NewProject() {
         clearTimeout(edgeTimer);
         if (idleTimer) clearTimeout(idleTimer);
         if (statusTimer) clearInterval(statusTimer);
-        if (elapsedTimerRef.current) {
-          clearInterval(elapsedTimerRef.current);
-          elapsedTimerRef.current = null;
+        // THE CLOCK OUTLIVES THE CONNECTION (2026-07-29). This block runs before
+        // the catch that polls for a handed-off extraction, so stopping the
+        // counter here froze it at 839 s while the server worked on for another
+        // ~13 minutes. Keep it running whenever a recovery is still possible —
+        // the catch owns stopping it once the project lands or the wait is
+        // genuinely over. elapsedStart is wall-clock, so it stays accurate
+        // across the handoff.
+        if (!(streamStartedRef.current && recoveryIdRef.current)) {
+          stopElapsed();
         }
         setAbortController(null);
       }
@@ -546,18 +576,27 @@ export default function NewProject() {
           : t('newProject.errAborted');
         // Hand straight to the poller — same path a real drop takes.
         if (abortReasonRef.current === 'edge_deadline' && recoveryIdRef.current) {
+          // The extraction is HEALTHY, so the screen must stay alive: keep the
+          // step animation, the room list and the running clock, and just move
+          // to the 'finishing' phase. Dropping to a static line here made a
+          // normal run look hung for its last third.
+          setStreamPhase('finishing');
+          setRecovering(true);
           const ok = await waitForRecoveredProject(recoveryIdRef.current, {
-            onTick: (s) => setStatus(t('newProject.statusRecovering', { s })),
+            onTick: (s) => setRecoverySec(s),
             isCancelled: () => abortReasonRef.current === 'user',
           });
           if (ok) {
+            stopElapsed();
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             navigate(`/project/${ok.id}`);
             return;
           }
+          setRecovering(false);
         }
+        stopElapsed();
       } else if (/network|fetch/i.test(e.message) || e.name === 'TypeError'
                  || /stream ended without result/i.test(e.message)) {
         // Connection-level failure. If the stream had already STARTED (we saw
@@ -576,21 +615,30 @@ export default function NewProject() {
         // workspace — the pre-prod experience, over a connection that dropped.
         // (2026-07-28: Railway's edge cut two consecutive 17-page runs.)
         if (streamStartedRef.current && recoveryIdRef.current) {
+          // Same live-screen treatment as the deliberate handoff above: an
+          // unplanned drop is equally survivable, so it gets the same UI.
+          setStreamPhase('finishing');
+          setRecovering(true);
           const ok = await waitForRecoveredProject(recoveryIdRef.current, {
-            onTick: (s) => setStatus(t('newProject.statusRecovering', { s })),
+            onTick: (s) => setRecoverySec(s),
             isCancelled: () => abortReasonRef.current === 'user',
           });
           if (ok) {
+            stopElapsed();
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             navigate(`/project/${ok.id}`);
             return;
           }
+          setRecovering(false);
         }
+        stopElapsed();
       } else {
         userMessage = e.message || t('newProject.errUnknown');
       }
+      stopElapsed();   // idempotent — covers the branches that never polled
+      setRecovering(false);
       setError(userMessage);
       setIsProcessing(false);
       setStatus('');
@@ -606,6 +654,8 @@ export default function NewProject() {
             phase={streamPhase}
             progress={streamProgress}
             elapsed={streamElapsed}
+            recovering={recovering}
+            recoverySec={recoverySec}
             error={error}
           />
         ) : (

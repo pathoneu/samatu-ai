@@ -22,8 +22,15 @@ const PHASES = [
 ];
 
 const PHASE_INDEX = Object.fromEntries(PHASES.map((p, i) => [p.id, i]));
+// 'finishing' is not a fifth step — it is the SAME last step, continuing after
+// the socket was handed off. Mapping it onto 'post' keeps the checklist, the
+// pulsing icon and the room list exactly where they were, so the user sees a
+// run that never stopped rather than a screen that changed shape at 14 min.
+PHASE_INDEX.finishing = PHASE_INDEX.post;
 
-export default function ProcessingStateStream({ phase, progress, elapsed, error }) {
+export default function ProcessingStateStream({
+  phase, progress, elapsed, error, recovering = false, recoverySec = 0,
+}) {
   const { t } = useTranslation();
   const currentStep = PHASE_INDEX[phase] ?? 0;
   const rooms = progress?.rooms || [];
@@ -44,7 +51,13 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
       detail = t('upload.stream.roomsIdentified', { count: rooms.length });
     } else if (step.id === 'zoom' && zoomTotal > 0) {
       detail = t('upload.stream.roomsProgress', { done: zoomDone, total: zoomTotal });
+    } else if (step.id === 'post' && recovering) {
+      detail = t('upload.stream.finishingFor', { s: recoverySec });
     }
+
+    const label = (step.id === 'post' && recovering)
+      ? t('upload.stream.finishingOnServer')
+      : t(step.labelKey);
 
     return (
       <motion.div
@@ -66,7 +79,7 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
             isActive ? 'text-foreground font-medium' :
             isDone ? 'text-primary' : 'text-muted-foreground'
           }`}>
-            {t(step.labelKey)}
+            {label}
           </div>
           {detail && (
             <div className="text-[11px] text-muted-foreground mt-0.5">{detail}</div>
@@ -148,6 +161,29 @@ export default function ProcessingStateStream({ phase, progress, elapsed, error 
         <div className="mt-4 p-3 max-w-md bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
           {error}
         </div>
+      )}
+
+      {/* Post-handoff reassurance. The connection is gone but the extraction
+          is not, and a long silent stretch is exactly when a user starts
+          re-uploading — so say plainly that it is still running and that they
+          are free to leave. */}
+      {recovering && !error && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-5 max-w-md text-center"
+        >
+          <div className="flex items-center justify-center gap-2 text-xs text-foreground">
+            <span className="relative flex h-2 w-2" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-70 motion-safe:animate-ping" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+            {t('upload.stream.handoffNote')}
+          </div>
+          <div className="mt-1.5 text-[11px] text-muted-foreground">
+            {t('upload.stream.canLeave')}
+          </div>
+        </motion.div>
       )}
 
       {elapsed != null && !error && (
