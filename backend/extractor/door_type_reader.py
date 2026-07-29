@@ -33,7 +33,15 @@ import pdfplumber
 from pdf2image import convert_from_bytes
 
 from models_config import model_for  # role: "doors" — resolved at call time
-MAX_TOKENS = 4096
+# Raised 2026-07-29 for the SAME reason apdailos_reader was (see its comment):
+# Opus 5 runs extended thinking BY DEFAULT and it counts against this cap, so a
+# snug max_tokens is shared between a variable-length thinking block and the
+# answer — the answer gets cut mid-JSON and the reader silently returns nothing.
+# Measured on apdailos: 2,776 output tokens one run, 4,757 the next, same PDF.
+# 16384 leaves ~14k for thinking and stays under the SDK non-streaming ceiling
+# (MAX_TOKENS_NONSTREAMING_CEILING = 21_333, above which the client raises
+# before any HTTP call).
+MAX_TOKENS = 16384
 # Keep each rendered page's long edge under Claude's silent-downscale threshold so
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus
 # limit; staying at/below it guarantees no provider downscale.

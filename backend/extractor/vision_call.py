@@ -896,7 +896,36 @@ def _resolve_paint_class_from_prefs(rules_or_overrides: dict | None) -> int:
     return cls if cls in (1, 2, 3) else _PAINT_CLASS_DEFAULT
 
 
-def _warn_apdailos_degraded(parsed: dict, reason: str | None) -> None:
+def _record_apdailos_meta(parsed: dict, result: dict, n_updated: int) -> None:
+    """Write the apdailos reader's outcome into ``_meta`` on EVERY path.
+
+    2026-07-29 post-mortem: three of four paid berzas runs produced NO
+    ``_meta.apdailos_*`` at all — the keys were written only on success, so a
+    failed reader left the run artifact indistinguishable from a run where the
+    reader had never existed. The failure reason lived exclusively inside a
+    Lithuanian user-facing warning string. Now the status, the stop_reason, the
+    per-attempt log and the exception class are all in the blob, so the next
+    post-mortem reads data instead of guessing.
+    """
+    rmeta = result.get("_meta") or {}
+    meta = parsed.setdefault("_meta", {})
+    meta["apdailos_status"] = result.get("status")
+    meta["apdailos_page"] = result.get("page")
+    meta["apdailos_pages"] = result.get("pages") or rmeta.get("pages") or []
+    meta["apdailos_rooms_updated"] = n_updated
+    meta["apdailos_elapsed_s"] = result.get("_elapsed_s")
+    meta["apdailos_error"] = result.get("_error")
+    meta["apdailos_stop_reason"] = rmeta.get("stop_reason")
+    meta["apdailos_attempts"] = rmeta.get("attempts") or []
+    meta["apdailos_max_tokens"] = rmeta.get("max_tokens")
+    meta["apdailos_output_tokens"] = rmeta.get("output_tokens")
+    meta["apdailos_truncated"] = bool(rmeta.get("truncated"))
+    if rmeta.get("error_class"):
+        meta["apdailos_error_class"] = rmeta["error_class"]
+
+
+def _warn_apdailos_degraded(parsed: dict, reason: str | None,
+                            partial: bool = False) -> None:
     """Persist a user-visible WARN when the apdailos (išklotinių) reader did
     not deliver per-room finish shares.
 
@@ -909,10 +938,12 @@ def _warn_apdailos_degraded(parsed: dict, reason: str | None) -> None:
     produced per-room paint areas differing by 350% and both looked clean.
     Failing loudly is the honest behavior (CLAUDE.md §"Honest disclosure").
     """
-    msg = ("Apdailos/išklotinių lapas nenuskaitytas – sienų apdaila (dažoma / "
-           "plytelės / plokštė) nustatyta pagal patalpų paskirties standartus, "
-           "ne pagal projektą. Ypač patikrinkite garažo, tambūro ir drėgnų "
-           "patalpų dažomus plotus.")
+    head = ("Apdailos/išklotinių lapas nuskaitytas tik iš dalies – LIKUSIŲ patalpų"
+            if partial else
+            "Apdailos/išklotinių lapas nenuskaitytas – sienų")
+    msg = (f"{head} apdaila (dažoma / plytelės / plokštė) nustatyta pagal "
+           "patalpų paskirties standartus, ne pagal projektą. Ypač "
+           "patikrinkite garažo, tambūro ir drėgnų patalpų dažomus plotus.")
     if reason:
         msg += f" (priežastis: {reason})"
     parsed.setdefault("warnings", []).append({"level": "WARN", "message": msg})
@@ -4065,19 +4096,29 @@ def extract_interior(
         _emit({"event": "apdailos_started"})
         apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
         _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # roll tokens into cost
-        if apdailos_result.get("status") == "ok":
+        status = apdailos_result.get("status")
+        if status in ("ok", "partial"):
             n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
-            parsed.setdefault("_meta", {})["apdailos_page"] = apdailos_result.get("page")
-            parsed["_meta"]["apdailos_rooms_updated"] = n_updated
-            parsed["_meta"]["apdailos_elapsed_s"] = apdailos_result.get("_elapsed_s")
+            _record_apdailos_meta(parsed, apdailos_result, n_updated)
             _emit({
                 "event": "apdailos_completed",
                 "page": apdailos_result.get("page"),
                 "rooms_updated": n_updated,
+                "status": status,
             })
             if n_updated == 0:
                 _warn_apdailos_degraded(parsed, "apdailos lape neatpažinta nė viena patalpa")
+            elif status == "partial":
+                # Some rooms arrived, some did not — say so rather than letting
+                # the un-updated rooms look read.
+                _warn_apdailos_degraded(
+                    parsed,
+                    f"atsakymas nutrūko – nuskaityta tik {n_updated} "
+                    f"iš {len(parsed.get('patalpos') or [])} patalpų "
+                    f"({apdailos_result.get('_error')})",
+                    partial=True)
         else:
+            _record_apdailos_meta(parsed, apdailos_result, 0)
             _emit({
                 "event": "apdailos_skipped",
                 "reason": apdailos_result.get("_error"),
@@ -4090,10 +4131,14 @@ def extract_interior(
         # reader modules were lost from git and failed silently for weeks.)
         print(f"[extractor] ⚠️ APDAILOS READER MODULE MISSING — paint recovery DISABLED: {exc}")
         _emit({"event": "apdailos_error", "message": f"module_missing: {exc}", "severity": "regression"})
+        _record_apdailos_meta(parsed, {"status": "module_missing", "_error": str(exc),
+                                       "_meta": {"error_class": type(exc).__name__}}, 0)
         _warn_apdailos_degraded(parsed, f"modulis nerastas: {exc}")
     except Exception as exc:
         print(f"[extractor] apdailos read failed (non-fatal): {exc}")
         _emit({"event": "apdailos_error", "message": str(exc)})
+        _record_apdailos_meta(parsed, {"status": "exception", "_error": str(exc),
+                                       "_meta": {"error_class": type(exc).__name__}}, 0)
         _warn_apdailos_degraded(parsed, str(exc))
 
     # Step 2.86: DOORS READER (2026-05-27).
