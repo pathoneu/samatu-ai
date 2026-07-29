@@ -6,7 +6,9 @@ PLUMBING_PROMPT = BASE_RULES + """
 PAGE TYPE: PLUMBING (santechnikos planas).
 
 Extract:
-- klozetai (int), praustuves (int), vonios (int), dušai (int),
+- klozetai (int), praustuves (int — TIK vonios/WC/san. mazgo praustuvai),
+  plautuves (int — virtuvės/skalbyklos kriauklės; atskira sąmatos eilutė,
+  niekada neįskaitoma į praustuves), vonios (int), dušai (int),
   trapai (int — floor drains), wc_remai (int — concealed cisterns),
   gyvatukai (int — towel radiators), radiatoriai (int).
 - boileris/katilas: tipas, location bbox.

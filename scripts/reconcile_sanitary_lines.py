@@ -39,7 +39,14 @@ FAMILIES = {
     "praustuve": {
         "lt": "Praustuvės maišytuvas",
         "contractor": re.compile(r"praustuv\w*\s+(maišytuv|sistem)", re.I),
-        "app": re.compile(r"praustuvės maišytuvo", re.I),
+        # The contractor's "praustuvo maišytuvas" bucket is EVERY sink mixer in
+        # the house, kitchen and laundry included: berzas bills 5 of them
+        # against 2 bathrooms, and carries no separate virtuvės-maišytuvas line
+        # at all. Since 2026-07-29 we bill that same work under two labels —
+        # `praustuves` is bathroom-only and the kitchen/laundry sink mixer goes
+        # to "Virtuvės maišytuvo montavimas" — so matching only the first would
+        # score a relabel as a −40% regression. Both sides, one bucket.
+        "app": re.compile(r"(praustuvės|virtuvės) maišytuvo", re.I),
     },
     "dusas": {
         "lt": "Dušo maišytuvas",

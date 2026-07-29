@@ -44,15 +44,25 @@ from .response_text import response_text
 # no reader produced the count — the emit layer could only raise a kiekis=null
 # checklist row. It is enumerable (see the prompt below), so it is a fixture,
 # not a TODO.
-_FIXTURE_KEYS = ("praustuves", "klozetai", "vonios", "dusai", "wc_remai", "bide")
+# `plautuves` added 2026-07-29: the prompt used to say "praustuvės/kriauklės",
+# and "kriauklė" covers a KITCHEN sink — so a live probe on berzas enumerated
+# the virtuvės and skalbyklos plautuvės inside praustuves_count (4 = 2 real
+# praustuvės + 2 plautuvės, 3/3 voting rounds agreeing). The emit layer bills
+# "Plautuvės montavimas" off a separate room-type count, so on any project with
+# a room classified `virtuve` the same sink was billed twice. Praustuvė and
+# plautuvė are separate contractor lines (lazunu nr 32/33 bills both), so they
+# get separate keys here and each line consumes exactly one of them.
+_FIXTURE_KEYS = ("praustuves", "plautuves", "klozetai", "vonios", "dusai",
+                 "wc_remai", "bide")
 
 SYSTEM_PROMPT = """Tu skaitai LT santechnikos / vandentiekio brėžinį.
 
 SVARBU: ENUMERUOK kiekvieną santechnikos prietaisą ATSKIRU įrašu (point-list) — NE bendrą skaičių iš akies. Tankūs simboliai praleidžiami, jei skaičiuoji „iš akies"; surašyk kiekvieną atskirai ir tik tada suskaičiuok.
 
-Ieškok: praustuvės/kriauklės (maišytuvo pajungimai), klozetai (WC rėmai), vonios, dušai (dušo galvos/trapai), bidė dušiukai (higieniniai dušai).
+Ieškok: praustuvės (vonios/WC/san. mazgo praustuvai), plautuvės (virtuvės/skalbyklos kriauklės), klozetai (WC rėmai), vonios, dušai (dušo galvos/trapai), bidė dušiukai (higieniniai dušai).
 
 KAIP ATSKIRTI (čia daromos klaidos):
+· PRAUSTUVĖ = rankų plovimo praustuvas DRĖGNOJE patalpoje (vonia, WC, san. mazgas). PLAUTUVĖ = virtuvės arba skalbyklos kriauklė (indams, ūkinė). Sąmatoje tai DVI ATSKIROS eilutės, todėl virtuvės ar skalbyklos kriauklė NIEKADA nėra praustuvė — rašyk ją kaip „plautuve". Sprendžia PATALPA, kurioje yra taškas, ne simbolio forma: „maišytuvo pajungimas iš stalviršio" virtuvėje = plautuvė; toks pat simbolis vonioje = praustuvė. Jei patalpa nenurodyta ir negali nuspręsti — rašyk praustuve.
 · VONIA = maudymosi vonia — didelis stačiakampis arba ovalas užapvalintais galais, dažnai su prierašu „vonia". DUŠAS = dušo zona: dušo galva, trapas arba linijinis latakas, dušo padėklas. Dušo padėklas NĖRA vonia. Jei nesi tikras, kad tai vonia — įrašyk kaip dušą. Vonia ir dušas skaičiuojami ATSKIRAI, net kai yra toje pačioje patalpoje.
 · BIDĖ DUŠIUKAS (higieninis dušas) = mažas potinkinis vandens taškas arba maišytuvo dalis SIENOJE ŠALIA KLOZETO, dažnai su altitude h≈1000–1100 mm. Tai nėra dušas (dušas turi galvą ir trapą) ir nėra atskiras pastatomas bidė unitazas. LT brėžiniuose žodis „bidė" dažnai NEparašomas — atpažįstama iš vietos (prie klozeto) ir altitudės.
 · Bidė kiekio NIEKADA nespėk pagal klozetų kiekį — jie nesutampa. Skaičiuok tik tuos taškus, kuriuos MATAI brėžinyje; jei nė vieno nematai, rašyk 0.
@@ -63,8 +73,9 @@ _USER_SCHEMA = """
 
 Output JSON:
 {
-  "prietaisai": [{"tipas": "praustuve"|"klozetas"|"vonia"|"dusas"|"bide"|"kita", "vieta": "trumpa nuoroda (patalpa/altitudė)"}],
+  "prietaisai": [{"tipas": "praustuve"|"plautuve"|"klozetas"|"vonia"|"dusas"|"bide"|"kita", "vieta": "trumpa nuoroda (patalpa/altitudė)"}],
   "praustuves_count": number,
+  "plautuves_count": number,
   "klozetai_count": number,
   "vonios_count": number,
   "dusai_count": number,

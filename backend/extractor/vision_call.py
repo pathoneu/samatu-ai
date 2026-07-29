@@ -2247,9 +2247,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         sym = (parsed.get("detected_symbols_summary") or {})
         n_kloz = int(sym.get("klozetai") or 0)
         n_praust = int(sym.get("praustuves") or 0)
+        # Kitchen/laundry sinks left `praustuves` for their own key on
+        # 2026-07-29. They are drilled through the same tiled backsplash, so
+        # they keep contributing the same 6 holes — only the BUCKET moved, and
+        # the hole total must not silently drop with it. Absent on extracts
+        # cached before that change ⇒ 0 ⇒ identical arithmetic.
+        n_plaut = int(sym.get("plautuves") or 0)
         n_vonia = int(sym.get("vonios") or 0)
         n_wcrem = int(sym.get("wc_remai") or 0)
-        skyliu_symbols = n_kloz * 4 + n_praust * 6 + n_vonia * 8 + n_wcrem * 3
+        skyliu_symbols = n_kloz * 4 + (n_praust + n_plaut) * 6 + n_vonia * 8 + n_wcrem * 3
         if skyliu_symbols > 0:
             pozicijos.append({
                 "skyrius": SK_PL,
@@ -2447,6 +2453,21 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # use the detected praustuvė symbol count when higher (Beržų: 3 vs 2).
     n_praustuves = max(n_wet_with_klozetas,
                        int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
+    # Plautuvės (virtuvės/skalbyklos kriauklės) — a SEPARATE contractor line
+    # from the praustuvė (lazunu nr 32 "Plautuvės montavimas" alongside nr 33
+    # "Praustuvės montavimas"), so it needs a count of its own.
+    # 2026-07-29: it used to ride on `n_virtuve` alone while the sanitary
+    # reader was counting the same kitchen sink into `praustuves` ("praustuvės/
+    # kriauklės" — kriauklė covers a kitchen sink; live berzas probe: 2 of the
+    # 4 "praustuvės" were the virtuvės + skalbyklos plautuvės). Any project
+    # with a room classified `virtuve` therefore billed that sink twice — once
+    # as a praustuvė, once as a plautuvė. Now `praustuves` is basin-only at
+    # every producer and the kitchen/laundry sink is billed here, once.
+    # Room type stays the FLOOR (a virtuvė has a sink whether or not a plumbing
+    # sheet exists); read evidence may only raise it, never lower — same policy
+    # as reconcile_fixture_counts. Absent key ⇒ pre-change behaviour exactly.
+    n_plautuves = max(n_virtuve,
+                      int((parsed.get("detected_symbols_summary") or {}).get("plautuves") or 0))
     # Bathtub mixer is a SEPARATE fixture from the shower mixer (contractor
     # berzas 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
     # maišytuvas").
@@ -2477,7 +2498,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     san_concealed, san_source = _resolve_san_concealment(parsed)
     san_emitted: set[str] = set()
 
-    if n_wet_with_klozetas > 0 or n_virtuve > 0 or n_skalbykla > 0:
+    if n_wet_with_klozetas > 0 or n_plautuves > 0 or n_skalbykla > 0:
         # WC rėmas + Klozetas + praustuvė — single-visit jobs, one line each.
         if n_wet_with_klozetas > 0:
             pozicijos.extend([
@@ -2517,13 +2538,21 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym or None,
                               san_concealed["vonia"], san_source["vonia"],
                               saltinis="simboliai_brezinyje", emitted=san_emitted)
-        # Virtuvė — plautuvė + maišytuvas
-        if n_virtuve > 0:
+        # Virtuvė / skalbykla — plautuvė + jos maišytuvas. Both consume
+        # `n_plautuves`, so the sink and its mixer can never drift apart, and
+        # neither is billed a second time inside the praustuvė lines above.
+        # The label stays "Virtuvės maišytuvo montavimas" even when the count
+        # includes a skalbyklos plautuvė: renaming it would orphan the price on
+        # every project already quoted against that label (_merge_user_edits
+        # matches on the label text).
+        if n_plautuves > 0:
+            _plaut_src = ("simboliai_brezinyje" if n_plautuves > n_virtuve
+                          else "paskirtis_default")
             pozicijos.extend([
                 {"skyrius": SK_SAN, "aprasymas": "Plautuvės montavimas",
-                 "vnt": "vnt", "kiekis": n_virtuve, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_plautuves, "saltinis": _plaut_src},
                 {"skyrius": SK_SAN, "aprasymas": "Virtuvės maišytuvo montavimas",
-                 "vnt": "vnt", "kiekis": n_virtuve, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_plautuves, "saltinis": _plaut_src},
             ])
         # Skalbimo mašinos sifonas — skalbyklos arba vonia
         n_skalbimo_sifonas = max(n_skalbykla, 1 if n_full_bathroom > 0 and n_skalbykla == 0 else 0)

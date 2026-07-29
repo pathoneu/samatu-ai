@@ -299,7 +299,8 @@ OUTPUT_SCHEMA = {
                 "led_juostos": {"type": "number", "description": "LED juostos bendras ilgis metrais (suma per visus kambarius)"},
                 "difuzoriai": {"type": "integer", "description": "Vėdinimo difuzoriai luboje (apvalūs / plyšiniai)"},
                 "klozetai": {"type": "integer", "description": "Klozetų skaičius (sanitariniame plane)"},
-                "praustuves": {"type": "integer", "description": "Praustuvių skaičius"},
+                "praustuves": {"type": "integer", "description": "Praustuvių skaičius DRĖGNOSE patalpose (vonia / WC / san. mazgas). NEĮSKAITANT virtuvės ar skalbyklos plautuvių — jos skaičiuojamos atskirai į `plautuves`."},
+                "plautuves": {"type": "integer", "description": "Virtuvės / skalbyklos plautuvių (kriauklių) skaičius. Sąmatoje tai atskira eilutė nuo praustuvių."},
                 "vonios": {"type": "integer", "description": "Vonios + dušo padėklai"},
                 "trapai": {"type": "integer", "description": "Trapų / linijinių latakų skaičius"},
                 "wc_remai": {"type": "integer", "description": "Potinkinių WC rėmų skaičius (jei matosi sienoje)"},
@@ -575,7 +576,8 @@ KO IEŠKOTI (LT industry konvencija):
 - **LED juostos** (`led_juostos` METRAIS): raudona / oranžinė ARBA brūkšninė linija lubų plane → susumuok ilgį visų atkarpų
 - **Difuzoriai** (`difuzoriai`): apskritimas su „X" arba grotelėmis (vėdinimo) lubų plane
 - **Klozetai** (`klozetai`): ovalas + sėdynės kontūras prie sienos sanitariniame plane
-- **Praustuvės** (`praustuves`): ovalas / stačiakampis su čiaupais
+- **Praustuvės** (`praustuves`): ovalas / stačiakampis su čiaupais **drėgnoje patalpoje** (vonia / WC / san. mazgas)
+- **Plautuvės** (`plautuves`): toks pat ovalas / stačiakampis su čiaupais, bet **virtuvėje ar skalbykloje** (indų / ūkinė kriauklė). Sprendžia PATALPA, ne simbolio forma. Virtuvės kriauklė NIEKADA neįskaitoma į `praustuves` — tai atskira sąmatos eilutė
 - **Vonios** (`vonios`): didelis stačiakampis su užapvalintais galais; jei dušo padėklas — taip pat įskaityk
 - **Trapai** (`trapai`): apskritimas su X arba „T" sanitariniame plane (linijinis latakas — pailgintas stačiakampis)
 - **WC rėmai** (`wc_remai`): jei sanitariniame yra žymėjimas „WC rėmas" arba potinkinio rėmo punktyrinė linija

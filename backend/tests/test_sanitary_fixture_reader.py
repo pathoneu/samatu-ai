@@ -111,6 +111,60 @@ def test_no_reader_run_publishes_no_tub_key_at_all():
     assert "vonios_kubilai" not in out["merged"]
 
 
+# ── praustuvė ≠ plautuvė: the kitchen sink gets its own key (2026-07-29) ─────
+# The prompt used to ask for "praustuvės/kriauklės", and "kriauklė" covers a
+# KITCHEN sink. A live 3/3-agreeing probe on berzas enumerated 4 praustuvės, of
+# which two were the virtuvės and skalbyklos PLAUTUVĖS. The emit layer bills
+# "Plautuvės montavimas" off a separate count, so on any project with a room
+# classified `virtuve` that one sink was billed twice.
+
+def test_plautuve_is_a_fixture_key_the_whole_chain_carries():
+    assert "plautuves" in _FIXTURE_KEYS
+    assert "plautuves_count" in _USER_SCHEMA        # the model is asked for it
+    assert '"plautuve"' in _USER_SCHEMA             # …and it is a valid `tipas`
+    assert "PLAUTUVĖ" in SYSTEM_PROMPT.upper()      # …and told how to tell them apart
+
+
+def test_prompt_no_longer_calls_a_kitchen_sink_a_praustuve():
+    """The exact wording that caused the miscount. `kriauklė` may appear only
+    where it defines a PLAUTUVĖ, never as a gloss for `praustuvės`."""
+    assert "praustuvės/kriauklės" not in SYSTEM_PROMPT
+    assert "praustuvės / kriauklės" not in SYSTEM_PROMPT
+
+
+def test_kitchen_and_laundry_sinks_reach_their_own_symbol_key():
+    """berzas as the reader now reads it: 2 praustuvės + 2 plautuvės, not 4
+    praustuvės. Both counts survive to detected_symbols_summary."""
+    out = reconcile_fixture_counts({"praustuves": 0},
+                                   {"praustuves": 2, "plautuves": 2})
+    assert out["merged"]["praustuves"] == 2
+    assert out["merged"]["plautuves"] == 2
+    assert "plautuves" in out["raised"]             # symbols carried none
+
+
+def test_plautuve_count_obeys_the_never_lower_policy():
+    """Same rule as every other fixture: enumeration may RAISE the symbol pass,
+    never silently lower it."""
+    out = reconcile_fixture_counts({"plautuves": 3}, {"plautuves": 1})
+    assert out["merged"]["plautuves"] == 3
+    assert "plautuves" not in out["raised"]
+
+
+def test_plautuves_votes_are_moded_like_every_other_fixture():
+    def _run(plautuves):
+        return {"status": "ok", "counts": {"praustuves": 2, "plautuves": plautuves}}
+    out = _aggregate_fixture_votes([_run(2), _run(1), _run(2)])
+    assert out["counts"]["plautuves"] == 2          # mode of (2,1,2)
+    assert out["_vote"]["spread"]["plautuves"] == 1
+
+
+def test_no_plautuve_read_is_zero_not_absent():
+    """A reader that ran and saw no kitchen sink must say 0, so the emit layer
+    can tell "none there" from "never looked"."""
+    out = reconcile_fixture_counts({}, {"praustuves": 2, "plautuves": 0})
+    assert out["merged"]["plautuves"] == 0
+
+
 # ── page selection ───────────────────────────────────────────────────────────
 class _FakePage:
     def __init__(self, text):

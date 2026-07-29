@@ -227,6 +227,108 @@ def test_bide_without_a_count_is_a_checklist_todo_not_a_silent_zero():
     assert all("suveskite kiekį" in p["aprasymas"] for p in bide), bide
 
 
+# ── praustuvė ≠ plautuvė: one sink, one line (2026-07-29) ───────────────────
+# The sanitary reader was asked for "praustuvės/kriauklės" — and a kriauklė is
+# also a KITCHEN sink, so a live berzas probe put the virtuvės and skalbyklos
+# plautuvės inside praustuves_count. "Plautuvės montavimas" is billed off its
+# own count, so on any project with a room classified `virtuve` that one sink
+# was billed twice. The contractor bills them as separate lines (lazunu nr 32
+# "Plautuvės montavimas" alongside nr 33 "Praustuvės montavimas").
+
+def _kitchen(nr="102"):
+    return _room(nr=nr, paskirtis="virtuve")
+
+
+def test_kitchen_sink_is_billed_once_not_once_per_bucket():
+    """2 bathroom basins + 1 kitchen sink = 3 sinks → 2 praustuvės, 1 plautuvė.
+    The kitchen sink must appear in exactly one of the two counts."""
+    out = _build(symbols={"praustuves": 2, "plautuves": 1},
+                 rooms=[_room(nr="107"), _room(nr="111"), _kitchen()])
+    assert _qty(out, "praustuvės montavimas") == [2]
+    assert _qty(out, "plautuvės montavimas") == [1]
+    # …and their mixers follow the same split — no fixture pays twice.
+    assert _qty(out, "praustuvės maišytuvo potinkinės") == [2]
+    assert _qty(out, "virtuvės maišytuvo montavimas") == [1]
+
+
+def test_praustuve_lines_never_consume_the_plautuve_count():
+    """THE regression guard. Whatever the kitchen/laundry count is, it may not
+    move the praustuvė lines by one — that leak, in reverse, was the bug."""
+    rooms = [_room(nr="107"), _room(nr="111"), _kitchen()]
+    base = _build(symbols={"praustuves": 2}, rooms=rooms)
+    plus = _build(symbols={"praustuves": 2, "plautuves": 4}, rooms=rooms)
+    assert _qty(plus, "praustuvės montavimas") == _qty(base, "praustuvės montavimas") == [2]
+    assert _qty(plus, "praustuvės maišytuvo potinkinės") == [2]
+    assert _qty(plus, "plautuvės montavimas") == [4]
+
+
+def test_read_plautuve_count_raises_the_room_type_default():
+    """One virtuvė room, but the plumbing sheet also shows the laundry sink."""
+    out = _build(symbols={"praustuves": 2, "plautuves": 2},
+                 rooms=[_room(nr="107"), _kitchen()])
+    assert _qty(out, "plautuvės montavimas") == [2]
+    assert _qty(out, "virtuvės maišytuvo montavimas") == [2]
+
+
+def test_read_plautuves_bill_even_when_no_room_is_classified_virtuve():
+    """berzas: room 102 "Svetainė/virtuvė" is classified `valgomasis` and the
+    skalbykla is its own paskirtis, so the room-type default is 0 — yet the
+    plumbing sheet shows two sinks. Evidence has to be able to bill them."""
+    out = _build(symbols={"praustuves": 2, "plautuves": 2},
+                 rooms=[_room(nr="107"), _room(nr="111"),
+                        _room(nr="102", paskirtis="valgomasis"),
+                        _room(nr="106", paskirtis="skalbykla")])
+    assert _qty(out, "plautuvės montavimas") == [2]
+    assert _qty(out, "virtuvės maišytuvo montavimas") == [2]
+
+
+def test_a_read_plautuve_count_is_not_labelled_a_room_type_default():
+    out = _build(symbols={"praustuves": 2, "plautuves": 2},
+                 rooms=[_room(nr="107"), _kitchen()])
+    plaut = [p for p in _san(out) if "plautuvės montavimas" in p["aprasymas"].lower()]
+    assert [p["saltinis"] for p in plaut] == ["simboliai_brezinyje"]
+    # …and the room-type fallback still says so.
+    only_room = _build(symbols={"praustuves": 2}, rooms=[_room(nr="107"), _kitchen()])
+    plaut2 = [p for p in _san(only_room) if "plautuvės montavimas" in p["aprasymas"].lower()]
+    assert [p["saltinis"] for p in plaut2] == ["paskirtis_default"]
+
+
+def test_extract_without_the_plautuves_key_behaves_exactly_as_before():
+    """Every project cached or priced before 2026-07-29 carries no `plautuves`.
+    Those must rebuild on the room-type count alone — no new lines appearing
+    under an already-quoted sąmata, no retroactive re-pricing."""
+    no_kitchen = _build(symbols={"praustuves": 3},
+                        rooms=[_room(nr="107"), _room(nr="111")])
+    assert _qty(no_kitchen, "plautuvės montavimas") == []
+    with_kitchen = _build(symbols={"praustuves": 3},
+                          rooms=[_room(nr="107"), _kitchen()])
+    assert _qty(with_kitchen, "plautuvės montavimas") == [1]
+    assert _qty(with_kitchen, "virtuvės maišytuvo montavimas") == [1]
+
+
+@pytest.mark.parametrize("n_plautuves", [1, 2, 5])
+def test_plautuve_and_its_mixer_can_never_drift(n_plautuves):
+    out = _build(symbols={"praustuves": 2, "plautuves": n_plautuves},
+                 rooms=[_room(nr="107"), _kitchen()])
+    assert (_qty(out, "plautuvės montavimas")
+            == _qty(out, "virtuvės maišytuvo montavimas") == [n_plautuves])
+
+
+def test_moving_a_sink_between_buckets_does_not_change_the_hole_count():
+    """Skylių gręžimas bills 6 holes per sink. The kitchen sink changed BUCKET,
+    not location — it is still drilled through a tiled backsplash, so the total
+    must be identical either way. No eval metric covers this line."""
+    rooms = [_room(nr="107"), _room(nr="111"), _kitchen()]
+
+    def _holes(out):
+        return [p["kiekis"] for p in out["pozicijos"]
+                if "skylių gręžimas" in p["aprasymas"].lower()]
+
+    before = _build(symbols={"praustuves": 3}, rooms=rooms)          # old bucket
+    after = _build(symbols={"praustuves": 2, "plautuves": 1}, rooms=rooms)
+    assert _holes(after) == _holes(before) != []
+
+
 def test_dry_project_emits_no_sanitary_lines_at_all():
     out = _build(rooms=[_room(nr="1", paskirtis="miegamoji")])
     assert _san(out) == []
