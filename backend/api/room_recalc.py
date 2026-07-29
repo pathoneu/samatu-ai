@@ -125,6 +125,13 @@ def _recalc_room(room: dict[str, Any], primitive_overrides: dict[str, Any]) -> d
         "extra_walls_m2", "extra_walls_virs_3m_m2", "high_ceiling_area_m2",
         "plyteles_grindys_m2_override", "gkp_extra_area_m2",
         "n_exterior_doors", "n_exterior_windows",
+        # TILE EVIDENCE (2026-07-29). Without these two the allowlist SILENTLY
+        # DROPS the išklotinės tile read, so recalculating a single room turns a
+        # fully tiled bathroom back into a painted one — paint billed on tile,
+        # the exact defect fixed in 5bfada8, re-entering through a side door.
+        # resolve_wall_tile_read() consumes them as its highest-priority
+        # evidence, so they are primitives here, not derived output.
+        "_tile_area_from_elevation_m2", "_bathroom_paint_above_tile_m",
     }
     new_room = {k: v for k, v in room.items() if k in primitives}
     new_room.update(primitive_overrides)
