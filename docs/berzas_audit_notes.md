@@ -4,6 +4,49 @@
 
 ---
 
+## ⛔ 2026-07-29 CORRECTION — the SECTION-3 tile numbers below are stale
+
+The wall-tile figures in §SECTION 3 (`42.04` for the two bathrooms, `67.12`
+total, "san107 app=20.48 UNDER −37% / san111 app=21.56 UNDER −25%") were read
+off `ai_extract.json`'s **saved** `santrauka`. That extract predates the
+išklotinės tile fixes of 2026-07-29 (f3537bf + fdaf6a9), which never reached
+the per-room recompute. Re-scoring the SAME extract with today's code:
+
+| | then (saved) | now (`--rescore --recompute`) | rangovas |
+|---|---|---|---|
+| san 107 sienos | 20.48 | **30.80** | 32.73 |
+| san 111 sienos | 21.56 | **33.60** | 28.80 |
+| documented pair (107+111) | 42.04 (−31.7%) | **64.40 (+4.7%)** | 61.53 |
+| Skalbykla 106 sienos | 20.58 | **0.00** | — (jokios sienų plytelių eilutės) |
+| Darbo kambarys 104 sienos | 4.50 | 4.50 | — |
+| ALL wall tile | 67.12 | **68.90 (−7.8%)** | 74.71 (24 + 25sienos + 27 + 28) |
+
+The Skalbykla 20.58 m² was a phantom: the apdailos reader traces colour-coded
+wall lines off p10 and picked up the neighbouring bathroom's BLUE line across a
+shared partition. Its own išklotinė (p12, sheet c1–c4, 8775 mm measured) marks
+no tile zone, and the contractor bills Katilinė with floor tile + 11.8 m of
+skirting only. `resolve_wall_tile_read` now treats a MEASURED elevation with no
+tile zone as evidence of absence. The audit's §"Missing in app" item 5
+("per-wall wall-tile precision … two errors cancelling") is superseded: the
+remaining aggregate gap is items 27+28 (13.18 m² of large-format / niche-reveal
+tile) which we still emit as 0.
+
+Reconciliation (before/after, zero API spend):
+`./venv/bin/python scripts/reconcile_tile_and_diffusers.py`
+
+**Difūzoriai** — the "emitted, 6 vnt (symbol=6)" row in the 2026-06-09 table
+below is correct as a description of the code, but the 6 are not real. This
+17-page PDF draws no ventilation diffuser: the word appears once, in note 3 of
+the apšvietimo plan ("…dėl difuzorių vietos ir formos parinkimo…" — positions
+still to be agreed), and no sheet's "Sutartiniai žymėjimai" defines a diffuser
+glyph. The 6 were crosshair circles the legend calls *Pakabinamas lubinis
+šviestuvas*, and they also fabricated 30 m of Ø125 ortakiai + 21 m of
+insulation + 20 hangers. His 15 montavimas / 21 apdirbimas come from the
+vėdinimo dalis, which is not in this bundle — neither number is derivable from
+these drawings, so the honest output is the checklist row.
+
+---
+
 ## ⛔ 2026-06-09 VERIFIED CORRECTION — READ THIS FIRST (supersedes the verdict below)
 
 **The original audit (everything under "## Verdict" onward) was run with a `_build_pozicijos_from_rooms` call that did NOT pass `detected_symbols_summary`.** That made every symbol-driven line hit its fallback or vanish. Re-running the **true live pipeline (WITH symbols)** overturns several headline findings:

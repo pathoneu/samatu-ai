@@ -2747,9 +2747,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # downgrade an unanchored number to the honest checklist row.
     from .symbol_legend import diffuser_count_is_anchored
     difuzoriai_anchored = diffuser_count_is_anchored(parsed)
+    difuzoriai_raw = difuzoriai_n          # what the symbol reader returned
     difuzoriai_unanchored_n = 0 if difuzoriai_anchored else difuzoriai_n
     if not difuzoriai_anchored:
-        difuzoriai_n = 0
+        difuzoriai_n = 0                   # billable count — 0 without an anchor
 
     if difuzoriai_n > 0:
         # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
@@ -2925,8 +2926,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                        "Gipso kartono klijavimas sienai išlyginti — suveskite plotą",
                        "m2", "pertvarų planas / pjūviai — nelygios mūro sienos (katilinė, techninės patalpos)"),
         ])
-        if ortakiai_total > 0:
-            # berzas nr 12 — 1 vnt
+        # berzas nr 12 — 1 vnt. 2026-07-29: WAS gated on `ortakiai_total > 0`,
+        # which on the reference project was only ever true because a phantom
+        # difuzoriai count fed the D125 fallback — so the legend gate above
+        # silently killed a contractor line we DO cover.
+        #
+        # The rule the gate should have expressed: an UNANCHORED signal is
+        # enough to raise a QUESTION, never enough to assert a NUMBER. Circles
+        # that might be ventilation terminals are not grounds to bill 6
+        # diffusers and 30 m of ducts, but they are grounds to ask the user
+        # whether a duct needs boxing in. Hence `difuzoriai_raw` — the count
+        # BEFORE the anchoring gate — and not the billable one.
+        if ortakiai_total > 0 or difuzoriai_raw > 0:
             pozicijos.append(_checklist(
                 SK_GKP, "Dėžutės montavimas ortakiams paslėpti — suveskite kiekį",
                 "vnt", "vėdinimo planas — ortakių trasos po lubomis (garažas, techninės patalpos)"))

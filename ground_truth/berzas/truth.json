@@ -655,7 +655,7 @@
       "value": 61.53,
       "confidence": "incomplete",
       "source": "notes:vonios sienos 28.80 + 32.73 (only the two main bathrooms documented)",
-      "notes": "Contractor documented only 2 rooms (vonios 107 + 111 = 32.73 + 28.80 = 61.53 m²). App also counts tile in Tambūras splashback, Skalbykla, Garažas etc. which the contractor either bundled into floor tile lines or did not itemise. The +37% delta vs this truth is a documentation gap, not an extraction error. Replace with full per-room contractor data when available (Phase 4 elevation extractor will produce per-room formats)."
+      "notes": "PARTIAL BY CONSTRUCTION — do not read a delta against it as an accuracy number without saying which rooms are in scope. The contractor's notes document wall tile for 2 rooms only (107 = 32.73 + 111 = 28.80 = 61.53 m²); the rest of his wall-tile universe sits inside mixed wall+floor lines. His FULL wall-tile set = item 24 (28.80) + the wall part of item 25 (32.73) + item 27 (4.48) + item 28 (8.70, nišos angokraščiai) = 74.71 m². Compare the documented pair against 61.53 and the app TOTAL against 74.71 — never the total against 61.53. 2026-07-29: the old note here claimed the whole delta was 'a documentation gap, not an extraction error'; that was half wrong. 20.58 m² of it was a real over-read in Skalbykla (apdailos colour-trace picked up the neighbouring bathroom's blue line across a shared partition; its own išklotinė marks no tile zone) and is fixed. Current: documented pair 64.40 (+4.7%), total 68.90 (−7.8% vs 74.71); the −7.8% is items 27+28 (13.18 m² of large-format / niche-reveal tile) which the app still emits as 0. Replace with full per-room contractor data when available."
     },
     "rotband_lyginimas_m2": {
       "value": 138.69,

@@ -1281,22 +1281,32 @@ def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
     def _fmt(v):
         return "—" if v is None else f"{v:+.2f}%"
 
-    print(f"\n  {'Project':<14} {'Combined Paint':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}")
-    print("  " + "─" * 60)
+    print(f"\n  {'Project':<14} {'Combined Paint':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}  {'engine':<9}")
+    print("  " + "─" * 71)
     for s in per_project_summary:
         if s.get("status") != "ok":
-            print(f"  {s['slug']:<14} {'—':>15} {'—':>9} {'—':>10} {'—':>8}")
+            print(f"  {s['slug']:<14} {'—':>15} {'—':>9} {'—':>10} {'—':>8}  {'—':<9}")
             continue
         combined = _metric(s, "Dažymo plotas")
         walls    = _metric(s, "Sienų dažomas plotas")
         ceiling  = _metric(s, "Lubų dažomas plotas")
         mae      = s.get("mae_pct")
+        # "live" = deterministic tail re-run against today's formulas.
+        # "FROZEN" = the saved extract's own numbers, however old they are —
+        # shouted, because a frozen row can neither show a fix nor catch a
+        # regression (see run_totals_only_multi's docstring).
+        engine = "live" if s.get("recomputed") else "FROZEN"
         print(f"  {s['slug']:<14} {_fmt(combined):>15} {_fmt(walls):>9} "
               f"{_fmt(ceiling):>10} "
-              f"{('—' if mae is None else f'{mae:.2f}%'):>8}")
-    print("  " + "─" * 60)
+              f"{('—' if mae is None else f'{mae:.2f}%'):>8}  {engine:<9}")
+    print("  " + "─" * 71)
     avg_line = "—" if overall_mae is None else f"{overall_mae:.2f}%"
     print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}")
+    if any(s.get("status") == "ok" and not s.get("recomputed")
+           for s in per_project_summary):
+        print("\n  ⚠ FROZEN rows score the numbers saved in ai_extract.json, not "
+              "today's engine.\n    Re-run with --recompute for the live "
+              "figures (still zero API spend).")
 
 
 def _partition_headline_metrics(results, ai_mode):
@@ -1341,7 +1351,8 @@ def _partition_headline_metrics(results, ai_mode):
     return scored, not_emitted, collapsed
 
 
-def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int:
+def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
+                          recompute: bool = False) -> int:
     """Iterate every project in ground_truth/registry.yaml and run the
     AI-vs-truth diff on its gt_totals block (no per-room work).
 
@@ -1349,6 +1360,22 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
     is available — either via REGISTRY[project_id].replay_path (cached)
     or by feeding gt_dimensions through the calculator. Projects with
     neither are reported as 'no_ai_side' so the gap is explicit.
+
+    ⚠ FROZEN vs RECOMPUTED (2026-07-29). The ai_extract / replay branches
+    load a saved JSON **verbatim** — ``run_pipeline_replay`` is a
+    ``json.load``, nothing more. So the default run scores the numbers that
+    were frozen into that file on the day it was written, NOT what today's
+    formula code would produce. A formula fix landed an hour ago is invisible
+    here, and an engine REGRESSION cannot be detected at all — the totals
+    would sit there unchanged while production broke.
+
+    That bit for real: on 2026-07-29 this table still reported objektas_b
+    ceilings at +56.44% after the unfinished-ceiling gate had already pulled
+    it to +25.71%, and the stale corpus average (13.97%) was ~8 pp worse than
+    the truth. Pass ``--recompute`` to re-run the deterministic tail on the
+    saved Vision reads — same zero-API cost, but it measures the CURRENT
+    engine. The per-project mode is printed in the table so a frozen number
+    can never again be mistaken for a live one.
 
     Output: a compact 5-line table by default (one row per project with
     combined paint / walls / ceilings / MAE percentages). Pass
@@ -1421,6 +1448,23 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
             if replay_path.exists():
                 parsed = run_pipeline_replay(replay_path)
                 ai_mode = "replay"
+        # Both replay branches loaded frozen JSON. Re-run the deterministic
+        # tail so the score reflects TODAY's formulas (see the docstring's
+        # frozen-vs-recomputed warning). use_gt_inputs below already runs the
+        # live engine, so it needs no such pass.
+        #
+        # ai_mode is deliberately NOT suffixed here: _partition_headline_metrics
+        # dispatches on `ai_mode == "ai_extract"` / `== "replay"` by exact
+        # equality to decide whether a 0.0-vs-truth is a real collapse or a
+        # schema gap. Appending "+recomputed" would match neither branch and
+        # silently stop flagging collapsed headline metrics. Recompute changes
+        # the FORMULAS applied, not the provenance of the Vision reads, so the
+        # provenance string must stay untouched.
+        recomputed = False
+        if parsed is not None and recompute:
+            print(f"  ↻ {slug}: recomputing deterministic tail")
+            parsed = _rerun_deterministic_tail(parsed, slug)
+            recomputed = True
         if parsed is None and truth.get("gt_dimensions"):
             parsed = run_pipeline_use_gt_inputs(truth)
             ai_mode = "use_gt_inputs"
@@ -1445,6 +1489,7 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False) -> int
             "name": entry.get("name", slug),
             "status": "ok",
             "ai_mode": ai_mode,
+            "recomputed": recomputed,
             "metrics_scored": len(scored),
             "metrics_not_emitted": not_emitted,
             "metrics_collapsed": collapsed,
@@ -1742,11 +1787,14 @@ def main() -> int:
     ap.add_argument("--all", action="store_true",
                     help="alias for --totals-only (spec compatibility)")
     ap.add_argument("--recompute", action="store_true",
-                    help="with --rescore: re-run the deterministic tail "
-                         "(height salvage + plausibility gate + per-room "
-                         "recompute + santrauka + pozicijos) on the saved "
-                         "primitives before scoring — measures CURRENT "
-                         "formula code against saved Vision reads, no API")
+                    help="with --rescore or --totals-only: re-run the "
+                         "deterministic tail (height salvage + plausibility "
+                         "gate + per-room recompute + santrauka + pozicijos) "
+                         "on the saved primitives before scoring — measures "
+                         "CURRENT formula code against saved Vision reads, no "
+                         "API. WITHOUT it, --totals-only scores the numbers "
+                         "frozen in ai_extract.json and cannot see a fix or a "
+                         "regression")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -1846,6 +1894,7 @@ def main() -> int:
         return run_totals_only_multi(
             GROUND_TRUTH_ROOT / "registry.yaml",
             detailed=args.detailed,
+            recompute=args.recompute,
         )
 
     if args.use_gt_inputs:

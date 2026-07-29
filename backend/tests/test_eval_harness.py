@@ -251,3 +251,56 @@ def test_meta_rollup_breakdown_attributes_cost_per_reader(harness):
     assert bd["apdailos"]["n_calls"] == 1
     total_eur = round(sum(v["cost_eur"] for v in bd.values()), 4)
     assert total_eur == pytest.approx(mr["extra_calls_cost_eur"], abs=1e-3)
+
+
+# ── --totals-only frozen-vs-live (2026-07-29) ────────────────────────────────
+# The corpus gate loaded ai_extract.json verbatim (run_pipeline_replay is a
+# json.load) and scored those frozen numbers. It therefore could not show a
+# formula fix NOR catch an engine regression: on 2026-07-29 it still reported
+# objektas_b ceilings at +56.44% hours after the unfinished-ceiling gate had
+# pulled it to +25.71%, making the corpus average look ~8 pp worse than it was.
+
+def test_totals_only_accepts_recompute(harness):
+    """--recompute must reach run_totals_only_multi. Without this parameter the
+    only corpus-wide gate we have can never see today's formula code."""
+    import inspect
+    sig = inspect.signature(harness.run_totals_only_multi)
+    assert "recompute" in sig.parameters
+    assert sig.parameters["recompute"].default is False, (
+        "default must stay False so historical invocations keep their meaning"
+    )
+
+
+def test_recompute_does_not_corrupt_ai_mode(harness):
+    """_partition_headline_metrics dispatches on `ai_mode == 'ai_extract'` by
+    exact equality. Tagging a recomputed run as e.g. 'ai_extract+recomputed'
+    would match neither branch, silently disabling collapsed-metric flagging.
+    Recompute changes which FORMULAS ran, not where the Vision reads came from,
+    so provenance must survive it untouched."""
+    import inspect
+    src = inspect.getsource(harness.run_totals_only_multi)
+    assert 'ai_mode = f"{ai_mode}' not in src, (
+        "ai_mode must not be suffixed — carry the recompute flag separately"
+    )
+    # And the semantics the above protects, asserted directly:
+    results = [_mk_metric(harness, "CombinedPaint", 0.0, 388.0)]
+    _, _, collapsed = harness._partition_headline_metrics(results, "ai_extract")
+    assert collapsed == ["CombinedPaint"]
+    _, _, collapsed_bad = harness._partition_headline_metrics(
+        results, "ai_extract+recomputed")
+    assert collapsed_bad == [], "proves the suffix would have silenced the flag"
+
+
+def test_summary_table_labels_frozen_rows(harness, capsys):
+    """A frozen row must SAY it is frozen, and a live row must say it is live —
+    otherwise the two are indistinguishable in the one table people read."""
+    rows = [
+        {"slug": "frozen_one", "status": "ok", "recomputed": False,
+         "mae_pct": 21.77, "metrics": []},
+        {"slug": "live_one", "status": "ok", "recomputed": True,
+         "mae_pct": 19.64, "metrics": []},
+    ]
+    harness._print_summary_table(rows, 20.7)
+    out = capsys.readouterr().out
+    assert "FROZEN" in out and "live" in out
+    assert "--recompute" in out, "the frozen warning must name the way out"
