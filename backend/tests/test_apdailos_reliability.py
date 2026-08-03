@@ -147,7 +147,11 @@ def test_page_pick_is_deterministic_for_identical_input(monkeypatch):
     pages = [_Page("TITULINIS"), _Page("VIZUALIZACIJA"),
              _Page("GRINDŲ APDAILOS PLANAS"), _Page("SIENŲ IŠKLOTINĖS L1"),
              _Page("SIENŲ IŠKLOTINĖS L2")]
-    monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    # Seam moved 2026-08-03: the page locator reads the shared parse in
+    # extractor.pdf_page_cache rather than opening its own document. The
+    # determinism contract under test is unchanged.
+    monkeypatch.setattr("extractor.pdf_page_cache.page_texts",
+                        lambda *_a, **_k: [p.extract_text() for p in pages])
     runs = [_REAL_FIND_PAGES(b"x") for _ in range(10)]
     assert all(r == runs[0] for r in runs)
     assert runs[0] == [4, 5, 3]  # išklotinės (prio 0) before the generic plan

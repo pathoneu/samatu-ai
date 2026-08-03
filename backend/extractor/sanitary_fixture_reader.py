@@ -144,16 +144,16 @@ def _find_sanitary_pages(pdf_bytes: bytes, pages_meta: list[dict] | None = None,
     strong: list[int] = []
     weak: list[int] = []
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                nr = i + 1
-                if role.get(nr) in _NON_PLUMBING_TIPAI:
-                    continue
-                t = (page.extract_text() or "").upper()
-                if any(h in t for h in _TITLE_HINTS):
-                    strong.append(nr)
-                elif any(h in t for h in _WEAK_HINTS):
-                    weak.append(nr)
+        from .pdf_page_cache import page_texts  # shared parse
+        for i, raw in enumerate(page_texts(pdf_bytes)):
+            nr = i + 1
+            if role.get(nr) in _NON_PLUMBING_TIPAI:
+                continue
+            t = (raw or "").upper()
+            if any(h in t for h in _TITLE_HINTS):
+                strong.append(nr)
+            elif any(h in t for h in _WEAK_HINTS):
+                weak.append(nr)
     except Exception as exc:  # noqa: BLE001
         print(f"[sanitary_fixture_reader] scan failed: {exc}")
     return (strong or weak)[:limit]

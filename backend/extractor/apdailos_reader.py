@@ -161,15 +161,15 @@ def _find_apdailos_pages(pdf_bytes: bytes) -> list[int]:
     confidence" on 14/15 rooms. Multi-page reading restored confident reads."""
     candidates: list[tuple[int, int]] = []  # (priority, 1-based page)
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                txt = (page.extract_text() or "").upper()
-                if "VIZUALIZACIJ" in txt:
-                    continue
-                if "IŠKLOTIN" in txt or "ISKLOTIN" in txt:
-                    candidates.append((0, i + 1))
-                elif "APDAILŲ PLANAS" in txt or "APDAILU PLANAS" in txt or "APDAILOS PLANAS" in txt:
-                    candidates.append((1, i + 1))
+        from .pdf_page_cache import page_texts  # shared parse, not a 7th open
+        for i, raw in enumerate(page_texts(pdf_bytes)):
+            txt = (raw or "").upper()
+            if "VIZUALIZACIJ" in txt:
+                continue
+            if "IŠKLOTIN" in txt or "ISKLOTIN" in txt:
+                candidates.append((0, i + 1))
+            elif "APDAILŲ PLANAS" in txt or "APDAILU PLANAS" in txt or "APDAILOS PLANAS" in txt:
+                candidates.append((1, i + 1))
     except Exception as exc:  # noqa: BLE001
         print(f"[apdailos_reader] pdfplumber scan failed: {exc}")
     candidates.sort()

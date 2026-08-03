@@ -146,32 +146,17 @@ def extract_page_signals(pdf_bytes: bytes) -> list[dict]:
     Unreadable pages yield {"text": "", "dalis": None} rather than raising:
     an empty text layer is a legitimate, handled state (raster-flattened
     CAD), not an error.
-    """
-    from .page_classifier import _ANTSPAUDAS_BBOX, _DOC_CODE_RE
 
-    out: list[dict] = []
-    try:
-        with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-            for page in pdf.pages:
-                try:
-                    text = page.extract_text() or ""
-                except Exception:
-                    text = ""
-                dalis = None
-                try:
-                    w, h = page.width, page.height
-                    x0, y0, x1, y1 = _ANTSPAUDAS_BBOX
-                    crop = page.within_bbox((w * x0, h * y0, w * x1, h * y1))
-                    match = _DOC_CODE_RE.search(crop.extract_text() or "")
-                    if match:
-                        code = match.group(1)
-                        dalis = "ŠVOK" if code == "SVOK" else code
-                except Exception:
-                    dalis = None
-                out.append({"text": text, "dalis": dalis})
-    except Exception:
-        return []
-    return out
+    2026-08-03: the pass itself moved to `pdf_page_cache`, which memoises it
+    for the whole extraction. The sharing this docstring promised only ever
+    reached two call sites; eight other stages kept opening their own
+    document and re-paying the same ~17 s. Entries now also carry `words`,
+    `width` and `height` so the positioned-marker lane can share them too —
+    the extra keys are additive, so every existing `["text"]` / `["dalis"]`
+    reader is unaffected.
+    """
+    from .pdf_page_cache import page_signals
+    return page_signals(pdf_bytes)
 
 
 def extract_page_texts(pdf_bytes: bytes) -> list[str]:

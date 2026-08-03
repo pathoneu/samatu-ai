@@ -54,6 +54,28 @@ def _isolate_experiment_envs(monkeypatch):
         monkeypatch.delenv(env, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _reset_pdf_page_cache():
+    """Hermeticity guard (2026-08-03): `extractor.pdf_page_cache` memoises the
+    single pdfplumber parse, keyed on sha256(pdf_bytes).
+
+    That key is exactly right in production — the same bytes always yield the
+    same text — but it bleeds across tests, because tests inject fake
+    documents by patching the shared `pdfplumber` module object while passing
+    a stub like `b"x"` as the bytes. Two tests with different fake pages then
+    collide on one cache key and the second silently reads the first one's
+    pages. Clearing between tests keeps each test's fake document its own.
+    """
+    try:
+        from extractor.pdf_page_cache import clear
+    except Exception:
+        yield
+        return
+    clear()
+    yield
+    clear()
+
+
 def pytest_configure(config):
     """Register custom marks so pytest doesn't warn on first use.
     `integration` gates real-PDF / real-API tests; CI runs them via

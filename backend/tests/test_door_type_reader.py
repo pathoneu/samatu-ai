@@ -123,7 +123,12 @@ def test_find_door_pages_prefers_tag_and_annotation_pages(monkeypatch):
     pages = [_Page("TITULINIS LAPAS"),
              _Page("AUKŠTO PLANAS ... skirta beapvadinėms durims"),  # annotation
              _Page("IŠKLOTINĖS LD-1 LD-1 LD-2 LD-3")]                # tags
-    monkeypatch.setattr(m.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    # Seam moved 2026-08-03: _find_door_pages reads the shared parse in
+    # extractor.pdf_page_cache instead of opening its own document (it used to
+    # re-parse the whole PDF once per voting round). Same texts in, same
+    # assertion below.
+    monkeypatch.setattr("extractor.pdf_page_cache.page_texts",
+                        lambda *_a, **_k: [p.extract_text() for p in pages])
     pp = _find_door_pages(b"x")
     assert 2 in pp and 3 in pp and 1 not in pp
 
