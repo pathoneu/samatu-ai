@@ -1,3 +1,5 @@
+import { CONF_RAUDONA, confidenceNeedsReview, confidenceRank, normalizeConfidence } from './confidence.js';
+
 export const TAKEOFF_FILTER_MODES = {
   all: 'all',
   review: 'review',
@@ -33,18 +35,75 @@ export function getQuantitySourceLabel(row) {
 }
 
 export function needsTakeoffReview(row) {
-  const confidence = String(row?.confidence || '').toLowerCase();
   if (isManualQuantity(row) || row?.user_verified_at) return false;
+  if (row?._review_status === 'accepted' || row?._review_status === 'rejected') return false;
   if (row?.review_required === true) return true;
-  return confidence === 'low' || confidence === 'medium';
+  return confidenceNeedsReview(row?.confidence);
 }
 
 export function isMissingPrice(row) {
   return !(Number(row?.kaina) > 0);
 }
 
+// € impact of a row: kiekis × kaina once prices exist, kiekis alone before —
+// the review queue is ranked by what a wrong line costs, not by confidence.
+export function getRowImpact(row, usePrices) {
+  const kiekis = Number(row?.kiekis) || 0;
+  if (!usePrices) return kiekis;
+  return kiekis * (Number(row?.kaina) || 0);
+}
+
+function hasAnyPrice(rows = []) {
+  return rows.some(row => Number(row?.kaina) > 0);
+}
+
+export function rankReviewRows(rows = []) {
+  const usePrices = hasAnyPrice(rows);
+  return rows
+    .filter(needsTakeoffReview)
+    .map(row => ({ row, impact: getRowImpact(row, usePrices) }))
+    .sort((a, b) =>
+      (b.impact - a.impact)
+      || (confidenceRank(b.row?.confidence) - confidenceRank(a.row?.confidence))
+      || ((a.row?.eil_nr || 0) - (b.row?.eil_nr || 0)))
+    .map(entry => entry.row);
+}
+
+/**
+ * Default review view: every raudona row plus the maxGeltona biggest geltona
+ * rows by € impact; the rest stays collapsed. shareOfTotal is the fraction of
+ * the whole estimate sum the primary rows represent (null before prices exist).
+ */
+export function selectReviewQueue(rows = [], { maxGeltona = 5, exclude = null } = {}) {
+  const usePrices = hasAnyPrice(rows);
+  const ranked = rankReviewRows(exclude ? rows.filter(row => !exclude(row)) : rows);
+
+  const geltonaShown = new Set(
+    ranked.filter(row => normalizeConfidence(row?.confidence) !== CONF_RAUDONA).slice(0, maxGeltona),
+  );
+  const primary = ranked.filter(row =>
+    normalizeConfidence(row?.confidence) === CONF_RAUDONA || geltonaShown.has(row));
+  const rest = ranked.filter(row => !primary.includes(row));
+
+  const totalSum = rows.reduce((sum, row) => sum + getRowImpact(row, true), 0);
+  const primarySum = primary.reduce((sum, row) => sum + getRowImpact(row, true), 0);
+  const shareOfTotal = usePrices && totalSum > 0 ? primarySum / totalSum : null;
+
+  return { ranked, primary, rest, usePrices, shareOfTotal };
+}
+
 export function getFirstReviewRow(rows = []) {
-  return rows.find(needsTakeoffReview) || null;
+  return rankReviewRows(rows)[0] || null;
+}
+
+// "šią 1 eilutę" / "šias 6 eilutes" / "šias 11 eilučių" — LT numeral agreement
+// for the review-queue copy.
+export function ltEilutesPhrase(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `šią ${n} eilutę`;
+  if (mod10 >= 2 && mod10 <= 9 && !(mod100 >= 11 && mod100 <= 19)) return `šias ${n} eilutes`;
+  return `šias ${n} eilučių`;
 }
 
 export function getRowTargetPage(row, project = {}) {

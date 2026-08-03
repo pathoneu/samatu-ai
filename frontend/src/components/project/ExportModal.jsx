@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, FileText, AlertCircle, FileCode, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
@@ -167,12 +168,12 @@ async function downloadFromBackend(endpoint, project, filename) {
 function exportErrors(project) {
   const rows = project.rows || [];
   const vatRate = project.vat_rate || 21;
-  const problematic = rows.filter(r => r.confidence === 'low' || r.warning || !r.kaina);
+  const problematic = rows.filter(r => normalizeConfidence(r.confidence) === CONF_RAUDONA || r.warning || !r.kaina);
 
   const lines = [];
   lines.push(['Nr.', 'Aprašymas', 'Skyrius', 'Problema'].join(';'));
   problematic.forEach(r => {
-    const issue = r.warning || (r.confidence === 'low' ? 'Žemas AI tikslumas' : 'Trūksta kainos');
+    const issue = r.warning || (normalizeConfidence(r.confidence) === CONF_RAUDONA ? 'Žemas AI tikslumas' : 'Trūksta kainos');
     lines.push([r.nr || '', `"${(r.aprasymas || '').replace(/"/g, '""')}"`, r.skyrius || '', issue].join(';'));
   });
 

@@ -9,6 +9,7 @@ import UploadZone from '@/components/upload/UploadZone';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { createProject, updateProject } from '@/lib/projectStore';
+import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
 import { useQueryClient } from '@tanstack/react-query';
@@ -461,7 +462,7 @@ export default function NewProject() {
           ...row,
           kaina: 0,
           suma:  0,
-          warning: row.confidence === 'low' ? t('newProject.warnLowConfidence')
+          warning: normalizeConfidence(row.confidence) === CONF_RAUDONA ? t('newProject.warnLowConfidence')
                  : !row.mato_vnt ? t('newProject.warnMissingUnit') : '',
         }));
         project = createProject({
