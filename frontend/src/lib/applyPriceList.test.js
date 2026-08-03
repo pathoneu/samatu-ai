@@ -4,6 +4,7 @@ import {
   scorePair,
   bestMatchForPozicija,
   applyPriceListToPositions,
+  manualPricePatch,
 } from './applyPriceList.js';
 
 test('scorePair: exact match → 1.0', () => {
@@ -97,4 +98,68 @@ test('applyPriceListToPositions: empty inputs', () => {
   const out2 = applyPriceListToPositions([{ aprasymas: 'x' }], []);
   assert.equal(out2.applied, 0);
   assert.equal(out2.skipped, 1);
+});
+
+// ── manualPricePatch — provenance stamping at the price editors ─────────────
+// Mirrors how every commit site merges the patch into the row.
+function commitPrice(row, typedKaina) {
+  return {
+    ...row,
+    kaina: typedKaina,
+    suma: (row.kiekis || 0) * typedKaina,
+    ...manualPricePatch(row, typedKaina),
+  };
+}
+
+test('manualPricePatch: typing a price into an empty row marks it manual', () => {
+  const row = commitPrice({ aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 0 }, 40);
+  assert.equal(row.kaina, 40);
+  assert.equal(row.kaina_source, 'manual');
+});
+
+test('manualPricePatch: editing a kainynas price flips source to manual and drops match score', () => {
+  const applied = { aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 7.5, kaina_source: 'kainynas', kaina_match_score: 0.92 };
+  const row = commitPrice(applied, 9);
+  assert.equal(row.kaina_source, 'manual');
+  assert.equal(row.kaina_match_score, undefined);
+});
+
+test('manualPricePatch: committing an unchanged price leaves provenance alone', () => {
+  const applied = { aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 7.5, kaina_source: 'kainynas', kaina_match_score: 0.92 };
+  // Row editor saved with only the description changed — price untouched.
+  const row = commitPrice(applied, 7.5);
+  assert.equal(row.kaina_source, 'kainynas');
+  assert.equal(row.kaina_match_score, 0.92);
+});
+
+test('manualPricePatch: clearing to 0 resets source so kainynas may refill', () => {
+  const manual = { aprasymas: 'Sienų dažymas', vnt: 'm²', kiekis: 100, kaina: 40, kaina_source: 'manual' };
+  const cleared = commitPrice(manual, 0);
+  assert.notEqual(cleared.kaina_source, 'manual');
+  const out = applyPriceListToPositions([cleared], [{ aprasymas: 'Sienų dažymas', vnt: 'm²', kaina: 7.5 }]);
+  assert.equal(out.items[0].kaina, 7.5);
+  assert.equal(out.items[0].kaina_source, 'kainynas');
+});
+
+test('P0 flow: hand-typed price survives apply; kainynas rows update on re-apply', () => {
+  const rows = [
+    commitPrice({ aprasymas: 'Sienų dažymas', vnt: 'm²', kiekis: 100, kaina: 0 }, 40),
+    { aprasymas: 'Lubų dažymas', vnt: 'm²', kiekis: 50 },
+  ];
+  const listV1 = [
+    { aprasymas: 'Sienų dažymas', vnt: 'm²', kaina: 7.5 },
+    { aprasymas: 'Lubų dažymas', vnt: 'm²', kaina: 6 },
+  ];
+  const first = applyPriceListToPositions(rows, listV1);
+  assert.equal(first.items[0].kaina, 40);          // the P0: typed price survives
+  assert.equal(first.items[0].kaina_source, 'manual');
+  assert.equal(first.items[1].kaina, 6);
+
+  const listV2 = [
+    { aprasymas: 'Sienų dažymas', vnt: 'm²', kaina: 8 },
+    { aprasymas: 'Lubų dažymas', vnt: 'm²', kaina: 6.5 },
+  ];
+  const second = applyPriceListToPositions(first.items, listV2);
+  assert.equal(second.items[0].kaina, 40);         // manual still survives re-apply
+  assert.equal(second.items[1].kaina, 6.5);        // kainynas price updates on re-apply
 });

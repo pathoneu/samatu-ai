@@ -30,7 +30,7 @@ import {
   CircleDollarSign, PencilRuler, Target, Sliders,
 } from 'lucide-react';
 import { getPriceLists } from '@/lib/projectStore';
-import { applyPriceListToPositions } from '@/lib/applyPriceList';
+import { applyPriceListToPositions, manualPricePatch } from '@/lib/applyPriceList';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
 // A well-formed number over the cap gets magnitude advice, not format advice —
@@ -132,6 +132,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
       kiekis,
       kaina,
       suma: kiekis * kaina,
+      ...manualPricePatch(item, kaina),
     });
     setEditing(false);
   };
@@ -1019,8 +1020,8 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
 // ── Apply Price List dropdown — Sprint 9 (2026-05-06) ────────────────────────
 // Lists user's saved price lists (from Kainynai page). On click, runs
 // fuzzy match against project pozicijos and writes back kaina per row.
-// Shows toast with count applied / skipped. Manual prices preserved
-// unless user holds Shift while picking.
+// Shows toast with count applied / skipped. Rows with kaina_source
+// 'manual' (hand-typed in any price editor) are never overwritten.
 
 function ApplyPriceListButton({ project, onProjectChange }) {
   const { t } = useTranslation();

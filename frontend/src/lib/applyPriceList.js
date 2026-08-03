@@ -83,6 +83,31 @@ export function bestMatchForPozicija(poz, priceItems) {
 }
 
 /**
+ * Provenance patch for a price the USER just committed in an editor.
+ * Every manual price-commit site must spread this into its row update:
+ *   onChange({ ...item, kaina, suma, ...manualPricePatch(item, kaina) })
+ * — otherwise the 'manual' guard above never fires and "Taikyti kainyną"
+ * overwrites hand-typed prices, breaking the UI promise
+ * "Rankomis įvestos kainos lieka nepakeistos".
+ *
+ * Rules:
+ *   - unchanged value → {}: saving a row without touching the price (e.g. a
+ *     description fix, or a blur that re-commits the same number) must not
+ *     convert a kainynas price into a protected manual one.
+ *   - cleared to 0 → source reset: 0 renders as "no price" (—) everywhere,
+ *     so a cleared row goes back to fillable-by-kainynas.
+ *   - any other value → 'manual'. kaina_match_score describes the kainynas
+ *     match, so it dies whenever the source changes.
+ */
+export function manualPricePatch(prevItem, nextKaina) {
+  const prev = Number(prevItem?.kaina) || 0;
+  const next = Number(nextKaina) || 0;
+  if (next === prev) return {};
+  if (next === 0) return { kaina_source: undefined, kaina_match_score: undefined };
+  return { kaina_source: 'manual', kaina_match_score: undefined };
+}
+
+/**
  * Apply a price list across a project's positions. Returns a new array;
  * input is not mutated. Each row gains `kaina` (eur per unit) and
  * `kaina_source: 'kainynas'` when matched. Existing user-overridden prices

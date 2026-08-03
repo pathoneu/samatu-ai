@@ -16,6 +16,7 @@ import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import { exportCSVFile, exportJSONFile } from '@/lib/measureExport';
 import { buildMeasureExportDoc } from '@/lib/measureExportDoc';
+import { manualPricePatch } from '@/lib/applyPriceList';
 import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
@@ -291,7 +292,7 @@ export default function WorkspacePanel({
     const updated = (project.darbu_sarasas || []).map(it => {
       const id = it._id || `${it.eil_nr}-${it.aprasymas}`;
       if (id !== rowId) return it;
-      return { ...it, kaina, suma: (it.kiekis || 0) * kaina };
+      return { ...it, kaina, suma: (it.kiekis || 0) * kaina, ...manualPricePatch(it, kaina) };
     });
     onProjectChange({ ...project, darbu_sarasas: updated });
   }, [project, onProjectChange]);

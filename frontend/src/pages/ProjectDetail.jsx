@@ -14,6 +14,7 @@ import ExportModal from '@/components/project/ExportModal';
 import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
 import { getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves } from '@/lib/projectStore';
+import { manualPricePatch } from '@/lib/applyPriceList';
 import { useConfirm } from '@/components/ui/confirm-provider';
 
 export default function ProjectDetail() {
@@ -109,6 +110,7 @@ export default function ProjectDetail() {
         ...updated[index],
         kaina: price,
         suma: price * (updated[index].kiekis || 0),
+        ...manualPricePatch(updated[index], price),
       };
       return updated;
     });
