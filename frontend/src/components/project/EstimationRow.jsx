@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
+import { CONF_ZALIA, CONF_GELTONA, CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 
 export default function EstimationRow({ row, index, onPriceChange, onRowClick }) {
   // LT decimal comma: `type="number"` reports an EMPTY value for "12,5", so the
@@ -25,16 +26,16 @@ export default function EstimationRow({ row, index, onPriceChange, onRowClick })
   };
 
   const confidenceColor = {
-    high: '',
-    medium: 'bg-chart-3/5',
-    low: 'bg-destructive/5',
+    [CONF_ZALIA]: '',
+    [CONF_GELTONA]: 'bg-chart-3/5',
+    [CONF_RAUDONA]: 'bg-destructive/5',
   };
 
   return (
     <tr
       className={cn(
         "border-b border-border/50 hover:bg-accent/30 transition-colors group",
-        confidenceColor[row.confidence]
+        confidenceColor[normalizeConfidence(row.confidence)]
       )}
     >
       <td className="px-4 py-2.5">

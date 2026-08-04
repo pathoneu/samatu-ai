@@ -232,7 +232,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
           {sourceDot}
           <span
             className="truncate"
-            title={item.review_reason || item.calculation_basis || sourceLabel}
+            title={item.review_reason || item._confidence_reason || item.calculation_basis || sourceLabel}
           >
             {item.aprasymas}
           </span>
@@ -711,9 +711,9 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
                 {t('project.mainView.reviewLabel', { label: getQuantitySourceLabel(currentReview), qty: fmt(currentReview.kiekis), unit: currentReview.mato_vnt || '' })}
               </span>
             </div>
-            {currentReview.review_reason && (
+            {(currentReview.review_reason || currentReview._confidence_reason) && (
               <div className="text-xs text-amber-800 dark:text-amber-200 truncate">
-                {currentReview.review_reason}
+                {currentReview.review_reason || currentReview._confidence_reason}
               </div>
             )}
           </div>

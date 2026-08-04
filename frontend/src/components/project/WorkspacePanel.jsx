@@ -20,6 +20,7 @@ import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
+import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
@@ -898,9 +899,11 @@ const PositionRow = memo(function PositionRow({
     color: 'hsl(var(--muted-foreground))',
     background: 'hsl(var(--muted) / 0.35)',
   };
-  const conf = (row.confidence || 'high').toLowerCase();
-  const confClass = conf === 'medium' ? 'dot-med' : conf === 'low' ? 'dot-low' : 'dot-high';
-  const confTitle = `Pasitikėjimas: ${conf === 'medium' ? 'vidutinis — patikrinkite' : conf === 'low' ? 'žemas — būtina patikrinti' : 'aukštas — nuskaityta iš brėžinio'}`;
+  // Backend stamps LT tiers (zalia/geltona/raudona); legacy blobs carry EN —
+  // normalize, or engine-flagged rows render as confident green (P0 2026-08-03).
+  const confTier = normalizeConfidence(row.confidence);
+  const confClass = CONFIDENCE_DOT_CLASS[confTier];
+  const confTitle = `Pasitikėjimas: ${confidenceLabel(confTier)}${row._confidence_reason ? ` — ${row._confidence_reason}` : ''}`;
   const sum = (row.kiekis || 0) * (row.kaina || 0);
   const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
   const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
@@ -964,7 +967,7 @@ const PositionRow = memo(function PositionRow({
       <div className="flex items-start gap-1.5 min-w-0">
         <span
           className="text-foreground/90 leading-snug break-words"
-          title={row.review_reason || row.calculation_basis || sourceLabel}
+          title={row.review_reason || row._confidence_reason || row.calculation_basis || sourceLabel}
         >
           {row.aprasymas}
         </span>

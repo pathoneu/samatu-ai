@@ -2,17 +2,20 @@ import React from 'react';
 import { X, AlertTriangle, CheckCircle2, HelpCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CONF_ZALIA, CONF_GELTONA, CONF_RAUDONA, CONFIDENCE_LABELS, normalizeConfidence } from '@/lib/confidence';
 
+// Keyed by the canonical LT tiers — normalizeConfidence also folds the legacy
+// EN vocabulary (high/medium/low) from old blobs into these.
 const confidenceConfig = {
-  high: { label: 'Aukštas tikslumas', icon: CheckCircle2, color: 'text-primary bg-primary/10 border-primary/20' },
-  medium: { label: 'Vidutinis tikslumas', icon: HelpCircle, color: 'text-chart-3 bg-chart-3/10 border-chart-3/20' },
-  low: { label: 'Žemas tikslumas', icon: AlertTriangle, color: 'text-destructive bg-destructive/10 border-destructive/20' },
+  [CONF_ZALIA]: { label: CONFIDENCE_LABELS[CONF_ZALIA], icon: CheckCircle2, color: 'text-primary bg-primary/10 border-primary/20' },
+  [CONF_GELTONA]: { label: CONFIDENCE_LABELS[CONF_GELTONA], icon: HelpCircle, color: 'text-chart-3 bg-chart-3/10 border-chart-3/20' },
+  [CONF_RAUDONA]: { label: CONFIDENCE_LABELS[CONF_RAUDONA], icon: AlertTriangle, color: 'text-destructive bg-destructive/10 border-destructive/20' },
 };
 
 export default function RowDetailPanel({ row, onClose }) {
   if (!row) return null;
 
-  const conf = confidenceConfig[row.confidence] || confidenceConfig.high;
+  const conf = confidenceConfig[normalizeConfidence(row.confidence)];
   const ConfIcon = conf.icon;
 
   return (
@@ -75,6 +78,11 @@ export default function RowDetailPanel({ row, onClose }) {
                 <ConfIcon className="w-3 h-3 mr-1" />
                 {conf.label}
               </Badge>
+              {row._confidence_reason && (
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  {row._confidence_reason}
+                </p>
+              )}
             </div>
             {row.warning && (
               <div className="p-3 bg-chart-3/5 border border-chart-3/20 rounded-lg">

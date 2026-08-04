@@ -1,7 +1,17 @@
 /**
  * ReviewQueueSidebar — confidence-driven review queue (Sprint G2).
  *
- * Surfaces low/medium confidence rooms + positions that need user review.
+ * Surfaces engine-flagged rooms + positions that need user review. Confidence
+ * arrives in the backend's LT vocabulary (zalia/geltona/raudona, see
+ * extractor/confidence.py) with legacy EN (high/medium/low) in old blobs —
+ * everything is normalized through lib/confidence.js.
+ *
+ * Positions are ranked by € impact (kiekis × kaina; kiekis alone before prices
+ * exist), NOT by confidence order: geltona mostly means "systematic ±20%", so
+ * the queue leads with the rows where a wrong quantity costs the most. Default
+ * view = all raudona + the 5 biggest geltona; the rest collapses behind
+ * "rodyti visas N".
+ *
  * KEY DIFFERENTIATOR: rooms/items with eksplikacija_row_bbox or table-source
  * (saltinis ∈ {eksplikacija, specifikacija, isklotines}) get a 🟢 lock badge
  * = "patvirtinta eksplikacijoje" — grid-based takeoff tools can't do this because they only
@@ -9,9 +19,6 @@
  *
  * Layout: collapsible section at top of WorkspacePanel scroll area.
  * Empty state: "Visi duomenys patvirtinti" (no review needed).
- *
- * Phase 1 (this commit): list + filter + sort + jump to PDF page.
- * Phase 2 (follow-up): inline ✓/✏️/✕ accept/edit/reject actions.
  */
 
 import { useMemo, useState } from 'react';
@@ -19,12 +26,16 @@ import {
   ChevronDown, ChevronRight, ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2,
   Check, X, Pencil,
 } from 'lucide-react';
+import {
+  needsTakeoffReview, selectReviewQueue, ltEilutesPhrase,
+} from '@/lib/takeoffWorkflow';
+import {
+  CONF_RAUDONA, normalizeConfidence, confidenceRank, confidenceLabel,
+} from '@/lib/confidence';
 
 const TABLE_SOURCES = new Set([
   'eksplikacija', 'specifikacija', 'isklotines', 'lubu_planas',
 ]);
-
-const REVIEW_CONFIDENCES = new Set(['low', 'medium']);
 
 function isLockedRoom(room) {
   return Array.isArray(room?.eksplikacija_row_bbox) && room.eksplikacija_row_bbox.length === 4;
@@ -32,19 +43,6 @@ function isLockedRoom(room) {
 
 function isLockedPosition(item) {
   return TABLE_SOURCES.has(item?.saltinis);
-}
-
-function needsReview(it) {
-  // Sprint G2 Phase 2: skip items already accepted/rejected by user
-  if (it?._review_status === 'accepted' || it?._review_status === 'rejected') return false;
-  return REVIEW_CONFIDENCES.has((it?.confidence || '').toLowerCase());
-}
-
-function confSortKey(it) {
-  const c = (it?.confidence || '').toLowerCase();
-  if (c === 'low') return 0;
-  if (c === 'medium') return 1;
-  return 2;
 }
 
 export default function ReviewQueueSidebar({
@@ -56,24 +54,31 @@ export default function ReviewQueueSidebar({
   onEditRoom = null,            // pencil: focus room + arm click-to-fill (falls back to jump)
 }) {
   const [open, setOpen] = useState(true);
+  const [showAllPositions, setShowAllPositions] = useState(false);
 
-  const { reviewRooms, reviewPositions, lockedRoomCount, lockedPositionCount } = useMemo(() => {
+  const { reviewRooms, queue, lockedRoomCount, lockedPositionCount } = useMemo(() => {
     const reviewRooms = rooms
-      .filter(r => needsReview(r) && !isLockedRoom(r))
-      .sort((a, b) => confSortKey(a) - confSortKey(b) || (a.nr || 0) - (b.nr || 0));
+      .filter(r => needsTakeoffReview(r) && !isLockedRoom(r))
+      .sort((a, b) =>
+        confidenceRank(b.confidence) - confidenceRank(a.confidence)
+        || (a.nr || 0) - (b.nr || 0));
 
-    const reviewPositions = positions
-      .filter(p => needsReview(p) && !isLockedPosition(p))
-      .sort((a, b) => confSortKey(a) - confSortKey(b) || (a.eil_nr || 0) - (b.eil_nr || 0));
+    // € impact ranking; eksplikacija-locked rows leave the queue but stay in
+    // the total the "≈X % sumos" copy is computed against.
+    const queue = selectReviewQueue(positions, { exclude: isLockedPosition });
 
     const lockedRoomCount = rooms.filter(isLockedRoom).length;
     const lockedPositionCount = positions.filter(isLockedPosition).length;
 
-    return { reviewRooms, reviewPositions, lockedRoomCount, lockedPositionCount };
+    return { reviewRooms, queue, lockedRoomCount, lockedPositionCount };
   }, [rooms, positions]);
 
-  const totalReview = reviewRooms.length + reviewPositions.length;
+  const reviewPositions = showAllPositions ? queue.ranked : queue.primary;
+  const totalReview = reviewRooms.length + queue.ranked.length;
   const totalLocked = lockedRoomCount + lockedPositionCount;
+
+  const sharePct = queue.shareOfTotal != null ? Math.round(queue.shareOfTotal * 100) : null;
+  const shareText = sharePct != null ? (sharePct < 1 ? '<1' : `≈${sharePct}`) : null;
 
   const handleRoomClick = (room) => {
     if (!onJumpToPage) return;
@@ -202,8 +207,8 @@ export default function ReviewQueueSidebar({
             </>
           )}
 
-          {/* Review positions */}
-          {reviewPositions.length > 0 && (
+          {/* Review positions — ranked by € impact, collapsed to raudona + top-5 geltona */}
+          {queue.ranked.length > 0 && (
             <>
               <div
                 className="px-3 py-1.5 text-muted-foreground uppercase tracking-wide font-medium"
@@ -213,17 +218,38 @@ export default function ReviewQueueSidebar({
                   borderBottom: '1px solid hsl(var(--border) / 0.3)',
                 }}
               >
-                Pozicijos ({reviewPositions.length})
+                Pozicijos ({queue.ranked.length})
+              </div>
+              <div
+                className="px-3 py-2"
+                style={{
+                  fontSize: 11,
+                  color: 'hsl(var(--foreground) / 0.85)',
+                  background: 'hsl(var(--conf-med) / 0.06)',
+                  borderBottom: '1px solid hsl(var(--border) / 0.4)',
+                }}
+              >
+                Patikrinkite <strong>{ltEilutesPhrase(queue.primary.length)}</strong>
+                {shareText && <span className="text-muted-foreground"> ({shareText} % sumos)</span>}
+                {!queue.usePrices && <span className="text-muted-foreground"> — rikiuota pagal kiekį, kol nėra kainų</span>}
               </div>
               {reviewPositions.map((p, i) => {
                 const posKey = p._id || `${p.eil_nr}-${p.aprasymas}`;
+                const kiekisText = p.kiekis != null
+                  ? `${Number(p.kiekis).toLocaleString('lt-LT', { maximumFractionDigits: 2 })} ${p.mato_vnt || ''}`.trim()
+                  : null;
+                const sum = (Number(p.kiekis) || 0) * (Number(p.kaina) || 0);
+                const sumText = sum > 0
+                  ? `${sum.toLocaleString('lt-LT', { maximumFractionDigits: 0 })} €`
+                  : null;
                 return (
                   <ReviewRow
                     key={`pos-${posKey}-${i}`}
                     conf={p.confidence}
+                    reason={p._confidence_reason}
                     primary={p.aprasymas || 'Pozicija'}
                     secondary={p.skyrius || p.kategorija || '—'}
-                    meta={p.kiekis != null ? `${Number(p.kiekis).toLocaleString('lt-LT', { maximumFractionDigits: 2 })} ${p.mato_vnt || ''}` : null}
+                    meta={[kiekisText, sumText].filter(Boolean).join(' · ') || null}
                     reasonHint={p.kiekis == null ? 'Kiekis neaptiktas' : null}
                     onClick={() => handlePositionClick(p)}
                     onAccept={onReviewStatusChange ? () => onReviewStatusChange('position', posKey, 'accepted') : null}
@@ -232,6 +258,22 @@ export default function ReviewQueueSidebar({
                   />
                 );
               })}
+              {queue.rest.length > 0 && (
+                <button
+                  onClick={() => setShowAllPositions(v => !v)}
+                  className="w-full text-left px-3 py-2 transition-colors hover:bg-muted/40"
+                  style={{
+                    fontSize: 11,
+                    color: 'hsl(var(--primary))',
+                    borderBottom: '1px solid hsl(var(--border) / 0.5)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {showAllPositions
+                    ? 'rodyti mažiau'
+                    : `rodyti visas ${queue.ranked.length}`}
+                </button>
+              )}
             </>
           )}
         </>
@@ -242,13 +284,14 @@ export default function ReviewQueueSidebar({
 
 // ── Single review row — confidence dot, name, area/qty, click to jump ──────
 // Sprint G2 Phase 2: inline ✓/✏️/✕ accept-edit-reject actions on hover.
-function ReviewRow({ conf, primary, secondary, meta, reasonHint, onClick, onAccept, onEdit, onReject }) {
-  const c = (conf || '').toLowerCase();
-  const Icon = c === 'low' ? AlertCircle : AlertTriangle;
-  const confColor = c === 'low' ? 'hsl(var(--source-ai))' : 'hsl(var(--warning, 38 92% 50%))';
-  const confTitle = c === 'low'
-    ? 'Žemas pasitikėjimas — privaloma patikrinti'
-    : 'Vidutinis pasitikėjimas — rekomenduojama patikrinti';
+// `reason` = backend _confidence_reason ("Skaičius iš simbolių: −20%/+33%" …) —
+// shown as the subline so the user sees WHY the row is flagged without hovering.
+function ReviewRow({ conf, reason, primary, secondary, meta, reasonHint, onClick, onAccept, onEdit, onReject }) {
+  const tier = normalizeConfidence(conf);
+  const isRaudona = tier === CONF_RAUDONA;
+  const Icon = isRaudona ? AlertCircle : AlertTriangle;
+  const confColor = isRaudona ? 'hsl(var(--conf-low))' : 'hsl(var(--conf-med))';
+  const confTitle = reason ? `${confidenceLabel(tier)} — ${reason}` : confidenceLabel(tier);
 
   const stop = (e) => { e.stopPropagation(); };
 
@@ -266,8 +309,8 @@ function ReviewRow({ conf, primary, secondary, meta, reasonHint, onClick, onAcce
       <Icon className="w-3 h-3 shrink-0" style={{ color: confColor }} />
       <div className="min-w-0">
         <div className="text-foreground/90 truncate">{primary}</div>
-        <div className="text-muted-foreground truncate" style={{ fontSize: 10 }}>
-          {reasonHint || secondary}
+        <div className="text-muted-foreground truncate" style={{ fontSize: 10 }} title={reason || undefined}>
+          {reasonHint || reason || secondary}
         </div>
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
