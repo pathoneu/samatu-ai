@@ -1,6 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#15181E"/>
-  <rect x="7" y="5" width="3.4" height="22" rx="1.5" fill="#EDEFF2"/>
-  <path d="M10 6.6 H19.5 a6.4 6.4 0 0 1 0 12.8 H10" fill="none" stroke="#EDEFF2" stroke-width="3.4"/>
-  <circle cx="19.5" cy="13" r="2.4" fill="#F76B1C"/>
+  <!-- Pathon monogram, Nordic Slate (2026-08): parchment tile + slate-ink P +
+       deep-slate node — the exact PathonMark the app header renders
+       (components/layout/Logo.jsx), replacing the pre-redesign dark-graphite
+       tile with the orange node. The hairline keeps the tile legible on dark
+       browser chrome. -->
+  <rect width="32" height="32" rx="7" fill="#F9FAF8"/>
+  <rect width="31" height="31" x="0.5" y="0.5" rx="6.5" stroke="#191C1B" stroke-opacity="0.12"/>
+  <rect x="7" y="5" width="3.4" height="22" rx="1.5" fill="#191C1B"/>
+  <path d="M10 6.6 H19.5 a6.4 6.4 0 0 1 0 12.8 H10" fill="none" stroke="#191C1B" stroke-width="3.4"/>
+  <circle cx="19.5" cy="13" r="2.4" fill="#192830"/>
 </svg>
