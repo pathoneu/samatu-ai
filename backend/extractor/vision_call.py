@@ -3329,11 +3329,82 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
     # Run all Pass-1 rounds FIRST so we know which page the rooms are on.
     runs: list[dict] = []
     per_round_meta: list[dict] = []
+
+    # ── Round execution: serial (default) or concurrent ────────────────────
+    # The rounds are independent by design — that is the whole point of voting —
+    # so nothing but wall-clock forces them to be sequential. Measured on the
+    # 2026-07-29 production run: 3 rounds x ~220 s = ~660 s of the 1613 s total.
+    #
+    # Results are collected into a slot-indexed list and read back IN ROUND
+    # ORDER, never completion order. That matters twice: the vote must see the
+    # same sequence it sees today, and runs[0] is the base for the voted _meta
+    # and the target of the adjacency extra-call append.
+    from .feature_flags import get_flags as _ff
+    _parallel = _ff().get("parallel_voting", False) and n > 1
+    _slots: list[dict | None] = [None] * n
+
+    def _one(i: int, np: dict | None = native_pdf) -> dict:
+        return _run_pass1_once(client, system, pages, native_pdf=np,
+                               model=round_models[i])
+
+    if _parallel:
+        import concurrent.futures as _cf
+        # Warm mode: round 1 alone writes the image prefix into the prompt
+        # cache, the rest then read it at 0.1x. Costs one extra round of
+        # latency, saves the cache re-write on every remaining round.
+        _warm = (os.environ.get("PARALLEL_VOTING_WARM", "").strip().lower()
+                 in {"1", "true", "yes", "on"})
+        # NATIVE-PDF SETTLEMENT (2026-07-29, latency-review catch).
+        # _flip_to_image_fallback MUTATES the shared native_pdf dict — a
+        # serial-era design where one API rejection of the document payload
+        # flips every later round to raster, wasting 2 attempts total. Fired
+        # concurrently, every round is already in flight, so each burns its
+        # own 2 document attempts (2 → 2N) and the in-place flip races the
+        # other threads reading the dict mid-build. Two-part fix:
+        #   1. a document payload forces round 1 to run ALONE first — it
+        #      settles document-vs-raster and performs any flip on the shared
+        #      dict before the fan-out;
+        #   2. the concurrent rounds each get a SHALLOW COPY, so a later
+        #      transient rejection flips only its own round, never a dict a
+        #      sibling thread is reading. (The b64 string inside is shared
+        #      read-only — copying it would be pure waste.)
+        _solo_first = _warm or bool(native_pdf and native_pdf.get("b64"))
+        _first = 1 if _solo_first else 0
+        if _solo_first:
+            _emit({"event": "voting_round_started", "round": 1, "of": n,
+                   "model": round_models[0]})
+            _slots[0] = _one(0)
+        rest = list(range(_first, n))
+        if rest:
+            for i in rest:
+                _emit({"event": "voting_round_started", "round": i + 1, "of": n,
+                       "model": round_models[i]})
+            print(f"[voting] {len(rest)} rounds concurrently "
+                  f"(solo_first={_solo_first} warm={_warm})")
+            with _cf.ThreadPoolExecutor(max_workers=len(rest)) as ex:
+                futs = {
+                    ex.submit(_one, i,
+                              dict(native_pdf) if native_pdf else None): i
+                    for i in rest
+                }
+                for f in _cf.as_completed(futs):
+                    i = futs[f]
+                    try:
+                        _slots[i] = f.result()
+                    except Exception as exc:   # noqa: BLE001
+                        # Mirror _run_pass1_once's own error shape so the
+                        # per-round bookkeeping below needs no special case.
+                        _slots[i] = {"status": "error", "_error": repr(exc)}
+    else:
+        for i in range(n):
+            _emit({"event": "voting_round_started", "round": i + 1, "of": n,
+                   "model": round_models[i]})
+            _slots[i] = _one(i)
+
     for i in range(n):
-        _emit({"event": "voting_round_started", "round": i + 1, "of": n,
-               "model": round_models[i]})
-        p = _run_pass1_once(client, system, pages, native_pdf=native_pdf,
-                            model=round_models[i])
+        p = _slots[i]
+        if p is None:                       # unreachable; defensive
+            p = {"status": "error", "_error": "round_produced_no_result"}
         if p.get("status") == "error":
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})

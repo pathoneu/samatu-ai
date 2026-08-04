@@ -47,6 +47,23 @@ _FLAG_DEFINITIONS = {
     #   heights so zoom skipped). Disable: ENABLE_EXTRACTION_VOTING=0.
     #   Rounds: VOTING_N (default 3, 2-5).
     "extraction_voting": ("ENABLE_EXTRACTION_VOTING", True),
+    # 2026-07-29: run the Pass-1 voting rounds CONCURRENTLY instead of one
+    # after another. Measured on the 17-page production run that took 1613 s
+    # end to end: the three rounds are ~220 s each and ran strictly serially,
+    # so they alone were ~660 s — 41% of the whole extraction — spent waiting
+    # on calls that do not depend on one another.
+    #
+    # ACCURACY IS UNCHANGED BY CONSTRUCTION: identical prompts, identical
+    # model, identical round count, and the results are re-ordered back into
+    # round order before voting, so the median sees exactly the same input it
+    # sees today. What changes is only how long we wait.
+    #
+    # The cost is prompt cache: today round 1 writes the image prefix and
+    # rounds 2-3 read it at 0.1x. Fired together, all three pay full price.
+    # PARALLEL_VOTING_WARM=1 keeps round 1 alone first (cache warm, rounds 2..n
+    # then concurrent) — less latency won, no extra spend.
+    # DEFAULT OFF until measured on a real PDF. Enable: ENABLE_PARALLEL_VOTING=1
+    "parallel_voting": ("ENABLE_PARALLEL_VOTING", False),
 }
 
 
