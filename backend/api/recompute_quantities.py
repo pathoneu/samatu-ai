@@ -117,6 +117,36 @@ def _num_field(raw, default: float, degradations: list, field: str,
         return float(default)
 
 
+def _calc_input(room: dict) -> dict:
+    """Room dict prepared for ``calc_room_quantities`` — the SAME contract the
+    extraction pipeline uses (``vision_call._recompute_per_room_via_python``)
+    and the per-room recalc uses (``api.room_recalc._recalc_room``).
+
+    `elementai` is the PRIMITIVE. `n_doors` / `n_windows` / `door_area_m2` /
+    `window_area_m2` are DERIVED from it and are NOT stored on the room — the
+    calculator's return value doesn't carry the counts and PRIMITIVE_KEYS never
+    persisted them. So they have to be re-derived on every call.
+
+    THE BUG this exists to prevent (2026-07-29, live project 87eb1197): this
+    module called ``calc_room_quantities(room, …)`` with the raw room, so
+    ``room.get("n_doors")`` was always absent and the calculator fell back to
+    its ``1 door / 1 window`` default. A Prielaidos ceiling-height edit
+    therefore rewrote the room's geometry as if every room had exactly one door
+    and one window — the same phantom-opening defect the 2026-06-01 audit fixed
+    inside the calculator, re-entering through a side door. Consequences on the
+    first edit of a room with 2 doors + 1 window:
+      · walls_paintable_m2 GREW by 1.125 m² (a door's worth of un-deducted wall)
+      · kampu_metrai SHRANK by 5.0 m (a door's worth of reveal contour), so
+        RAISING a ceiling LOWERED the corner metres
+    and both losses were permanent: the counts are recomputed from scratch each
+    time, so once a room had been touched every later edit repeated the same
+    wrong default and the numbers never came back. Not a rounding drift — a
+    whole missing opening.
+    """
+    from extractor.vision_call import _elementai_to_counts
+    return {**room, **_elementai_to_counts(room.get("elementai") or [])}
+
+
 def _degrade(degradations: list, room: str | None, field: str, reason: str,
              **extra) -> None:
     """Append one machine-readable degradation entry. Silent drops/excepts in the
@@ -173,7 +203,8 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                 # Recompute geometry-derived fields with the new height.
                 try:
                     from extractor.universal_rules import calc_room_quantities
-                    recalc = calc_room_quantities(room, ceiling_height_m=new_h)
+                    recalc = calc_room_quantities(
+                        _calc_input(room), ceiling_height_m=new_h)
                     # Carry forward the recomputed wall/ceiling/cornice fields.
                     for k in ("walls_gross_m2", "walls_paintable_m2",
                               "ceiling_paintable_m2", "dazymo_plotas_m2",
@@ -214,7 +245,8 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                 rt = dict(ROOM_TYPE_RULES.get(pask) or ROOM_TYPE_RULES["gyvenamoji"])
                 rt["walls_paint"] = wp
                 room["_walls_paint_override"] = wp
-                recalc = calc_room_quantities(room, rules={pask: rt})
+                recalc = calc_room_quantities(_calc_input(room),
+                                              rules={pask: rt})
                 for k in ("walls_gross_m2", "walls_paintable_m2",
                           "ceiling_paintable_m2", "dazymo_plotas_m2",
                           "kampai_m", "kampu_metrai", "lubu_karnizo_m",
