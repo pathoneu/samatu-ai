@@ -17,7 +17,48 @@ import re
 
 # +3.000 / +2,800 / ±0.000 / + 3.000 — sign followed by decimal value.
 # Capture group 1 is the numeric portion (handles both `.` and `,` decimals).
-_HEIGHT_MARKER_RE = re.compile(r'[+±]\s*(\d+[.,]\d{1,3})')
+#
+# 2026-08-03 — two defects fixed, motivated by the romainiai
+# "ceiling read from a phone number" report (`+37068794842` → 3.706 m):
+#
+#   1. SHADOWING. A second `_HEIGHT_MARKER_RE` was defined ~90 lines below for
+#      the warnings-salvage lane (`\+\s*(\d[.,]?\d{1,3})`). Python keeps the
+#      LAST binding, so this scanner — documented as reading `+3.000`-style
+#      section markers — silently ran the loose salvage pattern instead. The
+#      salvage pattern is now `_HEIGHT_MARKER_TEXT_RE` and cannot shadow this.
+#
+#   2. NO TOKEN BOUNDARY. Both patterns happily matched a PREFIX of a longer
+#      run: `+37068794842` yields the capture `3.706` the moment a separator
+#      appears anywhere in the first four characters, and a drawing code like
+#      `+3.70612345` matches TODAY under either pattern. A drafting elevation
+#      is a short, isolated token, so the lookbehind/lookahead now require the
+#      match to stand alone. Nothing that a real section prints is affected.
+#
+# NOTE on the romainiai artefact: the saved extract carries
+# `ceiling_height_from_section_marker: +3706 → 3.71 m (psl. 1)`, but this
+# function ALSO range-checks the raw capture (`float("3706")` = 3706, outside
+# [2.0, 4.5]) and therefore rejects it — verified against the tracked code at
+# both 99beb22 and c2e7673, the commits that carry that extract. The 3.706 in
+# the saved JSON is not reproducible from any tracked commit against today's
+# fixture bytes (the fixture PDFs are untracked and can be re-exported). What
+# IS reproducible, and what this guard closes, is the separator-bearing form.
+_HEIGHT_MARKER_RE = re.compile(
+    r'(?<![\w.,])[+±]\s*(\d+[.,]\d{1,3})(?![\d.,\w])')
+
+# A real drafting elevation is dimensioned in whole millimetres and, in every
+# LT project in the corpus, on a 10 mm grid (+2.800, +3.400, +5.700, H-2820).
+# A value off that grid is NOT rejected — a 2 825 mm slab is physically
+# possible — but it is disclosed, because "off-grid" is the signature of a
+# number that was never an elevation.
+MARKER_MM_GRID = 10
+
+
+def marker_is_on_mm_grid(value_m: float) -> bool:
+    """True when the marker sits on the MARKER_MM_GRID millimetre grid."""
+    try:
+        return round(float(value_m) * 1000) % MARKER_MM_GRID == 0
+    except (TypeError, ValueError):
+        return False
 
 # Plausible ceiling height range for LT residential / commercial buildings.
 # Below 2.0 m is impractical (post-2000 modern minimum is 2.5–2.65 m); above
@@ -102,8 +143,15 @@ _HEIGHT_CM_RE = re.compile(r'(\d{3})\s*cm\b')
 _HEIGHT_M_RE = re.compile(r'(\d[.,]\d{1,2})\s*m\b')
 # "3200mm", "2800mm" — millimetres
 _HEIGHT_MM_RE = re.compile(r'(\d{4})\s*mm\b')
-# "+3000", "+3.000", "+3,000" — drafting marker
-_HEIGHT_MARKER_RE = re.compile(r'\+\s*(\d[.,]?\d{1,3})')
+# "+3000", "+3.000", "+3,000" — drafting marker as Vision NARRATES it inside a
+# warning sentence ("Svetainė/virtuvė turi +3400 lubas"), which is why this one
+# tolerates the missing decimal separator that the page scanner's pattern also
+# accepts. RENAMED 2026-08-03: it used to be a second `_HEIGHT_MARKER_RE` and
+# silently shadowed the page scanner's stricter pattern at module level — see
+# the long note on `_HEIGHT_MARKER_RE` above. Carries the same token-boundary
+# guard so a phone number narrated in a warning cannot become a ceiling either.
+_HEIGHT_MARKER_TEXT_RE = re.compile(
+    r'(?<![\w.,])\+\s*(\d[.,]?\d{1,3})(?![\d.,\w])')
 
 # 2026-07-07 fix (objektas_b pastoliai collapse): double-height living spaces
 # are real ceilings — Vision narrated "dvigubo aukščio lubas (~5.7m)" for the
@@ -202,7 +250,7 @@ def salvage_heights_from_warnings(
         max_m = (MAX_NARRATED_CEILING_M if _CEILING_CONTEXT_RE.search(text)
                  else MAX_CEILING_M)
         heights: list[float] = []
-        for m in _HEIGHT_MARKER_RE.finditer(text):
+        for m in _HEIGHT_MARKER_TEXT_RE.finditer(text):
             v = _to_metres(m.group(1), "marker", max_m)
             if v is not None:
                 heights.append(v)

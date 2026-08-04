@@ -3902,6 +3902,9 @@ def extract_interior(
             best_ceiling_candidate,
             scan_page_height_markers,
         )
+        from extractor.height_markers import (
+            marker_is_on_mm_grid as _hm_on_grid,
+        )
         # Scan every page. Filter to plausible ceiling values happens in
         # height_markers.MIN_CEILING_M / MAX_CEILING_M. Cost: ~50ms/page
         # in pdfplumber for text extraction (no Vision call).
@@ -3935,13 +3938,25 @@ def extract_interior(
                 parsed["lubu_aukstis_m"] = cand_m
                 warnings_list = list(parsed.get("warnings") or [])
                 marker_raw = candidate["raw"]
+                # 2026-08-03: a marker off the millimetre grid was never an
+                # elevation (romainiai's 3.706 m came from the phone number
+                # +37068794842). The regex boundary guard in height_markers
+                # already drops that token; this is the second, value-side
+                # layer — it does NOT reject (a 2 825 mm slab is legal), it
+                # raises the warning to WARN so the user is told to check
+                # rather than being handed a silent hallucination.
+                on_grid = _hm_on_grid(cand_m)
                 warnings_list.append({
                     "code": "ceiling_height_from_section_marker",
-                    "severity": "info",
+                    "severity": "info" if on_grid else "warn",
                     "message": (
                         f"Lubų aukštis paimtas iš pjūvio žymeklio "
                         f"{marker_raw} → {cand_m:.2f} m "
                         f"(psl. {candidate['page']}). Patikrink Prielaidose."
+                        + ("" if on_grid else
+                           " DĖMESIO: reikšmė nėra apvalūs milimetrai — "
+                           "gali būti ne aukščio žymuo (pvz. telefono numeris "
+                           "ar brėžinio kodas).")
                     ),
                 })
                 parsed["warnings"] = warnings_list
