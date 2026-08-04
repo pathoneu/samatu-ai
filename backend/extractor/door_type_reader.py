@@ -101,17 +101,20 @@ def _find_door_pages(pdf_bytes: bytes) -> list[int]:
     pure title pages; prefers pages with door tags or 'beapvad'/'stumdom'/'durų anga'."""
     hits: list[tuple[int, int]] = []  # (priority, page)
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                t = (page.extract_text() or "")
-                tl = t.lower()
-                has_tag = bool(_TAG_RE.search(t))
-                has_anno = ("beapvad" in tl or "stumdom" in tl or "durų anga" in tl
-                            or "duru anga" in tl)
-                if has_tag and has_anno:
-                    hits.append((0, i + 1))
-                elif has_tag or has_anno:
-                    hits.append((1, i + 1))
+        # Shared parse. This locator is called once PER VOTING ROUND
+        # (read_door_types_voted runs the whole function n times), so before
+        # the cache a 3-round vote re-parsed the document three times.
+        from .pdf_page_cache import page_texts
+        for i, raw in enumerate(page_texts(pdf_bytes)):
+            t = raw or ""
+            tl = t.lower()
+            has_tag = bool(_TAG_RE.search(t))
+            has_anno = ("beapvad" in tl or "stumdom" in tl or "durų anga" in tl
+                        or "duru anga" in tl)
+            if has_tag and has_anno:
+                hits.append((0, i + 1))
+            elif has_tag or has_anno:
+                hits.append((1, i + 1))
     except Exception as exc:  # noqa: BLE001
         print(f"[door_type_reader] pdfplumber scan failed: {exc}")
     hits.sort()

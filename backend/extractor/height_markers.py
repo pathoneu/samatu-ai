@@ -43,30 +43,27 @@ def scan_page_height_markers(
         and within-page text order. Empty list on any pdfplumber error
         (defensive — caller treats absence as "no signal", not as failure).
     """
-    try:
-        import pdfplumber
-    except ImportError:
-        return []
-
     out: list[dict] = []
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for pn in page_nrs:
-                if pn < 1 or pn > len(pdf.pages):
-                    continue
+        # Shared parse — this lane scans EVERY page, so on its own it used to
+        # re-pay the full ~17 s document parse (see pdf_page_cache).
+        from .pdf_page_cache import page_signals
+        signals = page_signals(pdf_bytes)
+        if not signals:
+            return []
+        for pn in page_nrs:
+            if pn < 1 or pn > len(signals):
+                continue
+            text = signals[pn - 1]["text"]
+            for m in _HEIGHT_MARKER_RE.finditer(text):
+                raw = m.group(0)
+                val_str = m.group(1).replace(',', '.')
                 try:
-                    text = pdf.pages[pn - 1].extract_text() or ""
-                except Exception:
+                    val = float(val_str)
+                except ValueError:
                     continue
-                for m in _HEIGHT_MARKER_RE.finditer(text):
-                    raw = m.group(0)
-                    val_str = m.group(1).replace(',', '.')
-                    try:
-                        val = float(val_str)
-                    except ValueError:
-                        continue
-                    if MIN_CEILING_M <= val <= MAX_CEILING_M:
-                        out.append({"page": pn, "raw": raw, "value_m": val})
+                if MIN_CEILING_M <= val <= MAX_CEILING_M:
+                    out.append({"page": pn, "raw": raw, "value_m": val})
     except Exception:
         return []
     return out
@@ -363,45 +360,43 @@ def scan_positioned_page_tokens(
     Returns ``{"markers": [...], "labels": [...]}``; both lists are empty on
     any pdfplumber failure (absence = "no signal", never a hard failure).
     """
-    try:
-        import pdfplumber
-    except ImportError:
-        return {"markers": [], "labels": []}
-
     markers: list[dict] = []
     labels: list[dict] = []
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for pn in page_nrs:
-                if pn < 1 or pn > len(pdf.pages):
-                    continue
-                page = pdf.pages[pn - 1]
-                width = float(page.width or 0)
-                height = float(page.height or 0)
-                if width <= 0 or height <= 0:
+        # Shared parse. Word geometry is cached alongside the text, so this
+        # lane no longer opens the document a SECOND time after
+        # scan_page_height_markers already parsed it.
+        from .pdf_page_cache import page_signals
+        signals = page_signals(pdf_bytes)
+        if not signals:
+            return {"markers": [], "labels": []}
+        for pn in page_nrs:
+            if pn < 1 or pn > len(signals):
+                continue
+            sig = signals[pn - 1]
+            width = float(sig.get("width") or 0)
+            height = float(sig.get("height") or 0)
+            if width <= 0 or height <= 0:
+                continue
+            words = sig.get("words") or []
+            for w in words:
+                text = str(w.get("text") or "").strip()
+                if not text:
                     continue
                 try:
-                    words = page.extract_words()
-                except Exception:
+                    x_pct = ((float(w["x0"]) + float(w["x1"])) / 2) / width
+                    y_pct = ((float(w["top"]) + float(w["bottom"])) / 2) / height
+                except (KeyError, TypeError, ValueError):
                     continue
-                for w in words:
-                    text = str(w.get("text") or "").strip()
-                    if not text:
-                        continue
-                    try:
-                        x_pct = ((float(w["x0"]) + float(w["x1"])) / 2) / width
-                        y_pct = ((float(w["top"]) + float(w["bottom"])) / 2) / height
-                    except (KeyError, TypeError, ValueError):
-                        continue
-                    value = _marker_value_m(text)
-                    if value is not None:
-                        markers.append({"page": pn, "raw": text, "value_m": value,
-                                        "x_pct": x_pct, "y_pct": y_pct,
-                                        "page_w": width, "page_h": height})
-                    elif _ROOM_NR_TOKEN_RE.match(text):
-                        labels.append({"page": pn, "nr": text.lstrip("0") or "0",
-                                       "x_pct": x_pct, "y_pct": y_pct,
-                                       "page_w": width, "page_h": height})
+                value = _marker_value_m(text)
+                if value is not None:
+                    markers.append({"page": pn, "raw": text, "value_m": value,
+                                    "x_pct": x_pct, "y_pct": y_pct,
+                                    "page_w": width, "page_h": height})
+                elif _ROOM_NR_TOKEN_RE.match(text):
+                    labels.append({"page": pn, "nr": text.lstrip("0") or "0",
+                                   "x_pct": x_pct, "y_pct": y_pct,
+                                   "page_w": width, "page_h": height})
     except Exception:
         return {"markers": [], "labels": []}
     return {"markers": markers, "labels": labels}

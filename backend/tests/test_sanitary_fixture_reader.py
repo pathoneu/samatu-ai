@@ -187,10 +187,16 @@ class _FakePdf:
 
 @pytest.fixture
 def fake_pdf(monkeypatch):
+    """Inject a fake document as a list of per-page texts.
+
+    2026-08-03: the seam moved. `_find_sanitary_pages` no longer opens its own
+    pdfplumber document — it reads the shared parse in `extractor.pdf_page_cache`
+    (one parse per PDF instead of one per stage). The contract under test is
+    unchanged ("given these page texts, pick these pages"); only the injection
+    point moves, so every assertion below is untouched."""
     def _install(texts):
-        monkeypatch.setattr(
-            "extractor.sanitary_fixture_reader.pdfplumber.open",
-            lambda *a, **k: _FakePdf(texts))
+        monkeypatch.setattr("extractor.pdf_page_cache.page_texts",
+                            lambda *a, **k: list(texts))
     return _install
 
 

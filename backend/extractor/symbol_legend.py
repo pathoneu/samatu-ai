@@ -86,30 +86,23 @@ def scan_symbol_legend(pdf_bytes: bytes) -> dict:
         "chars": 0,
         "difuzoriai": {"defined": False, "pages": [], "samples": []},
     }
-    try:
-        import pdfplumber
-    except ImportError:
-        return result
-
     total_chars = 0
     pages: list[int] = []
     samples: list[str] = []
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for idx, page in enumerate(pdf.pages, start=1):
-                try:
-                    text = page.extract_text() or ""
-                except Exception:
-                    continue
-                total_chars += len(text)
-                m = _DIFFUSER_LABEL_RE.search(text)
-                if m:
-                    pages.append(idx)
-                    if len(samples) < 3:
-                        lo = max(0, m.start() - 60)
-                        hi = min(len(text), m.end() + 60)
-                        samples.append(
-                            " ".join(text[lo:hi].split()))
+        # Shared parse (pdf_page_cache) instead of a tenth pdfplumber.open().
+        # Same text, same fail-open contract — an unreadable document yields
+        # [] and this scan reports text_layer_ok=False exactly as before.
+        from .pdf_page_cache import page_texts
+        for idx, text in enumerate(page_texts(pdf_bytes), start=1):
+            total_chars += len(text)
+            m = _DIFFUSER_LABEL_RE.search(text)
+            if m:
+                pages.append(idx)
+                if len(samples) < 3:
+                    lo = max(0, m.start() - 60)
+                    hi = min(len(text), m.end() + 60)
+                    samples.append(" ".join(text[lo:hi].split()))
     except Exception:
         return result
 

@@ -119,11 +119,11 @@ def _find_floor_plan_page(pdf_bytes: bytes, page_classifications: Optional[list]
             except (TypeError, ValueError):
                 pass
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                txt = (page.extract_text() or "").upper()
-                if "AUKŠTO PLANAS" in txt or "PIRMO AUKŠTO" in txt:
-                    return i + 1
+        from .pdf_page_cache import page_texts  # shared parse, not a fresh open
+        for i, raw in enumerate(page_texts(pdf_bytes)):
+            txt = (raw or "").upper()
+            if "AUKŠTO PLANAS" in txt or "PIRMO AUKŠTO" in txt:
+                return i + 1
     except Exception as exc:  # noqa: BLE001
         print(f"[doors_reader] pdfplumber scan failed: {exc}")
     return 2
