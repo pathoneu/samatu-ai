@@ -199,7 +199,10 @@ async function waitForRecoveredProject(projectId, { onTick, isCancelled } = {}) 
       const res = await fetch(`${API}/api/projects/${projectId}`, { credentials: 'include' });
       if (res.ok) {
         const p = await res.json();
-        if (p && (p.patalpos?.length || p.darbu_sarasas?.length)) return p;
+        // status 'empty' = a saved zero-room run (2026-08-11): the server now
+        // persists those instead of dropping them, so the poller must accept
+        // them or it would wait 40 min on a project that already exists.
+        if (p && (p.patalpos?.length || p.darbu_sarasas?.length || p.status === 'empty')) return p;
       }
     } catch { /* offline blip — keep waiting, the server does not care */ }
     onTick?.(Math.round((Date.now() - started) / 1000));
@@ -440,12 +443,15 @@ export default function NewProject() {
         });
       } else if (projType === 'interior') {
         if (!json.patalpos) throw new Error(t('newProject.errUnexpectedFormat'));
-        // Zero-room result = the most common first-run dead end (wrong PDF type:
-        // a photo, a KŽ table, a facade-only sheet). Surface a recoverable message
-        // instead of silently creating an empty project. (2026-06-19)
-        if (json.patalpos.length === 0) {
-          throw new Error(t('newProject.errNoRooms'));
-        }
+        // Zero rooms used to THROW here — before createProject — so 13+ paid
+        // minutes produced nothing: no project, no pages, and the error text's
+        // own advice ("pridėkite patalpas rankiniu būdu") pointed at a project
+        // that did not exist. (2026-08-11 audit; the old 2026-06-19 rationale
+        // wanted a recoverable message — this IS the recoverable version.)
+        // The run is saved with the drawing attached, the message rides along
+        // as a warning, and the user lands in the viewer where "Taisyti zoną"
+        // and manual room-add actually work.
+        const zeroRooms = json.patalpos.length === 0;
         project = createProject({
           ...json,
           name:            projectName || json.projektas || t('newProject.defaultNameInterior'),
@@ -454,8 +460,15 @@ export default function NewProject() {
           rows:            [],
           total_rows:      json.patalpos.length,
           total_value:     0,
-          status:          'ready',
+          status:          zeroRooms ? 'empty' : 'ready',
+          ...(zeroRooms ? {
+            warnings: [
+              ...(json.warnings || []),
+              { level: 'WARN', message: t('newProject.errNoRooms') },
+            ],
+          } : {}),
         });
+        if (zeroRooms) toast.warning(t('newProject.errNoRooms'), { duration: 12000 });
       } else {
         if (!json.eilutes) throw new Error(t('newProject.errUnexpectedFormat'));
         const rows = json.eilutes.map(row => ({

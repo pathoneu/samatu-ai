@@ -83,6 +83,21 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
     except HTTPException:
         raise
     except Exception as e:
+        # PASSWORD-PROTECTED PDFs FAIL FAST, IN LITHUANIAN (2026-08-11).
+        # This branch used to swallow every probe failure so validation
+        # passed — and an encrypted PDF then died 90 s later in the renderer,
+        # showing the contractor raw poppler stderr ("Command Line Error:
+        # Incorrect password"). Encryption is the one unambiguous case: the
+        # render CANNOT succeed, so failing here costs nothing and the message
+        # can say exactly what to do. Every other probe failure keeps the
+        # permissive swallow on purpose — quirky-but-renderable PDFs exist,
+        # and pdftoppm is the real arbiter of renderability.
+        _err_text = f"{type(e).__name__}: {e}".lower()
+        if "password" in _err_text or "encrypt" in _err_text:
+            raise HTTPException(status_code=400, detail=(
+                "PDF apsaugotas slaptažodžiu — analizuoti negalime. "
+                "Nuimkite apsaugą (atsidarykite PDF ir išsaugokite per "
+                "Spausdinti → Išsaugoti kaip PDF) ir įkelkite iš naujo."))
         log.warning("pdf page count probe failed: %s", e)
         page_count = 0
 
@@ -5902,8 +5917,15 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     live stream ~10 min in and 20 minutes of paid Opus work evaporated.)"""
     if not user or not user.get("id"):
         return
-    if result.get("status") == "error" or not result.get("patalpos"):
+    if result.get("status") == "error":
         return
+    # ZERO-ROOM RESULTS ARE SAVED, NOT DROPPED (2026-08-11). This guard used
+    # to also require non-empty patalpos, mirroring a frontend throw that has
+    # since been fixed: a paid run that found no rooms was discarded entirely,
+    # leaving the user nothing to add rooms INTO. A healthy-but-empty read now
+    # persists (status 'empty', drawing attached) exactly like the connected
+    # path saves it, so the recovery path can't be the stricter of the two.
+    zero_rooms = not result.get("patalpos")
     import uuid as _uuid
     from datetime import timezone as _tz
     stem = _clean_pdf_stem(pdf_name)
@@ -5920,12 +5942,20 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
         "rows": [],
         "total_rows": len(result.get("patalpos") or []),
         "total_value": 0,
-        "status": "ready",
+        "status": "empty" if zero_rooms else "ready",
         "created_at": now,
         "updated_at": now,
         # Honest provenance: the UI/user can tell this arrived via recovery.
         "_saved_by": "stream_disconnect_recovery",
     }
+    if zero_rooms:
+        blob["warnings"] = list(result.get("warnings") or []) + [{
+            "level": "WARN",
+            "message": ("AI nerado patalpų šiame brėžinyje. Patikrinkite, ar "
+                        "įkėlėte interjero / aukšto planą (ne nuotrauką, ne KŽ "
+                        "lentelę, ne fasadą). Jei tai tikrai planas — "
+                        "pridėkite patalpas rankiniu būdu peržiūroje."),
+        }]
     # THE DRAWING TOO (2026-07-28, found on the first recovery): normally the
     # BROWSER uploads the PDF right after createProject — but on this path the
     # browser is gone, so a recovered project arrived with quantities and no

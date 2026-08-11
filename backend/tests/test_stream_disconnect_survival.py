@@ -52,19 +52,38 @@ def test_orphan_save_mirrors_frontend_project_shape(monkeypatch):
     assert blob["created_at"].endswith("Z") and blob["updated_at"].endswith("Z")
 
 
-def test_orphan_save_skips_error_empty_and_anonymous(monkeypatch):
+def test_orphan_save_skips_error_and_anonymous(monkeypatch):
     calls = []
     monkeypatch.setattr(main.db, "upsert_project",
                         lambda *a, **k: calls.append(a))
     # Error results are dropped (frontend would have thrown, not saved).
     main._save_orphaned_result({"status": "error", "patalpos": [{}]},
                                {"id": "u"}, "x.pdf")
-    # Zero-room results are dropped (frontend's errNoRooms guard).
-    main._save_orphaned_result({"status": "ok", "patalpos": []}, {"id": "u"}, "x.pdf")
     # No authenticated user → nowhere to hang ownership → skip.
     main._save_orphaned_result(_result(), None, "x.pdf")
     main._save_orphaned_result(_result(), {}, "x.pdf")
     assert calls == []
+
+
+def test_orphan_save_persists_zero_room_run_as_empty(monkeypatch):
+    """2026-08-11: a healthy-but-zero-room read is a PAID artifact, not junk.
+    It used to be dropped here (mirroring a frontend throw that has since been
+    fixed), which discarded 13+ minutes of work and left the user nothing to
+    add rooms into. Now it saves with status 'empty', the drawing attached,
+    and an LT warning explaining what to check — the same shape the connected
+    frontend path now creates, so the recovery path is never the stricter one."""
+    saved = {}
+    monkeypatch.setattr(main.db, "upsert_project",
+                        lambda pid, blob, user_id=None, **kw: saved.update(
+                            {"pid": pid, "blob": blob, "user_id": user_id}))
+    main._save_orphaned_result({"status": "ok", "patalpos": [], "warnings": []},
+                               {"id": "u-9"}, "fasadas.pdf")
+    blob = saved["blob"]
+    assert blob["status"] == "empty"
+    assert blob["total_rows"] == 0
+    assert any("nerado patalpų" in (w.get("message") or "")
+               for w in blob["warnings"]), "must explain WHY it is empty"
+    assert blob["_saved_by"] == "stream_disconnect_recovery"
 
 
 def test_orphan_save_defaults_name_when_filename_empty(monkeypatch):

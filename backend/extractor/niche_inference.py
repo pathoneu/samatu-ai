@@ -46,6 +46,8 @@ then, route over-bills through the contractor /calibrate UI.
 """
 from __future__ import annotations
 
+import re
+
 # Empirical LED-per-perimeter-meter ratios computed from Beržų's
 # contractor-validated room data (the only project with both clean
 # niche-locator output and verified per-room LED truth).
@@ -68,6 +70,76 @@ LED_RATIO_BY_PASKIRTIS: dict[str, float] = {
 }
 
 MIN_INFERENCE_RATIO = 0.15  # below this, treat as "no LED expected"
+
+# ── Enumerated-exclusion gate (2026-08-04) ────────────────────────────────────
+# The docstring above asks for "a coverage map not yet persisted in the
+# extract" before inference can be suppressed safely. A cheaper anchor IS
+# persisted: when Vision reads the ceiling plan well enough to ENUMERATE which
+# rooms have LED niches ("LED nišos kambariuose 01, 03, 04, 05"), that warning
+# is positive evidence about every room NOT on the list. Inferring a niche
+# into an excluded room contradicts a read we already trust elsewhere.
+#
+# Measured on the saved corpus (scripts/_diag_led.py, 2026-08-03): ciurliu
+# carried two fabricated bathroom niches exactly this warning excludes —
+# LED +33.31% → −7.9%, project MAE 13.801 → 7.462, corpus 9.311 → 7.820.
+# berzas / objektas_b / lazunu emit no enumerating warning and are
+# bit-identical, which is also the fail-closed contract: no enumeration →
+# this gate does nothing.
+
+_LED_CTX = re.compile(r"led|niš|nis[uų]", re.IGNORECASE)
+_ROOM_LIST = re.compile(
+    r"kambari(?:uose|ai|ų)\s*((?:\d+[.\d]*\s*,\s*)+\d+[.\d]*)", re.IGNORECASE)
+
+
+def enumerated_led_rooms(warnings) -> set[str] | None:
+    """Return the room-nr set from the first warning that BOTH mentions LED
+    niches AND enumerates room numbers — or None when no warning does.
+
+    Both conditions are required on the SAME warning: an LED mention alone
+    ("LED nišų ilgiai apytiksliai") carries no room evidence, and a room list
+    alone may be about something else entirely. Warnings arrive as dicts
+    ({message}) or bare strings depending on pipeline age; handle both.
+    """
+    for w in warnings or []:
+        text = w.get("message") if isinstance(w, dict) else str(w)
+        if not text or not _LED_CTX.search(text):
+            continue
+        m = _ROOM_LIST.search(text)
+        if m:
+            return {x.strip() for x in m.group(1).split(",")}
+    return None
+
+
+def drop_unenumerated_inferred_niches(parsed: dict) -> int:
+    """Remove statistical-inference nisa_LED rows from rooms an enumerating
+    warning excludes. Returns how many were dropped (0 = gate never fired).
+
+    Deliberately narrow, in both directions:
+      • Only `_source == "statistical_inference"` rows are touchable — a niche
+        Vision actually READ in an excluded room is a disagreement between two
+        reads, not a fabrication, and stays.
+      • No enumerating warning → nothing happens. A blanket "no inferred
+        niches" was simulated and REJECTED (2026-08-03): it moves objektas_b
+        LED −18.2% → −51.6% and lazunu −2.5% → −46.7% — the inference lane
+        earns its keep everywhere the drawing doesn't say otherwise.
+    """
+    allowed = enumerated_led_rooms(parsed.get("warnings"))
+    if not allowed:
+        return 0
+    dropped = 0
+    for room in parsed.get("patalpos") or []:
+        if str(room.get("nr") or "").strip() in allowed:
+            continue
+        keep = []
+        for e in room.get("elementai") or []:
+            if ((e.get("tipas") or "").lower() == "nisa_led"
+                    and e.get("_source") == "statistical_inference"):
+                dropped += 1
+                continue
+            keep.append(e)
+        if len(keep) != len(room.get("elementai") or []):
+            room["elementai"] = keep
+    return dropped
 
 
 def infer_missing_niches(rooms: list[dict]) -> int:

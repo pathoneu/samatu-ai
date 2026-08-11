@@ -1143,6 +1143,21 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         annotate_tile_elevation_evidence(parsed)
     except Exception as exc:
         print(f"[extractor] tile elevation evidence annotation failed: {exc}")
+    # Same recompute-time contract for the LED enumerated-exclusion gate
+    # (2026-08-04): when a persisted warning ENUMERATES which rooms have LED
+    # niches, statistically-inferred niches in the other rooms are fabrications
+    # and must not survive any recompute — fresh extraction, eval rescore, or a
+    # user edit. Placed here (not only at inference time) so the two ciurliu
+    # bathrooms already baked into saved extracts get cleaned too. Fails
+    # closed: no enumerating warning → drops nothing. Never raises.
+    try:
+        from .niche_inference import drop_unenumerated_inferred_niches
+        n_led_dropped = drop_unenumerated_inferred_niches(parsed)
+        if n_led_dropped:
+            print(f"[extractor] LED gate: dropped {n_led_dropped} inferred "
+                  f"niche(s) outside the enumerated rooms")
+    except Exception as exc:
+        print(f"[extractor] LED enumerated-exclusion gate failed: {exc}")
     for room in rooms:
         # 1. Parse elementai → counts/areas the calc function understands
         counts = _elementai_to_counts(room.get("elementai") or [])
@@ -3540,15 +3555,39 @@ def extract_interior(
         {"type": "text", "text": SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
     ]
 
+    def _pdf_render_failure_lt(exc: Exception) -> str:
+        """User-facing Lithuanian classification of a pdftoppm/pdf2image
+        failure. Two buckets only: encrypted (actionable — remove the
+        password) and everything else (re-save and retry). The raw exception
+        never enters the return value — it is stderr from a subprocess and
+        has already been printed at the call site."""
+        s = f"{type(exc).__name__}: {exc}".lower()
+        if "password" in s or "encrypt" in s:
+            return ("PDF apsaugotas slaptažodžiu — analizuoti negalime. "
+                    "Nuimkite apsaugą (atsidarykite PDF ir išsaugokite per "
+                    "Spausdinti → Išsaugoti kaip PDF) ir įkelkite iš naujo.")
+        return ("Nepavyko perskaityti PDF failo — jis gali būti sugadintas "
+                "arba netinkamai išsaugotas. Atsidarykite failą ir išsaugokite "
+                "iš naujo (Spausdinti → Išsaugoti kaip PDF), tada įkelkite "
+                "dar kartą.")
+
     # Step 1: PDF → base64 images
     _emit({"event": "rendering_pdf"})
     try:
         pages = pdf_to_b64_images(pdf_bytes)
     except Exception as exc:
-        _emit({"event": "error", "message": f"pdf_to_images_failed: {exc}"})
+        # The raw exception is poppler stderr ("Command Line Error: Incorrect
+        # password") — diagnostic gold for the server log, gibberish-in-English
+        # for the contractor whose browser used to receive it verbatim
+        # (2026-08-11 fix; the app audit caught it as the most likely
+        # first-failure a real user hits). Classify into a Lithuanian message
+        # that says what to DO; keep the raw text server-side only.
+        print(f"[extractor] pdf render failed (raw): {exc!r}")
+        _msg = _pdf_render_failure_lt(exc)
+        _emit({"event": "error", "message": _msg})
         return {
             "status": "error",
-            "_error": f"pdf_to_images_failed: {exc}",
+            "_error": _msg,
         }
 
     if not pages:
