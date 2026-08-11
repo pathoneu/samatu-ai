@@ -1025,7 +1025,7 @@
       "descPlaceholder": "Darbo pavadinimas",
       "descAria": "Darbo aprašymas",
       "qtyAria": "Kiekis",
-      "priceAria": "Vieneto kaina, €",
+      "priceAria": "Vieneto kaina, € be PVM",
       "numberHint": "Skaičius; kablelis arba taškas — abu tinka, pvz. 12,5",
       "priceHint": "Vieneto kaina eurais be PVM, pvz. 12,50",
       "qtyEditHint": "Įrašykite kiekį ir spauskite Enter · Esc — atsisakyti",
@@ -1050,7 +1050,8 @@
       "sourceTitle": "Atidaryti brėžinio {{page}} psl., iš kurio paimtas kiekis",
       "addRowTitle": "Pridėti tuščią eilutę — pavadinimą, kiekį ir kainą įrašysite patys",
       "priceListItemTitle": "Pritaikyti kainyno „{{name}}\" kainas iš karto. Rankiniu būdu įvestos kainos nekeičiamos, atšaukti nebus galima.",
-      "undo": "Atšaukti"
+      "undo": "Atšaukti",
+      "clickToEditPrice": "Spustelėkite ir įveskite kainą. Enter — įrašyti ir pereiti prie kitos eilutės, Esc — atsisakyti."
     },
     "assumptions": {
       "widthPlaceholder": "plotis",
@@ -1479,11 +1480,14 @@
     "startAnalysis": "Pradėti analizę",
     "startAnalysisTitle": "Įkeltas brėžinys bus perskaitytas ir kiekiai suskaičiuoti automatiškai",
     "startAnalysisDisabledTitle": "Pirmiausia įkelkite projekto PDF",
-    "startAnalysisHint": "Analizė trunka nuo 2 iki 20 min. — priklauso nuo brėžinio dydžio. Langą galite palikti atvirą.",
+    "startAnalysisHint": "Analizė trunka iki 30 min. — priklauso nuo brėžinio dydžio. Langą galite palikti atvirą arba uždaryti: baigę pranešime, o projektas pats atsiras sąraše.",
     "cancelTitle": "Analizė bus nutraukta, o PDF teks įkelti iš naujo",
     "errStalled": "Analizė sustojo (7 min be atsako iš serverio). Pabandykite dar kartą — jei kartojasi, praneškite mums.",
     "errTimeout": "Analizė viršijo 45 min limitą. Pabandykite mažesnį PDF arba praneškite mums.",
-    "statusRecovering": "Ryšys nutrūko, bet analizė tęsiasi serveryje. Laukiame rezultato… ({{s}} s) — nekartokite įkėlimo."
+    "statusRecovering": "Ryšys nutrūko, bet analizė tęsiasi serveryje. Laukiame rezultato… ({{s}} s) — nekartokite įkėlimo.",
+    "doneTabTitle": "✓ Analizė baigta — Pathon",
+    "doneNotifTitle": "Pathon — analizė baigta",
+    "doneNotifBody": "Kiekiai paruošti. Grįžkite peržiūrėti projekto."
   },
   "upload": {
     "zone": {

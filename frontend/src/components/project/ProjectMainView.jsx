@@ -92,6 +92,53 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   const [editing, setEditing] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
   const [draftQty, setDraftQty] = useState('');
+  // Inline PRICE editor (2026-08-11). Pricing 82 rows used to cost ~4 pointer
+  // actions each — hover, pencil, click into the input, tick — because the
+  // price cell itself was dead (the quantity cell beside it had a proper
+  // editor all along). Now: click the cell, type, Enter commits AND opens the
+  // next row's price — 82 rows ≈ 82 keystrokes. Advance is DOM-ordered
+  // ([data-price-cell] in document order == visual order), so it follows the
+  // grouped-by-section layout without threading indices through the parent.
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [draftPrice, setDraftPrice] = useState('');
+  const priceCellRef = useRef(null);
+
+  const beginPriceEdit = () => {
+    setDraftPrice(item.kaina ? String(item.kaina).replace('.', ',') : '');
+    setEditingPrice(true);
+  };
+
+  const advanceToNextPriceCell = () => {
+    // setTimeout(0), NOT requestAnimationFrame: rAF never fires while the tab
+    // is hidden or the pane unpainted, which silently killed the advance in
+    // testing. A macrotask always runs, and by then this row has left edit
+    // mode so the query sees the committed DOM.
+    setTimeout(() => {
+      const cells = Array.from(document.querySelectorAll('[data-price-cell]'));
+      const next = cells[cells.indexOf(priceCellRef.current) + 1];
+      if (next) next.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }, 0);
+  };
+
+  const commitPrice = (advance) => {
+    const raw = String(draftPrice).trim();
+    setEditingPrice(false);
+    if (raw === '') { if (advance) advanceToNextPriceCell(); return; }
+    const kaina = parseLtNumber(raw);
+    if (!isValidAmount(kaina)) {
+      toast.error(t(invalidAmountKey(kaina)));
+      return;
+    }
+    if (kaina !== (item.kaina || 0)) {
+      onChange({
+        ...item,
+        kaina,
+        suma: (item.kiekis || 0) * kaina,
+        ...manualPricePatch(item, kaina),
+      });
+    }
+    if (advance) advanceToNextPriceCell();
+  };
   const [draft, setDraft] = useState({
     aprasymas: item.aprasymas || '',
     kiekis: item.kiekis || 0,
@@ -305,16 +352,38 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
           </div>
         )}
       </td>
-      <td className="px-3 py-2 text-sm text-right tabular-nums">
-        {item.kaina
-          ? fmtEur(item.kaina)
-          : (
-            /* Looks clickable, isn't — the price is edited through the pencil.
-               Say where to go instead of leaving a dead italic hint. */
-            <span className="text-muted-foreground italic" title={t('project.mainView.enterPriceTitle')}>
-              {t('project.mainView.enterPrice')}
-            </span>
-          )}
+      <td
+        ref={priceCellRef}
+        data-price-cell
+        onClick={editingPrice ? undefined : beginPriceEdit}
+        className={`px-3 py-2 text-sm text-right tabular-nums ${editingPrice ? '' : 'cursor-text'}`}
+        title={editingPrice ? undefined : t('project.mainView.clickToEditPrice')}
+      >
+        {editingPrice ? (
+          <input
+            autoFocus
+            value={draftPrice}
+            onChange={e => setDraftPrice(e.target.value)}
+            onBlur={() => commitPrice(false)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); commitPrice(true); }
+              if (e.key === 'Escape') setEditingPrice(false);
+            }}
+            onClick={e => e.stopPropagation()}
+            placeholder="0,00"
+            aria-label={t('project.mainView.priceAria')}
+            inputMode="decimal"
+            className="w-20 bg-card border border-primary rounded outline-none text-right text-sm tabular-nums px-1.5 py-0.5"
+          />
+        ) : item.kaina ? (
+          <span className="underline decoration-dotted decoration-transparent hover:decoration-current underline-offset-2">
+            {fmtEur(item.kaina)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground italic underline decoration-dotted underline-offset-2">
+            {t('project.mainView.enterPrice')}
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 text-sm font-semibold text-right tabular-nums">
         {item.kaina ? fmtEur(itemSuma) : '—'}

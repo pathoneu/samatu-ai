@@ -190,6 +190,37 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
  * back toward the extraction time — it must clear the SLOWEST run, not the
  * typical one.
  */
+/**
+ * notifyAnalysisDone — the 27-minute wait's missing ending (2026-08-11).
+ *
+ * The progress UI tells the user they can leave, and they correctly do — but
+ * nothing ever called them back, so "leave, come back later" quietly became
+ * "leave". When the tab is hidden at completion: flip the title to a ✓ (the
+ * tab strip is the one place a backgrounded app can still speak) and, if the
+ * user granted it, fire a desktop notification. Permission is requested at
+ * SUBMIT — the only moment the user is present, engaged, and about to start
+ * a long wait, so the browser prompt reads as sensible rather than creepy.
+ * A visible tab gets neither: the user is already watching.
+ */
+function notifyAnalysisDone(t) {
+  try {
+    if (!document.hidden) return;
+    const original = document.title;
+    document.title = t('newProject.doneTabTitle');
+    const restore = () => {
+      document.title = original;
+      document.removeEventListener('visibilitychange', restore);
+    };
+    document.addEventListener('visibilitychange', restore);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(t('newProject.doneNotifTitle'), {
+        body: t('newProject.doneNotifBody'),
+        icon: '/favicon.svg',
+      });
+    }
+  } catch { /* notifications are best-effort, never break the flow */ }
+}
+
 async function waitForRecoveredProject(projectId, { onTick, isCancelled } = {}) {
   const started = Date.now();
   const LIMIT_MS = 40 * 60 * 1000;
@@ -268,6 +299,13 @@ export default function NewProject() {
 
   const handleCreate = async () => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
+    // Ask for notification permission NOW, while the user is present and about
+    // to start a ~30 min wait — see notifyAnalysisDone. Never blocks.
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch { /* no Notification API — fine */ }
     setError(null);
     setStatus(t('newProject.statusUploading'));
     setIsProcessing(true);
@@ -560,6 +598,7 @@ export default function NewProject() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      notifyAnalysisDone(t);
       navigate(`/project/${project.id}`);
     } catch (e) {
       // Paywall intercept (Phase 7): a 402/403 from /extract-interior means
@@ -605,6 +644,7 @@ export default function NewProject() {
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
             queryClient.invalidateQueries({ queryKey: ['projects'] });
+            notifyAnalysisDone(t);
             navigate(`/project/${ok.id}`);
             return;
           }
@@ -642,6 +682,7 @@ export default function NewProject() {
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
             queryClient.invalidateQueries({ queryKey: ['projects'] });
+            notifyAnalysisDone(t);
             navigate(`/project/${ok.id}`);
             return;
           }

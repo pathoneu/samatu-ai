@@ -1021,7 +1021,7 @@
       "descPlaceholder": "Work item name",
       "descAria": "Work description",
       "qtyAria": "Quantity",
-      "priceAria": "Unit price, €",
+      "priceAria": "Unit price, € excl. VAT",
       "numberHint": "A number; comma or dot both work, e.g. 12.5",
       "priceHint": "Unit price in euros excl. VAT, e.g. 12.50",
       "qtyEditHint": "Type the quantity and press Enter · Esc to discard",
@@ -1046,7 +1046,8 @@
       "sourceTitle": "Open drawing page {{page}} the quantity came from",
       "addRowTitle": "Add an empty row — you fill in the name, quantity and price",
       "priceListItemTitle": "Apply the “{{name}}” price list immediately. Manually entered prices are kept; this cannot be undone.",
-      "undo": "Undo"
+      "undo": "Undo",
+      "clickToEditPrice": "Click to enter a price. Enter saves and moves to the next row, Esc cancels."
     },
     "assumptions": {
       "widthPlaceholder": "width",
@@ -1475,11 +1476,14 @@
     "startAnalysis": "Start analysis",
     "startAnalysisTitle": "The uploaded drawing will be read and quantities calculated automatically",
     "startAnalysisDisabledTitle": "Upload the project PDF first",
-    "startAnalysisHint": "Analysis takes 2 to 20 min depending on drawing size. You can leave this tab open.",
+    "startAnalysisHint": "Analysis takes up to 30 min., depending on drawing size. You can keep this window open or close it — we'll notify you when it's done and the project will appear in your list.",
     "cancelTitle": "The analysis will stop and the PDF will have to be uploaded again",
     "errStalled": "The analysis stalled (no server response for 7 min). Please retry — if it repeats, let us know.",
     "errTimeout": "The analysis exceeded the 45 min limit. Try a smaller PDF or let us know.",
-    "statusRecovering": "Connection lost, but the analysis continues on the server. Waiting for the result… ({{s}} s) — do not re-upload."
+    "statusRecovering": "Connection lost, but the analysis continues on the server. Waiting for the result… ({{s}} s) — do not re-upload.",
+    "doneTabTitle": "✓ Analysis done — Pathon",
+    "doneNotifTitle": "Pathon — analysis done",
+    "doneNotifBody": "Quantities are ready. Come back to review the project."
   },
   "upload": {
     "zone": {
