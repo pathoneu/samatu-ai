@@ -31,7 +31,34 @@ from typing import Any
 
 import pdfplumber
 
-__all__ = ["extract_eksplikacija_pdfplumber", "MIN_ROOMS_THRESHOLD"]
+__all__ = ["extract_eksplikacija_pdfplumber", "MIN_ROOMS_THRESHOLD",
+           "wide_acceptance"]
+
+
+# ── The acceptance flag (2026-08-23 review) ─────────────────────────────────
+#
+# Everything in this module that FIXES a wrong read runs unconditionally:
+# the header-driven column map, merged-cell position preservation, decimal /
+# NBSP / unit tolerance, the Plotas-vs-Perimetras fix, the refusal of an
+# ambiguous two-number row, and the `_meta` counters.
+#
+# Everything that ACCEPTS MORE than the pre-2026-08-23 parser is gated here
+# and OFF by default:
+#   1. the single-cell row shape        (`SINGLE_CELL_ROW_RE`)
+#   2. the cross-sheet merge            (and with it the effective 1+2 room
+#                                        bypass of MIN_ROOMS_THRESHOLD)
+#   3. the widened `_looks_like_room_name` classifier union
+#   4. the widened page-title markers and room-number pattern
+#
+# See extractor/feature_flags.py for the measured damage and the rationale.
+def wide_acceptance() -> bool:
+    """True when ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE is on. Never raises —
+    a flag lookup must not be able to break a parse."""
+    try:
+        from .feature_flags import get_flags
+        return bool(get_flags().get("eksplikacija_wide_acceptance"))
+    except Exception:
+        return False
 
 
 # Minimum rooms required to declare success. <3 rooms is likely a partial /
@@ -43,20 +70,25 @@ MIN_PLOTAS_M2 = 1.0
 MAX_PLOTAS_M2 = 500.0
 
 # Eksplikacija page detection - text markers (case-insensitive contains).
-# 2026-08-23: widened past the two headings OUR four projects use. Designers
-# title the same table "PATALPU EKSPLIKACIJA", "Patalpu sarasas", "Patalpu
-# plotai", "Patalpu ziniarastis" or just "Patalpos". Widening the PAGE filter
-# is safe in a way that widening the ROW parser is not: every extra page still
-# has to produce >= MIN_ROOMS_THRESHOLD rows that survive name + area
-# validation before anything is returned.
-EKSPLIKACIJA_TEXT_MARKERS = [
-    "eksplik",
-    "patalpų sąrašas", "patalpu sarasas",
+#
+# 2026-08-23 widened this past the two headings our four projects use, on the
+# argument that a wider PAGE filter is safe because every extra page still has
+# to produce >= MIN_ROOMS_THRESHOLD valid rows. That argument holds ONE table
+# at a time — and it stopped holding the moment the cross-sheet merge landed
+# in the same change, because the merge stitches rows from every accepted page
+# into a single result. Measured on 03_SA.pdf: 9 more pages open to the scan,
+# 34 rows -> 285. So the wide list rides `wide_acceptance()` with the merge.
+EKSPLIKACIJA_TEXT_MARKERS_CONSERVATIVE = [
+    "eksplik", "patalpų sąrašas", "patalpu sarasas",
+]
+EKSPLIKACIJA_TEXT_MARKERS_WIDE = EKSPLIKACIJA_TEXT_MARKERS_CONSERVATIVE + [
     "patalpų plotai", "patalpu plotai",
     "patalpų žiniaraštis", "patalpu ziniarastis",
     "patalpų specifikacija", "patalpu specifikacija",
     "patalpų lentelė", "patalpu lentele",
 ]
+# Back-compat name — some tests and callers import this directly.
+EKSPLIKACIJA_TEXT_MARKERS = EKSPLIKACIJA_TEXT_MARKERS_WIDE
 
 # LT room name vocabulary (lowercased; partial match — e.g. "miegamasis" matches
 # "miegamasis 1"). Used to validate detected room names.
@@ -88,17 +120,32 @@ LEADING_UNIT_RE = re.compile(rf"^\s*(?:m²|m2|m\^2|kv\.?\s*m\.?|kvm)\s+",
 # "Plotas: 12,30" / "Plotas - 12,30" — a label before the number.
 LEADING_LABEL_RE = re.compile(r"^[^\d\-]*[:=]\s*")
 # m² value pattern — handles `63,45`, `63.45`, `63,45 m²`, `63.45m²`, `12.0`.
-NUMERIC_PATTERN = re.compile(r"(-?\d+(?:[.,\s\u00a0\u202f]\d+)*(?:[.,]\d+)?)")
+# The grouping class is a LITERAL SPACE plus the two non-breaking spaces,
+# NOT `\s`. `\s` matches a NEWLINE, and pdfplumber puts a newline in a cell
+# when two table rows collapsed into one ("1.05\n1.09" on 03_SA.pdf p. 82).
+# With `\s` the whole thing matched as ONE grouped number, _normalize_decimal
+# could not make a float of it, and the row was dropped — a row this parser
+# had read correctly for months. Thousands separators are spaces; they are
+# never line breaks.
+NUMERIC_PATTERN = re.compile(r"(-?\d+(?:[., \u00a0\u202f]\d+)*(?:[.,]\d+)?)")
 # Room number (Nr.) as designers actually write it:
 #   `1`, `01`, `101`, `1.01`, `1.2`, `M01`, `K-01`, `A-1`, `2-A`, `I-01`, `P-01`
-ROOM_NR_PATTERN = re.compile(
+# WIDE. Three leading letters and repeated `.-/` groups also match dimension
+# strings and drawing codes off a title block ("2030", "0415", "1.150"), which
+# is how a scale annotation became a room number on Projektas..pdf.
+ROOM_NR_PATTERN_WIDE = re.compile(
     r"^[A-ZĄČĘĖĮŠŲŪŽ]{0,3}[-. ]?\d+(?:[.\-/]\w{1,4})*[.)]?$")
+# CONSERVATIVE — the pre-2026-08-23 shape: `1`, `01`, `M01`, `K-01`, `1.01`.
+ROOM_NR_PATTERN_CONSERVATIVE = re.compile(
+    r"^[A-ZĄČĘĖĮŠŲŪŽ]?[-]?\d+(?:[.\-]\w+)?$")
+# Back-compat name for direct importers.
+ROOM_NR_PATTERN = ROOM_NR_PATTERN_WIDE
 # One cell holding "01. Įėjimo koridorius 4.05 m²" — the lazūnų g. 6 shape,
 # where the whole eksplikacija is a single-column table.
 SINGLE_CELL_ROW_RE = re.compile(
     r"^\s*(?P<nr>[A-ZĄČĘĖĮŠŲŪŽ]{0,3}[-. ]?\d+(?:[.\-/]\w{1,4})*)[.)]?\s+"
     r"(?P<name>.+?)\s+"
-    r"(?P<plotas>-?\d+(?:[.,\s\u00a0\u202f]\d+)*(?:[.,]\d+)?)"
+    r"(?P<plotas>-?\d+(?:[., \u00a0\u202f]\d+)*(?:[.,]\d+)?)"
     r"\s*(?:m²|m2|m\^2|kv\.?\s*m\.?|kvm)?\s*$",
     flags=re.IGNORECASE)
 
@@ -171,13 +218,17 @@ def _parse_number_preserving_decimals(raw: str | None) -> tuple[float | None, st
         return None, raw
 
 
-def _is_eksplikacija_page(page) -> bool:
+def _is_eksplikacija_page(page, wide: bool | None = None) -> bool:
     """Quick text-marker check before trying to parse tables."""
+    if wide is None:
+        wide = wide_acceptance()
     try:
         txt = (page.extract_text() or "").lower()
     except Exception:
         return False
-    return any(m in txt for m in EKSPLIKACIJA_TEXT_MARKERS)
+    markers = (EKSPLIKACIJA_TEXT_MARKERS_WIDE if wide
+               else EKSPLIKACIJA_TEXT_MARKERS_CONSERVATIVE)
+    return any(m in txt for m in markers)
 
 
 # Total / summary row markers — we EXCLUDE these. P1 has rows like
@@ -195,19 +246,26 @@ TOTAL_ROW_MARKERS = [
 MAX_ROOM_NAME_CHARS = 48
 
 
-def _looks_like_room_name(text: str | None) -> bool:
+def _looks_like_room_name(text: str | None, wide: bool | None = None) -> bool:
     """True when the cell text names a room.
 
-    Two sources, unioned so this can only ever recognise MORE than before:
-      1. LT_ROOM_VOCABULARY — the original hand-written token list;
+    Two sources:
+      1. LT_ROOM_VOCABULARY — the original hand-written token list. ALWAYS on.
       2. the shared classifier in universal_rules — the same ≥80-label
          vocabulary the paskirtis sweep pinned, so "Vestibiulis", "Pirtis",
          "Balkonas", "Šilumos punktas" and the abbreviations no longer need a
-         second, separately-maintained list here. Length-capped, because this
-         one is substring-based and runs against arbitrary table cells.
+         second, separately-maintained list here. Behind `wide_acceptance()`:
+         it is substring-based, runs against arbitrary table cells, and on
+         1_BD.pdf it accepted "2030 1100 2000 2470 2000 950 B3 Miegamasis" and
+         on Projektas..pdf "Brėžinys: Rūsio planas. M 1:150" as room names.
+
+    The MAX_ROOM_NAME_CHARS cap below is NOT gated — it only ever rejects, and
+    it rejects legend sentences the legacy token list used to accept.
     """
     if not text or not isinstance(text, str):
         return False
+    if wide is None:
+        wide = wide_acceptance()
     if len(text.strip()) > MAX_ROOM_NAME_CHARS:
         # A "room name" this long is a sentence out of a legend or a title
         # block. The legacy token list matched any of them containing
@@ -218,6 +276,8 @@ def _looks_like_room_name(text: str | None) -> bool:
     low = text.lower()
     if any(v in low for v in LT_ROOM_VOCABULARY):
         return True
+    if not wide:
+        return False
     try:
         from .universal_rules import ROOM_TYPE_RULES, normalize_paskirtis
     except Exception:
@@ -296,11 +356,14 @@ def _detect_header(row_cells: list) -> dict[str, int] | None:
     return mapping
 
 
-def _looks_like_room_nr(text: str | None) -> bool:
+def _looks_like_room_nr(text: str | None, wide: bool | None = None) -> bool:
     if not text or not isinstance(text, str):
         return False
+    if wide is None:
+        wide = wide_acceptance()
     s = text.strip().upper()
-    return bool(ROOM_NR_PATTERN.match(s))
+    pattern = ROOM_NR_PATTERN_WIDE if wide else ROOM_NR_PATTERN_CONSERVATIVE
+    return bool(pattern.match(s))
 
 
 def _split_multiline_row(row: list) -> list[list]:
@@ -371,6 +434,7 @@ def _try_parse_row(
     page_height_pdf: float | None = None,
     columns: dict | None = None,
     stats: dict | None = None,
+    wide: bool | None = None,
 ) -> dict | None:
     """Attempt to extract {nr, pavadinimas, plotas_m2, plotas_m2_raw} from a
     single row of cells. Returns None if row doesn't look like a room entry.
@@ -385,6 +449,8 @@ def _try_parse_row(
     """
     if not row or not isinstance(row, (list, tuple)):
         return None
+    if wide is None:
+        wide = wide_acceptance()
     # POSITION-PRESERVING. `None` becomes "" and STAYS in place — it must not
     # be filtered out. pdfplumber emits None (not "") for a merged/spanned
     # cell, and on the eksplikacija pages of backend/test_pdfs/ ~46% of all
@@ -425,13 +491,13 @@ def _try_parse_row(
 
         raw_name = _cell("pavadinimas")
         raw_nr = _cell("nr")
-        if raw_name and not _looks_like_room_name(raw_name):
+        if raw_name and not _looks_like_room_name(raw_name, wide):
             # Name column present but this row is a spacer / continuation.
             raw_name = ""
         if not raw_name and raw_nr:
             # Some tables merge "01 HOLAS" into the Nr column.
             m = re.match(r"^(\S+)\s+(.+)$", raw_nr)
-            if m and _looks_like_room_name(m.group(2)):
+            if m and _looks_like_room_name(m.group(2), wide):
                 raw_nr, raw_name = m.group(1), m.group(2)
         if not raw_name:
             return None
@@ -449,14 +515,20 @@ def _try_parse_row(
             aukstis_m = av
         source = "header"
     else:
-        # -- Single-cell path --------------------------------------------
+        # -- Single-cell path (WIDE only) ---------------------------------
         # "01. Ijimo koridorius 4.05 m2" in ONE cell -- the Lazunu g. 6 shape,
         # where the entire eksplikacija is a one-column table. The old
-        # `len(cells) < 2` guard rejected every such row outright.
+        # `len(cells) < 2` guard rejected every such row outright, and with
+        # the flag off it does again: one cell of free text is also what a
+        # legend line, a title block and a drawing caption look like, and the
+        # regex cannot tell them apart. lazunu goes back to a pdfplumber MISS
+        # and falls through to Vision -- see feature_flags.py.
         filled = [c.strip() for c in cells if c and c.strip()]
+        if len(filled) < 2 and not wide:
+            return None
         if len(filled) == 1:
             m = SINGLE_CELL_ROW_RE.match(_clean_name(filled[0]))
-            if m and _looks_like_room_name(m.group("name")):
+            if m and _looks_like_room_name(m.group("name"), wide):
                 val, raw = _parse_number_preserving_decimals(m.group("plotas"))
                 if val is None or not (MIN_PLOTAS_M2 <= val <= MAX_PLOTAS_M2):
                     return None
@@ -479,17 +551,17 @@ def _try_parse_row(
                         r"^([A-ZAAAEEIISUUZ\u0104\u010c\u0118\u0116\u012e"
                         r"\u0160\u0172\u016a\u017d]?[-]?\d+(?:[.\-]\w+)?)\s+(.+)$",
                         cell)
-                    if m and _looks_like_room_name(m.group(2)):
+                    if m and _looks_like_room_name(m.group(2), wide):
                         if not nr:
                             nr = m.group(1).strip()
                         pavadinimas = _clean_name(m.group(2))
                         continue
                 # Standalone room number
-                if nr is None and _looks_like_room_nr(cell):
+                if nr is None and _looks_like_room_nr(cell, wide):
                     nr = cell.strip()
                     continue
                 # Standalone room name
-                if pavadinimas is None and _looks_like_room_name(cell):
+                if pavadinimas is None and _looks_like_room_name(cell, wide):
                     pavadinimas = _clean_name(cell)
                     continue
                 val, raw = _parse_number_preserving_decimals(cell)
@@ -589,12 +661,17 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
         with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
             total_pages = len(pdf.pages)
             out["_meta"]["pages_scanned"] = total_pages
+            # Resolved once per parse, not per row: a run must not be able to
+            # change acceptance mode halfway through. Recorded so a saved
+            # extraction says which mode produced it.
+            wide = wide_acceptance()
+            out["_meta"]["wide_acceptance"] = wide
             best_extraction: list[dict] = []
             best_page: int | None = None
             all_tables: list[tuple[int, list[dict]]] = []
 
             for page_idx, page in enumerate(pdf.pages, start=1):
-                if not _is_eksplikacija_page(page):
+                if not _is_eksplikacija_page(page, wide):
                     continue
                 out["_meta"]["eksplikacija_pages_found"] += 1
 
@@ -649,6 +726,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                                 page_height_pdf=page_height if sub_idx == 0 else None,
                                 columns=columns,
                                 stats=out["_meta"],
+                                wide=wide,
                             )
                             if parsed:
                                 rooms_in_table.append(parsed)
@@ -665,7 +743,19 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
             # a secondary table contributes only when it stands on its own
             # (>= 2 rooms, so one stray parsed line cannot sneak in) and only
             # rooms whose `nr` the primary table has not already claimed.
-            if best_extraction:
+            #
+            # WIDE-ONLY (2026-08-23 review). The merge as written picks the
+            # LARGEST table as primary and then admits, from every other
+            # table, only rooms whose `nr` the primary has not claimed. On a
+            # building where each storey numbers its rooms 1-1…1-6 that rule
+            # discards an entire real storey — measured on Projektas..pdf,
+            # where the 14 apartment rooms lose to the basement table and
+            # vanish. It also lets a 1-room primary reach MIN_ROOMS_THRESHOLD
+            # by borrowing 2 rooms off an unrelated sheet, which is how a
+            # 1+2 result gets presented as a validated eksplikacija.
+            # A continued two-sheet eksplikacija is real and worth solving —
+            # but by matching the CONTINUATION, not by nr-set subtraction.
+            if best_extraction and wide:
                 out["_meta"]["tables_contributing"] = 1
                 claimed = {str(r.get("nr") or "").strip() for r in best_extraction}
                 for page_idx, rooms_in_table in all_tables:
@@ -694,6 +784,49 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                     out["_meta"]["tables_contributing"] += 1
                     if page_idx not in out["_meta"]["continued_pages"]:
                         out["_meta"]["continued_pages"].append(page_idx)
+
+            elif best_extraction:
+                # Conservative mode: ONE table, the biggest, exactly as the
+                # parser behaved before 2026-08-23. Record the tables we did
+                # not use so a run that lost a real second storey is at least
+                # visible in the log rather than invisible in both modes.
+                out["_meta"]["tables_contributing"] = 1
+                for page_idx, rooms_in_table in all_tables:
+                    if rooms_in_table is best_extraction:
+                        continue
+                    out["_meta"].setdefault("tables_discarded", []).append({
+                        "page": page_idx, "rooms": len(rooms_in_table),
+                        "reason": "wide_acceptance_off",
+                    })
+
+            # ── Coverage guard (2026-08-23 review). ALWAYS ON. ──────────
+            # `ambiguous_rows` counts rows where a room NAME was found next to
+            # two or more plausible areas and there was no header to say which
+            # column is which. A handful of those is normal (a stray legend
+            # line). More refusals than accepted rooms means the layout is not
+            # the one the scan path assumes — a three-column-pair eksplikacija
+            # (`Nr|Pav|m²|Nr|Pav|m²|Nr|Pav|m²`), or a table with an extra
+            # numeric column — and the rows we DID accept are a fragment.
+            #
+            # Measured on Projektas..pdf (a 5-storey block, one eksplikacija
+            # per sheet, three room-pairs across): 18 rooms accepted, 71 rows
+            # refused. Those 18 are the basement's first column-pair. The
+            # pre-2026-08-23 parser returned 24 — the FIRST FLOOR's first
+            # column-pair, ~40 rooms of the building silently missing, every
+            # one of them stamped `plotas_source: "eksplikacija"`.
+            #
+            # Neither number is the building. So: return nothing, and let the
+            # Vision eksplikacija reader (the pipeline's primary path anyway)
+            # read all five sheets. A MISS costs one sub-call; a confident
+            # 40%-complete room table costs the contractor a wrong estimate he
+            # has no reason to doubt.
+            _ambiguous = int(out["_meta"].get("ambiguous_rows") or 0)
+            if best_extraction and _ambiguous > len(best_extraction):
+                out["_meta"]["refused_low_coverage"] = {
+                    "rooms": len(best_extraction), "ambiguous_rows": _ambiguous,
+                    "page": best_page,
+                }
+                best_extraction = []
 
             if len(best_extraction) >= MIN_ROOMS_THRESHOLD:
                 out["patalpos"] = best_extraction

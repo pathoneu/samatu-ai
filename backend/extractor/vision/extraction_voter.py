@@ -50,24 +50,47 @@ def _room_key(room: dict) -> str:
 
 
 def default_min_votes(n_runs: int, *, robust: bool = True) -> int:
-    """Majority of the runs that actually produced a result: ceil(n/2).
+    """Majority of the runs that actually produced a result, floored at 2.
 
-    Was hardcoded to 2, which is a majority only at n=3 (the default) and n=4;
-    at n=2 it silently demanded unanimity and at n=5 it accepted a 2-of-5
-    minority. Unchanged at n=3 and n=4, so the shipping configuration is
-    untouched.
+    Was hardcoded to 2. That is a majority only at n=3 (the shipping default)
+    and n=4.
 
-    robust=False keeps a FLOOR of 2. Dropping to 1 is only safe when the
-    matcher cannot split one physical room across two groups — and the legacy
-    nr matcher does exactly that whenever the rounds number rooms differently
-    (the ciurliu failure). Under the legacy matcher, a 1-vote threshold would
-    let both halves of such a split survive as two rooms and double-count the
-    area. Unanimity-at-n=2 was a crude guard against that; it stays until the
-    matcher that removes the need for it is on.
+    n=5 — DELIBERATE CHANGE, 2 -> 3. The old threshold accepted a room that
+    only 2 of 5 rounds saw, which is a minority presented as a consensus.
+    n=5 needs VOTING_N=5 in the environment and nothing sets it, so this
+    changes no configuration anyone runs; it is corrected rather than
+    preserved because preserving it would mean keeping a minority vote alive
+    for the sake of a configuration that does not exist. (The comment at the
+    call site in vision_call.py used to claim n=5 was unchanged. It was not.)
+
+    n=2 — FLOOR OF 2, i.e. unanimity, on BOTH matchers. There is no such thing
+    as a majority of two, and n=2 is reachable in production without any
+    config change: VOTING_N is 3, and a Railway timeout killing one round
+    leaves two. A threshold of 1 there does not "vote" at all —
+    `match_rooms` appends unmatched rooms as singleton groups, so every room
+    either round hallucinated survives into the result, and `_cov` reports 0.0
+    for a one-member group so nothing downstream flags it. The union of two
+    rounds is strictly worse than their agreement.
+
+    That makes the `robust` argument inert today: `max(2, ceil(n/2))` is the
+    same number for both matchers at every n >= 2. It is kept in the signature
+    because the reason each matcher wants a floor differs — the legacy nr
+    matcher needs one because it SPLITS a physical room across two groups when
+    the rounds number rooms differently (the ciurliu failure), so a 1-vote
+    threshold would let both halves survive and double-count the area; the
+    robust matcher needs one because two rounds cannot corroborate each other.
+    If the robust matcher ever earns a lower threshold at n >= 3 it belongs
+    here, behind `robust`, with the measurement that justified it.
     """
     n = max(int(n_runs), 1)
-    majority = max(1, (n + 1) // 2)
-    return majority if robust else max(2, majority)
+    if n <= 1:
+        # ONE run. `vote_extraction` never gets here (_run_pass1_voted returns
+        # runs[0] directly), but `match_rooms` is called with a single run
+        # directly — and the old hardcoded 2 meant every group failed the
+        # threshold and the run produced ZERO rooms. A lone run's rooms are
+        # all we know; 1 is the only sensible threshold.
+        return 1
+    return max(2, (n + 1) // 2)
 
 
 def _robust_matching_enabled() -> bool:

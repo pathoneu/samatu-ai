@@ -120,6 +120,49 @@ _FLAG_DEFINITIONS = {
     # real but unmeasured. Flip this ON for one paid ciurliu + berzas A/B before
     # making it the default. Enable: ENABLE_ROBUST_ROOM_MATCHING=1
     "robust_room_matching": ("ENABLE_ROBUST_ROOM_MATCHING", False),
+    # 2026-08-23: the WIDENED acceptance paths of the deterministic
+    # eksplikacija parser (extractor/pdfplumber_eksplikacija.py).
+    #
+    # PROBLEM. The 2026-08-23 tolerance rewrite bundled two very different
+    # kinds of change. One kind FIXES things and is unconditionally right: the
+    # header-driven column map (stop reading the perimeter column as the
+    # area), merged-cell position preservation, LT/DE/US decimal + NBSP
+    # tolerance, refusing a row with two plausible numbers and no header, and
+    # the `_meta` visibility counters. The other kind ACCEPTS MORE: a
+    # single-cell row shape, the cross-sheet merge, and a room-name test
+    # unioned with the ≥80-label paskirtis classifier. Nothing in the six
+    # registry fixtures exercises the second kind, so the corpus gate is blind
+    # to it — and on the repo's own real PDFs it goes badly wrong:
+    #
+    #     03_SA.pdf        34 rows ->  285   (rows off 9 different tables)
+    #     1_BD.pdf         15      ->   56   ("2030 1100 2000 2470 2000 950
+    #                                         B3 Miegamasis" as a room name)
+    #     Projektas..pdf   24      ->   26   — and all 24 are DIFFERENT rows:
+    #                                         the 14 real apartment rooms are
+    #                                         replaced by the basement table
+    #                                         plus "Brėžinys: Rūsio planas.
+    #                                         M 1:150" as a 53 m² room.
+    #
+    # The Projektas case is the dangerous one: the cross-sheet merge picks the
+    # LARGEST table as primary and then drops any secondary table whose room
+    # numbers collide with it — which on a building where every storey numbers
+    # its rooms 1-1…1-6 means a whole storey of real rooms is binned, silently.
+    #
+    # WHY A FLAG AND NOT A REVERT. The wide paths are not wrong in principle;
+    # they are untested. lazūnų g. 6 is a genuine single-column eksplikacija
+    # that only the single-cell path can read, and its four areas match the
+    # cached Vision read exactly. Keeping them behind a flag preserves that
+    # work and lets it be re-enabled per project or after a real corpus is
+    # built, without shipping the over-acceptance to a contractor now.
+    #
+    # THE COST OF THE CONSERVATIVE DEFAULT: lazunu goes back to a pdfplumber
+    # MISS and falls through to the Vision eksplikacija reader — one extra
+    # paid sub-call on that one project shape, same numbers. That is the
+    # trade: a known small cost against an unbounded silent-wrong-area risk.
+    #
+    # Enable: ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE=1
+    "eksplikacija_wide_acceptance": (
+        "ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE", False),
 }
 
 

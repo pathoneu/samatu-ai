@@ -3629,13 +3629,19 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         _attach_vote_meta(runs[0].setdefault("_meta", {}))
         return runs[0]
 
-    # min_votes is resolved inside the voter as ceil(len(runs)/2) — a majority
-    # of the runs that actually SUCCEEDED, not of the rounds requested. It used
-    # to be hardcoded to 2, which is a majority only at n=3/n=4: at n=2
-    # (VOTING_N=2, or 2 of 3 rounds surviving a Railway timeout) it silently
-    # demanded unanimity, and at n=5 it accepted a 2-of-5 minority. See
-    # extraction_voter.default_min_votes — under the legacy nr matcher it still
-    # floors at 2, so the shipping configuration is unchanged.
+    # min_votes is resolved inside the voter as max(2, ceil(len(runs)/2)) — a
+    # majority of the runs that actually SUCCEEDED, not of the rounds
+    # requested, never below 2. It used to be hardcoded to 2, which is a
+    # majority only at n=3/n=4.
+    #
+    # n=3 (VOTING_N's default, the shipping configuration) is UNCHANGED: 2.
+    # n=4 unchanged: 2.
+    # n=5 CHANGES 2 -> 3 on purpose — 2 of 5 is a minority, not a consensus.
+    #     Reaching n=5 needs VOTING_N=5 in the environment and nothing sets it.
+    #     (This comment previously claimed n=5 was unchanged. It was not.)
+    # n=2 (2 of 3 rounds surviving a Railway timeout) stays at 2, i.e.
+    #     unanimity, on BOTH matchers — see extraction_voter.default_min_votes
+    #     for why the union of two rounds is worse than their agreement.
     voted = vote_extraction(runs)
     # Cost metering (2026-06-19): a voted extraction made N Pass-1 Vision calls,
     # so SUM the token usage across all runs — keeping only runs[0] would make the

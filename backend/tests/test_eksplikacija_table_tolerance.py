@@ -90,12 +90,32 @@ def test_raw_text_is_preserved_for_audit():
     assert (val, raw) == (63.45, "63,45 m²")
 
 
+# ── WIDE-ACCEPTANCE FIXTURE (2026-08-23 review) ───────────────────────────
+#
+# The paths below are gated behind ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE, which
+# is OFF in production — see extractor/feature_flags.py for what they did to
+# the real PDFs in backend/test_pdfs/. They are still the behaviour we want
+# WHEN the flag is on, so these tests force it on and keep pinning it. Tests
+# without this fixture exercise the shipping (conservative) configuration.
+@pytest.fixture
+def wide_on(monkeypatch):
+    monkeypatch.setenv("ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE", "1")
+
+
+@pytest.fixture(autouse=True)
+def _conservative_by_default(monkeypatch):
+    """Every test in this file runs with the flag explicitly OFF unless it
+    asks for `wide_on`, so a stray env var in the shell cannot make the
+    conservative assertions pass for the wrong reason."""
+    monkeypatch.setenv("ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE", "0")
+
+
 # ── 2. ROOM NUMBER SHAPES ──────────────────────────────────────────────────
 @pytest.mark.parametrize("nr", [
     "1", "01", "101", "1.01", "1.2", "M01", "K-01", "A-1", "2-A",
     "I-01", "P-01", "1)", "01.",
 ])
-def test_room_nr_shapes_are_recognised(nr):
+def test_room_nr_shapes_are_recognised(nr, wide_on):
     assert _looks_like_room_nr(nr) is True
 
 
@@ -222,7 +242,7 @@ def test_min_plotas_bound_is_still_enforced():
     ("M01 Vonia 6,45 m2", "M01", "Vonia", 6.45),
     ("1.01 Svetainė 32,44 kv.m", "1.01", "Svetainė", 32.44),
 ])
-def test_single_cell_row_is_parsed(cell, nr, name, area):
+def test_single_cell_row_is_parsed(cell, nr, name, area, wide_on):
     out = _try_parse_row([cell], 0, 2)
     assert out is not None, cell
     assert (out["nr"], out["pavadinimas"], out["plotas_m2"]) == (nr, name, area)
@@ -236,7 +256,7 @@ def test_single_cell_row_is_parsed(cell, nr, name, area):
     "01. 4.05",              # no name
     "Įėjimo koridorius",     # no area
 ])
-def test_single_cell_non_rooms_are_refused(cell):
+def test_single_cell_non_rooms_are_refused(cell, wide_on):
     assert _try_parse_row([cell], 0, 2) is None
 
 
@@ -265,7 +285,7 @@ def test_multiline_merged_rows_still_split():
     "Vestibiulis", "Prieškambaris", "Pirtis", "Sauna", "Balkonas",
     "Šilumos punktas", "Dušinė", "Kor.", "Mieg.", "Baseinas",
 ])
-def test_room_names_are_recognised(name):
+def test_room_names_are_recognised(name, wide_on):
     assert _looks_like_room_name(name) is True
 
 
@@ -354,3 +374,156 @@ def test_the_scan_path_is_unaffected_by_merged_cells():
     assert (_try_parse_row(["101", "Holas", None, "11,55"], 0, 7)["plotas_m2"]
             == _try_parse_row(["101", "Holas", "", "11,55"], 0, 7)["plotas_m2"]
             == 11.55)
+
+
+# ── 9. THE CONSERVATIVE DEFAULT (2026-08-23 review) ────────────────────────
+#
+# The 2026-08-23 rewrite bundled fixes with widenings. The widenings were
+# never exercised by the six registry fixtures, and on the repo's own real
+# PDFs they replaced 24 apartment rooms with a basement table and turned 34
+# rows into 285. These pin the shipping configuration: the fixes stay, the
+# widenings are off. See extractor/feature_flags.py.
+
+def test_the_flag_is_off_by_default():
+    from extractor.feature_flags import get_flags
+    from extractor.pdfplumber_eksplikacija import wide_acceptance
+    assert get_flags()["eksplikacija_wide_acceptance"] is False
+    assert wide_acceptance() is False
+
+
+def test_a_single_cell_row_is_refused_by_default():
+    """The lazūnų g. 6 shape. One cell of free text is also what a legend
+    line, a caption and a title block look like; with the flag off the parser
+    refuses it exactly as it did before 2026-08-23 and falls through to
+    Vision."""
+    assert _try_parse_row(["01. Įėjimo koridorius 4.05 m²"], 0, 2) is None
+
+
+def test_the_classifier_union_is_off_by_default():
+    """`LT_ROOM_VOCABULARY` still answers for everything it always answered
+    for; the ≥80-label classifier union does not."""
+    for always in ("Svetainė", "Miegamasis", "Vonia", "WC", "Koridorius"):
+        assert _looks_like_room_name(always) is True, always
+    for wide_only in ("Vestibiulis", "Pirtis", "Balkonas", "Šilumos punktas"):
+        assert _looks_like_room_name(wide_only) is False, wide_only
+
+
+def test_the_widened_room_number_shapes_are_off_by_default():
+    for always in ("1", "01", "M01", "K-01", "1.01"):
+        assert _looks_like_room_nr(always) is True, always
+    # Trailing punctuation was added on 2026-08-23. "1)" and "01." are as
+    # often a list bullet or a drawing code as a room number.
+    for wide_only in ("1)", "01."):
+        assert _looks_like_room_nr(wide_only) is False, wide_only
+
+
+def test_the_page_marker_list_narrows_with_the_flag():
+    from extractor.pdfplumber_eksplikacija import (
+        EKSPLIKACIJA_TEXT_MARKERS_CONSERVATIVE as NARROW,
+        EKSPLIKACIJA_TEXT_MARKERS_WIDE as WIDE,
+    )
+    assert set(NARROW) < set(WIDE)
+    assert "eksplik" in NARROW
+    assert "patalpų specifikacija" not in NARROW
+
+
+# ── 10. THE ALWAYS-ON FIXES SURVIVE THE CONSERVATIVE DEFAULT ──────────────
+
+def test_header_column_map_still_runs_with_the_flag_off():
+    cols = _detect_header(["Nr.", "Pavadinimas", "Plotas, m²", "Perimetras, m"])
+    out = _try_parse_row(["3", "Koridorius", "6,50", "12,40"], 0, 7, columns=cols)
+    assert out["plotas_m2"] == 6.50 and out["perimetras_m"] == 12.40
+
+
+def test_merged_cell_fix_still_runs_with_the_flag_off():
+    cols = _detect_header(["Nr.", "Pavadinimas", "Aukštis, m",
+                           "Plotas, m²", "Perimetras, m"])
+    out = _try_parse_row(["102", "Virtuvė", None, "12,30", "14,20"],
+                         0, 7, columns=cols)
+    assert out["plotas_m2"] == 12.30
+
+
+def test_ambiguous_row_refusal_still_runs_with_the_flag_off():
+    stats = {}
+    assert _try_parse_row(["3", "Koridorius", "6,50", "12,40"], 0, 7,
+                          stats=stats) is None
+    assert stats["ambiguous_rows"] == 1
+
+
+def test_decimal_and_nbsp_tolerance_still_runs_with_the_flag_off():
+    for text, expect in (("1 234,56", 1234.56), ("1 234,56", 1234.56),
+                         ("1.234,56", 1234.56), ("1,234.56", 1234.56),
+                         ("63,45 m²", 63.45), ("63.4", 63.4)):
+        assert _parse_number_preserving_decimals(text)[0] == expect, text
+
+
+def test_a_newline_between_two_numbers_does_not_kill_the_cell():
+    """pdfplumber puts a newline in a cell when two table rows collapsed into
+    one ("1.05\\n1.09", 03_SA.pdf p. 82). The 2026-08-23 grouping class used
+    `\\s`, which matches a newline, so the pair matched as ONE grouped number,
+    failed to float, and the row was dropped — a row the parser had read
+    correctly for months. Thousands separators are spaces, never line breaks."""
+    assert _parse_number_preserving_decimals("1.05\n1.09")[0] == 1.05
+    out = _try_parse_row(["5-7", "WC", "1.05\n1.09", ""], 0, 82)
+    assert out is not None and out["plotas_m2"] == 1.05
+
+
+# ── 11. COVERAGE GUARD ─────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def real_pdf_parse():
+    """Parse each real PDF once — 03_SA/1_BD/Projektas are 10-24 MB and a
+    per-case re-parse put two minutes on the suite."""
+    import extractor.pdfplumber_eksplikacija as mod
+    from pathlib import Path
+    cache: dict = {}
+
+    def _get(name):
+        if name not in cache:
+            pdf = Path(__file__).resolve().parent.parent / "test_pdfs" / name
+            if not pdf.exists():
+                pytest.skip(f"{name} not on disk")
+            # The flag is process-wide env, and this fixture is module-scoped:
+            # force it OFF here so the cached parses are the shipping ones.
+            import os
+            prev = os.environ.get("ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE")
+            os.environ["ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE"] = "0"
+            try:
+                cache[name] = mod.extract_eksplikacija_pdfplumber(pdf.read_bytes())
+            finally:
+                if prev is None:
+                    os.environ.pop("ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE", None)
+                else:
+                    os.environ["ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE"] = prev
+        return cache[name]
+
+    return _get
+
+
+def test_more_refusals_than_rooms_means_no_deterministic_answer(real_pdf_parse):
+    """Projektas..pdf: a 5-storey block whose eksplikacija runs THREE room
+    pairs across (`Nr|Pav|m²|Nr|Pav|m²|Nr|Pav|m²`). The scan path understands
+    one pair, refuses the rest as ambiguous, and the sheet with the fewest
+    refusals wins `best_extraction` — so the parser confidently returned the
+    BASEMENT table. The pre-2026-08-23 parser was no better: it returned 24
+    rows of which `1-7 Virtuvė 11.0` (true 8.09), `2-1 Koridorius 10.0` (true
+    6.90) and four duplicate `1-7` rows were read off the drawing's grid
+    numbers. Both answers are wrong; refusing and letting Vision read all five
+    sheets is the only honest one."""
+    out = real_pdf_parse("Projektas..pdf")
+    assert out["patalpos"] == []
+    guard = out["_meta"]["refused_low_coverage"]
+    assert guard["ambiguous_rows"] > guard["rooms"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("name,expect_rooms", [
+    ("03_SA.pdf", 34),          # identical to the pre-2026-08-23 parser
+    ("1_BD.pdf", 15),           # identical
+    ("SA-02.pdf", 0),           # identical (MISS)
+    ("vidaus_apdaila.pdf", 0),  # identical (MISS)
+    ("Projektas..pdf", 0),      # was 24 fabricated rows — see the test above
+])
+def test_real_pdfs_match_the_pre_sweep_parser(name, expect_rooms, real_pdf_parse):
+    out = real_pdf_parse(name)
+    assert len(out["patalpos"]) == expect_rooms, out["_meta"]
