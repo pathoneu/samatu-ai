@@ -28,6 +28,7 @@ import pdfplumber
 from pdf2image import convert_from_bytes
 
 from models_config import model_for  # role: "sanitary" — resolved at call time
+from .universal_rules import normalize_paskirtis
 # Raised 2026-07-29 for the SAME reason apdailos_reader was (see its comment):
 # Opus 5 runs extended thinking BY DEFAULT and it counts against this cap, so a
 # snug max_tokens is shared between a variable-length thinking block and the
@@ -87,7 +88,8 @@ Output JSON:
 
 def build_user_text(rooms: list[dict]) -> str:
     wet = [r for r in (rooms or [])
-           if (r.get("paskirtis") or "").lower() in ("vonia", "wc", "san", "virtuve", "skalbykla")]
+           if normalize_paskirtis(r.get("paskirtis") or "")
+           in ("vonia", "wc", "san", "virtuve", "skalbykla")]
     lines = ["Drėgnos/santechnikos patalpos (kontekstui):"]
     for r in wet:
         lines.append(f"  {r.get('nr') or '?'} {r.get('pavadinimas') or ''}")

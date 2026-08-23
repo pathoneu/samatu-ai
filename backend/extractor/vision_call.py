@@ -25,9 +25,30 @@ from .prompt import (
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
 from models_config import model_for
+from .universal_rules import normalize_paskirtis
 
 _ENV_TRUTHY = {"1", "true", "yes", "on"}
 _ENV_FALSY = {"0", "false", "no", "off"}
+
+
+def _pask(room: dict) -> str:
+    """Canonical paskirtis for a room dict (2026-08-23 vocabulary sweep).
+
+    Every wet-room / garažas / virtuvė test in this module used to read
+    ``(r.get("paskirtis") or "").lower()`` raw, so a designer whose extract
+    says "Vonios kambarys" or "Tambūras" instead of the enum token dropped
+    OUT of the santechnika, silikonavimas and hidroizoliacija aggregates
+    without a word. Routing every one of them through the classifier fixes
+    that class of drift in one place.
+
+    A BLANK paskirtis stays blank — normalize_paskirtis() defaults empty
+    input to "gyvenamoji", and quietly promoting an unlabelled room to a
+    living room inside a filter is the opposite of what these call sites
+    want. Naming an unlabelled room is `classify_room_name`'s job, done once
+    at the room's entry point.
+    """
+    raw = (room.get("paskirtis") or "").strip()
+    return normalize_paskirtis(raw) if raw else ""
 
 
 def _env_flag(name: str) -> bool:
@@ -1129,7 +1150,9 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "") -> float:
     BET tik gyvenamosioms patalpoms su dekoratyvinėm lubom — ne vonioms,
     garažams, ne katilinei. Praktinis LT samatininko convention'as.
     """
-    if (paskirtis or "").lower() not in _KARNIZAS_PASKIRTYS:
+    if not paskirtis:
+        return 0.0
+    if normalize_paskirtis(paskirtis) not in _KARNIZAS_PASKIRTYS:
         return 0.0
     return round(perim * 1.05, 2)
 
@@ -1168,7 +1191,7 @@ def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
     Šitas paprastas variantas sumuoja grindis + perim × 0.30. Dušo zona
     pridedama jei pastabose minimas „dušas"/„shower" arba paskirtis vonia.
     """
-    paskirtis = (room.get("paskirtis") or "").lower()
+    paskirtis = _pask(room)
     if paskirtis not in ("vonia", "wc", "san", "skalbykla"):
         return 0.0
     plotas = float(room.get("plotas_m2") or 0)
@@ -1191,7 +1214,10 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
 
     Same primitives → same output, every run. No Vision arithmetic drift.
     """
-    from .universal_rules import calc_room_quantities, translate_user_prefs_to_room_rules
+    from .universal_rules import (
+        calc_room_quantities, translate_user_prefs_to_room_rules,
+        classify_room_name, ROOM_TYPE_RULES,
+    )
 
     rules = translate_user_prefs_to_room_rules(rules_override or {})
     rooms = parsed.get("patalpos") or []
@@ -1219,6 +1245,24 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
                   f"niche(s) outside the enumerated rooms")
     except Exception as exc:
         print(f"[extractor] LED enumerated-exclusion gate failed: {exc}")
+    # ── Unlabelled rooms get a class from their NAME (2026-08-23) ────────
+    # A room with no `paskirtis` at all used to fall straight onto the
+    # gyvenamoji defaults — painted walls, parquet floor, no tile, no
+    # waterproofing — for EVERY room including the bathrooms. That is the
+    # shape a foreign extract takes when the deterministic eksplikacija
+    # parser read the room table but Vision never classified the rooms.
+    # Deriving the class from the label is strictly better than defaulting
+    # every one of them to a living room, and it is recorded as an inference
+    # so the UI/audit can show it. Rooms that already carry a paskirtis are
+    # untouched — every benchmark room does, so this is a no-op on the corpus.
+    for room in rooms:
+        if (room.get("paskirtis") or "").strip():
+            continue
+        guessed = classify_room_name(room.get("pavadinimas"), None)
+        if guessed and guessed in ROOM_TYPE_RULES:
+            room["paskirtis"] = guessed
+            room["_paskirtis_source"] = "inferred_from_name"
+
     for room in rooms:
         # 1. Parse elementai → counts/areas the calc function understands
         counts = _elementai_to_counts(room.get("elementai") or [])
@@ -1894,7 +1938,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     def _sum_filtered(field: str, paskirtys: set) -> float:
         return round(sum(float(r.get(field) or 0) for r in rooms
-                         if (r.get("paskirtis") or "").lower() in paskirtys), 2)
+                         if _pask(r) in paskirtys), 2)
 
     pozicijos: list[dict] = []
     SAL = "skaiciuota_is_brezinio"
@@ -2249,7 +2293,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # Reviziniai dureliai voniose (1 vnt per drėgnam patalpą)
     rev_dureliai = sum(1 for r in rooms
-                       if (r.get("paskirtis") or "").lower() in WET)
+                       if _pask(r) in WET)
     if rev_dureliai > 0:
         pozicijos.append({
             "skyrius": SK_GKP, "aprasymas": "Reviziniai dureliai (vamzdžių prieiga)",
@@ -2352,7 +2396,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # NOTE: pl_total is already assigned above (moved up to fix NameError bug).
     if pl_total > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
-                              if (r.get("paskirtis") or "").lower() in WET), 2)
+                              if _pask(r) in WET), 2)
         # 2026-06-11: silikonavimas seals ALL tiled zones, not only paskirtis-wet
         # rooms — skalbyklos, and any room the apdailos reader marks substantially
         # tiled, are sealed too. Counting only vonia/wc/san under-counted on both
@@ -2360,7 +2404,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # defensible part (berzas −10%, bacv −55%) with the unchanged ×1.4
         # coefficient. (45°-pjovimas keeps WET-only perim — it didn't under-count.)
         def _is_tiled(r: dict) -> bool:
-            if (r.get("paskirtis") or "").lower() in WET:
+            if _pask(r) in WET:
                 return True
             bd = r.get("sienu_apdailos_breakdown") or {}
             return float(bd.get("plyteles_share") or 0) >= 0.6
@@ -2370,8 +2414,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # Plytelių 45° pjovimas — outer corners × tile_height (vonia
             # default 2 outer corners). Floor: wet_perim × 0.4.
             avg_tile_h = sum(float(r.get("plyteles_sienos_aukstis_m") or 0) for r in rooms
-                             if (r.get("paskirtis") or "").lower() in WET)
-            n_wet = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() in WET)
+                             if _pask(r) in WET)
+            n_wet = sum(1 for r in rooms if _pask(r) in WET)
             tile_h = (avg_tile_h / n_wet) if n_wet > 0 else 2.0
             pjovimas_45 = max(round(wet_perim * 0.4, 2), round(2 * n_wet * tile_h, 2))
             pozicijos.append({
@@ -2448,7 +2492,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         else:
             # Fallback: opening-count heuristic when no symbols detected
             n_holes = sum(int(el.get("kiekis") or 1)
-                          for r in rooms if (r.get("paskirtis") or "").lower() in WET
+                          for r in rooms if _pask(r) in WET
                           for el in (r.get("elementai") or [])
                           if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris", "langas"))
             if n_holes > 0:
@@ -2460,7 +2504,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 })
         # Dušo nuolydis — 1 vnt per vonia su dušu
         n_showers = sum(1 for r in rooms
-                        if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
+                        if _pask(r) in {"vonia", "san"})
         if n_showers > 0:
             pozicijos.append({
                 "skyrius": SK_PL,
@@ -2472,7 +2516,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # per vonia). Anksčiau default 1 per vonia → 2 vnt (under by -60%).
         # User gali override per `lentyneliu_per_vonia`.
         n_full_vonia = sum(1 for r in rooms
-                           if (r.get("paskirtis") or "").lower() in {"vonia", "san"})
+                           if _pask(r) in {"vonia", "san"})
         if n_full_vonia > 0:
             per_vonia = (parsed.get("_overrides") or {}).get("lentyneliu_per_vonia", 2)
             try:
@@ -2506,7 +2550,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         for r in rooms:
             if float(r.get("plyteles_grindys_m2") or 0) <= 0:
                 continue
-            if (r.get("paskirtis") or "").lower() in WET:
+            if _pask(r) in WET:
                 continue  # fully tiled walls → no skirting (contractor agrees)
             n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
@@ -2540,7 +2584,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # api/recompute_quantities.py — without that map the rebuild would show
     # the user BOTH rows.
     n_wet_klozetas = sum(1 for r in rooms
-                          if (r.get("paskirtis") or "").lower() in {"vonia", "wc", "san", "san_mazgas"})
+                          if _pask(r) in {"vonia", "wc", "san", "san_mazgas"})
     if n_wet_klozetas > 0:
         pozicijos.append({
             "skyrius": SK_GKP,
@@ -2560,10 +2604,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # frontend'ui, kad galėtų išskleisti detales jei reikia.
     hidro_m2 = _sum("hidroizoliacija_m2")
     n_wet_zones = sum(1 for r in rooms
-                      if (r.get("paskirtis") or "").lower() in WET)
+                      if _pask(r) in WET)
     if hidro_m2 > 0 and n_wet_zones > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
-                              if (r.get("paskirtis") or "").lower() in WET), 2)
+                              if _pask(r) in WET), 2)
         # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
         membrana_kg = round(hidro_m2 * 3.0, 2)  # 2 sluoksniai
         pozicijos.append({
@@ -2621,11 +2665,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Tikslumas — count'ai pagal kambario tipą; vartotojas gali keisti.
     # ════════════════════════════════════════════════════════════════════════
 
-    n_vonia = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "vonia")
-    n_wc = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "wc")
-    n_san = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() in ("san", "san_mazgas"))
-    n_virtuve = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "virtuve")
-    n_skalbykla = sum(1 for r in rooms if (r.get("paskirtis") or "").lower() == "skalbykla")
+    n_vonia = sum(1 for r in rooms if _pask(r) == "vonia")
+    n_wc = sum(1 for r in rooms if _pask(r) == "wc")
+    n_san = sum(1 for r in rooms if _pask(r) in ("san", "san_mazgas"))
+    n_virtuve = sum(1 for r in rooms if _pask(r) == "virtuve")
+    n_skalbykla = sum(1 for r in rooms if _pask(r) == "skalbykla")
 
     # Pilnos drėgnos patalpos (vonia + wc + san) — turi klozetą + WC rėmą
     n_wet_with_klozetas = n_vonia + n_wc + n_san
@@ -3169,7 +3213,7 @@ def _recompute_santrauka(parsed: dict) -> dict:
     house_paint_total = sum(
         float(r.get("dazymo_plotas_m2") or 0)
         for r in rooms
-        if (r.get("paskirtis") or "").lower() != "garazas"
+        if _pask(r) != "garazas"
     )
 
     # Build santrauka in Vision schema format
@@ -4563,7 +4607,7 @@ def extract_interior(
             n_interior = sum(int(el.get("kiekis") or 1) for r in rooms_now
                              for el in (r.get("elementai") or [])
                              if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
-                             and (r.get("paskirtis") or "").lower() not in _NONINT)
+                             and _pask(r) not in _NONINT)
             rec = reconcile_frameless(
                 plan_frameless=n_tagged, reader_frameless=dt.get("beapvadines_count", 0),
                 bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,

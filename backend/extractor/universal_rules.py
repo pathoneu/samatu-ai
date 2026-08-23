@@ -12,6 +12,7 @@ V8-only functions NOT migrated (they call other V8 internals):
 
 from __future__ import annotations
 import math
+import re
 from typing import Any
 
 
@@ -331,6 +332,35 @@ ROOM_TYPE_RULES = {
     # painted walls + GKP/painted ceiling typical. Tile floor for safety.
     "laiptine":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
     "laiptinė":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
+    # ── 2026-08-23 vocabulary sweep ──────────────────────────────────────
+    # Five values the Vision schema (prompt.py RoomType enum) is allowed to
+    # emit had NO entry here, so `ROOM_TYPE_RULES.get(paskirtis) or
+    # ROOM_TYPE_RULES["gyvenamoji"]` silently gave them living-room finishes.
+    # For `kabinetas` / `techpatalpa` that fallback is defensible and both
+    # appear in the benchmark corpus (Beržų 104 "Darbo kambarys",
+    # objektas_b 13 "Tech. patalpa/skalbykla"), so their entries below are
+    # BYTE-EQUAL to gyvenamoji — this is documentation of the existing
+    # behaviour, not a new claim about technical rooms. Revisit `techpatalpa`
+    # (raw slab floor? unpainted?) only against contractor evidence.
+    "kabinetas":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
+    "techpatalpa": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
+    # `terasa` / `lodzija` are OUTSIDE the thermal envelope. Billing them as
+    # painted GKP rooms with a parquet floor (the old fallback) fabricates
+    # interior finishing for a balcony — the single worst over-bill this sweep
+    # found. walls_paint 0 + betonas ceiling also trips the
+    # `ceiling_unfinished` gate below, so an exterior room contributes no
+    # paint at all. Exterior deck tiling is a separate trade, not interior
+    # takeoff → tile_floor False.
+    "terasa":      {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": False},
+    # Sauna: wood-lined walls and ceiling (no putty, no paint), tiled floor,
+    # and a wet room for waterproofing purposes. `medis` is NOT a Vision
+    # lubu_tipas value — it can only arrive from this table, which is what
+    # keeps the ceiling-unfinished gate from firing on any read ceiling.
+    "pirtis":      {"walls_paint": 0.0, "ceiling_type": "medis", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
+    # Pool hall: tiled and wet, but deliberately NOT part of the bathroom
+    # family — the santechnika lane bills one klozetas + rėmas per
+    # vonia/wc/san room, and a pool is not a toilet.
+    "baseinas":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 2.0, "tile_floor": True},
 }
 
 
@@ -562,44 +592,215 @@ def group_rooms_by_floor(rooms: list[dict]) -> dict[int, list[dict]]:
     return out
 
 
+# ═════════════════════════════════════════════════════════════════════════
+# ROOM-NAME → PASKIRTIS VOCABULARY (2026-08-23 generalisation sweep)
+# ═════════════════════════════════════════════════════════════════════════
+# Our accuracy numbers come from four projects by one contractor. A drawing
+# from a designer we have never seen drifts exactly where this classifier
+# keys on OUR projects' words. The sweep that produced the tables below ran
+# 114 real Lithuanian room labels (plus every RoomType enum value and every
+# paskirtis in the benchmark corpus) through the old rules; 47 fell through
+# to the generic living-room default and 8 landed on an outright WRONG class
+# — "Vonios kambarys" was billed as a living room because the old needle was
+# the exact string "vonia" and "vonios" does not contain it.
+#
+# Design rules, deliberately boring:
+#   · deterministic, no fuzzy matching, no edit distance, no ML;
+#   · diacritics folded ONCE (ą→a … ž→z) so "Tambūras"/"Tamburas"/"TAMBURAS"
+#     need one needle, not three;
+#   · short/ambiguous labels ("Kor.", "Mieg.", "S.M.") match EXACTLY, never
+#     as substrings — a 3-letter substring rule is how classifiers explode;
+#   · longer needles are ordered so a compound name beats its head word
+#     ("Darbo kambarys" → kabinetas is checked before "kambar" → gyvenamoji);
+#   · anything still unrecognised passes through unchanged, exactly as before,
+#     and lands on the gyvenamoji ROOM_TYPE_RULES fallback.
+# Every mapping is pinned by backend/tests/test_paskirtis_vocabulary.py.
+
+_LT_DIACRITICS = str.maketrans({
+    "ą": "a", "č": "c", "ę": "e", "ė": "e", "į": "i",
+    "š": "s", "ų": "u", "ū": "u", "ž": "z",
+})
+_NON_WORD_RE = re.compile(r"[^a-z0-9]+")
+_TRAILING_INDEX_RE = re.compile(r"(?:\s+\d+)+$")
+
+
+def fold_room_label(s: str) -> str:
+    """lowercase → strip LT diacritics → every run of punctuation/space to a
+    single space. "San. mazgas" → "san mazgas"; "Kor." → "kor"; "S.M." → "s m".
+    """
+    folded = (s or "").lower().translate(_LT_DIACRITICS)
+    return _NON_WORD_RE.sub(" ", folded).strip()
+
+
+# Exact (whole-label) aliases. Abbreviations and initialisms live HERE and
+# only here — as substrings they would match half the vocabulary.
+# A bare "K." is deliberately absent: on LT plans it is used for kambarys,
+# koridorius AND katilinė, so guessing is worse than the generic default.
+_PASKIRTIS_EXACT: dict[str, str] = {
+    "kamb": "gyvenamoji",
+    "svet": "gyvenamoji",
+    "mieg": "miegamoji",
+    "virt": "virtuve",
+    "von": "vonia",
+    "dusas": "vonia",
+    "s m": "san", "sm": "san", "san m": "san", "sanm": "san",
+    "kor": "koridorius",
+    "hallas": "holas",
+    "drab": "drabuzine", "rk": "drabuzine",
+    "sand": "sandeliukas",
+    "gar": "garazas",
+    "tamb": "tamburas",
+    "kat": "katiline",
+    "tech": "techpatalpa",
+}
+
+# Sentinel for the one rule that is not a plain substring: the legacy
+# `"san" in p and "mazg" in p` conjunction, which must keep its exact slot in
+# the ordering ("San. mazgas", "San.mazgas", "Sanmazgas", "Sanitarinis mazgas").
+_SAN_MAZGAS = ("san", "mazg")
+
+# Ordered substring rules. ORDER IS THE CONTRACT — the first hit wins, so a
+# compound label must be listed above the generic word it contains.
+# Everything from the pre-2026-08-23 function is still here in its original
+# relative order; new needles were slotted where they cannot shadow an old
+# one (verified by the differential half of test_paskirtis_vocabulary.py).
+_PASKIRTIS_CONTAINS: tuple[tuple[str, str], ...] = (
+    # ── compounds that would otherwise be swallowed by "kambar" ──────────
+    ("vonios kamb", "vonia"),
+    ("duso kamb", "vonia"),
+    ("dusu kamb", "vonia"),
+    ("rubu kamb", "drabuzine"),
+    ("drabuziu kamb", "drabuzine"),
+    ("darbo kamb", "kabinetas"),
+    ("vaiku kamb", "miegamoji"),
+    ("vaiko kamb", "miegamoji"),
+    ("sveciu kamb", "miegamoji"),
+    ("berniuko kamb", "miegamoji"),
+    ("mergaites kamb", "miegamoji"),
+    ("tevu kamb", "miegamoji"),
+    ("miegamojo kamb", "miegamoji"),
+    ("prieskamb", "holas"),      # Prieškambaris is an entry hall, not a room
+    ("poilsio kamb", "gyvenamoji"),
+    ("zaidimu kamb", "gyvenamoji"),
+    ("technikos kamb", "techpatalpa"),
+    # ── legacy order starts here ─────────────────────────────────────────
+    ("garaz", "garazas"),
+    ("tambur", "tamburas"),
+    ("pirt", "pirtis"),          # pirtis, pirties, garinė pirtis
+    ("saun", "pirtis"),
+    ("basein", "baseinas"),
+    ("vonia", "vonia"),
+    ("vonio", "vonia"),          # vonios / vonioje — the old needle missed these
+    ("dusin", "vonia"),
+    ("prausykl", "san"),
+    ("wc", "wc"),
+    ("tualet", "wc"),
+    (_SAN_MAZGAS, "san"),        # legacy `"san" in p and "mazg" in p` slot
+    ("drabuz", "drabuzine"),
+    ("rubin", "drabuzine"),
+    ("spinta", "drabuzine"),     # built-in walk-in wardrobe
+    ("katil", "katiline"),
+    ("silumos punkt", "katiline"),
+    ("silumos mazg", "katiline"),
+    ("skalb", "skalbykla"),
+    ("dziovykl", "skalbykla"),
+    ("virtuv", "virtuve"),
+    ("valgom", "valgomasis"),
+    ("miegam", "miegamoji"),
+    ("kabinet", "kabinetas"),
+    ("biblioteka", "kabinetas"),
+    ("ofis", "kabinetas"),
+    ("posedz", "kabinetas"),
+    ("kambar", "gyvenamoji"),
+    ("svetain", "gyvenamoji"),
+    ("sporto sal", "gyvenamoji"),
+    ("kino sal", "gyvenamoji"),
+    ("mansard", "gyvenamoji"),   # a finished mansard IS living space in LT TPs
+    ("holas", "holas"),
+    ("hol", "holas"),
+    ("vestibiul", "holas"),
+    ("foje", "holas"),
+    ("priimamas", "holas"),
+    ("koridor", "koridorius"),
+    ("laiptin", "laiptine"),
+    ("laiptai", "laiptine"),     # prompt.py: "laiptai = laiptinė"
+    ("sandel", "sandeliukas"),
+    ("ukine patalp", "sandeliukas"),
+    ("pagalbine patalp", "sandeliukas"),
+    ("palep", "sandeliukas"),
+    ("pastog", "sandeliukas"),
+    ("rusys", "sandeliukas"),
+    ("rusio", "sandeliukas"),
+    ("teras", "terasa"),
+    ("balkon", "terasa"),
+    ("lodzij", "terasa"),
+    ("verand", "terasa"),
+    ("ziemos sod", "terasa"),
+    ("techn", "techpatalpa"),
+    ("tech patalp", "techpatalpa"),
+    ("techpatalp", "techpatalpa"),
+    ("serverin", "techpatalpa"),
+    ("inzinerin", "techpatalpa"),
+    ("dirbtuv", "techpatalpa"),
+    ("tarnybine patalp", "techpatalpa"),
+    ("valymo patalp", "techpatalpa"),
+)
+
+
+def _rule_hits(needle, folded: str) -> bool:
+    """One ordered rule against a folded label. A tuple needle means ALL of
+    its parts must be present (the san+mazgas conjunction)."""
+    if isinstance(needle, tuple):
+        return all(part in folded for part in needle)
+    return needle in folded
+
+
 def normalize_paskirtis(p: str) -> str:
-    """Normalizuoja patalpos paskirtį į standartinę."""
+    """Normalizuoja patalpos paskirtį (arba patalpos pavadinimą) į standartinę.
+
+    Accepts BOTH a RoomType enum value ("miegamoji") and a raw label off the
+    drawing ("Tėvų miegamasis", "MIEG.", "Vonios kambarys"). Unrecognised
+    input is returned lowercased/stripped, unchanged — callers keep falling
+    back to the gyvenamoji ROOM_TYPE_RULES defaults exactly as before.
+    """
     if not p:
         return "gyvenamoji"
-    p = p.lower().strip()
-    if "garaž" in p or "garaz" in p:
-        return "garazas"
-    if "tambūr" in p or "tambur" in p:
-        return "tamburas"
-    if "vonia" in p:
-        return "vonia"
-    if "wc" in p or "tualet" in p:
-        return "wc"
-    if "san" in p and "mazg" in p:
-        return "san"
-    if "drabuž" in p or "rūbin" in p or "rubin" in p:
-        return "drabuzine"
-    if "katil" in p:
-        return "katiline"
-    if "skalb" in p:
-        return "skalbykla"
-    if "virtuv" in p:
-        return "virtuve"
-    if "valgom" in p:
-        return "valgomasis"
-    if "miegam" in p:
-        return "miegamoji"
-    if "kambar" in p or "svetain" in p:
-        return "gyvenamoji"
-    if "holas" in p or "hol" in p:
-        return "holas"
-    if "koridor" in p:
-        return "koridorius"
-    if "laiptin" in p:
-        return "laiptine"
-    if "sandėl" in p or "sandel" in p:
-        return "sandeliukas"
-    return p
+    folded = fold_room_label(p)
+    if not folded:
+        return p.lower().strip()
+
+    hit = _PASKIRTIS_EXACT.get(folded)
+    if hit:
+        return hit
+    # "Kamb. 3", "Kor. 1", "Mieg 2" — drop trailing index tokens, retry exact.
+    trimmed = _TRAILING_INDEX_RE.sub("", folded).strip()
+    if trimmed != folded:
+        hit = _PASKIRTIS_EXACT.get(trimmed)
+        if hit:
+            return hit
+
+    for needle, cls in _PASKIRTIS_CONTAINS:
+        if _rule_hits(needle, folded):
+            return cls
+    return p.lower().strip()
+
+
+def classify_room_name(pavadinimas: str | None,
+                       paskirtis: str | None = None) -> str:
+    """Best available class for a room, preferring an explicit `paskirtis`.
+
+    Used where an extract carries a room NAME but no paskirtis at all (a
+    foreign PDF whose eksplikacija parsed cleanly while Vision never labelled
+    the rooms). Without this every such room defaulted to `gyvenamoji`,
+    including the bathrooms — painted walls, no tile, no waterproofing.
+    """
+    if paskirtis:
+        cls = normalize_paskirtis(paskirtis)
+        if cls in ROOM_TYPE_RULES:
+            return cls
+    if pavadinimas:
+        return normalize_paskirtis(pavadinimas)
+    return normalize_paskirtis(paskirtis or "")
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -1343,7 +1544,12 @@ def calc_room_quantities(room: dict,
         and walls_paint_factor == 0.0
         and walls_paint_factor_override is None
         and not is_full_tile
-        and ceiling_type == "betonas"
+        # "betonas" = raw slab (garažas / tambūras / terasa); "medis" = the
+        # wood lining of a pirtis. Both are surfaces the painter never touches,
+        # and neither is a Vision `lubu_tipas` value — "medis" can ONLY come
+        # from ROOM_TYPE_RULES, so a ceiling actually READ off a drawing can
+        # never fall into this branch by accident. (2026-08-23)
+        and ceiling_type in ("betonas", "medis")
         and gkp_extra_area_m2 <= 0
     )
     if ceiling_paint_override is not None and not bool(ceiling_paint_override):

@@ -48,6 +48,8 @@ from __future__ import annotations
 
 import re
 
+from .universal_rules import normalize_paskirtis
+
 # Empirical LED-per-perimeter-meter ratios computed from Beržų's
 # contractor-validated room data (the only project with both clean
 # niche-locator output and verified per-room LED truth).
@@ -67,6 +69,21 @@ LED_RATIO_BY_PASKIRTIS: dict[str, float] = {
     "drabuzine":   0.00,
     "rubine":      0.00,
     "techpatalpa": 0.00,
+    # 2026-08-23 vocabulary sweep — classes the normaliser can now produce
+    # that Beržų never contained. All 0.00 ON PURPOSE: inferring LED metres
+    # into a room type we have zero contractor evidence for is exactly the
+    # fabrication the ciurliu over-bill taught us to avoid (see module
+    # docstring). `holas` and `laiptine` are the two that plausibly DO carry
+    # LED in premium projects — raise them only against measured truth, not
+    # intuition.
+    "holas":       0.00,
+    "laiptine":    0.00,
+    "sandeliukas": 0.00,
+    "katiline":    0.00,
+    "terasa":      0.00,
+    "pirtis":      0.00,
+    "baseinas":    0.00,
+    "virtuve":     0.00,
 }
 
 MIN_INFERENCE_RATIO = 0.15  # below this, treat as "no LED expected"
@@ -158,7 +175,15 @@ def infer_missing_niches(rooms: list[dict]) -> int:
         )
         if existing_led > 0:
             continue
-        paskirtis = (room.get("paskirtis") or "").lower()
+        # Normalised, not raw-lowercased (2026-08-23): a foreign extract that
+        # labels the room "Koridorius 1" or "Tambūras" used to miss the table
+        # entirely and get ratio 0.0 by accident. Corpus paskirtys are already
+        # canonical, so this is a no-op on the benchmark. A room with NO
+        # paskirtis at all keeps ratio 0.0 — normalize_paskirtis() defaults
+        # empty input to "gyvenamoji" (0.40), and inferring LED into a room
+        # nobody classified would be inference on top of inference.
+        raw_paskirtis = (room.get("paskirtis") or "").strip()
+        paskirtis = normalize_paskirtis(raw_paskirtis) if raw_paskirtis else ""
         ratio = LED_RATIO_BY_PASKIRTIS.get(paskirtis, 0.0)
         if ratio < MIN_INFERENCE_RATIO:
             continue

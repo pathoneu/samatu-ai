@@ -102,7 +102,10 @@ def calculate_room_tile_area(payload: ElevationPayload) -> dict[str, RoomTileRes
     return dict(rooms)
 
 
-WET_ROOM_PASKIRTYS = {"vonia", "wc", "san", "skalbykla", "katiline"}
+WET_ROOM_PASKIRTYS = {"vonia", "wc", "san", "skalbykla", "katiline",
+                      # 2026-08-23 sweep: rooms that legitimately tile to the
+                      # ceiling, so a ≥80% tile read is NOT suspicious there.
+                      "pirtis", "baseinas"}
 HIGH_TILE_RATIO_WARNING = 0.80
 
 
@@ -127,7 +130,10 @@ def diagnose_tile_coverage(
         if wall_gross <= 0:
             continue
         ratio = result.tile_area_m2 / wall_gross
-        paskirtis = (room.get("paskirtis") or "").lower()
+        # Normalised (2026-08-23): "Vonios kambarys" used to be treated as a
+        # DRY room here and fired a false "non-wet room with 95% tile" warning.
+        from .universal_rules import normalize_paskirtis
+        paskirtis = normalize_paskirtis(room.get("paskirtis") or "")
         if ratio >= HIGH_TILE_RATIO_WARNING and paskirtis not in WET_ROOM_PASKIRTYS:
             warnings.append({
                 "room_nr": nr,
