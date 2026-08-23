@@ -34,6 +34,7 @@ from pdf2image import convert_from_bytes
 
 from models_config import model_for  # role: "doors" — resolved at call time
 from .response_text import response_text
+from .universal_rules import normalize_paskirtis
 # Raised 2026-07-29 for the SAME reason apdailos_reader was (see its comment):
 # Opus 5 runs extended thinking BY DEFAULT and it counts against this cap, so a
 # snug max_tokens is shared between a variable-length thinking block and the
@@ -229,7 +230,8 @@ def merge_doors_into_rooms(rooms: list[dict], doors_result: dict) -> int:
     if not doors:
         return 0
     by_nr = {str(r.get("nr") or ""): r for r in rooms}
-    entrance_rooms = [r for r in rooms if (r.get("paskirtis") or "").lower() in _ENTRANCE]
+    entrance_rooms = [r for r in rooms
+                      if normalize_paskirtis(r.get("paskirtis") or "") in _ENTRANCE]
     modified: set[str] = set()
 
     # First pass — strip stale pass-1 doors from every room.

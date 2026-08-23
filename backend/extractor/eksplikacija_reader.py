@@ -322,9 +322,34 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
         pdf_attempt = extract_eksplikacija_pdfplumber(pdf_bytes)
         if pdf_attempt.get("patalpos"):
             # SUCCESS — pdfplumber found a real eksplikacija. Return immediately.
+            #
+            # THE RULE (restated 2026-08-23, when the parser was widened):
+            # pdfplumber REPLACES the Vision read of the room table, it does
+            # not merely supplement it. That is only defensible because the
+            # bar for "found" is set by construction, not by hope:
+            #   · the page must carry an eksplikacija heading;
+            #   · >= MIN_ROOMS_THRESHOLD rows must survive BOTH the LT
+            #     room-name vocabulary and the 1-500 m2 plausibility band;
+            #   · a row with two plausible numbers and no column header is
+            #     REFUSED, not guessed (pdfplumber_eksplikacija._try_parse_row).
+            # Anything short of that returns empty and Vision runs as before.
+            #
+            # Measured on the six fixture PDFs after the widening: berzas,
+            # ciurliu and sernu still MISS; objektas_b (15 rooms) and romainiai
+            # (11) were already hits and return byte-identical numbers; lazunu
+            # flipped MISS -> HIT (4 rooms) and its four areas match the cached
+            # Vision read exactly. No fixture's numbers changed.
+            meta = pdf_attempt.get("_meta") or {}
+            sources = {}
+            for r in pdf_attempt["patalpos"]:
+                key = r.get("_row_source") or "scan"
+                sources[key] = sources.get(key, 0) + 1
             print(f"[eksplikacija_reader] pdfplumber HIT — {len(pdf_attempt['patalpos'])} "
                   f"rooms from page {pdf_attempt.get('eksplikacija_source_page')}, "
-                  f"{pdf_attempt['_meta'].get('elapsed_s', 0)}s, $0")
+                  f"{meta.get('elapsed_s', 0)}s, $0 "
+                  f"(rows={sources}, header={meta.get('header_detected')}, "
+                  f"ambiguous_rows_skipped={meta.get('ambiguous_rows', 0)}, "
+                  f"tables={meta.get('tables_contributing')})")
             return pdf_attempt
         else:
             print(f"[eksplikacija_reader] pdfplumber MISS — falling through to Vision "

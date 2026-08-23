@@ -24,6 +24,8 @@ from __future__ import annotations
 # Sprint §AUDIT (2026-04-29): unused import removed.
 from typing import Any
 
+from .universal_rules import normalize_paskirtis
+
 __all__ = ["validate_consistency"]
 
 
@@ -320,7 +322,7 @@ def _rule_hidroizoliacija_in_wet_rooms(rooms: list[dict]) -> list[dict]:
     perspėjimas kad ji praleista."""
     out = []
     for r in rooms:
-        paskirtis = (r.get("paskirtis") or "").lower()
+        paskirtis = normalize_paskirtis(r.get("paskirtis") or "")
         if paskirtis not in WET_PASKIRTYS:
             continue
         hidro = float(r.get("hidroizoliacija_m2") or 0)
@@ -341,7 +343,7 @@ def _rule_plyteles_in_vonios(rooms: list[dict]) -> list[dict]:
     — info-level (gali būti dažytos sienos arba VPC)."""
     out = []
     for r in rooms:
-        paskirtis = (r.get("paskirtis") or "").lower()
+        paskirtis = normalize_paskirtis(r.get("paskirtis") or "")
         if paskirtis not in ("vonia", "wc", "san"):
             continue
         plyteles = float(r.get("plyteles_sienos_m2") or 0)

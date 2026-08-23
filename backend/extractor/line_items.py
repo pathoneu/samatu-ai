@@ -27,6 +27,11 @@ DEFAULT_HYDRO_WALL_TURNUP_M = 0.20  # STR 2.04.01 default
 
 WET_ROOM_PASKIRTIS = {
     "vonia", "wc", "san", "katiline", "skalbykla", "dušas", "prausykla",
+    # 2026-08-23: classes the normaliser can now produce. A sauna floor and a
+    # pool surround are waterproofed exactly like a bathroom (STR 2.04.01).
+    # "dušas"/"prausykla" above are legacy raw values kept for old blobs —
+    # normalize_paskirtis maps those labels to vonia/san today.
+    "pirtis", "baseinas",
 }
 
 
@@ -159,8 +164,13 @@ def plaster_corners_lm(room: dict | object, fallback_corners: int = 4) -> float:
 def _is_wet_room(room: dict | object) -> bool:
     if bool(_get(room, "wet_room", False)):
         return True
-    paskirtis = (_get(room, "paskirtis") or "").lower()
-    return paskirtis in WET_ROOM_PASKIRTIS
+    # Normalised (2026-08-23 vocabulary sweep). Raw-lowercasing meant a room
+    # labelled "Vonios kambarys", "Dušinė" or "Pirtis" got NO waterproofing —
+    # the single most expensive silent omission the sweep found. Corpus
+    # paskirtys are already canonical, so this is a no-op on the benchmark.
+    from .universal_rules import normalize_paskirtis
+    raw = (_get(room, "paskirtis") or "").strip()
+    return bool(raw) and normalize_paskirtis(raw) in WET_ROOM_PASKIRTIS
 
 
 def hidroizoliacija_m2(
