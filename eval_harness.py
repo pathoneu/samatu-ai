@@ -74,7 +74,7 @@ def _merge_registry_yaml() -> None:
         # registry-excluded score got hand-averaged into a "corpus MAE".
         for flag in ("scope_mismatch", "scope_mismatch_reason",
                      "blocked_for_vision_extraction", "blocked_partial_input",
-                     "blocked_reason"):
+                     "blocked_reason", "ablation_of"):
             if entry.get(flag):
                 merged[flag] = entry[flag]
         REGISTRY[slug] = merged
@@ -1420,6 +1420,17 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
                 "slug": slug, "status": "excluded_partial_input",
                 "reason": (entry.get("blocked_reason") or
                            "input PDF lacks required pages"),
+                "metrics": [], "excluded_from_mae": True,
+            })
+            continue
+        # ABLATIONS (2026-08-22): synthetic variants of a corpus project that
+        # share its truth file. Scored individually (--project X --vision),
+        # never averaged — four Beržų variants would quadruple its weight and
+        # turn the corpus MAE into a Beržų MAE.
+        if entry.get("ablation_of"):
+            per_project_summary.append({
+                "slug": slug, "status": "excluded_ablation",
+                "reason": f"ablation of {entry['ablation_of']} — scored individually",
                 "metrics": [], "excluded_from_mae": True,
             })
             continue

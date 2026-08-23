@@ -105,3 +105,47 @@ projects:
     has_gt_dimensions: false
     has_cached_extract: false
     notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into lazunu_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
+
+  # ── Beržų ABLATIONS (2026-08-22) — synthetic "foreign projects" with KNOWN truth.
+  # We have no out-of-sample interior PDF, so these manufacture the ways a
+  # foreign project differs from Beržų while keeping its contractor-verified
+  # truth. Built by scripts/build_berzas_ablations.py; PDFs untracked like all
+  # fixtures. `ablation_of` EXCLUDES them from the corpus average (they would
+  # quadruple Beržų's weight) — score each one individually:
+  #   venv/bin/python eval_harness.py --project berzas_bundle --vision
+  - slug: berzas_bundle
+    name: "Beržų g. 24 — buried in a 54-page bundle (SA-02 + interior)"
+    truth_path: ground_truth/berzas/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_bundle.pdf"
+    contractor: "Rangovas A"
+    ablation_of: berzas
+    has_gt_dimensions: true
+    has_cached_extract: false
+    notes: "37 pages of the SA-02 architectural part FIRST, then the 17 interior pages — the shape a contractor actually uploads. Tests page selection, the 20-page soft cap and runtime."
+  - slug: berzas_no_eksplikacija
+    name: "Beržų g. 24 — no eksplikacija table"
+    truth_path: ground_truth/berzas/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_no_eksplikacija.pdf"
+    contractor: "Rangovas A"
+    ablation_of: berzas
+    has_gt_dimensions: true
+    has_cached_extract: false
+    notes: "p2 rasterised with the PATALPŲ EKSPLIKACIJA table whited out of the image AND the text layer (all other p2 words kept as an invisible layer). Forces the no-table path (the Čiurlių failure mode) on a project we can score."
+  - slug: berzas_no_isklotines
+    name: "Beržų g. 24 — no wall elevations"
+    truth_path: ground_truth/berzas/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_no_isklotines.pdf"
+    contractor: "Rangovas A"
+    ablation_of: berzas
+    has_gt_dimensions: true
+    has_cached_extract: false
+    notes: "Pages 11–16 (išklotinės) removed → 11 pages. Tile must fall back to the apdailos plan / paskirtis defaults; rows should go geltona/raudona, not confidently wrong."
+  - slug: berzas_flat150
+    name: "Beržų g. 24 — flattened 150 DPI raster, no text layer"
+    truth_path: ground_truth/berzas/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_flat150.pdf"
+    contractor: "Rangovas A"
+    ablation_of: berzas
+    has_gt_dimensions: true
+    has_cached_extract: false
+    notes: "Every page rasterised at 150 DPI — a scanned / iLovePDF-style re-export. Every deterministic text lane goes dark; Vision carries everything."

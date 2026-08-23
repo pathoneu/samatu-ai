@@ -304,3 +304,22 @@ def test_summary_table_labels_frozen_rows(harness, capsys):
     out = capsys.readouterr().out
     assert "FROZEN" in out and "live" in out
     assert "--recompute" in out, "the frozen warning must name the way out"
+
+
+def test_ablations_share_truth_but_never_enter_the_corpus_average(harness):
+    """2026-08-22: the Beržų ablation variants (synthetic 'foreign projects')
+    reuse ground_truth/berzas/truth.json. They must be scorable one at a time
+    (--project X --vision) yet excluded from --totals-only, or four copies of
+    Beržų would quadruple its weight and the corpus MAE would become a Beržų
+    MAE. `ablation_of` is the flag; the merge must carry it and the corpus
+    loop must honour it."""
+    import inspect
+    reg = harness.REGISTRY
+    for slug in ("berzas_bundle", "berzas_no_eksplikacija",
+                 "berzas_no_isklotines", "berzas_flat150"):
+        assert slug in reg, f"{slug} missing from REGISTRY"
+        assert reg[slug]["ablation_of"] == "berzas"
+        assert reg[slug]["truth_path"] == reg["berzas"]["truth_path"]
+    src = inspect.getsource(harness.run_totals_only_multi)
+    assert 'entry.get("ablation_of")' in src, "corpus loop must exclude ablations"
+    assert "excluded_ablation" in src
