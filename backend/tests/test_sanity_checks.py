@@ -20,7 +20,8 @@ def test_paintable_wall_to_floor_fires_below_band():
     w = check_paintable_wall_to_floor(rooms)
     assert w is not None
     assert w.code == "paintable_floor_ratio"
-    assert "1.50" in w.actual
+    # LT decimal comma — these strings render verbatim in the sanity banner.
+    assert "1,50" in w.actual
 
 
 def test_paintable_wall_to_floor_fires_above_band():

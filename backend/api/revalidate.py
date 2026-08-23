@@ -29,40 +29,17 @@ router = APIRouter(prefix="/api/projects", tags=["revalidate"])
 
 
 def _build_lt_sanity_mirror(parsed: dict, rooms_count: int) -> dict:
-    """Mirror of the same shape main.py emits at /extract-interior + /recompute-interior.
+    """Mirror of the same shape /extract-interior + /recompute-interior emit.
 
-    Frontend's SanityWarningsBanner reads `project.lt_sanity.warnings[]`,
-    so we have to keep this payload byte-compatible with the original
-    extractor pipeline. Ref: backend/main.py around line 4742.
+    Thin wrapper over the shared builder so all three paths stay identical.
+    Pre-2026-08 this was a private copy that read `_lt_warnings` ONLY — so
+    pressing "Atnaujinti AI patikrinimus" DELETED every check that lives in
+    `warnings` (cross-page, scale, the CLAUDE.md §6 sanity family,
+    consistency, perimeter). Refreshing the checks quietly removed most of
+    them; the banner then looked reassuringly empty.
     """
-    flat_warnings = parsed.get("_lt_warnings") or []
-    ui_warnings: list[dict] = []
-    for w in flat_warnings:
-        level = w.get("level", "INFO")
-        if level == "WARN":
-            level = "WARNING"
-        ui_warnings.append({
-            "level": level,
-            "room": w.get("patalpa_nr") or w.get("room") or "",
-            "field": w.get("field", ""),
-            "value": w.get("value"),
-            "expected": w.get("expected"),
-            "message": w.get("message", ""),
-        })
-    n_err = sum(1 for w in ui_warnings if w["level"] == "ERROR")
-    n_warn = sum(1 for w in ui_warnings if w["level"] == "WARNING")
-    n_info = sum(1 for w in ui_warnings if w["level"] == "INFO")
-    return {
-        "warnings": ui_warnings,
-        "summary": {
-            "rooms_count": rooms_count,
-            "total_area_m2": round(parsed.get("bendras_plotas_m2", 0) or 0, 1),
-            "warnings_count": n_err + n_warn,
-            "errors": n_err,
-            "warnings": n_warn,
-            "info": n_info,
-        },
-    }
+    from extractor.sanity_mirror import build_lt_sanity
+    return build_lt_sanity(parsed, rooms_count=rooms_count)
 
 
 def _revalidate_payload(payload: dict) -> dict:
@@ -133,7 +110,32 @@ def _revalidate_payload(payload: dict) -> dict:
             "source": "revalidate",
         })
 
-    # 3. Rebuild the UI mirror that SanityWarningsBanner consumes.
+    # 3. CLAUDE.md §6 cross-checks (paint/floor ratio, ceiling≈floor,
+    # baseboard≈perimeter−0.8m/door, dažų sąnaudos, GKP lapai, angokraščiai).
+    # These are the app's only generalisation safety net on a project we have
+    # never seen, so "Atnaujinti AI patikrinimus" must RE-RUN them, not just
+    # carry the stale ones. Source-tagged replace keeps the refresh idempotent.
+    try:
+        from extractor.sanity_checks import run_all_checks as sanity_run
+        fresh_sanity = sanity_run(parsed) or []
+    except Exception:
+        log.exception("revalidate: sanity_checks failed")
+        fresh_sanity = [{
+            "code": "sanity_check_error",
+            "severity": "low",
+            "source": "sanity_checks",
+            "message": "Nepavyko atlikti kiekių logikos patikros — "
+                       "kiekius patikrinkite rankiniu būdu.",
+            "hint": "Pabandykite atnaujinti patikrinimus dar kartą.",
+        }]
+    parsed["warnings"] = [
+        w for w in (parsed.get("warnings") or [])
+        if not (isinstance(w, dict) and w.get("source") == "sanity_checks")
+    ] + fresh_sanity
+
+    # 4. Rebuild the UI mirror that SanityWarningsBanner consumes. The builder
+    # reads BOTH `_lt_warnings` and `warnings`, so every validator stream
+    # survives the rebuild — including the ones this endpoint does not re-run.
     parsed["lt_sanity"] = _build_lt_sanity_mirror(parsed, rooms_count=len(rooms))
     parsed["_revalidated"] = True
     return parsed

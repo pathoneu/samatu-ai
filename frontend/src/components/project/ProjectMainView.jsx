@@ -416,7 +416,10 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
 
 // ── Pagrindinis komponentas ──────────────────────────────────────────────────
 
-export default function ProjectMainView({ project, onProjectChange, onShowDrawing, onJumpToPage }) {
+export default function ProjectMainView({
+  project, onProjectChange, onShowDrawing, onJumpToPage,
+  onOpenAssumptions, focusSanityNonce = 0,
+}) {
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
@@ -431,6 +434,20 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
   useEffect(() => {
     setDarbai(project.darbu_sarasas || []);
   }, [project.darbu_sarasas]);
+
+  // Arriving from the top-bar sanity pill (which is reachable from the
+  // Brėžinys landing tab). Scroll the banner into view — switching tabs alone
+  // drops the user at the top of a long Kiekiai page, nowhere near it.
+  const sanityRef = useRef(null);
+  useEffect(() => {
+    if (!focusSanityNonce) return;
+    const el = sanityRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [focusSanityNonce]);
 
   // Sprint 0 Fix 6: session telemetry — track time-on-task per project view
   const sessionRef = useRef(null);
@@ -639,20 +656,28 @@ export default function ProjectMainView({ project, onProjectChange, onShowDrawin
       </div>
 
       {/* LT sanity warnings — Sprint 2: vartotojas mato kur AI gali būti suklydęs */}
-      {project.lt_sanity && (
-        <SanityWarningsBanner
-          sanity={project.lt_sanity}
-          projectId={project.id}
-          onRevalidated={(fresh) => {
-            // Backend returns a partial project (lt_sanity, patalpos,
-            // warnings_count) — merge so we keep v8_rooms and other state.
-            const next = { ...project };
-            if (fresh.lt_sanity) next.lt_sanity = fresh.lt_sanity;
-            if (Array.isArray(fresh.patalpos)) next.patalpos = fresh.patalpos;
-            onProjectChange?.(next);
-          }}
-        />
-      )}
+      <div ref={sanityRef} id="sanity-banner" className="scroll-mt-4">
+        {project.lt_sanity && (
+          <SanityWarningsBanner
+            sanity={project.lt_sanity}
+            projectId={project.id}
+            onOpenAssumptions={onOpenAssumptions}
+            focusNonce={focusSanityNonce}
+            onRevalidated={(fresh) => {
+              // Backend returns a partial project (lt_sanity, patalpos,
+              // warnings_count) — merge so we keep v8_rooms and other state.
+              // `fresh.lt_sanity` has ALREADY been merged against the current
+              // one inside the banner (lib/sanitySeverity.mergeSanity), so a
+              // rebuild that did not re-run a validator cannot erase its
+              // checks from the UI.
+              const next = { ...project };
+              if (fresh.lt_sanity) next.lt_sanity = fresh.lt_sanity;
+              if (Array.isArray(fresh.patalpos)) next.patalpos = fresh.patalpos;
+              onProjectChange?.(next);
+            }}
+          />
+        )}
+      </div>
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
