@@ -70,24 +70,32 @@ def _raster_page_pdf(src: pathlib.Path, page_no: int, dpi: int,
 
 
 def build_no_eksplikacija():
+    """The table is NOT only on p2: Beržų repeats the PATALPŲ EKSPLIKACIJA in
+    the title block of EVERY plan sheet (p2–p10, verified 2026-08-23 — the
+    first build removed one of nine copies and the reader simply found the
+    next). Rasterise every page whose text layer carries the header, white
+    the table out of the image, and keep the other words as an invisible
+    layer so page-filter text density and text lanes still see the plan."""
+    import re
     reader = PdfReader(str(SRC))
-    with pdfplumber.open(str(SRC)) as pdf:
-        p2 = pdf.pages[1]
-        size = (float(p2.width), float(p2.height))
-        x0, t, x1, b = TABLE
-        keep = [w for w in p2.extract_words()
-                if not (x0 <= w["x0"] <= x1 and t <= w["top"] <= b)]
-        dropped = len(p2.extract_words()) - len(keep)
-    page_pdf = _raster_page_pdf(SRC, 2, 200, TABLE, keep, size)
     writer = PdfWriter()
-    for i, page in enumerate(reader.pages):
-        if i == 1:
+    n_done = 0
+    with pdfplumber.open(str(SRC)) as pdf:
+        for i, page in enumerate(reader.pages):
+            pl = pdf.pages[i]
+            words = pl.extract_words()
+            has_table = any(re.search(r"EKSPLIKACIJA", w["text"], re.I) for w in words)
+            if not has_table:
+                writer.add_page(page); continue
+            x0, t, x1, b = TABLE
+            keep = [w for w in words if not (x0 <= w["x0"] <= x1 and t <= w["top"] <= b)]
+            page_pdf = _raster_page_pdf(SRC, i + 1, 200, TABLE, keep,
+                                        (float(pl.width), float(pl.height)))
             writer.add_page(PdfReader(io.BytesIO(page_pdf)).pages[0])
-        else:
-            writer.add_page(page)
+            n_done += 1
     out = OUT / "berzas_no_eksplikacija.pdf"
     writer.write(str(out))
-    print(f"no_eksplikacija: {out.name} — p2 rasterised, {dropped} table words removed, {len(keep)} kept invisible")
+    print(f"no_eksplikacija: {out.name} — table removed on {n_done} pages (image + text layer)")
 
 
 def build_no_isklotines():

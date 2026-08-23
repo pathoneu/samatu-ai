@@ -152,8 +152,35 @@ def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
 MAX_APDAILOS_PAGES = 12
 
 
-def _find_apdailos_pages(pdf_bytes: bytes) -> list[int]:
+def _classified_pages(pages_meta, tipai: tuple[str, ...]) -> list[int]:
+    """Pages Pass-1 classified as one of `tipai`, in priority order of `tipai`
+    then page order. Shared by the text-blind fallbacks below."""
+    role: dict[int, str] = {}
+    for p in pages_meta or []:
+        try:
+            nr = int(p.get("nr"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if nr >= 1:
+            role[nr] = (p.get("tipas") or "").lower()
+    out: list[int] = []
+    for t in tipai:
+        out.extend(sorted(nr for nr, r in role.items() if r == t and nr not in out))
+    return out
+
+
+def _find_apdailos_pages(pdf_bytes: bytes, pages_meta=None) -> list[int]:
     """ALL candidate finish pages (1-based), best-priority first.
+
+    TEXT-BLIND FALLBACK (2026-08-23, flattened-scan ablation): the title-word
+    scan below needs a text layer. On a rasterised re-export (iLovePDF-style,
+    common for LT drawings) it finds nothing, this reader silently returned
+    `skipped`, every room fell to paskirtis finish defaults, and Beržų's wall
+    paint came out −31.6% — while Pass-1 had classified p10 finish_schedule
+    and p11–17 wall_elevation perfectly from the images. So when the text scan
+    yields nothing, use that classification (same pattern as
+    sanitary_fixture_reader). Text hits still win when present: that keeps
+    every text-layer project byte-identical.
 
     Large TPs carry per-room sienų išklotinės across MANY sheets (Rangovas B:
     pages 12-22, 1-2 rooms each) — a single page structurally cannot describe
@@ -173,6 +200,12 @@ def _find_apdailos_pages(pdf_bytes: bytes) -> list[int]:
     except Exception as exc:  # noqa: BLE001
         print(f"[apdailos_reader] pdfplumber scan failed: {exc}")
     candidates.sort()
+    if not candidates:
+        fallback = _classified_pages(pages_meta, ("wall_elevation", "finish_schedule"))
+        if fallback:
+            print(f"[apdailos_reader] no text-layer hits — using Pass-1 classified "
+                  f"pages {fallback[:MAX_APDAILOS_PAGES]}")
+        return fallback[:MAX_APDAILOS_PAGES]
     return [pg for _prio, pg in candidates[:MAX_APDAILOS_PAGES]]
 
 
@@ -267,6 +300,7 @@ def read_apdailos_finishes(
     rooms: list[dict],
     apdailos_page: Optional[int] = None,
     client=None,
+    pages_meta: Optional[list] = None,
 ) -> dict:
     """Read wall finish breakdown per room from the IŠKLOTINIŲ IR APDAILŲ
     PLANAS page.
@@ -287,7 +321,7 @@ def read_apdailos_finishes(
     produced nothing.
     """
     t0 = time.time()
-    pages = [apdailos_page] if apdailos_page else _find_apdailos_pages(pdf_bytes)
+    pages = [apdailos_page] if apdailos_page else _find_apdailos_pages(pdf_bytes, pages_meta)
     if not pages:
         return {"status": "skipped", "page": None, "pages": [], "patalpos": [],
                 "_error": "no apdailos page found", "_elapsed_s": round(time.time() - t0, 2),

@@ -96,9 +96,14 @@ def build_user_text(rooms: list[dict]) -> str:
     return "\n".join(lines) + _USER_SCHEMA
 
 
-def _find_door_pages(pdf_bytes: bytes) -> list[int]:
+def _find_door_pages(pdf_bytes: bytes, pages_meta=None) -> list[int]:
     """1-based pages carrying door tags or type annotations (text-first). Skips
-    pure title pages; prefers pages with door tags or 'beapvad'/'stumdom'/'durų anga'."""
+    pure title pages; prefers pages with door tags or 'beapvad'/'stumdom'/'durų anga'.
+
+    Text-blind fallback (2026-08-23): on a rasterised PDF the text scan finds
+    nothing and the reader skipped silently. Pass-1's page classification is
+    image-based, so fall back to its door/window schedule and floor-plan pages
+    (door tags live on the pertvarų planas). Text hits still win when present."""
     hits: list[tuple[int, int]] = []  # (priority, page)
     try:
         # Shared parse. This locator is called once PER VOTING ROUND
@@ -118,6 +123,13 @@ def _find_door_pages(pdf_bytes: bytes) -> list[int]:
     except Exception as exc:  # noqa: BLE001
         print(f"[door_type_reader] pdfplumber scan failed: {exc}")
     hits.sort()
+    if not hits:
+        from .apdailos_reader import _classified_pages
+        fallback = _classified_pages(pages_meta, ("door_window_schedule", "floor_plan"))
+        if fallback:
+            print(f"[door_type_reader] no text-layer hits — using Pass-1 classified "
+                  f"pages {fallback[:MAX_DOOR_PAGES]}")
+        return fallback[:MAX_DOOR_PAGES]
     return [pg for _p, pg in hits[:MAX_DOOR_PAGES]]
 
 
@@ -148,7 +160,7 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
     {status, pages, doors, beapvadines_count, standartines_count, stumdomos_count,
      bendras_tipas, _elapsed_s, _meta}."""
     t0 = time.time()
-    pages = _find_door_pages(pdf_bytes)
+    pages = _find_door_pages(pdf_bytes, page_classifications)
     if not pages:
         return {"status": "skipped", "pages": [], "beapvadines_count": 0,
                 "_error": "no door tag/annotation page found",

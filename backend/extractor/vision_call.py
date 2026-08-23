@@ -249,6 +249,35 @@ def build_pdf_subset_b64(pdf_bytes: bytes, page_indices: list[int]) -> dict:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def _reread_eksplikacija_on_pages(pdf_bytes: bytes, client,
+                                  page_indices: list[int]) -> dict | None:
+    """Run the eksplikacija reader on a pypdf SUBSET of the document (1-based
+    original page numbers) and map `eksplikacija_source_page` back to the
+    original numbering. Used only after the first read was rejected as a
+    foreign table. Returns None on any failure — the caller keeps Vision
+    areas and warns."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+        used: list[int] = []
+        for idx in page_indices:
+            if 1 <= int(idx) <= len(reader.pages):
+                writer.add_page(reader.pages[int(idx) - 1]); used.append(int(idx))
+        if not used:
+            return None
+        buf = io.BytesIO(); writer.write(buf)
+        from .eksplikacija_reader import read_eksplikacija
+        out = read_eksplikacija(buf.getvalue(), client)
+        src = out.get("eksplikacija_source_page")
+        if isinstance(src, int) and 1 <= src <= len(used):
+            out["eksplikacija_source_page"] = used[src - 1]
+        return out
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] eksplikacija page-subset retry failed: {exc}")
+        return None
+
+
 def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict],
                         page_texts: list[str] | None = None) -> dict:
     """Build the native-PDF payload for Pass-1 (SAMATU_PDF_NATIVE=1).
@@ -3756,6 +3785,66 @@ def extract_interior(
         # used when it identifies EXACTLY ONE unclaimed row.
         eks_rows = list(eks.get("patalpos", []))
 
+        # ── IS THIS TABLE EVEN OURS? (2026-08-23, bundle ablation) ──────────
+        # A PDF that bundles the architectural part with the interior part
+        # carries TWO room schedules, and the reader returns the first one it
+        # sees. Joining that by number alone gave Beržų's "111 Tėvų vonia" the
+        # other building's "111 LAUKO TERASA 66.47 m²" as a confident read
+        # (headline MAE 3.1% → 34.7%, every room NAME still correct). So:
+        # judge the table by name agreement over nr-matched rows; if it is
+        # foreign, re-read the eksplikacija from the pages the rooms were
+        # actually read from (±2), which is where THEIR table must live; if
+        # that also fails, keep the Vision areas and say so in a warning.
+        try:
+            from .eksplikacija_guard import (
+                assess_eksplikacija_table, room_source_pages)
+            _verdict = assess_eksplikacija_table(rooms, eks_rows)
+            parsed.setdefault("_meta", {})["eksplikacija_guard"] = {
+                k: _verdict[k] for k in ("verdict", "matched", "agreed", "rate")}
+            if _verdict["verdict"] == "reject":
+                _bad_page = eks.get("eksplikacija_source_page")
+                print(f"[extractor] eksplikacija REJECTED as foreign: page "
+                      f"{_bad_page}, names agreed {_verdict['agreed']}/"
+                      f"{_verdict['matched']}")
+                _retry_pages = room_source_pages(
+                    rooms, len(pages), margin=2,
+                    exclude={int(_bad_page)} if _bad_page else None)
+                _retry = None
+                if _retry_pages:
+                    _retry = _reread_eksplikacija_on_pages(
+                        pdf_bytes, client, _retry_pages)
+                    if _retry and _retry.get("patalpos"):
+                        _append_extra_call(parsed, _retry.get("_meta"),
+                                           reader="eksplikacija_retry")
+                        _v2 = assess_eksplikacija_table(rooms, _retry["patalpos"])
+                        parsed["_meta"]["eksplikacija_guard"]["retry"] = {
+                            "pages": _retry_pages,
+                            "source_page": _retry.get("eksplikacija_source_page"),
+                            **{k: _v2[k] for k in ("verdict", "matched", "agreed", "rate")},
+                        }
+                        if _v2["verdict"] == "accept":
+                            eks = _retry
+                            eks_rows = list(_retry.get("patalpos", []))
+                            print(f"[extractor] eksplikacija retry ACCEPTED from "
+                                  f"page {_retry.get('eksplikacija_source_page')}")
+                        else:
+                            _retry = None
+                if not (_retry and _retry.get("patalpos")):
+                    eks_rows = []
+                    parsed.setdefault("warnings", []).append({
+                        "level": "WARN",
+                        "code": "eksplikacija_foreign",
+                        "message": (
+                            f"Eksplikacijos lentelė (psl. {_bad_page}) neatitinka "
+                            f"plano patalpų pavadinimų (sutapo "
+                            f"{_verdict['agreed']} iš {_verdict['matched']}) — "
+                            "greičiausiai tai kitos projekto dalies lentelė. "
+                            "Plotai imti iš plano matmenų; patikrinkite patalpų "
+                            "plotus."),
+                    })
+        except Exception as _gexc:  # noqa: BLE001 — the guard must never kill a run
+            print(f"[extractor] eksplikacija guard failed (non-fatal): {_gexc}")
+
         import unicodedata as _ud
 
         def _nkey(s):
@@ -3770,11 +3859,18 @@ def extract_interior(
                 eks_by_nr[nr] = r
             eks_by_name.setdefault(_nkey(r.get("pavadinimas")), []).append(r)
 
+        from .eksplikacija_guard import row_contradicts as _row_contradicts
         claimed = set()
         merged_count = 0
         for room in rooms:
             nr = str(room.get("nr") or "").strip()
             eks_row = eks_by_nr.get(nr)
+            # Row guard: a nr collision whose NAME flatly contradicts the
+            # room's is two different rooms sharing a number (partial
+            # renumbering) — never let it override by nr.
+            if eks_row is not None and _row_contradicts(room, eks_row):
+                room["plotas_match_rejected"] = eks_row.get("pavadinimas")
+                eks_row = None
             if eks_row is None:
                 cands = [r for r in eks_by_name.get(_nkey(room.get("pavadinimas")), [])
                          if id(r) not in claimed]
@@ -4307,7 +4403,9 @@ def extract_interior(
     try:
         from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
         _emit({"event": "apdailos_started"})
-        apdailos_result = read_apdailos_finishes(pdf_bytes, parsed.get("patalpos") or [])
+        apdailos_result = read_apdailos_finishes(
+            pdf_bytes, parsed.get("patalpos") or [],
+            pages_meta=parsed.get("puslapiai") or [])
         _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # roll tokens into cost
         status = apdailos_result.get("status")
         if status in ("ok", "partial"):
