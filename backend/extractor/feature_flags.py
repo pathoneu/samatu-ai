@@ -64,6 +64,62 @@ _FLAG_DEFINITIONS = {
     # then concurrent) — less latency won, no extra spend.
     # DEFAULT OFF until measured on a real PDF. Enable: ENABLE_PARALLEL_VOTING=1
     "parallel_voting": ("ENABLE_PARALLEL_VOTING", False),
+    # 2026-08-23: identity-safe room matching inside the Pass-1 voter.
+    #
+    # PROBLEM. extraction_voter groups rooms across the N voting rounds by
+    # `nr:<nr>`. On a plan WITH an eksplikacija table the nr is read from the
+    # table and is the same physical room in every round. On a plan WITHOUT one
+    # the model INVENTS the numbering, and two rounds can number the same rooms
+    # differently — so the voter medians two DIFFERENT rooms, and the median of
+    # two values is their mean, manufacturing a number no round produced.
+    # ciurliu (no eksplikacija) is the worst case in the corpus: round A's nr06
+    # is a 4.5 m2 bathroom, round B's nr06 is the 42 m2 open-plan living room
+    # (confirmed independently by the adjacency pass: npw 2 vs 5), and the voter
+    # emitted a 23.25 m2 "vonia" with an impossible perimeter. 25 of the 452
+    # voted rooms that still carry per-round values in this repo (5.5%) have a
+    # pairwise area spread > 35%; every one is on a no-eksplikacija plan.
+    #
+    # FIX. Keep the nr path when the numbering is complete, unique per run,
+    # identical across runs AND geometrically coherent; otherwise match by
+    # optimal assignment over area/perimeter/name/paskirtis/bbox with a hard
+    # area veto. See backend/extractor/vision/room_matcher.py.
+    #
+    # EVIDENCE (offline, $0). The raw voting rounds are never persisted, so the
+    # rounds were RECONSTRUCTED from the saved `_vote.values` blocks. That
+    # reconstruction is validated: fed back through the UNCHANGED voter it
+    # reproduces the stored production rooms and the stored eval numbers
+    # exactly (ciurliu: 6/6 rooms identical, headline 7.462%, category 47.658%).
+    #   * blast radius — of the 48 saved voted runs in the repo, 41 keep the nr
+    #     path and are byte-identical; the 7 that switch are ALL ciurliu (the
+    #     one no-eksplikacija project in the corpus; 6 distinct files).
+    #     Incoherent groups (two rooms >35% apart in area medianed together)
+    #     go 2-6 -> 0 in every one of them.
+    #   * over those 6 distinct ciurliu runs: mean headline MAE
+    #     19.40% -> 16.50%, mean category MAE 47.13% -> 45.59%. Headline is
+    #     better on 3 and worse on 3, but the wins are big (-4.7, -12.8, -2.3
+    #     pp) and the losses small (+1.6, +0.4, +0.2 pp). Per-metric mean
+    #     |error|: 7 better (lubos 26.6 -> 21.6, grindys 30.4 -> 25.6, kampai
+    #     42.7 -> 41.0, combined paint 11.8 -> 8.4), 1 unchanged, 2 slightly
+    #     worse (plytelės 42.7 -> 44.4, rotband 120.0 -> 120.4).
+    #   * lazunu: whole parsed dict bit-identical (table-anchored nrs).
+    #
+    # WHY IT IS STILL DEFAULT OFF. On the single named benchmark run
+    # (ground_truth/ciurliu) headline MAE goes 7.462% -> 9.077%. The whole
+    # regression is one metric: sienų dažomas plotas -0.11% -> -3.88%. That
+    # -0.11% is luck, not accuracy — the incoherent grouping inflates the
+    # floored perimeter (perimeter_floor_synthetic takes max(perim, 4*sqrt(area)),
+    # which is convex, so mismatched pairs score HIGHER) by 2.6 m, which happens
+    # to cancel a systematic wall under-read. Removing the mismatch removes the
+    # accidental compensation. Everything else on that run improves, some of it
+    # enormously (plytelės +66.7% -> -5.2%, grindys -33.4% -> -14.5%: the old
+    # output claims 92 m2 of tiling in a 93 m2 flat because it believes in a
+    # 23.25 m2 bathroom that no round ever saw).
+    # The offline replay ALSO cannot test the case that matters most: rooms that
+    # today fall out as singletons (ciurliu drops 8 of 20) would rejoin and vote
+    # 3-of-3, and their values were never saved. So the production delta is
+    # real but unmeasured. Flip this ON for one paid ciurliu + berzas A/B before
+    # making it the default. Enable: ENABLE_ROBUST_ROOM_MATCHING=1
+    "robust_room_matching": ("ENABLE_ROBUST_ROOM_MATCHING", False),
 }
 
 

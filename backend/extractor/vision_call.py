@@ -3618,7 +3618,14 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         _attach_vote_meta(runs[0].setdefault("_meta", {}))
         return runs[0]
 
-    voted = vote_extraction(runs, min_votes=2)
+    # min_votes is resolved inside the voter as ceil(len(runs)/2) — a majority
+    # of the runs that actually SUCCEEDED, not of the rounds requested. It used
+    # to be hardcoded to 2, which is a majority only at n=3/n=4: at n=2
+    # (VOTING_N=2, or 2 of 3 rounds surviving a Railway timeout) it silently
+    # demanded unanimity, and at n=5 it accepted a 2-of-5 minority. See
+    # extraction_voter.default_min_votes — under the legacy nr matcher it still
+    # floors at 2, so the shipping configuration is unchanged.
+    voted = vote_extraction(runs)
     # Cost metering (2026-06-19): a voted extraction made N Pass-1 Vision calls,
     # so SUM the token usage across all runs — keeping only runs[0] would make the
     # per-user spend ledger undercount by ~N×. Other _meta keys come from runs[0].
