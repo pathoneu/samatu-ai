@@ -8,6 +8,13 @@ Matching key is the eksplikacija anchor (nr → name → paskirtis+area),
 which is read from a TABLE and is far more stable run-to-run than the
 geometry-derived fields we vote on (perimetras_m, lubu_aukstis_m, counts).
 
+⚠ That key is only as good as the table. On a plan with NO eksplikacija the
+model invents the numbering and two rounds can number the same rooms
+differently, so the nr key medians two DIFFERENT rooms together. The
+`robust_room_matching` flag routes those plans through
+`room_matcher.match_rooms_robust` instead — read that module's docstring
+before touching the matching logic here.
+
 Why median (not mean): a single wild run (e.g. perimeter 18 where the
 truth is 30) must not drag the consensus. Median of 3 ignores one outlier
 entirely; mean would not.
@@ -42,18 +49,63 @@ def _room_key(room: dict) -> str:
     return f"pa:{(room.get('paskirtis') or '').lower()}:{round(float(room.get('plotas_m2') or 0))}"
 
 
-def match_rooms(runs: list[list[dict]], *, min_votes: int = 2) -> list[list[dict]]:
+def default_min_votes(n_runs: int) -> int:
+    """Majority of the runs that actually produced a result: ceil(n/2).
+
+    Was hardcoded to 2, which is a majority only at n=3 (the default) and n=4;
+    at n=2 it silently demanded unanimity and at n=5 it accepted a 2-of-5
+    minority. Unchanged at n=3 and n=4, so the shipping configuration is
+    untouched.
+    """
+    return max(1, (max(int(n_runs), 1) + 1) // 2)
+
+
+def _robust_matching_enabled() -> bool:
+    try:
+        from ..feature_flags import get_flags
+        return bool(get_flags().get("robust_room_matching"))
+    except Exception:                       # never fail an extraction on a flag
+        return False
+
+
+def match_rooms(runs: list[list[dict]], *, min_votes: int | None = None,
+                robust: bool | None = None) -> list[list[dict]]:
     """Group room dicts that refer to the same physical room across runs.
 
     Returns a list of groups (each a list of the matched room dicts),
     keeping only groups present in >= min_votes distinct runs. Order is
     deterministic: by first-seen key.
+
+    robust=None reads the `robust_room_matching` feature flag. When it is on
+    AND the room numbering is not trustworthy (see room_matcher — invented
+    numbering on a plan with no eksplikacija), rooms are matched by an optimal
+    assignment on geometry + name + bbox instead of by nr, so two DIFFERENT
+    rooms are never medianed together. See room_matcher.__doc__ for the
+    ciurliu evidence.
     """
+    if min_votes is None:
+        min_votes = default_min_votes(len(runs))
+    if robust is None:
+        robust = _robust_matching_enabled()
+    nr_keys: list[list[str]] | None = None
+    if robust:
+        from .room_matcher import match_rooms_robust, nr_match_keys
+        nr_keys = nr_match_keys(runs)
+        if nr_keys is None:
+            groups = match_rooms_robust(runs)
+            return [g for g in groups if len(g) >= min_votes]
+        # Trustworthy numbering — group by the NORMALISED key the gate just
+        # validated, not by the raw string. Identical to the legacy key
+        # whenever the runs already agree on the exact spelling (every
+        # eksplikacija-anchored project), but it no longer silently drops
+        # every room when one round writes "1" and another writes "01".
+
     buckets: dict[str, list[tuple[int, dict]]] = {}
     order: list[str] = []
     for run_idx, run in enumerate(runs):
-        for room in run or []:
-            k = _room_key(room)
+        for room_idx, room in enumerate(run or []):
+            k = (f"nr:{nr_keys[run_idx][room_idx]}" if nr_keys is not None
+                 else _room_key(room))
             if k not in buckets:
                 buckets[k] = []
                 order.append(k)
@@ -181,7 +233,7 @@ def _low_confidence_fields(voted_rooms: list[dict]) -> list[dict]:
     return flags
 
 
-def vote_extraction(runs: list[dict], *, min_votes: int = 2) -> dict:
+def vote_extraction(runs: list[dict], *, min_votes: int | None = None) -> dict:
     """Vote N parsed-shape dicts into one consensus dict.
 
     Carries through the first run's non-voted top-level keys (puslapiai,
@@ -191,13 +243,20 @@ def vote_extraction(runs: list[dict], *, min_votes: int = 2) -> dict:
     """
     base = dict(runs[0]) if runs else {}
     room_runs = [r.get("patalpos") or [] for r in runs]
-    groups = match_rooms(room_runs, min_votes=min_votes)
+    if min_votes is None:
+        min_votes = default_min_votes(len(room_runs))
+    robust = _robust_matching_enabled()
+    from .room_matcher import nr_key_is_trustworthy
+    matcher = ("nr_key" if (not robust or nr_key_is_trustworthy(room_runs))
+               else "assignment")
+    groups = match_rooms(room_runs, min_votes=min_votes, robust=robust)
     voted_rooms = [vote_room_group(g) for g in groups]
     base["patalpos"] = voted_rooms
     base["detected_symbols_summary"] = vote_symbols(runs)
     base["_voting"] = {
         "n_runs": len(runs),
         "min_votes": min_votes,
+        "matcher": matcher,
         "n_rooms_consensus": len(voted_rooms),
         "n_rooms_per_run": [len(r) for r in room_runs],
         "low_confidence_fields": _low_confidence_fields(voted_rooms),
