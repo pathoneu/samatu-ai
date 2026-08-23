@@ -3999,6 +3999,52 @@ async def detect_type(request: Request, file: UploadFile = File(...)):
     return {"type": proj_type}
 
 
+@app.post("/api/pdf-preflight")
+async def pdf_preflight(request: Request, file: UploadFile = File(...)):
+    """Five-second look at an uploaded PDF, BEFORE the ~25-minute Vision spend.
+
+    Why this exists: a wrong-type upload used to burn 11-15 minutes and return
+    zero patalpos, and a 130-page technical set would run past the browser
+    poller's own limit. Every signal needed to warn the contractor first is in
+    the PDF's text layer, which costs milliseconds and zero euros.
+
+    NOT billable and NOT a Vision call, so it takes plain `require_user` rather
+    than `_billable_user` — reserving spend for a $0 pdfplumber-class read
+    would charge the user for the thing that saves him money. Per-IP rate
+    limited like every other upload route, since it does decompress a file.
+
+    Returns the `extractor.preflight.preflight_pdf` payload. The verdict is a
+    HEURISTIC: the UI is required to phrase it as "atrodo, kad…" and to keep
+    "Tęsti" available. The one thing it does decide is `hard_block` on
+    page_count > MAX_PAGES, where the pipeline would otherwise silently
+    truncate the document and analyse the wrong 100 pages.
+    """
+    _auth.require_user(request)
+    _check_rate_limit(_client_key(request), "pdf-preflight")
+    contents = await file.read()
+    # Reused so size / magic-byte / mediabox / password errors come out of ONE
+    # place, already worded in Lithuanian — the upload is rejected here, five
+    # seconds in, instead of ninety seconds into a render.
+    _validate_pdf_upload(contents, file.filename or "")
+
+    from extractor.preflight import preflight_pdf
+    try:
+        result = await asyncio.to_thread(preflight_pdf, contents)
+    except Exception:  # noqa: BLE001 — preflight must never block an upload
+        log.exception("pdf-preflight failed; letting the upload proceed")
+        return {
+            "page_count": 0, "verdict": "unknown", "interior_pages_estimate": 0,
+            "est_minutes": "iki 30 min", "est_minutes_max": 30,
+            "warnings": [], "hard_block": False, "hard_block_reason": None,
+            "sampled_pages": 0, "sample_truncated": False, "page_kinds": {},
+        }
+    log.info("pdf-preflight: file=%s pages=%d verdict=%s sampled=%d in %.2fs",
+             file.filename or "", result.get("page_count", 0),
+             result.get("verdict"), result.get("sampled_pages", 0),
+             result.get("elapsed_s", 0.0))
+    return result
+
+
 # ── TASK 7: KŽ row category detection ────────────────────────────────────────
 
 _KZ_CATEGORY_KEYWORDS: list[tuple[str, list[str]]] = [

@@ -1492,7 +1492,25 @@
     "statusRecovering": "Connection lost, but the analysis continues on the server. Waiting for the result… ({{s}} s) — do not re-upload.",
     "doneTabTitle": "✓ Analysis done — Pathon",
     "doneNotifTitle": "Pathon — analysis done",
-    "doneNotifBody": "Quantities are ready. Come back to review the project."
+    "doneNotifBody": "Quantities are ready. Come back to review the project.",
+    "preflight": {
+      "checking": "Checking the file…",
+      "pages": "{{n}} pages",
+      "duration": "Analysis will take {{value}}",
+      "disclaimer": "A quick guess from the PDF text, not an analysis result.",
+      "continue": "Continue",
+      "continueTitle": "Start the analysis with this file",
+      "pickAnother": "Choose another file",
+      "pickAnotherTitle": "Remove this file and upload another",
+      "verdict": {
+        "interior_plan": "This looks like an interior design project — the kind we read best.",
+        "table_only": "This looks like a bill-of-quantities table rather than a drawing — the analysis will most likely find no rooms. Continue anyway?",
+        "photo_or_scan": "This PDF appears to have no text layer — scanned or photographs. The analysis may still work, but it will be slower and less accurate.",
+        "facade_or_site": "These look like facade or site drawings rather than interior plans — the analysis will most likely find no rooms. Continue anyway?",
+        "mixed_bundle": "This looks like a full technical project — the interior sheets are only part of the file. The analysis will read every page.",
+        "unknown": "We could not tell what kind of drawings these are. The analysis may still work."
+      }
+    }
   },
   "upload": {
     "zone": {
@@ -1526,7 +1544,8 @@
       "finishingOnServer": "Finishing on the server…",
       "finishingFor": "{{s}}s more — still analysing",
       "handoffNote": "Analysis continues on the server",
-      "canLeave": "You can close this window — the project will appear in your list."
+      "canLeave": "You can close this window — the project will appear in your list.",
+      "warningLabel": "Warning:"
     }
   },
   "billing": {

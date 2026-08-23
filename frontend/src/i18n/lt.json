@@ -1498,7 +1498,25 @@
     "statusRecovering": "Ryšys nutrūko, bet analizė tęsiasi serveryje. Laukiame rezultato… ({{s}} s) — nekartokite įkėlimo.",
     "doneTabTitle": "✓ Analizė baigta — Pathon",
     "doneNotifTitle": "Pathon — analizė baigta",
-    "doneNotifBody": "Kiekiai paruošti. Grįžkite peržiūrėti projekto."
+    "doneNotifBody": "Kiekiai paruošti. Grįžkite peržiūrėti projekto.",
+    "preflight": {
+      "checking": "Tikriname failą…",
+      "pages": "{{n}} psl.",
+      "duration": "Analizė truks {{value}}",
+      "disclaimer": "Tai greitas spėjimas iš PDF teksto, ne analizės rezultatas.",
+      "continue": "Tęsti",
+      "continueTitle": "Pradėti analizę su šiuo failu",
+      "pickAnother": "Pasirinkti kitą failą",
+      "pickAnotherTitle": "Pašalinti šį failą ir įkelti kitą",
+      "verdict": {
+        "interior_plan": "Atrodo, kad tai interjero projektas — tokius brėžinius skaitome geriausiai.",
+        "table_only": "Atrodo, kad tai kiekių žiniaraščio lentelė, o ne brėžinys — analizė greičiausiai neras patalpų. Tęsti vis tiek?",
+        "photo_or_scan": "Atrodo, kad PDF neturi teksto sluoksnio — skenuotas arba nuotraukos. Analizė gali pavykti, bet bus lėtesnė ir mažiau tiksli.",
+        "facade_or_site": "Atrodo, kad tai fasadų arba sklypo brėžiniai, ne interjero planai — analizė greičiausiai neras patalpų. Tęsti vis tiek?",
+        "mixed_bundle": "Atrodo, kad tai pilnas techninis projektas — interjero brėžiniai sudaro tik dalį failo. Analizė perskaitys visus puslapius.",
+        "unknown": "Nepavyko atpažinti, kokie tai brėžiniai. Analizė vis tiek gali pavykti."
+      }
+    }
   },
   "upload": {
     "zone": {
@@ -1532,7 +1550,8 @@
       "finishingOnServer": "Užbaigiame serveryje…",
       "finishingFor": "dar {{s}} s — analizė tęsiasi",
       "handoffNote": "Analizė tęsiasi serveryje",
-      "canLeave": "Šį langą galite uždaryti — projektas pats atsiras sąraše."
+      "canLeave": "Šį langą galite uždaryti — projektas pats atsiras sąraše.",
+      "warningLabel": "Įspėjimas:"
     }
   },
   "billing": {

@@ -37,6 +37,12 @@ export default function ProcessingStateStream({
   const zoomDone = progress?.zoomDone || 0;
   const zoomTotal = progress?.zoomTotal || 0;
   const pageCount = progress?.pageCount;
+  // `validation_warning` — the backend's own read of the uploaded file (page
+  // count over the pipeline's limit, etc.), pushed before Pass-1 so it lands
+  // while the user is still watching. It was emitted and dropped on the floor
+  // until 2026-08-23; it is a warning about the RUN, not an error, so it sits
+  // above the checklist rather than replacing it.
+  const validationWarning = progress?.validationWarning;
 
   const renderPhase = (i) => {
     const step = PHASES[i];
@@ -113,6 +119,18 @@ export default function ProcessingStateStream({
           )}
         </AnimatePresence>
       </div>
+
+      {validationWarning && !error && (
+        <div
+          role="status"
+          className="mb-5 max-w-md rounded-lg border border-[hsl(var(--conf-med))]/45 bg-card p-3 text-xs text-foreground"
+        >
+          <span className="mr-1.5 font-medium text-[hsl(var(--conf-med))]">
+            {t('upload.stream.warningLabel')}
+          </span>
+          {validationWarning}
+        </div>
+      )}
 
       <div className="space-y-3 w-full max-w-xs mb-6">
         {PHASES.map((_, i) => renderPhase(i))}
