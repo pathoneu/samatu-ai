@@ -1516,6 +1516,8 @@
       "continueTitle": "Pradėti analizę su šiuo failu",
       "pickAnother": "Pasirinkti kitą failą",
       "pickAnotherTitle": "Pašalinti šį failą ir įkelti kitą",
+      "overrideBlock": "Vis tiek analizuoti pirmus 100 psl.",
+      "overrideBlockTitle": "Pradėti analizę žinant, kad puslapiai po 100-ojo nebus skaitomi",
       "verdict": {
         "interior_plan": "Atrodo, kad tai interjero projektas — tokius brėžinius skaitome geriausiai.",
         "table_only": "Atrodo, kad tai kiekių žiniaraščio lentelė, o ne brėžinys — analizė greičiausiai neras patalpų. Tęsti vis tiek?",

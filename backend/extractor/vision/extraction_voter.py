@@ -254,11 +254,24 @@ def vote_extraction(runs: list[dict], *, min_votes: int | None = None) -> dict:
     base = dict(runs[0]) if runs else {}
     room_runs = [r.get("patalpos") or [] for r in runs]
     robust = _robust_matching_enabled()
+    # Import INSIDE the flag branch, and never let it fail the run — same
+    # posture as _robust_matching_enabled above. With the flag off (the
+    # shipping configuration) the answer is "nr_key" by definition, so an
+    # unguarded import of a brand-new module was the one way a flag that is
+    # switched OFF could still kill a paid 25-minute extraction. Resolved
+    # BEFORE min_votes, so a failed import degrades to the legacy matcher AND
+    # its floor-of-2 together — never to robust thresholds on the legacy
+    # matcher, which is the combination that double-counts a split room.
+    matcher = "nr_key"
+    if robust:
+        try:
+            from .room_matcher import nr_key_is_trustworthy
+            if not nr_key_is_trustworthy(room_runs):
+                matcher = "assignment"
+        except Exception:                   # never fail an extraction on a flag
+            robust = False
     if min_votes is None:
         min_votes = default_min_votes(len(room_runs), robust=robust)
-    from .room_matcher import nr_key_is_trustworthy
-    matcher = ("nr_key" if (not robust or nr_key_is_trustworthy(room_runs))
-               else "assignment")
     groups = match_rooms(room_runs, min_votes=min_votes, robust=robust)
     voted_rooms = [vote_room_group(g) for g in groups]
     base["patalpos"] = voted_rooms

@@ -1191,8 +1191,19 @@ def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
     Šitas paprastas variantas sumuoja grindis + perim × 0.30. Dušo zona
     pridedama jei pastabose minimas „dušas"/„shower" arba paskirtis vonia.
     """
+    # `pirtis` / `baseinas` were added to line_items.WET_ROOM_PASKIRTIS on
+    # 2026-08-23 but not here, and the two are LIVE AT ONCE: this function
+    # feeds /extract-interior and /recompute-interior, line_items feeds
+    # /api/recompute-quantities (Prielaidos). A sauna project therefore showed
+    # 0 m² hidroizoliacija in the estimate and ~62 m² the moment the user
+    # touched a Prielaidos slider — the same project, two numbers, no
+    # explanation. Kept as a literal (not an import of the other module's set)
+    # because `katiline` sits in that set and has NOT been waterproofed here
+    # historically; widening it too is a scope decision for the founder, not a
+    # review fix. Anything added there must be mirrored here deliberately.
     paskirtis = _pask(room)
-    if paskirtis not in ("vonia", "wc", "san", "skalbykla"):
+    if paskirtis not in ("vonia", "wc", "san", "skalbykla",
+                         "pirtis", "baseinas"):
         return 0.0
     plotas = float(room.get("plotas_m2") or 0)
     H = float(room.get("lubu_aukstis_m") or 2.82)
@@ -3716,6 +3727,13 @@ def extract_interior(
             "_error": "PDF has no renderable pages",
         }
 
+    # The document's OWN length, captured before page selection shrinks
+    # `pages`. Anything that reasons about `room.puslapio_nr` must use this,
+    # not `len(pages)`: puslapio_nr stays in ORIGINAL numbering by design
+    # (page_filter preserves page_index) while `pages` loses the dropped
+    # sheets, so the two disagree the moment any page is filtered out.
+    n_pdf_pages = len(pages)
+
     # Step 1.1: cost-safe page selection — drop pages Pass-1 cannot read
     # anything from. Two deterministic ($0, no model call) rules: vendor
     # price catalogs (Sprint E1, 2026-04-28) and text-free photographic
@@ -3896,16 +3914,28 @@ def extract_interior(
                 print(f"[extractor] eksplikacija REJECTED as foreign: page "
                       f"{_bad_page}, names agreed {_verdict['agreed']}/"
                       f"{_verdict['matched']}")
+                # n_pdf_pages, NOT len(pages): `pages` has already lost every
+                # sheet page selection dropped, while puslapio_nr is original
+                # numbering. Passing the shrunken count clipped away exactly
+                # the late interior sheets this retry exists to re-read — in a
+                # bundle the interjero dalis is routinely bound LAST, so a
+                # heavily filtered set produced an EMPTY page list and the
+                # retry never ran at all.
                 _retry_pages = room_source_pages(
-                    rooms, len(pages), margin=2,
+                    rooms, n_pdf_pages, margin=2,
                     exclude={int(_bad_page)} if _bad_page else None)
                 _retry = None
                 if _retry_pages:
                     _retry = _reread_eksplikacija_on_pages(
                         pdf_bytes, client, _retry_pages)
-                    if _retry and _retry.get("patalpos"):
+                    # Meter FIRST and unconditionally: the Vision call was made
+                    # and billed whether or not it came back with usable rows,
+                    # and a sub-call the ledger never sees is spend the per-user
+                    # cap cannot count.
+                    if _retry:
                         _append_extra_call(parsed, _retry.get("_meta"),
                                            reader="eksplikacija_retry")
+                    if _retry and _retry.get("patalpos"):
                         _v2 = assess_eksplikacija_table(rooms, _retry["patalpos"])
                         parsed["_meta"]["eksplikacija_guard"]["retry"] = {
                             "pages": _retry_pages,

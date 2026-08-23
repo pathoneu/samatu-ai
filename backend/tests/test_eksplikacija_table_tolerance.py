@@ -298,3 +298,59 @@ def test_page_headings_are_recognised(heading):
     from extractor.pdfplumber_eksplikacija import EKSPLIKACIJA_TEXT_MARKERS
     low = heading.lower()
     assert any(m in low for m in EKSPLIKACIJA_TEXT_MARKERS), heading
+
+
+# ── merged cells (2026-08-23 review) ────────────────────────────────────────
+#
+# pdfplumber returns None — not "" — for a merged/spanned cell, and on the
+# eksplikacija pages of backend/test_pdfs/ roughly 46% of all cells are None.
+# `_try_parse_row` used to drop them, which was harmless while the parser was
+# positionally agnostic and became an index shift the moment the header path
+# started indexing by column. Every test above hand-writes strings, so the
+# whole class was invisible.
+
+def test_a_merged_cell_does_not_shift_the_column_map():
+    """THE bug the header path introduced. One None left of the plotas column
+    shifted every index right, so the PERIMETER was read as the area — and
+    stamped `plotas_source: eksplikacija`, the label that overrides Vision."""
+    cols = _detect_header(["Nr.", "Pavadinimas", "Aukštis, m",
+                           "Plotas, m²", "Perimetras, m"])
+    merged = _try_parse_row(["102", "Virtuvė", None, "12,30", "14,20"],
+                            0, 7, columns=cols)
+    assert merged["plotas_m2"] == 12.30, "read the perimeter as the area"
+    assert merged["perimetras_m"] == 14.20
+    # …and identical to the same row with an empty string in that cell.
+    plain = _try_parse_row(["102", "Virtuvė", "", "12,30", "14,20"],
+                           0, 7, columns=cols)
+    assert merged["plotas_m2"] == plain["plotas_m2"]
+    assert merged["perimetras_m"] == plain["perimetras_m"]
+
+
+def test_a_merged_leading_column_does_not_drop_the_whole_table():
+    """`Aukštas | Nr | Pavadinimas | Plotas` with the floor cell merged down
+    the sheet: the shift pushed `nr` onto `pavadinimas`, no row parsed, and
+    `_meta` still said header_detected=True with zero rooms."""
+    cols = _detect_header(["Aukštas", "Nr.", "Pavadinimas", "Plotas, m²"])
+    rows = [["1", "101", "Holas", "11,55"],
+            [None, "102", "Virtuvė", "12,30"],
+            [None, "103", "Svetainė", "32,44"],
+            [None, "104", "Vonia", "6,45"]]
+    got = [_try_parse_row(r, i, 7, columns=cols) for i, r in enumerate(rows)]
+    assert all(g is not None for g in got), got
+    assert [g["nr"] for g in got] == ["101", "102", "103", "104"]
+    assert [g["plotas_m2"] for g in got] == [11.55, 12.30, 32.44, 6.45]
+
+
+def test_an_all_empty_row_is_still_refused():
+    """Keeping the Nones in place must not turn a spacer row into a room."""
+    cols = _detect_header(["Nr.", "Pavadinimas", "Plotas, m²"])
+    assert _try_parse_row([None, None, None], 0, 7, columns=cols) is None
+    assert _try_parse_row(["", "", ""], 0, 7, columns=cols) is None
+    assert _try_parse_row([None, None, None], 0, 7) is None
+
+
+def test_the_scan_path_is_unaffected_by_merged_cells():
+    """No header → the old largest-plausible-number behaviour, unchanged."""
+    assert (_try_parse_row(["101", "Holas", None, "11,55"], 0, 7)["plotas_m2"]
+            == _try_parse_row(["101", "Holas", "", "11,55"], 0, 7)["plotas_m2"]
+            == 11.55)
