@@ -23,6 +23,15 @@ const PASKIRTIS_OPTIONS = [
   { value: 'garazas', label: 'Garažas' },
   { value: 'katiline', label: 'Katilinė' },
   { value: 'skalbykla', label: 'Skalbykla' },
+  // 2026-08-23: the 8 backend classes the list was missing (see RoomCard).
+  { value: 'kabinetas', label: 'Kabinetas / darbo kambarys' },
+  { value: 'san', label: 'San. mazgas' },
+  { value: 'pirtis', label: 'Pirtis / sauna' },
+  { value: 'baseinas', label: 'Baseinas' },
+  { value: 'laiptine', label: 'Laiptinė' },
+  { value: 'rubine', label: 'Rūbinė' },
+  { value: 'techpatalpa', label: 'Techninė patalpa' },
+  { value: 'terasa', label: 'Terasa / balkonas' },
 ];
 
 export default function PolygonRoomModal({

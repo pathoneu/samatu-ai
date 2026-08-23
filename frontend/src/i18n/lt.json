@@ -1145,7 +1145,15 @@
         "tambūras": "Tambūras",
         "garazas": "Garažas",
         "katiline": "Katilinė",
-        "skalbykla": "Skalbykla"
+        "skalbykla": "Skalbykla",
+        "kabinetas": "Kabinetas / darbo kambarys",
+        "san": "San. mazgas",
+        "pirtis": "Pirtis / sauna",
+        "baseinas": "Baseinas",
+        "laiptine": "Laiptinė",
+        "rubine": "Rūbinė",
+        "techpatalpa": "Techninė patalpa",
+        "terasa": "Terasa / balkonas"
       },
       "showOnDrawingTitle": "Rodyti brėžinyje (psl. {{page}})",
       "area": "Plotas",

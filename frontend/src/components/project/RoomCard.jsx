@@ -105,10 +105,16 @@ function getFieldConfidence(room, field) {
 
 // Room-purpose options. `label` resolves against i18n at render
 // (project.roomCard.paskirtis.<value>).
+// 2026-08-23: the list offered 14 of the backend's 22 classes, so a room the
+// AI misnamed as e.g. a sauna or a terrace could not be corrected by hand —
+// the correction workflow was blocked for exactly the classes the vocabulary
+// sweep introduced. Values must match universal_rules.ROOM_TYPE_RULES keys.
 const PASKIRTIS_VALUES = [
-  'gyvenamoji', 'miegamoji', 'virtuve', 'valgomasis', 'vonia', 'wc',
-  'koridorius', 'holas', 'drabuzine', 'sandeliukas', 'tambūras',
-  'garazas', 'katiline', 'skalbykla',
+  'gyvenamoji', 'miegamoji', 'virtuve', 'valgomasis', 'kabinetas',
+  'vonia', 'wc', 'san', 'pirtis', 'baseinas',
+  'koridorius', 'holas', 'laiptine', 'tambūras',
+  'drabuzine', 'rubine', 'sandeliukas', 'skalbykla',
+  'garazas', 'katiline', 'techpatalpa', 'terasa',
 ];
 
 // Resolve the display label for a room purpose via i18n; unknown values pass

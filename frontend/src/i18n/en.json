@@ -1139,7 +1139,15 @@
         "tambūras": "Vestibule",
         "garazas": "Garage",
         "katiline": "Boiler room",
-        "skalbykla": "Laundry"
+        "skalbykla": "Laundry",
+        "kabinetas": "Office / study",
+        "san": "Bathroom (WC + shower)",
+        "pirtis": "Sauna",
+        "baseinas": "Pool",
+        "laiptine": "Staircase",
+        "rubine": "Wardrobe",
+        "techpatalpa": "Technical room",
+        "terasa": "Terrace / balcony"
       },
       "showOnDrawingTitle": "Show on drawing (p. {{page}})",
       "area": "Area",
