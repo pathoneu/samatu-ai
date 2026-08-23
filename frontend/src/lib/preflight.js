@@ -81,7 +81,11 @@ export function pollLimitMs(pre) {
 export function preflightCard(pre) {
   if (!pre || typeof pre !== 'object') return null;
   const pageCount = Number(pre.page_count) || 0;
-  if (!pageCount) return null;   // unreadable probe — say nothing rather than guess
+  // An unreadable probe with NO block is a probe that failed — say nothing
+  // rather than guess. But a zero-page result the backend has explicitly
+  // blocked is the strongest verdict there is (a corrupt file): render it,
+  // or "Pradėti analizę" stays enabled on a PDF the pipeline cannot open.
+  if (!pageCount && pre.hard_block !== true) return null;
 
   const verdict = PREFLIGHT_VERDICTS.includes(pre.verdict) ? pre.verdict : 'unknown';
   const blocked = pre.hard_block === true;

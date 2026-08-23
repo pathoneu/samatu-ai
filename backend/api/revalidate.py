@@ -154,12 +154,20 @@ async def revalidate_project(request: Request, project_id: str) -> dict:
 
     refreshed = _revalidate_payload(project)
     try:
-        db.upsert_project(project_id, refreshed, user_id=user["id"])
+        saved = db.upsert_project(project_id, refreshed, user_id=user["id"])
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
     return {
         "status": "ok",
+        # THE VERSION THE CLIENT MUST ADOPT (2026-08-23 prod walkthrough). This
+        # endpoint persists server-side, which stamps a new updated_at — but
+        # the browser's optimistic-concurrency bookkeeping still held the OLD
+        # one, so its very next write-through sent a stale base_updated_at,
+        # hit its own 409 lost-update guard, and told the contractor
+        # "pakeitimai neįrašyti" about data that HAD saved. Returning the new
+        # stamp lets the client re-base before it writes again.
+        "updated_at": (saved or {}).get("updated_at"),
         "warnings_count": refreshed.get("lt_sanity", {})
                                    .get("summary", {})
                                    .get("warnings_count", 0),

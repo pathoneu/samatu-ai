@@ -302,7 +302,19 @@ def summarize(page_count: int, kinds: list[str], *,
 
     hard_block = page_count > MAX_PAGES_HARD
     hard_block_reason = None
-    if hard_block:
+    if page_count <= 0:
+        # A valid %PDF header with an unreadable body parsed to ZERO pages.
+        # Before 2026-08-23 this returned verdict "unknown" with no block, the
+        # card rendered nothing, and "Pradėti analizę" stayed enabled — €2.50
+        # and 25 minutes on a file the pipeline cannot open.
+        hard_block = True
+        hard_block_reason = (
+            "Nepavyko perskaityti nė vieno PDF puslapio — failas greičiausiai "
+            "sugadintas arba netinkamai išsaugotas. Atsidarykite jį ir "
+            "išsaugokite iš naujo (Spausdinti → Išsaugoti kaip PDF), tada "
+            "įkelkite dar kartą."
+        )
+    if hard_block and hard_block_reason is None:
         hard_block_reason = (
             f"PDF turi {page_count} psl., o vienu kartu analizuojame iki "
             f"{MAX_PAGES_HARD}. Įkelkite tik interjero dalį atskiru PDF failu "

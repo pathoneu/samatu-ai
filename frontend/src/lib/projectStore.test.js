@@ -324,3 +324,12 @@ test('a project deleted between the list and the detail fetch (404) is not a fai
   assert.equal(out.length, 1, 'a 404 must not block the pull forever');
   assert.equal(out[0].name, 'Liko');
 });
+
+test('noteServerVersion re-bases the tab on a version produced outside the PUT path', async () => {
+  const { noteServerVersion } = await import('./projectStore.js');
+  noteServerVersion('p-reval', '2026-08-23T10:00:00Z');
+  assert.equal(_getServerVersion('p-reval'), '2026-08-23T10:00:00Z');
+  // Missing values must be ignored, never clobber a known version with undefined.
+  noteServerVersion('p-reval', undefined);
+  assert.equal(_getServerVersion('p-reval'), '2026-08-23T10:00:00Z');
+});

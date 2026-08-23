@@ -112,3 +112,31 @@ def test_revalidate_does_not_explode_when_validator_throws(monkeypatch):
     assert "kryžminio puslapių patikrinimo" in crashed[0]["message"]
     assert "simulated validator crash" not in crashed[0]["message"]
     assert "RuntimeError" not in crashed[0]["message"]
+
+
+def test_revalidate_endpoint_returns_the_new_server_version(tmp_path, monkeypatch):
+    """2026-08-23 prod walkthrough: the endpoint persists (stamping a new
+    updated_at) but returned no version, so the browser's next write-through
+    carried the OLD base_updated_at, hit its own 409 lost-update guard and told
+    the contractor "pakeitimai neįrašyti" about data that HAD saved. The
+    response must carry the stamp the client has to re-base on."""
+    from fastapi.testclient import TestClient
+    import main as main_mod
+    import auth as _auth
+    import db as _db
+    monkeypatch.setattr(_db, "_DB_PATH", tmp_path / "reval.db")
+    monkeypatch.setattr(_auth, "AUTH_DISABLED", False)
+    _db.init_schema(); _db._migrate_schema()
+    user = _db.create_user("u@x.lt", _auth.hash_password("passw0rd123"), name="U")
+    pid = "proj-reval-1"
+    _db.upsert_project(pid, {**_two_storey_lt_project(), "id": pid, "name": "t"},
+                       user_id=user["id"])
+    c = TestClient(main_mod.app)
+    assert c.post("/api/auth/login",
+                  json={"email": "u@x.lt", "password": "passw0rd123"}).status_code == 200
+    r = c.post(f"/api/projects/{pid}/revalidate")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body.get("updated_at"), body.keys()
+    stored = _db.get_project(pid, user_id=user["id"])
+    assert body["updated_at"] == stored["updated_at"], "must be the persisted stamp"

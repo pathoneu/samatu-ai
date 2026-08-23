@@ -42,6 +42,8 @@ what the severity pill reads.
 """
 from __future__ import annotations
 
+import re
+
 # Anything a validator has ever put in `level`, normalised.
 _LEVEL_ALIASES = {
     "ERROR": "ERROR", "FAIL": "ERROR", "CRITICAL": "ERROR", "CRIT": "ERROR",
@@ -150,6 +152,35 @@ def summarize(ui_warnings: list[dict], rooms_count: int,
     }
 
 
+# Developer prose that OLD checks persisted into project blobs (the emit sites
+# were translated on 2026-08-23, but saved projects still carry the strings and
+# every rebuild re-surfaces them — the prod walkthrough saw "Patikrink ar
+# shared-walls correction veikia (Sprint 4 Block B)" in the red banner). Strip
+# the jargon sentence, keep the measurable part of the message.
+_DEV_PROSE = re.compile(
+    r"\s*[^.]*\b(Sprint\s*\d|developer|shared-walls correction|TODO|FIXME)"
+    r"[^.]*\.?", re.IGNORECASE)
+
+
+def _sanitize_and_dedupe(ui: list[dict]) -> list[dict]:
+    """Drop legacy dev-jargon clauses from messages and collapse exact
+    duplicates (same code + room + message) that accumulate when a saved
+    stream and a re-run stream both carry the same check."""
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for w in ui:
+        msg = w.get("message")
+        if isinstance(msg, str) and _DEV_PROSE.search(msg):
+            cleaned = _DEV_PROSE.sub("", msg).strip()
+            w = {**w, "message": cleaned or msg}
+        key = (w.get("code"), w.get("room"), w.get("field"), (w.get("message") or "").strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(w)
+    return out
+
+
 def build_lt_sanity(parsed: dict, rooms_count: int | None = None) -> dict:
     """Build `{warnings, summary}` from EVERY validator stream on `parsed`.
 
@@ -170,6 +201,7 @@ def build_lt_sanity(parsed: dict, rooms_count: int | None = None) -> dict:
             continue
         for w in stream:
             ui.append(to_ui_warning(w, default_source=source_default))
+    ui = _sanitize_and_dedupe(ui)
 
     if rooms_count is None:
         rooms = parsed.get("patalpos")

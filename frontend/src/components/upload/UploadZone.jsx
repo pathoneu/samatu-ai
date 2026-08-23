@@ -108,8 +108,8 @@ export default function UploadZone({
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <FileText className="w-5 h-5 text-primary" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>{selectedFile.name}</p>
               <p className="text-xs text-muted-foreground">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>

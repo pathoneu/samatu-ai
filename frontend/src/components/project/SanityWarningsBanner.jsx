@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, RefreshCw, Sliders } from 'lucide-react';
 
 import { revalidateProject } from '../../lib/revalidateApi';
+import { noteServerVersion } from '../../lib/projectStore';
 import {
   SEV_HIGH,
   SEV_MED,
@@ -157,6 +158,10 @@ export default function SanityWarningsBanner({
     setRevalidateError(null);
     try {
       const fresh = await revalidateProject(projectId);
+      // The server just persisted a new version; re-base the tab on it BEFORE
+      // the merged result is written back, or the write-through 409s against
+      // our own save and the user is told their changes were lost.
+      noteServerVersion(projectId, fresh?.updated_at);
       // MERGE, never replace: the rebuild only re-runs some validators, and
       // dropping the rest is how "refresh the checks" quietly turned into
       // "delete most of the checks".

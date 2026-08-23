@@ -541,6 +541,7 @@ function DarbuSarasas({ items }) {
               </span>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <tbody>
                 {group.items.map(it => {
@@ -608,6 +609,7 @@ function DarbuSarasas({ items }) {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
       </div>

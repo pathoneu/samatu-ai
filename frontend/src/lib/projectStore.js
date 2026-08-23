@@ -167,6 +167,14 @@ export function _getServerVersion(id) {   // test hook
   return _serverVersions.get(id);
 }
 
+// Adopt a server-side version stamp produced OUTSIDE the PUT path — e.g. the
+// revalidate endpoint persists on the server and returns the new updated_at.
+// Without re-basing here, the tab's next write-through carries a stale
+// base_updated_at, trips the 409 guard below and falsely reports lost work.
+export function noteServerVersion(id, updatedAt) {
+  if (id && updatedAt) _serverVersions.set(id, updatedAt);
+}
+
 // In-flight PUT per project id — used to supersede a slow earlier request so a
 // PUT can never land after a newer one for the same project on a lossy link.
 const _inflight = new Map();   // id -> AbortController

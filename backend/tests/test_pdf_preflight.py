@@ -244,10 +244,17 @@ def test_thin_sample_is_disclosed_but_a_near_complete_one_is_not():
 
 # ── the IO wrapper fails open ───────────────────────────────────────────────
 
-def test_preflight_on_garbage_bytes_returns_unknown_not_an_exception():
+def test_preflight_on_garbage_bytes_blocks_with_a_lithuanian_reason():
+    """2026-08-23 prod walkthrough: a %PDF header with an unreadable body
+    parsed to zero pages, came back verdict "unknown" with NO block, the card
+    rendered nothing, and "Pradėti analizę" stayed enabled — €2.50 and 25 min
+    on a file the pipeline cannot open. Zero readable pages is the strongest
+    verdict there is. Still never an exception."""
     out = preflight_pdf(b"not a pdf at all")
-    assert out["verdict"] == "unknown"
-    assert out["hard_block"] is False
+    assert out["page_count"] == 0
+    assert out["hard_block"] is True
+    assert "sugadintas" in (out["hard_block_reason"] or "")
+    assert "Spausdinti" in out["hard_block_reason"], "must say what to DO"
 
 
 def test_preflight_payload_has_every_key_the_card_reads():
@@ -350,3 +357,30 @@ def test_preflight_on_real_fixtures(name, expect_verdict, expect_block):
     assert out["hard_block"] is expect_block, out
     # The whole point is that this is cheap: the endpoint budget is 5 s.
     assert out["elapsed_s"] < 5.0, out["elapsed_s"]
+
+
+def test_sanity_mirror_strips_legacy_dev_prose_and_dedupes():
+    """Persisted project blobs still carry warnings OLD checks wrote with
+    developer jargon ("Patikrink ar shared-walls correction veikia (Sprint 4
+    Block B)"), and a saved stream plus a re-run stream can carry the same
+    check twice. The mirror is the one place every sink passes through."""
+    from extractor.sanity_mirror import build_lt_sanity
+    parsed = {
+        "warnings": [
+            {"code": "baseboard_perimeter_mismatch", "room": "103", "severity": "med",
+             "message": "Grindjuostės 25,0 m, o perimetras 18,4 m. Patikrink ar "
+                        "shared-walls correction veikia (Sprint 4 Block B), ar durų "
+                        "skaičius atpažintas."},
+            {"code": "baseboard_perimeter_mismatch", "room": "103", "severity": "med",
+             "message": "Grindjuostės 25,0 m, o perimetras 18,4 m. Patikrink ar "
+                        "shared-walls correction veikia (Sprint 4 Block B), ar durų "
+                        "skaičius atpažintas."},
+            {"code": "gk_sheets_off", "room": None, "severity": "low",
+             "message": "GKP lapų skaičius skiriasi nuo formulės."},
+        ],
+    }
+    out = build_lt_sanity(parsed, rooms_count=1)
+    msgs = [w["message"] for w in out["warnings"]]
+    assert len(msgs) == 2, msgs                       # exact duplicate collapsed
+    assert not any("Sprint" in m or "shared-walls" in m for m in msgs), msgs
+    assert any(m.startswith("Grindjuostės 25,0 m") for m in msgs), "keep the measurable part"
