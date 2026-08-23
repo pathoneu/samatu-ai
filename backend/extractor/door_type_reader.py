@@ -160,7 +160,8 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
     {status, pages, doors, beapvadines_count, standartines_count, stumdomos_count,
      bendras_tipas, _elapsed_s, _meta}."""
     t0 = time.time()
-    pages = _find_door_pages(pdf_bytes, page_classifications)
+    pages = (_find_door_pages(pdf_bytes, page_classifications) if page_classifications
+             else _find_door_pages(pdf_bytes))
     if not pages:
         return {"status": "skipped", "pages": [], "beapvadines_count": 0,
                 "_error": "no door tag/annotation page found",

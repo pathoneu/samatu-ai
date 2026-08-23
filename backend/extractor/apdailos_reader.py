@@ -321,7 +321,11 @@ def read_apdailos_finishes(
     produced nothing.
     """
     t0 = time.time()
-    pages = [apdailos_page] if apdailos_page else _find_apdailos_pages(pdf_bytes, pages_meta)
+    # Positional-compatible: callers (and the reliability tests) may stub the
+    # locator with a one-argument fake; only pass pages_meta when we have it.
+    pages = ([apdailos_page] if apdailos_page
+             else _find_apdailos_pages(pdf_bytes, pages_meta) if pages_meta
+             else _find_apdailos_pages(pdf_bytes))
     if not pages:
         return {"status": "skipped", "page": None, "pages": [], "patalpos": [],
                 "_error": "no apdailos page found", "_elapsed_s": round(time.time() - t0, 2),
