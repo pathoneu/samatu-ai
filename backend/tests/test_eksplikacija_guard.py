@@ -117,3 +117,29 @@ def test_room_source_pages_are_the_rooms_own_sheets():
     # clipped to the document
     assert room_source_pages([{"puslapio_nr": 1}], 3, margin=2) == [1, 2, 3]
     assert room_source_pages([{"puslapio_nr": None}], 10) == []
+
+
+def test_room_source_pages_needs_the_ORIGINAL_page_count_not_the_filtered_one():
+    """The `n_pages` contract: the ORIGINAL document length, never `len(pages)`
+    after `page_filter` has dropped sheets.
+
+    `room.puslapio_nr` stays in ORIGINAL numbering by design (see
+    `page_filter.select_pass1_pages`), while `pages` shrinks. Feeding the
+    shrunken length in clips every room that sits past it — and in a bundle
+    the interior part is bound LAST, so the clip removes exactly the sheets
+    the retry exists to re-read. Regression guard for vision_call's call site.
+    """
+    # 54-page bundle: 37 architectural sheets, interior rooms on pp. 40-52.
+    rooms = [{"puslapio_nr": p} for p in (40, 41, 45, 52)]
+    full = room_source_pages(rooms, 54, margin=2, exclude={12})
+    assert full[0] == 38 and full[-1] == 54
+
+    # page_filter dropped 6 photo/vendor pages → len(pages) == 48 at the call
+    # site. Everything past 48 silently disappears.
+    clipped = room_source_pages(rooms, 48, margin=2, exclude={12})
+    assert max(clipped) == 47
+    assert 52 not in clipped
+
+    # A heavier filter wipes the retry out completely — the guard degrades to
+    # "keep Vision areas + warn" without ever making the one retry call.
+    assert room_source_pages(rooms, 35, margin=2, exclude={12}) == []

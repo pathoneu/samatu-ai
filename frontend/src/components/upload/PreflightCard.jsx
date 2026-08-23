@@ -24,7 +24,9 @@ const TONE = {
   blocked: { icon: Ban,           border: 'border-destructive/40',      accent: 'text-destructive' },
 };
 
-export default function PreflightCard({ card, loading = false, onContinue, onPickAnother }) {
+export default function PreflightCard({
+  card, loading = false, onContinue, onPickAnother, onContinueAnyway,
+}) {
   const { t } = useTranslation();
 
   if (loading) {
@@ -101,6 +103,24 @@ export default function PreflightCard({ card, loading = false, onContinue, onPic
               >
                 {t('newProject.preflight.pickAnother')}
               </Button>
+              {/* A block must never be a dead end. Splitting the PDF is the
+                  RIGHT answer and stays the primary one — but a contractor
+                  whose interior sheets happen to sit inside the first 100
+                  pages used to be refused outright, with no way through and
+                  nobody to ask. He is told exactly what he gives up; the
+                  decision is his. (Before 2026-08-23 this file uploaded fine
+                  and the backend simply capped at 100 pages.) */}
+              {card.blocked && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onContinueAnyway}
+                  title={t('newProject.preflight.overrideBlockTitle')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {t('newProject.preflight.overrideBlock')}
+                </Button>
+              )}
             </div>
           )}
         </div>

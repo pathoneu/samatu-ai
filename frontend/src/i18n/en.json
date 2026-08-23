@@ -1502,6 +1502,8 @@
       "continueTitle": "Start the analysis with this file",
       "pickAnother": "Choose another file",
       "pickAnotherTitle": "Remove this file and upload another",
+      "overrideBlock": "Analyse the first 100 pages anyway",
+      "overrideBlockTitle": "Start the analysis knowing pages beyond 100 will not be read",
       "verdict": {
         "interior_plan": "This looks like an interior design project — the kind we read best.",
         "table_only": "This looks like a bill-of-quantities table rather than a drawing — the analysis will most likely find no rooms. Continue anyway?",

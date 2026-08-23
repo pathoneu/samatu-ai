@@ -348,12 +348,22 @@ export default function NewProject() {
 
   const card = preflightCard(preflight);
 
-  const handleCreate = async () => {
+  const handleCreate = async (opts) => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
     // A page count past the pipeline's limit is the one preflight verdict that
     // is a FACT rather than a guess: beyond it the extraction silently reads
     // the first 100 pages, which on a 139-page bundle is usually the wrong 100.
-    if (card?.blocked) { setError(card.reason || t('newProject.errNoPdf')); return; }
+    // USUALLY — not always, and the card is a client-side gate, not a backend
+    // guarantee. So it stops the default path and demands a second, explicit
+    // click ("Vis tiek analizuoti pirmus 100 psl.") rather than refusing the
+    // upload outright: a 105-page set whose interjero dalis is bound FIRST is
+    // perfectly analysable, and before this card shipped it simply worked.
+    // `opts` is that acknowledgement — a click event (from onContinue) has no
+    // ackBlock key, so only the override button gets through.
+    if (card?.blocked && !opts?.ackBlock) {
+      setError(card.reason || t('newProject.errNoPdf'));
+      return;
+    }
     // Ask for notification permission NOW, while the user is present and about
     // to start a ~30 min wait — see notifyAnalysisDone. Never blocks.
     try {
@@ -949,6 +959,7 @@ export default function NewProject() {
             loading={preflightBusy}
             onContinue={handleCreate}
             onPickAnother={clearChosenFile}
+            onContinueAnyway={() => handleCreate({ ackBlock: true })}
           />
         </div>
 

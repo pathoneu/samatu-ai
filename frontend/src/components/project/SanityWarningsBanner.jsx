@@ -75,6 +75,11 @@ export default function SanityWarningsBanner({
 }) {
   const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(loadDismissed);
+  // `subscribeDismissals` was imported and never wired, so the banner was the
+  // only surface NOT listening to the store it writes to: a second tab (or the
+  // pill, if it ever grows a reset) could change the set and this list would
+  // keep rendering the stale one until a remount.
+  useEffect(() => subscribeDismissals(() => setDismissed(loadDismissed())), []);
   const [openOverride, setOpenOverride] = useState({});
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState(null);

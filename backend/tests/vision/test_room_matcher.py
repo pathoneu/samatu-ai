@@ -263,11 +263,29 @@ def test_voting_records_which_matcher_ran(monkeypatch):
     assert 23.25 not in [r["plotas_m2"] for r in out["patalpos"]]
 
 
-def test_flag_off_is_byte_identical_to_the_old_matcher(monkeypatch):
+def test_flag_off_reproduces_the_pre_flag_matcher_exactly(monkeypatch):
+    """The shipping path (flag OFF) must group EXACTLY as it did at 904463a.
+
+    The literal areas are the pin. Comparing `match_rooms()` against
+    `match_rooms(robust=False)` — which is what this test used to do — takes
+    the same branch of the same new code twice and can never fail: replacing
+    `_room_key` with a constant that collapses all twelve rooms into one
+    bucket still satisfied it. These six numbers do not.
+
+    They are the legacy nr-key matcher's known ciurliu *mis*-pairing (23.25 =
+    the average of B's 13.0 "Kambarys 2" and A's 40.0 open plan, joined on
+    nr="04"). That is the behaviour we are pinning: the flag exists to fix it,
+    and until it is on, nothing may change it by accident.
+    """
     monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "0")
     on_flag = match_rooms([CIURLIU_A, CIURLIU_B])
     explicit = match_rooms([CIURLIU_A, CIURLIU_B], robust=False)
     assert _voted_areas(on_flag) == _voted_areas(explicit)
+    assert _voted_areas(on_flag) == [4.5, 9.25, 14.0, 15.5, 23.25, 26.5]
+    assert [[r["nr"] for r in g] for g in on_flag] == [
+        ["01", "01"], ["02", "02"], ["03", "03"],
+        ["04", "04"], ["05", "05"], ["06", "06"],
+    ]
 
 
 def test_table_anchored_project_is_untouched_by_the_flag(monkeypatch):
