@@ -213,7 +213,14 @@ def test_room_seen_in_a_majority_survives_even_without_a_matching_nr():
 # ── min_votes scales with N ──────────────────────────────────────────────
 @pytest.mark.parametrize("n,expected", [(1, 1), (2, 1), (3, 2), (4, 2), (5, 3)])
 def test_default_min_votes_is_a_majority(n, expected):
-    assert default_min_votes(n) == expected
+    assert default_min_votes(n, robust=True) == expected
+
+
+@pytest.mark.parametrize("n,expected", [(1, 2), (2, 2), (3, 2), (4, 2), (5, 3)])
+def test_legacy_matcher_keeps_a_floor_of_two(n, expected):
+    """Relaxing below 2 is only safe once the matcher cannot split one room
+    into two groups; the nr matcher can, so it keeps the old guard."""
+    assert default_min_votes(n, robust=False) == expected
 
 
 def test_n3_behaviour_is_unchanged_by_the_min_votes_change():
@@ -226,13 +233,23 @@ def test_n3_behaviour_is_unchanged_by_the_min_votes_change():
     assert [r["nr"] for r in out["patalpos"]] == ["01"]     # B dropped, 1 of 3
 
 
-def test_two_runs_no_longer_require_unanimity():
+def test_two_runs_no_longer_require_unanimity(monkeypatch):
     """min_votes was hardcoded to 2, so at N=2 a room needed BOTH runs."""
+    monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "1")
     runs = [{"patalpos": [room("01", "A", 10.0, 13.0)]},
             {"patalpos": [room("01", "A", 10.0, 13.0), room("02", "B", 5.0, 9.0)]}]
     out = vote_extraction(runs)
     assert out["_voting"]["min_votes"] == 1
     assert [r["nr"] for r in out["patalpos"]] == ["01", "02"]
+
+
+def test_two_runs_still_require_unanimity_under_the_legacy_matcher(monkeypatch):
+    monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "0")
+    runs = [{"patalpos": [room("01", "A", 10.0, 13.0)]},
+            {"patalpos": [room("01", "A", 10.0, 13.0), room("02", "B", 5.0, 9.0)]}]
+    out = vote_extraction(runs)
+    assert out["_voting"]["min_votes"] == 2
+    assert [r["nr"] for r in out["patalpos"]] == ["01"]
 
 
 # ── flag wiring ──────────────────────────────────────────────────────────

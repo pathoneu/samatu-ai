@@ -49,15 +49,25 @@ def _room_key(room: dict) -> str:
     return f"pa:{(room.get('paskirtis') or '').lower()}:{round(float(room.get('plotas_m2') or 0))}"
 
 
-def default_min_votes(n_runs: int) -> int:
+def default_min_votes(n_runs: int, *, robust: bool = True) -> int:
     """Majority of the runs that actually produced a result: ceil(n/2).
 
     Was hardcoded to 2, which is a majority only at n=3 (the default) and n=4;
     at n=2 it silently demanded unanimity and at n=5 it accepted a 2-of-5
     minority. Unchanged at n=3 and n=4, so the shipping configuration is
     untouched.
+
+    robust=False keeps a FLOOR of 2. Dropping to 1 is only safe when the
+    matcher cannot split one physical room across two groups — and the legacy
+    nr matcher does exactly that whenever the rounds number rooms differently
+    (the ciurliu failure). Under the legacy matcher, a 1-vote threshold would
+    let both halves of such a split survive as two rooms and double-count the
+    area. Unanimity-at-n=2 was a crude guard against that; it stays until the
+    matcher that removes the need for it is on.
     """
-    return max(1, (max(int(n_runs), 1) + 1) // 2)
+    n = max(int(n_runs), 1)
+    majority = max(1, (n + 1) // 2)
+    return majority if robust else max(2, majority)
 
 
 def _robust_matching_enabled() -> bool:
@@ -83,10 +93,10 @@ def match_rooms(runs: list[list[dict]], *, min_votes: int | None = None,
     rooms are never medianed together. See room_matcher.__doc__ for the
     ciurliu evidence.
     """
-    if min_votes is None:
-        min_votes = default_min_votes(len(runs))
     if robust is None:
         robust = _robust_matching_enabled()
+    if min_votes is None:
+        min_votes = default_min_votes(len(runs), robust=robust)
     nr_keys: list[list[str]] | None = None
     if robust:
         from .room_matcher import match_rooms_robust, nr_match_keys
@@ -243,9 +253,9 @@ def vote_extraction(runs: list[dict], *, min_votes: int | None = None) -> dict:
     """
     base = dict(runs[0]) if runs else {}
     room_runs = [r.get("patalpos") or [] for r in runs]
-    if min_votes is None:
-        min_votes = default_min_votes(len(room_runs))
     robust = _robust_matching_enabled()
+    if min_votes is None:
+        min_votes = default_min_votes(len(room_runs), robust=robust)
     from .room_matcher import nr_key_is_trustworthy
     matcher = ("nr_key" if (not robust or nr_key_is_trustworthy(room_runs))
                else "assignment")
