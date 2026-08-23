@@ -6,8 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Rocket } from 'lucide-react';
 import UploadZone from '@/components/upload/UploadZone';
+import PreflightCard from '@/components/upload/PreflightCard';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
+import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
 import { createProject, updateProject } from '@/lib/projectStore';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
@@ -221,9 +223,18 @@ function notifyAnalysisDone(t) {
   } catch { /* notifications are best-effort, never break the flow */ }
 }
 
-async function waitForRecoveredProject(projectId, { onTick, isCancelled } = {}) {
+/**
+ * @param {string} projectId
+ * @param {{onTick?:Function, isCancelled?:Function, limitMs?:number}} opts
+ *   `limitMs` comes from the preflight (see lib/preflight.pollLimitMs). A
+ *   60-page project runs past the historical fixed 40 min, and the browser
+ *   giving up first meant telling the user his run had failed while the server
+ *   was still working and about to save the project. Defaults to 40 min when
+ *   there was no preflight, so nothing changes for an unmeasured upload.
+ */
+async function waitForRecoveredProject(projectId, { onTick, isCancelled, limitMs } = {}) {
   const started = Date.now();
-  const LIMIT_MS = 40 * 60 * 1000;
+  const LIMIT_MS = limitMs || 40 * 60 * 1000;
   while (Date.now() - started < LIMIT_MS) {
     if (isCancelled?.()) return null;
     try {
@@ -252,6 +263,14 @@ export default function NewProject() {
   const [projectName, setProjectName]   = useState('');
   const [companyName, setCompanyName]   = useState('');
   const [file, setFile]                 = useState(null);
+  // Preflight: the free 5 s look at the PDF, run the moment a file is chosen.
+  // `preflight` is the raw endpoint payload (also read for the poller ceiling);
+  // `preflightBusy` drives the "Tikriname failą…" line; `uploadResetToken` is
+  // how "Pasirinkti kitą failą" clears UploadZone's own internal state.
+  const [preflight, setPreflight]       = useState(null);
+  const [preflightBusy, setPreflightBusy] = useState(false);
+  const [uploadResetToken, setUploadResetToken] = useState(0);
+  const preflightRunRef = useRef(0);
   const [projTypeChoice, setProjType]   = useState('interior');
   // Default interior subtype, no setter — UI selector removed 2026-05-13.
   const [interiorSubtype] = useState('naujas');
@@ -266,7 +285,7 @@ export default function NewProject() {
   // still extracting, so the UI must keep RUNNING rather than freeze.
   const [streamPhase, setStreamPhase]     = useState(null);
   const [streamProgress, setStreamProgress] = useState({
-    rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null,
+    rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null, validationWarning: null,
   });
   const [streamElapsed, setStreamElapsed] = useState(0);
   // Post-handoff view state: are we polling, and for how long.
@@ -297,8 +316,44 @@ export default function NewProject() {
   // result when the connection drops mid-extraction instead of erroring out.
   const recoveryIdRef = useRef(null);
 
+  /**
+   * Look at the PDF the moment it is chosen. Free (no Vision), ~1-3 s, and it
+   * is the only chance to tell a contractor that his 139-page technical set or
+   * his KŽ table is about to buy him 25 minutes of nothing.
+   *
+   * Never blocks the upload: a failed probe just leaves the card unrendered.
+   * The run counter guards against a stale answer landing after the user has
+   * already picked a different file.
+   */
+  const handleFileSelect = async (nextFile) => {
+    const run = ++preflightRunRef.current;
+    setFile(nextFile);
+    setPreflight(null);
+    setError(null);
+    if (!nextFile) { setPreflightBusy(false); return; }
+    setPreflightBusy(true);
+    const result = await fetchPreflight(nextFile);
+    if (run !== preflightRunRef.current) return;   // superseded — ignore
+    setPreflight(result);
+    setPreflightBusy(false);
+  };
+
+  const clearChosenFile = () => {
+    preflightRunRef.current++;
+    setFile(null);
+    setPreflight(null);
+    setPreflightBusy(false);
+    setUploadResetToken((n) => n + 1);
+  };
+
+  const card = preflightCard(preflight);
+
   const handleCreate = async () => {
     if (!file) { setError(t('newProject.errNoPdf')); return; }
+    // A page count past the pipeline's limit is the one preflight verdict that
+    // is a FACT rather than a guess: beyond it the extraction silently reads
+    // the first 100 pages, which on a 139-page bundle is usually the wrong 100.
+    if (card?.blocked) { setError(card.reason || t('newProject.errNoPdf')); return; }
     // Ask for notification permission NOW, while the user is present and about
     // to start a ~30 min wait — see notifyAnalysisDone. Never blocks.
     try {
@@ -311,7 +366,9 @@ export default function NewProject() {
     setIsProcessing(true);
     setStreamPhase(null);
     streamStartedRef.current = false;
-    setStreamProgress({ rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null });
+    setStreamProgress({
+      rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null, validationWarning: null,
+    });
     setStreamElapsed(0);
     setRecovering(false);
     setRecoverySec(0);
@@ -391,7 +448,17 @@ export default function NewProject() {
               if (ev.event === 'recovery_id' && ev.project_id) {
                 recoveryIdRef.current = ev.project_id;
               }
-              if (ev.event === 'started') {
+              if (ev.event === 'validation_warning') {
+                // The backend has emitted this since the streaming endpoint
+                // shipped and NOTHING listened — the one message that says
+                // "your PDF is longer than we will read" was thrown away at
+                // the exact moment the user was watching the screen.
+                setStreamProgress(p => ({
+                  ...p,
+                  validationWarning: ev.message || null,
+                  pageCount: ev.page_count || p.pageCount,
+                }));
+              } else if (ev.event === 'started') {
                 setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
               } else if (ev.event === 'pass1_started') {
                 setStreamPhase('pass1');
@@ -638,6 +705,10 @@ export default function NewProject() {
           const ok = await waitForRecoveredProject(recoveryIdRef.current, {
             onTick: (s) => setRecoverySec(s),
             isCancelled: () => abortReasonRef.current === 'user',
+            // Scaled to the size the preflight measured: a 60-page project
+            // outlives the historical fixed 40 min, and the client giving up
+            // first turns a healthy run into a reported failure.
+            limitMs: pollLimitMs(preflight),
           });
           if (ok) {
             stopElapsed();
@@ -676,6 +747,10 @@ export default function NewProject() {
           const ok = await waitForRecoveredProject(recoveryIdRef.current, {
             onTick: (s) => setRecoverySec(s),
             isCancelled: () => abortReasonRef.current === 'user',
+            // Scaled to the size the preflight measured: a 60-page project
+            // outlives the historical fixed 40 min, and the client giving up
+            // first turns a healthy run into a reported failure.
+            limitMs: pollLimitMs(preflight),
           });
           if (ok) {
             stopElapsed();
@@ -862,14 +937,30 @@ export default function NewProject() {
 
         <div>
           <Label className="text-sm text-muted-foreground mb-1.5 block">{t('newProject.pdfLabel')}</Label>
-          <UploadZone onFileSelect={setFile} accept=".pdf" label={t('newProject.uploadLabel')} />
+          <UploadZone
+            onFileSelect={handleFileSelect}
+            accept=".pdf"
+            label={t('newProject.uploadLabel')}
+            resetToken={uploadResetToken}
+          />
+          {/* Five seconds of looking, before twenty-five minutes of paying. */}
+          <PreflightCard
+            card={card}
+            loading={preflightBusy}
+            onContinue={handleCreate}
+            onPickAnother={clearChosenFile}
+          />
         </div>
 
         <div>
           <Button
             onClick={handleCreate}
-            disabled={!file}
-            title={file ? t('newProject.startAnalysisTitle') : t('newProject.startAnalysisDisabledTitle')}
+            disabled={!file || card?.blocked}
+            title={
+              card?.blocked ? card.reason
+                : file ? t('newProject.startAnalysisTitle')
+                  : t('newProject.startAnalysisDisabledTitle')
+            }
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12"
           >
             <Rocket className="w-5 h-5 mr-2" />
@@ -878,10 +969,15 @@ export default function NewProject() {
           {/* Time expectation. Extraction is minutes, not seconds (a Beržų-class
               drawing runs ~19 min — see IDLE_ABORT_MS above). A bare "Pradėti
               analizę" + rocket reads as instant, so contractors closed the tab.
-              (2026-07-28 explainability pass.) */}
-          <p className="mt-2 text-xs text-muted-foreground text-center">
-            {t('newProject.startAnalysisHint')}
-          </p>
+              (2026-07-28 explainability pass.)
+              Hidden once the preflight card is up: this line says "iki 30 min"
+              unconditionally, and printing that under a card that just said
+              "virš valandos" is worse than saying nothing. */}
+          {!card && (
+            <p className="mt-2 text-xs text-muted-foreground text-center">
+              {t('newProject.startAnalysisHint')}
+            </p>
+          )}
         </div>
       </div>
     </div>

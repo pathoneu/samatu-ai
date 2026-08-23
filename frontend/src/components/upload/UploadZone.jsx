@@ -1,15 +1,32 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function UploadZone({ onFileSelect, accept = '.pdf,.xlsx,.xls', label }) {
+/**
+ * @param {object}   props
+ * @param {Function} props.onFileSelect  called with the File, or null when cleared
+ * @param {number}   props.resetToken    bump to clear the zone FROM THE OUTSIDE.
+ *   The selected file lives in this component's own state, so a parent that
+ *   rejects the file (preflight's "Pasirinkti kitą failą") could otherwise
+ *   drop it while the zone kept showing the old filename.
+ */
+export default function UploadZone({
+  onFileSelect, accept = '.pdf,.xlsx,.xls', label, resetToken = 0,
+}) {
   const { t } = useTranslation();
   const resolvedLabel = label ?? t('upload.zone.defaultLabel');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState(null);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!resetToken) return;   // 0 = initial mount, nothing to clear
+    setSelectedFile(null);
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [resetToken]);
 
   // Client-side guard so a wrong type / oversized file fails INSTANTLY instead
   // of after a ~30s server round-trip ending in a backend error. (2026-06-19)
