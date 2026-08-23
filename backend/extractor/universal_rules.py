@@ -698,7 +698,6 @@ _PASKIRTIS_CONTAINS: tuple[tuple[str, str], ...] = (
     (_SAN_MAZGAS, "san"),        # legacy `"san" in p and "mazg" in p` slot
     ("drabuz", "drabuzine"),
     ("rubin", "drabuzine"),
-    ("spinta", "drabuzine"),     # built-in walk-in wardrobe
     ("katil", "katiline"),
     ("silumos punkt", "katiline"),
     ("silumos mazg", "katiline"),
@@ -744,6 +743,16 @@ _PASKIRTIS_CONTAINS: tuple[tuple[str, str], ...] = (
     ("dirbtuv", "techpatalpa"),
     ("tarnybine patalp", "techpatalpa"),
     ("valymo patalp", "techpatalpa"),
+    # LAST, and deliberately so: "spinta" is FURNITURE, not a room. Sitting
+    # above the room words (where it landed on 2026-08-23) it swallowed every
+    # label that names a room and its wardrobe — "Svetainė su spinta",
+    # "Miegamasis su spinta", "Koridorius su spinta" all became `drabuzine`.
+    # ROOM_TYPE_RULES for drabuzine matches gyvenamoji so paint was unharmed,
+    # but the LED niche ratio went 0.40/0.17/0.55 → 0.00 (niche_inference
+    # LED_RATIO_BY_PASKIRTIS) and "Virtuvė su spinta" lost the 0.6 m
+    # backsplash band and its tiled floor. Only a label with no room word in
+    # it at all should fall through to here.
+    ("spinta", "drabuzine"),     # built-in walk-in wardrobe
 )
 
 

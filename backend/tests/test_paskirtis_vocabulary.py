@@ -296,6 +296,61 @@ def test_wet_labels_reach_the_waterproofing_lane(label):
     assert _is_wet_room({"paskirtis": label}) is True
 
 
+@pytest.mark.parametrize("label", [
+    "Vonios kambarys", "Dušinė", "San. mazgas", "WC", "Pirtis", "Baseinas",
+    "Skalbykla",
+])
+def test_wet_labels_reach_the_OTHER_waterproofing_lane_too(label):
+    """The test above pins `line_items`, which serves /api/recompute-quantities
+    (Prielaidos). It is NOT the lane /extract-interior and /recompute-interior
+    use — that one is `vision_call._calc_hidroizoliacija_m2`, and on
+    2026-08-23 only the first was widened. A sauna project then reported 0 m²
+    hidroizoliacija in the estimate and ~62 m² after one Prielaidos slider.
+    Both lanes are live, so both are pinned here; `katiline` is deliberately
+    absent because it has never been waterproofed in the extract lane.
+    """
+    from extractor.vision_call import _calc_hidroizoliacija_m2
+    room = {"paskirtis": label, "plotas_m2": 12.0, "lubu_aukstis_m": 2.7}
+    assert _calc_hidroizoliacija_m2(room, 14.0) > 0
+
+
+@pytest.mark.parametrize("label", ["Svetainė", "Miegamasis", "Terasa", "Garažas"])
+def test_dry_labels_do_not_reach_the_extract_waterproofing_lane(label):
+    from extractor.vision_call import _calc_hidroizoliacija_m2
+    room = {"paskirtis": label, "plotas_m2": 12.0, "lubu_aukstis_m": 2.7}
+    assert _calc_hidroizoliacija_m2(room, 14.0) == 0.0
+
+
+@pytest.mark.parametrize("label,cls,led", [
+    ("Svetainė su spinta", "gyvenamoji", 0.40),
+    ("Koridorius su spinta", "koridorius", 0.55),
+    ("Valgomasis su spinta", "valgomasis", 0.39),
+    ("Miegamasis su spinta", "miegamoji", 0.17),
+])
+def test_a_wardrobe_in_the_label_does_not_replace_the_room(label, cls, led):
+    """"spinta" is furniture. Placed above the room words it swallowed every
+    "<room> su spinta" label into `drabuzine`, whose LED niche ratio is 0.00 —
+    so the LED strip metres for a living room with a fitted wardrobe silently
+    became zero. It must be the LAST needle consulted."""
+    assert normalize_paskirtis(label) == cls
+    assert LED_RATIO_BY_PASKIRTIS.get(cls) == led
+
+
+def test_kitchen_with_a_wardrobe_keeps_its_backsplash():
+    assert normalize_paskirtis("Virtuvė su spinta") == "virtuve"
+    assert ROOM_TYPE_RULES["virtuve"]["tile_walls_to_m"] == 0.6
+    assert ROOM_TYPE_RULES["virtuve"]["tile_floor"] is True
+
+
+@pytest.mark.parametrize("label", [
+    "Spinta", "Rūbinė-spinta", "Drabužinė / spinta zona prie miegamojo",
+])
+def test_a_label_that_is_only_a_wardrobe_still_classifies(label):
+    """Moving the needle last must not lose the cases it was added for —
+    including the one that really is in the corpus."""
+    assert normalize_paskirtis(label) == "drabuzine"
+
+
 @pytest.mark.parametrize("label", ["Svetainė", "Miegamasis", "Terasa", "Garažas"])
 def test_dry_labels_do_not_reach_the_waterproofing_lane(label):
     from extractor.line_items import _is_wet_room

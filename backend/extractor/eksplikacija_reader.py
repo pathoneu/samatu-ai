@@ -349,14 +349,24 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
                   f"{meta.get('elapsed_s', 0)}s, $0 "
                   f"(rows={sources}, header={meta.get('header_detected')}, "
                   f"ambiguous_rows_skipped={meta.get('ambiguous_rows', 0)}, "
-                  f"tables={meta.get('tables_contributing')})")
+                  f"tables={meta.get('tables_contributing')}, "
+                  f"discarded={meta.get('tables_discarded') or []})")
             return pdf_attempt
         else:
+            # The MISS branch is where the diagnostics actually MATTER, and it
+            # printed none of them: `ambiguous_rows` (rows the parser refused
+            # because two numbers were plausible) and `header_detected` are the
+            # difference between "there is no table on this page" and "I found
+            # the table and threw every row away". Measured on real files:
+            # Projektas..pdf refuses 71 rows, 03_SA.pdf 25 — invisible until now.
+            _m = pdf_attempt["_meta"]
             print(f"[eksplikacija_reader] pdfplumber MISS — falling through to Vision "
-                  f"(scanned {pdf_attempt['_meta'].get('pages_scanned', 0)} pages, "
-                  f"{pdf_attempt['_meta'].get('eksplikacija_pages_found', 0)} marked "
-                  f"as eksplikacija, {pdf_attempt['_meta'].get('tables_examined', 0)} "
-                  f"tables examined)")
+                  f"(scanned {_m.get('pages_scanned', 0)} pages, "
+                  f"{_m.get('eksplikacija_pages_found', 0)} marked "
+                  f"as eksplikacija, {_m.get('tables_examined', 0)} "
+                  f"tables examined, header={_m.get('header_detected')}, "
+                  f"ambiguous_rows_skipped={_m.get('ambiguous_rows', 0)}, "
+                  f"discarded={_m.get('tables_discarded') or []})")
     except Exception as exc:
         # Soft failure — continue to Vision path
         print(f"[eksplikacija_reader] pdfplumber pre-pass error (non-fatal): {exc}")

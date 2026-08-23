@@ -385,8 +385,19 @@ def _try_parse_row(
     """
     if not row or not isinstance(row, (list, tuple)):
         return None
-    cells = [c if isinstance(c, str) else "" for c in row if c is not None]
-    if not cells:
+    # POSITION-PRESERVING. `None` becomes "" and STAYS in place — it must not
+    # be filtered out. pdfplumber emits None (not "") for a merged/spanned
+    # cell, and on the eksplikacija pages of backend/test_pdfs/ ~46% of all
+    # cells are None. The old parser dropped them harmlessly because it was
+    # positionally agnostic (it scanned every cell for the largest number);
+    # the 2026-08-23 header path indexes into this list with column indices
+    # that `_detect_header` computed from the RAW row, so one dropped cell
+    # shifts every column right and the PERIMETER is read as the area — then
+    # stamped `plotas_source: "eksplikacija"`, the highest-trust label, which
+    # overrides the Vision area in vision_call. Measured on a real merged-cell
+    # table: 12.30 m² read as 14.20 m², every room, silently.
+    cells = [c if isinstance(c, str) else "" for c in row]
+    if not any(c.strip() for c in cells):
         return None
     # Skip total / summary rows
     if _is_total_row(cells):
@@ -663,6 +674,20 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                     fresh = [r for r in rooms_in_table
                              if str(r.get("nr") or "").strip() not in claimed]
                     if len(fresh) < 2:
+                        # A WHOLE SHEET just went in the bin. Usually right
+                        # (it is the same table continued, or a fragment), but
+                        # when two floors are numbered 101-105 each it is a
+                        # real storey of real rooms — and until 2026-08-23 this
+                        # branch left no trace at all: `tables_contributing`
+                        # still read 1 and the log said nothing. Record it so
+                        # the discard is at least visible in the run log.
+                        out["_meta"].setdefault("tables_discarded", []).append({
+                            "page": page_idx,
+                            "rooms": len(rooms_in_table),
+                            "nr_collisions": sum(
+                                1 for r in rooms_in_table
+                                if str(r.get("nr") or "").strip() in claimed),
+                        })
                         continue
                     claimed.update(str(r.get("nr") or "").strip() for r in fresh)
                     best_extraction = best_extraction + fresh

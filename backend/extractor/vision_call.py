@@ -1191,8 +1191,19 @@ def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
     Šitas paprastas variantas sumuoja grindis + perim × 0.30. Dušo zona
     pridedama jei pastabose minimas „dušas"/„shower" arba paskirtis vonia.
     """
+    # `pirtis` / `baseinas` were added to line_items.WET_ROOM_PASKIRTIS on
+    # 2026-08-23 but not here, and the two are LIVE AT ONCE: this function
+    # feeds /extract-interior and /recompute-interior, line_items feeds
+    # /api/recompute-quantities (Prielaidos). A sauna project therefore showed
+    # 0 m² hidroizoliacija in the estimate and ~62 m² the moment the user
+    # touched a Prielaidos slider — the same project, two numbers, no
+    # explanation. Kept as a literal (not an import of the other module's set)
+    # because `katiline` sits in that set and has NOT been waterproofed here
+    # historically; widening it too is a scope decision for the founder, not a
+    # review fix. Anything added there must be mirrored here deliberately.
     paskirtis = _pask(room)
-    if paskirtis not in ("vonia", "wc", "san", "skalbykla"):
+    if paskirtis not in ("vonia", "wc", "san", "skalbykla",
+                         "pirtis", "baseinas"):
         return 0.0
     plotas = float(room.get("plotas_m2") or 0)
     H = float(room.get("lubu_aukstis_m") or 2.82)
