@@ -165,24 +165,40 @@ def apply_lt_sanity(parsed: dict) -> dict:
         # Ceiling height vs STR minimums
         if H > 0:
             min_H = _LUBU_AUKSTIS_MIN.get(paskirtis, 2.20)
+            # `code` + `field` are what SanityWarningsBanner keys the
+            # "Atidaryti Prielaidas" jump off — a height warning the user can
+            # act on in one click instead of hunting for the control.
             if H < min_H:
                 warnings.append({
                     "level": "WARN",
+                    "code": "lubu_aukstis_below_str",
+                    "field": "lubu_aukstis_m",
                     "patalpa_nr": nr,
+                    "value": round(H, 2),
+                    "expected": f"≥{min_H:.2f} m",
                     "message": (
                         f"{pavadinimas} (nr={nr}): lubų aukštis {H:.2f} m žemiau STR "
                         f"minimumo {min_H:.2f} m (paskirtis: {paskirtis})."
                     ),
+                    "hint": "Patikrinkite lubų aukštį Prielaidose — jį galima "
+                            "nurodyti kiekvienai patalpai atskirai.",
                 })
             if H < _LUBU_AUKSTIS_ABSOLUTE_RANGE[0] or H > _LUBU_AUKSTIS_ABSOLUTE_RANGE[1]:
                 warnings.append({
                     "level": "WARN",
+                    "code": "lubu_aukstis_out_of_range",
+                    "field": "lubu_aukstis_m",
                     "patalpa_nr": nr,
+                    "value": round(H, 2),
+                    "expected": (f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[0]}–"
+                                 f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[1]} m"),
                     "message": (
                         f"{pavadinimas} (nr={nr}): lubų aukštis {H:.2f} m neįprastas "
                         f"(norma {_LUBU_AUKSTIS_ABSOLUTE_RANGE[0]}–"
                         f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[1]} m)."
                     ),
+                    "hint": "Patikrinkite lubų aukštį Prielaidose — jį galima "
+                            "nurodyti kiekvienai patalpai atskirai.",
                 })
 
         # Perimeter vs area consistency

@@ -5812,7 +5812,9 @@ async def extract_interior_endpoint(
         if isinstance(result.get("lt_sanity"), dict):
             ls = result["lt_sanity"]
             ls.setdefault("warnings", []).append({
-                "level": "WARNING", "message": validation["warning"], "room": ""
+                "level": "WARNING", "severity": "med",
+                "message": validation["warning"], "room": "",
+                "source": "large_pdf",
             })
             # setdefault like the sibling line above: an lt_sanity dict without a
             # "summary" key raised KeyError here AFTER the paid Vision call had
@@ -5821,6 +5823,7 @@ async def extract_interior_endpoint(
             _sum = ls.setdefault("summary", {})
             _sum["warnings_count"] = _sum.get("warnings_count", 0) + 1
             _sum["warnings"] = _sum.get("warnings", 0) + 1
+            _sum["medium"] = _sum.get("medium", 0) + 1
         result["_pdf_page_count"] = validation.get("page_count", 0)
 
     # Meter Vision cost against the user so the per-user spend cap can fire
@@ -6134,7 +6137,9 @@ async def extract_interior_stream_endpoint(
                 if isinstance(result.get("lt_sanity"), dict):
                     ls = result["lt_sanity"]
                     ls.setdefault("warnings", []).append({
-                        "level": "WARNING", "message": validation["warning"], "room": ""
+                        "level": "WARNING", "severity": "med",
+                        "message": validation["warning"], "room": "",
+                        "source": "large_pdf",
                     })
                     # setdefault, NOT ls["summary"][...] — an lt_sanity without a
                     # "summary" key used to raise KeyError here, OUTSIDE the try
@@ -6142,6 +6147,7 @@ async def extract_interior_stream_endpoint(
                     _sum = ls.setdefault("summary", {})
                     _sum["warnings_count"] = _sum.get("warnings_count", 0) + 1
                     _sum["warnings"] = _sum.get("warnings", 0) + 1
+                    _sum["medium"] = _sum.get("medium", 0) + 1
                 result["_pdf_page_count"] = validation.get("page_count", 0)
             # Meter Vision cost against the user (best-effort) so the spend
             # cap can fire. Only on a successful extraction with token usage.
@@ -6399,37 +6405,6 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     parsed = _recompute_santrauka(parsed)
     parsed = apply_lt_sanity(parsed)
 
-    # Emit lt_sanity:{warnings,summary} mirror so SanityWarningsBanner renders
-    # (same mirror the main /extract-interior emits in step 4.1).
-    flat_warnings = parsed.get("_lt_warnings") or []
-    ui_warnings = []
-    for w in flat_warnings:
-        level = w.get("level", "INFO")
-        if level == "WARN":
-            level = "WARNING"
-        ui_warnings.append({
-            "level": level,
-            "room": w.get("patalpa_nr") or w.get("room") or "",
-            "field": w.get("field", ""),
-            "value": w.get("value"),
-            "expected": w.get("expected"),
-            "message": w.get("message", ""),
-        })
-    n_err = sum(1 for w in ui_warnings if w["level"] == "ERROR")
-    n_warn = sum(1 for w in ui_warnings if w["level"] == "WARNING")
-    n_info = sum(1 for w in ui_warnings if w["level"] == "INFO")
-    parsed["lt_sanity"] = {
-        "warnings": ui_warnings,
-        "summary": {
-            "rooms_count": len(out_rooms),
-            "total_area_m2": round(parsed.get("bendras_plotas_m2", 0), 1),
-            "warnings_count": n_err + n_warn,
-            "errors": n_err,
-            "warnings": n_warn,
-            "info": n_info,
-        },
-    }
-
     # Sprint §FIX (2026-04-29): use the FULL deterministic pozicijų generator
     # (~70+ lines per residential project) instead of the prior 13-line summary.
     # Earlier code was lossy: every Prielaidos toggle dropped 56→10 positions.
@@ -6444,6 +6419,29 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         parsed["pozicijos"] = parsed.get("pozicijos") or []
         _pozicijos_failed = True
     parsed = _emit_v8_compat_fields(parsed)
+
+    # Re-run the CLAUDE.md §6 cross-checks (paint/floor ratio, ceiling≈floor,
+    # baseboard≈perimeter, GKP lapai, angokraščiai) against the recomputed
+    # rooms. Runs AFTER _build_pozicijos_from_rooms because check_gk_sheets_math
+    # compares against the rebuilt pozicijos — same order /extract-interior uses
+    # (step 2.95 builds pozicijos, step 4.065 checks them). Before this, a
+    # Prielaidos recompute rebuilt the mirror from _lt_warnings alone and the
+    # whole §6 family silently vanished from the banner.
+    try:
+        from extractor.sanity_checks import run_all_checks as _sanity_run
+        parsed["warnings"] = [
+            w for w in (parsed.get("warnings") or [])
+            if not (isinstance(w, dict) and w.get("source") == "sanity_checks")
+        ] + _sanity_run(parsed)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[recompute-interior] sanity_checks failed: %s", exc)
+
+    # Emit lt_sanity:{warnings,summary} mirror so SanityWarningsBanner renders.
+    # Shared builder — the same one /extract-interior step 4.1 and
+    # /api/projects/{id}/revalidate use, so severity/hint/code/actual survive
+    # and every validator stream (not just _lt_warnings) reaches the banner.
+    from extractor.sanity_mirror import build_lt_sanity
+    parsed["lt_sanity"] = build_lt_sanity(parsed, rooms_count=len(out_rooms))
 
     # Surface partial failures instead of returning stale/empty numbers as if
     # they were fresh. Status stays 200/"ok" (frontend contract) — the signal
@@ -6476,13 +6474,19 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             _ls["summary"] = {}
         for _m in _msgs:
             _ls["warnings"].append({
-                "level": "WARNING", "room": "", "field": "recompute",
+                "level": "WARNING", "severity": "med", "room": "",
+                "field": "recompute", "code": "recompute_partial_failure",
                 "value": None, "expected": None, "message": _m,
+                "hint": "Perkraukite puslapį ir bandykite dar kartą; "
+                        "jei kartojasi — kiekius patikrinkite rankiniu būdu.",
+                "source": "recompute",
             })
         _ls["summary"]["warnings_count"] = (
             _ls["summary"].get("warnings_count", 0) + len(_msgs))
         _ls["summary"]["warnings"] = (
             _ls["summary"].get("warnings", 0) + len(_msgs))
+        _ls["summary"]["medium"] = (
+            _ls["summary"].get("medium", 0) + len(_msgs))
 
     parsed["status"] = "ok"
     parsed["_recomputed"] = True

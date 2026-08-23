@@ -17,6 +17,7 @@ import PageStructureCard from '@/components/project/PageStructureCard';
 import AiChat from '@/components/project/AiChat';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
+import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 // Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
 // flow never shipped to production after 2026-04-26 rollback.
 import ExportDropdown from '@/components/project/ExportDropdown';
@@ -71,10 +72,12 @@ function ConfidenceDot({ level }) {
 // ── Project top bar (mirrors prototype/screen-project.jsx ProjectTopBar) ─
 //
 // 52px high single-row bar with: back arrow · project.name (13/600) ·
-// company (11 muted) · Interjeras pill · spacer · Be PVM (13) | Su PVM (18 bold) ·
-// Prielaidos button · Eksportuoti button. Always visible above tab bar.
+// company (11 muted) · Interjeras pill · AI patikrinimų pill · spacer ·
+// Be PVM (13) | Su PVM (18 bold) · Prielaidos button · Eksportuoti button.
+// Always visible above tab bar — which is why the sanity pill lives here:
+// the project lands on Brėžinys and the full banner is on Kiekiai.
 
-function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false }) {
+function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false, onShowSanity }) {
   const { t } = useTranslation();
   // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
   // creation — no rename control existed anywhere in the UI).
@@ -154,6 +157,7 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
         >
           {t('project.interior.typePill')}
         </span>
+        <SanitySeverityPill sanity={project.lt_sanity} onOpen={onShowSanity} />
       </div>
       <div className="flex-1 min-w-0" />
       <div
@@ -628,6 +632,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   const project = projectState;
   const setProject = setProjectState;
   const [tab, setTab]           = useState(() => 'brezinys');
+  // Bumped by the top-bar sanity pill. ProjectMainView watches it to scroll
+  // the banner into view and force the loud groups open — otherwise the jump
+  // lands on the Kiekiai tab somewhere above the warnings the user clicked.
+  const [sanityFocus, setSanityFocus] = useState(0);
+  const showSanity = () => { setTab('main'); setSanityFocus(n => n + 1); };
   const [doubleSides, setDoubleSides] = useState(false);
   const [gkMetodas, setGkMetodas]     = useState('tikslus');  // Task 9
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set()); // Task 6
@@ -847,6 +856,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         totalGross={totalGross}
         reverseVat={reverseVat}
         onPrielaidos={() => setTab('rules')}
+        onShowSanity={showSanity}
         onEksportuoti={() => setTab('eksport')}
         onDelete={onDelete}
         onRename={(newName) => {
@@ -903,6 +913,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             focusOnRoom(pageNr, room);
             setTab('brezinys');
           } : null}
+          // A sanity warning about lubų aukštis is only actionable if the
+          // control it names is one click away.
+          onOpenAssumptions={() => setTab('rules')}
+          focusSanityNonce={sanityFocus}
         />
       )}
 

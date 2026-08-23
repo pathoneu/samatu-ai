@@ -305,6 +305,38 @@ def _prepare_native_pdf(pdf_bytes: bytes, pages: list[dict],
 # override on the pass-1 stream (do NOT change the global client).
 VISION_TIMEOUT_S = 600.0
 
+# consistency_checker check name → (LT message, LT hint) for the sanity banner.
+# The checker's own messages are English developer prose meant for the audit
+# report under parsed["_consistency_checks"]; these are what the estimator
+# reads. Missing key ⇒ the raw English falls through (visible, not silent).
+_CONSISTENCY_LT: dict[str, tuple[str, str]] = {
+    "room_count": (
+        "Patalpų skaičius plane nesutampa su eksplikacija",
+        "Patikrinkite, ar visos eksplikacijos patalpos rastos brėžinyje — "
+        "trūkstamos patalpos reiškia trūkstamus kiekius.",
+    ),
+    "wall_floor_ratio": (
+        "Sienų ir grindų ploto santykis netipinis",
+        "Tikėtina 2–5×. Patikrinkite lubų aukštį Prielaidose arba ar visos "
+        "patalpos rastos.",
+    ),
+    "height_plausibility": (
+        "Dalies patalpų lubų aukštis neįtikėtinas (norma 2,4–4,0 m)",
+        "Patikrinkite lubų aukštį Prielaidose — jį galima nurodyti kiekvienai "
+        "patalpai atskirai.",
+    ),
+    "perim_geometry": (
+        "Dalies patalpų perimetras per mažas jų plotui",
+        "Patikrinkite patalpų matmenis ir brėžinio mastelį.",
+    ),
+    "height_uniformity": (
+        "Visoms patalpoms priskirtas vienodas standartinis lubų aukštis — "
+        "galimai numatytoji reikšmė, o ne perskaityta iš brėžinio",
+        "Patikrinkite pjūvį arba antspaudą ir, jei reikia, nurodykite aukštį "
+        "Prielaidose.",
+    ),
+}
+
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
 # parents[1] = backend/ (extractor/vision_call.py → extractor/ → backend/)
 _env_file = Path(__file__).resolve().parents[1] / ".env"
@@ -1778,11 +1810,13 @@ def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
     Idempotent: this builder re-runs on every recompute, so prior entries
     tagged `_SAN_ASSUMPTION_FIELD` are dropped before the new ones go in.
 
-    Three sinks because the two live paths build the lt_sanity mirror at
-    different points: /extract-interior builds it AFTER this builder (so
-    `warnings` reaches it), /recompute-interior builds it BEFORE (so the
-    already-materialised `lt_sanity.warnings` has to be appended to directly —
-    same post-hoc pattern as main.py's large-PDF warning).
+    Writes to `warnings` AND, defensively, to an already-materialised
+    `lt_sanity.warnings`. Both live paths now build the mirror AFTER this
+    builder runs (2026-08 loudness pass moved /recompute-interior's mirror
+    below `_build_pozicijos_from_rooms`, so `check_gk_sheets_math` can see the
+    rebuilt pozicijos), which means `warnings` is the channel that actually
+    carries these notes. The `lt_sanity` branch is kept for any caller that
+    hands us a payload with the mirror already attached.
     """
     parsed["_sanitary_assumptions"] = list(notes)
     # Purge FIRST (even with nothing to add) — an override that turns the split
@@ -1790,7 +1824,9 @@ def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
     ws = [w for w in (parsed.get("warnings") or [])
           if w.get("field") != _SAN_ASSUMPTION_FIELD]
     for n in notes:
-        ws.append({"level": "INFO", "field": _SAN_ASSUMPTION_FIELD,
+        ws.append({"level": "INFO", "severity": "low",
+                   "field": _SAN_ASSUMPTION_FIELD,
+                   "source": "sanitary_assumptions",
                    "patalpa_nr": None, "message": n})
     if ws or parsed.get("warnings") is not None:
         parsed["warnings"] = ws
@@ -1799,11 +1835,14 @@ def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
         cur = [w for w in (ls.get("warnings") or [])
                if w.get("field") != _SAN_ASSUMPTION_FIELD]
         for n in notes:
-            cur.append({"level": "INFO", "field": _SAN_ASSUMPTION_FIELD,
+            cur.append({"level": "INFO", "severity": "low",
+                        "field": _SAN_ASSUMPTION_FIELD,
+                        "source": "sanitary_assumptions",
                         "room": "", "message": n})
         ls["warnings"] = cur
         summ = ls.setdefault("summary", {})
         summ["info"] = sum(1 for w in cur if w.get("level") == "INFO")
+        summ["low"] = summ["info"]
 
 
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
@@ -4813,6 +4852,8 @@ def extract_interior(
     # Pure-Python audit (room count vs eksplikacija, wall/floor ratio,
     # height plausibility + uniformity, perim-geometry). Emits a report
     # under parsed["_consistency_checks"] + warnings on failed checks.
+    # `_CONSISTENCY_LT` (module level, next to the other LT copy) turns its
+    # English internals into what the estimator actually reads.
     try:
         from .consistency_checker import run_all_checks as _ck_run
         ck_report = _ck_run(parsed)
@@ -4821,9 +4862,21 @@ def extract_interior(
             existing = parsed.get("warnings") or []
             for c in ck_report["checks"]:
                 if c["status"] in ("WARN", "FAIL"):
+                    # consistency_checker's own `message` is English
+                    # developer prose ("walls/floor = 5.32 > 5.0 — either
+                    # ceiling height very high…"). It used to be pasted into
+                    # the banner verbatim; since FAIL now renders red and
+                    # expanded, translate at the emit site and keep the raw
+                    # detail in the audit report on _consistency_checks.
+                    lt_msg, lt_hint = _CONSISTENCY_LT.get(
+                        c["name"], (f"{c['name']}: {c['message']}", ""))
                     existing.append({
                         "level": c["status"], "source": "consistency_checker",
-                        "message": f"{c['name']}: {c['message']}",
+                        "code": f"consistency_{c['name']}",
+                        "value": c.get("value"),
+                        "expected": c.get("expected"),
+                        "message": lt_msg,
+                        "hint": lt_hint,
                     })
             parsed["warnings"] = existing
             print(f"[extractor] consistency_checker: "
@@ -4845,12 +4898,21 @@ def extract_interior(
         if perim_report["n_needs_reextraction"] > 0:
             existing = parsed.get("warnings") or []
             for fr in perim_report["flagged_rooms"]:
+                # LT, not English: this row renders verbatim in the banner and
+                # is now counted/expanded by default (2026-08 loudness pass).
                 existing.append({
                     "level": "WARN",
-                    "message": (f"Room {fr['room_nr']} ({fr['room_name']}): "
-                                f"perimeter {fr['perim_m']:.1f}m outside geometric "
-                                f"bounds [{fr['lower_bound_m']:.1f}, {fr['upper_bound_m']:.1f}]"
-                                f" for area {fr['area_m2']:.1f}m²"),
+                    "code": "perimeter_out_of_bounds",
+                    "field": "perimetras_m",
+                    "patalpa_nr": fr["room_nr"],
+                    "message": (f"{fr['room_name']} (nr={fr['room_nr']}): perimetras "
+                                f"{fr['perim_m']:.1f} m neįmanomas "
+                                f"{fr['area_m2']:.1f} m² plotui"),
+                    "expected": (f"{fr['lower_bound_m']:.1f}–"
+                                 f"{fr['upper_bound_m']:.1f} m"),
+                    "actual": f"{fr['perim_m']:.1f} m",
+                    "hint": "Patikrinkite patalpos matmenis ir brėžinio mastelį "
+                            "— perimetras nesiderina su plotu.",
                     "source": "perimeter_validator",
                 })
             parsed["warnings"] = existing
@@ -4863,41 +4925,14 @@ def extract_interior(
         print(f"[extractor] perimeter_validator failed (non-fatal): {exc}")
 
     # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
-    # SanityWarningsBanner.jsx expects this V8 shape; new extractor uses flat
-    # `_lt_warnings`. Normalize level WARN → WARNING to match UI's level enum.
-    # Also merges `warnings[]` (Vision-emitted + auto eksplikacija-missing INFO)
-    # so the user sees BOTH STR sanity AND pipeline-level notes in one banner.
+    # SanityWarningsBanner.jsx. Builder is shared with /recompute-interior and
+    # /api/projects/{id}/revalidate (extractor/sanity_mirror.py) — the three
+    # hand-rolled copies drifted and dropped `severity`/`hint`/`code`/`actual`,
+    # which silently demoted every `severity="high"` §6 check (sanity_checks.py
+    # emits severity and no level) into a collapsed, uncounted blue INFO row.
     try:
-        flat_warnings = parsed.get("_lt_warnings") or []
-        pipeline_warnings = parsed.get("warnings") or []
-        ui_warnings = []
-        for w in flat_warnings + pipeline_warnings:
-            level = w.get("level", "INFO")
-            if level == "WARN":
-                level = "WARNING"
-            ui_warnings.append({
-                "level": level,
-                "room": w.get("patalpa_nr") or w.get("room") or "",
-                "field": w.get("field", ""),
-                "value": w.get("value"),
-                "expected": w.get("expected"),
-                "message": w.get("message", ""),
-            })
-        rooms_total = parsed.get("patalpos") or []
-        n_err = sum(1 for w in ui_warnings if w["level"] == "ERROR")
-        n_warn = sum(1 for w in ui_warnings if w["level"] == "WARNING")
-        n_info = sum(1 for w in ui_warnings if w["level"] == "INFO")
-        parsed["lt_sanity"] = {
-            "warnings": ui_warnings,
-            "summary": {
-                "rooms_count": len(rooms_total),
-                "total_area_m2": round(parsed.get("bendras_plotas_m2", 0), 1),
-                "warnings_count": n_err + n_warn,
-                "errors": n_err,
-                "warnings": n_warn,
-                "info": n_info,
-            },
-        }
+        from .sanity_mirror import build_lt_sanity
+        parsed["lt_sanity"] = build_lt_sanity(parsed)
     except Exception as exc:
         print(f"[extractor] lt_sanity mirror emit failed: {exc}")
 

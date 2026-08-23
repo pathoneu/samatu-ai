@@ -15,6 +15,12 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 
 
+# Every warning this module emits carries this tag, so a re-run (revalidate /
+# recompute) can drop the previous batch instead of stacking duplicates — and
+# so `extractor/sanity_mirror.py` can tell the banner which validator spoke.
+SOURCE = "sanity_checks"
+
+
 @dataclass
 class Warning:
     code: str
@@ -25,11 +31,25 @@ class Warning:
     actual: str         # human-readable actual value
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        # `severity` is the load-bearing field: sanity_mirror maps high/med →
+        # a counted, expanded WARNING row and low → a collapsed INFO one.
+        # There is deliberately NO `level` key here — severity is the source
+        # of truth for these checks.
+        return {**asdict(self), "source": SOURCE}
 
 
 def _sum_field(rooms, field):
     return sum(float(r.get(field) or 0) for r in rooms)
+
+
+def _lt(value, digits: int = 2) -> str:
+    """Format a number the Lithuanian way — decimal COMMA.
+
+    These strings are user-visible and, since the 2026-08 loudness pass, the
+    first thing an estimator reads on a project we have never seen. A dotted
+    `6.10×` in an otherwise Lithuanian sentence reads as a typo.
+    """
+    return f"{value:.{digits}f}".replace(".", ",")
 
 
 def check_paintable_wall_to_floor(rooms):
@@ -45,11 +65,12 @@ def check_paintable_wall_to_floor(rooms):
         return None
     return Warning(
         code="paintable_floor_ratio",
-        message=f"Sienų plotas {ratio:.2f}× grindų ploto",
-        hint="Turi būti 2.5-4×. Patikrink ar langai/durys teisingai atimti, lubų aukštis tinkamas.",
+        message=f"Dažomas sienų plotas {_lt(ratio)}× grindų ploto",
+        hint="Tikėtina 2,5–4×. Patikrinkite lubų aukštį Prielaidose ir ar "
+             "langai bei durys atimti.",
         severity="med" if 2.0 < ratio < 4.5 else "high",
-        expected="2.5-4.0",
-        actual=f"{ratio:.2f}",
+        expected="2,5–4,0×",
+        actual=f"{_lt(ratio)}×",
     )
 
 
@@ -69,11 +90,15 @@ def check_ceiling_to_floor(rooms):
         return None
     return Warning(
         code="ceiling_floor_mismatch",
-        message=f"Lubų plotas {ratio:.2f}× grindų ploto",
-        hint="Turi būti ~1.0× (plokščios lubos). Jei yra soffitai, pakabintos lubos — patikrink, ar jų plotai teisingi.",
+        message=f"Lubų plotas {_lt(ratio)}× grindų ploto",
+        hint="Plokščioms luboms tikėtina ~1,0×. Jei yra soffitai ar "
+             "pakabinamos lubos — patikrinkite jų plotus.",
         severity="low" if 0.85 < ratio < 1.15 else "med",
-        expected="0.95-1.05 (soffit'ai 0.90-1.10)",
-        actual=f"{ratio:.2f}",
+        # Kept parenthesis-free: the UI renders this inline as
+        # "(tikėtina …)", and a nested paren reads as a typo. The soffit
+        # allowance is spelled out in the hint instead.
+        expected="0,95–1,05×",
+        actual=f"{_lt(ratio)}×",
     )
 
 
@@ -105,11 +130,15 @@ def check_baseboard_perimeter(rooms):
         return None
     return Warning(
         code="baseboard_perimeter_mismatch",
-        message=f"Grindjuostės {total_grind:.1f}m vs tikėtinos ~{expected_grind:.1f}m (perim {total_perim:.1f}m − {door_count} durys × 0.8m)",
-        hint="Turi būti perim − durų pločiai. Patikrink ar shared-walls correction veikia (Sprint 4 Block B), ar durų skaičius atpažintas.",
+        message=(f"Grindjuostės {_lt(total_grind, 1)} m, tikėtina "
+                 f"~{_lt(expected_grind, 1)} m "
+                 f"(perimetras {_lt(total_perim, 1)} m − {door_count} durys × 0,8 m)"),
+        hint="Grindjuostė = patalpų perimetras minus durų pločiai. "
+             "Patikrinkite, ar visos durys atpažintos ir ar bendros sienos "
+             "neskaičiuotos dukart.",
         severity="med",
-        expected=f"~{expected_grind:.1f}m (±10%)",
-        actual=f"{total_grind:.1f}m",
+        expected=f"~{_lt(expected_grind, 1)} m (±10 %)",
+        actual=f"{_lt(total_grind, 1)} m",
     )
 
 
@@ -129,11 +158,13 @@ def check_paint_quantity(rooms):
         return None
     return Warning(
         code="paint_consumption_rate",
-        message=f"Dažų sąnaudos {rate:.3f} l/m² ({paint_l:.1f}l / {paint_m2:.0f} m²)",
-        hint="Turi būti ~0.22 l/m² (2 coats, 9 m²/l). Patikrink paint class — Q4 sugeria daugiau.",
+        message=(f"Dažų sąnaudos {_lt(rate, 3)} l/m² "
+                 f"({_lt(paint_l, 1)} l / {paint_m2:.0f} m²)"),
+        hint="Tikėtina ~0,22 l/m² (2 sluoksniai, 9 m²/l). Patikrinkite dažų "
+             "klasę Prielaidose — Q4 paviršius sugeria daugiau.",
         severity="low",
-        expected="0.18-0.27 l/m²",
-        actual=f"{rate:.3f} l/m²",
+        expected="0,18–0,27 l/m²",
+        actual=f"{_lt(rate, 3)} l/m²",
     )
 
 
@@ -166,11 +197,14 @@ def check_gk_sheets_math(rooms, vision_result=None):
         return None
     return Warning(
         code="gk_sheets_off",
-        message=f"GKP lapų skaičius nesutampa: pozicija {actual_sheets:.0f} vs apskaičiuota {expected_sheets:.1f} (±5% leistina)",
-        hint="ceil(GKP_lubu_plotas_m² / 3.0) × 1.10 = lapų skaičius. Patikrinkite per-room gkp_lubu_standart_m2.",
+        message=(f"GKP lapų skaičius nesutampa: pozicijoje {actual_sheets:.0f} vnt., "
+                 f"apskaičiuota {_lt(expected_sheets, 1)} vnt. (leistina ±5 %)"),
+        hint="Lapų skaičius = GKP lubų plotas / 3,0 m² (1,2 × 2,5 m lapas), "
+             "suapvalinus į viršų, × 1,10 atliekoms. Patikrinkite lubų GKP "
+             "plotus pagal patalpas.",
         severity="low",
-        expected=f"≈{expected_sheets:.0f} vnt",
-        actual=f"{actual_sheets:.0f} vnt",
+        expected=f"≈{expected_sheets:.0f} vnt.",
+        actual=f"{actual_sheets:.0f} vnt.",
     )
 
 
@@ -196,22 +230,26 @@ def check_window_reveals(rooms):
     if total_reveals == 0:
         return Warning(
             code="window_reveals_zero",
-            message=f"Rasta {window_count} langų, bet angokraščių ilgis 0m",
-            hint="Tikriausiai nesusijungia langai → angokraščių pozicija. Sprint 4 sekantis darbas.",
+            message=f"Rasta {window_count} langų, bet angokraščių ilgis 0 m",
+            hint="Langai neperkelti į angokraščių poziciją — standartiniam "
+                 "langui ~5–7 m (2 × aukštis + 2 × plotis). Patikrinkite langų "
+                 "matmenis Prielaidose arba įveskite angokraščius rankiniu būdu.",
             severity="med",
-            expected=f"~{window_count*5.4:.0f}m (~5–7m per window: 2H + 2W)",
-            actual="0m",
+            expected=f"~{window_count * 5.4:.0f} m",
+            actual="0 m",
         )
     avg = total_reveals / window_count
     if 4.5 <= avg <= 7.5:
         return None
     return Warning(
         code="window_reveal_avg_off",
-        message=f"Vidutinis lango angokraštis {avg:.1f}m × {window_count} langų = {total_reveals:.0f}m",
-        hint="Standartinis langas ~5m angokraščio. Per žemai — patikrink, ar visi angokraščiai įskaičiuoti. Per aukštai — gali būti panoraminis langas.",
+        message=(f"Vidutinis lango angokraštis {_lt(avg, 1)} m × "
+                 f"{window_count} langų = {total_reveals:.0f} m"),
+        hint="Standartiniam langui ~5 m angokraščio. Mažiau — patikrinkite, ar "
+             "visi angokraščiai įskaičiuoti; daugiau — galbūt panoraminis langas.",
         severity="low",
-        expected="4-6m vidurkis",
-        actual=f"{avg:.1f}m",
+        expected="4,5–7,5 m vidurkis",
+        actual=f"{_lt(avg, 1)} m",
     )
 
 
@@ -244,12 +282,21 @@ def run_all_checks(vision_result: dict) -> list[dict]:
                 warnings.append(w.to_dict())
         except Exception as exc:
             # Never fail extraction because a sanity check threw
+            # LT in the UI, Python detail in the log: these rows render
+            # verbatim in the banner, so a stack-y message ("KeyError:
+            # 'plotas_m2'") would land in front of the estimator — the same
+            # leak the 2026-07-28 audit fixed in revalidate.py.
+            print(f"[sanity_checks] {check_fn.__name__} failed: "
+                  f"{type(exc).__name__}: {exc}")
             warnings.append({
                 "code": "sanity_check_error",
-                "message": f"Sanity check {check_fn.__name__} klaida: {exc}",
-                "hint": "Pranešk developer'iui.",
+                "message": (f"Nepavyko atlikti vienos kiekių logikos patikros "
+                            f"({check_fn.__name__}) — šio patikrinimo "
+                            f"rezultato nėra."),
+                "hint": "Kiekius patikrinkite rankiniu būdu.",
                 "severity": "low",
-                "expected": "no exception",
-                "actual": str(type(exc).__name__),
+                "expected": "—",
+                "actual": type(exc).__name__,
+                "source": SOURCE,
             })
     return warnings
