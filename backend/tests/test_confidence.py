@@ -29,7 +29,10 @@ def test_calibrated_class_is_geltona():
     out = _parsed([_room()])
     durys = _find(out, "beapvadinėms durims")
     assert durys["confidence"] == "geltona"
-    assert "−61%" in durys["_confidence_reason"] or "-61%" in durys["_confidence_reason"]
+    # 2026-08-31: reasons guide, never confess — the old string quoted
+    # benchmark error pairs; the new one tells the user what to compare.
+    assert "specifikacija" in durys["_confidence_reason"]
+    assert "%" not in durys["_confidence_reason"]
 
 
 def test_unlisted_class_defaults_zalia():
@@ -47,7 +50,7 @@ def test_apdailos_low_demotes_finish_lines():
     out = _parsed([room])
     paint = _find(out, "glaistymas/dažymas")
     assert paint["confidence"] == "geltona"
-    assert "low confidence" in paint["_confidence_reason"]
+    assert "prielaidomis" in paint["_confidence_reason"], paint["_confidence_reason"]
 
 
 def test_voting_flags_demote_geometry_lines():
@@ -77,7 +80,11 @@ def test_kampai_reason_discloses_calibration():
     out = _parsed([_room(n_partition_walls=3)])
     kampai = _find(out, "kampų montavimas")
     assert kampai["confidence"] == "geltona"
-    assert "kalibr" in kampai["_confidence_reason"].lower()
+    # The calibration confession ("kalibruota pagal 1 rangovo samatą (Beržų)")
+    # leaked a client name and our methodology — the string now explains the
+    # formula and the check instead.
+    assert "kampus plane" in kampai["_confidence_reason"]
+    assert "Berž" not in kampai["_confidence_reason"]
 
 
 def test_angokrasciai_flags_unread_opening_dims():

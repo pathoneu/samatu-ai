@@ -281,19 +281,19 @@ def reconcile_frameless(plan_frameless: int, reader_frameless: int,
     if bendras_tipas == "beapvadines" and premium and n_interior_doors > max(plan, reader):
         return {"count": int(n_interior_doors), "confidence": "geltona",
                 "reason": (f"Brėžinyje nuoroda „visos vidaus durys — beapvadinės" + chr(34) +
-                           f"; pritaikyta visoms {n_interior_doors} vidaus durims (pradinis pass rado {plan}) — patikrink")}
+                           f"; pritaikyta visoms {n_interior_doors} vidaus durims — patikrinkite pagal durų specifikaciją")}
     if bendras_tipas == "beapvadines" and not premium:
         # Surface the governing note but don't auto-expand on a non-premium project.
         return {"count": max(plan, reader), "confidence": "geltona",
-                "reason": f"Pastaba mini beapvadines duris, bet archetipas ne premium — pritaikyta tik aiškiai pažymėtoms ({max(plan, reader)}); patikrink"}
+                "reason": f"Brėžinio pastaba mini beapvadines duris — pritaikyta tik aiškiai pažymėtoms ({max(plan, reader)}); patikrinkite pagal durų specifikaciją"}
 
     if reader > plan:
         return {"count": reader, "confidence": "geltona",
-                "reason": f"Anotacijose/žymėse rasta {reader} beapvadinių durų, pradinis pass rado {plan} — patikrink"}
+                "reason": f"Brėžinio žymėse rasta {reader} beapvadinių durų, plane matyti {plan} — patikrinkite pagal durų specifikaciją"}
     if reader < plan and reader > 0:
         # conflict — keep the plan count, surface both, never silently lower
         return {"count": plan, "confidence": "geltona",
-                "reason": f"Plane rasta {plan} beapvadinių durų, žymėse/anotacijose {reader} — nesutampa, patikrink"}
+                "reason": f"Plane matyti {plan} beapvadinių durų, o žymėse — {reader}: skaičiai nesutampa, patikrinkite pagal durų specifikaciją"}
     # agree (or reader gave nothing): trust the plan count
     if reader == plan and reader > 0:
         return {"count": plan, "confidence": "zalia", "reason": ""}

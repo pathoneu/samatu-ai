@@ -28,14 +28,45 @@ _SEVERITY = {ZALIA: 0, GELTONA: 1, RAUDONA: 2}
 
 # (substring of aprasymas, confidence, measured reason) — 2-anchor calibration
 CLASS_RULES: list[tuple[str, str, str]] = [
+    # USER-FACING STRINGS (rewritten 2026-08-31). The founder caught the old
+    # ones on screen: they quoted benchmark error pairs ("−61%/−64% vs rangovo
+    # samatas (2 projektai)"), named a CLIENT project (Beržų) and spoke in
+    # internal jargon ("Simbolių recall"). That is methodology confession, not
+    # guidance — it tells a contractor "this number is tuned on someone else's
+    # job and we don't trust it", and leaks another customer's project name
+    # into every future user's screen. The calibration facts now live HERE as
+    # comments; the string the user sees says what the number is based on and
+    # what to check. Never put client names, benchmark counts, error
+    # percentages or pipeline jargon in the third tuple element — the
+    # vocabulary guard test enforces this.
+    #
+    # (calibration: hidden doors under-read −61%/−64% on both anchor projects)
     ("beapvadinėms durims", GELTONA,
-     "Vision nepastebi paslėptų durų: −61%/−64% vs rangovo samatas (2 projektai)"),
-    ("silikonavimas", GELTONA, "Sisteminis trūkumas: −39%/−68% vs rangovą (2 projektai)"),
-    ("skylių gręžimas plytelėse", GELTONA, "Simbolių recall: −11%/−21% (2 projektai)"),
-    ("45° pjovimas", GELTONA, "Nestabili formulė: +15%/−63% (2 projektai)"),
-    ("lentynėlių", GELTONA, "Skaičius iš simbolių: −20%/+33% (2 projektai)"),
-    ("praustuvės", GELTONA, "Simbolių skaičiavimas: ±40% (2 projektai)"),
-    ("klozeto montavimas", GELTONA, "Simbolių/bide skaičiavimas: 0%/−40% (2 projektai)"),
+     "Paslėptos (beapvadinės) durys brėžinyje sunkiai įžiūrimos — dalis jų "
+     "dažnai lieka nesuskaičiuota. Palyginkite su durų specifikacija."),
+    # (calibration: −39%/−68% under-read)
+    ("silikonavimas", GELTONA,
+     "Silikonavimo ilgis dažnai būna didesnis, nei matyti plane — patikrinkite "
+     "pagal sanitarinės įrangos ir plytelių sandūras."),
+    # (calibration: symbol recall −11%/−21%)
+    ("skylių gręžimas plytelėse", GELTONA,
+     "Skylių skaičius priklauso nuo santechnikos taškų — suskaičiuokite pagal "
+     "įrangos išdėstymą plane."),
+    # (calibration: unstable +15%/−63%)
+    ("45° pjovimas", GELTONA,
+     "Pjovimo ilgis priklauso nuo vidinių kampų išdėstymo plytelių zonose — "
+     "patikrinkite pagal išklotines."),
+    # (calibration: symbol counts −20%/+33%)
+    ("lentynėlių", GELTONA,
+     "Skaičius nustatytas iš simbolių dušo zonose — patikrinkite brėžinyje."),
+    # (calibration: ±40%)
+    ("praustuvės", GELTONA,
+     "Skaičius nustatytas iš simbolių plane — patikrinkite pagal santechnikos "
+     "planą."),
+    # (calibration: 0%/−40%)
+    ("klozeto montavimas", GELTONA,
+     "Skaičius nustatytas iš simbolių plane — patikrinkite pagal santechnikos "
+     "planą."),
     # 2026-07-29: bidė is read for the first time. LT brėžiniuose the word
     # „bidė" is usually absent — the reader identifies it by POSITION (next to
     # the klozetas) and altitude (~1000-1100 mm), so the count is a genuine
@@ -49,15 +80,25 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     ("vonios maišytuvo", GELTONA,
      "Vonia ir dušo padėklas brėžinyje atrodo panašiai — patikrinkite, ar patalpoje "
      "tikrai yra vonia, ne dušas"),
+    # (calibration: formula fitted to ONE contractor samata incl. the disputed
+    #  half-corner + perimeter term; unvalidated beyond it — keep that fact
+    #  here, not on the contractor's screen)
     ("kampų montavimas", GELTONA,
-     "Formulė kalibruota pagal 1 rangovo samatą (Beržų) — apima ginčytiną "
-     "pusinių kampų ir perimetro dedamąją; tikslumas nepatvirtintas (reikia daugiau etalonų)"),
-    ("rotband", GELTONA, "Dalis nuo sienų ploto (0.30) — priklauso nuo apdailos tikslumo"),
-    ("angokraščių", GELTONA, "Nestabilu tarp projektų: −15%/+1% (2 projektai)"),
+     "Kampų ilgis apskaičiuotas iš patalpų geometrijos (išoriniai kampai × "
+     "aukštis) — suskaičiuokite dažomus kampus plane ir palyginkite."),
+    ("rotband", GELTONA,
+     "Apskaičiuota kaip dalis sienų ploto (30%) — faktinis kiekis priklauso "
+     "nuo sienų būklės."),
+    # (calibration: −15%/+1% between projects)
+    ("angokraščių", GELTONA,
+     "Angokraščių ilgis priklauso nuo angų matmenų — palyginkite su durų ir "
+     "langų sąrašu."),
     # Floor-covering ASSIGNMENT (kuri patalpa plytelės vs parketas vs guma) is
     # paskirtis-heuristic-driven and missed garažas/tambūras floors on both
     # anchor projects (−20%…−100% per-room; parketas +29%).
-    ("grindų plytel", GELTONA, "Dangos priskyrimas pagal paskirtį: −20%/−100% kai kurioms patalpoms (2 projektai)"),
+    ("grindų plytel", GELTONA,
+     "Dangos tipas patalpai parinktas pagal jos paskirtį — patikrinkite, "
+     "kuriose patalpose numatytos plytelės."),
 ]
 
 # OVER-BILLING / app-added scope (reconciliation 2026-06-17 vs Rangovas A samata):
@@ -162,15 +203,15 @@ def apply_confidence(parsed: dict) -> dict:
 
         if apdailos_low and any(s in label for s in _FINISH_PATTERNS):
             conf = _worse(conf, GELTONA)
-            reasons.append("Apdailos planas neaiškus — apdailos skaitytuvas pažymėjo 'low confidence' daliai patalpų")
+            reasons.append("Apdailos planas neaiškiai įskaitomas — dalies patalpų apdaila nustatyta su prielaidomis; patikrinkite apdailų lentelę")
 
         if voting_flags and any(s in label for s in _GEOMETRY_PATTERNS):
             conf = _worse(conf, GELTONA)
-            reasons.append(f"Ekstrakcijos paleidimai nesutarė dėl {len(voting_flags)} patalpų geometrijos")
+            reasons.append(f"AI skaitymai nesutarė dėl {len(voting_flags)} patalpų matmenų — patikrinkite tų patalpų plotus ir perimetrus")
 
         if "kampų montavimas" in label and npw_total == 0:
             conf = _worse(conf, RAUDONA)
-            reasons.append("Gretimybės analizė nerado pertvarų — kampų suma be pusinių kampų (žinomai per maža)")
+            reasons.append("Pertvarų išdėstymo atpažinti nepavyko — kampų suma greičiausiai PER MAŽA. Suskaičiuokite dažomus kampus plane rankiniu būdu")
 
         # Per-project recall gap: an opening whose dims Vision didn't read is
         # silently skipped in the reveal calc. Surface it on the angokraščiai line.
