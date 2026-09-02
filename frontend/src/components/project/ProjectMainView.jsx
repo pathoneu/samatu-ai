@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { getPriceLists } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch } from '@/lib/applyPriceList';
+import { insertRowInSection, nextEilNr } from '@/lib/darbuRows';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
 // A well-formed number over the cap gets magnitude advice, not format advice —
@@ -579,6 +580,22 @@ export default function ProjectMainView({
     onProjectChange?.({ ...project, darbu_sarasas: updated });
   };
 
+  // Contractor ask (2026-09-02): a row must be addable into ANY section, not
+  // only "Kiti darbai".
+  const handleAddRowInSection = (cat) => {
+    const next = {
+      eil_nr: nextEilNr(darbai),
+      aprasymas: t('project.mainView.newRow'),
+      mato_vnt: 'm²',
+      kiekis: 0,
+      kaina: 0,
+      skyrius: cat,
+    };
+    const updated = insertRowInSection(darbai, cat, next, t('project.mainView.otherWorks'));
+    setDarbai(updated);
+    onProjectChange?.({ ...project, darbu_sarasas: updated });
+  };
+
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
   const reviewTargetPage = currentReview ? getRowTargetPage(currentReview, project) : null;
 
@@ -1057,8 +1074,20 @@ export default function ProjectMainView({
                   return categories.map(cat => (
                     <React.Fragment key={`cat-${cat}`}>
                       <tr className="bg-muted/40">
-                        <td colSpan={7} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-                          {cat}
+                        <td colSpan={7} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground">
+                          <span className="flex items-center justify-between gap-2">
+                            {cat}
+                            <button
+                              type="button"
+                              onClick={() => handleAddRowInSection(cat)}
+                              title={t('project.mainView.addRowToSectionTitle', { section: cat })}
+                              aria-label={t('project.mainView.addRowToSectionTitle', { section: cat })}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium normal-case tracking-normal text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              {t('project.mainView.addRow')}
+                            </button>
+                          </span>
                         </td>
                       </tr>
                       {grouped[cat].map((item) => {

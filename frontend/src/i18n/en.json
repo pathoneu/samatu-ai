@@ -1056,7 +1056,8 @@
       "addRowTitle": "Add an empty row — you fill in the name, quantity and price",
       "priceListItemTitle": "Apply the “{{name}}” price list immediately. Manually entered prices are kept; this cannot be undone.",
       "undo": "Undo",
-      "clickToEditPrice": "Click to enter a price. Enter saves and moves to the next row, Esc cancels."
+      "clickToEditPrice": "Click to enter a price. Enter saves and moves to the next row, Esc cancels.",
+      "addRowToSectionTitle": "Add a row to section “{{section}}”"
     },
     "assumptions": {
       "widthPlaceholder": "width",

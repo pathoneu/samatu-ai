@@ -1062,7 +1062,8 @@
       "addRowTitle": "Pridėti tuščią eilutę — pavadinimą, kiekį ir kainą įrašysite patys",
       "priceListItemTitle": "Pritaikyti kainyno „{{name}}\" kainas iš karto. Rankiniu būdu įvestos kainos nekeičiamos, atšaukti nebus galima.",
       "undo": "Atšaukti",
-      "clickToEditPrice": "Spustelėkite ir įveskite kainą. Enter — įrašyti ir pereiti prie kitos eilutės, Esc — atsisakyti."
+      "clickToEditPrice": "Spustelėkite ir įveskite kainą. Enter — įrašyti ir pereiti prie kitos eilutės, Esc — atsisakyti.",
+      "addRowToSectionTitle": "Pridėti eilutę į skyrių „{{section}}“"
     },
     "assumptions": {
       "widthPlaceholder": "plotis",
