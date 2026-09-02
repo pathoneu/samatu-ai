@@ -645,6 +645,10 @@ _SKYRIUS_ENUM = {
     "Plyteles": "tile",
     "Pridetiniai elementai": "extras",
     "Santechnikos darbai/ kondicionavimo darbai": "plumbing",
+    # An export written by a tool that strips diacritics turns the new section
+    # into "Medziagos"; without this it classified as "extras" and the shopping
+    # list scattered back into the work sections on re-import.
+    "Medziagos": "materials",
 }
 
 # Legacy → modern skyrius name migration. Used both in _emit_v8_compat_fields
@@ -659,6 +663,7 @@ _SKYRIUS_ENUM = {
 # a section rename can't decide, from the section alone, whether a line is wall
 # work or ceiling work.
 SKYRIUS_LEGACY_MIGRATION = {
+    "Medziagos": "Medžiagos",
     "Glaistymas dazymas": "Sienų lubų glaistymas dažymas",
     "Glaistymas dažymas": "Sienų lubų glaistymas dažymas",
     "Plyteles": "Plytelių klijavimas",
@@ -925,6 +930,9 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # Which work a "Medžiagos" row belongs to — the UI renders it as
             # muted subtext under the material's name.
             "susijes_darbas": p.get("susijes_darbas"),
+            # …and the flag that SAYS it is a material, so a consumer never has
+            # to string-match the section name to tell goods from labour.
+            "_medziaga": p.get("_medziaga"),
             # 2026-06-14: carry per-line confidence (zalia/geltona/raudona) + its
             # Lithuanian reason into the V8-compat shape so the UI can surface
             # which quantities to double-check, regardless of whether it renders
@@ -1416,6 +1424,12 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
     _SK_GKP = "GKP montavimas"
     _SAL = "skaiciuota_is_brezinio"
 
+    # These two rows ARE the sheets — a count of boards, not an area of labour.
+    # They used to carry a `medziagos_*` copy of themselves as well, which is one
+    # purchase on two priceable lines; the flag says "this row is the goods, move
+    # it, never clone it". The thickness stays in the label because walls take
+    # 12.5 mm and ceilings 9.5 mm: two different products, two price keys.
+    # (2026-09-02)
     pozicijos = []
     if walls_total > 0:
         wall_sheets = math.ceil(walls_total / SHEET * WASTE)
@@ -1423,12 +1437,7 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai sienoms ({wall_thickness} mm)",
             "vnt": "vnt", "kiekis": wall_sheets, "saltinis": _SAL,
-            # Thickness in the material name: walls take 12.5 mm and ceilings
-            # 9.5 mm, so the two are different products — and in the global
-            # Medžiagos section they would otherwise share one label and one
-            # price key. (2026-09-02)
-            "medziagos_aprasymas": f"GKP lapas sienoms {wall_thickness} mm (1200×2500 mm = 3 m²)",
-            "medziagos_kiekis": wall_sheets, "medziagos_vnt": "vnt",
+            _IS_MATERIAL_LINE: True,
         })
     if ceilings_total > 0:
         ceil_sheets = math.ceil(ceilings_total / SHEET * WASTE)
@@ -1436,8 +1445,7 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai luboms ({ceil_thickness} mm)",
             "vnt": "vnt", "kiekis": ceil_sheets, "saltinis": _SAL,
-            "medziagos_aprasymas": f"GKP lapas luboms {ceil_thickness} mm (1200×2500 mm = 3 m²)",
-            "medziagos_kiekis": ceil_sheets, "medziagos_vnt": "vnt",
+            _IS_MATERIAL_LINE: True,
         })
     return pozicijos
 
@@ -1811,6 +1819,28 @@ def migrate_skyrius_row(skyrius: str | None, aprasymas: str | None) -> str:
 # longer WRITTEN onto freshly built rows.
 SK_MEDZIAGOS = "Medžiagos"
 
+# ── Rows that ARE the purchase (2026-09-02, second audit pass) ───────────────
+#
+# A handful of "work" rows in this builder are not labour at all: their kiekis
+# and vnt ARE the material's ("Vonios sienų plytelės" 137 m², "GKP lapai luboms"
+# 61 vnt). Each of them ALSO carried a `medziagos_*` copy of itself, so the
+# extraction produced TWO priceable rows for ONE purchase — and the kainynas
+# auto-fill, which scores substring containment at 0.92, filled both from a
+# single price line: 137 m² of tiles quoted as 275 m² in a client-facing sąmata.
+#
+# `_IS_MATERIAL_LINE` marks such a row: never clone a material off it. When the
+# row also names the work it serves (`susijes_darbas`) and that work is still in
+# the list, `_extract_medziagos_section` MOVES it into the shopping list with its
+# LABEL AND QUANTITY INTACT — the label is the price key an old priced blob
+# matches on, so moving a row cannot move money. Without a resolvable parent the
+# row simply stays where it is. Either way the purchase is billed exactly once.
+#
+# Rows that are a SERVICE with a consumable inside (pastolių nuoma in d.d.,
+# šiukšlių išvežimas in m³, apsauginės dangos) are not marked: their self-copy is
+# dropped so the duplicate dies, but a rental or a haulage line does not belong
+# in a shopping list, and the contractor already prices them all-in.
+_IS_MATERIAL_LINE = "_is_material_line"
+
 # A material row's quantity comes from a consumption norm applied to the work
 # quantity, never from the drawing — say so, and say what to check against.
 _MEDZIAGOS_SALTINIS = "medziagu_norma"
@@ -1864,13 +1894,45 @@ def _extract_medziagos_section(parsed: dict) -> None:
 
     Material order follows work order, which the sort has already grouped by
     section — so the shopping list reads in the same sequence as the sąmata.
+
+    A row flagged `_IS_MATERIAL_LINE` is not cloned but MOVED: it already IS the
+    purchase, and a second row for it is the double-billing this pass exists to
+    prevent. It keeps its label (the price key) and its quantity; only its
+    section changes, and only when the work it names is really in the list.
     """
     pozicijos = parsed.get("pozicijos") or []
+    work_labels = {(p.get("aprasymas") or "").strip() for p in pozicijos}
+    kept: list[dict] = []
     materials: list[dict] = []
     for p in pozicijos:
         if (p.get("skyrius") or "") == SK_MEDZIAGOS:
-            continue                      # already extracted (defensive)
+            kept.append(p)                # already extracted (defensive)
+            continue
         parent = (p.get("aprasymas") or "").strip()
+        if p.get(_IS_MATERIAL_LINE):
+            # This row is the goods. Drop any self-copy it still carries and
+            # move it whole — never emit a second row for the same purchase.
+            p.pop("medziagos_aprasymas", None)
+            p.pop("medziagos_kiekis", None)
+            p.pop("medziagos_vnt", None)
+            serves = (p.get("susijes_darbas") or "").strip()
+            if serves and serves in work_labels and serves != parent:
+                p["skyrius"] = SK_MEDZIAGOS
+                p["_medziaga"] = True
+                # Its OWN reason describes its OWN number, so it is kept; a row
+                # that never got one still has to say where its quantity comes
+                # from — a shopping-list line with no explanation is the one a
+                # contractor cannot check.
+                if not (p.get("_confidence_reason") or "").strip():
+                    p["_confidence_reason"] = _MEDZIAGOS_REASON
+                materials.append(p)
+                continue
+            # Nothing to hang it under — leave it where the contractor already
+            # reads it, still billed exactly once.
+            p.pop("susijes_darbas", None)
+            kept.append(p)
+            continue
+        kept.append(p)
         found: list[tuple[str, Any, str]] = []
         # 1. the material embedded on the work row
         ap = p.pop("medziagos_aprasymas", None)
@@ -1898,13 +1960,18 @@ def _extract_medziagos_section(parsed: dict) -> None:
                 "susijes_darbas": parent,
                 "_medziaga": True,
                 "confidence": p.get("confidence") or "zalia",
-                "_confidence_reason": (p.get("_confidence_reason")
-                                       or _MEDZIAGOS_REASON),
+                # The parent's reason explains the PARENT's number — "Iš
+                # eksplikacijos lentelės „Iš viso": 50,00 − 20,00 = 30,00 m²"
+                # under a 37,5 kg bag of glaistas describes a different
+                # quantity in a different unit, which reads as a mistake. A
+                # material's own reason is the consumption norm. (2026-09-02)
+                "_confidence_reason": _MEDZIAGOS_REASON,
             })
     if not materials:
+        parsed["pozicijos"] = kept
         return
     _disambiguate_material_labels(materials)
-    parsed["pozicijos"] = list(pozicijos) + materials
+    parsed["pozicijos"] = kept + materials
 
 
 def _consolidate_paint_enabled() -> bool:
@@ -2669,6 +2736,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     gkp_standart = _sum("gkp_lubu_standart_m2")
     gkp_high = _sum("gkp_lubu_virs_3m_m2")
     gkp_total = gkp_standart + gkp_high
+    gkp_parent: str | None = None
     if gkp_total > 0:
         if gkp_standart > 0:
             pozicijos.append({
@@ -2680,12 +2748,19 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "skyrius": SK_GKP, "aprasymas": "GKP lubų montavimas (virš 3 m aukščio)",
                 "vnt": "m2", "kiekis": gkp_high, "saltinis": SAL,
             })
+        # The work every board, profile and screw below is bought FOR. Naming it
+        # is what lets `_extract_medziagos_section` move those rows into the
+        # shopping list and still say what they belong to.
+        gkp_parent = ("GKP lubų montavimas (standartinis aukštis)" if gkp_standart > 0
+                      else "GKP lubų montavimas (virš 3 m aukščio)")
         # Sprint 0 Fix 1: separate 9.5mm ceiling sheets from 12.5mm wall sheets.
         # Current data model only tracks ceiling GKP; sienos_gkp_m2=0 until wall
         # GKP fields are added to the extraction schema.
-        pozicijos.extend(build_gkp_pozicijos([
+        for _sheet_row in build_gkp_pozicijos([
             {"sienos_gkp_m2": 0, "lubos_gkp_m2": gkp_total}
-        ]))
+        ]):
+            _sheet_row["susijes_darbas"] = gkp_parent
+            pozicijos.append(_sheet_row)
         # 2026-05-06 formula audit: split CD (laikantieji, ~1.6-1.8 m/m²)
         # vs UW (pakraščio, ~0.4 m/m²) so the bill of materials shows
         # different profile types separately. Total ~2.0 m/m² (was 3.0,
@@ -2693,36 +2768,38 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # docs/formulas/2026-05-06-formula-audit.md §8 (Knauf W111).
         cd_total = round(gkp_total * 1.6, 2)
         uw_total = round(gkp_total * 0.4, 2)
+        # CD / UW / savisriegiai: metres and counts of PRODUCT, not of labour —
+        # the fitting is inside the montavimas m² above. They move to the
+        # shopping list whole; cloning them billed the same profiles twice.
+        # (`GKP siūlių glaistymas` is a genuine labour+material pair: the row is
+        # m of jointing WORK, the material is the tape and filler it consumes.)
         pozicijos.extend([
             {"skyrius": SK_GKP, "aprasymas": "GKP karkaso CD profiliai (laikantieji)",
              "vnt": "m", "kiekis": cd_total, "saltinis": SAL,
-             "medziagos_aprasymas": "CD 60×27 mm (~1.6 m/m² lubų, ~625 mm c/c)",
-             "medziagos_kiekis": cd_total, "medziagos_vnt": "m"},
+             "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True},
             {"skyrius": SK_GKP, "aprasymas": "GKP karkaso UW profiliai (pakraščio)",
              "vnt": "m", "kiekis": uw_total, "saltinis": SAL,
-             "medziagos_aprasymas": "UW 28×27 mm pakraščio kontūras",
-             "medziagos_kiekis": uw_total, "medziagos_vnt": "m"},
+             "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True},
             {"skyrius": SK_GKP, "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
              "vnt": "m", "kiekis": round(gkp_total * 1.5, 2), "saltinis": SAL,
              "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
              "medziagos_kiekis": round(gkp_total * 1.5, 2), "medziagos_vnt": "m"},
             {"skyrius": SK_GKP, "aprasymas": "Savisriegiai GKP montavimui",
              "vnt": "vnt", "kiekis": int(gkp_total * 30), "saltinis": SAL,
-             # Named, not just normed: as a stand-alone row in the Medžiagos
-             # section "~30 vnt/m² lubų" says nothing about WHAT to buy.
-             "medziagos_aprasymas": "Savisriegiai GKP (~30 vnt/m² lubų)",
-             "medziagos_kiekis": int(gkp_total * 30), "medziagos_vnt": "vnt"},
+             "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True},
         ])
 
     # Reviziniai dureliai voniose (1 vnt per drėgnam patalpą)
     rev_dureliai = sum(1 for r in rooms
                        if _pask(r) in WET)
     if rev_dureliai > 0:
+        # The hatches themselves — one count, one purchase. When there is a GKP
+        # ceiling to fit them into they join the shopping list under it;
+        # otherwise the row stays here. Either way it is billed once.
         pozicijos.append({
             "skyrius": SK_GKP, "aprasymas": "Reviziniai dureliai (vamzdžių prieiga)",
             "vnt": "vnt", "kiekis": rev_dureliai, "saltinis": SAL,
-            "medziagos_aprasymas": "Reviziniai dureliai 200×200 mm",
-            "medziagos_kiekis": rev_dureliai, "medziagos_vnt": "vnt",
+            "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True,
         })
 
     # ════════════════════════════════════════════════════════════════════════
@@ -2756,13 +2833,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "medziagos_kiekis": round(kiekis * 5.0, 2),
             "medziagos_vnt": "kg",
         })
+        # The tiles themselves (already carrying the 8% waste). This row IS the
+        # purchase — it used to clone itself into a second priceable line, and
+        # one kainynas entry then filled BOTH: 137 m² of tiles quoted as 275.
         pozicijos.append({
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelės",
             "vnt": "m2", "kiekis": round(kiekis * 1.08, 2), "saltinis": SAL,
-            "medziagos_aprasymas": f"{vieta} plytelės (m² + 8% atliekų)",
-            "medziagos_kiekis": round(kiekis * 1.08, 2),
-            "medziagos_vnt": "m2",
+            "susijes_darbas": f"{vieta} plytelių klijavimas",
+            _IS_MATERIAL_LINE: True,
         })
         pozicijos.append({
             "skyrius": SK_PL,
@@ -3044,7 +3123,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_HI,
             "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
             "vnt": "vnt", "kiekis": n_wet_zones, "saltinis": SAL,
-            "medziagos_aprasymas": "Hidroizoliacijos medžiaga + sandarinimo juostelė (×2 sluoksniai)",
+            # The kg are the MEMBRANE only (2 × 1,5 kg/m²). The old label also
+            # promised the sealing tape, whose quantity is metres of wet-room
+            # perimeter (`_detail_juostele_m`) and is not in this number — a
+            # shopping-list row must not name something its kiekis does not
+            # cover. The tape itself stays inside the work line above, which
+            # says so in its own name. (2026-09-02)
+            "medziagos_aprasymas": "Hidroizoliacinė medžiaga (2 sluoksniai)",
             "medziagos_kiekis": membrana_kg, "medziagos_vnt": "kg",
             # Detail fields — frontend can show on expand
             "_detail_m2": hidro_m2,
@@ -3068,10 +3153,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pvc_grindys = _sum("pvc_grindys_m2")
     if pvc_grindys > 0:
         pozicijos.extend([
+            # The underlay roll itself — same m² as the row it used to clone.
             {"skyrius": SK_GR, "aprasymas": "Grindų dangos pamušalas",
              "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
-             "medziagos_aprasymas": "Pamušalo membrana",
-             "medziagos_kiekis": pvc_grindys, "medziagos_vnt": "m2"},
+             "susijes_darbas": "Parketo / laminato klojimas",
+             _IS_MATERIAL_LINE: True},
             {"skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
              "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
              "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
@@ -3085,8 +3171,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_GR, "aprasymas": "Slenksniai (perėjimai tarp patalpų)",
             "vnt": "vnt", "kiekis": n_slenksniai, "saltinis": SAL,
-            "medziagos_aprasymas": "Slenksnis (alu / mediena)",
-            "medziagos_kiekis": n_slenksniai, "medziagos_vnt": "vnt",
+            "susijes_darbas": "Parketo / laminato klojimas",
+            _IS_MATERIAL_LINE: True,
         })
 
     # ════════════════════════════════════════════════════════════════════════
@@ -3526,11 +3612,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if high_ceiling_dazymo > 0:
         # ~1 d.d. per ~50 m² didelio aukščio dažomo ploto
         pastoliu_dd = max(1, round(high_ceiling_dazymo / 50))
+        # A RENTAL priced in darbo dienos. Its old "Pastoliai (mobilūs)" copy was
+        # the same d.d. on a second priceable line — the same duplicate as the
+        # tiles, and one a hand-priced sąmata bills twice just as easily. Dropped
+        # rather than moved: d.d. of scaffolding is not a shopping-list item.
         pozicijos.append({
             "skyrius": SK_PR, "aprasymas": "Pastolių nuoma (aukštesnių nei 3m)",
             "vnt": "d.d", "kiekis": pastoliu_dd, "saltinis": "lubu_aukstis>3m",
-            "medziagos_aprasymas": "Pastoliai (mobilūs)",
-            "medziagos_kiekis": pastoliu_dd, "medziagos_vnt": "d.d",
         })
 
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
@@ -3540,17 +3628,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # 2026-05-27 calibration (Berzas fixture): 12 m³ / 165,61 m² = 0,0725.
         # Anksčiau 0,06 davė 9,9 m³ (under by -17%).
         siuksliu_m3 = max(1.0, round(bendras_plotas * 0.075, 1))
+        # Both of these were also billing themselves twice (m³ of waste as
+        # "Konteineris + transportas", m² of masking as "PE plėvelė + dažymo
+        # juostos"). They are services with their consumable inside the price —
+        # the contractor quotes them all-in — so the copy is dropped and the
+        # line stays here, priced once, rather than moving to Medžiagos.
         pozicijos.extend([
             {"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
-             "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio",
-             "medziagos_aprasymas": "Konteineris + transportas",
-             "medziagos_kiekis": siuksliu_m3, "medziagos_vnt": "m3"},
+             "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio"},
             {"skyrius": SK_PR, "aprasymas": "Statybvietės sutvarkymas po darbų",
              "vnt": "kompl", "kiekis": 1, "saltinis": SAL},
             {"skyrius": SK_PR, "aprasymas": "Apsauginės dangos / juostos darbų metu",
-             "vnt": "m2", "kiekis": round(bendras_plotas, 2), "saltinis": SAL,
-             "medziagos_aprasymas": "PE plėvelė + dažymo juostos",
-             "medziagos_kiekis": round(bendras_plotas, 2), "medziagos_vnt": "m2"},
+             "vnt": "m2", "kiekis": round(bendras_plotas, 2), "saltinis": SAL},
         ])
 
     # 2026-06-06: collapse the per-coat glaistymas/dažymas split into the

@@ -95,18 +95,102 @@ def test_section_maps_to_the_materials_enum():
 
 def test_the_materials_the_builder_computes_all_land_in_the_section():
     """The families the engine quantifies today. A material that stops being
-    emitted is a silently lost line on the contractor's shopping list."""
+    emitted is a silently lost line on the contractor's shopping list.
+
+    2026-09-02 (second audit pass): the rows that ARE the purchase — tiles, GKP
+    boards, profiles, screws, hatches, underlay, thresholds — are MOVED here
+    under their own labels instead of being cloned, so the needles are the work
+    labels now. Their old clone names are asserted GONE below."""
     out = _built()
     labels = " | ".join(m["aprasymas"] for m in _mats(out))
     for needle in ("Rotband", "Glaistas sienoms", "Gruntas sienoms",
                    "Dažai sienoms", "Glaistas luboms", "Gruntas luboms",
                    "Dažai luboms", "PVC kampuotės", "Grindjuostės",
-                   "GKP lapas luboms", "CD 60×27", "UW 28×27",
-                   "Savisriegiai GKP", "plytelių klijai", "plytelės (m²",
-                   "fugavimo masė", "Hidroizoliacijos medžiaga",
-                   "Savaime išsilyginantis", "Grindų danga", "Slenksnis",
-                   "PE plėvelė"):
+                   "GKP lapai luboms", "CD profiliai", "UW profiliai",
+                   "Savisriegiai GKP", "plytelių klijai", "Vonios sienų plytelės",
+                   "fugavimo masė", "Hidroizoliacinė medžiaga",
+                   "Savaime išsilyginantis", "Grindų danga",
+                   "Grindų dangos pamušalas", "Slenksniai",
+                   "Reviziniai dureliai"):
         assert needle in labels, f"{needle!r} missing from Medžiagos: {labels}"
+
+
+def test_a_purchase_is_never_billed_on_two_rows():
+    """THE P0 (2026-09-02, second audit pass).
+
+    A family of "work" rows in this builder ARE the product: their kiekis and
+    vnt are the material's. Each also carried a `medziagos_*` copy of itself, so
+    one purchase reached the sąmata as TWO priceable rows — and the kainynas
+    auto-fill, which scores substring containment at 0.92, filled both from one
+    price line ("Vonios sienų plytelės" AND "Vonios sienų plytelės (m² + 8%
+    atliekų)"): 137 m² of tiles quoted as 275 m² to a client.
+
+    The invariant, stated so it survives a future emit site: a material must not
+    repeat its parent's quantity AND unit AND its opening words. All three
+    together are the signature of a row cloning itself — and of a price list
+    entry short enough to be contained in both labels, which is how one kainynas
+    line filled two rows. A genuine labour+material pair fails the third test:
+    "Angokraščių apdirbimas GKP" and "GKP juostelės + savisriegiai" are the same
+    metres of the same job, but no single price line matches both, and the
+    contractor really does pay for the fitting and for the strips."""
+    def _head(label):
+        return " ".join((label or "").lower().split()[:2])
+
+    for rooms in (None,
+                  [_room("201", paskirtis="vonia", plotas_m2=8.0, perimetras_m=12.0),
+                   _room("202", paskirtis="virtuve", plotas_m2=14.0, perimetras_m=15.0),
+                   _room("203", lubu_aukstis_m=3.4)]):
+        out = _built(rooms=rooms)
+        works = {p["aprasymas"]: p for p in _works(out)}
+        for m in _mats(out):
+            parent = works.get(m.get("susijes_darbas") or "")
+            if parent is None:
+                continue
+            same = (round(float(m["kiekis"]), 2)
+                    == round(float(parent.get("kiekis") or 0), 2)
+                    and str(m["vnt"]) == str(parent.get("vnt"))
+                    and _head(m["aprasymas"]) == _head(parent["aprasymas"]))
+            assert not same, (
+                f"{m['aprasymas']!r} ({m['kiekis']} {m['vnt']}) is the same "
+                f"purchase as {parent['aprasymas']!r} — one kainynas line "
+                f"prices both and the client is billed twice")
+
+
+def test_the_old_self_clone_labels_are_gone():
+    """Belt and braces for the P0: the clone names must not come back, in the
+    Medžiagos section or anywhere else. Each of these was a second row for a
+    purchase the sąmata already carried."""
+    out = _built(rooms=[_room("101"),
+                        _room("102", paskirtis="vonia", plotas_m2=6.0,
+                              perimetras_m=10.0),
+                        _room("103", lubu_aukstis_m=3.4)])
+    labels = " | ".join(p["aprasymas"] for p in out["pozicijos"])
+    for gone in ("GKP lapas luboms", "GKP lapas sienoms", "CD 60×27",
+                 "UW 28×27", "plytelės (m² + 8% atliekų)", "Pamušalo membrana",
+                 "Slenksnis (alu / mediena)", "Reviziniai dureliai 200×200",
+                 "Pastoliai (mobilūs)", "Konteineris + transportas",
+                 "PE plėvelė + dažymo juostos"):
+        assert gone not in labels, f"{gone!r} is back — one purchase, two rows"
+
+
+def test_a_moved_purchase_keeps_its_label_so_an_old_price_still_lands():
+    """The label is the price key every rebuild matches on. A row that moves
+    into the shopping list must keep the name it was priced under, or a legacy
+    priced project loses the money on it."""
+    out = _built(rooms=[_room("101"),
+                        _room("102", paskirtis="vonia", plotas_m2=6.0,
+                              perimetras_m=10.0)])
+    mats = {m["aprasymas"]: m for m in _mats(out)}
+    tiles = mats.get("Vonios sienų plytelės")
+    assert tiles is not None, sorted(mats)
+    prior = [{"aprasymas": "Vonios sienų plytelės", "kiekis": tiles["kiekis"],
+              "vnt": "m2", "kaina": 24.0, "skyrius": "Plytelių klijavimas"}]
+    merged = _merge_user_edits([dict(p) for p in out["pozicijos"]], prior)
+    row = next(r for r in merged if r["aprasymas"] == "Vonios sienų plytelės")
+    assert row["kaina"] == 24.0
+    assert row["skyrius"] == SK_MEDZIAGOS
+    assert not row.get("_orphaned_after_rebuild"), \
+        "the moved row must be MATCHED, not carried as an orphan duplicate"
 
 
 def test_work_rows_no_longer_embed_their_material():
@@ -154,11 +238,17 @@ def test_counts_stay_whole_numbers():
 
 def test_material_inherits_its_work_row_confidence():
     """A bag of glaistas is exactly as trustworthy as the area it was computed
-    from — never greener, and never separately scored on its own label."""
+    from — never greener, and never separately scored on its own label.
+
+    Applies to CLONED materials, whose quantity is a norm applied to the
+    parent's. A row that was MOVED (`_is_material_line`) carries its own
+    quantity and was scored on it, so it keeps its own tier."""
     out = _built()
     by_label = {p["aprasymas"]: p for p in _works(out)}
     tiers = set()
     for m in _mats(out):
+        if m.get("_is_material_line"):
+            continue
         parent = by_label[m["susijes_darbas"]]
         assert m["confidence"] == (parent.get("confidence") or "zalia"), m
         tiers.add(m["confidence"])
