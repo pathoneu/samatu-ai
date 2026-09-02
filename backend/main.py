@@ -6852,6 +6852,8 @@ def _chat_price_summary(rows: list, vat_rate) -> dict:
 
 # Numeric per-room fields worth totalling for the chat. Keep this list
 # explicit — summing "every numeric key" would roll up shares/ratios too.
+# A source may be a TUPLE of field names when one quantity is stored across
+# more than one key — see `dazai_l` below.
 _CHAT_ROOM_TOTAL_FIELDS = (
     ("plotas_m2", "grindu_plotas_m2"),
     ("perimetras_m", "perimetru_suma_m"),
@@ -6866,7 +6868,12 @@ _CHAT_ROOM_TOTAL_FIELDS = (
     ("grindjuosciu_m", "grindjuosciu_m"),
     ("hidroizoliacija_m2", "hidroizoliacija_m2"),
     ("glaistas_kg", "glaistas_kg"),
-    ("dazai_l", "dazai_l"),
+    # Paint litres live in ONE field after an extraction and in TWO after a
+    # Prielaidos recompute (`dazai_l` = walls, `dazai_luboms_l` = ceiling —
+    # api/recompute_quantities.py). Reading `dazai_l` alone therefore
+    # under-reported the paint to the assistant on every edited project, and
+    # the assistant states that number to the contractor as fact. (F14.)
+    (("dazai_l", "dazai_luboms_l"), "dazai_l"),
     ("gruntas_l", "gruntas_l"),
     ("nisu_metrai", "nisu_metrai"),
     ("angokrasciu_gkp_m", "angokrasciu_gkp_m"),
@@ -6883,19 +6890,21 @@ def _chat_room_summary(rooms: list) -> dict:
     """
     out: dict = {"patalpu_skaicius": len(rooms or []), "apima_visas_patalpas": True}
     for src, dst in _CHAT_ROOM_TOTAL_FIELDS:
+        srcs = (src,) if isinstance(src, str) else src
         total = 0.0
         seen = False
         for r in rooms or []:
             if not isinstance(r, dict):
                 continue
-            try:
-                v = float(r.get(src))
-            except (TypeError, ValueError):
-                continue
-            if v != v:  # NaN
-                continue
-            total += v
-            seen = True
+            for key in srcs:
+                try:
+                    v = float(r.get(key))
+                except (TypeError, ValueError):
+                    continue
+                if v != v:  # NaN
+                    continue
+                total += v
+                seen = True
         if seen and total:
             out[dst] = round(total, 2)
     return out
