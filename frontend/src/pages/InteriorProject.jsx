@@ -663,6 +663,17 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
     setFocusedRoom(room || null);
   };
 
+  // „Pataisyti" / a ⚙ on an assumption-driven term opens Prielaidos ON the
+  // control that produced the wrong number. The nonce is what makes a SECOND
+  // jump to the same field scroll again. (2026-09-02, Patikra.)
+  const [assumptionFocus, setAssumptionFocus] = useState(null);
+  const openAssumptions = (focus = null) => {
+    setTab('rules');
+    setAssumptionFocus(focus
+      ? { ...focus, nonce: (assumptionFocus?.nonce || 0) + 1 }
+      : null);
+  };
+
   // PDF URL iš IndexedDB (sukuriamas blob: URL'as runtime)
   const [pdfUrl, setPdfUrl] = useState(null);
   useEffect(() => {
@@ -888,6 +899,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           focusedPage={focusedPage}
           focusedRoom={focusedRoom}
           onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
+          onOpenAssumptions={openAssumptions}
           onProjectChange={(updated) => {
             updateProject(project.id, updated);
             setProject(updated);
@@ -923,7 +935,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           } : null}
           // A sanity warning about lubų aukštis is only actionable if the
           // control it names is one click away.
-          onOpenAssumptions={() => setTab('rules')}
+          onOpenAssumptions={openAssumptions}
           focusSanityNonce={sanityFocus}
         />
       )}

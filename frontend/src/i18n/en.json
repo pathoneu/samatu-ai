@@ -1070,7 +1070,8 @@
       "priceListItemTitle": "Apply the “{{name}}” price list immediately. Manually entered prices are kept; this cannot be undone.",
       "undo": "Undo",
       "clickToEditPrice": "Click to enter a price. Enter saves and moves to the next row, Esc cancels.",
-      "addRowToSectionTitle": "Add a row to section “{{section}}”"
+      "addRowToSectionTitle": "Add a row to section “{{section}}”",
+      "openLedgerTitle": "Click to see how this number was calculated"
     },
     "assumptions": {
       "widthPlaceholder": "width",
@@ -1248,6 +1249,37 @@
     },
     "workspace": {
       "measExportLabel": "Export measurements"
+    },
+    "ledger": {
+      "title": "How this was calculated",
+      "close": "Close",
+      "unitPrice": "Unit price",
+      "total": "Total",
+      "assumption": "Assumption",
+      "rollUp": "Calculation steps",
+      "rollUpTitle": "Expand every calculation step",
+      "roomsCount": "Rooms ({{count}})",
+      "excluded": "Excluded ({{count}})",
+      "showAll": "show all ({{count}})",
+      "showLess": "show fewer",
+      "termsTitle": "What this room's share is made of",
+      "page": "p. {{page}}",
+      "pageTitle": "Show room {{room}} on the drawing",
+      "showDrawing": "Show on the drawing",
+      "assumptionGear": "Change the ceiling height of room {{room}}",
+      "manualRow": "Manual row",
+      "manualRowNote": "you entered this quantity yourself; it was not calculated.",
+      "unwired": "A per-room breakdown is not available for this row yet.",
+      "unwiredSource": "Source: {{source}}.",
+      "unwiredNoSource": "This row carries no source marker.",
+      "op": {
+        "sum": "sum",
+        "cap": "cap",
+        "share": "share",
+        "coefficient": "coefficient",
+        "constant": "constant",
+        "anchor": "from table"
+      }
     }
   },
   "shared": {

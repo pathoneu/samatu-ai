@@ -26,6 +26,7 @@ import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOv
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
+import RowDetailPanel from './RowDetailPanel';
 import WallElevationsPanel from './WallElevationsPanel';
 import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
@@ -111,6 +112,9 @@ export default function WorkspacePanel({
   onEditRoomZone = null,
   onShowAllRooms = null,
   onRoomRowHover = null,
+  // Patikra (2026-09-02): a fix jumps to the control that produced the wrong
+  // number. `focus` is {field, roomNr} — untargeted when omitted.
+  onOpenAssumptions = null,
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -346,11 +350,24 @@ export default function WorkspacePanel({
     });
   }, [project, onProjectChange, t]);
 
-  // Stable row click — same memo logic
-  const handleRowClick = useCallback((row) => {
-    const r = (project.v8_rooms || project.patalpos || []).find(rr => rr.nr === row._room_nr);
-    if (r && onJumpToPage) onJumpToPage(r.puslapio_nr, r);
-  }, [project.v8_rooms, project.patalpos, onJumpToPage]);
+  // Clicking a quantity row opens „Kaip suskaičiuota" — the ledger, the rooms
+  // behind the number, and the page jumps that used to be this click's ONLY
+  // effect (they now sit on each contributing room, where they point at the
+  // right one instead of at whatever `_room_nr` happened to be stamped).
+  const [detailRow, setDetailRow] = useState(null);
+  const handleRowClick = useCallback((row) => setDetailRow(row), []);
+
+  // The panel holds a captured row; a recompute or a price edit replaces the
+  // array under it. Re-derive by id so the open panel never shows stale numbers.
+  const openDetailRow = useMemo(() => {
+    if (!detailRow) return null;
+    const rows = project.darbu_sarasas || [];
+    const key = detailRow.id || detailRow._id;
+    const fresh = key
+      ? rows.find(r => (r.id || r._id) === key)
+      : rows.find(r => r.eil_nr === detailRow.eil_nr && r.aprasymas === detailRow.aprasymas);
+    return fresh || detailRow;
+  }, [detailRow, project.darbu_sarasas]);
 
   // Latest project, for a callback that fires LATER than the render that made
   // it (the delete-undo toast action).
@@ -697,6 +714,15 @@ export default function WorkspacePanel({
           <PlyteliuSpecsSection specs={project._plyteliu_specs} />
         )}
       </div>
+      {openDetailRow && (
+        <RowDetailPanel
+          row={openDetailRow}
+          rooms={allRooms}
+          onClose={() => setDetailRow(null)}
+          onFocusRoom={onJumpToPage}
+          onOpenAssumptions={onOpenAssumptions}
+        />
+      )}
       {popoverState && (
         <EksplikacijaSourcePopover
           room={popoverState.room}
@@ -998,6 +1024,7 @@ const PositionRow = memo(function PositionRow({
   return (
     <div
       onClick={onClick}
+      title={t('project.mainView.openLedgerTitle')}
       className="grid items-start cursor-pointer hover:bg-muted/40 transition-colors group"
       style={{
         // Narrowed kiekis/kaina/suma columns from 104/86/86 → 88/72/76 so

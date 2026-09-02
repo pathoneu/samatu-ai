@@ -1076,7 +1076,8 @@
       "priceListItemTitle": "Pritaikyti kainyno „{{name}}\" kainas iš karto. Rankiniu būdu įvestos kainos nekeičiamos, atšaukti nebus galima.",
       "undo": "Atšaukti",
       "clickToEditPrice": "Spustelėkite ir įveskite kainą. Enter — įrašyti ir pereiti prie kitos eilutės, Esc — atsisakyti.",
-      "addRowToSectionTitle": "Pridėti eilutę į skyrių „{{section}}“"
+      "addRowToSectionTitle": "Pridėti eilutę į skyrių „{{section}}“",
+      "openLedgerTitle": "Spustelėkite — pamatysite, kaip šis skaičius suskaičiuotas"
     },
     "assumptions": {
       "widthPlaceholder": "plotis",
@@ -1254,6 +1255,37 @@
     },
     "workspace": {
       "measExportLabel": "Eksportuoti matavimus"
+    },
+    "ledger": {
+      "title": "Kaip suskaičiuota",
+      "close": "Uždaryti",
+      "unitPrice": "Vieneto kaina",
+      "total": "Suma",
+      "assumption": "Prielaida",
+      "rollUp": "Skaičiavimo eiga",
+      "rollUpTitle": "Išskleisti visus skaičiavimo žingsnius",
+      "roomsCount": "Patalpos ({{count}})",
+      "excluded": "Neįtraukta ({{count}})",
+      "showAll": "rodyti visas ({{count}})",
+      "showLess": "rodyti mažiau",
+      "termsTitle": "Iš ko susideda šios patalpos dalis",
+      "page": "psl. {{page}}",
+      "pageTitle": "Rodyti patalpą {{room}} brėžinyje",
+      "showDrawing": "Rodyti brėžinyje",
+      "assumptionGear": "Keisti patalpos {{room}} lubų aukštį",
+      "manualRow": "Rankinė eilutė",
+      "manualRowNote": "kiekį įrašėte patys, programa jo neskaičiavo.",
+      "unwired": "Detalizacija pagal patalpas šiai eilutei dar neprieinama.",
+      "unwiredSource": "Šaltinis: {{source}}.",
+      "unwiredNoSource": "Šaltinio žymos šioje eilutėje nėra.",
+      "op": {
+        "sum": "suma",
+        "cap": "riba",
+        "share": "dalis",
+        "coefficient": "koeficientas",
+        "constant": "pastovus",
+        "anchor": "iš lentelės"
+      }
     }
   },
   "shared": {

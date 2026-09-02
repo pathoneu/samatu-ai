@@ -27,7 +27,7 @@ import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
   Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
-  CircleDollarSign, PencilRuler, Target, Sliders, Star,
+  CircleDollarSign, PencilRuler, Target, Sliders, Star, Sigma,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
@@ -45,6 +45,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
 import ReextractButton from './ReextractButton';
+import RowDetailPanel from './RowDetailPanel';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import { useAuth } from '@/lib/authContext';
 import { createSession } from '@/lib/telemetry';
@@ -88,7 +89,7 @@ function groupByCategory(darbu_sarasas, otherLabel) {
 
 // ── Vienas darbo eilutės redaktorius (inline) ────────────────────────────────
 
-function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
+function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
@@ -284,12 +285,20 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
       <td className="px-3 py-2 text-sm text-foreground">
         <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
-          <span
-            className="truncate"
-            title={item.review_reason || item._confidence_reason || item.calculation_basis || sourceLabel}
+          {/* The description is the row's handle: clicking it opens „Kaip
+              suskaičiuota". The price and quantity cells stay separate <td>s,
+              so this cannot swallow an edit click. (2026-09-02, Patikra) */}
+          <button
+            type="button"
+            onClick={() => onOpenLedger?.(item)}
+            disabled={!onOpenLedger}
+            className="truncate text-left hover:underline decoration-dotted underline-offset-2 disabled:no-underline disabled:cursor-default"
+            title={onOpenLedger
+              ? t('project.mainView.openLedgerTitle')
+              : (item.review_reason || item._confidence_reason || item.calculation_basis || sourceLabel)}
           >
             {item.aprasymas}
-          </span>
+          </button>
           {/* 2026-05-06: source badge removed per user — visual clutter. */}
           {confDot}
         </div>
@@ -452,6 +461,14 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
         {item.kaina ? fmtEur(itemSuma) : '—'}
       </td>
       <td className="px-3 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+        {onOpenLedger && (
+          <button onClick={() => onOpenLedger(item)}
+            className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1"
+            title={t('project.mainView.openLedgerTitle')}
+            aria-label={t('project.mainView.openLedgerTitle')}>
+            <Sigma className="w-3.5 h-3.5" />
+          </button>
+        )}
         {onJumpToSource && targetPage && (
           <button onClick={() => onJumpToSource(targetPage, item)}
             className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1" title={t('project.mainView.openSourceTitle', { page: targetPage })}>
@@ -526,6 +543,10 @@ export default function ProjectMainView({
     };
   }, [project?.id]);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
+  // „Kaip suskaičiuota" (2026-09-02, Patikra): the row whose ledger is open.
+  // Re-derived from the live array below so a recompute under an open panel
+  // refreshes it instead of freezing yesterday's number on screen.
+  const [detailRow, setDetailRow] = useState(null);
   const [reviewDraftQty, setReviewDraftQty] = useState('');
   const [takeoffQuery, setTakeoffQuery] = useState('');
   const [takeoffMode, setTakeoffMode] = useState(TAKEOFF_FILTER_MODES.all);
@@ -544,6 +565,17 @@ export default function ProjectMainView({
     [darbai],
   );
   const currentReview = useMemo(() => getFirstReviewRow(darbai), [darbai]);
+
+  // The open ledger panel holds a captured row; every price keystroke replaces
+  // the array under it. Re-derive by id so it never shows a stale quantity.
+  const openDetailRow = useMemo(() => {
+    if (!detailRow) return null;
+    const key = detailRow.id || detailRow._id;
+    const fresh = key
+      ? darbai.find(r => (r.id || r._id) === key)
+      : darbai.find(r => r.eil_nr === detailRow.eil_nr && r.aprasymas === detailRow.aprasymas);
+    return fresh || detailRow;
+  }, [detailRow, darbai]);
 
   useEffect(() => {
     if (currentReview) setReviewDraftQty(String(currentReview.kiekis ?? 0).replace('.', ','));
@@ -1173,6 +1205,7 @@ export default function ProjectMainView({
                             onRemove={() => handleRowRemove(idx)}
                             targetPage={targetPage}
                             onJumpToSource={onJumpToPage}
+                            onOpenLedger={setDetailRow}
                           />
                         );
                       })}
@@ -1208,6 +1241,16 @@ export default function ProjectMainView({
           {t('project.mainView.accuracyNote')}
         </p>
       </div>
+
+      {openDetailRow && (
+        <RowDetailPanel
+          row={openDetailRow}
+          rooms={project.v8_rooms || project.patalpos || []}
+          onClose={() => setDetailRow(null)}
+          onFocusRoom={onJumpToPage}
+          onOpenAssumptions={onOpenAssumptions}
+        />
+      )}
     </div>
   );
 }

@@ -133,6 +133,9 @@ export default function InteriorWorkspace({
   focusedRoom = null,
   onJumpToPage = null,
   onProjectChange = null,
+  // Patikra (2026-09-02): „Pataisyti" has to land on the control that produced
+  // the wrong number, so the jump carries {field, roomNr} through to Prielaidos.
+  onOpenAssumptions = null,
 }) {
   const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -587,6 +590,7 @@ export default function InteriorWorkspace({
       >
         <WorkspacePanel
           project={project}
+          onOpenAssumptions={onOpenAssumptions}
           focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
           hiddenRoomNrs={hiddenRoomNrs}
           onToggleRoomVisibility={handleToggleRoomVisibility}
