@@ -14,7 +14,7 @@ import {
   createProject, updateProject, getPriceLists, pullPriceListsFromBackend,
   markPriceFillPending,
 } from '@/lib/projectStore';
-import { autoFillFromDefaultPriceList } from '@/lib/applyPriceList';
+import { autoFillFromDefaultPriceList, describeAmbiguous } from '@/lib/applyPriceList';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
@@ -249,7 +249,7 @@ async function withAutoPrices(payload, t) {
       { applied, exact, similar, name }), { duration: 8000 });
     if (ambiguous?.length) {
       toast.warning(t('project.mainView.toastAmbiguous', { count: ambiguous.length }),
-        { duration: 8000 });
+        { duration: 8000, description: describeAmbiguous(ambiguous, t) });
     }
     return out.project;
   } catch (e) {

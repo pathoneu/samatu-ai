@@ -30,7 +30,7 @@ import {
   CircleDollarSign, PencilRuler, Target, Sliders, Star,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
-import { applyPriceListToPositions, manualPricePatch } from '@/lib/applyPriceList';
+import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
 import { insertRowInSection, nextEilNr } from '@/lib/darbuRows';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
@@ -161,6 +161,11 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
   }[sourceKind] || 'border-slate-500/20 bg-slate-500/10 text-muted-foreground';
   const rowId = item._id || `${item.eil_nr}-${item.aprasymas}`;
   const isCountUnit = String(item.mato_vnt || '').toLowerCase().includes('vnt');
+  const kainynasPriced = item.kaina_source === 'kainynas';
+  // The matcher scores 1.0 only when the two descriptions are the same once
+  // folded; anything less is a judgement call the user should see.
+  const approxMatch = kainynasPriced
+    && item.kaina_match_score != null && item.kaina_match_score < 1;
 
   const handleSave = () => {
     // LT decimal comma: parseFloat('12,5') silently returned 12 and an empty
@@ -296,6 +301,31 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
             {t('project.mainView.materialFor', { work: item.susijes_darbas })}
           </div>
         )}
+        {/* A row the last recompute could not reproduce is CARRIED, not deleted
+            — its quantity is the old one. The flag existed since 2026-07-28 and
+            nothing rendered it, so the user could not tell a stale line from a
+            fresh one, let alone act on it. (2026-09-02) */}
+        {item._orphaned_after_rebuild && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+              title={t('project.mainView.orphanTitle')}
+            >
+              <AlertCircle className="w-3 h-3" />
+              {t('project.mainView.orphanBadge')}
+            </span>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(item)}
+                className="text-[10px] underline decoration-dotted underline-offset-2 text-muted-foreground hover:text-red-600"
+                title={t('project.mainView.removeTitle')}
+              >
+                {t('project.mainView.orphanRemove')}
+              </button>
+            )}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
       <td className="px-3 py-2 text-sm text-foreground text-right tabular-nums">
@@ -385,8 +415,32 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
             className="w-20 bg-card border border-primary rounded outline-none text-right text-sm tabular-nums px-1.5 py-0.5"
           />
         ) : item.kaina ? (
-          <span className="underline decoration-dotted decoration-transparent hover:decoration-current underline-offset-2">
-            {fmtEur(item.kaina)}
+          <span className="inline-flex items-center justify-end gap-1">
+            <span className="underline decoration-dotted decoration-transparent hover:decoration-current underline-offset-2">
+              {fmtEur(item.kaina)}
+            </span>
+            {/* WHERE the price came from. `kaina_source` has been written since
+                the kainynas shipped and nothing read it — so a price the
+                matcher guessed at from a merely SIMILAR row looked exactly like
+                one the contractor typed. Amber says "check this one".
+                (2026-09-02) */}
+            {kainynasPriced && (
+              <span
+                aria-hidden="true"
+                title={approxMatch
+                  ? t('project.mainView.priceFromKainynasSimilarTitle')
+                  : t('project.mainView.priceFromKainynasTitle')}
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  approxMatch ? 'bg-amber-500' : 'bg-primary/50'}`}
+              />
+            )}
+            {kainynasPriced && (
+              <span className="sr-only">
+                {approxMatch
+                  ? `${t('project.mainView.priceFromKainynas')} — ${t('project.mainView.priceFromKainynasSimilar')}`
+                  : t('project.mainView.priceFromKainynas')}
+              </span>
+            )}
           </span>
         ) : (
           <span className="text-muted-foreground italic underline decoration-dotted underline-offset-2">
@@ -1048,6 +1102,14 @@ export default function ProjectMainView({
           </Button>
         </div>
 
+        {/* LT contractors habitually quote a work rate „su medžiagomis". Since
+            the materials became their own section, entering an all-in rate on a
+            work row AND letting the kainynas price the materials bills the same
+            purchase twice — so say what these prices are. (2026-09-02) */}
+        <div className="px-4 py-2 border-b border-border bg-muted/10 text-xs text-muted-foreground">
+          {t('project.mainView.worksAreLabourOnly')}
+        </div>
+
         {darbai.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground text-sm">
             {t('project.mainView.emptyList')}
@@ -1217,7 +1279,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     // hand — a silent skip inside "praleista" would never get looked at.
     if (primary.ambiguous?.length) {
       toast.warning(t('project.mainView.toastAmbiguous', { count: primary.ambiguous.length }),
-        { duration: 8000 });
+        { duration: 8000, description: describeAmbiguous(primary.ambiguous, t) });
     }
   };
 

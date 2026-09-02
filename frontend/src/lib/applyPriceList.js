@@ -223,6 +223,30 @@ export function applyPriceListToPositions(positions, priceItems, options = {}) {
   return { items: next, applied, skipped, exact, similar, ambiguous };
 }
 
+/**
+ * Name the rows the matcher refused to price, the way the recompute already
+ * names its carried rows.
+ *
+ * `applyPriceListToPositions` has always returned `{aprasymas, candidates}` per
+ * ambiguous row, and every one of the three call sites threw all but the count
+ * away — so the user was told "3 rows need a price by hand" and had no way to
+ * find WHICH three in an 80-row sąmata. Takes `t` so it stays translatable
+ * without importing i18n into lib/. Returns undefined when there is nothing to
+ * name, which is what a toast's `description` expects. (2026-09-02)
+ */
+export const AMBIGUOUS_ROWS_SHOWN = 5;
+
+export function describeAmbiguous(ambiguous, t) {
+  const rows = (ambiguous || [])
+    .map((a) => (typeof a === 'string' ? a : a?.aprasymas))
+    .filter(Boolean);
+  if (!rows.length) return undefined;
+  const shown = rows.slice(0, AMBIGUOUS_ROWS_SHOWN).join(' · ');
+  return t('project.mainView.toastAmbiguousRows', {
+    rows: rows.length > AMBIGUOUS_ROWS_SHOWN ? `${shown}…` : shown,
+  });
+}
+
 /** The user's default kainynas, or null. One per user is enforced server-side. */
 export function findDefaultPriceList(priceLists) {
   return (priceLists || []).find(pl => pl?.is_default && (pl.items || []).length) || null;

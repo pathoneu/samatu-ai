@@ -7,6 +7,8 @@ import {
   manualPricePatch,
   findDefaultPriceList,
   autoFillFromDefaultPriceList,
+  describeAmbiguous,
+  AMBIGUOUS_ROWS_SHOWN,
 } from './applyPriceList.js';
 
 test('scorePair: exact match → 1.0', () => {
@@ -418,4 +420,48 @@ test('auto-fill also prices a KŽ project (rows[])', () => {
   const out = autoFillFromDefaultPriceList(kz, [DEFAULT_LIST]);
   assert.equal(out.project.rows[0].kaina, 7.5);
   assert.equal(out.project.rows[0].suma, 75);
+});
+
+// ── the ambiguous rows are NAMED, not just counted (2026-09-02) ──────────────
+//
+// `applyPriceListToPositions` has always returned {aprasymas, candidates} per
+// row it refused to price, and all three call sites passed only the count on to
+// the toast — so the user was told "3 rows need a price by hand" with no way to
+// find WHICH three in an 80-row sąmata.
+
+const tRows = (_key, vars) => vars.rows;
+
+test('describeAmbiguous names the rows the matcher refused to price', () => {
+  const list = [
+    { aprasymas: 'Sienų glaistymas Q2', candidates: [] },
+    { aprasymas: 'Sienų glaistymas Q4', candidates: [] },
+  ];
+  assert.equal(describeAmbiguous(list, tRows),
+    'Sienų glaistymas Q2 · Sienų glaistymas Q4');
+});
+
+test('describeAmbiguous truncates a long list instead of flooding the toast', () => {
+  const list = Array.from({ length: 9 }, (_, i) => ({ aprasymas: `Eilutė ${i + 1}` }));
+  const out = describeAmbiguous(list, tRows);
+  assert.ok(out.endsWith('…'), out);
+  assert.equal(out.split(' · ').length, AMBIGUOUS_ROWS_SHOWN);
+});
+
+test('describeAmbiguous returns undefined when there is nothing to name', () => {
+  assert.equal(describeAmbiguous([], tRows), undefined);
+  assert.equal(describeAmbiguous(undefined, tRows), undefined);
+  assert.equal(describeAmbiguous([{ candidates: [] }], tRows), undefined);
+});
+
+test('the ambiguity guard really does report the row it skipped', () => {
+  // End-to-end: two price lines within the margin at DIFFERENT prices → the
+  // row must come back named, not silently folded into "praleista".
+  const out = applyPriceListToPositions(
+    [{ aprasymas: 'Sienų glaistymas', vnt: 'm²', kiekis: 10 }],
+    [{ aprasymas: 'Sienų glaistymas Q2', vnt: 'm²', kaina: 6 },
+     { aprasymas: 'Sienų glaistymas Q4', vnt: 'm²', kaina: 11 }],
+  );
+  assert.equal(out.applied, 0);
+  assert.deepEqual(out.ambiguous.map(a => a.aprasymas), ['Sienų glaistymas']);
+  assert.equal(describeAmbiguous(out.ambiguous, tRows), 'Sienų glaistymas');
 });

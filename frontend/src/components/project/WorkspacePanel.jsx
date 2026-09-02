@@ -8,8 +8,11 @@
  */
 
 import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff, Ruler,
+  AlertCircle,
 } from 'lucide-react';
 import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
@@ -109,6 +112,7 @@ export default function WorkspacePanel({
   onShowAllRooms = null,
   onRoomRowHover = null,
 }) {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
   const [filter, setFilter] = useState('');
@@ -314,11 +318,44 @@ export default function WorkspacePanel({
     onProjectChange({ ...project, darbu_sarasas: updated });
   }, [project, onProjectChange]);
 
+  // Delete one row, recoverable for 6 s — the same Gmail-undo contract
+  // ProjectMainView uses, so a stale carried row can be dismissed from EITHER
+  // table without a confirm dialog and without being unrecoverable.
+  // (2026-09-02, alongside the `_orphaned_after_rebuild` badge.)
+  const handleRowRemove = useCallback((row) => {
+    if (!onProjectChange) return;
+    const list = project.darbu_sarasas || [];
+    const idx = list.indexOf(row);
+    if (idx < 0) return;
+    onProjectChange({ ...project, darbu_sarasas: list.filter((_, i) => i !== idx) });
+    toast(t('project.mainView.toastRowDeleted'), {
+      duration: 6000,
+      action: {
+        label: t('project.mainView.undo'),
+        onClick: () => {
+          // Read the CURRENT list, not the one captured at delete time — an
+          // edit made in between must not be reverted by this reinsert.
+          const current = latestProjectRef.current?.darbu_sarasas || [];
+          const at = Math.min(Math.max(idx, 0), current.length);
+          onProjectChange({
+            ...latestProjectRef.current,
+            darbu_sarasas: [...current.slice(0, at), row, ...current.slice(at)],
+          });
+        },
+      },
+    });
+  }, [project, onProjectChange, t]);
+
   // Stable row click — same memo logic
   const handleRowClick = useCallback((row) => {
     const r = (project.v8_rooms || project.patalpos || []).find(rr => rr.nr === row._room_nr);
     if (r && onJumpToPage) onJumpToPage(r.puslapio_nr, r);
   }, [project.v8_rooms, project.patalpos, onJumpToPage]);
+
+  // Latest project, for a callback that fires LATER than the render that made
+  // it (the delete-undo toast action).
+  const latestProjectRef = useRef(project);
+  useEffect(() => { latestProjectRef.current = project; });
 
   const focusedRowRef = useRef(null);
   useEffect(() => {
@@ -618,6 +655,16 @@ export default function WorkspacePanel({
           onToggle={null}
           top={0}
         />
+        {/* LT contractors habitually quote a work rate „su medžiagomis". Since
+            the materials became their own section, entering an all-in rate on a
+            work row AND letting the kainynas price the materials bills the same
+            purchase twice — so say what these prices are. (2026-09-02) */}
+        <div className="px-3 py-1.5 text-muted-foreground"
+             style={{ fontSize: 10, lineHeight: 1.4,
+                      background: 'hsl(var(--muted) / 0.25)',
+                      borderBottom: '1px solid hsl(var(--border) / 0.5)' }}>
+          {t('project.mainView.worksAreLabourOnly')}
+        </div>
         {positionGroups.map(group => (
           <PositionGroup
             key={group.skyrius}
@@ -629,6 +676,7 @@ export default function WorkspacePanel({
             onQuantityChange={handleQuantityChange}
             onQuantityAdjust={handleQuantityAdjust}
             onPriceChange={handlePriceChange}
+            onRemoveRow={handleRowRemove}
           />
         ))}
         {positionGroups.length === 0 && filter && (
@@ -809,6 +857,7 @@ const PositionGroup = memo(function PositionGroup({
   onQuantityChange,
   onQuantityAdjust,
   onPriceChange,
+  onRemoveRow,
 }) {
   return (
     <div>
@@ -849,6 +898,7 @@ const PositionGroup = memo(function PositionGroup({
           onQuantityChange={(q) => onQuantityChange(row._id || `${row.eil_nr}-${row.aprasymas}`, q)}
           onQuantityAdjust={(delta) => onQuantityAdjust(row._id || `${row.eil_nr}-${row.aprasymas}`, delta)}
           onPriceChange={(p) => onPriceChange(row._id || `${row.eil_nr}-${row.aprasymas}`, p)}
+          onRemove={onRemoveRow ? () => onRemoveRow(row) : null}
         />
       ))}
     </div>
@@ -865,7 +915,9 @@ const PositionRow = memo(function PositionRow({
   onQuantityChange,
   onQuantityAdjust,
   onPriceChange,
+  onRemove,
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [draftPrice, setDraftPrice] = useState('');
   const [editingQty, setEditingQty] = useState(false);
@@ -908,6 +960,11 @@ const PositionRow = memo(function PositionRow({
   const sum = (row.kiekis || 0) * (row.kaina || 0);
   const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
   const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
+  const kainynasPriced = row.kaina_source === 'kainynas';
+  // The matcher scores 1.0 only when the two descriptions are the same once
+  // folded; anything less is a judgement call the user should see.
+  const approxMatch = kainynasPriced
+    && row.kaina_match_score != null && row.kaina_match_score < 1;
 
   const beginEdit = (e) => {
     e.stopPropagation();
@@ -1062,16 +1119,38 @@ const PositionRow = memo(function PositionRow({
       ) : (
         <span
           onClick={beginEdit}
-          className="mono tabular cursor-text whitespace-nowrap group-hover:underline group-hover:decoration-dotted"
+          className="mono tabular cursor-text whitespace-nowrap inline-flex items-center justify-end gap-1"
           style={{
             fontSize: 11,
             color: row.kaina ? 'hsl(var(--muted-foreground))' : 'hsl(var(--muted-foreground) / 0.6)',
             textAlign: 'right',
             textUnderlineOffset: 2,
           }}
-          title="Spustelėkite, norėdami redaguoti kainą"
+          title={kainynasPriced
+            ? (approxMatch
+              ? t('project.mainView.priceFromKainynasSimilarTitle')
+              : t('project.mainView.priceFromKainynasTitle'))
+            : 'Spustelėkite, norėdami redaguoti kainą'}
         >
-          {row.kaina ? `${row.kaina.toFixed(2)} €` : '—'}
+          <span className="group-hover:underline group-hover:decoration-dotted">
+            {row.kaina ? `${row.kaina.toFixed(2)} €` : '—'}
+          </span>
+          {/* WHERE the price came from. `kaina_source` has been written since
+              the kainynas shipped and nothing read it — so a price the matcher
+              guessed at from a merely SIMILAR row looked exactly like one the
+              contractor typed. Amber says "check this one". (2026-09-02) */}
+          {row.kaina && kainynasPriced && (
+            <span
+              aria-hidden="true"
+              className="shrink-0 rounded-full"
+              style={{
+                width: 5, height: 5,
+                background: approxMatch
+                  ? 'hsl(var(--warning, 38 92% 50%))'
+                  : 'hsl(var(--primary) / 0.5)',
+              }}
+            />
+          )}
         </span>
       )}
       <span className="mono tabular text-foreground font-medium whitespace-nowrap"
@@ -1089,7 +1168,42 @@ const PositionRow = memo(function PositionRow({
           }}
           title={row.susijes_darbas}
         >
-          Darbui: {row.susijes_darbas}
+          {t('project.mainView.materialFor', { work: row.susijes_darbas })}
+        </div>
+      )}
+      {/* A row the last recompute could not reproduce is CARRIED, not deleted —
+          its quantity is the old one. The flag existed since 2026-07-28 and
+          nothing rendered it, so the user could not tell a stale line from a
+          fresh one, let alone act on it. (2026-09-02) */}
+      {row._orphaned_after_rebuild && (
+        <div
+          className="col-span-6 flex items-center gap-1.5"
+          style={{ gridColumn: 'span 6 / span 6', paddingLeft: 18, paddingTop: 3 }}
+        >
+          <span
+            className="inline-flex items-center gap-1 rounded px-1 uppercase font-semibold"
+            style={{
+              fontSize: 8, lineHeight: '13px',
+              border: '1px solid hsl(var(--warning, 38 92% 50%) / 0.45)',
+              color: 'hsl(var(--warning, 38 92% 50%))',
+              background: 'hsl(var(--warning, 38 92% 50%) / 0.08)',
+            }}
+            title={t('project.mainView.orphanTitle')}
+          >
+            <AlertCircle style={{ width: 9, height: 9 }} />
+            {t('project.mainView.orphanBadge')}
+          </span>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              className="underline decoration-dotted text-muted-foreground hover:text-red-600"
+              style={{ fontSize: 9, textUnderlineOffset: 2 }}
+              title={t('project.mainView.removeTitle')}
+            >
+              {t('project.mainView.orphanRemove')}
+            </button>
+          )}
         </div>
       )}
       {(row._detail_m2 != null || row._detail_juostele_m != null) && (
