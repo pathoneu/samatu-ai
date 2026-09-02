@@ -1826,12 +1826,23 @@ def calc_room_quantities(room: dict,
         "kampai_m": round(kampai, 2),
         # also expose as kampu_metrai (Vision schema name)
         "kampu_metrai": round(kampai, 2),
-        # 2026-06-02: removed kampai_inner_m / kampai_opening_reveals_m /
-        # kampai_pusiniai_m sub-fields. They were added 2026-05-31 to feed
-        # samata item 19's pusiniai breakdown into the eval, but the eval
-        # only reads the parent kampu_metrai total and contractors don't
-        # see the breakdown either. Dead output — collapsed to a single
-        # total to match the simplified KŽ summary.
+        # ── The four addends behind that one number (restored 2026-09-02) ──
+        # Removed 2026-06-02 as "dead output — the eval only reads the parent
+        # total and contractors don't see the breakdown either". The second
+        # half of that stopped being true: kampai is the founder's own example
+        # of a line nobody can check, and the contribution ledger renders these
+        # as the terms inside each room. They ARE the number:
+        #     inner + angos + pusiniai + perimetras == kampu_metrai
+        # Emitted even when zero, so a room that contributes nothing still says
+        # which term is missing rather than going silent.
+        "kampai_inner_m": round(inner_corners_m, 2),
+        "kampai_opening_reveals_m": round(opening_reveals_m, 2),
+        # The pusiniai term as BILLED: computed above regardless, but only in
+        # the total when the project counts partition corners. A term the line
+        # does not contain must not be shown as if it did.
+        "kampai_pusiniai_m": round(
+            pusiniai_m if count_partition_corners else 0.0, 2),
+        "kampai_perimetras_m": round(perim if walls_paint_factor > 0 else 0.0, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "plyteles_sienos_m2": round(plyteles_sienos, 2),
         "plyteles_grindys_m2": round(plyteles_grindys, 2),
@@ -1840,6 +1851,12 @@ def calc_room_quantities(room: dict,
         "grindjuostes_m": round(grindjuostes, 2),
         # also expose as grindjuosciu_m (Vision schema name)
         "grindjuosciu_m": round(grindjuostes, 2),
+        # The two inputs behind it, so the ledger can show the room's own
+        # equation (perimetras − durų pločiai, + 10 % atliekų) instead of a
+        # bare metre count. Zero on a room that gets no plinth at all.
+        "_grindjuosciu_baze_m": round(grindjuostes_base, 2),
+        "_grindjuosciu_duru_m": round(
+            door_widths_total if grindjuostes_base > 0 else 0.0, 2),
         # 2026-06-05: silikonavimas_m — Kampų silikonavimas (corner sealant).
         # Wet rooms (vonia/wc/san) only. Multiplier 2.3 is the data-derived
         # median across projects where the AI extract caught the wet rooms:

@@ -93,6 +93,47 @@ def test_material_row_reasons_are_clean():
         assert not hit, f"banned token {hit.group(0)!r} on {p['aprasymas']!r}: {r}"
 
 
+def test_contribution_ledger_strings_are_clean():
+    """The ledger (2026-09-02) adds a whole new class of user-visible prose:
+    why each room is IN a number, why each one is OUT, and what every roll-up
+    step did. Same net — a contractor reads these the way he reads a reason."""
+    from extractor.vision_call import _build_pozicijos_from_rooms
+
+    out = _build_pozicijos_from_rooms({
+        "patalpos": [
+            {"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+             "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
+             "dazymo_plotas_m2": 65.0, "kampu_metrai": 30.0,
+             "kampai_inner_m": 10.8, "kampai_opening_reveals_m": 1.2,
+             "kampai_pusiniai_m": 0.0, "kampai_perimetras_m": 18.0,
+             "grindjuosciu_m": 16.0, "_grindjuosciu_baze_m": 14.55,
+             "elementai": []},
+            {"nr": "102", "pavadinimas": "Vonia", "paskirtis": "vonia",
+             "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 2.7,
+             "walls_paintable_m2": 0.0, "ceiling_paintable_m2": 6.0,
+             "plyteles_grindys_m2": 6.0, "kampu_metrai": 0.0,
+             "grindjuosciu_m": 0.0, "elementai": []},
+        ],
+        "santrauka": {},
+    })
+    seen = 0
+    for p in out["pozicijos"]:
+        strings = (
+            [c["included_because"] for c in (p.get("contributions") or [])]
+            + [e["excluded_because"] for e in (p.get("excluded") or [])]
+            + [s["label"] for s in (p.get("roll_up") or [])]
+            + [s.get("note") or "" for s in (p.get("roll_up") or [])]
+            + [k for c in (p.get("contributions") or [])
+               for k in (c.get("terms") or {})]
+        )
+        seen += len(strings)
+        for s in strings:
+            m = BANNED.search(s)
+            assert not m, f"banned token {m.group(0)!r} on {p['aprasymas']!r}: {s}"
+    assert seen > 10, "the ledger produced almost no prose — did it stop emitting?"
+
+
 def test_door_reconciliation_reasons_are_clean():
     """Drive every branch of reconcile_frameless and scan the reasons it
     actually returns — banning identifiers in source was the wrong net

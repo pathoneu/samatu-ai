@@ -94,6 +94,13 @@ _VALID_FIELDS = _ASSUMPTION_FIELDS | _GESTURE_FIELDS
 # SUPPLIED but unparseable one is recorded in _degradations (audit fix 3).
 _MISSING = object()
 
+# The four addends behind `kampu_metrai` (restored 2026-09-02 for the
+# contribution ledger). They travel with the parent total through every
+# carry-forward below: a room whose corner metres were recomputed but whose
+# terms were not would render an equation that contradicts its own result.
+_KAMPAI_TERMS = ("kampai_inner_m", "kampai_opening_reveals_m",
+                 "kampai_pusiniai_m", "kampai_perimetras_m")
+
 
 def _num(v, default: float) -> float:
     """Tolerant float coercion — a malformed assumption/room field must degrade,
@@ -246,7 +253,8 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                     # Carry forward the recomputed wall/ceiling/cornice fields.
                     for k in ("walls_gross_m2", "walls_paintable_m2",
                               "ceiling_paintable_m2", "dazymo_plotas_m2",
-                              "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                              "kampai_m", "kampu_metrai", *_KAMPAI_TERMS,
+                              "lubu_karnizo_m",
                               "glaistas_kg", "gruntas_l"):
                         if k in recalc:
                             room[k] = recalc[k]
@@ -287,7 +295,8 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                                               rules={pask: rt})
                 for k in ("walls_gross_m2", "walls_paintable_m2",
                           "ceiling_paintable_m2", "dazymo_plotas_m2",
-                          "kampai_m", "kampu_metrai", "lubu_karnizo_m",
+                          "kampai_m", "kampu_metrai", *_KAMPAI_TERMS,
+                          "lubu_karnizo_m",
                           "glaistas_kg", "gruntas_l",
                           "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2"):
                     if k in recalc:

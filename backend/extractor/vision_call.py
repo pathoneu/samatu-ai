@@ -25,6 +25,7 @@ from .prompt import (
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
 from models_config import model_for
+from . import ledger as _ledger
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
 
@@ -945,6 +946,16 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # `pozicijos` or `darbu_sarasas`.
             "confidence": p.get("confidence"),
             "_confidence_reason": p.get("_confidence_reason"),
+            # 2026-09-02 (Patikra P0): the contribution ledger — which rooms
+            # produced this number, which were left out and why, and the
+            # roll-up that turns them into the billed quantity. Both live
+            # tables read `darbu_sarasas`, so a ledger that stopped here would
+            # never reach the contractor. `_assumption` rides along for the
+            # same reason: 19 rows carry one and not one of them was visible.
+            "contributions": p.get("contributions"),
+            "excluded": p.get("excluded"),
+            "roll_up": p.get("roll_up"),
+            "_assumption": p.get("_assumption"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
@@ -1714,22 +1725,42 @@ def _per_room_provenance(rooms: list[dict], stretch_nrs: set[str],
 
 def _ceiling_paint_base(parsed: dict, rooms: list[dict],
                         stretch_nrs: set[str], per_room_sum: float) -> tuple[float, str | None]:
-    """(billed ceiling m², provenance line or None).
+    """(billed ceiling m², provenance line or None) — see `_ceiling_base_meta`."""
+    meta = _ceiling_base_meta(parsed, rooms, stretch_nrs, per_room_sum)
+    return meta["base"], meta["provenance"]
+
+
+def _ceiling_base_meta(parsed: dict, rooms: list[dict], stretch_nrs: set[str],
+                       per_room_sum: float) -> dict:
+    """Everything about how the billed ceiling quantity was reached.
+
+    Returns `{base, provenance, source, total, label, stretch_m2,
+    unpainted_m2}` where `source` is "anchor" (the eksplikacija's own „Iš viso"
+    minus the rooms nobody paints) or "per_room" (Σ of the rooms' painted
+    ceilings). The contribution ledger needs the numbers, not just the LT
+    sentence — an anchored line is NOT Σ-decomposable and has to say so with an
+    `anchor` roll-up step rather than a Σ nobody can reproduce.
 
     Falls back to `per_room_sum` — today's behaviour — whenever there is no
     anchor, the anchor is implausible, or nothing is left to paint. On those
     paths the provenance still names a stretch-ceiling deduction when one
     happened (`_per_room_provenance`).
     """
+    def _per_room(base: float) -> dict:
+        return {"base": base, "source": "per_room", "total": None, "label": None,
+                "stretch_m2": 0.0, "unpainted_m2": 0.0,
+                "provenance": (_per_room_provenance(rooms, stretch_nrs, base)
+                               if base > 0 else None)}
+
     if per_room_sum <= 0:
-        return per_room_sum, None
+        return {**_per_room(per_room_sum), "provenance": None}
     anchor = parsed.get("_ceiling_anchor") or {}
     try:
         total = float(anchor.get("total_area_m2") or 0)
     except (TypeError, ValueError):
         total = 0.0
     if total <= 0:
-        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
+        return _per_room(per_room_sum)
 
     rooms_sum = round(sum(float(r.get("plotas_m2") or 0) for r in rooms), 2)
     if rooms_sum <= 0 or abs(total - rooms_sum) > _ANCHOR_TOLERANCE * rooms_sum:
@@ -1751,7 +1782,7 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
                     "imtas iš patalpų sąrašo. Patikrinkite, ar eksplikacijoje "
                     "sumuojamos tos pačios patalpos."),
             })
-        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
+        return _per_room(per_room_sum)
 
     stretch_m2 = round(sum(float(r.get("plotas_m2") or 0) for r in rooms
                            if _is_stretch_ceiling(r, stretch_nrs)), 2)
@@ -1761,10 +1792,10 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
         and float(r.get("ceiling_paintable_m2") or 0) <= 0), 2)
     base = round(max(total - stretch_m2 - unpainted_m2, 0.0), 2)
     if base <= 0:
-        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
+        return _per_room(per_room_sum)
 
-    parts = [f"Iš eksplikacijos lentelės „{anchor.get('label') or 'Iš viso'}\": "
-             f"{_lt_num(total)}"]
+    label = anchor.get("label") or "Iš viso"
+    parts = [f"Iš eksplikacijos lentelės „{label}\": {_lt_num(total)}"]
     if stretch_m2 > 0:
         parts.append(f" − {_lt_num(stretch_m2)} (įtempiamos lubos)")
     if unpainted_m2 > 0:
@@ -1772,7 +1803,9 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
     if stretch_m2 > 0 or unpainted_m2 > 0:
         parts.append(f" = {_lt_num(base)}")
     parts.append(" m²")
-    return base, "".join(parts)
+    return {"base": base, "provenance": "".join(parts), "source": "anchor",
+            "total": total, "label": label, "stretch_m2": stretch_m2,
+            "unpainted_m2": unpainted_m2}
 
 
 # ── Sienų / lubų skyrių atskyrimas (2026-09-02 contractor ask F3) ────────────
@@ -2027,8 +2060,9 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     lubos_paint = round(sum(_ceiling_paint_m2(r, stretch_nrs) for r in rooms), 2)
     # The eksplikacija's own "Iš viso", when we have a trustworthy one, replaces
     # the per-room ceiling sum (see `_ceiling_paint_base`).
-    lubos_billed, lubos_provenance = _ceiling_paint_base(
-        parsed, rooms, stretch_nrs, lubos_paint)
+    _lubos_meta = _ceiling_base_meta(parsed, rooms, stretch_nrs, lubos_paint)
+    lubos_billed = _lubos_meta["base"]
+    lubos_provenance = _lubos_meta["provenance"]
     dazymo_total = round(walls_paint + lubos_billed, 2)
     if dazymo_total <= 0:
         parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
@@ -2060,6 +2094,16 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         return xw, hc
 
     _virs = [_room_virs_3m_paint(r) for r in rooms]
+    # PERSIST the per-room split (2026-09-02, Patikra P0). Both live paint rows
+    # existed only as project totals — a contractor could see 203,74 m² billed
+    # "virš 3 m" and had no way to learn which room put it there. Written here,
+    # where it is computed, rather than in `_recompute_per_room_via_python`: the
+    # split depends on the įtempiamos-lubos overrides, which that pass does not
+    # see, and a stored value that goes stale against the billed one is worse
+    # than no value at all.
+    for _r, (_vw, _vc) in zip(rooms, _virs):
+        _r["_paint_virs_3m_sienos_m2"] = round(_vw, 2)
+        _r["_paint_virs_3m_lubu_m2"] = round(_vc, 2)
     walls_virs = min(max(round(sum(v[0] for v in _virs), 2), 0.0), walls_paint)
     # The tier split DISTRIBUTES the billed ceiling total: when the anchor moved
     # it, the virš-3m share must not exceed what we are actually billing.
@@ -2099,6 +2143,71 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
 
     is_q4 = any((p.get("_q_lygis") == "Q4") for p in members)
 
+    # ── The ledger behind each paint line (2026-09-02, Patikra P0) ───────────
+    # Which rooms produced this m², which were left out and why, and — for the
+    # ceiling — the arithmetic that is NOT a Σ (the eksplikacija anchor). See
+    # extractor/ledger.py for the shape and the replay contract.
+    _TIER_LT = {"iki": "iki 3 m", "virs": "virš 3 m"}
+
+    def _paint_rooms(surf: str, tier: str) -> tuple[list[dict], list[dict]]:
+        contribs: list[dict] = []
+        skipped: list[dict] = []
+        for r, (vw, vc) in zip(rooms, _virs):
+            if surf == "Sienų":
+                full = round(float(r.get("walls_paintable_m2") or 0), 2)
+                virs_r = round(min(vw, full), 2)
+                why = ("Dažoma sienų dalis — likusi dengiama plytelėmis"
+                       if 0 < float(r.get("_walls_paint_factor") or 1) < 1
+                       else "Sienos dažomos")
+                why_not = ("Visos sienos dengiamos plytelėmis"
+                           if r.get("_walls_full_tile")
+                           else "Šios patalpos sienos nedažomos")
+            else:
+                full = round(_ceiling_paint_m2(r, stretch_nrs), 2)
+                virs_r = round(min(vc, full), 2)
+                why = "Lubos dažomos"
+                why_not = ("Įtempiamos lubos — glaistymo ir dažymo darbų nėra"
+                           if _is_stretch_ceiling(r, stretch_nrs)
+                           else "Šios patalpos lubos nedažomos")
+            value = {"all": full, "virs": virs_r}.get(tier, round(full - virs_r, 2))
+            if value <= 0:
+                skipped.append(_ledger.excluded(r, why_not if full <= 0 else (
+                    f"Šioje patalpoje {_TIER_LT.get(tier, '')} paviršių nėra")))
+                continue
+            contribs.append(_ledger.contribution(r, value, "m2", why))
+        return contribs, skipped
+
+    def _paint_roll_up(surf: str, tier: str, kiekis: float,
+                       contribs: list[dict]) -> list[dict]:
+        label = _ledger.rooms_label(len(contribs))
+        if tier != "all":
+            label = f"{label} ({_TIER_LT[tier]})"
+        if surf != "Lubų" or _lubos_meta["source"] != "anchor":
+            return [_ledger.sum_step(contribs, label)]
+        # Anchored ceiling: a stated total minus the rooms nobody paints. NOT
+        # Σ-decomposable by construction — that is the honest answer.
+        steps = [_ledger.step(
+            "anchor", f"Eksplikacijos „{_lubos_meta['label']}\"",
+            _lubos_meta["total"], "Patalpų lentelės suma iš brėžinio")]
+        running = float(_lubos_meta["total"])
+        for amount, name in ((_lubos_meta["stretch_m2"], "įtempiamos lubos"),
+                             (_lubos_meta["unpainted_m2"], "nedažomos lubos")):
+            if amount > 0:
+                running = round(running - float(amount), 2)
+                steps.append(_ledger.step(
+                    "sum", f"− {name}", running,
+                    f"Atimta {_lt_num(amount)} m²"))
+        if tier != "all":
+            steps.append(_ledger.step(
+                "share", f"Dalis {_TIER_LT[tier]}", kiekis,
+                "Likusi dalis — atskiroje eilutėje"))
+        return steps
+
+    def _with_ledger(row: dict, surf: str, tier: str) -> dict:
+        contribs, skipped = _paint_rooms(surf, tier)
+        return _ledger.attach(row, contribs, skipped,
+                              _paint_roll_up(surf, tier, row["kiekis"], contribs))
+
     def _surface_lines(surf: str, total: float, virs: float, iki: float,
                        share: float, provenance: str | None) -> list[dict]:
         """iki/virš-3m lines for ONE surface, plus its Q4 sanding line."""
@@ -2113,22 +2222,31 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             base["_confidence_reason"] = provenance
         out: list[dict] = []
         if virs <= 0.01:
-            out.append({**base, "kiekis": total,
-                        "aprasymas": f"{surf} glaistymas/dažymas"})
+            out.append(_with_ledger({**base, "kiekis": total,
+                                     "aprasymas": f"{surf} glaistymas/dažymas"},
+                                    surf, "all"))
         elif iki <= 0.01:
-            out.append({**base, "kiekis": virs, "_height_zone": ">3m",
-                        "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+            out.append(_with_ledger(
+                {**base, "kiekis": virs, "_height_zone": ">3m",
+                 "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"},
+                surf, "virs"))
         else:
-            out.append({**base, "kiekis": iki,
-                        "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"})
-            out.append({**base, "kiekis": virs, "_height_zone": ">3m",
-                        "confidence": "medium", "_medziagos": [],
-                        "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+            out.append(_with_ledger(
+                {**base, "kiekis": iki,
+                 "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"},
+                surf, "iki"))
+            out.append(_with_ledger(
+                {**base, "kiekis": virs, "_height_zone": ">3m",
+                 "confidence": "medium", "_medziagos": [],
+                 "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"},
+                surf, "virs"))
         if is_q4:
-            out.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
-                        "_consolidated": True, "kiekis": total,
-                        "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
-                        "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"})
+            out.append(_with_ledger(
+                {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
+                 "_consolidated": True, "kiekis": total,
+                 "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
+                 "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"},
+                surf, "all"))
         return out
 
     new_lines: list[dict] = (
@@ -2592,12 +2710,36 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # montavimas"). Previously the same metrai were ALSO emitted as
         # vidiniai+išoriniai → the corner length billed ~2×. Outer-corner
         # kampuotės (~30%) carried as the material sub-field.
-        pozicijos.append({
+        _kampai_row = {
             "skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
             "vnt": "m", "kiekis": kampai_total, "saltinis": SAL,
             "medziagos_aprasymas": "PVC kampuotės (išoriniai kampai)",
             "medziagos_kiekis": round(kampai_total * 0.3, 2), "medziagos_vnt": "m",
-        })
+        }
+        # The founder's own example of a line nobody could check: 501,30 m of
+        # corner bead with no way to see which room or which term produced it.
+        # The four addends were restored on the room for exactly this
+        # (universal_rules `kampai_*`); a room saved by an older engine carries
+        # only some of them, and `terms_or_none` drops the set rather than show
+        # an equation that does not add up.
+        _k_contribs, _k_excluded = [], []
+        for r in rooms:
+            _km = round(float(r.get("kampu_metrai") or 0), 2)
+            if _km <= 0:
+                _k_excluded.append(_ledger.excluded(
+                    r, "Sienos nedažomos — kampų armuoti nereikia"))
+                continue
+            _k_contribs.append(_ledger.contribution(
+                r, _km, "m", "Dažomos sienos — kampai armuojami",
+                terms={
+                    "vidiniai kampai": r.get("kampai_inner_m"),
+                    "angų atbrailos": r.get("kampai_opening_reveals_m"),
+                    "pusiniai kampai": r.get("kampai_pusiniai_m"),
+                    "perimetras": r.get("kampai_perimetras_m"),
+                }))
+        pozicijos.append(_ledger.attach(
+            _kampai_row, _k_contribs, _k_excluded,
+            [_ledger.sum_step(_k_contribs, _ledger.rooms_label(len(_k_contribs)))]))
 
     # Angokraščių apdailos (reveal length around openings) + paslėptų durų stakta.
     # 2026-06-06 (RC3): use the calibrated per-room `angokrasciu_gkp_m` field from
@@ -2697,14 +2839,50 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         })
     grindjuostes_total = round(grindjuostes_capped, 2)
     if grindjuostes_total > 0:
+        # The ledger for a CAPPED line. Contributions stay the rooms' own raw
+        # metres and the cap is its own roll-up step, so the chain reads
+        # „Σ 11 patalpų 111,87 → riba 0,65 m/m² 107,67" — the alternative
+        # (pro-rating the rooms silently) hides the one number the contractor
+        # would want to argue with.
+        _g_contribs, _g_excluded = [], []
+        for r in rooms:
+            _gm = round(float(r.get("grindjuosciu_m") or 0), 2)
+            if _gm <= 0:
+                _g_excluded.append(_ledger.excluded(r, (
+                    "Grindys klojamos plytelėmis — grindjuosčių nėra"
+                    if float(r.get("plyteles_grindys_m2") or 0) > 0
+                    else "Šios patalpos grindjuosčių sąmatoje nėra")))
+                continue
+            _baze = r.get("_grindjuosciu_baze_m")
+            _terms = None
+            if _baze is not None:
+                _terms = {"perimetras be durų": round(float(_baze), 2),
+                          "atliekos 10 %": round(_gm - float(_baze), 2)}
+            _g_contribs.append(_ledger.contribution(
+                r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
+        _g_roll = [_ledger.sum_step(_g_contribs,
+                                    _ledger.rooms_label(len(_g_contribs)))]
+        if grindjuostes_raw > grindjuostes_capped + 0.01:
+            _pct = (grindjuostes_capped / grindjuostes_raw * 100
+                    if grindjuostes_raw else 100)
+            _g_roll.append(_ledger.step(
+                "cap", f"Riba {_lt_num(GRINDJUOSCIU_RATIO_CAP)} m/m²",
+                grindjuostes_total,
+                f"Kiekvienos patalpos dalis sumažinta iki {_pct:.0f} %. "
+                "Bendros sienos priklauso dviem patalpoms, todėl "
+                "perimetrų suma jas suskaičiuoja dukart."))
         pozicijos.extend([
-            {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
-             "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL,
-             "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
-             "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
-             "medziagos_vnt": "m"},
-            {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
-             "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
+            _ledger.attach(
+                {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
+                 "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL,
+                 "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
+                 "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
+                 "medziagos_vnt": "m"},
+                _g_contribs, _g_excluded, list(_g_roll)),
+            _ledger.attach(
+                {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
+                 "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
+                _g_contribs, _g_excluded, list(_g_roll)),
         ])
 
     karnizas_total = _sum("lubu_karnizo_m")
