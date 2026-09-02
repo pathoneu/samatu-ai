@@ -235,3 +235,40 @@ def test_a_priced_ceiling_row_keeps_its_price_when_the_quantity_shrinks():
     assert out[0]["kaina"] == 7.5
     assert out[0]["kiekis"] == 160.0
     assert out[0]["suma"] == 1200.0
+
+
+# ── Provenance without an eksplikacija anchor (2026-09-02, browser-found gap) ──
+
+def _ceiling_work_lines(poz):
+    return [p for p in poz
+            if (p.get("aprasymas") or "").startswith("Lubų glaistymas/dažymas")]
+
+
+def test_no_anchor_deduction_is_still_explained():
+    """Without a table total the stretch deduction used to be silent: the
+    ceiling line read the reduced m² and nothing said where the rest went.
+    The founder's transparency rule applies to this path too."""
+    rooms = [_room("101"), _room("102"), _room("103")]
+    out = _build_pozicijos_from_rooms(_parsed(
+        [dict(r) for r in rooms],
+        {"stretch_ceiling_override": {"101": 1}},
+    ))["pozicijos"]
+    lines = _ceiling_work_lines(out)
+    assert lines, "consolidated ceiling line missing"
+    reasons = " | ".join(p.get("_confidence_reason") or "" for p in lines)
+    assert "įtempiamos lubos" in reasons
+    full = round(sum(r["ceiling_paintable_m2"] for r in rooms), 2)
+    dropped = rooms[0]["ceiling_paintable_m2"]
+    billed = round(full - dropped, 2)
+    for v in (full, dropped, billed):
+        assert f"{v:.2f}".replace(".", ",") in reasons
+    # Guide, don't confess — same vocabulary rule the reason guard enforces.
+    for banned in ("Berž", "kalibruot", "rangov", "etalon", "%/"):
+        assert banned.lower() not in reasons.lower()
+
+
+def test_no_anchor_no_stretch_adds_no_provenance():
+    rooms = [_room("101"), _room("102")]
+    out = _build_pozicijos_from_rooms(_parsed([dict(r) for r in rooms]))["pozicijos"]
+    for p in _ceiling_work_lines(out):
+        assert "įtempiamos lubos" not in (p.get("_confidence_reason") or "")

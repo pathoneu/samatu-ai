@@ -1678,12 +1678,34 @@ def _lt_num(v: float) -> str:
     return f"{float(v):.2f}".replace(".", ",")
 
 
+def _per_room_provenance(rooms: list[dict], stretch_nrs: set[str],
+                         per_room_sum: float) -> str | None:
+    """The no-anchor twin of the anchored provenance line.
+
+    Without a table total the ceiling is Σ per-room paintable ceiling, and a
+    room marked įtempiamos simply contributes 0 — which made the deduction
+    silent: the line read 141,67 m² with nothing saying where 23,97 m² went.
+    The founder's transparency rule ("165,61 − 24,30 (įtempiamos lubos) =
+    141,31") applies to this path too. None when nothing was deducted, so a
+    project without stretch rooms keeps its existing reason text.
+    """
+    stretch_m2 = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms
+                           if _is_stretch_ceiling(r, stretch_nrs)), 2)
+    if stretch_m2 <= 0:
+        return None
+    full = round(per_room_sum + stretch_m2, 2)
+    return (f"Patalpų lubų plotas: {_lt_num(full)} − {_lt_num(stretch_m2)} "
+            f"(įtempiamos lubos) = {_lt_num(per_room_sum)} m²")
+
+
 def _ceiling_paint_base(parsed: dict, rooms: list[dict],
                         stretch_nrs: set[str], per_room_sum: float) -> tuple[float, str | None]:
     """(billed ceiling m², provenance line or None).
 
     Falls back to `per_room_sum` — today's behaviour — whenever there is no
-    anchor, the anchor is implausible, or nothing is left to paint.
+    anchor, the anchor is implausible, or nothing is left to paint. On those
+    paths the provenance still names a stretch-ceiling deduction when one
+    happened (`_per_room_provenance`).
     """
     if per_room_sum <= 0:
         return per_room_sum, None
@@ -1693,7 +1715,7 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
     except (TypeError, ValueError):
         total = 0.0
     if total <= 0:
-        return per_room_sum, None
+        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
 
     rooms_sum = round(sum(float(r.get("plotas_m2") or 0) for r in rooms), 2)
     if rooms_sum <= 0 or abs(total - rooms_sum) > _ANCHOR_TOLERANCE * rooms_sum:
@@ -1715,7 +1737,7 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
                     "imtas iš patalpų sąrašo. Patikrinkite, ar eksplikacijoje "
                     "sumuojamos tos pačios patalpos."),
             })
-        return per_room_sum, None
+        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
 
     stretch_m2 = round(sum(float(r.get("plotas_m2") or 0) for r in rooms
                            if _is_stretch_ceiling(r, stretch_nrs)), 2)
@@ -1725,7 +1747,7 @@ def _ceiling_paint_base(parsed: dict, rooms: list[dict],
         and float(r.get("ceiling_paintable_m2") or 0) <= 0), 2)
     base = round(max(total - stretch_m2 - unpainted_m2, 0.0), 2)
     if base <= 0:
-        return per_room_sum, None
+        return per_room_sum, _per_room_provenance(rooms, stretch_nrs, per_room_sum)
 
     parts = [f"Iš eksplikacijos lentelės „{anchor.get('label') or 'Iš viso'}\": "
              f"{_lt_num(total)}"]
