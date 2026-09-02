@@ -741,6 +741,61 @@ def _materials_last(rows: list[dict]) -> list[dict]:
     return work + mats if mats else rows
 
 
+def _reassign_duplicate_ids(rows: list[dict]) -> int:
+    """Re-establish `id` uniqueness on the MERGE OUTPUT. Returns how many moved.
+
+    `assign_position_ids` runs inside the builder, so it only ever sees the
+    rebuilt list. Pass 3 then appends carried orphans keeping the ids they were
+    saved with, and an orphan can legitimately carry a live row's id — a priced
+    legacy label whose id folds onto its successor through `LEGACY_LABEL_KEYS`,
+    for instance. Two rows with one id are indistinguishable to the price index,
+    to the next merge's pass 0 and to a React key, so the duplicate is renamed
+    here rather than shipped.
+
+    THE RULE (mirror this exactly in `frontend/src/lib/mergeDarbuSarasas.js`):
+
+      · rows are claimed in TWO passes — first every row that is NOT flagged
+        `_orphaned_after_rebuild`, in list order, then every carried orphan, in
+        list order. So the rebuilt canonical row always keeps the clean id and
+        the orphan is the one that takes a suffix;
+      · a row with no id is skipped (legacy blobs stay untouched);
+      · claiming `base`: take it if free, else the first free `f"{base}-{n}"`
+        counting up from n = 2. The counting-up (rather than "position among
+        duplicates") is what keeps it collision-free when an orphan already
+        carries a `-2` id from an earlier build.
+
+    Same `-N` shape as `extractor/position_id.assign_position_ids`, so an id
+    minted here and one minted there are indistinguishable downstream.
+    """
+    used: set[str] = set()
+    moved = 0
+
+    def _claim(base: str) -> str:
+        if base not in used:
+            used.add(base)
+            return base
+        n = 2
+        while f"{base}-{n}" in used:
+            n += 1
+        used.add(f"{base}-{n}")
+        return f"{base}-{n}"
+
+    for orphans in (False, True):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if bool(row.get("_orphaned_after_rebuild")) is not orphans:
+                continue
+            base = str(row.get("id") or "").strip()
+            if not base:
+                continue
+            claimed = _claim(base)
+            if claimed != base:
+                row["id"] = claimed
+                moved += 1
+    return moved
+
+
 def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
                       notes: list | None = None) -> list[dict]:
     """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
@@ -784,6 +839,10 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
 
     `notes` (optional, out-param): appended with one dict per carried orphan /
     suppressed line so the endpoint can DISCLOSE what wasn't recomputed.
+
+    Finally `_reassign_duplicate_ids` re-establishes `id` uniqueness over the
+    OUTPUT: pass 3 appends orphans carrying the ids they were saved with, and
+    `assign_position_ids` only ever saw the rebuilt list.
     """
     if notes is None:
         notes = []
@@ -932,7 +991,9 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
         notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
                       "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),
                       "user_edit": has_money})
-    return _materials_last(rebuilt)
+    out = _materials_last(rebuilt)
+    _reassign_duplicate_ids(out)
+    return out
 
 
 @router.post("/recompute-quantities")

@@ -214,6 +214,12 @@ def test_priced_round_trip_keeps_every_price_with_ids_on(blob):
 
     up = _post(blob, poz0, assumptions, 3.1, ds0)
     down = _post(blob, up["pozicijos"], up["assumptions"], 2.8, up["darbu_sarasas"])
+    # The number the round-trip is MEASURED against: the same blob taken
+    # straight to 2,8 in one leg. `>= money0` was the old guard and it could not
+    # fail on the failure it was written for — a doubled row only ever makes the
+    # total bigger. Equality against the one-leg total does.
+    straight = _post(blob, [dict(p) for p in blob["pozicijos"]],
+                     dict(blob.get("_overrides") or {}), 2.8, _priced(blob))
 
     notes = up["_merge_notes"] + down["_merge_notes"]
     renamed = {n["aprasymas"] for n in notes if n.get("reason") == "relabeled"}
@@ -227,8 +233,66 @@ def test_priced_round_trip_keeps_every_price_with_ids_on(blob):
         if row["aprasymas"] in renamed:
             continue
         assert priced_after.get(row["aprasymas"]) == row["kaina"], row["aprasymas"]
-    # …and nothing was double-counted onto a second row.
-    assert _money(down["darbu_sarasas"]) >= money0
+    # …and nothing was double-counted onto a second row: a detour through 3,1 m
+    # must cost exactly what going straight to 2,8 m costs.
+    assert _money(down["darbu_sarasas"]) == _money(straight["darbu_sarasas"])
+    assert _money(down["darbu_sarasas"]) > money0 * 0.9, "the leg lost work"
+    # No row can be reached by two ids, and none by two labels.
+    ids = [r.get("id") for r in down["darbu_sarasas"] if r.get("id")]
+    assert len(set(ids)) == len(ids)
+    labels = [r.get("aprasymas") for r in down["darbu_sarasas"]]
+    assert len(set(labels)) == len(labels)
+
+
+def test_the_merge_output_never_ships_two_rows_with_one_id(blob):
+    """`assign_position_ids` runs inside the BUILDER, so it never sees the merge
+    output. Pass 3 appends carried orphans keeping the ids they were saved with,
+    and an orphan can legitimately carry a live row's id: a hand-priced legacy
+    sanitary label hashes onto its successor through `LEGACY_LABEL_KEYS`. Two
+    rows, one id — indistinguishable to the price index, to the next merge's
+    pass 0 and to a React key."""
+    from api.recompute_quantities import _merge_user_edits
+    rebuilt = _build(blob)
+    successor = "Potinkinio praustuvės maišytuvo potinkinės dalies montavimas"
+    live = next(r for r in rebuilt if r["aprasymas"] == successor)
+    legacy = {"skyrius": "Santechnikos darbai",
+              "aprasymas": "Praustuvės maišytuvo montavimas",
+              "vnt": "vnt", "kiekis": 2,
+              "id": position_id("Santechnikos darbai",
+                                "Praustuvės maišytuvo montavimas"),
+              "kaina": 45.0, "kaina_source": "manual"}
+    assert legacy["id"] == live["id"], "the fold this test depends on is gone"
+
+    # The successor's own prior row comes FIRST, so it wins pass 0 and the
+    # priced legacy row falls all the way through to the orphan carry.
+    prior = [dict(r) for r in rebuilt] + [legacy]
+    merged = _merge_user_edits([dict(r) for r in rebuilt], prior, [])
+
+    ids = [r["id"] for r in merged if r.get("id")]
+    assert len(set(ids)) == len(ids), \
+        sorted(i for i in ids if ids.count(i) > 1)
+    orphan = next(r for r in merged
+                  if r.get("_orphaned_after_rebuild")
+                  and r["aprasymas"] == legacy["aprasymas"])
+    kept = next(r for r in merged if r["aprasymas"] == successor)
+    # The rebuilt canonical row keeps the clean id; the orphan takes the suffix.
+    assert kept["id"] == live["id"]
+    assert orphan["id"] == f"{live['id']}-2"
+
+
+def test_the_suffix_pass_counts_up_past_an_id_that_already_carries_one():
+    """A `-2` an earlier build minted is a real id, not a free slot. Claiming
+    the next free `-N` instead of "position among duplicates" is what keeps the
+    rule collision-free — the frontend port has to count up too."""
+    from api.recompute_quantities import _reassign_duplicate_ids
+    rows = [
+        {"aprasymas": "gyva", "id": "abc"},
+        {"aprasymas": "senas -2", "id": "abc-2", "_orphaned_after_rebuild": True},
+        {"aprasymas": "senas", "id": "abc", "_orphaned_after_rebuild": True},
+        {"aprasymas": "be id"},
+    ]
+    assert _reassign_duplicate_ids(rows) == 1
+    assert [r.get("id") for r in rows] == ["abc", "abc-2", "abc-3", None]
 
 
 def test_the_id_pass_is_a_no_op_on_a_blob_that_has_none(blob):
