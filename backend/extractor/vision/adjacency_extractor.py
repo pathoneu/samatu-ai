@@ -248,6 +248,26 @@ def apply_adjacency_to_rooms(
         room["n_partition_walls"] = adj.n_partition_walls
         room["_exterior_wall_count"] = adj.exterior_wall_count
         room["_adjacency_confidence"] = adj.confidence
+        # KEEP the payload, not just the three scalars it reduces to
+        # (2026-09-02). `n_partition_walls` is one of the four addends behind
+        # every room's corner metres, and until now the only answer to "why 4?"
+        # was the number itself — the neighbour list, the wall types and the
+        # model's own one-line evidence were computed on a paid pass and thrown
+        # away at the call site. Persisted per room, they are the term's
+        # explanation, one dict deep.
+        room["_adjacency"] = {
+            "neighbours": [
+                {"room": a.to_room, "room_nr": a.to_room_nr,
+                 "shared_walls": a.shared_wall_count,
+                 "wall_types": list(a.wall_types or [])}
+                for a in adj.adjacent_rooms
+            ],
+            "wall_types": sorted({t for a in adj.adjacent_rooms
+                                  for t in (a.wall_types or [])}),
+            "exterior_walls": adj.exterior_wall_count,
+            "confidence": adj.confidence,
+            "evidence": adj.evidence,
+        }
         summary["n_partition_walls_total"] += adj.n_partition_walls
         has_exterior = adj.exterior_wall_count > 0
         if has_exterior:

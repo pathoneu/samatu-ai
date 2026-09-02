@@ -538,6 +538,28 @@ def frame_agreement(labels: list[dict], rooms: list[dict]) -> dict:
     return {"agree": agree, "total": total, "ratio": round(ratio, 3)}
 
 
+def _marker_points(markers: list[dict]) -> list[dict]:
+    """The drawable half of a height marker: what it says and where it says it.
+
+    Kept alongside `page` so a room can answer „iš kur šitas 3,4 m?" by
+    pointing at the printed number instead of naming a page. Coordinates are
+    page-relative fractions (the `polygon_pct` / `bbox_pct` frame). Markers
+    with no usable position are simply omitted — a half-placed dot is worse
+    than none.
+    """
+    out: list[dict] = []
+    for m in markers:
+        try:
+            x, y = float(m["x_pct"]), float(m["y_pct"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        out.append({"raw": str(m.get("raw") or ""),
+                    "value_m": m.get("value_m"),
+                    "page": m.get("page"),
+                    "x_pct": round(x, 4), "y_pct": round(y, 4)})
+    return out
+
+
 def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
                             rooms: list[dict]) -> dict:
     """Assign each positioned altitude marker to the room whose outline
@@ -620,6 +642,13 @@ def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
             "page": ms[0]["page"],
             "markers": sorted(m["raw"] for m in ms),
             "values_m": sorted(m["value_m"] for m in ms),
+            # WHERE each marker is printed (2026-09-02). The whole point of
+            # this lane is that a positioned marker is unambiguous because of
+            # its position, and we were throwing the position away — so the
+            # ceiling height a room was billed at could never be pointed at on
+            # the drawing. Page-relative fractions, the same frame polygon_pct
+            # and bbox_pct already live in.
+            "points": _marker_points(ms),
         }
 
     out["rooms_without_marker"] = [
@@ -791,6 +820,7 @@ def assign_markers_by_label_proximity(markers: list[dict], labels: list[dict],
             "method": "label_proximity",
             "markers": sorted(str(m["raw"]) for m in ms),
             "values_m": sorted(m["value_m"] for m in ms),
+            "points": _marker_points(ms),
         }
 
     out["rooms_without_marker"] = [

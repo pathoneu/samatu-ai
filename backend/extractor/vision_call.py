@@ -1400,6 +1400,20 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
 
         # 5. Audit field
         room["_computed_by"] = "python_deterministic"
+        # …and the two counts every opening deduction rides on (2026-09-02).
+        # They were DERIVED from `elementai` on every call and never stored, so
+        # a row could not say "3 durys × 1,125 m²".
+        #
+        # Stored UNDER-PREFIXED on purpose. `calc_room_quantities` reads a bare
+        # `n_doors` off the room it is handed, and `main.py:6498`
+        # (/recompute-interior) hands it the RAW room — so a bare key would
+        # silently change that endpoint's geometry from its 1-door/1-window
+        # default to the real counts. That default IS a defect (it is the one
+        # `api/recompute_quantities._calc_input` exists to prevent), but fixing
+        # it moves billed quantities and belongs in its own measured change,
+        # not in a persistence pass that must stay additive.
+        room["_n_doors"] = counts["n_doors"]
+        room["_n_windows"] = counts["n_windows"]
         # 6. Calculation trace (human-readable for RoomCard)
         H = float(room.get("lubu_aukstis_m") or 2.82)
         perim = float(room.get("perimetras_m") or 0)
@@ -2170,9 +2184,16 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
                            if _is_stretch_ceiling(r, stretch_nrs)
                            else "Šios patalpos lubos nedažomos")
             value = {"all": full, "virs": virs_r}.get(tier, round(full - virs_r, 2))
+            if full <= 0:
+                # A PREDICATE left this room out — that is what the contractor
+                # needs named ("why isn't the garažas in this?").
+                skipped.append(_ledger.excluded(r, why_not))
+                continue
             if value <= 0:
-                skipped.append(_ledger.excluded(r, why_not if full <= 0 else (
-                    f"Šioje patalpoje {_TIER_LT.get(tier, '')} paviršių nėra")))
+                # The room paints this surface, just not in this height tier.
+                # Its sibling line lists it, and the roll-up label already says
+                # which tier this one is — listing it as "excluded" here would
+                # be noise on every room of every ordinary project.
                 continue
             contribs.append(_ledger.contribution(r, value, "m2", why))
         return contribs, skipped
@@ -5444,6 +5465,15 @@ def extract_interior(
             rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
                                            fx.get("counts") or {})
             parsed["detected_symbols_summary"] = rec["merged"]
+            # KEEP the enumeration, not only the counts it collapses into
+            # (2026-09-02). The reader is asked to point-list every fixture
+            # BECAUSE counting from a glance under-reads dense symbols — and
+            # then the list, `{tipas, vieta}` per fixture, was dropped at this
+            # call site. Every santechnika row is billed off these integers, so
+            # the list is the only evidence a contractor could check them
+            # against. Small (tens of short dicts) and already paid for.
+            if fx.get("prietaisai"):
+                parsed["_sanitary_prietaisai"] = fx["prietaisai"]
             parsed.setdefault("_meta", {})["fixtures_raised"] = rec["raised"]
             parsed["_meta"]["fixtures_elapsed_s"] = fx.get("_elapsed_s")
             _emit({"event": "fixtures_completed", "raised": rec["raised"],
