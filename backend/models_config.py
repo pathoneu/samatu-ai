@@ -21,6 +21,10 @@ Exact model IDs (authoritative — never append date suffixes):
       rollback (set MODEL_OVERRIDE=claude-opus-4-8 to restore instantly).
   - ``claude-fable-5``   — evaluated twice (2026-07-03, 2026-07-28),
       lost both times on headline MAE at 2× the price. Not used.
+  - ``claude-fable-5-1`` — evaluated 2026-09-02 (same-day fresh A/B vs opus-5,
+      docs/superpowers/research/2026-09-02-fable51-benchmark.md): mean MAE
+      tie (29.14 vs 29.38), Beržų (contractor truth) 10.66 vs 5.23 — worse,
+      2.4× the cost, +22% wall time, doors reader 3× slower. Not used.
   - ``claude-sonnet-5``  — evaluated 2026-07-28: 24.3%/46.1% MAE on
       Beržų, unusable for LT drawings. Never route vision roles here.
 
