@@ -916,6 +916,7 @@
       "pdfBackupFailed": "The drawing was saved in this browser only — the server upload failed."
     },
     "mainView": {
+      "materialFor": "For work: {{work}}",
       "otherWorks": "Other works",
       "subtract1": "Subtract 1",
       "editQty": "Click to edit the quantity",

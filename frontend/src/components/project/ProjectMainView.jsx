@@ -288,6 +288,14 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage }) {
           {/* 2026-05-06: source badge removed per user — visual clutter. */}
           {confDot}
         </div>
+        {/* Medžiagos rows say which work they belong to — without it a bare
+            "Gruntas" line in the shopping list is unreadable. (2026-09-02) */}
+        {item.susijes_darbas && (
+          <div className="text-[11px] text-muted-foreground truncate mt-0.5"
+               title={item.susijes_darbas}>
+            {t('project.mainView.materialFor', { work: item.susijes_darbas })}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
       <td className="px-3 py-2 text-sm text-foreground text-right tabular-nums">

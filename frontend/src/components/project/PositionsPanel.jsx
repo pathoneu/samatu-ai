@@ -122,6 +122,17 @@ function PositionRow({ row, isActive, isHovered, onClick, onHover, onChange }) {
         <ConfidenceMark row={row} />
         <div className="flex-1 min-w-0">
           <div className="text-foreground/90 leading-snug truncate">{row.aprasymas}</div>
+          {/* Medžiagos rows say which work they belong to — without it a bare
+              "Gruntas" line in the shopping list is unreadable. (2026-09-02) */}
+          {row.susijes_darbas && (
+            <div className="text-[10px] text-muted-foreground/80 leading-tight truncate mt-0.5"
+                 title={row.susijes_darbas}>
+              {/* This panel carries no i18n hook — its sibling line below is a
+                  hardcoded "+ medžiaga:" too. Kept consistent rather than
+                  threading useTranslation through an unmounted component. */}
+              Darbui: {row.susijes_darbas}
+            </div>
+          )}
           {row.medziagos_kiekis != null && row.medziagos_kiekis > 0 && (
             <div className="text-[10px] text-muted-foreground/80 leading-tight truncate mt-0.5">
               + medžiaga: <span className="tabular-nums">{fmt(row.medziagos_kiekis)} {row.medziagos_vnt}</span>

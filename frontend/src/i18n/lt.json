@@ -922,6 +922,7 @@
       "pdfBackupFailed": "Brėžinys išsaugotas tik šioje naršyklėje — nepavyko įkelti į serverį."
     },
     "mainView": {
+      "materialFor": "Darbui: {{work}}",
       "otherWorks": "Kiti darbai",
       "subtract1": "Atimti 1",
       "editQty": "Spauskite, kad pataisytumėte kiekį",

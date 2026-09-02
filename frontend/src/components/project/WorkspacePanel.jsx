@@ -1078,6 +1078,20 @@ const PositionRow = memo(function PositionRow({
         style={{ fontSize: 11, textAlign: 'right' }}>
         {row.kaina ? `${sum.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}
       </span>
+      {/* Medžiagos rows say which work they belong to — without it a bare
+          "Gruntas" line in the shopping list is unreadable. (2026-09-02) */}
+      {row.susijes_darbas && (
+        <div
+          className="col-span-6 text-muted-foreground truncate"
+          style={{
+            gridColumn: 'span 6 / span 6',
+            fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
+          }}
+          title={row.susijes_darbas}
+        >
+          Darbui: {row.susijes_darbas}
+        </div>
+      )}
       {(row._detail_m2 != null || row._detail_juostele_m != null) && (
         <div
           className="col-span-6 text-muted-foreground"

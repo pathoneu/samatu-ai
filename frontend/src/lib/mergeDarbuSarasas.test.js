@@ -245,3 +245,51 @@ test('the real demo blob loses no row and no euro on a 61-row rebuild', () => {
   assert.equal(money(out), money(old));
   assert.equal(carriedOrphans(notes).length, old.length - rebuilt.length);
 });
+
+// ── the Medžiagos section (2026-09-02, contractor ask F2) ────────────────────
+//
+// Materials moved out of the work rows into one global section at the end. For
+// a project priced BEFORE that move, the rebuild adds rows that never existed —
+// so the invariant to pin is that gaining rows costs nothing: no priced row is
+// deleted, and no price migrates onto a material.
+
+test('Medžiagos rows appear without deleting a priced row or moving a price', () => {
+  const old = [
+    { aprasymas: 'Sienų glaistymas/dažymas', kiekis: 100, kaina: 12 },
+    { aprasymas: 'Sienų lyginimas Knauf Rotband', kiekis: 30, kaina: 9 },
+  ];
+  const rebuilt = [
+    { aprasymas: 'Sienų glaistymas/dažymas', kiekis: 100, skyrius: 'Sienų glaistymas dažymas' },
+    { aprasymas: 'Sienų lyginimas Knauf Rotband', kiekis: 30, skyrius: 'Sienų glaistymas dažymas' },
+    { aprasymas: 'Glaistas sienoms (pradinis + baigiamasis)', kiekis: 125, skyrius: 'Medžiagos',
+      susijes_darbas: 'Sienų glaistymas/dažymas' },
+    { aprasymas: 'Rotband (~10 kg/m² esant 5mm storiui)', kiekis: 300, skyrius: 'Medžiagos',
+      susijes_darbas: 'Sienų lyginimas Knauf Rotband' },
+  ];
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, old, notes);
+
+  assert.equal(out.length, 4, 'no orphan carried — every old row was matched');
+  assert.equal(carriedOrphans(notes).length, 0);
+  const by = Object.fromEntries(out.map((r) => [r.aprasymas, r]));
+  // the two priced work rows keep their €/vnt …
+  assert.equal(by['Sienų glaistymas/dažymas'].kaina, 12);
+  assert.equal(by['Sienų lyginimas Knauf Rotband'].kaina, 9);
+  // … and the money did not follow the material into the shopping list.
+  assert.equal(by['Glaistas sienoms (pradinis + baigiamasis)'].kaina, undefined);
+  assert.equal(by['Rotband (~10 kg/m² esant 5mm storiui)'].kaina, undefined);
+  assert.equal(money(out), money(old));
+});
+
+test('a priced material keeps its price across the next rebuild', () => {
+  const mat = {
+    aprasymas: 'Glaistas luboms (pradinis + baigiamasis)', kiekis: 200,
+    skyrius: 'Medžiagos', susijes_darbas: 'Lubų glaistymas/dažymas', kaina: 0.9,
+  };
+  const rebuilt = [{ ...mat, kiekis: 180, kaina: undefined, suma: undefined }];
+  const out = mergeDarbuSarasasEdits(rebuilt, [mat]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].kaina, 0.9);
+  assert.equal(out[0].kiekis, 180, 'the quantity is the rebuild’s, the price is the user’s');
+  assert.equal(out[0].suma, 162);
+});
