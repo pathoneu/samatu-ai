@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Reques
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import logging
 import os
 import time as _time
@@ -4725,6 +4725,31 @@ def _enrich_eilutes(eilutes: list[dict]) -> list[dict]:
 
 _PLAIN_INT_NR = re.compile(r"[0-9]+")
 
+# The order a sąmata's sections are read in. Mirrors SKYRIUS_ORDER inside
+# vision_call._build_pozicijos_from_rooms, which sorts a FRESH extraction; this
+# copy sorts what an EXPORT is handed, which may be a blob saved before the
+# section split. The names are literals rather than the SK_* constants because
+# main.py imports vision_call lazily (circular at module level) — the drift
+# guard is behavioural: tests/test_export_section_order.py builds positions with
+# the canonical builder and asserts the export reproduces its section sequence.
+#
+# Merged and Sienų deliberately SHARE rank 1, exactly as the builder has them: a
+# row still carrying the pre-split section name belongs with the wall work.
+_EXPORT_SKYRIUS_RANK: dict[str, int] = {
+    "Sienų lubų glaistymas dažymas":  1,
+    "Sienų glaistymas dažymas":       1,
+    "Lubų glaistymas dažymas":        2,
+    "GKP montavimas":                 3,
+    "Plytelių klijavimas":            4,
+    "Hidroizoliacija":                5,
+    "Grindys":                        6,
+    "Santechnikos darbai":            7,
+    "Ventiliacijos darbai":           8,
+    "Elektros instaliacijos darbai":  9,
+    "Pridėtiniai elementai":         10,
+    "Medžiagos":                     11,   # the shopping list is always last
+}
+
 
 def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     """Return EXPORT COPIES of `eilutes` whose Nr. column runs 1..N with no gaps.
@@ -4764,13 +4789,24 @@ def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     # (the §FIX-7 complaint: "2 GKP montavimas sections in Excel"). Fresh
     # extractions are sorted server-side and never hit this; a project saved
     # before the paint split can, because its wall and ceiling rows interleave
-    # under one old section and now belong to two. Stable-group by FIRST
-    # appearance: section order and within-section row order are both preserved,
-    # only the duplicate headers go away.
-    order: dict[str, int] = {}
+    # under one old section and now belong to two.
+    #
+    # 2026-09-02 review (F13a): grouping by FIRST APPEARANCE was not enough. A
+    # legacy blob whose first paint row happens to be "Lubų karnizo
+    # sumontavimas" migrates to the Lubų section and used to drag it ahead of
+    # Sienų — but Sienų comes before Lubų everywhere else in the product. Order
+    # by the canonical section order, with first appearance as the tiebreak, so
+    # sections we do not recognise still group and still land after everything
+    # we do. The ranks (and the deliberate merged/Sienų tie) mirror
+    # SKYRIUS_ORDER in vision_call._build_pozicijos_from_rooms; a behavioural
+    # drift guard lives in tests/test_export_section_order.py.
+    first_seen: dict[str, int] = {}
     for e in rows:
-        order.setdefault((e.get("skyrius") or "").strip(), len(order))
-    rows.sort(key=lambda e: order[(e.get("skyrius") or "").strip()])
+        first_seen.setdefault((e.get("skyrius") or "").strip(), len(first_seen))
+    rows.sort(key=lambda e: (
+        _EXPORT_SKYRIUS_RANK.get((e.get("skyrius") or "").strip(), 999),
+        first_seen[(e.get("skyrius") or "").strip()],
+    ))
 
     for i, e in enumerate(rows, 1):
         e["nr"] = str(i)
@@ -6335,12 +6371,30 @@ async def extract_interior_stream_endpoint(
 # already-extracted patalpos[]. Sub-second roundtrip vs minutes for full re-extract.)
 
 class RecomputePayload(BaseModel):
+    # `_ceiling_anchor` arrives under its literal underscored key, and pydantic
+    # v2 reserves leading-underscore ATTRIBUTE names for private state — so the
+    # field is named without one and reaches the key through an alias.
+    # populate_by_name keeps the plain name working for direct callers/tests.
+    model_config = ConfigDict(populate_by_name=True)
+
     patalpos: list[dict]
     rules_override: dict = Field(default_factory=dict)
     # Optional per-room overrides keyed by patalpa.nr (e.g. force tile vs parquet)
     per_room_overrides: dict = Field(default_factory=dict)
     archetipas: str | None = None
     bendras_plotas_m2: float | None = None
+    # The eksplikacijos "Iš viso" the ceiling quantity is billed off
+    # (extractor/vision_call.py `_ceiling_paint_base`). Pydantic silently
+    # DISCARDED it before, so a round trip through here un-anchored the Lubų row
+    # — 60.0 m² reverted to the per-room 58.5 and the provenance line saying
+    # where the number came from vanished with it. (F4, 2026-09-02 review.)
+    ceiling_anchor: dict | None = Field(default=None, alias="_ceiling_anchor")
+    # The reader context `/api/recompute-quantities` already accepts and splats
+    # into `parsed` (_door_types, detected_symbols_summary, _plyteliu_specs,
+    # _symbol_legend, …). `_build_pozicijos_from_rooms` reads all of them, so
+    # without it a rebuild here drops the door/fixture/tile lines and the
+    # frontend's carried-orphans merge has to paper over the loss.
+    context: dict = Field(default_factory=dict)
 
 
 @app.post("/recompute-interior")
@@ -6455,6 +6509,10 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
     # Recompute santrauka + emit V8-compat + lt_sanity mirror
     parsed = {
+        # Reader context FIRST so every explicit key below wins over a stale
+        # copy of itself inside it. Empty by default → byte-identical to before
+        # for any caller that does not send one.
+        **(payload.context or {}),
         "archetipas": payload.archetipas or "standart",
         # `r.get("plotas_m2", 0)` returns None for an EXPLICIT null (the shape a
         # room with an unreadable area actually has in saved blobs), and
@@ -6470,6 +6528,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
     }
+    # The anchor must be in `parsed` BEFORE _build_pozicijos_from_rooms runs —
+    # that is where `_ceiling_paint_base` looks for it. An explicit field wins
+    # over whatever a stale `context` copy carries.
+    if payload.ceiling_anchor:
+        parsed["_ceiling_anchor"] = payload.ceiling_anchor
 
     # Reuse extractor's post-processing helpers
     from extractor.vision_call import (
@@ -6789,6 +6852,8 @@ def _chat_price_summary(rows: list, vat_rate) -> dict:
 
 # Numeric per-room fields worth totalling for the chat. Keep this list
 # explicit — summing "every numeric key" would roll up shares/ratios too.
+# A source may be a TUPLE of field names when one quantity is stored across
+# more than one key — see `dazai_l` below.
 _CHAT_ROOM_TOTAL_FIELDS = (
     ("plotas_m2", "grindu_plotas_m2"),
     ("perimetras_m", "perimetru_suma_m"),
@@ -6803,7 +6868,12 @@ _CHAT_ROOM_TOTAL_FIELDS = (
     ("grindjuosciu_m", "grindjuosciu_m"),
     ("hidroizoliacija_m2", "hidroizoliacija_m2"),
     ("glaistas_kg", "glaistas_kg"),
-    ("dazai_l", "dazai_l"),
+    # Paint litres live in ONE field after an extraction and in TWO after a
+    # Prielaidos recompute (`dazai_l` = walls, `dazai_luboms_l` = ceiling —
+    # api/recompute_quantities.py). Reading `dazai_l` alone therefore
+    # under-reported the paint to the assistant on every edited project, and
+    # the assistant states that number to the contractor as fact. (F14.)
+    (("dazai_l", "dazai_luboms_l"), "dazai_l"),
     ("gruntas_l", "gruntas_l"),
     ("nisu_metrai", "nisu_metrai"),
     ("angokrasciu_gkp_m", "angokrasciu_gkp_m"),
@@ -6820,19 +6890,21 @@ def _chat_room_summary(rooms: list) -> dict:
     """
     out: dict = {"patalpu_skaicius": len(rooms or []), "apima_visas_patalpas": True}
     for src, dst in _CHAT_ROOM_TOTAL_FIELDS:
+        srcs = (src,) if isinstance(src, str) else src
         total = 0.0
         seen = False
         for r in rooms or []:
             if not isinstance(r, dict):
                 continue
-            try:
-                v = float(r.get(src))
-            except (TypeError, ValueError):
-                continue
-            if v != v:  # NaN
-                continue
-            total += v
-            seen = True
+            for key in srcs:
+                try:
+                    v = float(r.get(key))
+                except (TypeError, ValueError):
+                    continue
+                if v != v:  # NaN
+                    continue
+                total += v
+                seen = True
         if seen and total:
             out[dst] = round(total, 2)
     return out

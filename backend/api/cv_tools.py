@@ -86,15 +86,20 @@ def _rate_limit(request: Request, endpoint: str) -> None:
     """F4 (2026-07-04 pentest): the /api/cv/* endpoints render pages via OpenCV
     (CPU) and were fully unauthenticated — a DoS lever. They now require a
     billable user (via Depends); on top of that, key the shared sliding-window
-    rate limiter (main._check_rate_limit) by client IP so one account can't loop
-    the render. Imported lazily to avoid a circular import (main includes this
-    router). Best-effort: never block a request on a limiter hiccup."""
+    rate limiter (main._check_rate_limit) so one account can't loop the render.
+    Imported lazily to avoid a circular import (main includes this router).
+    Best-effort: never block a request on a limiter hiccup.
+
+    2026-09-02 review: the key used to be `request.client.host`, which under
+    production's ``--forwarded-allow-ips='*'`` is the LEFTMOST X-Forwarded-For
+    value — supplied by the caller, so rotating it emptied the bucket every
+    request. `main._client_key` takes the rightmost hop, the one our own proxy
+    appends, which the caller cannot forge."""
     try:
-        from main import _check_rate_limit
+        from main import _check_rate_limit, _client_key
     except Exception:
         return
-    client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(client_ip, f"cv-{endpoint}")
+    _check_rate_limit(_client_key(request), f"cv-{endpoint}")
 
 
 class MatchTemplateBody(BaseModel):

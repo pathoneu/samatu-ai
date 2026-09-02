@@ -877,19 +877,30 @@ def corrections_summary() -> list[dict]:
 # Ownership follows projects EXACTLY, including the NULL-owner write barrier
 # (2026-06-19 hunt): an authenticated caller may never write a row owned by
 # someone else, an owner-less row included.
+#
+# 2026-09-02 review: `user_id` is REQUIRED on every function below and there is
+# no unscoped branch left. Two reasons. `if user_id:` is truthiness, so an empty
+# string — a plausible shape for a mis-wired caller — took the UNSCOPED path and
+# `list_price_lists("")` handed back every user's kainynai. And nothing outside
+# the tests ever wanted the unscoped read: the router always has a session. An
+# owner-less row can therefore no longer be CREATED either; the ones that exist
+# are legacy, and the write barrier below still refuses to hand them to anyone.
 
-def list_price_lists(user_id: str | None = None) -> list[dict]:
-    """All of one user's price lists (newest first). None = every list
-    (single-tenant SAMATU_AUTH_DISABLED mode / admin tooling only)."""
+def _require_user_id(user_id: str) -> str:
+    """Refuse a missing/empty owner loudly instead of widening the query."""
+    if not isinstance(user_id, str) or not user_id:
+        raise ValueError("price list access requires a non-empty user_id")
+    return user_id
+
+
+def list_price_lists(user_id: str) -> list[dict]:
+    """All of one user's price lists, newest first."""
+    _require_user_id(user_id)
     with _conn() as c:
-        if user_id:
-            rows = c.execute(
-                "SELECT * FROM price_lists WHERE user_id = ? ORDER BY created_at DESC",
-                (user_id,),
-            ).fetchall()
-        else:
-            rows = c.execute(
-                "SELECT * FROM price_lists ORDER BY created_at DESC").fetchall()
+        rows = c.execute(
+            "SELECT * FROM price_lists WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
         return [_price_list_row_to_dict(r) for r in rows]
 
 
@@ -912,20 +923,27 @@ def _price_list_row_to_dict(row) -> dict:
     return d
 
 
-def get_price_list(price_list_id: str, user_id: str | None = None) -> dict | None:
+def get_price_list(price_list_id: str, user_id: str) -> dict | None:
+    _require_user_id(user_id)
     with _conn() as c:
-        if user_id:
-            row = c.execute(
-                "SELECT * FROM price_lists WHERE id = ? AND user_id = ?",
-                (price_list_id, user_id)).fetchone()
-        else:
-            row = c.execute("SELECT * FROM price_lists WHERE id = ?",
-                            (price_list_id,)).fetchone()
+        row = c.execute(
+            "SELECT * FROM price_lists WHERE id = ? AND user_id = ?",
+            (price_list_id, user_id)).fetchone()
         return _price_list_row_to_dict(row) if row else None
 
 
+def _read_price_list(c, price_list_id: str) -> dict | None:
+    """Owner-agnostic read on an OPEN connection. Private on purpose: the only
+    caller is `upsert_price_list`, reading back the row it just wrote inside the
+    same transaction (which also closes the read-after-write window a second
+    connection would have opened)."""
+    row = c.execute("SELECT * FROM price_lists WHERE id = ?",
+                    (price_list_id,)).fetchone()
+    return _price_list_row_to_dict(row) if row else None
+
+
 def upsert_price_list(price_list_id: str, payload: dict,
-                      user_id: str | None = None) -> dict:
+                      user_id: str) -> dict:
     """Insert or full-replace one price list.
 
     `is_default` is exclusive per user: setting it here clears the flag on that
@@ -933,6 +951,7 @@ def upsert_price_list(price_list_id: str, payload: dict,
     _DB_LOCK), so two concurrent "make this the default" clicks can never leave
     two defaults behind.
     """
+    _require_user_id(user_id)
     now = _now_iso()
     name = (payload.get("name") or "Kainynas").strip()[:200]
     items = payload.get("items")
@@ -945,11 +964,14 @@ def upsert_price_list(price_list_id: str, payload: dict,
             "SELECT created_at, user_id FROM price_lists WHERE id = ?",
             (price_list_id,)).fetchone()
         if existing:
-            if user_id and existing["user_id"] != user_id:
+            # No `user_id and …` guard: an empty owner used to skip the barrier
+            # entirely. A legacy NULL-owner row still fails this comparison, so
+            # it stays unwritable — the 2026-06-19 write-barrier lesson.
+            if existing["user_id"] != user_id:
                 raise PermissionError(
                     f"User {user_id} does not own price list {price_list_id}")
             created_at = existing["created_at"]
-            owner = existing["user_id"] or user_id
+            owner = existing["user_id"]
         else:
             created_at = payload.get("created_date") or payload.get("created_at") or now
             owner = user_id
@@ -970,16 +992,14 @@ def upsert_price_list(price_list_id: str, payload: dict,
             c.execute(
                 "UPDATE price_lists SET is_default = 0, updated_at = ? "
                 " WHERE user_id = ? AND id != ?", (now, owner, price_list_id))
-    return get_price_list(price_list_id) or {}
+        return _read_price_list(c, price_list_id) or {}
 
 
-def delete_price_list(price_list_id: str, user_id: str | None = None) -> bool:
+def delete_price_list(price_list_id: str, user_id: str) -> bool:
+    _require_user_id(user_id)
     with _conn() as c:
-        if user_id:
-            cur = c.execute("DELETE FROM price_lists WHERE id = ? AND user_id = ?",
-                            (price_list_id, user_id))
-        else:
-            cur = c.execute("DELETE FROM price_lists WHERE id = ?", (price_list_id,))
+        cur = c.execute("DELETE FROM price_lists WHERE id = ? AND user_id = ?",
+                        (price_list_id, user_id))
         return cur.rowcount > 0
 
 

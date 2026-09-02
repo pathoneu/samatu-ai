@@ -360,11 +360,21 @@ def _rule_plyteles_in_vonios(rooms: list[dict]) -> list[dict]:
 
 def _rule_paint_consumption_sane(rooms: list[dict]) -> list[dict]:
     """Vidutinė dažų sąnauda turi būti ~0.20 l/m² (2 sluoksniai, ~9 m²/l).
-    Jei iš šio kiekio jaučiamas didelis nukrypimas — galima formula klaida."""
+    Jei iš šio kiekio jaučiamas didelis nukrypimas — galima formula klaida.
+
+    `dazymo_plotas_m2` is walls AND ceiling, so the litres it is divided by must
+    be too. After an extraction that is `dazai_l` alone; after a Prielaidos
+    recompute the same quantity is stored as `dazai_l` (walls) +
+    `dazai_luboms_l` (ceiling), and reading only the first halved the ratio on
+    a ceiling-heavy room and raised a warning about a formula that was fine.
+    `_room_dazai_l` is the single definition of "this room's litres". (F14.)
+    """
+    from .vision_call import _room_dazai_l
+
     out = []
     for r in rooms:
         dazymo = float(r.get("dazymo_plotas_m2") or 0)
-        dazai = float(r.get("dazai_l") or 0)
+        dazai = _room_dazai_l(r)
         if dazymo <= 0 or dazai <= 0:
             continue
         per_m2 = dazai / dazymo
