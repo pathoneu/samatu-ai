@@ -33,6 +33,7 @@ import {
   SEV_MED,
   SEV_LOW,
   ACTION_PRIELAIDOS,
+  assumptionFocus,
   expectedSuffix,
   groupBySeverity,
   mergeSanity,
@@ -285,7 +286,9 @@ export default function SanityWarningsBanner({
                         {action === ACTION_PRIELAIDOS && onOpenAssumptions && (
                           <button
                             type="button"
-                            onClick={() => onOpenAssumptions()}
+                            /* Land on the control the warning names, not at
+                               the top of a long panel. (2026-09-02, Patikra.) */
+                            onClick={() => onOpenAssumptions(assumptionFocus(w))}
                             className="inline-flex items-center gap-1 underline hover:no-underline"
                             style={{ color: 'hsl(var(--accent-2))' }}
                           >

@@ -146,6 +146,43 @@ export function warningAction(w) {
   return ACTION_BY_CODE[w.code] || ACTION_BY_FIELD[w.field] || null;
 }
 
+// Which Prielaidos control a warning is actually about. The warnings have
+// carried `code` / `field` / `room` since lt_rules.py:172 and the banner threw
+// all three away — `onOpenAssumptions()` with no arguments dropped the user at
+// the top of a long panel. (2026-09-02, Patikra.)
+const ASSUMPTION_FIELD_BY_CODE = {
+  lubu_aukstis_below_str: 'lubu_auksciai',
+  lubu_aukstis_out_of_range: 'lubu_auksciai',
+  consistency_height_plausibility: 'lubu_auksciai',
+  consistency_height_uniformity: 'lubu_auksciai',
+  paintable_floor_ratio: 'lubu_auksciai',
+  consistency_wall_floor_ratio: 'lubu_auksciai',
+  ceiling_floor_mismatch: 'stretch_ceiling_override',
+};
+
+const ASSUMPTION_FIELD_BY_WARNING_FIELD = {
+  lubu_aukstis_m: 'lubu_auksciai',
+};
+
+/**
+ * The `{field, roomNr}` an „Atidaryti Prielaidas" jump should land on, or null
+ * when the warning names no control we can scroll to (then the panel just
+ * opens, exactly as before).
+ */
+export function assumptionFocus(w) {
+  if (!w || typeof w !== 'object') return null;
+  const field = ASSUMPTION_FIELD_BY_CODE[w.code]
+    || ASSUMPTION_FIELD_BY_WARNING_FIELD[w.field]
+    || null;
+  if (!field) return null;
+  // `room` is the room NUMBER on the per-room validators and absent on the
+  // project-level ones; an absent room focuses the section, not a row.
+  const roomNr = w.room != null && String(w.room).trim() !== ''
+    ? String(w.room).trim()
+    : null;
+  return { field, roomNr };
+}
+
 // Validators disagree on where the expected range goes: some put it in the
 // message ("…tikėtina ~41,4 m…", "…norma 2,2–4,5 m…"), some only in
 // `expected`. Appending it unconditionally produced rows that said the same

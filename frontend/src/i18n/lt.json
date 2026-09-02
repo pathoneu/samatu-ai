@@ -1288,6 +1288,62 @@
       },
       "notASum": "Patalpų skaičiai rodo, iš ko surinktas kiekis; galutinį skaičių nustato skaičiavimo eiga aukščiau, todėl jų suma su juo nesutampa.",
       "notASumAnchor": "Kiekis imtas iš eksplikacijos lentelės; patalpų skaičiai — iš brėžinio, todėl jų suma su bendru kiekiu nesutampa."
+    },
+    "patikra": {
+      "title": "Patikra",
+      "countTitle": "Eilučių ir patalpų, kurių dar niekas nepatikrino",
+      "lockedTitle": "{{count}} įrašų patvirtinti eksplikacijoje arba lentelėje — peržiūros nereikia",
+      "lockedRowTitle": "Šie įrašai turi tikslias mm reikšmes iš eksplikacijos/specifikacijos lentelių",
+      "risk": "Nepatikrinta rizika: {{amount}}",
+      "riskTitle": "Kiek kainuoja eilutės, kurių dar niekas nepatvirtino",
+      "remaining": "liko {{count}}",
+      "trust": "Patikimumas",
+      "trustTitleEur": "Patikrinta ranka: {{verified}} iš {{total}}. Kelia tik žmogaus patvirtinimas — žalia spalva ne.",
+      "allChecked": "Visos svarbiausios eilutės patikrintos.",
+      "upNext": "Laukia eilėje ({{count}})",
+      "sensitive": "Jautriausia vieta",
+      "sensitiveText": {
+        "height": "lubų aukštis patalpoje {{room}} — {{value}}",
+        "area": "plotas patalpoje {{room}} — {{value}}"
+      },
+      "sourceAssumed": "(prielaida, brėžinyje nerasta)",
+      "sourceRead": "(skaityta iš brėžinio)",
+      "sharesOfLine": "Ši patalpa sudaro {{pct}} % visos eilutės ({{qty}}).",
+      "valueUnknown": "reikšmė nenurodyta",
+      "accept": "Teisinga",
+      "acceptTitle": "Kiekis teisingas — eilutė išeina iš patikros ir tampa etalonu tikslumo matavimams",
+      "fix": {
+        "height": "Pataisyti aukštį",
+        "area": "Pataisyti plotą"
+      },
+      "fixTitle": {
+        "height": "Atidaryti Prielaidas ties patalpos {{room}} lubų aukščiu",
+        "area": "Perbrėžti patalpos {{room}} kontūrą brėžinyje"
+      },
+      "fixQuantity": "Pataisyti kiekį",
+      "fixQuantityTitle": "Įrašyti kiekį ranka — įėjimo pataisyti nėra iš ko",
+      "quantityAria": "Kiekis",
+      "quantityTitle": "Kiekis; kablelis arba taškas — abu tinka. Enter — įrašyti, Esc — atsisakyti.",
+      "save": "Įrašyti",
+      "cancel": "Atsisakyti",
+      "why": "kodėl toks skaičius?",
+      "learned": "Įsiminta mokymui — pataisymas Nr. {{count}} šiame projekte",
+      "log": "Mokymosi žurnalas ({{count}})",
+      "logTitle": "Šio projekto pataisymai, naujausi viršuje. Įrašyta pas jus — apie modelio pakeitimus nieko nežadame.",
+      "rippleTitle": "Pataisyta: {{label}}",
+      "rippleRows": "Perskaičiuota: {{count}} eilučių",
+      "toastRipple": "Perskaičiuota: {{count}} eilučių · {{delta}}",
+      "toastRippleNoPrice": "Perskaičiuota: {{count}} eilučių",
+      "fieldNames": {
+        "lubu_auksciai": "Lubų aukštis",
+        "walls_paint_override": "Sienų apdaila",
+        "stretch_ceiling_override": "Įtempiamos lubos",
+        "glaistimo_lygis": "Glaistymo lygis",
+        "sienos_storis_m": "Sienos storis",
+        "santechnika_potinkinis": "Maišytuvų montavimas"
+      },
+      "riskNoPrices": "Rizika eurais bus matoma įvedus kainas",
+      "trustTitleRows": "Patikrinta ranka: {{verified}} iš {{total}} eilučių. Kol nėra kainų, dalis skaičiuojama eilutėmis — kiekių su skirtingais matavimo vienetais sudėti negalima. Kelia tik žmogaus patvirtinimas."
     }
   },
   "shared": {

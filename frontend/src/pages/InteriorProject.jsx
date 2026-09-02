@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +23,10 @@ import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 import ExportDropdown from '@/components/project/ExportDropdown';
 import ShareButton from '@/components/project/ShareButton';
 import { getPdfUrl } from '@/lib/pdfStore';
-import { updateProject, getProject, flushProjectSaves } from '@/lib/projectStore';
+import { updateProject, getProject, flushProjectSaves, logCorrection } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
 import { mergeDarbuSarasasEdits, carriedOrphans } from '@/lib/mergeDarbuSarasas';
+import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
@@ -443,6 +444,14 @@ function backendCarriedPositions(result) {
   return deg?.positions || [];
 }
 
+/** What the ripple card calls the fix that produced it. */
+function correctionLabel(correction, t) {
+  if (!correction?.field_path) return t('project.interior.assumptionsTitle');
+  const field = String(correction.field_path).split('.')[0];
+  const name = t(`project.patikra.fieldNames.${field}`, { defaultValue: field });
+  return correction.room_nr ? `${name} · ${correction.room_nr}` : name;
+}
+
 function notifyCarriedOrphans(labels, t) {
   const unique = [...new Set((labels || []).filter(Boolean))];
   if (unique.length === 0) return;
@@ -674,6 +683,29 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       : null);
   };
 
+  // What the last recompute actually moved, so the fix has a visible result
+  // instead of a silently different sąmata. Held in state, not on the project
+  // blob: it is a message about one edit, not a property of the estimate.
+  const [lastRipple, setLastRipple] = useState(null);
+  // What the user changed last, so the ripple card can name it. A REF, not
+  // state: the recompute is debounced 400 ms, and the callback that resolves it
+  // was captured before the correction was recorded — a state read there would
+  // always name the PREVIOUS fix.
+  const lastCorrectionRef = useRef(null);
+  const reportRipple = useCallback((label, prior, next, extra = {}) => {
+    const diff = diffDarbuSarasas(prior || [], next || []);
+    setLastRipple({ label, diff, at: new Date().toISOString(), ...extra });
+    if (diff.count === 0) return;
+    const delta = diff.deltaEur;
+    toast.success(diff.usePrices
+      ? t('project.patikra.toastRipple', {
+        count: diff.count,
+        delta: `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toLocaleString('lt-LT', {
+          maximumFractionDigits: 0 })} €`,
+      })
+      : t('project.patikra.toastRippleNoPrice', { count: diff.count }));
+  }, [t]);
+
   // PDF URL iš IndexedDB (sukuriamas blob: URL'as runtime)
   const [pdfUrl, setPdfUrl] = useState(null);
   useEffect(() => {
@@ -900,6 +932,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           focusedRoom={focusedRoom}
           onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
           onOpenAssumptions={openAssumptions}
+          lastRipple={lastRipple}
           onProjectChange={(updated) => {
             updateProject(project.id, updated);
             setProject(updated);
@@ -960,6 +993,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             rawData={project}
             pozicijos={project.pozicijos || []}
             darbuSarasas={project.darbu_sarasas || []}
+            focusField={assumptionFocus}
+            onCorrection={(payload) => {
+              // „Įsiminta mokymui" = written to this project's correction log.
+              // Nothing more is claimed, and nothing more happens.
+              logCorrection(project.id, payload);
+              lastCorrectionRef.current = payload;
+            }}
             onRecomputed={(result) => {
               const notes = [];
               const nextProject = {
@@ -982,6 +1022,9 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               };
               setProject(nextProject);
               updateProject(project.id, nextProject);
+              reportRipple(
+                correctionLabel(lastCorrectionRef.current, t),
+                project.darbu_sarasas, nextProject.darbu_sarasas);
               // On this path the BACKEND already carried the orphans (it holds the
               // prior pozicijos), so its degradation entry is the authoritative
               // list; the local merge only adds rows the backend never saw.

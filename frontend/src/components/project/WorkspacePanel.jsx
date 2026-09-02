@@ -22,7 +22,7 @@ import { buildMeasureExportDoc } from '@/lib/measureExportDoc';
 import { manualPricePatch } from '@/lib/applyPriceList';
 import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
-import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
+import { acceptPositionQuantity, adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
 import { findRowById } from '@/lib/ledger';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
@@ -116,6 +116,8 @@ export default function WorkspacePanel({
   // Patikra (2026-09-02): a fix jumps to the control that produced the wrong
   // number. `focus` is {field, roomNr} — untargeted when omitted.
   onOpenAssumptions = null,
+  // What the last recompute moved, so the rail can show the € ripple.
+  lastRipple = null,
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -317,6 +319,28 @@ export default function WorkspacePanel({
     }
   }, [project, onProjectChange]);
 
+  // „Teisinga ✓" — the row leaves the queue AND becomes ground truth: the same
+  // `user_verified_at` stamp `scripts/build_ground_truth.py` harvests, so the
+  // audit workflow IS the corpus that measures every future engine change.
+  const handleAcceptRow = useCallback((row) => {
+    if (!onProjectChange) return;
+    const rowId = row._id || `${row.eil_nr}-${row.aprasymas}`;
+    // ONE accept definition, shared with the Kiekiai table's „Patvirtinti".
+    const accepted = acceptPositionQuantity(project.darbu_sarasas || [], rowId);
+    const updated = accepted.map(it => (
+      (it._id || `${it.eil_nr}-${it.aprasymas}`) === rowId
+        ? { ...it, _review_status: 'accepted' }
+        : it));
+    onProjectChange({ ...project, darbu_sarasas: updated });
+  }, [project, onProjectChange]);
+
+  // The rail hands over a ROW, not a key: `updatePositionQuantity` matches on
+  // `_id || eil_nr-aprasymas` and knows nothing about the new `id` hash, so a
+  // key derived id-first would never match and the fix would silently no-op.
+  const handleRowQuantityChange = useCallback((row, qty) => {
+    handleQuantityChange(row._id || `${row.eil_nr}-${row.aprasymas}`, qty);
+  }, [handleQuantityChange]);
+
   const handleQuantityAdjust = useCallback((rowId, delta) => {
     if (!onProjectChange) return;
     const updated = adjustPositionQuantity(project.darbu_sarasas || [], rowId, delta);
@@ -431,6 +455,12 @@ export default function WorkspacePanel({
           eksplikacijaSourcePage={project?._eksplikacija?.eksplikacija_source_page}
           onJumpToPage={onJumpToPage}
           onEditRoom={onEditRoomZone}
+          projectId={project.id}
+          lastRipple={lastRipple}
+          onOpenAssumptions={onOpenAssumptions}
+          onOpenRowDetail={setDetailRow}
+          onAcceptRow={handleAcceptRow}
+          onQuantityChange={handleRowQuantityChange}
           onReviewStatusChange={onProjectChange ? (kind, key, status) => {
             // Sprint G2 Phase 2: persist _review_status on the matching item.
             if (kind === 'room') {

@@ -1,16 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  diffDarbuSarasas,
   filterTakeoffRows,
   getFirstReviewRow,
   getQuantitySourceKind,
   getQuantitySourceLabel,
   getRowImpact,
   getRowTargetPage,
+  isRowVerified,
   needsTakeoffReview,
+  pickSensitiveInput,
   rankReviewRows,
   selectReviewQueue,
   summarizeTakeoffWorkflow,
+  trustMeter,
+  unverifiedRisk,
 } from './takeoffWorkflow.js';
 
 // Production vocabulary is LT (backend extractor/confidence.py): zalia/geltona/raudona.
@@ -234,4 +239,221 @@ test('getRowTargetPage: prefers eksplikacija page for table-backed rows and fall
   assert.equal(getRowTargetPage({ eksplikacija_row_bbox: [1, 2, 3, 4], puslapio_nr: 2 }, project), 7);
   assert.equal(getRowTargetPage({ puslapio_nr: 2 }, project), 2);
   assert.equal(getRowTargetPage({}, project), null);
+});
+
+// ── Patikra — the guided audit loop (2026-09-02) ────────────────────────────
+
+const PATIKRA_ROOMS = [
+  // Read off the drawing: eksplikacija area, a per-room height.
+  { nr: '110', pavadinimas: 'Miegamasis', plotas_m2: 23.97, lubu_aukstis_m: 2.8,
+    plotas_saltinis: 'eksplikacija', lubu_aukstis_saltinis: 'per_room' },
+  // Assumed: one section average spread over every room.
+  { nr: '104', pavadinimas: 'Darbo kambarys', plotas_m2: 13.51, lubu_aukstis_m: 2.85,
+    plotas_saltinis: 'eksplikacija', lubu_aukstis_saltinis: 'section_average' },
+  // Assumed area — no table behind it.
+  { nr: '103', pavadinimas: 'Koridorius', plotas_m2: 9.64, lubu_aukstis_m: 2.8,
+    plotas_saltinis: 'polygon', lubu_aukstis_saltinis: 'per_room' },
+];
+
+const contribution = (nr, name, value, terms) => ({
+  room_nr: nr, room_name: name, page: 2, value, unit: 'm',
+  included_because: 'Dažomos sienos', geometry: 'polygon',
+  ...(terms ? { terms } : {}),
+});
+
+test('trustMeter counts only what a human stood behind', () => {
+  const meter = trustMeter([
+    { kiekis: 10, kaina: 5 },                                   // 50 €, untouched
+    { kiekis: 10, kaina: 5, user_verified_at: '2026-09-02' },   // 50 €, verified
+    { kiekis: 10, kaina: 5, confidence: 'zalia' },              // 50 €, green ≠ verified
+  ]);
+  assert.equal(meter.usePrices, true);
+  assert.equal(meter.total, 150);
+  assert.equal(meter.verified, 50);
+  assert.equal(meter.verifiedCount, 1);
+  assert.ok(Math.abs(meter.share - 1 / 3) < 1e-9);
+});
+
+test('trustMeter also accepts an accepted review or a manual quantity', () => {
+  const meter = trustMeter([
+    { kiekis: 4, kaina: 1, _review_status: 'accepted' },
+    { kiekis: 4, kaina: 1, manual_override: true },
+    { kiekis: 4, kaina: 1, _review_status: 'rejected' },
+  ]);
+  assert.equal(meter.verifiedCount, 2);
+  assert.ok(Math.abs(meter.share - 2 / 3) < 1e-9);
+});
+
+test('trustMeter falls back to kiekis before any price exists, and 0 on empty', () => {
+  const meter = trustMeter([
+    { kiekis: 30 }, { kiekis: 10, user_verified_at: 'x' },
+  ]);
+  assert.equal(meter.usePrices, false);
+  assert.equal(meter.total, 40);
+  assert.equal(meter.share, 0.25);
+
+  const empty = trustMeter([]);
+  assert.equal(empty.share, 0);
+  assert.equal(empty.totalCount, 0);
+});
+
+test('unverifiedRisk prices exactly the rows still in the queue', () => {
+  const risk = unverifiedRisk([
+    { kiekis: 10, kaina: 5, confidence: 'raudona' },            // 50 € pending
+    { kiekis: 10, kaina: 5, confidence: 'geltona' },            // 50 € pending
+    { kiekis: 10, kaina: 5, confidence: 'zalia' },              // settled
+    { kiekis: 10, kaina: 5, confidence: 'raudona', user_verified_at: 'x' },
+  ]);
+  assert.equal(risk.count, 2);
+  assert.equal(risk.amount, 100);
+  assert.equal(risk.usePrices, true);
+});
+
+test('a paint line with no terms leans on the top room’s ceiling height', () => {
+  const row = { kiekis: 100, mato_vnt: 'm²',
+    contributions: [contribution('110', 'Miegamasis', 60), contribution('104', 'Darbo', 40)] };
+  const pick = pickSensitiveInput(row, PATIKRA_ROOMS);
+  assert.equal(pick.kind, 'height');
+  assert.equal(pick.roomNr, '110');
+  assert.equal(pick.value, 2.8);
+  assert.equal(pick.assumed, false);         // per_room = read off the drawing
+  assert.equal(pick.source, 'per_room');
+  assert.ok(Math.abs(pick.contributionShare - 0.6) < 1e-9);
+});
+
+test('an assumed height outranks a read one even on a smaller share', () => {
+  const row = { kiekis: 100, mato_vnt: 'm²',
+    contributions: [contribution('104', 'Darbo kambarys', 60)] };
+  const pick = pickSensitiveInput(row, PATIKRA_ROOMS);
+  assert.equal(pick.kind, 'height');
+  assert.equal(pick.assumed, true);
+  assert.equal(pick.source, 'section_average');
+});
+
+test('a perimeter-driven line points at the area, not the height', () => {
+  // Grindjuostės: every term is perimeter work, and 103’s area is not from a table.
+  const row = { kiekis: 20, mato_vnt: 'm', contributions: [
+    contribution('103', 'Koridorius', 20,
+      { 'perimetras be durų': 18.2, 'atliekos 10 %': 1.8 }),
+  ] };
+  const pick = pickSensitiveInput(row, PATIKRA_ROOMS);
+  assert.equal(pick.kind, 'area');
+  assert.equal(pick.assumed, true);
+  assert.equal(pick.value, 9.64);
+  assert.equal(pick.unit, 'm²');
+});
+
+test('kampai terms keep the height as the sensitive input', () => {
+  const row = { kiekis: 81.4, mato_vnt: 'm', contributions: [
+    contribution('110', 'Miegamasis', 81.4, {
+      'vidiniai kampai': 11.2, 'angų atbrailos': 30.0,
+      'pusiniai kampai': 25.2, 'perimetras': 15.0,
+    }),
+  ] };
+  assert.equal(pickSensitiveInput(row, PATIKRA_ROOMS).kind, 'height');
+});
+
+test('with no ledger the card falls back to the row’s own reason', () => {
+  const row = { kiekis: 5, _confidence_reason: 'Skaičius iš simbolių brėžinyje.' };
+  assert.deepEqual(pickSensitiveInput(row, PATIKRA_ROOMS),
+    { kind: 'reason', reason: 'Skaičius iš simbolių brėžinyje.' });
+  // Nothing to say at all → nothing claimed.
+  assert.equal(pickSensitiveInput({ kiekis: 5 }, PATIKRA_ROOMS), null);
+  // A contribution whose room is gone from the project degrades the same way.
+  assert.deepEqual(
+    pickSensitiveInput({ kiekis: 5, _confidence_reason: 'x',
+      contributions: [contribution('999', 'Nėra', 5)] }, PATIKRA_ROOMS),
+    { kind: 'reason', reason: 'x' });
+});
+
+test('pickSensitiveInput survives rooms with no source fields at all', () => {
+  const row = { kiekis: 10, contributions: [contribution('201', 'Nauja', 10)] };
+  const pick = pickSensitiveInput(row, [{ nr: '201', pavadinimas: 'Nauja' }]);
+  assert.equal(pick.kind, 'height');
+  assert.equal(pick.value, null);      // no height stored — say nothing, don't invent
+  assert.equal(pick.assumed, true);    // and no source means it was not read
+  assert.equal(pick.source, null);
+});
+
+test('the ripple diff reports the rows that moved and the € delta', () => {
+  const prior = [
+    { id: 'a', skyrius: 'S', aprasymas: 'Dažymas', kiekis: 100, kaina: 5 },
+    { id: 'b', skyrius: 'S', aprasymas: 'Kampai', kiekis: 50, kaina: 2 },
+    { id: 'c', skyrius: 'S', aprasymas: 'Dingusi', kiekis: 10, kaina: 1 },
+  ];
+  const next = [
+    { id: 'a', skyrius: 'S', aprasymas: 'Dažymas', kiekis: 120, kaina: 5 },  // +100 €
+    { id: 'b', skyrius: 'S', aprasymas: 'Kampai', kiekis: 50, kaina: 2 },    // unchanged
+    { id: 'd', skyrius: 'S', aprasymas: 'Nauja', kiekis: 4, kaina: 3 },      // +12 €
+  ];
+  const diff = diffDarbuSarasas(prior, next);
+  assert.equal(diff.count, 3);                       // changed + added + removed
+  assert.equal(diff.deltaEur, 102);                  // +100 +12 −10
+  assert.deepEqual(diff.changed.map(c => c.kind), ['changed', 'added', 'removed']);
+  assert.equal(diff.changed[0].before, 100);
+  assert.equal(diff.changed[0].after, 120);
+});
+
+test('a duplicated id never attributes an edit to the wrong row', () => {
+  // Both sides carry two rows under 'dup'; matching by id would pick whichever
+  // came first and report a change nobody made.
+  const prior = [
+    { id: 'dup', skyrius: 'S', aprasymas: 'Pirma', kiekis: 10, kaina: 1 },
+    { id: 'dup', skyrius: 'S', aprasymas: 'Antra', kiekis: 20, kaina: 1 },
+  ];
+  const next = [
+    { id: 'dup', skyrius: 'S', aprasymas: 'Pirma', kiekis: 10, kaina: 1 },
+    { id: 'dup', skyrius: 'S', aprasymas: 'Antra', kiekis: 20, kaina: 1 },
+  ];
+  const diff = diffDarbuSarasas(prior, next);
+  // The label pair disambiguates: nothing moved, so nothing is reported.
+  assert.equal(diff.count, 0);
+  assert.equal(diff.deltaEur, 0);
+});
+
+test('an id AND label collision is reported as add+remove, never as a silent swap', () => {
+  const prior = [
+    { id: 'dup', skyrius: 'S', aprasymas: 'Ta pati', kiekis: 10, kaina: 1 },
+    { id: 'dup', skyrius: 'S', aprasymas: 'Ta pati', kiekis: 20, kaina: 1 },
+  ];
+  const next = [
+    { id: 'dup', skyrius: 'S', aprasymas: 'Ta pati', kiekis: 10, kaina: 1 },
+    { id: 'dup', skyrius: 'S', aprasymas: 'Ta pati', kiekis: 20, kaina: 1 },
+  ];
+  const diff = diffDarbuSarasas(prior, next);
+  // Unresolvable on both keys → 2 added + 2 removed, and the € delta still nets
+  // to zero. Over-reporting is safe; mis-attributing an edit is not.
+  assert.deepEqual(diff.changed.map(c => c.kind).sort(),
+    ['added', 'added', 'removed', 'removed']);
+  assert.equal(diff.deltaEur, 0);
+});
+
+test('the diff works on old blobs that carry no ids at all', () => {
+  const prior = [{ skyrius: 'S', aprasymas: 'Dažymas', kiekis: 100, kaina: 5 }];
+  const next = [{ skyrius: 'S', aprasymas: 'Dažymas', kiekis: 90, kaina: 5 }];
+  const diff = diffDarbuSarasas(prior, next);
+  assert.equal(diff.count, 1);
+  assert.equal(diff.deltaEur, -50);
+});
+
+test('isRowVerified is the one definition the meter and the queue share', () => {
+  assert.equal(isRowVerified({ user_verified_at: 'x' }), true);
+  assert.equal(isRowVerified({ _review_status: 'accepted' }), true);
+  assert.equal(isRowVerified({ quantity_source: 'manual_override' }), true);
+  assert.equal(isRowVerified({ confidence: 'zalia' }), false);
+  assert.equal(isRowVerified(null), false);
+});
+
+test('the meter counts rows, not mixed units, before prices exist', () => {
+  const meter = trustMeter([
+    { kiekis: 1180.8, mato_vnt: 'kg' },
+    { kiekis: 23.97, mato_vnt: 'm²', user_verified_at: 'x' },
+    { kiekis: 4, mato_vnt: 'vnt.' },
+    { kiekis: 12, mato_vnt: 'm' },
+  ]);
+  assert.equal(meter.usePrices, false);
+  assert.equal(meter.countShare, 0.25);
+  // The kiekis share exists but is meaningless across kg + m² + vnt.; the UI
+  // reads countShare instead. Pinned so nobody swaps them back.
+  assert.ok(meter.share < 0.02);
 });

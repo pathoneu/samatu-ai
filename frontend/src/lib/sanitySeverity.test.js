@@ -5,6 +5,7 @@ import {
   SEV_MED,
   SEV_LOW,
   ACTION_PRIELAIDOS,
+  assumptionFocus,
   normalizeLevel,
   normalizeSeverity,
   warningSeverity,
@@ -233,4 +234,27 @@ test('mergeSanity: no prior state just adopts the rebuild', () => {
   const out = mergeSanity(null, fresh);
   assert.equal(out.warnings.length, 1);
   assert.equal(out.summary.high, 1);
+});
+
+// ── „Atidaryti Prielaidas" now lands on the named control (2026-09-02) ──────
+
+test('assumptionFocus maps a warning to the control it is about', () => {
+  assert.deepEqual(
+    assumptionFocus({ code: 'lubu_aukstis_out_of_range', room: '110' }),
+    { field: 'lubu_auksciai', roomNr: '110' });
+  // Project-level validator: the section, no row.
+  assert.deepEqual(
+    assumptionFocus({ code: 'consistency_height_uniformity' }),
+    { field: 'lubu_auksciai', roomNr: null });
+  // Falls back to the warning's `field` when the code is unmapped.
+  assert.deepEqual(
+    assumptionFocus({ code: 'kazkas_naujo', field: 'lubu_aukstis_m', room: 102 }),
+    { field: 'lubu_auksciai', roomNr: '102' });
+  assert.deepEqual(
+    assumptionFocus({ code: 'ceiling_floor_mismatch', room: '110' }),
+    { field: 'stretch_ceiling_override', roomNr: '110' });
+  // Nothing to scroll to → the panel just opens, exactly as before.
+  assert.equal(assumptionFocus({ code: 'paint_consumption_rate' }), null);
+  assert.equal(assumptionFocus(null), null);
+  assert.equal(assumptionFocus({ code: 'lubu_aukstis_out_of_range', room: '  ' }).roomNr, null);
 });

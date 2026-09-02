@@ -782,13 +782,40 @@ export function markRoomVerified(projectId, roomNr) {
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
 
 export function logCorrection(projectId, payload) {
-  if (!projectId || !payload?.field_path) return;
-  fetch(`${API}/api/projects/${projectId}/corrections`, {
+  if (!projectId || !payload?.field_path) return Promise.resolve(false);
+  return fetch(`${API}/api/projects/${projectId}/corrections`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).catch((e) => console.warn('[projectStore] correction log failed:', e));
+  })
+    .then(res => res.ok)
+    .catch((e) => {
+      console.warn('[projectStore] correction log failed:', e);
+      return false;
+    });
+}
+
+/**
+ * This project's correction log, newest first — the „Mokymosi žurnalas".
+ *
+ * Read-only and best-effort: the counter and the list are a reassurance that
+ * the fix was written down, so a failed read must degrade to an empty list, not
+ * to an error screen over the sąmata.
+ */
+export async function fetchCorrections(projectId, { limit = 200 } = {}) {
+  if (!projectId) return [];
+  try {
+    const res = await fetch(
+      `${API}/api/projects/${projectId}/corrections?limit=${limit}`,
+      { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.corrections) ? data.corrections : [];
+  } catch (e) {
+    console.warn('[projectStore] corrections read failed:', e);
+    return [];
+  }
 }
 
 // ── Price Lists (kainynai) ───────────────────────────────────────────────────

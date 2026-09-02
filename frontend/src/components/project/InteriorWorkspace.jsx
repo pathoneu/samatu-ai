@@ -136,6 +136,8 @@ export default function InteriorWorkspace({
   // Patikra (2026-09-02): „Pataisyti" has to land on the control that produced
   // the wrong number, so the jump carries {field, roomNr} through to Prielaidos.
   onOpenAssumptions = null,
+  // …and the recompute it triggers comes back as a visible € ripple.
+  lastRipple = null,
 }) {
   const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -591,6 +593,7 @@ export default function InteriorWorkspace({
         <WorkspacePanel
           project={project}
           onOpenAssumptions={onOpenAssumptions}
+          lastRipple={lastRipple}
           focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
           hiddenRoomNrs={hiddenRoomNrs}
           onToggleRoomVisibility={handleToggleRoomVisibility}

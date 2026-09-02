@@ -1,4 +1,7 @@
 import { CONF_RAUDONA, confidenceNeedsReview, confidenceRank, normalizeConfidence } from './confidence.js';
+import {
+  contributionsOf, isAreaRead, isHeightRead, sortedContributions, termShare,
+} from './ledger.js';
 
 export const TAKEOFF_FILTER_MODES = {
   all: 'all',
@@ -129,6 +132,216 @@ export function filterTakeoffRows(rows = [], { query = '', mode = TAKEOFF_FILTER
     ].filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
   });
+}
+
+// ── Patikra — the guided audit loop (2026-09-02) ─────────────────────────────
+//
+// Three pure pieces the rail renders: how much of the sąmata a human has
+// actually stood behind (`trustMeter`), what the unchecked part is worth
+// (`unverifiedRisk`), and which single input the biggest room in a line leans
+// on (`pickSensitiveInput`) — plus the diff that turns a recompute into a
+// visible „N eilučių · ±X €" (`diffDarbuSarasas`).
+
+/**
+ * A row a HUMAN has stood behind. Confidence does not count: the measured
+ * false-green rate was 50–60 % before the confidence pass, so a meter that
+ * green rows could raise would report trust nobody gave.
+ */
+export function isRowVerified(row) {
+  return !!(row?.user_verified_at
+    || row?._review_status === 'accepted'
+    || isManualQuantity(row));
+}
+
+/**
+ * Share of the sąmata that has been verified by hand — by € once prices exist,
+ * by kiekis before that (`usePrices` says which, so the UI can be honest).
+ * An empty project reads 0, never 100.
+ */
+export function trustMeter(rows = []) {
+  const usePrices = hasAnyPrice(rows);
+  let total = 0;
+  let verified = 0;
+  let verifiedCount = 0;
+  rows.forEach((row) => {
+    const impact = getRowImpact(row, usePrices);
+    total += impact;
+    if (isRowVerified(row)) {
+      verified += impact;
+      verifiedCount += 1;
+    }
+  });
+  return {
+    usePrices,
+    total,
+    verified,
+    verifiedCount,
+    totalCount: rows.length,
+    share: total > 0 ? verified / total : 0,
+    // Before prices exist the € share is unavailable, and a Σ over kg + m² +
+    // vnt. is not a number anybody can act on — so the meter falls back to the
+    // share of ROWS, which at least means what it says.
+    countShare: rows.length > 0 ? verifiedCount / rows.length : 0,
+  };
+}
+
+/** What the rows still waiting for review are worth. */
+export function unverifiedRisk(rows = []) {
+  const usePrices = hasAnyPrice(rows);
+  const pending = rows.filter(needsTakeoffReview);
+  return {
+    usePrices,
+    count: pending.length,
+    amount: pending.reduce((sum, row) => sum + getRowImpact(row, usePrices), 0),
+  };
+}
+
+// How much of a contribution each candidate input drives, when the family has
+// no sub-terms to say otherwise. Paint is perimeter × H with no terms at all,
+// so the height is its whole story.
+const NO_TERMS_DRIVER_SHARE = { height: 1, area: 0 };
+
+function inputScore(driverShare, soft) {
+  return driverShare + (soft ? 1 : 0);
+}
+
+/**
+ * „Jautriausia vieta" — the one input this line leans on hardest, in the room
+ * that contributes most to it.
+ *
+ * Scored, not guessed: each candidate gets the share of the top contribution it
+ * drives (from the `terms` vocabulary, or the family default when a line has no
+ * terms) plus a point when the room's source says the value was ASSUMED rather
+ * than read off the drawing. Ties go to the height, because it multiplies.
+ * A line with no contributions has nothing to point at and falls back to the
+ * row's own `_confidence_reason`.
+ */
+export function pickSensitiveInput(row, rooms = []) {
+  const reason = row?._confidence_reason || null;
+  const contributions = sortedContributions(contributionsOf(row));
+  const top = contributions[0];
+  if (!top) return reason ? { kind: 'reason', reason } : null;
+
+  const room = (rooms || []).find(r => String(r?.nr) === String(top.room_nr));
+  if (!room) return reason ? { kind: 'reason', reason } : null;
+
+  const heightSource = room.lubu_aukstis_saltinis;
+  const areaSource = room.plotas_saltinis;
+  const heightSoft = !isHeightRead(heightSource);
+  const areaSoft = !isAreaRead(areaSource);
+
+  const heightShare = termShare(top.terms, 'height') ?? NO_TERMS_DRIVER_SHARE.height;
+  const areaShare = termShare(top.terms, 'perimeter') ?? NO_TERMS_DRIVER_SHARE.area;
+
+  const height = {
+    kind: 'height',
+    value: Number(room.lubu_aukstis_m) || null,
+    unit: 'm',
+    source: heightSource || null,
+    assumed: heightSoft,
+    score: inputScore(heightShare, heightSoft),
+  };
+  const area = {
+    kind: 'area',
+    value: Number(room.plotas_m2) || null,
+    unit: 'm²',
+    source: areaSource || null,
+    assumed: areaSoft,
+    score: inputScore(areaShare, areaSoft),
+  };
+  const pick = area.score > height.score ? area : height;
+
+  return {
+    ...pick,
+    reason,
+    roomNr: top.room_nr,
+    roomName: top.room_name,
+    page: top.page ?? null,
+    geometry: top.geometry || 'none',
+    contributionValue: Number(top.value) || 0,
+    contributionUnit: top.unit || row?.mato_vnt || '',
+    // The share of the line this room alone accounts for — „nuo jos priklauso…"
+    // is only worth saying when the room is actually a big part of the line.
+    contributionShare: Number(row?.kiekis) > 0
+      ? (Number(top.value) || 0) / Number(row.kiekis)
+      : null,
+  };
+}
+
+function rowSum(row) {
+  return (Number(row?.kiekis) || 0) * (Number(row?.kaina) || 0);
+}
+
+/**
+ * What a recompute actually moved — „Perskaičiuota: N eilučių · −212 €".
+ *
+ * Rows are matched by `id`, but ONLY while that id is unique on BOTH sides: a
+ * merge can carry an orphaned prior row that keeps an id the rebuilt row also
+ * has, and attributing an edit to the wrong line is worse than reporting one
+ * fewer change. Ambiguous ids and old id-less blobs fall back to the
+ * section+label pair, and anything still unmatched counts as added or removed.
+ */
+export function diffDarbuSarasas(prior = [], next = []) {
+  const labelOf = row => `${row?.skyrius || ''} ${row?.aprasymas || ''}`;
+
+  const index = (rows) => {
+    const byId = new Map();
+    const byLabel = new Map();
+    rows.forEach((row) => {
+      const id = row?.id || row?._id;
+      if (id) byId.set(id, (byId.get(id) || []).concat(row));
+      const label = labelOf(row);
+      byLabel.set(label, (byLabel.get(label) || []).concat(row));
+    });
+    return { byId, byLabel };
+  };
+
+  const priorIdx = index(prior);
+  const nextIdx = index(next);
+  const matchInPrior = (row) => {
+    const id = row?.id || row?._id;
+    if (id) {
+      const here = nextIdx.byId.get(id) || [];
+      const there = priorIdx.byId.get(id) || [];
+      if (here.length === 1 && there.length === 1) return there[0];
+    }
+    const label = labelOf(row);
+    const hereL = nextIdx.byLabel.get(label) || [];
+    const thereL = priorIdx.byLabel.get(label) || [];
+    return (hereL.length === 1 && thereL.length === 1) ? thereL[0] : null;
+  };
+
+  const changed = [];
+  const matched = new Set();
+  let deltaEur = 0;
+  next.forEach((row) => {
+    const before = matchInPrior(row);
+    if (before) matched.add(before);
+    const beforeQty = before ? Number(before.kiekis) || 0 : null;
+    const afterQty = Number(row.kiekis) || 0;
+    const delta = rowSum(row) - (before ? rowSum(before) : 0);
+    deltaEur += delta;
+    if (before == null) {
+      changed.push({ kind: 'added', row, before: null, after: afterQty, deltaEur: delta });
+    } else if (Math.abs(afterQty - beforeQty) > 0.005) {
+      changed.push({ kind: 'changed', row, before: beforeQty, after: afterQty, deltaEur: delta });
+    }
+  });
+  prior.forEach((row) => {
+    if (matched.has(row)) return;
+    deltaEur -= rowSum(row);
+    changed.push({
+      kind: 'removed', row, before: Number(row.kiekis) || 0, after: null,
+      deltaEur: -rowSum(row),
+    });
+  });
+
+  return {
+    changed,
+    count: changed.length,
+    deltaEur: Math.round(deltaEur * 100) / 100,
+    usePrices: hasAnyPrice(next) || hasAnyPrice(prior),
+  };
 }
 
 export function summarizeTakeoffWorkflow(project = {}, { hasPdf = false } = {}) {

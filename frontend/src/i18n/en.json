@@ -1282,6 +1282,62 @@
       },
       "notASum": "The per-room figures show what the quantity is assembled from; the chain above decides the final number, so they do not add up to it.",
       "notASumAnchor": "The quantity comes from the room schedule; the per-room figures come from the drawing, so they do not add up to the total."
+    },
+    "patikra": {
+      "title": "Review",
+      "countTitle": "Rows and rooms nobody has checked yet",
+      "lockedTitle": "{{count}} entries confirmed in the room schedule or a table — no review needed",
+      "lockedRowTitle": "These entries carry exact mm values from the room schedule / specification tables",
+      "risk": "Unchecked risk: {{amount}}",
+      "riskTitle": "What the rows nobody has confirmed are worth",
+      "remaining": "{{count}} left",
+      "trust": "Confidence",
+      "trustTitleEur": "Checked by hand: {{verified}} of {{total}}. Only human confirmation raises it — a green dot does not.",
+      "allChecked": "Every important row has been checked.",
+      "upNext": "Up next ({{count}})",
+      "sensitive": "Most sensitive input",
+      "sensitiveText": {
+        "height": "ceiling height in room {{room}} — {{value}}",
+        "area": "floor area of room {{room}} — {{value}}"
+      },
+      "sourceAssumed": "(assumed, not found on the drawing)",
+      "sourceRead": "(read from the drawing)",
+      "sharesOfLine": "This room is {{pct}} % of the whole row ({{qty}}).",
+      "valueUnknown": "value not given",
+      "accept": "Correct",
+      "acceptTitle": "The quantity is right — the row leaves the queue and becomes a benchmark for accuracy measurement",
+      "fix": {
+        "height": "Fix the height",
+        "area": "Fix the area"
+      },
+      "fixTitle": {
+        "height": "Open Assumptions at the ceiling height of room {{room}}",
+        "area": "Redraw the outline of room {{room}} on the drawing"
+      },
+      "fixQuantity": "Fix the quantity",
+      "fixQuantityTitle": "Type the quantity by hand — there is no input to correct",
+      "quantityAria": "Quantity",
+      "quantityTitle": "Quantity; comma or dot both work. Enter to save, Esc to cancel.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "why": "why this number?",
+      "learned": "Recorded for training — correction no. {{count}} in this project",
+      "log": "Learning log ({{count}})",
+      "logTitle": "This project's corrections, newest first. Recorded on your side — we promise nothing about model changes.",
+      "rippleTitle": "Fixed: {{label}}",
+      "rippleRows": "Recalculated: {{count}} rows",
+      "toastRipple": "Recalculated: {{count}} rows · {{delta}}",
+      "toastRippleNoPrice": "Recalculated: {{count}} rows",
+      "fieldNames": {
+        "lubu_auksciai": "Ceiling height",
+        "walls_paint_override": "Wall finish",
+        "stretch_ceiling_override": "Stretch ceiling",
+        "glaistimo_lygis": "Skim level",
+        "sienos_storis_m": "Wall thickness",
+        "santechnika_potinkinis": "Mixer installation"
+      },
+      "riskNoPrices": "The euro figure appears once prices are entered",
+      "trustTitleRows": "Checked by hand: {{verified}} of {{total}} rows. Before prices exist the share counts rows — quantities in different units cannot be added. Only human confirmation raises it."
     }
   },
   "shared": {

@@ -210,7 +210,18 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AssumptionsPanel({ assumptions, onChange, prielaidos, rawData, pozicijos, darbuSarasas, onRecomputed, defaultOpen = false, title }) {
+export default function AssumptionsPanel({
+  assumptions, onChange, prielaidos, rawData, pozicijos, darbuSarasas,
+  onRecomputed, defaultOpen = false, title,
+  // Patikra (2026-09-02): {field, roomNr, nonce} — the control „Pataisyti" or a
+  // sanity warning sent the user here to change. The nonce is what makes a
+  // SECOND jump to the same field scroll again.
+  focusField = null,
+  // Every fix is training material, but only if it is written down. The panel
+  // knows the field, the room and the value it is replacing; the page owns the
+  // log call. (2026-09-02.)
+  onCorrection = null,
+}) {
   const { t } = useTranslation();
   const resolvedTitle = title ?? t('project.assumptions.defaultTitle');
   const [open, setOpen] = useState(defaultOpen);
@@ -260,10 +271,27 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
   }, []);
 
-  const handleRecompute = useCallback((field, newValue) => {
+  const handleRecompute = useCallback((field, newValue, meta = null) => {
     if (!onRecomputed || isDemo) return;  // Skip if parent won't accept results, or on the view-only sample
     // Keep the OLDEST pre-edit snapshot of the burst as the rollback target.
     if (revertRef.current === null) revertRef.current = assumptions || {};
+    // Write the correction down BEFORE the debounce: `assumptions` still holds
+    // the pre-edit value here (the caller has already handed the new one to
+    // onChange, but this component has not re-rendered yet), and a burst of
+    // keystrokes on one field should still log the value the user landed on —
+    // which it does, because each keystroke logs its own old→new pair.
+    if (onCorrection) {
+      const roomNr = meta?.roomNr != null ? String(meta.roomNr) : null;
+      const prior = (assumptions || {})[field];
+      onCorrection({
+        field_path: roomNr ? `${field}.${roomNr}` : field,
+        old_value: roomNr && prior && typeof prior === 'object' ? prior[roomNr] ?? null : prior ?? null,
+        new_value: roomNr && newValue && typeof newValue === 'object'
+          ? newValue[roomNr] ?? null : newValue,
+        room_nr: roomNr,
+        source: 'prielaidos',
+      });
+    }
     if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
     setRecomputing(true);
     recomputeTimerRef.current = setTimeout(async () => {
@@ -300,12 +328,12 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
         if (reqId === reqIdRef.current) setRecomputing(false);
       }
     }, RECOMPUTE_DEBOUNCE_MS);
-  }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, isDemo, t]);
+  }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, onCorrection, isDemo, t]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
     onChange(next);
-    handleRecompute('lubu_auksciai', next.lubu_auksciai);
+    handleRecompute('lubu_auksciai', next.lubu_auksciai, { roomNr });
   };
 
   // Bulk override — set the same height for ALL rooms at once. Useful when
@@ -329,7 +357,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
       walls_paint_override: { ...walls_paint_override, [roomNr]: painted ? 1 : 0 },
     };
     onChange(next);
-    handleRecompute('walls_paint_override', next.walls_paint_override);
+    handleRecompute('walls_paint_override', next.walls_paint_override, { roomNr });
   };
   const isWallsPainted = (room) => {
     const ov = walls_paint_override[room.nr];
@@ -346,9 +374,41 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
   const setStretchCeiling = (roomNr, stretch) => {
     const next = withStretchCeiling(safeAssumptions, roomNr, stretch);
     onChange(next);
-    handleRecompute('stretch_ceiling_override', next.stretch_ceiling_override);
+    handleRecompute('stretch_ceiling_override', next.stretch_ceiling_override, { roomNr });
   };
   const isStretchCeiling = (room) => isStretchCeilingNr(safeAssumptions, room.nr);
+
+  // Land on the control that was named, not at the top of a long panel. The
+  // panel can arrive collapsed (Prielaidos tab opens it, a sanity jump may not),
+  // so open it first and scroll on the NEXT frame, once the section is laid out.
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!focusField?.field) return undefined;
+    setOpen(true);
+    // A macrotask, NOT requestAnimationFrame: rAF does not fire while the tab is
+    // in the background, so a jump made from a hidden tab (or a browser that
+    // throttles frames) silently did nothing. `setOpen(true)` has been flushed
+    // by the time this runs, so the section is laid out either way.
+    const timer = window.setTimeout(() => {
+      const selector = focusField.roomNr != null
+        ? `[data-assumption="${focusField.field}:${focusField.roomNr}"]`
+        : `[data-assumption^="${focusField.field}:"]`;
+      const el = rootRef.current?.querySelector(selector);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // A ring the user can actually see arriving, then gone — a permanent
+      // highlight reads as "this field is in an error state".
+      el.style.outline = '2px solid hsl(var(--primary))';
+      el.style.outlineOffset = '2px';
+      window.setTimeout(() => {
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+      }, 2400);
+      const field = el.matches('input, button') ? el : el.querySelector('input, button');
+      field?.focus?.({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [focusField?.field, focusField?.roomNr, focusField?.nonce]);
 
   const rooms = panelRooms(rawData);
   const avgH  = rooms.length > 0
@@ -356,7 +416,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     : 2.80;
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
+    <div ref={rootRef} className="border border-border rounded-xl overflow-hidden">
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/40 transition-colors"
         onClick={() => setOpen(v => !v)}
@@ -545,7 +605,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {rooms.map(room => (
-                  <div key={room.nr} className="flex items-center gap-2">
+                  <div
+                    key={room.nr}
+                    data-assumption={`lubu_auksciai:${room.nr}`}
+                    className="flex items-center gap-2 rounded transition-colors"
+                  >
                     <span className="text-xs text-muted-foreground truncate flex-1" title={room.pavadinimas}>
                       {room.pavadinimas || room.nr}
                     </span>
@@ -591,6 +655,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                   return (
                     <button
                       key={room.nr}
+                      data-assumption={`walls_paint_override:${room.nr}`}
                       onClick={() => setWallsPaint(room.nr, !painted)}
                       title={t(painted ? 'project.assumptions.wallsPaintOffTitle' : 'project.assumptions.wallsPaintOnTitle', {
                         room: room.pavadinimas || room.nr,
@@ -631,6 +696,7 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                   return (
                     <button
                       key={room.nr}
+                      data-assumption={`stretch_ceiling_override:${room.nr}`}
                       onClick={() => setStretchCeiling(room.nr, !stretch)}
                       title={t(stretch ? 'project.assumptions.stretchCeilingOffTitle' : 'project.assumptions.stretchCeilingOnTitle', {
                         room: room.pavadinimas || room.nr,
