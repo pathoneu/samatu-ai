@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Reques
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import logging
 import os
 import time as _time
@@ -6335,12 +6335,30 @@ async def extract_interior_stream_endpoint(
 # already-extracted patalpos[]. Sub-second roundtrip vs minutes for full re-extract.)
 
 class RecomputePayload(BaseModel):
+    # `_ceiling_anchor` arrives under its literal underscored key, and pydantic
+    # v2 reserves leading-underscore ATTRIBUTE names for private state — so the
+    # field is named without one and reaches the key through an alias.
+    # populate_by_name keeps the plain name working for direct callers/tests.
+    model_config = ConfigDict(populate_by_name=True)
+
     patalpos: list[dict]
     rules_override: dict = Field(default_factory=dict)
     # Optional per-room overrides keyed by patalpa.nr (e.g. force tile vs parquet)
     per_room_overrides: dict = Field(default_factory=dict)
     archetipas: str | None = None
     bendras_plotas_m2: float | None = None
+    # The eksplikacijos "Iš viso" the ceiling quantity is billed off
+    # (extractor/vision_call.py `_ceiling_paint_base`). Pydantic silently
+    # DISCARDED it before, so a round trip through here un-anchored the Lubų row
+    # — 60.0 m² reverted to the per-room 58.5 and the provenance line saying
+    # where the number came from vanished with it. (F4, 2026-09-02 review.)
+    ceiling_anchor: dict | None = Field(default=None, alias="_ceiling_anchor")
+    # The reader context `/api/recompute-quantities` already accepts and splats
+    # into `parsed` (_door_types, detected_symbols_summary, _plyteliu_specs,
+    # _symbol_legend, …). `_build_pozicijos_from_rooms` reads all of them, so
+    # without it a rebuild here drops the door/fixture/tile lines and the
+    # frontend's carried-orphans merge has to paper over the loss.
+    context: dict = Field(default_factory=dict)
 
 
 @app.post("/recompute-interior")
@@ -6455,6 +6473,10 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
     # Recompute santrauka + emit V8-compat + lt_sanity mirror
     parsed = {
+        # Reader context FIRST so every explicit key below wins over a stale
+        # copy of itself inside it. Empty by default → byte-identical to before
+        # for any caller that does not send one.
+        **(payload.context or {}),
         "archetipas": payload.archetipas or "standart",
         # `r.get("plotas_m2", 0)` returns None for an EXPLICIT null (the shape a
         # room with an unreadable area actually has in saved blobs), and
@@ -6470,6 +6492,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
     }
+    # The anchor must be in `parsed` BEFORE _build_pozicijos_from_rooms runs —
+    # that is where `_ceiling_paint_base` looks for it. An explicit field wins
+    # over whatever a stale `context` copy carries.
+    if payload.ceiling_anchor:
+        parsed["_ceiling_anchor"] = payload.ceiling_anchor
 
     # Reuse extractor's post-processing helpers
     from extractor.vision_call import (
