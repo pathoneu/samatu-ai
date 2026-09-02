@@ -964,6 +964,19 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
+    # …and now DROP the ledger from `pozicijos`. The rows above hold the very
+    # same list objects, so the evidence is not copied, it is moved: the blob
+    # was carrying two copies of every contribution (≈12 kB of the demo
+    # project's ≈220 kB, and it grows with the room count), and only the
+    # `darbu_sarasas` copy is ever read — both live tables, the row-detail panel
+    # and the exports read that list. `id` stays: the merge's pass 0 and the
+    # price index key on it. Nothing downstream reads a ledger key off
+    # `pozicijos` (the eval sums `kiekis`; the exporters read `eilutes`).
+    for p in parsed.get("pozicijos") or []:
+        if isinstance(p, dict):
+            for key in (*_ledger.LEDGER_KEYS, _ledger.SUM_FLAG_KEY):
+                p.pop(key, None)
+
     # v8_totals — mirrored santrauka with V8 key names
     s = parsed.get("santrauka") or {}
     parsed["v8_totals"] = {

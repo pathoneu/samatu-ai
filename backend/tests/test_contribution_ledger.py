@@ -2,7 +2,10 @@
 
 The KEYSTONE test is `test_every_ledger_replays_to_its_kiekis`: on every corpus
 fixture and the shipped demo blob, replaying a line's `roll_up` reproduces its
-`kiekis` to ±0,01. It is asserted against `roll_up`, never against a raw Σ —
+`kiekis` to ±0,01. It runs over `darbu_sarasas` — the list that actually reaches
+the contractor — because since 2026-09-02 the compat emit MOVES the ledger there
+off `pozicijos` rather than leaving a second copy nobody reads. It is asserted
+against `roll_up`, never against a raw Σ —
 since 2026-09-02 the ceiling quantity is the eksplikacija's own „Iš viso" minus
 the rooms nobody paints, which is deliberately NOT Σ-decomposable and would fail
 a naive sum by construction. That is the whole reason the `anchor` op exists.
@@ -65,6 +68,19 @@ def _recomputed_build(source: dict) -> list[dict]:
     return _build_pozicijos_from_rooms(parsed)["pozicijos"]
 
 
+def _shipped(source: dict) -> list[dict]:
+    """The rows that actually REACH the contractor.
+
+    Since 2026-09-02 the ledger lives on `darbu_sarasas` only — the compat emit
+    moves it off `pozicijos`, which was carrying a second copy nobody read. So
+    the keystone has to assert against this list, not against the builder's."""
+    parsed = {k: v for k, v in source.items()
+              if k not in ("darbu_sarasas", "pozicijos")}
+    parsed["pozicijos"] = []
+    return _emit_v8_compat_fields(
+        _build_pozicijos_from_rooms(parsed))["darbu_sarasas"]
+
+
 def _ledgered(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("roll_up")]
 
@@ -78,7 +94,7 @@ def _ledger_c(room: dict, value: float) -> dict:
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_every_ledger_replays_to_its_kiekis(fixture: Path):
-    rows = _build(json.loads(fixture.read_text(encoding="utf-8")))
+    rows = _shipped(json.loads(fixture.read_text(encoding="utf-8")))
     ledgered = _ledgered(rows)
     assert ledgered, f"{fixture.parent.name}: no line carries a ledger at all"
     for row in ledgered:
@@ -97,7 +113,7 @@ def test_no_ledger_leans_on_a_rounding_step(fixture: Path):
     `round` may close a cent, never a quantity — measured 2026-09-02, the
     pre-attach gap is 0,00 on every fixture, so no row should carry one at all.
     """
-    for row in _ledgered(_build(json.loads(fixture.read_text(encoding="utf-8")))):
+    for row in _ledgered(_shipped(json.loads(fixture.read_text(encoding="utf-8")))):
         for i, s in enumerate(row["roll_up"]):
             if s.get("op") != "round":
                 continue
@@ -131,7 +147,7 @@ def test_attach_refuses_to_reconcile_a_chain_that_is_simply_wrong():
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_the_ledger_keys_are_exactly_what_the_frontend_reads(fixture: Path):
-    for row in _ledgered(_build(json.loads(fixture.read_text(encoding="utf-8")))):
+    for row in _ledgered(_shipped(json.loads(fixture.read_text(encoding="utf-8")))):
         assert set(LEDGER_KEYS) <= set(row)
         for c in row["contributions"]:
             assert set(c) >= {"room_nr", "room_name", "page", "value", "unit",
@@ -355,6 +371,29 @@ def test_darbu_sarasas_carries_the_ledger(blob):
     assert rot["_assumption"], "the 19 rows carrying an assumption still can't show it"
 
 
+def test_the_ledger_is_moved_to_darbu_sarasas_not_copied(blob):
+    """The blob used to persist EVERY contribution twice — once on `pozicijos`
+    and once on `darbu_sarasas` — and only the second copy is ever read: both
+    live tables, the row-detail panel and the exports read `darbu_sarasas`. The
+    emit now drops the ledger from `pozicijos`, keeping `id`, which the merge's
+    pass 0 and the price index key on."""
+    parsed = {k: v for k, v in blob.items()
+              if k not in ("darbu_sarasas", "pozicijos")}
+    parsed["pozicijos"] = []
+    built = _build_pozicijos_from_rooms(parsed)
+    assert _ledgered(built["pozicijos"]), "the builder stopped emitting a ledger"
+    out = _emit_v8_compat_fields(built)
+
+    for p in out["pozicijos"]:
+        assert not (set(LEDGER_KEYS) & set(p)), p["aprasymas"]
+        assert "contributions_sum_to_total" not in p
+        assert p.get("id"), p["aprasymas"]
+    assert _ledgered(out["darbu_sarasas"]), "…and it did not land on the wire"
+    # The evidence was MOVED: the wire rows hold the very objects, not copies.
+    shipped = next(r for r in out["darbu_sarasas"]
+                   if r["aprasymas"] == "Dažymo kampų montavimas")
+    assert shipped["contributions"] and shipped["roll_up"]
+
 
 def test_sections_are_untouched_by_the_ledger(blob):
     rows = _build(blob)
@@ -383,8 +422,14 @@ def test_a_prielaidos_edit_rebuilds_the_ledger(blob):
     }
     r = client.post("/api/recompute-quantities", json=body)
     assert r.status_code == 200, r.text
-    rows = _ledgered(r.json()["pozicijos"])
+    payload = r.json()
+    # The endpoint runs the compat emit, so the ledger comes back on
+    # `darbu_sarasas` — the list the tables and the panel read — and NOT a
+    # second time on `pozicijos`.
+    rows = _ledgered(payload["darbu_sarasas"])
     assert rows, "the rebuild came back with no ledger"
+    assert not _ledgered(payload["pozicijos"]), \
+        "the response is still carrying two copies of every contribution"
     for row in rows:
         assert abs(replay(row.get("contributions"), row["roll_up"])
                    - float(row["kiekis"])) <= 0.01, row["aprasymas"]
@@ -406,7 +451,7 @@ from test_confidence_reasons_are_for_the_user import BANNED  # noqa: E402
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_every_ledger_string_guides_rather_than_confesses(fixture: Path):
-    for row in _ledgered(_build(json.loads(fixture.read_text(encoding="utf-8")))):
+    for row in _ledgered(_shipped(json.loads(fixture.read_text(encoding="utf-8")))):
         strings = (
             [c["included_because"] for c in row["contributions"]]
             + [e["excluded_because"] for e in row["excluded"]]
