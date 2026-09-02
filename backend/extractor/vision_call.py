@@ -635,6 +635,9 @@ _SKYRIUS_ENUM = {
     "Santechnikos darbai": "plumbing",
     "Elektros instaliacijos darbai": "electrical",
     "Pridėtiniai elementai": "extras",
+    # 2026-09-02: the auto-computed materials moved out of the work rows into
+    # one global section at the foot of the sąmata (see `SK_MEDZIAGOS`).
+    "Medžiagos": "materials",
     "Out of scope": "out_of_scope",
     # Legacy ASCII-stripped keys (mojibake from earlier exports) — preserved
     # so projects saved with old skyrius names still classify correctly.
@@ -912,10 +915,16 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "vnt": vnt,
             "kiekis": p.get("kiekis", 0),
             "saltinis": p.get("saltinis", ""),
-            # Sprint D Track 1 — medžiagos embedded į work line (LT convention)
+            # Sprint D Track 1 — medžiagos embedded į work line (LT convention).
+            # 2026-09-02: no longer WRITTEN by the builder (materials moved to
+            # the "Medžiagos" section), but still READ here so a project saved
+            # before the move keeps rendering the sub-line it was saved with.
             "medziagos_aprasymas": p.get("medziagos_aprasymas"),
             "medziagos_kiekis": p.get("medziagos_kiekis"),
             "medziagos_vnt": p.get("medziagos_vnt"),
+            # Which work a "Medžiagos" row belongs to — the UI renders it as
+            # muted subtext under the material's name.
+            "susijes_darbas": p.get("susijes_darbas"),
             # 2026-06-14: carry per-line confidence (zalia/geltona/raudona) + its
             # Lithuanian reason into the V8-compat shape so the UI can surface
             # which quantities to double-check, regardless of whether it renders
@@ -1414,7 +1423,11 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai sienoms ({wall_thickness} mm)",
             "vnt": "vnt", "kiekis": wall_sheets, "saltinis": _SAL,
-            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            # Thickness in the material name: walls take 12.5 mm and ceilings
+            # 9.5 mm, so the two are different products — and in the global
+            # Medžiagos section they would otherwise share one label and one
+            # price key. (2026-09-02)
+            "medziagos_aprasymas": f"GKP lapas sienoms {wall_thickness} mm (1200×2500 mm = 3 m²)",
             "medziagos_kiekis": wall_sheets, "medziagos_vnt": "vnt",
         })
     if ceilings_total > 0:
@@ -1423,7 +1436,7 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai luboms ({ceil_thickness} mm)",
             "vnt": "vnt", "kiekis": ceil_sheets, "saltinis": _SAL,
-            "medziagos_aprasymas": "GKP lapas 1200×2500 mm = 3 m²",
+            "medziagos_aprasymas": f"GKP lapas luboms {ceil_thickness} mm (1200×2500 mm = 3 m²)",
             "medziagos_kiekis": ceil_sheets, "medziagos_vnt": "vnt",
         })
     return pozicijos
@@ -1626,6 +1639,25 @@ def _ceiling_paint_m2(room: dict, stretch_nrs: set[str]) -> float:
     return float(room.get("ceiling_paintable_m2") or 0)
 
 
+def _room_dazai_l(room: dict) -> float:
+    """The room's paint litres, whichever path wrote them.
+
+    The extraction pipeline writes ONE figure per room in `dazai_l` — walls and
+    ceiling together (`_recompute_per_room_via_python`, §4.2). The
+    assumptions-recompute endpoint writes the same quantity as two fields,
+    `dazai_l` (walls) + `dazai_luboms_l` (ceiling), and sanity_checks has always
+    summed both. Reading `dazai_l` alone therefore lost the ceiling's litres
+    after any Prielaidos edit.
+
+    That was invisible while the number rode inside `medziagos_kiekis`; since
+    2026-09-02 it is a priceable row in the Medžiagos section, so a no-op
+    ceiling edit would have visibly moved the paint the user is buying.
+    Absent `dazai_luboms_l` (every extraction) ⇒ byte-identical to before.
+    """
+    return (float(room.get("dazai_l") or 0)
+            + float(room.get("dazai_luboms_l") or 0))
+
+
 # ── Lubų kiekis iš eksplikacijos „Iš viso" (2026-09-02 contractor ask F3) ────
 #
 # The designer's own sum at the foot of the room table is the most authoritative
@@ -1740,6 +1772,119 @@ def migrate_skyrius_row(skyrius: str | None, aprasymas: str | None) -> str:
     return s
 
 
+# ── Medžiagos: one global section at the END (2026-09-02 contractor ask F2) ──
+#
+# Until today every auto-computed material rode ALONG its work row, in
+# `medziagos_aprasymas`/`_kiekis`/`_vnt` — and, on the consolidated paint lines,
+# in `_medziagos[]`. The contractor prices labour and materials as two different
+# things: a work section is what he pays a team for, and everything he has to BUY
+# is one shopping list at the foot of the sąmata. Riding along, a material was
+# invisible in every export (only the UI rendered the sub-line) and impossible to
+# price at all.
+#
+# This MOVES them; it never recomputes them. Every quantity in the section is the
+# same number the work row was already carrying, so billed quantities — and the
+# eval — are untouched by construction. The old fields stay READABLE (a project
+# saved before today still renders its embedded materials); they are simply no
+# longer WRITTEN onto freshly built rows.
+SK_MEDZIAGOS = "Medžiagos"
+
+# A material row's quantity comes from a consumption norm applied to the work
+# quantity, never from the drawing — say so, and say what to check against.
+_MEDZIAGOS_SALTINIS = "medziagu_norma"
+_MEDZIAGOS_REASON = (
+    "Medžiagos kiekis apskaičiuotas iš darbo kiekio pagal sąnaudų normą — "
+    "palyginkite su gamintojo nurodytomis sąnaudomis."
+)
+
+
+def _medziagos_kiekis(v):
+    """The quantity, when it is a real positive number, in its ORIGINAL type.
+
+    A material the engine could not quantify does NOT become a 0-kiekis
+    placeholder row — an empty line in a materials list reads as "nothing
+    needed", which is a lie. Counts stay ints (4649 savisriegiai, not 4649.0).
+    """
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if f > 0 else None
+
+
+def _disambiguate_material_labels(materials: list[dict]) -> None:
+    """Make every material label unique within the sąmata.
+
+    The label IS the price key on every rebuild (`_merge_user_edits` and its JS
+    twin match on `aprasymas`), so two different materials sharing one label
+    would share one price — and a user who priced them apart would see one of
+    the two carried back as an orphan. The emit sites name their materials
+    uniquely (vonios vs virtuvės plytelės, sienų vs lubų glaistas); this is the
+    net that keeps the invariant true if a future one forgets.
+    """
+    counts: dict[str, int] = {}
+    for m in materials:
+        counts[m["aprasymas"]] = counts.get(m["aprasymas"], 0) + 1
+    for m in materials:
+        if counts[m["aprasymas"]] > 1 and m.get("susijes_darbas"):
+            m["aprasymas"] = f"{m['aprasymas']} — {m['susijes_darbas']}"
+
+
+def _extract_medziagos_section(parsed: dict) -> None:
+    """Move every auto-computed material off its work row into `SK_MEDZIAGOS`.
+
+    Runs LAST — after the section sort and after `apply_confidence`, so each
+    material can inherit its parent work's FINAL confidence tier and reason
+    rather than being re-scored on its own label (a bag of glaistas is exactly
+    as trustworthy as the area it was computed from). It also keeps
+    `apply_confidence`'s call-once contract intact: the material rows never
+    reach it.
+
+    Material order follows work order, which the sort has already grouped by
+    section — so the shopping list reads in the same sequence as the sąmata.
+    """
+    pozicijos = parsed.get("pozicijos") or []
+    materials: list[dict] = []
+    for p in pozicijos:
+        if (p.get("skyrius") or "") == SK_MEDZIAGOS:
+            continue                      # already extracted (defensive)
+        parent = (p.get("aprasymas") or "").strip()
+        found: list[tuple[str, Any, str]] = []
+        # 1. the material embedded on the work row
+        ap = p.pop("medziagos_aprasymas", None)
+        kiekis = _medziagos_kiekis(p.pop("medziagos_kiekis", None))
+        vnt = p.pop("medziagos_vnt", None)
+        if ap and str(ap).strip() and kiekis is not None:
+            found.append((str(ap).strip(), kiekis, str(vnt or "vnt")))
+        # 2. the list the paint consolidation attaches to its combined lines
+        for m in (p.pop("_medziagos", None) or []):
+            if not isinstance(m, dict):
+                continue
+            m_ap = str(m.get("aprasymas") or "").strip()
+            m_kiekis = _medziagos_kiekis(m.get("kiekis"))
+            if m_ap and m_kiekis is not None:
+                found.append((m_ap, m_kiekis, str(m.get("vnt") or "vnt")))
+        for m_ap, m_kiekis, m_vnt in found:
+            materials.append({
+                "skyrius": SK_MEDZIAGOS,
+                "aprasymas": m_ap,
+                "vnt": m_vnt,
+                "kiekis": m_kiekis,
+                "saltinis": _MEDZIAGOS_SALTINIS,
+                # Which work this belongs to — the UI renders it as muted
+                # subtext, and it is what makes a bare "Gruntas" line readable.
+                "susijes_darbas": parent,
+                "_medziaga": True,
+                "confidence": p.get("confidence") or "zalia",
+                "_confidence_reason": (p.get("_confidence_reason")
+                                       or _MEDZIAGOS_REASON),
+            })
+    if not materials:
+        return
+    _disambiguate_material_labels(materials)
+    parsed["pozicijos"] = list(pozicijos) + materials
+
+
 def _consolidate_paint_enabled() -> bool:
     """Feature-flag gate for paint-line consolidation (default ON)."""
     try:
@@ -1835,18 +1980,25 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     l_share = ((1 - w_share) * (lubos_paint / lubos_paint_all)
                if lubos_paint_all > 0 else 0.0)
 
-    def _medziagos(share: float) -> list[dict]:
+    # 2026-09-02: the material names carry their SURFACE. They used to be bare
+    # ("Gruntas" on both the walls and the ceilings line), which was fine while
+    # each rode inside its own work row — but in the global Medžiagos section two
+    # identically-named rows would share one price key on every rebuild.
+    _SURFACE_MEDZIAGA = {"Sienų": "sienoms", "Lubų": "luboms"}
+
+    def _medziagos(surf: str, share: float) -> list[dict]:
         if share <= 0:
             return []
+        kam = _SURFACE_MEDZIAGA.get(surf, surf.lower())
         return [
-            {"aprasymas": "Glaistas (pradinis + baigiamasis)",
+            {"aprasymas": f"Glaistas {kam} (pradinis + baigiamasis)",
              "kiekis": round(sum(float(r.get("glaistas_kg") or 0) for r in rooms) * share, 2),
              "vnt": "kg"},
-            {"aprasymas": "Gruntas",
+            {"aprasymas": f"Gruntas {kam}",
              "kiekis": round(sum(float(r.get("gruntas_l") or 0) for r in rooms) * share, 2),
              "vnt": "l"},
-            {"aprasymas": "Dažai (2 sluoksniai)",
-             "kiekis": round(sum(float(r.get("dazai_l") or 0) for r in rooms) * share, 2),
+            {"aprasymas": f"Dažai {kam} (2 sluoksniai)",
+             "kiekis": round(sum(_room_dazai_l(r) for r in rooms) * share, 2),
              "vnt": "l"},
         ]
 
@@ -1861,7 +2013,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
                    if (p.get("aprasymas") or "").startswith(surf)]
         base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
                 "_consolidated": True,
-                "_medziagos": _medziagos(share), "_detalus": detalus}
+                "_medziagos": _medziagos(surf, share), "_detalus": detalus}
         if provenance:
             base["_confidence_reason"] = provenance
         out: list[dict] = []
@@ -2189,7 +2341,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _ceiling_keep = (lubos_paint / lubos_paint_all) if lubos_paint_all > 0 else 0.0
     lubos_share = (1 - walls_share) * _ceiling_keep if _dazymo_all > 0 else 0.5
     glaistas_total = _sum("glaistas_kg")
-    dazai_total = _sum("dazai_l")
+    dazai_total = round(sum(_room_dazai_l(r) for r in rooms), 2)
     gruntas_total = _sum("gruntas_l")
 
     # Wet rooms (vonia/wc/san) — voniose dažymas tik virš plytelių zonos
@@ -2245,12 +2397,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
-             "medziagos_aprasymas": "Pradinis glaistas",
+             "medziagos_aprasymas": "Pradinis glaistas sienoms",
              "medziagos_kiekis": round(glaistas_total * walls_share * 0.5, 2),
              "medziagos_vnt": "kg"},
             {"skyrius": SK_GD, "aprasymas": "Sienų antrinis glaistymas Q2",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
-             "medziagos_aprasymas": "Baigiamasis glaistas",
+             "medziagos_aprasymas": "Baigiamasis glaistas sienoms",
              "medziagos_kiekis": round(glaistas_total * walls_share * 0.5, 2),
              "medziagos_vnt": "kg"},
             {"skyrius": SK_GD, "aprasymas": f"Sienų šlifavimas{sanding_suffix}",
@@ -2258,14 +2410,14 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              **({"darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"} if is_q4 else {})},
             {"skyrius": SK_GD, "aprasymas": "Sienų gruntavimas (1 sluoksnis)",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
-             "medziagos_aprasymas": "Gruntas",
+             "medziagos_aprasymas": "Gruntas sienoms",
              "medziagos_kiekis": round(gruntas_total * walls_share, 2),
              "medziagos_vnt": "l"},
             {"skyrius": SK_GD, "aprasymas": "Sienų dažymas (1 sluoksnis)",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL},
             {"skyrius": SK_GD, "aprasymas": "Sienų dažymas (2 sluoksnis)",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
-             "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+             "medziagos_aprasymas": "Dažai sienoms (2 sluoksniai)",
              "medziagos_kiekis": round(dazai_total * walls_share, 2),
              "medziagos_vnt": "l"},
         ])
@@ -2292,12 +2444,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Lubų pirminis glaistymas Q1",
              "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
-             "medziagos_aprasymas": "Pradinis glaistas",
+             "medziagos_aprasymas": "Pradinis glaistas luboms",
              "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
              "medziagos_vnt": "kg", **_luba},
             {"skyrius": SK_GD, "aprasymas": "Lubų antrinis glaistymas Q2",
              "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
-             "medziagos_aprasymas": "Baigiamasis glaistas",
+             "medziagos_aprasymas": "Baigiamasis glaistas luboms",
              "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
              "medziagos_vnt": "kg", **_luba},
             {"skyrius": SK_GD, "aprasymas": f"Lubų šlifavimas{sanding_suffix}",
@@ -2305,12 +2457,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              **({"darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"} if is_q4 else {})},
             {"skyrius": SK_GD, "aprasymas": "Lubų gruntavimas (1 sluoksnis)",
              "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
-             "medziagos_aprasymas": "Gruntas",
+             "medziagos_aprasymas": "Gruntas luboms",
              "medziagos_kiekis": round(gruntas_total * lubos_share, 2),
              "medziagos_vnt": "l", **_luba},
             {"skyrius": SK_GD, "aprasymas": "Lubų dažymas (2 sluoksniai)",
              "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
-             "medziagos_aprasymas": "Dažai (2 sluoksniai)",
+             "medziagos_aprasymas": "Dažai luboms (2 sluoksniai)",
              "medziagos_kiekis": round(dazai_total * lubos_share, 2),
              "medziagos_vnt": "l", **_luba},
         ])
@@ -2534,7 +2686,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "medziagos_kiekis": round(gkp_total * 1.5, 2), "medziagos_vnt": "m"},
             {"skyrius": SK_GKP, "aprasymas": "Savisriegiai GKP montavimui",
              "vnt": "vnt", "kiekis": int(gkp_total * 30), "saltinis": SAL,
-             "medziagos_aprasymas": "~30 vnt/m² lubų",
+             # Named, not just normed: as a stand-alone row in the Medžiagos
+             # section "~30 vnt/m² lubų" says nothing about WHAT to buy.
+             "medziagos_aprasymas": "Savisriegiai GKP (~30 vnt/m² lubų)",
              "medziagos_kiekis": int(gkp_total * 30), "medziagos_vnt": "vnt"},
         ])
 
@@ -2562,14 +2716,21 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pl_grindys_kita = round(_sum("plyteles_grindys_m2") - pl_grindys_vonia - pl_grindys_virtuve, 2)
 
     def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str):
-        """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos."""
+        """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos.
+
+        2026-09-02: the material names carry their LOCATION. Bare names were
+        fine while each rode inside its own work row, but the global Medžiagos
+        section would otherwise show up to six identical "Plytelės (m² + 8%
+        atliekų)" rows — and vonios plytelės are rarely the same product, or the
+        same price, as virtuvės.
+        """
         if kiekis <= 0:
             return
         pozicijos.append({
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelių klijavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
-            "medziagos_aprasymas": "Plytelių klijai (~5 kg/m²)",
+            "medziagos_aprasymas": f"{vieta} plytelių klijai (~5 kg/m²)",
             "medziagos_kiekis": round(kiekis * 5.0, 2),
             "medziagos_vnt": "kg",
         })
@@ -2577,7 +2738,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelės",
             "vnt": "m2", "kiekis": round(kiekis * 1.08, 2), "saltinis": SAL,
-            "medziagos_aprasymas": "Plytelės (m² + 8% atliekų)",
+            "medziagos_aprasymas": f"{vieta} plytelės (m² + 8% atliekų)",
             "medziagos_kiekis": round(kiekis * 1.08, 2),
             "medziagos_vnt": "m2",
         })
@@ -2585,7 +2746,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelių fugavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
-            "medziagos_aprasymas": "Fugavimo masė (~0.3 kg/m²)",
+            "medziagos_aprasymas": f"{vieta} plytelių fugavimo masė (~0.3 kg/m²)",
             "medziagos_kiekis": round(kiekis * 0.3, 2),
             "medziagos_vnt": "kg",
         })
@@ -3403,6 +3564,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         "Ventiliacijos darbai":          8,
         "Elektros instaliacijos darbai": 9,
         "Pridėtiniai elementai":        10,
+        # Materials are extracted AFTER this sort, so nothing here carries the
+        # section yet. Listed anyway so the ordering contract is stated in one
+        # place: the shopping list is always the last thing in the sąmata.
+        SK_MEDZIAGOS:                   11,
     }
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
@@ -3414,6 +3579,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # 2026-06-11-experiments-results.md.
     from .confidence import apply_confidence
     apply_confidence(parsed)
+
+    # 2026-09-02 (contractor ask F2): lift every auto-computed material off its
+    # work row into ONE "Medžiagos" section at the end. Runs AFTER
+    # apply_confidence so each material inherits its parent work's final tier.
+    _extract_medziagos_section(parsed)
     return parsed
 
 

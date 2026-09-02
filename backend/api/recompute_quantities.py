@@ -12,7 +12,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
-from extractor.universal_rules import UNIVERSAL_RULES, paint_coverage_for_class
+from extractor.universal_rules import paint_coverage_for_class
 
 import auth as _auth
 
@@ -177,11 +177,25 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
     """
     if degradations is None:
         degradations = []
+    # 2026-09-02: resolved exactly the way the extraction pipeline resolves it
+    # (`_paint_class` or `paint_class`, LT default 2 — not 1). The two paths
+    # have to land on the same profile or they compute different paint litres
+    # for an unchanged project; see the `dazai_l` block below.
+    from extractor.vision_call import _PAINT_CLASS_DEFAULT
+    if assumptions.get("_paint_class") is not None:
+        _pc_raw = assumptions["_paint_class"]
+    elif "paint_class" in assumptions:
+        # SUPPLIED — even as None. Kept distinct from absent so an unusable
+        # value still lands in `degradations` instead of vanishing (audit 3).
+        _pc_raw = assumptions["paint_class"]
+    else:
+        _pc_raw = _MISSING
     paint_class = int(_num_field(
-        assumptions.get("paint_class", _MISSING), 1,
-        degradations, "paint_class"))
+        _pc_raw, _PAINT_CLASS_DEFAULT, degradations, "paint_class"))
+    # Coverage is now only the WEIGHTING between walls and ceiling inside the
+    # canonical total — the absorption factor lives in the class profile
+    # `_calc_dazai_liters` applies, so `first_coat_factor` is no longer read here.
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
-    absorption = float(UNIVERSAL_RULES["first_coat_factor"])
     per_room_h = assumptions.get("lubu_auksciai") or {}
     per_room_paint = assumptions.get("walls_paint_override") or {}
     default_h = _num_field(
@@ -273,8 +287,31 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
         ceiling = _num_field(
             room.get("lubu_dazomas_plotas_m2") or room.get("ceiling_paintable_m2") or _MISSING,
             0.0, degradations, "lubu_dazomas_plotas_m2", room=nr)
-        room["dazai_l"] = round(walls * absorption / cov_walls, 2) if walls else 0.0
-        room["dazai_luboms_l"] = round(ceiling * absorption / cov_ceil, 2) if ceiling else 0.0
+        # 2026-09-02: the room's TOTAL paint litres come from the canonical
+        # `_calc_dazai_liters` — the same function the extraction pipeline uses
+        # (vision_call §4.2). This endpoint used to run its own formula off a
+        # different constant set (paint_coverage + first_coat_factor vs the
+        # class profiles), so an unchanged project came back with different
+        # litres after any Prielaidos edit — measured on the Beržų fixture,
+        # 83.83 l of wall paint became 67.59 l on a NO-OP ceiling edit.
+        #
+        # That was invisible while the litres only ever fed `medziagos_kiekis`;
+        # since materials became their own priceable section it would have been
+        # a sąmata that moves when the user changes nothing.
+        #
+        # `dazai_luboms_l` stays — sanity_checks sums both fields and
+        # RulesOverridePanel shows the per-surface split — but it is now a
+        # DECOMPOSITION of the canonical total, weighted by each surface's
+        # coverage, so `dazai_l + dazai_luboms_l` equals the one figure the
+        # extraction pipeline writes.
+        from extractor.vision_call import _calc_dazai_liters
+        total_l = _calc_dazai_liters(walls + ceiling, paint_class=paint_class)
+        w_raw = (walls / cov_walls) if walls else 0.0
+        c_raw = (ceiling / cov_ceil) if ceiling else 0.0
+        denom = w_raw + c_raw
+        walls_l = round(total_l * w_raw / denom, 2) if denom else 0.0
+        room["dazai_l"] = walls_l
+        room["dazai_luboms_l"] = round(total_l - walls_l, 2) if denom else 0.0
 
         # Recompute glaistas_kg from glaistimo_lygis (Q1-Q4) if assumption set.
         # Playwright regression 2026-05-10: the Q-toggle in Prielaidos was

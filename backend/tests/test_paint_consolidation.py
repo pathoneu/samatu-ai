@@ -12,7 +12,9 @@ trades and two rates. Σ of the two still equals the old single line.
 """
 import os
 
-from extractor.vision_call import _build_pozicijos_from_rooms
+from extractor.vision_call import (
+    _build_pozicijos_from_rooms, _calc_dazai_liters, _calc_glaistas_kg,
+)
 from extractor.universal_rules import calc_room_quantities
 
 
@@ -28,6 +30,14 @@ def _room(**kw):
          "lubu_aukstis_m": 2.7, "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
+    # The per-room material fields the extraction pipeline computes on top of
+    # calc_room_quantities (`_recompute_per_room_via_python` §4.1-4.3). Without
+    # them every material quantity is 0 and the material assertion below passes
+    # vacuously — which is exactly what it did before 2026-09-02.
+    dazymo = float(r.get("dazymo_plotas_m2") or 0)
+    r["glaistas_kg"] = _calc_glaistas_kg(dazymo)
+    r["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=2)
+    r["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
     return r
 
 
@@ -57,14 +67,18 @@ def test_paint_consolidated_default_on():
     assert abs(lubos[0]["kiekis"] - r["ceiling_paintable_m2"]) < 0.5, lubos
     expected = round(r["walls_paintable_m2"] + r["ceiling_paintable_m2"], 2)
     assert abs(sienos[0]["kiekis"] + lubos[0]["kiekis"] - expected) < 0.5
-    # materials preserved (not lost to consolidation), and split — never doubled
-    assert sienos[0].get("_medziagos"), "materials not preserved on the walls line"
-    assert lubos[0].get("_medziagos"), "materials not preserved on the ceiling line"
-    def _mat(rows, name):
-        return next(m["kiekis"] for m in rows if m["aprasymas"] == name)
+    # materials preserved (not lost to consolidation), and split — never doubled.
+    # 2026-09-02: they no longer ride on the work line — each is a row in the
+    # global "Medžiagos" section, linked back by `susijes_darbas`.
+    assert not sienos[0].get("_medziagos"), "materials must leave the work line"
+    def _mat(work_label, name):
+        return next(p["kiekis"] for p in out["pozicijos"]
+                    if p["skyrius"] == "Medžiagos"
+                    and p["susijes_darbas"] == work_label
+                    and p["aprasymas"] == name)
     glaistas_total = round(sum(float(x.get("glaistas_kg") or 0) for x in rooms), 2)
-    assert abs(_mat(sienos[0]["_medziagos"], "Glaistas (pradinis + baigiamasis)")
-               + _mat(lubos[0]["_medziagos"], "Glaistas (pradinis + baigiamasis)")
+    assert abs(_mat(sienos[0]["aprasymas"], "Glaistas sienoms (pradinis + baigiamasis)")
+               + _mat(lubos[0]["aprasymas"], "Glaistas luboms (pradinis + baigiamasis)")
                - glaistas_total) < 0.05
     # Rotband stays a separate line (contractor item 15)
     assert any("Rotband" in l for l in labels), labels

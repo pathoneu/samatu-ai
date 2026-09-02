@@ -22,8 +22,17 @@ def test_recompute_paint_class_change_uses_backend_formula():
 
 
 def test_recompute_paint_formula_class_2_walls_100m2():
-    """Regression test: 100 m² walls at class 2 (8 m²/L coverage) with
-    1.8× first-coat absorption → exactly 22.5 L of wall paint."""
+    """100 m² of paintable surface at class 2 → exactly 20.0 L.
+
+    2026-09-02: this used to assert 22.5 L — this endpoint ran its own formula
+    (paint_coverage["plastered_q2_q3"] = 8 m²/L × first_coat_factor 1.8) while
+    the extraction pipeline used the class profile (9 m²/L × 1.8) for the same
+    room. Both numbers sit inside CLAUDE.md §1.10's 7-9 m²/L band, but a project
+    cannot have two answers: the litres shifted ~11% the first time a user
+    touched Prielaidos. Since materials became a priced section of their own the
+    endpoint delegates to the canonical `_calc_dazai_liters`, so a Prielaidos
+    edit reproduces the extraction's own figure.
+    """
     payload = {
         "rooms": [{"name": "K1", "dazomas_plotas_m2": 100.0}],
         "edits": [{"field": "paint_class", "new_value": 2}],
@@ -32,8 +41,11 @@ def test_recompute_paint_formula_class_2_walls_100m2():
     r = client.post("/api/recompute-quantities", json=payload)
     assert r.status_code == 200
     body = r.json()
-    # 100 m² * 1.8 / 8 m²/L = 22.5 L
-    assert body["rooms"][0]["dazai_l"] == 22.5
+    # 100 m² × 1.8 absorption / 9 m²/L (class-2 profile) = 20.0 L
+    assert body["rooms"][0]["dazai_l"] == 20.0
+    # …and that is exactly what the extraction pipeline computes for it.
+    from extractor.vision_call import _calc_dazai_liters
+    assert body["rooms"][0]["dazai_l"] == _calc_dazai_liters(100.0, paint_class=2)
 
 
 def _living_room(nr="1", h=2.8):

@@ -226,14 +226,22 @@ def test_pozicijos_includes_rotband_for_paintable_walls(three_room_parsed):
     """Rotband leveling must appear when walls_paintable > 0 (Rangovas P1-P5
     pattern — 5/5 projects). Quantity = walls_paintable_m2."""
     out = _run_full_pipeline(three_room_parsed)
+    # 2026-09-02: match WORK rows only — the material carries the same product
+    # name and now lives in its own "Medžiagos" section.
     rotband = [p for p in out["pozicijos"]
-               if "rotband" in p["aprasymas"].lower()]
+               if "rotband" in p["aprasymas"].lower()
+               and p["skyrius"] != "Medžiagos"]
     assert len(rotband) == 1, f"Rotband missing: {rotband}"
     assert rotband[0]["vnt"] == "m2"
     assert rotband[0]["kiekis"] > 0
-    # Material should be specified
-    assert rotband[0].get("medziagos_aprasymas")
-    assert "kg" in rotband[0].get("medziagos_vnt", "")
+    # …and the material it consumes is a row of its own, linked back to it.
+    assert not rotband[0].get("medziagos_aprasymas"), \
+        "work rows must no longer embed their material"
+    mat = next(p for p in out["pozicijos"]
+               if p["skyrius"] == "Medžiagos"
+               and p["susijes_darbas"] == rotband[0]["aprasymas"])
+    assert mat["vnt"] == "kg"
+    assert mat["kiekis"] > 0
 
 
 def test_pozicijos_santechnika_skyrius_has_klozetas_per_wet_room(three_room_parsed):
@@ -816,8 +824,13 @@ def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
     # Detail fields preserved for frontend expand
     assert line.get("_detail_m2", 0) > 0
     assert line.get("_detail_juostele_m", 0) > 0
-    # Material kg = m² × 3.0 (2 coats × 1.5 kg/m²)
-    assert line["medziagos_kiekis"] == round(line["_detail_m2"] * 3.0, 2)
+    # Material kg = m² × 3.0 (2 coats × 1.5 kg/m²) — a row of its own in the
+    # "Medžiagos" section since 2026-09-02, linked back to this work line.
+    mat = next(p for p in out["pozicijos"]
+               if p["skyrius"] == "Medžiagos"
+               and p["susijes_darbas"] == line["aprasymas"])
+    assert mat["kiekis"] == round(line["_detail_m2"] * 3.0, 2)
+    assert mat["vnt"] == "kg"
 
 
 def test_pozicijos_p3_silikon_split_per_rangovas_audit():
@@ -836,7 +849,11 @@ def test_pozicijos_p3_silikon_split_per_rangovas_audit():
         ],
     }
     out = _run_full_pipeline(parsed)
-    silikon_lines = [p for p in out["pozicijos"] if "silikon" in p["aprasymas"].lower()]
+    # WORK rows only — the silicone tubes are their own "Medžiagos" rows since
+    # 2026-09-02 and carry the word too.
+    silikon_lines = [p for p in out["pozicijos"]
+                     if "silikon" in p["aprasymas"].lower()
+                     and p["skyrius"] != "Medžiagos"]
     assert len(silikon_lines) == 2, f"expected 2 silikon lines (san + kampai), got {len(silikon_lines)}"
     # Wet perim 12.0; sanitarinis = 12 × 1.31 = 15.72; kampai = 12 × 0.99 = 11.88
     san = next(p for p in silikon_lines if "sanitarinės" in p["aprasymas"].lower())

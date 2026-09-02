@@ -70,7 +70,10 @@ def test_rotband_share_calibrated_to_contractor_30pct():
     rooms = [_room([], plotas_m2=40.0, perimetras_m=26.0, lubu_aukstis_m=2.7)]
     out = _build_pozicijos_from_rooms(_parsed(rooms))
     walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
-    rotband = [p for p in out["pozicijos"] if "rotband" in p["aprasymas"].lower()]
+    # WORK rows only — the Rotband bags are their own "Medžiagos" row since
+    # 2026-09-02 and carry the product name too.
+    rotband = [p for p in out["pozicijos"] if "rotband" in p["aprasymas"].lower()
+               and p["skyrius"] != "Medžiagos"]
     assert len(rotband) == 1, rotband
     share = rotband[0]["kiekis"] / walls_paint
     assert abs(share - 0.30) < 0.005, f"rotband share {share:.3f}, expected 0.30"

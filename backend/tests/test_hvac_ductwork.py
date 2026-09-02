@@ -39,7 +39,12 @@ def test_explicit_d125_emits_one_line():
     assert len(lines) == 3
     d125 = next(l for l in lines if "D125" in l.get("aprasymas", ""))
     assert d125["kiekis"] == 12.0
-    assert d125["medziagos_kiekis"] == 12.6  # 12 × 1.05 atliekos
+    # 12 × 1.05 atliekos — a "Medžiagos" row of its own since 2026-09-02.
+    mat = next(p for p in out["pozicijos"]
+               if p["skyrius"] == "Medžiagos"
+               and p["susijes_darbas"] == d125["aprasymas"])
+    assert mat["kiekis"] == 12.6
+    assert mat["vnt"] == "m"
 
 
 def test_all_three_diameters():

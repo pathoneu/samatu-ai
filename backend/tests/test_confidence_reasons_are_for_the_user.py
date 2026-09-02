@@ -63,6 +63,36 @@ def test_dynamic_reasons_are_clean():
     assert "PER MAŽA" in joined
 
 
+def test_material_row_reasons_are_clean():
+    """The Medžiagos section (2026-09-02) adds one reason of its own — the note
+    a material row carries when its parent work line had none — and inherits
+    the parent's otherwise. Scan the new string, and the rows a real build
+    produces, through the same net."""
+    from extractor.vision_call import (
+        _MEDZIAGOS_REASON, SK_MEDZIAGOS, _build_pozicijos_from_rooms,
+    )
+    m = BANNED.search(_MEDZIAGOS_REASON)
+    assert not m, f"banned token {m.group(0)!r} in the material reason"
+
+    out = _build_pozicijos_from_rooms({
+        "patalpos": [
+            {"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+             "glaistas_kg": 120.0, "dazai_l": 12.0, "gruntas_l": 8.0,
+             "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
+             "dazymo_plotas_m2": 65.0, "kampu_metrai": 30.0,
+             "grindjuosciu_m": 16.0, "elementai": []},
+        ],
+        "santrauka": {},
+    })
+    mats = [p for p in out["pozicijos"] if p["skyrius"] == SK_MEDZIAGOS]
+    assert mats, "the build produced no material rows to scan"
+    for p in mats:
+        r = p.get("_confidence_reason") or ""
+        hit = BANNED.search(r)
+        assert not hit, f"banned token {hit.group(0)!r} on {p['aprasymas']!r}: {r}"
+
+
 def test_door_reconciliation_reasons_are_clean():
     """Drive every branch of reconcile_frameless and scan the reasons it
     actually returns — banning identifiers in source was the wrong net

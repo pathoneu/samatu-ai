@@ -90,4 +90,7 @@ def test_f4_recompute_works_for_logged_in_user(tmp_path, monkeypatch):
         "current_assumptions": {"paint_class": 1},
     })
     assert r.status_code == 200, r.text
-    assert r.json()["rooms"][0]["dazai_l"] == 22.5
+    # 100 m² × 1.8 absorption / 9 m²/L (class-2 profile) = 20.0 L. Was 22.5
+    # until 2026-09-02, when this endpoint stopped running its own paint formula
+    # — see test_recompute_quantities.test_recompute_paint_formula_class_2_walls_100m2.
+    assert r.json()["rooms"][0]["dazai_l"] == 20.0

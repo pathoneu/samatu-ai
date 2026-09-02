@@ -17,6 +17,8 @@ import pytest
 from extractor.universal_rules import calc_room_quantities
 from extractor.vision_call import (
     _build_pozicijos_from_rooms,
+    _calc_dazai_liters,
+    _calc_glaistas_kg,
     _ceiling_paint_m2,
     _stretch_ceiling_nrs,
 )
@@ -27,6 +29,14 @@ def _room(nr, **kw):
          "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
+    # The per-room material fields the extraction pipeline computes on top of
+    # calc_room_quantities (`_recompute_per_room_via_python` §4.1-4.3). Without
+    # them every material quantity is 0 and the material assertions below pass
+    # vacuously — which is exactly what they did before 2026-09-02.
+    dazymo = float(r.get("dazymo_plotas_m2") or 0)
+    r["glaistas_kg"] = _calc_glaistas_kg(dazymo)
+    r["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=2)
+    r["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
     return r
 
 
@@ -177,12 +187,14 @@ def test_material_leaves_with_the_work_instead_of_moving_to_the_walls():
         out = _by_label(_build_pozicijos_from_rooms(_parsed(
             [dict(r) for r in rooms], {"stretch_ceiling_override": {"101": 1}},
         ))["pozicijos"])
-        for label in ("Sienų pirminis glaistymas Q1", "Sienų gruntavimas (1 sluoksnis)",
-                      "Sienų dažymas (2 sluoksnis)"):
-            assert base[label]["medziagos_kiekis"] == out[label]["medziagos_kiekis"], label
+        # 2026-09-02: the materials live in the global "Medžiagos" section now,
+        # each linked back to its work line by `susijes_darbas`.
+        for label in ("Pradinis glaistas sienoms", "Gruntas sienoms",
+                      "Dažai sienoms (2 sluoksniai)"):
+            assert base[label]["kiekis"] == out[label]["kiekis"], label
         # The ceiling half shrank by exactly one of the two identical rooms.
-        assert out["Lubų gruntavimas (1 sluoksnis)"]["medziagos_kiekis"] == pytest.approx(
-            base["Lubų gruntavimas (1 sluoksnis)"]["medziagos_kiekis"] / 2, abs=0.05)
+        assert out["Gruntas luboms"]["kiekis"] == pytest.approx(
+            base["Gruntas luboms"]["kiekis"] / 2, abs=0.05)
     finally:
         os.environ.pop("ENABLE_CONSOLIDATE_PAINT_LINES", None)
 

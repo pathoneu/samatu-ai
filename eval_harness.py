@@ -85,6 +85,12 @@ _merge_registry_yaml()
 
 # ── Metric mapping: contractor truth field → extractor output field/extractor ──
 # Each entry: truth_key → (label, accessor(parsed_extractor_output) → float)
+#
+# Literal copy of `extractor.vision_call.SK_MEDZIAGOS`. Copied rather than
+# imported because this module is loaded before `backend/` is on sys.path.
+_MEDZIAGOS_SKYRIUS = "Medžiagos"
+
+
 def _santrauka_get(parsed: dict, key: str) -> float:
     return float((parsed.get("santrauka") or {}).get(key) or 0.0)
 
@@ -112,10 +118,19 @@ def _pozicijos_sum(parsed: dict, substr: str) -> float | None:
     2026-07-04 mapping fix: several contractor truth lines (e.g. "Sienų
     lyginimas Rotband") ARE produced by the pipeline — as pozicijos[]
     line items, not santrauka keys — but the eval never read them, so
-    they scored as missing coverage on every project."""
+    they scored as missing coverage on every project.
+
+    2026-09-02: MATERIAL rows are excluded. The builder now lifts every
+    auto-computed material into its own "Medžiagos" section, and a material's
+    name repeats its work's ("Rotband (~10 kg/m² …)" under "Sienų lyginimas
+    Knauf Rotband"). Summed together, the m² of wall being levelled and the kg
+    of Rotband levelling it would land in one number — 125.73 m² would have
+    scored as 1 383.03. A work metric may only ever read work rows."""
     total = 0.0
     found = False
     for item in (parsed.get("pozicijos") or []):
+        if (item.get("skyrius") or "") == _MEDZIAGOS_SKYRIUS or item.get("_medziaga"):
+            continue
         if substr in (item.get("aprasymas") or "").lower():
             total += float(item.get("kiekis") or 0)
             found = True
