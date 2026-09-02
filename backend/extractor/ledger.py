@@ -30,7 +30,12 @@ THE SHAPE (frozen — the frontend renders these keys verbatim)
     "roll_up": [{"op": "sum", "label": "Σ 11 patalpų", "value": 501.3,
                  "note": "…"}],                       # note optional
 
-`roll_up[].op ∈ {sum, cap, share, coefficient, constant, anchor}`.
+`roll_up[].op ∈ {sum, cap, share, coefficient, constant, anchor, round}`.
+
+`round` is the ONLY step the ledger adds by itself (`attach`) and it may close
+a rounding gap and nothing else — see the bound on `_ROUND_ABS` below. It exists
+because a `Σ` of twice-rounded per-room values can land a cent from the billed
+number; it is not a licence to reconcile a chain to any total.
 
 **Every `value` in `roll_up` is the RUNNING RESULT after that step**, never a
 delta — so the chain reads „Σ 11 patalpų 501,30 → riba 0,65 m/m² 107,67" and
@@ -54,12 +59,32 @@ from typing import Any
 # What the compat emit and both merge layers must carry onto `darbu_sarasas`.
 LEDGER_KEYS = ("contributions", "excluded", "roll_up")
 
+# Set by `attach` alongside the three: may a renderer put a „Σ" next to the
+# headline? Not part of LEDGER_KEYS — that tuple is the frozen shape the
+# frontend switches on — but it travels with them and is stripped with them.
+SUM_FLAG_KEY = "contributions_sum_to_total"
+
 # `Σ terms` may differ from the contribution's own value by this much before the
 # terms are dropped as untrustworthy (see `terms_or_none`).
 _TERMS_TOLERANCE = 0.02
 
 # How closely a replayed `roll_up` must reproduce `kiekis`.
 REPLAY_TOLERANCE = 0.01
+
+# The widest gap a `round` step may close: a couple of cents, or a thousandth of
+# the quantity on the big lines. Anything larger is not rounding — it is a chain
+# that does not describe this number, and the guard test has to SEE that. The
+# unbounded version of this step (2026-09-02, "Suapvalinta") made
+# `test_every_ledger_replays_to_its_kiekis` unfalsifiable: a ledger claiming
+# 12,00 m for a 501,30 m line replayed clean and would have rendered
+# „Apvalinimo skirtumas +489,30" to the contractor.
+_ROUND_ABS = 0.05
+_ROUND_REL = 0.001
+
+
+def rounding_bound(target: float) -> float:
+    """How far a `round` step may move the chain to land on `target`."""
+    return max(_ROUND_ABS, _ROUND_REL * abs(float(target)))
 
 
 def room_geometry(room: dict) -> str:
@@ -148,14 +173,23 @@ def rooms_label(n: int) -> str:
 
 def attach(poz: dict, contributions: list[dict], excluded_rooms: list[dict],
            roll_up: list[dict], kiekis: float | None = None) -> dict:
-    """Put the ledger on a position and make the chain end at its `kiekis`.
+    """Put the ledger on a position, closing a ROUNDING gap and nothing wider.
 
-    The last step is FORCED onto the billed quantity: every quantity in this
-    codebase is rounded at least twice on its way to a line, so `Σ` of rounded
-    per-room values can land a cent away from the number the contractor is
-    billed. A chain whose last value is not the billed one is a chain the panel
-    would render as a contradiction, so the difference is stated as its own
-    step rather than hidden.
+    Every quantity in this codebase is rounded at least twice on its way to a
+    line, so `Σ` of rounded per-room values can land a cent away from the number
+    the contractor is billed. That cent is stated as its own `round` step rather
+    than hidden — but only while it really is a cent (`rounding_bound`).
+
+    A wider gap means the chain does not describe this quantity, and the fix is
+    the emitting family, not a reconciliation step. So the chain is left ending
+    where it actually ends and `test_every_ledger_replays_to_its_kiekis` fails —
+    which is the whole point of having that test.
+
+    Also sets `contributions_sum_to_total`: whether adding up the room rows in
+    the panel reproduces the billed quantity. False on an anchored ceiling (the
+    chain starts from the eksplikacija's own total, not from the rooms) and on a
+    capped line (the cap clipped the Σ); a renderer reads it to decide whether a
+    „Σ" affordance next to the headline would tell the truth.
     """
     poz["contributions"] = contributions
     poz["excluded"] = excluded_rooms
@@ -163,11 +197,18 @@ def attach(poz: dict, contributions: list[dict], excluded_rooms: list[dict],
     if roll_up and isinstance(target, (int, float)):
         last = float(roll_up[-1]["value"])
         diff = round(float(target) - last, 2)
-        if abs(diff) > 0.005:
+        if 0.005 < abs(diff) <= rounding_bound(target):
             roll_up = roll_up + [step(
-                "sum", "Suapvalinta", float(target),
+                "round", "Suapvalinta", float(target),
                 f"Apvalinimo skirtumas {diff:+.2f}".replace(".", ","))]
     poz["roll_up"] = roll_up
+    # Against the BILLED number, not against the end of the chain: the two are
+    # the same on a healthy line, and on a broken one it is the billed number a
+    # renderer would put the „Σ" beside.
+    poz[SUM_FLAG_KEY] = bool(
+        contributions and isinstance(target, (int, float))
+        and abs(round(sum(float(c.get("value") or 0) for c in contributions), 2)
+                - float(target)) <= REPLAY_TOLERANCE)
     return poz
 
 
@@ -194,5 +235,12 @@ def replay(contributions: list[dict] | None, roll_up: list[dict] | None
         if s.get("op") == "cap" and running is not None and value > running + REPLAY_TOLERANCE:
             raise AssertionError(
                 f"cap step raised the quantity: {running} → {value}")
+        if (s.get("op") == "round" and running is not None
+                and abs(value - running) > rounding_bound(value)):
+            # `attach` refuses to emit one this wide; a persisted chain that
+            # carries one anyway is reconciling, not rounding.
+            raise AssertionError(
+                f"round step moved the quantity by more than a rounding: "
+                f"{running} → {value} ({s.get('label')})")
         running = value
     return running

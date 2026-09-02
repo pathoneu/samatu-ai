@@ -2539,6 +2539,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     Plytelių klijavimas, Hidroizoliacija, Santechnikos darbai, Elektros
     instaliacijos darbai, Pridėtiniai elementai. Each line has skyrius/aprasymas/vnt/kiekis
     matching the original schema so downstream `_emit_v8_compat_fields` still works.
+
+    MUTATES `parsed` AND THE ROOM DICTS INSIDE IT — audit flags
+    (`_grindjuosciu_capped`), `_meta`, `warnings` and the LED/tile bookkeeping
+    are written back onto the caller's own objects. Two builds off one dict are
+    therefore NOT independent: a test that shares a module-scoped blob makes the
+    first build decide what the second one sees (2026-09-02 review finding 2).
+    Hand it a fresh `json.loads` per build.
     """
     rooms = parsed.get("patalpos") or []
     if not rooms:

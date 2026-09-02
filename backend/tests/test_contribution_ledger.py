@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from extractor.ledger import (  # noqa: E402
-    LEDGER_KEYS, replay, rooms_label, terms_or_none,
+    LEDGER_KEYS, attach, contribution as _ledger_contribution, replay,
+    rooms_label, rounding_bound, terms_or_none,
 )
 from extractor.vision_call import (  # noqa: E402
     SK_GD_LUBOS, SK_GD_SIENOS, _build_pozicijos_from_rooms, _emit_v8_compat_fields,
@@ -38,8 +39,13 @@ SNAPSHOT = ROOT / "data" / "demo-berzu-24-snapshot-20260714.json"
 CORPUS = sorted((ROOT.parent / "ground_truth").glob("*/ai_extract.json"))
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def blob() -> dict:
+    """FUNCTION-scoped on purpose. `_build_pozicijos_from_rooms` mutates the
+    room dicts it is handed (see its docstring), so a module-scoped blob let one
+    test's rebuild decide whether the next one passed: the exclusion test below
+    only saw an excluded room after `test_kampai_terms_…` had run the recompute
+    over the shared dict, and failed when run alone."""
     return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
 
@@ -64,6 +70,10 @@ def _ledgered(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("roll_up")]
 
 
+def _ledger_c(room: dict, value: float) -> dict:
+    return _ledger_contribution(room, value, "m", "Sienos dažomos")
+
+
 # ── the keystone ────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
@@ -82,6 +92,45 @@ def test_every_ledger_replays_to_its_kiekis(fixture: Path):
 
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
+def test_no_ledger_leans_on_a_rounding_step(fixture: Path):
+    """The keystone above only proves the chain ENDS at `kiekis`; without this
+    it would also pass on a chain that got there by asserting the difference.
+    `round` may close a cent, never a quantity — measured 2026-09-02, the
+    pre-attach gap is 0,00 on every fixture, so no row should carry one at all.
+    """
+    for row in _ledgered(_build(json.loads(fixture.read_text(encoding="utf-8")))):
+        for i, s in enumerate(row["roll_up"]):
+            if s.get("op") != "round":
+                continue
+            prev = float(row["roll_up"][i - 1]["value"]) if i else 0.0
+            gap = abs(float(s["value"]) - prev)
+            assert gap <= 0.01, (
+                f"{fixture.parent.name} · {row['aprasymas']}: the chain is "
+                f"reconciled by {gap} — that is not a rounding")
+
+
+def test_attach_refuses_to_reconcile_a_chain_that_is_simply_wrong():
+    """The founder's own example: a ledger claiming 12,00 m for a 501,30 m line.
+    It must NOT replay clean, or the keystone proves nothing."""
+    from extractor.ledger import step as _step
+    rooms = [{"nr": "101"}, {"nr": "102"}]
+    thin = [_ledger_c(rooms[0], 7.0), _ledger_c(rooms[1], 5.0)]
+    wrong = attach({"kiekis": 501.30}, thin, [], [_step("sum", "Σ 2 patalpų", 12.0)])
+    assert [s["op"] for s in wrong["roll_up"]] == ["sum"], wrong["roll_up"]
+    assert abs(replay(wrong["contributions"], wrong["roll_up"]) - 501.30) > 0.01
+    assert wrong["contributions_sum_to_total"] is False
+    # …while a real cent of double-rounding still gets its own honest step.
+    full = [_ledger_c(rooms[0], 250.64), _ledger_c(rooms[1], 250.65)]
+    ok = attach({"kiekis": 501.30}, full, [], [_step("sum", "Σ 2 patalpų", 501.29)])
+    assert [s["op"] for s in ok["roll_up"]] == ["sum", "round"]
+    assert abs(replay(ok["contributions"], ok["roll_up"]) - 501.30) <= 0.01
+    assert ok["contributions_sum_to_total"] is True
+    assert rounding_bound(501.30) == pytest.approx(0.5013)
+    assert rounding_bound(12.0) == 0.05
+
+
+@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+                         ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_the_ledger_keys_are_exactly_what_the_frontend_reads(fixture: Path):
     for row in _ledgered(_build(json.loads(fixture.read_text(encoding="utf-8")))):
         assert set(LEDGER_KEYS) <= set(row)
@@ -95,7 +144,7 @@ def test_the_ledger_keys_are_exactly_what_the_frontend_reads(fixture: Path):
             assert set(e) == {"room_nr", "room_name", "excluded_because"}
         for s in row["roll_up"]:
             assert s["op"] in ("sum", "cap", "share", "coefficient",
-                               "constant", "anchor")
+                               "constant", "anchor", "round")
             assert set(s) <= {"op", "label", "value", "note"}
             assert isinstance(s["value"], (int, float))
 
@@ -175,7 +224,11 @@ def test_an_anchored_ceiling_says_anchor_not_sum(blob):
 
 
 def test_a_room_with_no_painted_walls_is_excluded_with_a_reason(blob):
-    row = next(r for r in _build(blob)
+    """Through `_recomputed_build` — the production order. The shipped snapshot's
+    rooms were written by an older engine and carry no `_walls_full_tile` /
+    `walls_paintable_m2 == 0` room until the per-room math has run, so building
+    off the raw blob exercises nothing."""
+    row = next(r for r in _recomputed_build(blob)
                if r["aprasymas"].startswith("Sienų glaistymas/dažymas"))
     assert row["excluded"], "every room contributed — fixture changed?"
     for e in row["excluded"]:
