@@ -414,6 +414,11 @@ export function resetPullCache() {
   for (const c of _inflight.values()) { try { c.abort(); } catch { /* settled */ } }
   _inflight.clear();
   _serverVersions.clear();
+  // Price lists are user-scoped and backend-backed since 2026-09-02 — releasing
+  // their once-per-session guard here is what makes the NEXT user's first
+  // Kainynai visit fetch his own lists instead of reusing the previous pull.
+  // (authContext.purgeLocalUserData already drops the cached rows themselves.)
+  _hasPulledPriceLists = false;
 }
 export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
@@ -771,13 +776,98 @@ export function logCorrection(projectId, payload) {
   }).catch((e) => console.warn('[projectStore] correction log failed:', e));
 }
 
-// ── Price Lists (still localStorage-only — low value to sync for MVP) ─────────
+// ── Price Lists (kainynai) ───────────────────────────────────────────────────
+//
+// WRITE-THROUGH since 2026-09-02, mirroring projects: localStorage is the cache
+// for instant, synchronous reads (the apply-dropdown and the auto-fill both need
+// the list without awaiting), the backend `price_lists` table is the source of
+// truth. Before this, a kainynas existed in exactly one browser profile — the
+// artefact the contractor had typed by hand was the least durable thing in the
+// product.
+//
+// Reads stay SYNCHRONOUS on purpose; `pullPriceListsFromBackend()` refreshes the
+// cache (Dashboard mount, the Kainynai page, and right before an automatic
+// fill), and every mutation pushes to the backend fire-and-forget.
+
+let _hasPulledPriceLists = false;
+// Writes still on the wire. The pull REPLACES the cache, so it has to wait for
+// them: measured in the browser 2026-09-02 — import a kainynas, the page
+// invalidates its query, the force-pull overtakes the fire-and-forget PUT and
+// the freshly imported list vanished from the list view until the next reload.
+const _priceListWrites = new Set();
+
+/** Resolve once every pending price-list write has settled. */
+export async function flushPriceListWrites() {
+  while (_priceListWrites.size) {
+    await Promise.allSettled(Array.from(_priceListWrites));
+  }
+}
+
+function _trackPriceListWrite(p) {
+  const tracked = p.finally(() => _priceListWrites.delete(tracked));
+  _priceListWrites.add(tracked);
+  return tracked;
+}
+
+function _priceListsSyncToBackend(pl) {
+  if (!pl?.id) return;
+  return _trackPriceListWrite(fetch(`${API}/api/price-lists/${pl.id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: pl.name,
+      company_name: pl.company_name,
+      items: pl.items || [],
+      is_default: !!pl.is_default,
+      created_date: pl.created_date,
+    }),
+  }).then(_handleSyncResponse).catch(_handleSyncError));
+}
+
+function _writePriceLists(lists) {
+  _persist(PRICE_LISTS_KEY, JSON.stringify(lists));
+  return lists;
+}
 
 export function getPriceLists() {
   try {
-    return JSON.parse(localStorage.getItem(PRICE_LISTS_KEY) || '[]');
+    const raw = JSON.parse(localStorage.getItem(PRICE_LISTS_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Refresh the cache from the backend. Once per session unless forced — the
+ * payload carries every item of every list, so it is not something to re-fetch
+ * on each render.
+ *
+ * A failed pull leaves the cache ALONE (same rule as projects): a network blip
+ * must never look like "your kainynai are gone".
+ */
+export async function pullPriceListsFromBackend({ force = false } = {}) {
+  if (_hasPulledPriceLists && !force) return null;
+  _hasPulledPriceLists = true;
+  // The pull replaces the cache — anything still in flight must land first, or
+  // it is thrown away before the server has even seen it.
+  await flushPriceListWrites();
+  try {
+    const res = await fetch(`${API}/api/price-lists`, { credentials: 'include' });
+    if (res.status === 401) {
+      _hasPulledPriceLists = false;
+      return null;                       // caller (AuthProvider) handles the redirect
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { price_lists: list = [] } = await res.json();
+    if (!Array.isArray(list)) throw new Error('bad payload');
+    _writePriceLists(list);
+    return list;
+  } catch (e) {
+    console.warn('[projectStore] price list pull failed:', e);
+    _hasPulledPriceLists = false;        // let the next mount retry
+    return null;
   }
 }
 
@@ -786,16 +876,87 @@ export function createPriceList(data) {
     ...data,
     id: crypto.randomUUID(),
     created_date: new Date().toISOString(),
+    is_default: !!data?.is_default,
   };
   const lists = getPriceLists();
+  if (pl.is_default) for (const other of lists) other.is_default = false;
   lists.unshift(pl);
-  _persist(PRICE_LISTS_KEY, JSON.stringify(lists));
+  _writePriceLists(lists);
+  _priceListsSyncToBackend(pl);
   return pl;
 }
 
 export function deletePriceList(id) {
-  const lists = getPriceLists().filter(p => p.id !== id);
-  _persist(PRICE_LISTS_KEY, JSON.stringify(lists));
+  _writePriceLists(getPriceLists().filter(p => p.id !== id));
+  _trackPriceListWrite(
+    fetch(`${API}/api/price-lists/${id}`, { method: 'DELETE', credentials: 'include' })
+      .then((res) => {
+        // A 404 means the backend never had it (an older localStorage-only list)
+        // — that is a successful delete, not a failure to report.
+        if (res.status !== 404) _handleSyncResponse(res);
+      })
+      .catch(_handleSyncError),
+  );
+}
+
+/**
+ * Mark one kainynas as the default used for automatic price fill, or clear the
+ * flag when it is already the default. Exactly one default per user — enforced
+ * here for the cache and again server-side for the durable copy.
+ */
+export function setDefaultPriceList(id) {
+  const lists = getPriceLists();
+  const target = lists.find(p => p.id === id);
+  if (!target) return null;
+  const nextValue = !target.is_default;
+  const changed = [];
+  for (const pl of lists) {
+    const want = nextValue && pl.id === id;
+    if (!!pl.is_default !== want) { pl.is_default = want; changed.push(pl); }
+  }
+  _writePriceLists(lists);
+  // Push the flipped rows only. The backend clears the other defaults itself,
+  // but pushing them keeps the two copies identical even if that write races.
+  for (const pl of changed) _priceListsSyncToBackend(pl);
+  return target;
+}
+
+export function getDefaultPriceList() {
+  return getPriceLists().find(p => p?.is_default) || null;
+}
+
+// ── "this extraction still needs its automatic price fill" hand-off ───────────
+//
+// The happy path fills prices INSIDE the payload NewProject creates, so nothing
+// is pending. But when the stream drops (Railway cuts long runs), the backend
+// finishes the extraction and saves the project itself — the browser only polls
+// for it and navigates. That project never passes through createProject, so the
+// project page has to do the fill, and it needs to know this is a fresh
+// extraction rather than an old project being opened.
+//
+// sessionStorage, not localStorage: the marker must survive a reload (it does)
+// and must NOT outlive the tab, so a stale flag can never fire a fill months
+// later. Idempotency across reloads is still owned by the project blob's
+// `_kainynas_auto_applied` stamp — this only says "a fill is expected".
+const PRICE_FILL_PENDING_PREFIX = 'samatu_kainynas_pending:';
+
+export function markPriceFillPending(projectId) {
+  if (!projectId) return;
+  try { sessionStorage.setItem(PRICE_FILL_PENDING_PREFIX + projectId, '1'); }
+  catch { /* private mode / quota — the manual button still exists */ }
+}
+
+/** Read-and-clear. Returns true when this project was waiting for a fill. */
+export function consumePriceFillPending(projectId) {
+  if (!projectId) return false;
+  try {
+    const key = PRICE_FILL_PENDING_PREFIX + projectId;
+    const pending = sessionStorage.getItem(key) === '1';
+    if (pending) sessionStorage.removeItem(key);
+    return pending;
+  } catch {
+    return false;
+  }
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -821,9 +982,11 @@ export function saveSettings(settings) {
 
 // v2 (2026-07-28 audit): the backup carried projects + settings only, so a
 // "Atsarginė kopija" taken before a browser wipe silently lost the user's PRICE
-// LISTS — which are localStorage-only (no backend mirror, see getPriceLists
-// above) and are the thing they spent the most manual work on. They are in the
-// payload now. Restoring a v1 backup still works: price_lists is simply absent.
+// LISTS — the thing they spent the most manual work on. They are in the payload
+// now. Restoring a v1 backup still works: price_lists is simply absent.
+// (2026-09-02: price lists ALSO have a backend mirror now, so the backup is
+// belt-and-braces rather than the only copy — but a restore still pushes them
+// back to the server, see importProjectsBackup.)
 const BACKUP_VERSION = 2;
 
 export function exportProjectsBackup() {
@@ -835,8 +998,8 @@ export function exportProjectsBackup() {
     projects_count: projects.length,
     projects,
     settings,
-    // localStorage-only data — the backend has NO copy of either, so if these
-    // aren't in the file they exist in exactly one browser profile.
+    // Settings are still localStorage-only; price lists are mirrored server-side
+    // since 2026-09-02 but stay in the payload so a v2 file remains complete.
     price_lists: getPriceLists(),
   };
   return JSON.stringify(payload, null, 2);
@@ -921,12 +1084,18 @@ export function importProjectsBackup(jsonText, opts = {}) {
   let priceListsImported = 0;
   if (Array.isArray(parsed.price_lists)) {
     const byId = new Map(getPriceLists().map(pl => [pl.id, pl]));
+    const restored = [];
     for (const pl of parsed.price_lists) {
       if (!pl?.id) continue;
       byId.set(pl.id, pl);
+      restored.push(pl);
       priceListsImported += 1;
     }
     _persist(PRICE_LISTS_KEY, JSON.stringify(Array.from(byId.values())));
+    // Push them to the backend too (2026-09-02): a restore that only refilled
+    // localStorage would leave the durable copy missing the very lists the user
+    // just recovered, and the next pull would delete them again.
+    for (const pl of restored) _priceListsSyncToBackend(pl);
   }
 
   return {

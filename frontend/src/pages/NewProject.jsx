@@ -10,7 +10,11 @@ import PreflightCard from '@/components/upload/PreflightCard';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
-import { createProject, updateProject } from '@/lib/projectStore';
+import {
+  createProject, updateProject, getPriceLists, pullPriceListsFromBackend,
+  markPriceFillPending,
+} from '@/lib/projectStore';
+import { autoFillFromDefaultPriceList } from '@/lib/applyPriceList';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { postSse } from '@/lib/sseFetch';
@@ -221,6 +225,37 @@ function notifyAnalysisDone(t) {
       });
     }
   } catch { /* notifications are best-effort, never break the flow */ }
+}
+
+/**
+ * Automatic price fill, applied to the project payload BEFORE it is created
+ * (founder decision 2026-09-02: "auto-apply from the default price list + keep
+ * the manual button"). Doing it here — not after the save — means the prices
+ * ride the very first write, so there is no second PUT to race and nothing to
+ * re-apply if the user reloads mid-flight.
+ *
+ * Only fills rows with no price, never overwrites, and stamps
+ * `_kainynas_auto_applied` so it can only ever happen once per extraction.
+ * Never blocks project creation: a failure here is a missing convenience, not
+ * a lost 25-minute analysis.
+ */
+async function withAutoPrices(payload, t) {
+  try {
+    await pullPriceListsFromBackend();     // once per session, small payload
+    const out = autoFillFromDefaultPriceList(payload, getPriceLists());
+    if (!out) return payload;
+    const { applied, exact, similar, name, ambiguous } = out.summary;
+    toast.success(t('project.mainView.autoPricesApplied',
+      { applied, exact, similar, name }), { duration: 8000 });
+    if (ambiguous?.length) {
+      toast.warning(t('project.mainView.toastAmbiguous', { count: ambiguous.length }),
+        { duration: 8000 });
+    }
+    return out.project;
+  } catch (e) {
+    console.warn('Automatinis kainų užpildymas nepavyko:', e);
+    return payload;
+  }
 }
 
 /**
@@ -546,7 +581,7 @@ export default function NewProject() {
       const CONSTRUCTION_TYPES = ['fasadas', 'stogas', 'zeme', 'betonas'];
       let project;
       if (CONSTRUCTION_TYPES.includes(projType)) {
-        project = createProject({
+        project = createProject(await withAutoPrices({
           name:         projectName || json.projektas || t('newProject.defaultNameConstruction'),
           company_name: companyName,
           tipas:        projType,
@@ -555,7 +590,7 @@ export default function NewProject() {
           total_rows:   0,
           total_value:  0,
           status:       'ready',
-        });
+        }, t));
       } else if (projType === 'interior') {
         if (!json.patalpos) throw new Error(t('newProject.errUnexpectedFormat'));
         // Zero rooms used to THROW here — before createProject — so 13+ paid
@@ -567,7 +602,7 @@ export default function NewProject() {
         // as a warning, and the user lands in the viewer where "Taisyti zoną"
         // and manual room-add actually work.
         const zeroRooms = json.patalpos.length === 0;
-        project = createProject({
+        project = createProject(await withAutoPrices({
           ...json,
           name:            projectName || json.projektas || t('newProject.defaultNameInterior'),
           company_name:    companyName,
@@ -582,7 +617,7 @@ export default function NewProject() {
               { level: 'WARN', message: t('newProject.errNoRooms') },
             ],
           } : {}),
-        });
+        }, t));
         if (zeroRooms) toast.warning(t('newProject.errNoRooms'), { duration: 12000 });
       } else {
         if (!json.eilutes) throw new Error(t('newProject.errUnexpectedFormat'));
@@ -593,7 +628,7 @@ export default function NewProject() {
           warning: normalizeConfidence(row.confidence) === CONF_RAUDONA ? t('newProject.warnLowConfidence')
                  : !row.mato_vnt ? t('newProject.warnMissingUnit') : '',
         }));
-        project = createProject({
+        project = createProject(await withAutoPrices({
           name:         projectName || json.projektas || t('newProject.defaultNameKz'),
           company_name: companyName,
           tipas:        'kz',
@@ -602,7 +637,7 @@ export default function NewProject() {
           total_value:  0,
           status:       'ready',
           vat_rate:     21,
-        });
+        }, t));
       }
 
       // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad
@@ -724,6 +759,10 @@ export default function NewProject() {
             stopElapsed();
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
+            // This project was built and saved SERVER-side, so it never passed
+            // through the payload-level auto price fill above. Hand the job to
+            // the project page. (2026-09-02)
+            markPriceFillPending(ok.id);
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             notifyAnalysisDone(t);
             navigate(`/project/${ok.id}`);
@@ -766,6 +805,10 @@ export default function NewProject() {
             stopElapsed();
             try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
             uploadPdfToBackend(ok.id, file).catch(() => {});
+            // This project was built and saved SERVER-side, so it never passed
+            // through the payload-level auto price fill above. Hand the job to
+            // the project page. (2026-09-02)
+            markPriceFillPending(ok.id);
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             notifyAnalysisDone(t);
             navigate(`/project/${ok.id}`);

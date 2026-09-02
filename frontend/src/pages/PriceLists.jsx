@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Upload, Trash2, FileUp } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, FileUp, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { getPriceLists, createPriceList, deletePriceList } from '@/lib/projectStore';
+import {
+  getPriceLists, createPriceList, deletePriceList,
+  setDefaultPriceList, pullPriceListsFromBackend,
+} from '@/lib/projectStore';
+import { API_BASE as API } from '@/lib/apiBase';
 
 // Sprint §30 (2026-04-29): CSV parser. Supports both `,` and `;` separators
 // (LT Excel uses `;` by default). Quoted fields with embedded commas. UTF-8 BOM
@@ -78,16 +82,50 @@ function parseCsv(text) {
   return items;
 }
 
+// Task 5 (2026-09-02): .xlsx goes to the backend (openpyxl), because the
+// contractor keeps his kainynas in Excel and a browser-side xlsx reader would
+// mean shipping a zip+XML parser to every visitor. CSV keeps the client parser
+// above — it needs no round trip and works offline.
+async function parseXlsxViaBackend(file) {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  let res;
+  try {
+    res = await fetch(`${API}/api/price-lists/parse-xlsx`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+  } catch {
+    throw new Error('Nepavyko pasiekti serverio. Patikrinkite interneto ryšį.');
+  }
+  let body = null;
+  try { body = await res.json(); } catch { /* non-JSON error page */ }
+  if (!res.ok) {
+    if (res.status === 401) throw new Error('Sesija baigėsi — prisijunkite iš naujo.');
+    throw new Error(body?.detail || `Serveris grąžino klaidą (${res.status})`);
+  }
+  if (!Array.isArray(body?.items)) throw new Error('Serveris grąžino netikėtą atsakymą');
+  return body;
+}
+
 export default function PriceLists() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const { data: priceLists = [], isLoading } = useQuery({
     queryKey: ['priceLists'],
-    queryFn: getPriceLists,
+    // Backend is the source of truth since 2026-09-02; the pull refreshes the
+    // localStorage cache the rest of the app reads synchronously. A failed pull
+    // leaves the cache intact, so the page still shows what this browser has.
+    queryFn: async () => {
+      await pullPriceListsFromBackend({ force: true });
+      return getPriceLists();
+    },
   });
 
   const handleCreate = async () => {
@@ -108,9 +146,48 @@ export default function PriceLists() {
     toast.success('Kainynas ištrintas');
   };
 
-  // Sprint §30: bulk CSV import — parse + create new pricelist
-  const handleCsvImport = (file) => {
+  // "Numatytasis" — the kainynas used to fill prices automatically after a new
+  // analysis. One at a time; clicking the star again clears it.
+  const handleToggleDefault = (pl) => {
+    setDefaultPriceList(pl.id);
+    queryClient.invalidateQueries({ queryKey: ['priceLists'] });
+    toast.success(pl.is_default
+      ? `„${pl.name}“ nebe numatytasis kainynas`
+      : `„${pl.name}“ — numatytasis kainynas. Kainos bus užpildomos automatiškai po naujos analizės.`);
+  };
+
+  const saveImported = (items, file, skipped = 0) => {
+    const safeName = file.name.replace(/\.(csv|xlsx|xls)$/i, '').slice(0, 60)
+      || 'Importuotas kainynas';
+    createPriceList({
+      name: safeName,
+      company_name: '',
+      items,
+      total_items: items.length,
+    });
+    queryClient.invalidateQueries({ queryKey: ['priceLists'] });
+    toast.success(
+      `Importuota ${items.length} eil. iš „${file.name}“`
+      + (skipped ? ` (praleista ${skipped} eil. be aprašymo arba be kainos)` : ''),
+    );
+  };
+
+  // Sprint §30 + Task 5: bulk import — CSV parsed here, .xlsx by the backend.
+  const handleImport = async (file) => {
     if (!file) return;
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+    if (isExcel) {
+      setIsImporting(true);
+      try {
+        const parsed = await parseXlsxViaBackend(file);
+        saveImported(parsed.items, file, parsed.skipped_rows || 0);
+      } catch (e) {
+        toast.error(`„Excel“ klaida: ${e.message}`);
+      } finally {
+        setIsImporting(false);
+      }
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -119,15 +196,7 @@ export default function PriceLists() {
           toast.error('CSV neturi tinkamų eilučių');
           return;
         }
-        const safeName = file.name.replace(/\.csv$/i, '').slice(0, 60) || 'Importuotas kainynas';
-        createPriceList({
-          name: safeName,
-          company_name: '',
-          items,
-          total_items: items.length,
-        });
-        queryClient.invalidateQueries({ queryKey: ['priceLists'] });
-        toast.success(`Importuota ${items.length} eil. iš „${file.name}"`);
+        saveImported(items, file);
       } catch (e) {
         toast.error(`CSV klaida: ${e.message}`);
       }
@@ -141,21 +210,35 @@ export default function PriceLists() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Kainynai</h1>
-          <p className="text-sm text-muted-foreground mt-1">Valdykite įmonės kainų sąrašus</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Valdykite įmonės kainų sąrašus. Pažymėkite žvaigždute numatytąjį —
+            jo kainos bus įrašomos automatiškai po naujos analizės.
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Sprint §30: CSV import — parses skyrius/aprasymas/vnt/kaina columns */}
+          {/* Sprint §30 + Task 5: import — parses skyrius/aprasymas/vnt/kaina
+              from CSV (in the browser) or .xlsx (server-side, openpyxl). */}
           <input
             type="file"
             id="csv-import-input"
-            accept=".csv,text/csv"
-            onChange={(e) => handleCsvImport(e.target.files?.[0])}
+            accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              // Reset first, so picking the SAME file twice still fires onChange.
+              e.target.value = '';
+              handleImport(f);
+            }}
             className="hidden"
           />
-          <Button asChild variant="outline" title="Importuoti kainas iš CSV failo (skyrius, aprasymas, vnt, kaina)">
+          <Button
+            asChild
+            variant="outline"
+            disabled={isImporting}
+            title="Importuoti kainas iš „Excel“ (.xlsx) arba CSV failo. Stulpeliai: skyrius, aprašymas, vnt, kaina"
+          >
             <label htmlFor="csv-import-input" className="cursor-pointer">
               <FileUp className="w-4 h-4 mr-2" />
-              Importuoti CSV
+              {isImporting ? 'Įkeliama…' : 'Importuoti Excel / CSV'}
             </label>
           </Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -202,7 +285,8 @@ export default function PriceLists() {
           </div>
           <h3 className="font-semibold text-foreground mb-1">Dar nėra kainynų</h3>
           <p className="text-sm text-muted-foreground text-center max-w-md">
-            Sukurkite kainyną, norėdami sekti kainų sąrašus.
+            Įkelkite savo „Excel“ (.xlsx) arba CSV kainyną — stulpeliai:
+            skyrius, aprašymas, vnt, kaina.
           </p>
         </div>
       ) : (
@@ -214,22 +298,58 @@ export default function PriceLists() {
                   <FileSpreadsheet className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">{pl.name}</h3>
+                  <h3 className="font-semibold text-foreground flex items-center gap-2">
+                    {pl.name}
+                    {pl.is_default && (
+                      <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary">
+                        Numatytasis
+                      </span>
+                    )}
+                  </h3>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                    {pl.company_name && <span>{pl.company_name}</span>}
-                    <span>•</span>
-                    <span>{format(new Date(pl.created_date), 'yyyy-MM-dd')}</span>
+                    {/* Separators are rendered BETWEEN parts, not before them —
+                        a list with no company_name used to open with a stray •. */}
+                    {[
+                      pl.company_name,
+                      `${(pl.items || []).length} eil.`,
+                      format(new Date(pl.created_date || pl.created_at || Date.now()), 'yyyy-MM-dd'),
+                    ].filter(Boolean).map((part, i) => (
+                      <React.Fragment key={part}>
+                        {i > 0 && <span>•</span>}
+                        <span>{part}</span>
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDelete(pl.id)}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* Numatytasis — the list used for the automatic fill after a
+                    new analysis. Always visible when set, so the user can see
+                    which prices will land without hovering. */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleToggleDefault(pl)}
+                  title={pl.is_default
+                    ? 'Nebenaudoti šio kainyno automatiškai'
+                    : 'Naudoti šį kainyną automatiškai naujuose projektuose'}
+                  aria-pressed={!!pl.is_default}
+                  className={pl.is_default
+                    ? 'text-primary'
+                    : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary'}
+                >
+                  <Star className={`w-4 h-4 ${pl.is_default ? 'fill-current' : ''}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(pl.id)}
+                  title="Ištrinti kainyną"
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

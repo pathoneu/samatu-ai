@@ -13,9 +13,13 @@ import RowDetailPanel from '@/components/project/RowDetailPanel';
 import ExportModal from '@/components/project/ExportModal';
 import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
-import { getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves } from '@/lib/projectStore';
-import { manualPricePatch } from '@/lib/applyPriceList';
+import {
+  getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves,
+  getPriceLists, pullPriceListsFromBackend, consumePriceFillPending,
+} from '@/lib/projectStore';
+import { autoFillFromDefaultPriceList, manualPricePatch } from '@/lib/applyPriceList';
 import { useConfirm } from '@/components/ui/confirm-provider';
+import { toast } from 'sonner';
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
@@ -54,6 +58,44 @@ export default function ProjectDetail() {
       setLocalRows(project.rows);
     }
   }, [project]);
+
+  // Automatic price fill for a project the SERVER built (the stream dropped
+  // mid-extraction and NewProject only polled for the result, so the payload
+  // never went through withAutoPrices). Runs at most once: the sessionStorage
+  // marker is read-and-cleared, and the fill itself refuses to repeat because
+  // it stamps `_kainynas_auto_applied` on the saved project. (2026-09-02)
+  const autoFillRanRef = useRef(false);
+  useEffect(() => {
+    if (!project?.id || autoFillRanRef.current) return;
+    if (!consumePriceFillPending(project.id)) return;
+    autoFillRanRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        await pullPriceListsFromBackend();
+        if (cancelled) return;
+        const out = autoFillFromDefaultPriceList(project, getPriceLists());
+        if (!out || cancelled) return;
+        const { _kainynas_auto_applied, ...rest } = out.project;
+        updateProject(project.id, { ...rest, _kainynas_auto_applied });
+        flushProjectSaves();
+        queryClient.invalidateQueries({ queryKey: ['project', project.id] });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        const { applied, exact, similar, name, ambiguous } = out.summary;
+        toast.success(t('project.mainView.autoPricesApplied',
+          { applied, exact, similar, name }), { duration: 8000 });
+        if (ambiguous?.length) {
+          toast.warning(t('project.mainView.toastAmbiguous', { count: ambiguous.length }),
+            { duration: 8000 });
+        }
+      } catch (e) {
+        // Never break the project page over a convenience — the manual
+        // "Taikyti kainyną" button still does the same job.
+        console.warn('Automatinis kainų užpildymas nepavyko:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [project, queryClient, t]);
 
   // Auto-save with debounce.
   //

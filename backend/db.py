@@ -863,6 +863,126 @@ def corrections_summary() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+# ── Price lists / kainynai (2026-09-02) ───────────────────────────────────────
+#
+# The contractor's own €/vnt list. Until now these lived ONLY in localStorage
+# (projectStore `samatu_price_lists`), so a cleared browser or a second device
+# lost the one artefact the user had typed by hand. This table is the source of
+# truth; the frontend store keeps a write-through cache in front of it.
+#
+# `items` is the same JSON array the CSV/xlsx importers produce:
+#   [{skyrius, aprasymas, mato_vnt, kaina}, …]
+# stored verbatim so importer and matcher stay the only owners of that shape.
+#
+# Ownership follows projects EXACTLY, including the NULL-owner write barrier
+# (2026-06-19 hunt): an authenticated caller may never write a row owned by
+# someone else, an owner-less row included.
+
+def list_price_lists(user_id: str | None = None) -> list[dict]:
+    """All of one user's price lists (newest first). None = every list
+    (single-tenant SAMATU_AUTH_DISABLED mode / admin tooling only)."""
+    with _conn() as c:
+        if user_id:
+            rows = c.execute(
+                "SELECT * FROM price_lists WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM price_lists ORDER BY created_at DESC").fetchall()
+        return [_price_list_row_to_dict(r) for r in rows]
+
+
+def _price_list_row_to_dict(row) -> dict:
+    d = dict(row)
+    raw = d.pop("items", None)
+    try:
+        items = json.loads(raw or "[]")
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        # Same reasoning as get_project: a corrupt blob must not read as an
+        # EMPTY price list — that silently un-prices every future sąmata.
+        log.error("price list %s has a corrupt items blob (%s)", d.get("id"), exc)
+        items = []
+        d["_items_corrupt"] = True
+    d["items"] = items if isinstance(items, list) else []
+    d["total_items"] = len(d["items"])
+    d["is_default"] = bool(d.get("is_default"))
+    # The frontend cache has always called this field `created_date`.
+    d["created_date"] = d.get("created_at")
+    return d
+
+
+def get_price_list(price_list_id: str, user_id: str | None = None) -> dict | None:
+    with _conn() as c:
+        if user_id:
+            row = c.execute(
+                "SELECT * FROM price_lists WHERE id = ? AND user_id = ?",
+                (price_list_id, user_id)).fetchone()
+        else:
+            row = c.execute("SELECT * FROM price_lists WHERE id = ?",
+                            (price_list_id,)).fetchone()
+        return _price_list_row_to_dict(row) if row else None
+
+
+def upsert_price_list(price_list_id: str, payload: dict,
+                      user_id: str | None = None) -> dict:
+    """Insert or full-replace one price list.
+
+    `is_default` is exclusive per user: setting it here clears the flag on that
+    user's other lists inside the SAME connection (which holds the global
+    _DB_LOCK), so two concurrent "make this the default" clicks can never leave
+    two defaults behind.
+    """
+    now = _now_iso()
+    name = (payload.get("name") or "Kainynas").strip()[:200]
+    items = payload.get("items")
+    if not isinstance(items, list):
+        items = []
+    blob = json.dumps(items, ensure_ascii=False)
+    is_default = 1 if payload.get("is_default") else 0
+    with _conn() as c:
+        existing = c.execute(
+            "SELECT created_at, user_id FROM price_lists WHERE id = ?",
+            (price_list_id,)).fetchone()
+        if existing:
+            if user_id and existing["user_id"] != user_id:
+                raise PermissionError(
+                    f"User {user_id} does not own price list {price_list_id}")
+            created_at = existing["created_at"]
+            owner = existing["user_id"] or user_id
+        else:
+            created_at = payload.get("created_date") or payload.get("created_at") or now
+            owner = user_id
+        c.execute("""
+            INSERT INTO price_lists
+                (id, user_id, name, company_name, items, is_default,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name,
+                company_name=excluded.company_name,
+                items=excluded.items,
+                is_default=excluded.is_default,
+                updated_at=excluded.updated_at
+        """, (price_list_id, owner, name, payload.get("company_name"),
+              blob, is_default, created_at, now))
+        if is_default and owner:
+            c.execute(
+                "UPDATE price_lists SET is_default = 0, updated_at = ? "
+                " WHERE user_id = ? AND id != ?", (now, owner, price_list_id))
+    return get_price_list(price_list_id) or {}
+
+
+def delete_price_list(price_list_id: str, user_id: str | None = None) -> bool:
+    with _conn() as c:
+        if user_id:
+            cur = c.execute("DELETE FROM price_lists WHERE id = ? AND user_id = ?",
+                            (price_list_id, user_id))
+        else:
+            cur = c.execute("DELETE FROM price_lists WHERE id = ?", (price_list_id,))
+        return cur.rowcount > 0
+
+
 def _migrate_schema() -> None:
     """Idempotent column additions for existing DBs created before auth.
     SQLite ALTER TABLE only supports ADD COLUMN — keep migrations append-only."""
@@ -990,6 +1110,22 @@ def _migrate_schema() -> None:
                 created_at     TEXT NOT NULL
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC)")
+        # price_lists (2026-09-02): the contractor's kainynas, previously
+        # localStorage-only. user_id is nullable for the same reason projects'
+        # is — SAMATU_AUTH_DISABLED single-tenant mode has no owner — and the
+        # upsert enforces the NULL-owner write barrier either way.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS price_lists (
+                id           TEXT PRIMARY KEY,
+                user_id      TEXT,
+                name         TEXT NOT NULL,
+                company_name TEXT,
+                items        TEXT NOT NULL,      -- JSON array
+                is_default   INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_price_lists_user ON price_lists(user_id, created_at DESC)")
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────

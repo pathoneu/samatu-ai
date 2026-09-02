@@ -27,9 +27,9 @@ import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
   Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
-  CircleDollarSign, PencilRuler, Target, Sliders,
+  CircleDollarSign, PencilRuler, Target, Sliders, Star,
 } from 'lucide-react';
-import { getPriceLists } from '@/lib/projectStore';
+import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch } from '@/lib/applyPriceList';
 import { insertRowInSection, nextEilNr } from '@/lib/darbuRows';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
@@ -1153,7 +1153,20 @@ function ApplyPriceListButton({ project, onProjectChange }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    setPriceLists(getPriceLists());
+    // Default kainynas first: it is the one the contractor reaches for, and the
+    // one the automatic fill already used.
+    const readCache = () => setPriceLists(
+      [...getPriceLists()].sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0)));
+    readCache();
+    // …and refresh from the backend the first time this session. Without it, a
+    // user who signs in on a second device and opens a project straight from
+    // the dashboard sees "Kainynas dar neįkeltas" even though his lists are
+    // sitting on the server — the cache is only filled by the Kainynai page.
+    let alive = true;
+    pullPriceListsFromBackend()
+      .then(() => { if (alive) readCache(); })
+      .catch(() => { /* cache still shows whatever this browser has */ });
+    return () => { alive = false; };
   }, [open]);
 
   useEffect(() => {
@@ -1185,7 +1198,19 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     }
     updated._last_applied_pricelist = { id: priceList.id, name: priceList.name, applied_at: new Date().toISOString() };
     onProjectChange?.(updated);
-    toast.success(t('project.mainView.toastApplied', { applied: primary.applied, name: priceList.name, skipped: primary.skipped }));
+    toast.success(t('project.mainView.toastApplied', {
+      applied: primary.applied,
+      name: priceList.name,
+      skipped: primary.skipped,
+      exact: primary.exact,
+      similar: primary.similar,
+    }));
+    // Rows the matcher refused to guess at are the ones the user must price by
+    // hand — a silent skip inside "praleista" would never get looked at.
+    if (primary.ambiguous?.length) {
+      toast.warning(t('project.mainView.toastAmbiguous', { count: primary.ambiguous.length }),
+        { duration: 8000 });
+    }
   };
 
   if (priceLists.length === 0) {
@@ -1226,7 +1251,13 @@ function ApplyPriceListButton({ project, onProjectChange }) {
               title={t('project.mainView.priceListItemTitle', { name: pl.name })}
               className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between gap-3"
             >
-              <span className="truncate">{pl.name}</span>
+              <span className="truncate flex items-center gap-1.5">
+                {pl.is_default && (
+                  <Star className="w-3 h-3 shrink-0 fill-current text-primary"
+                        aria-label={t('project.mainView.priceListDefault')} />
+                )}
+                {pl.name}
+              </span>
               <span className="text-xs text-muted-foreground tabular shrink-0">
                 {t('project.mainView.priceListRows', { count: (pl.items || []).length })}
               </span>

@@ -391,6 +391,8 @@ from api.room_recalc import router as room_recalc_router
 from api.export_excel import router as export_excel_router
 # Project stats — dashboard payload (counts, confidence, verification progress).
 from api.project_stats import router as project_stats_router
+# Kainynai — xlsx import + durable per-user price-list storage (2026-09-02).
+from api.price_lists import router as price_lists_router
 
 load_dotenv()
 
@@ -697,6 +699,7 @@ app.include_router(calibrate_router)
 app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
 app.include_router(project_stats_router)
+app.include_router(price_lists_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

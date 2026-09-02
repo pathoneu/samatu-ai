@@ -333,3 +333,89 @@ test('noteServerVersion re-bases the tab on a version produced outside the PUT p
   noteServerVersion('p-reval', undefined);
   assert.equal(_getServerVersion('p-reval'), '2026-08-23T10:00:00Z');
 });
+
+// ── Price lists: write-through (2026-09-02) ─────────────────────────────────
+
+test('createPriceList writes the cache AND pushes to the backend', async () => {
+  const { createPriceList } = await import('./projectStore.js');
+  _resetSaveState();
+  installLocalStorage({ samatu_price_lists: JSON.stringify([]) });
+  const calls = installFetchRecorder();
+  const pl = createPriceList({ name: 'Mano kainynas', items: [{ aprasymas: 'x', kaina: 1 }] });
+  assert.equal(getPriceLists().length, 1);
+  await tick(0);
+  const put = calls.find(c => c.method === 'PUT');
+  assert.ok(put, 'expected a PUT to the backend');
+  assert.ok(put.url.endsWith(`/api/price-lists/${pl.id}`));
+  assert.equal(JSON.parse(put.body).items.length, 1);
+});
+
+test('deletePriceList drops it locally and on the backend; a 404 is not an error', async () => {
+  const { deletePriceList } = await import('./projectStore.js');
+  _resetSaveState();
+  installLocalStorage({
+    samatu_price_lists: JSON.stringify([{ id: 'pl1', name: 'A' }, { id: 'pl2', name: 'B' }]),
+  });
+  const calls = installFetchRecorder({ ok: false, status: 404, json: async () => ({}) });
+  deletePriceList('pl1');
+  assert.deepEqual(getPriceLists().map(p => p.id), ['pl2']);
+  await tick(0);
+  assert.ok(calls.some(c => c.method === 'DELETE' && c.url.endsWith('/pl1')));
+});
+
+test('setDefaultPriceList keeps exactly one default and syncs both rows', async () => {
+  const { setDefaultPriceList, getDefaultPriceList } = await import('./projectStore.js');
+  _resetSaveState();
+  installLocalStorage({
+    samatu_price_lists: JSON.stringify([
+      { id: 'pl1', name: 'A', is_default: true },
+      { id: 'pl2', name: 'B' },
+    ]),
+  });
+  const calls = installFetchRecorder();
+  setDefaultPriceList('pl2');
+  assert.equal(getDefaultPriceList().id, 'pl2');
+  assert.equal(getPriceLists().filter(p => p.is_default).length, 1);
+  await tick(0);
+  assert.equal(calls.filter(c => c.method === 'PUT').length, 2, 'both rows pushed');
+  // Clicking the star again clears it — no default at all is a valid state.
+  setDefaultPriceList('pl2');
+  assert.equal(getDefaultPriceList(), null);
+});
+
+test('a failed price-list pull leaves the cache alone', async () => {
+  const { pullPriceListsFromBackend } = await import('./projectStore.js');
+  _resetSaveState();
+  installLocalStorage({
+    samatu_price_lists: JSON.stringify([{ id: 'pl1', name: 'Turimas' }]),
+  });
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+  assert.equal(await pullPriceListsFromBackend({ force: true }), null);
+  assert.equal(getPriceLists().length, 1, 'a 500 must not read as "no kainynai"');
+
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ price_lists: [{ id: 'srv', name: 'Iš serverio', items: [] }] }),
+  });
+  const pulled = await pullPriceListsFromBackend();   // guard released by the failure
+  assert.equal(pulled.length, 1);
+  assert.equal(getPriceLists()[0].name, 'Iš serverio');
+});
+
+test('restoring a backup pushes the recovered price lists to the backend', async () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([]),
+    samatu_price_lists: JSON.stringify([]),
+  });
+  const calls = installFetchRecorder();
+  const res = importProjectsBackup(JSON.stringify({
+    version: 2,
+    projects: [],
+    price_lists: [{ id: 'pl-restored', name: 'Atkurtas', items: [] }],
+  }));
+  assert.equal(res.price_lists_imported, 1);
+  await tick(0);
+  assert.ok(calls.some(c => c.method === 'PUT' && c.url.endsWith('/pl-restored')),
+    'a restore that only refills localStorage loses the list on the next pull');
+});
