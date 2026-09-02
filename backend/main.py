@@ -4725,6 +4725,31 @@ def _enrich_eilutes(eilutes: list[dict]) -> list[dict]:
 
 _PLAIN_INT_NR = re.compile(r"[0-9]+")
 
+# The order a sąmata's sections are read in. Mirrors SKYRIUS_ORDER inside
+# vision_call._build_pozicijos_from_rooms, which sorts a FRESH extraction; this
+# copy sorts what an EXPORT is handed, which may be a blob saved before the
+# section split. The names are literals rather than the SK_* constants because
+# main.py imports vision_call lazily (circular at module level) — the drift
+# guard is behavioural: tests/test_export_section_order.py builds positions with
+# the canonical builder and asserts the export reproduces its section sequence.
+#
+# Merged and Sienų deliberately SHARE rank 1, exactly as the builder has them: a
+# row still carrying the pre-split section name belongs with the wall work.
+_EXPORT_SKYRIUS_RANK: dict[str, int] = {
+    "Sienų lubų glaistymas dažymas":  1,
+    "Sienų glaistymas dažymas":       1,
+    "Lubų glaistymas dažymas":        2,
+    "GKP montavimas":                 3,
+    "Plytelių klijavimas":            4,
+    "Hidroizoliacija":                5,
+    "Grindys":                        6,
+    "Santechnikos darbai":            7,
+    "Ventiliacijos darbai":           8,
+    "Elektros instaliacijos darbai":  9,
+    "Pridėtiniai elementai":         10,
+    "Medžiagos":                     11,   # the shopping list is always last
+}
+
 
 def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     """Return EXPORT COPIES of `eilutes` whose Nr. column runs 1..N with no gaps.
@@ -4764,13 +4789,24 @@ def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     # (the §FIX-7 complaint: "2 GKP montavimas sections in Excel"). Fresh
     # extractions are sorted server-side and never hit this; a project saved
     # before the paint split can, because its wall and ceiling rows interleave
-    # under one old section and now belong to two. Stable-group by FIRST
-    # appearance: section order and within-section row order are both preserved,
-    # only the duplicate headers go away.
-    order: dict[str, int] = {}
+    # under one old section and now belong to two.
+    #
+    # 2026-09-02 review (F13a): grouping by FIRST APPEARANCE was not enough. A
+    # legacy blob whose first paint row happens to be "Lubų karnizo
+    # sumontavimas" migrates to the Lubų section and used to drag it ahead of
+    # Sienų — but Sienų comes before Lubų everywhere else in the product. Order
+    # by the canonical section order, with first appearance as the tiebreak, so
+    # sections we do not recognise still group and still land after everything
+    # we do. The ranks (and the deliberate merged/Sienų tie) mirror
+    # SKYRIUS_ORDER in vision_call._build_pozicijos_from_rooms; a behavioural
+    # drift guard lives in tests/test_export_section_order.py.
+    first_seen: dict[str, int] = {}
     for e in rows:
-        order.setdefault((e.get("skyrius") or "").strip(), len(order))
-    rows.sort(key=lambda e: order[(e.get("skyrius") or "").strip()])
+        first_seen.setdefault((e.get("skyrius") or "").strip(), len(first_seen))
+    rows.sort(key=lambda e: (
+        _EXPORT_SKYRIUS_RANK.get((e.get("skyrius") or "").strip(), 999),
+        first_seen[(e.get("skyrius") or "").strip()],
+    ))
 
     for i, e in enumerate(rows, 1):
         e["nr"] = str(i)
