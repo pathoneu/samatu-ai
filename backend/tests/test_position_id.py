@@ -244,6 +244,30 @@ def test_priced_round_trip_keeps_every_price_with_ids_on(blob):
     assert len(set(labels)) == len(labels)
 
 
+def test_the_price_index_finds_a_row_by_id_when_the_label_moved():
+    """Prices live in `darbu_sarasas`; `_hydrate_prices_from_darbu_sarasas`
+    carries them onto `pozicijos` so the merge can see the money. It matched on
+    label text only — three spellings of a guess — so a relabel no rename map
+    knows about lost the price. The id is the one key that does not guess."""
+    from api.recompute_quantities import _hydrate_prices_from_darbu_sarasas
+    ds = [{"aprasymas": "Naujas pavadinimas, kurio joks žemėlapis nežino",
+           "id": "abc123abc123", "kiekis": 10, "kaina": 7.5}]
+
+    prior = [{"aprasymas": "Senas pavadinimas", "id": "abc123abc123", "kiekis": 10}]
+    assert _hydrate_prices_from_darbu_sarasas(prior, ds) == 1
+    assert prior[0]["kaina"] == 7.5 and prior[0]["suma"] == 75.0
+
+    # The label keys stay the fallback for every project saved before ids.
+    prior_no_id = [{"aprasymas": ds[0]["aprasymas"], "kiekis": 2}]
+    assert _hydrate_prices_from_darbu_sarasas(prior_no_id, ds) == 1
+    assert prior_no_id[0]["kaina"] == 7.5
+
+    # …and an id that matches nothing may not steal a price off the index.
+    stranger = [{"aprasymas": "Visai kita eilutė", "id": "ffffffffffff", "kiekis": 1}]
+    assert _hydrate_prices_from_darbu_sarasas(stranger, ds) == 0
+    assert "kaina" not in stranger[0]
+
+
 def test_the_merge_output_never_ships_two_rows_with_one_id(blob):
     """`assign_position_ids` runs inside the BUILDER, so it never sees the merge
     output. Pass 3 appends carried orphans keeping the ids they were saved with,

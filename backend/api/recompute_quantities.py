@@ -616,23 +616,35 @@ def _has_user_edit_beyond_kainynas(p: dict) -> bool:
 _TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
 
 
-def _price_index(darbu_sarasas: list[dict]) -> dict[str, dict]:
-    """label-key → priced/edited darbu_sarasas row.
+def _price_key_for_id(pid) -> str:
+    """Namespace an `id` so it can never collide with a label key."""
+    return f"\x1fid\x1f{str(pid).strip()}"
 
-    Indexed three ways because the same line appears under slightly different
-    text in the two lists: exact lowercased label, the height-independent
-    `_norm_label`, and the label with a trailing parenthetical removed
-    (`_emit_v8_compat_fields` appends `(pastaba)` to the darbu_sarasas label,
-    e.g. tile size, so its text is LONGER than the pozicija's)."""
+
+def _price_index(darbu_sarasas: list[dict]) -> dict[str, dict]:
+    """id/label-key → priced/edited darbu_sarasas row.
+
+    Indexed FOUR ways. The stable `id` (2026-09-02) is the only one that is not
+    a guess about wording — it survives a rename, a re-section and a Q-level
+    relabel — so `_hydrate_prices_from_darbu_sarasas` tries it first and falls
+    back to the three label keys for every project saved before ids existed:
+    exact lowercased label, the height-independent `_norm_label`, and the label
+    with a trailing parenthetical removed (`_emit_v8_compat_fields` appends
+    `(pastaba)` to the darbu_sarasas label, e.g. tile size, so its text is
+    LONGER than the pozicija's)."""
     idx: dict[str, dict] = {}
     for row in darbu_sarasas or []:
         if not isinstance(row, dict) or not _has_user_edit(row):
             continue
         lab = (row.get("aprasymas") or row.get("pavadinimas") or "").strip()
-        if not lab:
+        pid = str(row.get("id") or "").strip()
+        if not lab and not pid:
             continue
-        for key in (lab.lower(), _norm_label(lab),
-                    _TRAILING_PAREN_RE.sub("", lab).strip().lower()):
+        keys = [_price_key_for_id(pid)] if pid else []
+        if lab:
+            keys += [lab.lower(), _norm_label(lab),
+                     _TRAILING_PAREN_RE.sub("", lab).strip().lower()]
+        for key in keys:
             if key:
                 idx.setdefault(key, row)
     return idx
@@ -656,10 +668,15 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
         if not isinstance(p, dict) or _has_user_edit(p):
             continue
         lab = (p.get("aprasymas") or "").strip()
-        if not lab:
+        pid = str(p.get("id") or "").strip()
+        if not lab and not pid:
             continue
-        row = (idx.get(lab.lower()) or idx.get(_norm_label(lab))
-               or idx.get(_TRAILING_PAREN_RE.sub("", lab).strip().lower()))
+        # The id first: it is the one key that does not depend on the two lists
+        # agreeing about wording.
+        row = idx.get(_price_key_for_id(pid)) if pid else None
+        if row is None and lab:
+            row = (idx.get(lab.lower()) or idx.get(_norm_label(lab))
+                   or idx.get(_TRAILING_PAREN_RE.sub("", lab).strip().lower()))
         if row is None:
             continue
         kaina = row.get("kaina")
