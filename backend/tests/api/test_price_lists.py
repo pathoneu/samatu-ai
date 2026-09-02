@@ -232,6 +232,40 @@ def test_a_forged_sheet_dimension_cannot_buy_cpu_time():
     assert elapsed < 1.0, f"took {elapsed:.2f}s — the dimension still sizes the work"
 
 
+def _sheet(body: bytes) -> bytes:
+    return (b'<?xml version="1.0"?><worksheet xmlns="http://schemas.'
+            b'openxmlformats.org/spreadsheetml/2006/main">' + body)
+
+
+@pytest.mark.parametrize("sheet_xml,marker,label", [
+    # Truncated sheetData — the writer died mid-file. openpyxl parses
+    # <dimension> eagerly, so this one is already caught at load time.
+    (_sheet(b'<sheetData><row r="1"><c r="A1">'),
+     "Nepavyko nuskaityti", "truncated"),
+    # A numeric cell whose value is not a number. The read-only reader parses
+    # the sheet LAZILY, so this surfaces during iteration — past the load's
+    # try/except, which is where the unhandled 500 came from.
+    (_sheet(b'<sheetData><row r="1"><c r="A1" t="n"><v>ne skaicius</v></c>'
+            b'</row></sheetData></worksheet>'),
+     "sugadint", "bad <v>"),
+    # A shared-string index past the end of the (absent) string table. Also
+    # lazy, also a 500 before.
+    (_sheet(b'<sheetData><row r="1"><c r="A1" t="s"><v>4242</v></c></row>'
+            b'</sheetData></worksheet>'),
+     "sugadint", "shared-string overrun"),
+])
+def test_a_corrupt_sheet_is_a_400_not_a_500(sheet_xml, marker, label):
+    """`load_workbook` only parses the workbook SHELL; in read-only mode the
+    rows are parsed lazily, so a bad cell escaped the load's try/except and came
+    out as an unhandled 500. It is a bad file, not a broken server."""
+    blob = _rebuild_zip(_wb_bytes(STANDARD_ROWS),
+                        {"xl/worksheets/sheet1.xml": sheet_xml})
+    with pytest.raises(HTTPException) as exc:
+        pl_mod.parse_xlsx_items(blob)
+    assert exc.value.status_code == 400, label
+    assert marker in exc.value.detail, (label, exc.value.detail)
+
+
 def test_an_honest_wide_sheet_still_reads_its_first_columns():
     """The column cap must bound work, not truncate a real kainynas: the four
     columns we look for are always at the left edge."""
@@ -635,23 +669,95 @@ def test_admins_get_no_cross_user_access(as_user):
     assert a.get("/api/price-lists").json()["price_lists"][0]["name"] == "A privatus"
 
 
+def _insert_orphan(pid: str, name: str = "Orphan") -> None:
+    """Seed a legacy owner-less row.
+
+    Direct SQL on purpose: `upsert_price_list` can no longer create one — the
+    user_id is required — so an orphan is exactly what it is in production, a
+    row left over from before the column existed.
+    """
+    with _db._conn() as c:
+        c.execute(
+            "INSERT INTO price_lists (id, user_id, name, company_name, items,"
+            " is_default, created_at, updated_at)"
+            " VALUES (?, NULL, ?, NULL, '[]', 0, ?, ?)",
+            (pid, name, "2026-01-01T00:00:00", "2026-01-01T00:00:00"))
+
+
+def _drop(pid: str) -> None:
+    with _db._conn() as c:
+        c.execute("DELETE FROM price_lists WHERE id = ?", (pid,))
+
+
 def test_null_owner_rows_cannot_be_hijacked():
     """The 2026-06-19 write-barrier lesson, applied to price lists: an
     owner-less row must not be writable by any logged-in user."""
     pid = str(uuid.uuid4())
-    _db.upsert_price_list(pid, {"name": "Orphan", "items": []}, user_id=None)
-    with pytest.raises(PermissionError):
-        _db.upsert_price_list(pid, {"name": "Hijacked"}, user_id=USER_A["id"])
-    assert _db.get_price_list(pid)["name"] == "Orphan"
-    _db.delete_price_list(pid)
+    _insert_orphan(pid)
+    try:
+        with pytest.raises(PermissionError):
+            _db.upsert_price_list(pid, {"name": "Hijacked"}, user_id=USER_A["id"])
+        assert _db.get_price_list(pid, user_id=USER_A["id"]) is None
+        with _db._conn() as c:
+            row = c.execute("SELECT name FROM price_lists WHERE id = ?",
+                            (pid,)).fetchone()
+        assert row["name"] == "Orphan"
+    finally:
+        _drop(pid)
+
+
+def test_an_orphan_is_invisible_and_undeletable_over_the_api(as_user):
+    pid = str(uuid.uuid4())
+    _insert_orphan(pid)
+    try:
+        client = as_user(USER_A)
+        assert client.get("/api/price-lists").json()["price_lists"] == []
+        assert client.delete(f"/api/price-lists/{pid}").status_code == 404
+        assert client.put(f"/api/price-lists/{pid}",
+                          json={"name": "Pavogta"}).status_code == 404
+    finally:
+        _drop(pid)
+
+
+@pytest.mark.parametrize("bad", [None, "", 0])
+def test_an_empty_owner_never_widens_a_query(bad):
+    """`if user_id:` was truthiness, so an empty string took the UNSCOPED
+    branch and `list_price_lists("")` returned EVERY user's kainynai. There is
+    no unscoped branch any more; a falsy owner is a programming error."""
+    seeded = str(uuid.uuid4())
+    _insert_orphan(seeded, "Kažkieno kito")
+    try:
+        for call in (
+            lambda: _db.list_price_lists(bad),
+            lambda: _db.get_price_list(seeded, bad),
+            lambda: _db.delete_price_list(seeded, bad),
+            lambda: _db.upsert_price_list(seeded, {"name": "x"}, bad),
+        ):
+            with pytest.raises(ValueError):
+                call()
+        # And nothing was read or written on the way to the exception.
+        with _db._conn() as c:
+            assert c.execute("SELECT name FROM price_lists WHERE id = ?",
+                             (seeded,)).fetchone()["name"] == "Kažkieno kito"
+    finally:
+        _drop(seeded)
+
+
+def test_a_scoped_read_never_crosses_owners():
+    a_id, b_id = str(uuid.uuid4()), str(uuid.uuid4())
+    _db.upsert_price_list(a_id, {"name": "A", "items": []}, USER_A["id"])
+    _db.upsert_price_list(b_id, {"name": "B", "items": []}, USER_B["id"])
+    assert _db.get_price_list(b_id, user_id=USER_A["id"]) is None
+    assert _db.delete_price_list(b_id, user_id=USER_A["id"]) is False
+    assert [p["id"] for p in _db.list_price_lists(USER_A["id"])] == [a_id]
 
 
 def test_corrupt_items_blob_does_not_read_as_empty():
     pid = str(uuid.uuid4())
-    _db.upsert_price_list(pid, {"name": "Sugadintas", "items": []}, user_id=None)
+    _db.upsert_price_list(pid, {"name": "Sugadintas", "items": []},
+                          user_id=USER_A["id"])
     with _db._conn() as c:
         c.execute("UPDATE price_lists SET items = ? WHERE id = ?", ("{not json", pid))
-    row = _db.get_price_list(pid)
+    row = _db.get_price_list(pid, user_id=USER_A["id"])
     assert row["_items_corrupt"] is True
     assert row["items"] == []
-    _db.delete_price_list(pid)

@@ -12,9 +12,10 @@ Task 5 of the 2026-09-02 contractor batch. Two jobs:
    cleared browser or a second device lost hours of typing; the SQLite table is
    now the source of truth and the frontend store writes through to it.
 
-Ownership: every route is auth-gated and owner-scoped exactly like the project
-routes (admins may read across users; writes are always checked against the
-row's owner, NULL-owner rows included — the 2026-06-19 write-barrier lesson).
+Ownership: every route is auth-gated and scoped to the CALLER's own rows —
+no cross-user read, admins included (see the CRUD note below). Writes are
+checked against the row's owner, NULL-owner rows included — the 2026-06-19
+write-barrier lesson.
 """
 
 from __future__ import annotations
@@ -461,6 +462,21 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
                     detail=f"Per daug eilučių (daugiau nei {MAX_ROWS}). "
                            "Suskaidykite kainyną į kelis failus.")
             _consume(row)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 - openpyxl raises a zoo of types
+        # `load_workbook` above only parses the workbook SHELL. In read-only
+        # mode the sheet is parsed lazily, during the iteration here, so a
+        # truncated sheetData, a malformed <v>, or a shared-string index past
+        # the end of the table all raise past the load and used to escape this
+        # function as an unhandled 500. It is a bad file, not a broken server.
+        log.info("xlsx sheet read failed: %r", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="„Excel“ failo turinio nepavyko perskaityti — failas gali "
+                   "būti sugadintas. Atidarykite jį „Excel“ programoje ir "
+                   "įrašykite iš naujo kaip .xlsx.",
+        ) from exc
     finally:
         try:
             wb.close()
