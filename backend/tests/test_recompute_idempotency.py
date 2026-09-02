@@ -47,10 +47,15 @@ FIXTURE = (REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24"
 ROOM = "110"
 H_EXTRACTED = 2.8
 
-# Quantity fields a ceiling-height edit is allowed to move. `dazai_l` is
-# deliberately absent: the pipeline emits ONE per-room paint litre figure while
-# this endpoint splits it into dazai_l (walls) + dazai_luboms_l (ceiling), a
-# pre-existing difference that feeds `medziagos_kiekis`, never `kiekis`.
+# Quantity fields a ceiling-height edit is allowed to move.
+#
+# The paint LITRES are in the list since 2026-09-02 (a2f4e59). The comment here
+# used to excuse them — "feeds medziagos_kiekis, never kiekis" — and that stopped
+# being true the day materials became their own priceable section: `dazai_l` +
+# `dazai_luboms_l` is now the `kiekis` of a row the contractor quotes. Both are
+# checked, and the endpoint's walls/ceiling split has to sum to the one figure
+# the extraction pipeline writes, or a no-op edit visibly moves the paint the
+# user is buying.
 ROOM_QUANTITY_FIELDS = (
     "walls_gross_m2", "walls_paintable_m2", "ceiling_paintable_m2",
     "dazymo_plotas_m2", "kampai_m", "kampu_metrai", "angokrasciu_gkp_m",
@@ -58,7 +63,20 @@ ROOM_QUANTITY_FIELDS = (
     "plyteles_grindys_m2", "isliginamasis_m2", "silikonavimas_m",
     "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2", "lubu_aukstis_m",
     "perimetras_m", "plotas_m2",
+    "dazai_l", "dazai_luboms_l",
 )
+
+# …with one honest asterisk, the one the old comment was really about: the two
+# paths STORE the litres differently. The extraction writes the room's whole
+# figure in `dazai_l`; this endpoint writes it as walls + ceiling. So across the
+# two paths only the SUM is comparable — `vision_call._room_dazai_l` is the
+# function that reads it, and it adds both. Recompute-vs-recompute still
+# compares each field on the nose.
+_DAZAI_FIELDS = ("dazai_l", "dazai_luboms_l")
+
+
+def _dazai_total(room: dict) -> float:
+    return round(sum(float(room.get(f) or 0) for f in _DAZAI_FIELDS), 2)
 
 # Santrauka key the two paths legitimately disagree on. The extraction pipeline
 # never writes `pasleptu_duru_staktu_m` onto a room (the pozicijos builder
@@ -155,10 +173,16 @@ def _assert_same_quantities(expected: dict, actual: dict, ctx: str,
     pozicijos kiekis must match EXACTLY — no tolerance. A tolerance here would
     let the ratchet through: the live drift was +0.34 m² on one row."""
     for want, got in zip(expected["patalpos"], actual["patalpos"]):
-        for field in ROOM_QUANTITY_FIELDS:
+        fields = ([f for f in ROOM_QUANTITY_FIELDS if f not in _DAZAI_FIELDS]
+                  if cross_path else ROOM_QUANTITY_FIELDS)
+        for field in fields:
             assert want.get(field) == got.get(field), (
                 f"{ctx}: room {want.get('nr')} {want.get('pavadinimas')} "
                 f".{field}: {want.get(field)} -> {got.get(field)}")
+        if cross_path:
+            assert _dazai_total(want) == _dazai_total(got), (
+                f"{ctx}: room {want.get('nr')} {want.get('pavadinimas')} "
+                f" dažai viso: {_dazai_total(want)} -> {_dazai_total(got)}")
 
     skip = _CROSS_PATH_ONLY if cross_path else set()
     want_s = {k: v for k, v in _santrauka(expected).items() if k not in skip}

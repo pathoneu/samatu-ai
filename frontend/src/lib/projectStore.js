@@ -36,6 +36,10 @@ const SETTINGS_KEY = 'samatu_settings';
 // carrying the merged 'Sienų lubų glaistymas dažymas' are re-sectioned per ROW
 // by `migrateSkyriusRow` below (mirror of vision_call.migrate_skyrius_row).
 const SKYRIUS_LEGACY_MIGRATION = {
+  // An export written by a tool that strips diacritics turns the shopping list
+  // into "Medziagos"; without this it loaded as a section of its own and the
+  // materials scattered away from the foot of the sąmata.
+  'Medziagos': 'Medžiagos',
   'Glaistymas dazymas': 'Sienų lubų glaistymas dažymas',
   'Glaistymas dažymas': 'Sienų lubų glaistymas dažymas',
   'Plyteles': 'Plytelių klijavimas',
@@ -312,27 +316,38 @@ function _doFlush() {
     // retries it (e.g. after the user frees space by deleting a project).
     _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(_memProjects));
   }
-  if (_dirtyIds.size === 0) return;
+  if (_dirtyIds.size === 0) return [];
   const ids = Array.from(_dirtyIds);
   _dirtyIds.clear();
+  const pushes = [];
   for (const id of ids) {
     const proj = (_memProjects || []).find(p => p.id === id);
     if (!proj) continue;   // deleted before the flush — nothing to push
     const opts = _pendingOpts.get(id);
     _pendingOpts.delete(id);
-    _syncToBackend(proj, opts || {});
+    const verdict = _syncToBackend(proj, opts || {});
+    pushes.push(Promise.resolve(verdict).then(v => ({ id, verdict: v || 'ok' })));
   }
+  return pushes;
 }
 
 /**
  * Force any pending save out NOW (localStorage + backend PUT).
  *
  * Call sites: page unload/hide, and project unmount — leaving the editor must
- * never strand the last 400 ms of typing.
+ * never strand the last 400 ms of typing. Those callers ignore the return
+ * value; it exists so a caller that has something to LOSE if the write is
+ * refused can await the server's verdict — see the automatic price fill in
+ * ProjectDetail, whose prices lived only in this browser's cache when the PUT
+ * came back 409 and nothing ever retried. (2026-09-02)
+ *
+ * @returns {Promise<Array<{id: string, verdict: string}>>} one entry per PUT
+ *   this flush started ('ok' | 'conflict' | 'unauthorized' | 'failed' |
+ *   'superseded'); empty when there was nothing pending.
  */
 export function flushProjectSaves() {
   if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
-  _doFlush();
+  return Promise.all(_doFlush() || []);
 }
 
 /** Write immediately — for one-shot intents that must not sit on a timer. */
@@ -944,6 +959,24 @@ export function markPriceFillPending(projectId) {
   if (!projectId) return;
   try { sessionStorage.setItem(PRICE_FILL_PENDING_PREFIX + projectId, '1'); }
   catch { /* private mode / quota — the manual button still exists */ }
+}
+
+/**
+ * Is a fill still expected for this project? Read-only.
+ *
+ * The consume-first version burned the marker before the fill had reached the
+ * server: when the PUT was refused (409 lost-update guard), the prices lived
+ * only in this browser's cache, the next backend pull replaced that cache, and
+ * nothing was left to say a fill was ever owed. Peek, fill, and clear the marker
+ * only once the server has taken the write. (2026-09-02)
+ */
+export function peekPriceFillPending(projectId) {
+  if (!projectId) return false;
+  try {
+    return sessionStorage.getItem(PRICE_FILL_PENDING_PREFIX + projectId) === '1';
+  } catch {
+    return false;
+  }
 }
 
 /** Read-and-clear. Returns true when this project was waiting for a fill. */

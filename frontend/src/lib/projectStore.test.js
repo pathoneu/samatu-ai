@@ -4,7 +4,8 @@ import {
   _handleSyncResponse, _hasStorageNotice, _resetSaveState, _getServerVersion,
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
-  pullProjectsFromBackend,
+  pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
+  consumePriceFillPending,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -418,4 +419,64 @@ test('restoring a backup pushes the recovered price lists to the backend', async
   await tick(0);
   assert.ok(calls.some(c => c.method === 'PUT' && c.url.endsWith('/pl-restored')),
     'a restore that only refills localStorage loses the list on the next pull');
+});
+
+// ── the flush reports its verdict (2026-09-02) ───────────────────────────────
+//
+// The automatic price fill on the disconnect-recovery path writes a SECOND PUT
+// for a project the server already owns, so it meets the 409 lost-update guard.
+// It used to fire-and-forget: on a refusal the prices lived only in this
+// browser's cache, the next backend pull replaced that cache, and the
+// sessionStorage marker had already been burned — nothing ever retried.
+
+test('flushProjectSaves resolves with the server verdict per project', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  installFetchRecorder();
+  updateProject('p1', { name: 'A1' });
+  const verdicts = await flushProjectSaves();
+  assert.deepEqual(verdicts, [{ id: 'p1', verdict: 'ok' }]);
+});
+
+test('flushProjectSaves surfaces a refused write instead of swallowing it', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  installFetchRecorder({ ok: false, status: 409, json: async () => ({}) });
+  updateProject('p1', { name: 'kainos-iš-kainyno' });
+  const verdicts = await flushProjectSaves();
+  assert.equal(verdicts.length, 1);
+  assert.equal(verdicts[0].verdict, 'conflict');
+});
+
+test('flushProjectSaves with nothing pending resolves empty', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  installFetchRecorder();
+  assert.deepEqual(await flushProjectSaves(), []);
+});
+
+// ── the "a fill is still owed" marker ────────────────────────────────────────
+
+function installSessionStorage() {
+  const map = new Map();
+  globalThis.sessionStorage = {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => { map.set(k, String(v)); },
+    removeItem: (k) => { map.delete(k); },
+  };
+}
+
+test('peekPriceFillPending reads without burning the marker', () => {
+  installSessionStorage();
+  markPriceFillPending('p1');
+  assert.equal(peekPriceFillPending('p1'), true);
+  assert.equal(peekPriceFillPending('p1'), true, 'peek must not consume');
+  assert.equal(consumePriceFillPending('p1'), true);
+  assert.equal(peekPriceFillPending('p1'), false, 'consume clears it');
+});
+
+test('an unmarked project is never treated as owing a fill', () => {
+  installSessionStorage();
+  assert.equal(peekPriceFillPending('p-never-marked'), false);
+  assert.equal(peekPriceFillPending(null), false);
 });

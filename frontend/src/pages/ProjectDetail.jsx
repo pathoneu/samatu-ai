@@ -16,8 +16,11 @@ import ConstructionProject from '@/pages/ConstructionProject';
 import {
   getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves,
   getPriceLists, pullPriceListsFromBackend, consumePriceFillPending,
+  peekPriceFillPending, markPriceFillPending,
 } from '@/lib/projectStore';
-import { autoFillFromDefaultPriceList, manualPricePatch } from '@/lib/applyPriceList';
+import {
+  autoFillFromDefaultPriceList, manualPricePatch, describeAmbiguous,
+} from '@/lib/applyPriceList';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { toast } from 'sonner';
 
@@ -67,7 +70,7 @@ export default function ProjectDetail() {
   const autoFillRanRef = useRef(false);
   useEffect(() => {
     if (!project?.id || autoFillRanRef.current) return;
-    if (!consumePriceFillPending(project.id)) return;
+    if (!peekPriceFillPending(project.id)) return;
     autoFillRanRef.current = true;
     let cancelled = false;
     (async () => {
@@ -75,18 +78,34 @@ export default function ProjectDetail() {
         await pullPriceListsFromBackend();
         if (cancelled) return;
         const out = autoFillFromDefaultPriceList(project, getPriceLists());
-        if (!out || cancelled) return;
+        // Nothing to fill (no default kainynas, or already stamped) — the
+        // marker has done its job and must not survive into a later visit.
+        if (!out) { consumePriceFillPending(project.id); return; }
+        if (cancelled) return;
         const { _kainynas_auto_applied, ...rest } = out.project;
         updateProject(project.id, { ...rest, _kainynas_auto_applied });
-        flushProjectSaves();
+        // This project is one the SERVER already owns, so the write goes
+        // through the lost-update guard. WAIT for its verdict: a refused PUT
+        // used to leave the prices in this browser's cache only, and since the
+        // marker was already burned, the next backend pull replaced that cache
+        // and no retry ever happened — the fill was silently lost. (2026-09-02)
+        const verdicts = await flushProjectSaves();
+        const mine = verdicts.find(v => v.id === project.id);
         queryClient.invalidateQueries({ queryKey: ['project', project.id] });
         queryClient.invalidateQueries({ queryKey: ['projects'] });
+        if (mine && mine.verdict !== 'ok') {
+          // projectStore has already told the user the save didn't land. Keep
+          // the marker armed so a reload retries instead of claiming success.
+          markPriceFillPending(project.id);
+          return;
+        }
+        consumePriceFillPending(project.id);
         const { applied, exact, similar, name, ambiguous } = out.summary;
         toast.success(t('project.mainView.autoPricesApplied',
           { applied, exact, similar, name }), { duration: 8000 });
         if (ambiguous?.length) {
           toast.warning(t('project.mainView.toastAmbiguous', { count: ambiguous.length }),
-            { duration: 8000 });
+            { duration: 8000, description: describeAmbiguous(ambiguous, t) });
         }
       } catch (e) {
         // Never break the project page over a convenience — the manual

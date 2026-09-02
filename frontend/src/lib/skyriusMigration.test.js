@@ -103,3 +103,11 @@ test('a priced row keeps its price when only its section changes', () => {
   assert.equal(merged[0].kaina, 4.2);
   assert.equal(Math.round(merged[0].suma * 100) / 100, 593.5);
 });
+
+test('the ASCII-stripped shopping list migrates like every other section', () => {
+  // An export written by a tool that drops diacritics ("Medziagos") used to
+  // load as a section of its own, so the materials scattered away from the
+  // foot of the sąmata. Mirror of the backend's SKYRIUS_LEGACY_MIGRATION.
+  assert.equal(migrateSkyriusRow('Medziagos', 'Dažai sienoms'), 'Medžiagos');
+  assert.equal(migrateSkyriusRow('Medžiagos', 'Dažai sienoms'), 'Medžiagos');
+});
