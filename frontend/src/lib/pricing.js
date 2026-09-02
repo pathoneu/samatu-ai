@@ -24,6 +24,7 @@ export const RATES = {
   'claude-opus-5': { in: 5.0, out: 25.0 },   // production champion since 2026-07-28 (backend/pricing.py)
   'claude-opus-4-8': { in: 5.0, out: 25.0 },
   'claude-fable-5': { in: 10.0, out: 50.0 },
+  'claude-fable-5-1': { in: 10.0, out: 50.0 },  // 2026-09-01 release; benchmarked 2026-09-02
 };
 
 const DEFAULT_MODEL = 'claude-opus-4-8';

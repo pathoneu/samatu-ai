@@ -46,6 +46,11 @@ RATES: dict[str, dict[str, float]] = {
     "claude-opus-5": {"in": 5.0, "out": 25.0},      # champion since 2026-07-28
     "claude-opus-4-8": {"in": 5.0, "out": 25.0},    # previous champion / rollback
     "claude-fable-5": {"in": 10.0, "out": 50.0},
+    # 2026-09-02 (released 2026-09-01): same base rates as Fable 5; its cache
+    # READS are $0.25/MTok (0.025×, not 0.1×) — CACHE_READ_MULT below is still
+    # the 0.1× that every other model bills, so a Fable 5.1 cost is slightly
+    # OVER-stated on the cache-read component until that becomes per-model.
+    "claude-fable-5-1": {"in": 10.0, "out": 50.0},
     "claude-sonnet-5": {"in": 3.0, "out": 15.0},    # evaluated, not used for vision
 }
 
