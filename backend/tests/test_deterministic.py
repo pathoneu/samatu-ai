@@ -161,7 +161,9 @@ def test_pipeline_pozicijos_built_from_rooms(three_room_parsed):
     # Three-room sample (vonia + miegamasis + svetainė) must produce all four
     # main skyriai because vonia → Hidroizoliacija + Plyteles, others →
     # Glaistymas dazymas + GKP montavimas.
-    assert "Sienų lubų glaistymas dažymas" in skyriai
+    # 2026-09-02: the paint block is TWO sections (contractor ask F3).
+    assert "Sienų glaistymas dažymas" in skyriai
+    assert "Lubų glaistymas dažymas" in skyriai
     assert "GKP montavimas" in skyriai
     assert "Plytelių klijavimas" in skyriai
     assert "Hidroizoliacija" in skyriai
@@ -621,7 +623,8 @@ def test_rangovas_baseline_p1_style_residential_emits_all_key_skyriai():
     # Key Rangovas-style skyriai must all be present
     REQUIRED = {
         "GKP montavimas",
-        "Sienų lubų glaistymas dažymas",
+        "Sienų glaistymas dažymas",
+        "Lubų glaistymas dažymas",
         "Plytelių klijavimas",
         "Hidroizoliacija",
         "Grindys",
@@ -697,13 +700,18 @@ def test_pipeline_handles_high_ceiling_3plus_m():
     # Lubų glaistymas/dažymas (virš 3m) — FINISH labor (Sprint §FIX-5)
     # 2026-06-06: paint lines consolidated — "Sienų, lubų glaistymas/dažymas
     # (virš 3m aukščio)" (was "Lubų glaistymas/dažymas (virš 3 m aukščio)").
+    # 2026-09-02: consolidated PER SURFACE, so the high-ceiling room now
+    # produces a virš-3m line for the walls AND one for the ceiling.
     high_paint = [p for p in out["pozicijos"]
                   if "virš 3m aukščio" in p["aprasymas"].lower()
                   and "glaistymas" in p["aprasymas"].lower()]
+    high_paint_lubos = [p for p in high_paint
+                        if p["aprasymas"].startswith("Lubų")]
     pastoliai = [p for p in out["pozicijos"]
                  if "pastolių" in p["aprasymas"].lower()]
     assert len(high_gkp) == 1, "Missing GKP virš 3m line for high-ceiling room"
-    assert len(high_paint) == 1, "Missing Lubų >3m painting line (Rangovas P1 split)"
+    assert len(high_paint) == 2, f"Expected a walls + a lubos virš-3m line: {high_paint}"
+    assert len(high_paint_lubos) == 1, "Missing Lubų >3m painting line (Rangovas P1 split)"
     assert len(pastoliai) == 1, "Missing pastolių nuoma for high-ceiling room"
 
 
@@ -780,7 +788,9 @@ def test_pozicijos_p7_legacy_skyrius_migration():
     assert "Glaistymas dazymas" not in skyrius_set, "Legacy mojibake key should not appear"
     assert "Pridetiniai elementai" not in skyrius_set, "Legacy mojibake should not appear"
     assert "Plytelių klijavimas" in skyrius_set
-    assert "Sienų lubų glaistymas dažymas" in skyrius_set
+    # 2026-09-02: the legacy name maps onto the merged section, and the row is
+    # then sorted into one of its two successors by its aprašymas.
+    assert "Sienų glaistymas dažymas" in skyrius_set
     assert "Pridėtiniai elementai" in skyrius_set
 
 

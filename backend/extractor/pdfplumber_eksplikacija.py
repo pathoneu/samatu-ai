@@ -292,6 +292,91 @@ def _is_total_row(row_cells: list) -> bool:
     return any(m in joined for m in TOTAL_ROW_MARKERS)
 
 
+# A summary row's number is a BUILDING total, not a room's — it legitimately
+# exceeds MAX_PLOTAS_M2. Bounds only to reject a page number or a year.
+MIN_TOTAL_AREA_M2 = 1.0
+MAX_TOTAL_AREA_M2 = 100_000.0
+# The label shown back to the contractor ("Iš viso", "Bendras plotas"), so keep
+# it short enough to sit inside a sąmata row.
+MAX_TOTAL_LABEL_CHARS = 48
+
+
+def _total_row_label(cells: list, columns: dict | None) -> str:
+    """The human text of a summary row — what we quote to the user as the
+    source of the ceiling quantity."""
+    if columns:
+        idx = columns.get("pavadinimas")
+        if idx is not None and idx < len(cells):
+            txt = _clean_name(cells[idx] or "")
+            if txt:
+                return txt[:MAX_TOTAL_LABEL_CHARS]
+    for cell in cells:
+        txt = _clean_name(cell or "")
+        low = txt.lower()
+        if txt and any(m in low for m in TOTAL_ROW_MARKERS):
+            return txt[:MAX_TOTAL_LABEL_CHARS]
+    joined = _clean_name(" ".join(c for c in cells if c))
+    return joined[:MAX_TOTAL_LABEL_CHARS]
+
+
+def _try_parse_total_row(row: list, row_idx: int, page_nr: int,
+                         columns: dict | None = None) -> dict | None:
+    """Read the AREA off an 'Iš viso' / 'Bendras plotas' row.
+
+    2026-09-02 (contractor ask F3): this row was DETECTED and thrown away. It is
+    the designer's own sum of the room table — the most authoritative floor area
+    the document contains — and the ceiling glaistymas/gruntavimas/dažymas
+    quantity is anchored to it (minus the rooms whose ceilings aren't painted).
+
+    Two ways to read it, and no third:
+      · header path — the mapped `plotas` column, the same index the room rows
+        use, on the SAME position-preserving cell list (a merged/None cell must
+        not shift the map; see `_try_parse_row`'s note and dd57e93).
+      · no header — accepted ONLY when the row holds exactly ONE plausible
+        number. Two numbers with nothing to say which is the area is the same
+        ambiguity `_try_parse_row` refuses for rooms, and guessing here would
+        silently anchor a billed quantity to a perimeter.
+    """
+    if not row or not isinstance(row, (list, tuple)):
+        return None
+    cells = [c if isinstance(c, str) else "" for c in row]
+    if not any(c.strip() for c in cells):
+        return None
+    if not _is_total_row(cells):
+        return None
+
+    def _plausible(val):
+        return val is not None and MIN_TOTAL_AREA_M2 <= val <= MAX_TOTAL_AREA_M2
+
+    if columns:
+        idx = columns.get("plotas")
+        if idx is None or idx >= len(cells):
+            return None
+        val, raw = _parse_number_preserving_decimals(cells[idx])
+        if not _plausible(val):
+            return None
+        source = "header"
+    else:
+        found: list[tuple[float, str | None]] = []
+        for cell in cells:
+            val, raw = _parse_number_preserving_decimals(cell)
+            if _plausible(val):
+                found.append((val, raw))
+        if len(found) != 1:
+            return None
+        val, raw = found[0]
+        source = "scan"
+
+    return {
+        "value": round(float(val), 2),
+        "value_raw": raw,
+        "label": _total_row_label(cells, columns),
+        "page": page_nr,
+        "row_idx": row_idx,
+        "_row_source": source,
+    }
+
+
 # -- Header-aware column mapping (2026-08-23) ------------------------------
 # Without a header the parser took the LARGEST plausible number in the row as
 # the area. On a `Nr | Pavadinimas | Plotas | Perimetras` table that silently
@@ -668,7 +753,8 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
             out["_meta"]["wide_acceptance"] = wide
             best_extraction: list[dict] = []
             best_page: int | None = None
-            all_tables: list[tuple[int, list[dict]]] = []
+            best_totals: list[dict] = []
+            all_tables: list[tuple[int, list[dict], list[dict]]] = []
 
             for page_idx, page in enumerate(pdf.pages, start=1):
                 if not _is_eksplikacija_page(page, wide):
@@ -708,6 +794,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                             out["_meta"]["header_detected"] = True
                             break
                     rooms_in_table: list[dict] = []
+                    totals_in_table: list[dict] = []
                     for row_idx, (row_cells, row_obj) in enumerate(zip(extracted, rows)):
                         if row_idx == header_row_idx:
                             continue
@@ -730,11 +817,21 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                             )
                             if parsed:
                                 rooms_in_table.append(parsed)
+                                continue
+                            # Not a room → it may be the table's own sum. The
+                            # rooms list is UNCHANGED by this (a total row was
+                            # already refused above and still is).
+                            total = _try_parse_total_row(
+                                sub, row_idx * 100 + sub_idx, page_idx,
+                                columns=columns)
+                            if total:
+                                totals_in_table.append(total)
                     if rooms_in_table:
-                        all_tables.append((page_idx, rooms_in_table))
+                        all_tables.append((page_idx, rooms_in_table, totals_in_table))
                     if len(rooms_in_table) > len(best_extraction):
                         best_extraction = rooms_in_table
                         best_page = page_idx
+                        best_totals = totals_in_table
 
             # -- Continued tables (2026-08-23) ---------------------------
             # A two-storey eksplikacija is routinely split across two sheets.
@@ -758,7 +855,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
             if best_extraction and wide:
                 out["_meta"]["tables_contributing"] = 1
                 claimed = {str(r.get("nr") or "").strip() for r in best_extraction}
-                for page_idx, rooms_in_table in all_tables:
+                for page_idx, rooms_in_table, totals_in_table in all_tables:
                     if rooms_in_table is best_extraction or len(rooms_in_table) < 2:
                         continue
                     fresh = [r for r in rooms_in_table
@@ -781,6 +878,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                         continue
                     claimed.update(str(r.get("nr") or "").strip() for r in fresh)
                     best_extraction = best_extraction + fresh
+                    best_totals = best_totals + totals_in_table
                     out["_meta"]["tables_contributing"] += 1
                     if page_idx not in out["_meta"]["continued_pages"]:
                         out["_meta"]["continued_pages"].append(page_idx)
@@ -791,7 +889,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                 # not use so a run that lost a real second storey is at least
                 # visible in the log rather than invisible in both modes.
                 out["_meta"]["tables_contributing"] = 1
-                for page_idx, rooms_in_table in all_tables:
+                for page_idx, rooms_in_table, _totals in all_tables:
                     if rooms_in_table is best_extraction:
                         continue
                     out["_meta"].setdefault("tables_discarded", []).append({
@@ -827,10 +925,28 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                     "page": best_page,
                 }
                 best_extraction = []
+                best_totals = []
 
             if len(best_extraction) >= MIN_ROOMS_THRESHOLD:
                 out["patalpos"] = best_extraction
                 out["eksplikacija_source_page"] = best_page
+                # ── The table's own "Iš viso" (2026-09-02) ──────────────
+                # Published only alongside an ACCEPTED room table, and only
+                # from the table(s) those rooms came from — a summary row off
+                # an unrelated sheet is not this building's total. A drawing
+                # that sums per floor AND per building gives several: keep
+                # them all for audit, and pick the one nearest our own row
+                # sum, because that is the one covering these rooms.
+                if best_totals:
+                    rooms_sum = round(sum(float(r.get("plotas_m2") or 0)
+                                          for r in best_extraction), 2)
+                    pick = min(best_totals,
+                               key=lambda c: abs(float(c["value"]) - rooms_sum))
+                    out["_meta"]["total_area_m2"] = pick["value"]
+                    out["_meta"]["total_row_label"] = pick["label"]
+                    out["_meta"]["total_row_page"] = pick["page"]
+                    out["_meta"]["total_rows_sum_m2"] = rooms_sum
+                    out["_meta"]["total_candidates"] = best_totals
 
     except Exception as exc:
         out["_meta"]["error"] = str(exc)

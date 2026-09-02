@@ -30,10 +30,14 @@ const SETTINGS_KEY = 'samatu_settings';
 // Sprint §FIX-2 (2026-04-29): expanded with GKP/glaistymas variants —
 // user reported 3 separate "GKP montavimas" groups in UI from these.
 // Mirror of backend SKYRIUS_LEGACY_MIGRATION (extractor/vision_call.py).
+//
+// 2026-09-02: 'Sienų glaistymas dažymas' was REMOVED from this map — it is now
+// one of the two canonical paint sections, not a legacy alias. Rows still
+// carrying the merged 'Sienų lubų glaistymas dažymas' are re-sectioned per ROW
+// by `migrateSkyriusRow` below (mirror of vision_call.migrate_skyrius_row).
 const SKYRIUS_LEGACY_MIGRATION = {
   'Glaistymas dazymas': 'Sienų lubų glaistymas dažymas',
   'Glaistymas dažymas': 'Sienų lubų glaistymas dažymas',
-  'Sienų glaistymas dažymas': 'Sienų lubų glaistymas dažymas',
   'Plyteles': 'Plytelių klijavimas',
   'Plytelių darbai': 'Plytelių klijavimas',
   'Pridetiniai elementai': 'Pridėtiniai elementai',
@@ -52,6 +56,26 @@ const SKYRIUS_LEGACY_MIGRATION = {
   'GKP lubų montavimas': 'GKP montavimas',
 };
 
+const SK_GD_MERGED = 'Sienų lubų glaistymas dažymas';
+const SK_GD_SIENOS = 'Sienų glaistymas dažymas';
+const SK_GD_LUBOS = 'Lubų glaistymas dažymas';
+// LED niches are cut into the ceiling and are glaistomos/dažomos with it.
+const LUBOS_PREFIXES = ['Lubų', 'LED nišų'];
+
+/**
+ * Canonical skyrius for ONE row — the legacy name map plus the 2026-09-02
+ * sienų/lubų split. Mirror of `extractor/vision_call.migrate_skyrius_row`;
+ * a row's section can only be decided from its APRAŠYMAS, because the merged
+ * section held both wall and ceiling work.
+ */
+export function migrateSkyriusRow(skyrius, aprasymas) {
+  const s = (skyrius || '').trim();
+  const mapped = SKYRIUS_LEGACY_MIGRATION[s] || s;
+  if (mapped !== SK_GD_MERGED) return mapped;
+  const a = (aprasymas || '').trim();
+  return LUBOS_PREFIXES.some(pre => a.startsWith(pre)) ? SK_GD_LUBOS : SK_GD_SIENOS;
+}
+
 function _migrateProject(p) {
   if (!p || typeof p !== 'object') return p;
   const migrated = { ...p };
@@ -59,14 +83,12 @@ function _migrateProject(p) {
   if (Array.isArray(p.darbu_sarasas)) {
     migrated.darbu_sarasas = p.darbu_sarasas.map(it => {
       if (!it || typeof it !== 'object') return it;
-      const newSk = SKYRIUS_LEGACY_MIGRATION[it.skyrius];
-      const newSkLabel = SKYRIUS_LEGACY_MIGRATION[it.skyrius_label];
-      if (newSk || newSkLabel) {
-        return {
-          ...it,
-          skyrius: newSk || it.skyrius,
-          skyrius_label: newSkLabel || it.skyrius_label,
-        };
+      const newSk = migrateSkyriusRow(it.skyrius, it.aprasymas || it.pavadinimas);
+      const newSkLabel = it.skyrius_label
+        ? migrateSkyriusRow(it.skyrius_label, it.aprasymas || it.pavadinimas)
+        : it.skyrius_label;
+      if (newSk !== it.skyrius || newSkLabel !== it.skyrius_label) {
+        return { ...it, skyrius: newSk, skyrius_label: newSkLabel };
       }
       return it;
     });
@@ -75,8 +97,8 @@ function _migrateProject(p) {
   if (Array.isArray(p.pozicijos)) {
     migrated.pozicijos = p.pozicijos.map(it => {
       if (!it || typeof it !== 'object') return it;
-      const newSk = SKYRIUS_LEGACY_MIGRATION[it.skyrius];
-      return newSk ? { ...it, skyrius: newSk } : it;
+      const newSk = migrateSkyriusRow(it.skyrius, it.aprasymas);
+      return newSk !== it.skyrius ? { ...it, skyrius: newSk } : it;
     });
   }
   return migrated;

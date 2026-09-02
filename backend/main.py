@@ -4742,9 +4742,33 @@ def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     renumbering those would break the reference, so they pass through verbatim.
     """
     rows = [dict(e) for e in eilutes]
+    # 2026-09-02: canonicalise the section name on the export COPY, per row.
+    # The paint block split into "Sienų glaistymas dažymas" + "Lubų glaistymas
+    # dažymas", and only a row's aprašymas says which half it is — so a project
+    # saved under the merged name exports into the right two sections.
+    from extractor.vision_call import migrate_skyrius_row as _mig
+    for e in rows:
+        sec = (e.get("skyrius") or "").strip()
+        if sec:
+            e["skyrius"] = _mig(sec, e.get("aprasymas") or e.get("pavadinimas"))
+
     nrs = [str(e.get("nr") or "").strip() for e in rows]
     if any(nr and not _PLAIN_INT_NR.fullmatch(nr) for nr in nrs):
         return rows
+
+    # Both exports print a section header whenever `skyrius` CHANGES between
+    # consecutive rows, so a section that appears twice in the list prints twice
+    # (the §FIX-7 complaint: "2 GKP montavimas sections in Excel"). Fresh
+    # extractions are sorted server-side and never hit this; a project saved
+    # before the paint split can, because its wall and ceiling rows interleave
+    # under one old section and now belong to two. Stable-group by FIRST
+    # appearance: section order and within-section row order are both preserved,
+    # only the duplicate headers go away.
+    order: dict[str, int] = {}
+    for e in rows:
+        order.setdefault((e.get("skyrius") or "").strip(), len(order))
+    rows.sort(key=lambda e: order[(e.get("skyrius") or "").strip()])
+
     for i, e in enumerate(rows, 1):
         e["nr"] = str(i)
     return rows
@@ -5043,10 +5067,12 @@ def generate_excel(request: Request, data: dict):
     # section headers match the per-section tab names. (2026-06-19 hunt: the
     # normalization ran AFTER the main sheet, so legacy projects showed one
     # section under two different names across the workbook.)
-    from extractor.vision_call import SKYRIUS_LEGACY_MIGRATION as _SKYRIUS_MIG
+    # 2026-09-02: `migrate_skyrius_row` (not the bare name map) — the paint
+    # section split in two and only the row's aprašymas says which half it is.
+    from extractor.vision_call import migrate_skyrius_row as _SKYRIUS_MIG
     for e in eilutes:
         _sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        e["skyrius"] = _SKYRIUS_MIG.get(_sec_raw, _sec_raw)
+        e["skyrius"] = _SKYRIUS_MIG(_sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
 
     ws_main = wb.active
     ws_main.title = "Sąmata"
@@ -5061,11 +5087,11 @@ def generate_excel(request: Request, data: dict):
     # "Glaistymas dazymas", etc.) collapse into one canonical sheet.
     # ─────────────────────────────────────────────────────────────────────────
     from collections import OrderedDict
-    # (SKYRIUS_LEGACY_MIGRATION already imported above as _SKYRIUS_MIG.)
+    # (migrate_skyrius_row already imported above as _SKYRIUS_MIG.)
     sections: dict[str, list] = OrderedDict()
     for e in eilutes:
         sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        sec = _SKYRIUS_MIG.get(sec_raw, sec_raw)
+        sec = _SKYRIUS_MIG(sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
         # Mutate the row's skyrius to canonical so the section header in
         # _write_rows shows the normalized name too.
         e["skyrius"] = sec

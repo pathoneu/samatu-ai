@@ -622,7 +622,13 @@ _VNT_NORMALIZE = {
 _SKYRIUS_ENUM = {
     # Modern LT-correct keys (with diacritics)
     "GKP montavimas": "gkp",
+    # 2026-09-02: the paint section split in two. Both halves keep the "paint"
+    # enum so every downstream consumer (exports, F2/F3, the UI's section
+    # colouring) treats them exactly as it treated the merged one. The merged
+    # key stays mapped — projects saved before the split still carry it.
     "Sienų lubų glaistymas dažymas": "paint",
+    "Sienų glaistymas dažymas": "paint",
+    "Lubų glaistymas dažymas": "paint",
     "Plytelių klijavimas": "tile",
     "Hidroizoliacija": "waterproof",
     "Grindys": "floor",
@@ -642,10 +648,16 @@ _SKYRIUS_ENUM = {
 # (server) and frontend localStorage on project load.
 # Sprint §FIX-2 (2026-04-29): expanded with GKP/glaistymas variants found in old
 # extractions — user reported 3 separate "GKP montavimas" groups in UI from these.
+#
+# 2026-09-02: "Sienų glaistymas dažymas" was REMOVED from this map. It used to
+# fold into the merged section; it is now one of the two canonical names, and
+# leaving the entry here would have mapped a valid name away. Rows still
+# carrying the merged name are re-sorted per ROW by `migrate_skyrius_row` —
+# a section rename can't decide, from the section alone, whether a line is wall
+# work or ceiling work.
 SKYRIUS_LEGACY_MIGRATION = {
     "Glaistymas dazymas": "Sienų lubų glaistymas dažymas",
     "Glaistymas dažymas": "Sienų lubų glaistymas dažymas",
-    "Sienų glaistymas dažymas": "Sienų lubų glaistymas dažymas",
     "Plyteles": "Plytelių klijavimas",
     "Plytelių darbai": "Plytelių klijavimas",
     "Pridetiniai elementai": "Pridėtiniai elementai",
@@ -876,11 +888,15 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
     darbu_sarasas = []
     for i, p in enumerate(pozicijos, start=1):
         skyrius_raw = p.get("skyrius", "Pridėtiniai elementai")
-        # P7: Migrate legacy ASCII-stripped keys to modern LT-with-diacritics
-        skyrius = SKYRIUS_LEGACY_MIGRATION.get(skyrius_raw, skyrius_raw)
         vnt_raw = p.get("vnt", "vnt")
         vnt = _VNT_NORMALIZE.get(vnt_raw, vnt_raw)
         aprasymas = p.get("aprasymas", "")
+        # P7: Migrate legacy ASCII-stripped keys to modern LT-with-diacritics.
+        # 2026-09-02: plus the per-ROW sienų/lubų split, so a project saved
+        # under the old merged section loads with its wall and ceiling lines in
+        # the right place. Prices are matched by aprasymas, never by skyrius, so
+        # re-sectioning a row cannot move money (see `_merge_user_edits`).
+        skyrius = migrate_skyrius_row(skyrius_raw, aprasymas)
         # Append `pastaba` to aprasymas if present (e.g. tile size detail)
         pastaba = p.get("pastaba")
         if pastaba:
@@ -1610,6 +1626,120 @@ def _ceiling_paint_m2(room: dict, stretch_nrs: set[str]) -> float:
     return float(room.get("ceiling_paintable_m2") or 0)
 
 
+# ── Lubų kiekis iš eksplikacijos „Iš viso" (2026-09-02 contractor ask F3) ────
+#
+# The designer's own sum at the foot of the room table is the most authoritative
+# floor area the document carries — it is what the contractor quotes from. Our
+# per-room ceiling sum can drift from it by a few tenths (rounding, a room the
+# reader missed), so when we have that total AND it is plainly about these rooms
+# we bill the ceiling off it instead, minus the rooms whose ceilings nobody
+# paints (įtempiamos lubos, and rooms the finish rules already leave bare).
+#
+# Only ever set from a pdfplumber table the eksplikacija guard ACCEPTED (see
+# vision_call step 2.4). No total, a Vision-read table, or a foreign one ⇒ no
+# anchor, and the per-room sum is used exactly as before.
+_ANCHOR_TOLERANCE = 0.30   # ±30% of Σ room plotai — outside that it isn't ours
+
+
+def _lt_num(v: float) -> str:
+    """`165.61` → `165,61` — LT decimal comma, for strings the user reads."""
+    return f"{float(v):.2f}".replace(".", ",")
+
+
+def _ceiling_paint_base(parsed: dict, rooms: list[dict],
+                        stretch_nrs: set[str], per_room_sum: float) -> tuple[float, str | None]:
+    """(billed ceiling m², provenance line or None).
+
+    Falls back to `per_room_sum` — today's behaviour — whenever there is no
+    anchor, the anchor is implausible, or nothing is left to paint.
+    """
+    if per_room_sum <= 0:
+        return per_room_sum, None
+    anchor = parsed.get("_ceiling_anchor") or {}
+    try:
+        total = float(anchor.get("total_area_m2") or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+    if total <= 0:
+        return per_room_sum, None
+
+    rooms_sum = round(sum(float(r.get("plotas_m2") or 0) for r in rooms), 2)
+    if rooms_sum <= 0 or abs(total - rooms_sum) > _ANCHOR_TOLERANCE * rooms_sum:
+        # The table's sum and the rooms we costed describe different things
+        # (another storey, another building part). Say so and keep the per-room
+        # sum rather than silently billing someone else's floor area. Emitted
+        # once: the builder and the consolidation both ask for the base, and a
+        # rebuild must not stack another copy on every recompute.
+        _warns = parsed.setdefault("warnings", [])
+        if not any(isinstance(w, dict) and w.get("code") == "eksplikacija_total_ignored"
+                   for w in _warns):
+            _warns.append({
+                "level": "WARN",
+                "code": "eksplikacija_total_ignored",
+                "message": (
+                    f"Eksplikacijos suma „{anchor.get('label') or 'Iš viso'}\" "
+                    f"({_lt_num(total)} m²) per daug skiriasi nuo suskaičiuotų "
+                    f"patalpų ploto ({_lt_num(rooms_sum)} m²), todėl lubų kiekis "
+                    "imtas iš patalpų sąrašo. Patikrinkite, ar eksplikacijoje "
+                    "sumuojamos tos pačios patalpos."),
+            })
+        return per_room_sum, None
+
+    stretch_m2 = round(sum(float(r.get("plotas_m2") or 0) for r in rooms
+                           if _is_stretch_ceiling(r, stretch_nrs)), 2)
+    unpainted_m2 = round(sum(
+        float(r.get("plotas_m2") or 0) for r in rooms
+        if not _is_stretch_ceiling(r, stretch_nrs)
+        and float(r.get("ceiling_paintable_m2") or 0) <= 0), 2)
+    base = round(max(total - stretch_m2 - unpainted_m2, 0.0), 2)
+    if base <= 0:
+        return per_room_sum, None
+
+    parts = [f"Iš eksplikacijos lentelės „{anchor.get('label') or 'Iš viso'}\": "
+             f"{_lt_num(total)}"]
+    if stretch_m2 > 0:
+        parts.append(f" − {_lt_num(stretch_m2)} (įtempiamos lubos)")
+    if unpainted_m2 > 0:
+        parts.append(f" − {_lt_num(unpainted_m2)} (lubos nedažomos)")
+    if stretch_m2 > 0 or unpainted_m2 > 0:
+        parts.append(f" = {_lt_num(base)}")
+    parts.append(" m²")
+    return base, "".join(parts)
+
+
+# ── Sienų / lubų skyrių atskyrimas (2026-09-02 contractor ask F3) ────────────
+#
+# The contractor prices walls and ceilings as two trades and wants them read as
+# two sections. `SK_GD_MERGED` is what every project saved before today carries;
+# it stays a recognised name (old blobs must load), but nothing new is emitted
+# under it — `_paint_section` sorts each row into one of the two successors.
+SK_GD_MERGED = "Sienų lubų glaistymas dažymas"
+SK_GD_SIENOS = "Sienų glaistymas dažymas"
+SK_GD_LUBOS = "Lubų glaistymas dažymas"
+
+# Ceiling work whose label does not start with "Lubų". LED niches are cut into
+# the ceiling and are glaistomos/dažomos with it, so they belong with the lubos.
+_LUBOS_PREFIXES = ("Lubų", "LED nišų")
+
+
+def _paint_section(aprasymas: str | None) -> str:
+    """Which of the two paint sections this row belongs to."""
+    a = (aprasymas or "").strip()
+    return SK_GD_LUBOS if a.startswith(_LUBOS_PREFIXES) else SK_GD_SIENOS
+
+
+def migrate_skyrius_row(skyrius: str | None, aprasymas: str | None) -> str:
+    """Canonical skyrius for ONE row — legacy name map plus the 2026-09-02
+    sienų/lubų split. Shared by `_emit_v8_compat_fields`, the Excel export and
+    (mirrored in JS) the frontend project-load migration, so a saved project
+    lands in the same section everywhere."""
+    s = (skyrius or "").strip()
+    s = SKYRIUS_LEGACY_MIGRATION.get(s, s)
+    if s == SK_GD_MERGED:
+        return _paint_section(aprasymas)
+    return s
+
+
 def _consolidate_paint_enabled() -> bool:
     """Feature-flag gate for paint-line consolidation (default ON)."""
     try:
@@ -1623,16 +1753,26 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     """Collapse the per-coat glaistymas/dažymas split into the contractor's
     combined line(s). Mutates parsed['pozicijos'] in place; preserves order and
     keeps Rotband/kampai/angokraščiai. Materials kept in `_medziagos`, the
-    original split labels in `_detalus`. Combined area unchanged."""
+    original split labels in `_detalus`.
+
+    2026-09-02 (contractor ask F3): the combined line is now emitted PER SURFACE
+    — "Sienų glaistymas/dažymas …" and "Lubų glaistymas/dažymas …" instead of
+    one "Sienų, lubų …" line. The contractor prices the two as separate trades
+    and asked for two sections; a single line spanning both cannot be sorted
+    into either, and there would be nothing for the eksplikacija ceiling anchor
+    (and the įtempiamos-lubos deduction) to attach to. The iki/virš-3m tier
+    split still works exactly as before — it now distributes each surface's own
+    total. Σ of the new lines equals the old single line's kiekis whenever no
+    ceiling is anchored or marked įtempiamos."""
     if not _consolidate_paint_enabled():
         return
     pozicijos = parsed.get("pozicijos") or []
     rooms = parsed.get("patalpos") or []
-    SK_GD = "Sienų lubų glaistymas dažymas"
+    SK_GD = SK_GD_MERGED
     SAL = "skaiciuota_is_brezinio"
 
     def _is_split(p: dict) -> bool:
-        if (p.get("skyrius") or "") != SK_GD:
+        if (p.get("skyrius") or "") != SK_GD or p.get("_consolidated"):
             return False
         a = p.get("aprasymas") or ""
         return any(a.startswith(pre) for pre in _PAINT_SPLIT_PREFIXES)
@@ -1643,16 +1783,21 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
 
     stretch_nrs = _stretch_ceiling_nrs(parsed)
     walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint_all = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
     lubos_paint = round(sum(_ceiling_paint_m2(r, stretch_nrs) for r in rooms), 2)
-    dazymo_total = round(walls_paint + lubos_paint, 2)
+    # The eksplikacija's own "Iš viso", when we have a trustworthy one, replaces
+    # the per-room ceiling sum (see `_ceiling_paint_base`).
+    lubos_billed, lubos_provenance = _ceiling_paint_base(
+        parsed, rooms, stretch_nrs, lubos_paint)
+    dazymo_total = round(walls_paint + lubos_billed, 2)
     if dazymo_total <= 0:
         parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
         return
 
     from .universal_rules import is_high_ceiling as _is_high
 
-    def _room_virs_3m_paint(r: dict) -> float:
-        """m² of a room's paint (walls + ceiling) that belongs above 3 m.
+    def _room_virs_3m_paint(r: dict) -> tuple[float, float]:
+        """(walls, ceiling) m² of a room's paint that belongs above 3 m.
 
         2026-07-05 audit fix (bug 4): a room whose NOMINAL height is <3 m can
         still carry explicit above-3m surfaces — a feature/soffit wall
@@ -1660,61 +1805,90 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
         ceiling above 3 m). Splitting by room height alone dumped those into the
         iki-3m line. A genuinely high room (≥3 m) still sends all its paint to
-        virš-3m."""
+        virš-3m.
+
+        2026-09-02: returned per surface instead of summed, so each surface's
+        own line can be tiered. Each half is clamped to what that surface
+        actually paints — the old single clamp `min(xw + hc, w + c)` could let a
+        large soffit borrow the ceiling's headroom."""
         w = float(r.get("walls_paintable_m2") or 0)
         c = _ceiling_paint_m2(r, stretch_nrs)
         if _is_high(r.get("lubu_aukstis_m")):
-            return w + c
-        xw = float(r.get("extra_walls_virs_3m_m2") or 0)
+            return w, c
+        xw = min(float(r.get("extra_walls_virs_3m_m2") or 0), w)
         hc = min(float(r.get("high_ceiling_area_m2") or 0), c)
-        # never allocate more to virš than the room actually paints
-        return min(xw + hc, w + c)
+        return xw, hc
 
-    virs_3m = round(sum(_room_virs_3m_paint(r) for r in rooms), 2)
-    virs_3m = min(max(virs_3m, 0.0), dazymo_total)
-    iki_3m = round(dazymo_total - virs_3m, 2)
+    _virs = [_room_virs_3m_paint(r) for r in rooms]
+    walls_virs = min(max(round(sum(v[0] for v in _virs), 2), 0.0), walls_paint)
+    # The tier split DISTRIBUTES the billed ceiling total: when the anchor moved
+    # it, the virš-3m share must not exceed what we are actually billing.
+    lubos_virs = min(max(round(sum(v[1] for v in _virs), 2), 0.0), lubos_billed)
+    walls_iki = round(walls_paint - walls_virs, 2)
+    lubos_iki = round(lubos_billed - lubos_virs, 2)
 
-    medziagos = [
-        {"aprasymas": "Glaistas (pradinis + baigiamasis)",
-         "kiekis": round(sum(float(r.get("glaistas_kg") or 0) for r in rooms), 2), "vnt": "kg"},
-        {"aprasymas": "Gruntas",
-         "kiekis": round(sum(float(r.get("gruntas_l") or 0) for r in rooms), 2), "vnt": "l"},
-        {"aprasymas": "Dažai (2 sluoksniai)",
-         "kiekis": round(sum(float(r.get("dazai_l") or 0) for r in rooms), 2), "vnt": "l"},
-    ]
-    detalus = [p.get("aprasymas") for p in members]
+    # Materials follow their surface. Shares are anchored on the FULL paintable
+    # area for the same reason the builder anchors them there: a ceiling that
+    # leaves the sąmata must take its material with it, not hand it to the walls.
+    _all = walls_paint + lubos_paint_all
+    w_share = (walls_paint / _all) if _all > 0 else 0.5
+    l_share = ((1 - w_share) * (lubos_paint / lubos_paint_all)
+               if lubos_paint_all > 0 else 0.0)
+
+    def _medziagos(share: float) -> list[dict]:
+        if share <= 0:
+            return []
+        return [
+            {"aprasymas": "Glaistas (pradinis + baigiamasis)",
+             "kiekis": round(sum(float(r.get("glaistas_kg") or 0) for r in rooms) * share, 2),
+             "vnt": "kg"},
+            {"aprasymas": "Gruntas",
+             "kiekis": round(sum(float(r.get("gruntas_l") or 0) for r in rooms) * share, 2),
+             "vnt": "l"},
+            {"aprasymas": "Dažai (2 sluoksniai)",
+             "kiekis": round(sum(float(r.get("dazai_l") or 0) for r in rooms) * share, 2),
+             "vnt": "l"},
+        ]
+
     is_q4 = any((p.get("_q_lygis") == "Q4") for p in members)
 
-    # Surface label reflects which surfaces actually carry paint (e.g. a bare
-    # garažas paints only the ceiling → "Lubų glaistymas/dažymas").
-    if walls_paint > 0 and lubos_paint > 0:
-        surf = "Sienų, lubų"
-    elif walls_paint > 0:
-        surf = "Sienų"
-    else:
-        surf = "Lubų"
+    def _surface_lines(surf: str, total: float, virs: float, iki: float,
+                       share: float, provenance: str | None) -> list[dict]:
+        """iki/virš-3m lines for ONE surface, plus its Q4 sanding line."""
+        if total <= 0:
+            return []
+        detalus = [p.get("aprasymas") for p in members
+                   if (p.get("aprasymas") or "").startswith(surf)]
+        base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
+                "_consolidated": True,
+                "_medziagos": _medziagos(share), "_detalus": detalus}
+        if provenance:
+            base["_confidence_reason"] = provenance
+        out: list[dict] = []
+        if virs <= 0.01:
+            out.append({**base, "kiekis": total,
+                        "aprasymas": f"{surf} glaistymas/dažymas"})
+        elif iki <= 0.01:
+            out.append({**base, "kiekis": virs, "_height_zone": ">3m",
+                        "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+        else:
+            out.append({**base, "kiekis": iki,
+                        "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"})
+            out.append({**base, "kiekis": virs, "_height_zone": ">3m",
+                        "confidence": "medium", "_medziagos": [],
+                        "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
+        if is_q4:
+            out.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
+                        "_consolidated": True, "kiekis": total,
+                        "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
+                        "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"})
+        return out
 
-    new_lines: list[dict] = []
-    base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
-            "_medziagos": medziagos, "_detalus": detalus}
-    if virs_3m <= 0.01:
-        # no high-ceiling rooms — single line, no height suffix
-        new_lines.append({**base, "kiekis": dazymo_total,
-                          "aprasymas": f"{surf} glaistymas/dažymas"})
-    elif iki_3m <= 0.01:
-        # every painted room is >3m — single virš-3m line
-        new_lines.append({**base, "kiekis": virs_3m, "_height_zone": ">3m",
-                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)"})
-    else:
-        new_lines.append({**base, "kiekis": iki_3m,
-                          "aprasymas": f"{surf} glaistymas/dažymas (iki 3m aukščio)"})
-        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": virs_3m,
-                          "aprasymas": f"{surf} glaistymas/dažymas (virš 3m aukščio)",
-                          "_height_zone": ">3m", "confidence": "medium"})
-    if is_q4:
-        new_lines.append({"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL, "kiekis": dazymo_total,
-                          "aprasymas": f"{surf} šlifavimas Q4 (80–120 grit, 100% paviršius)",
-                          "darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"})
+    new_lines: list[dict] = (
+        _surface_lines("Sienų", walls_paint, walls_virs, walls_iki, w_share, None)
+        + _surface_lines("Lubų", lubos_billed, lubos_virs, lubos_iki, l_share,
+                         lubos_provenance)
+    )
 
     # Rebuild preserving order: replace the first member-run with the new lines.
     rebuilt: list[dict] = []
@@ -2107,31 +2281,38 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "_assumption": "Plotas iš apdailos plano (molio/kalkinio tinko ar kitos dangos zona). Paruošimas įskaičiuotas į dekoravimo darbą — atskiros glaistymo eilutės šiam plotui nėra.",
         })
 
-    if lubos_paint > 0:
+    # The eksplikacija's own "Iš viso" is the ceiling quantity when we have a
+    # trustworthy one — minus the rooms whose ceilings nobody paints. Falls back
+    # to the per-room sum otherwise (see `_ceiling_paint_base`).
+    lubos_billed, lubos_provenance = _ceiling_paint_base(
+        parsed, rooms, stretch_nrs, lubos_paint)
+    _luba = {"_confidence_reason": lubos_provenance} if lubos_provenance else {}
+
+    if lubos_billed > 0:
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Lubų pirminis glaistymas Q1",
-             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
              "medziagos_aprasymas": "Pradinis glaistas",
              "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
-             "medziagos_vnt": "kg"},
+             "medziagos_vnt": "kg", **_luba},
             {"skyrius": SK_GD, "aprasymas": "Lubų antrinis glaistymas Q2",
-             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
              "medziagos_aprasymas": "Baigiamasis glaistas",
              "medziagos_kiekis": round(glaistas_total * lubos_share * 0.5, 2),
-             "medziagos_vnt": "kg"},
+             "medziagos_vnt": "kg", **_luba},
             {"skyrius": SK_GD, "aprasymas": f"Lubų šlifavimas{sanding_suffix}",
-             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL, **_luba,
              **({"darbo_norma_h_m2": _Q4_SANDING_HOURS_PER_M2, "_q_lygis": "Q4"} if is_q4 else {})},
             {"skyrius": SK_GD, "aprasymas": "Lubų gruntavimas (1 sluoksnis)",
-             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
              "medziagos_aprasymas": "Gruntas",
              "medziagos_kiekis": round(gruntas_total * lubos_share, 2),
-             "medziagos_vnt": "l"},
+             "medziagos_vnt": "l", **_luba},
             {"skyrius": SK_GD, "aprasymas": "Lubų dažymas (2 sluoksniai)",
-             "vnt": "m2", "kiekis": lubos_paint, "saltinis": SAL,
+             "vnt": "m2", "kiekis": lubos_billed, "saltinis": SAL,
              "medziagos_aprasymas": "Dažai (2 sluoksniai)",
              "medziagos_kiekis": round(dazai_total * lubos_share, 2),
-             "medziagos_vnt": "l"},
+             "medziagos_vnt": "l", **_luba},
         ])
 
         # Sprint §FIX-5 (2026-04-29): per rangovas P1 — atskirame eilutę „Lubų
@@ -2140,10 +2321,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # rangovas savo Pasiūlyme P1: 68.28 m² būtent šitas split. Kainos formuoja
         # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
         from .universal_rules import is_high_ceiling as _is_high
-        lubos_virs_3m = round(sum(
+        # Clamped to what is actually billed — this line is a SUBSET highlight
+        # of the ceiling quantity above, so it can never exceed it (the anchor
+        # can move that quantity below the raw per-room sum).
+        lubos_virs_3m = min(round(sum(
             _ceiling_paint_m2(r, stretch_nrs) for r in rooms
             if _is_high(r.get("lubu_aukstis_m"))
-        ), 2)
+        ), 2), lubos_billed)
         if lubos_virs_3m > 0:
             pozicijos.append({
                 "skyrius": SK_GD,
@@ -3199,16 +3383,26 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # apdirbimas GKP" (SK_GKP) emits BEFORE the main painting block, then the
     # rest of GKP montavimas emits AFTER. Stable sort fixes both Excel sheets
     # and frontend grouping.
+    # 2026-09-02: the paint block is now two sections and Sienų comes FIRST —
+    # the order the contractor reads a sąmata in. `_paint_section` decides which
+    # of the two each row belongs to; the merged name keeps slot 1 for any row
+    # that somehow still carries it (an old blob fed back through a rebuild).
+    for p in pozicijos:
+        if (p.get("skyrius") or "") == SK_GD_MERGED:
+            p["skyrius"] = _paint_section(p.get("aprasymas"))
+
     SKYRIUS_ORDER = {
-        "Sienų lubų glaistymas dažymas": 1,
-        "GKP montavimas":                2,
-        "Plytelių klijavimas":           3,
-        "Hidroizoliacija":               4,
-        "Grindys":                       5,
-        "Santechnikos darbai":           6,
-        "Ventiliacijos darbai":          7,
-        "Elektros instaliacijos darbai": 8,
-        "Pridėtiniai elementai":         9,
+        SK_GD_MERGED:                    1,
+        SK_GD_SIENOS:                    1,
+        SK_GD_LUBOS:                     2,
+        "GKP montavimas":                3,
+        "Plytelių klijavimas":           4,
+        "Hidroizoliacija":               5,
+        "Grindys":                       6,
+        "Santechnikos darbai":           7,
+        "Ventiliacijos darbai":          8,
+        "Elektros instaliacijos darbai": 9,
+        "Pridėtiniai elementai":        10,
     }
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
@@ -4076,6 +4270,32 @@ def extract_interior(
         parsed.setdefault("_meta", {})["eksplikacija_merged_rooms"] = merged_count
         parsed["_meta"]["eksplikacija_total_rows"] = len(eks.get("patalpos", []))
         parsed["_eksplikacija"] = eks  # full pre-pass result for frontend reference
+
+        # ── The ceiling anchor (2026-09-02, contractor ask F3) ──────────────
+        # The designer's own "Iš viso" at the foot of the table is the floor
+        # area the contractor quotes from, so the ceiling glaistymas/
+        # gruntavimas/dažymas is billed off it (minus the rooms whose ceilings
+        # nobody paints). Published ONLY when:
+        #   · the deterministic pdfplumber parser read the sum (the Vision
+        #     eksplikacija reader does not return one — a Vision-lane project
+        #     keeps the per-room sum, exactly as today), and
+        #   · the guard ACCEPTED this table as belonging to these rooms. An
+        #     "insufficient" verdict means we could not judge, and an unjudged
+        #     total is not a number to bill from.
+        # `_build_pozicijos_from_rooms` re-checks it against Σ room plotai
+        # before using it (`_ceiling_paint_base`).
+        parsed.pop("_ceiling_anchor", None)
+        _eks_meta = eks.get("_meta") or {}
+        _guard_verdict = ((parsed.get("_meta") or {})
+                          .get("eksplikacija_guard") or {})
+        _final_verdict = (_guard_verdict.get("retry") or {}).get(
+            "verdict", _guard_verdict.get("verdict"))
+        if _eks_meta.get("total_area_m2") and _final_verdict == "accept":
+            parsed["_ceiling_anchor"] = {
+                "total_area_m2": _eks_meta["total_area_m2"],
+                "label": _eks_meta.get("total_row_label") or "Iš viso",
+                "page": _eks_meta.get("total_row_page"),
+            }
         _emit({
             "event": "eksplikacija_merged",
             "merged_rooms": merged_count,

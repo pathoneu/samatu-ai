@@ -142,7 +142,9 @@ def test_single_living_room_full_pipeline():
     assert len(pozicijos) > 5, f"Single room project should have multiple pozicijos, got {len(pozicijos)}"
     # Specifically expect painting + GKP + grindys lines
     skyriai = {p.get("skyrius") for p in pozicijos}
-    assert "Sienų lubų glaistymas dažymas" in skyriai
+    # 2026-09-02: the paint block is TWO sections (contractor ask F3).
+    assert "Sienų glaistymas dažymas" in skyriai
+    assert "Lubų glaistymas dažymas" in skyriai
     assert "GKP montavimas" in skyriai
 
 

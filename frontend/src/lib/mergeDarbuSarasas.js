@@ -25,6 +25,25 @@
 const _lc = (s) => (s || '').toLowerCase();
 
 /**
+ * 2026-09-02 sienų/lubų split — the JS twin of the backend's
+ * `_PAINT_SPLIT_EXACT_RENAMES` (api/recompute_quantities.py). The combined
+ * "Sienų, lubų glaistymas/dažymas …" line became one line per surface.
+ *
+ * Matched at the EXACT label, tier suffix included: the tier-stripped key
+ * matches BOTH new tier lines, so `normLabel` (pass 2) would find it ambiguous
+ * and refuse, and pass 3 would then carry the old priced row ALONGSIDE the new
+ * ones — the same work twice, exactly the failure the LED consolidation caused
+ * in 2026-07. Keep this map byte-identical to the backend's or the two merges
+ * disagree and the duplicate comes back.
+ */
+const LEGACY_EXACT_RENAMES = {
+  'sienų, lubų glaistymas/dažymas': 'sienų glaistymas/dažymas',
+  'sienų, lubų glaistymas/dažymas (iki 3m aukščio)': 'sienų glaistymas/dažymas (iki 3m aukščio)',
+  'sienų, lubų glaistymas/dažymas (virš 3m aukščio)': 'sienų glaistymas/dažymas (virš 3m aukščio)',
+  'sienų, lubų šlifavimas q4 (80–120 grit, 100% paviršius)': 'sienų šlifavimas q4 (80–120 grit, 100% paviršius)',
+};
+
+/**
  * Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
  * and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
  * paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Used by
@@ -95,7 +114,10 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
   const oldByLabel = new Map();
   for (const o of oldList) {
     const k = _lc(o.aprasymas);
-    if (k && !oldByLabel.has(k)) oldByLabel.set(k, o);
+    if (!k) continue;
+    if (!oldByLabel.has(k)) oldByLabel.set(k, o);
+    const renamed = LEGACY_EXACT_RENAMES[k];
+    if (renamed && !oldByLabel.has(renamed)) oldByLabel.set(renamed, o);
   }
   const matchedOld = new Set();  // old items already consumed (by object identity)
   // Rows the server folded into another line are already represented (with

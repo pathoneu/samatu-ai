@@ -463,6 +463,27 @@ _LEGACY_LABEL_RENAMES = {
 # Every legacy label the canonical builder no longer emits → its successor.
 _LEGACY_LABEL_MAP = {**_SAN_LEGACY_SPLIT, **_LEGACY_LABEL_RENAMES}
 
+# 2026-09-02 sienų/lubų split: the combined "Sienų, lubų glaistymas/dažymas …"
+# line became two, one per surface. Mapped at the EXACT label (tier suffix and
+# all) rather than through `_norm_label`, because the tier-stripped key matches
+# BOTH new tier lines — ambiguous, so pass 2 would refuse and pass 3 would carry
+# the priced old row alongside the four new ones, showing the same work twice.
+#
+# The money goes to the WALLS half, on the same principle as the sanitary split:
+# it is the larger area and the one the combined €/m² was mostly buying. The
+# ceiling half comes back unpriced, which is visible and correct — the
+# contractor now prices the two trades separately, which is why he asked for
+# the split.
+_PAINT_SPLIT_EXACT_RENAMES = {
+    "sienų, lubų glaistymas/dažymas": "sienų glaistymas/dažymas",
+    "sienų, lubų glaistymas/dažymas (iki 3m aukščio)":
+        "sienų glaistymas/dažymas (iki 3m aukščio)",
+    "sienų, lubų glaistymas/dažymas (virš 3m aukščio)":
+        "sienų glaistymas/dažymas (virš 3m aukščio)",
+    "sienų, lubų šlifavimas q4 (80–120 grit, 100% paviršius)":
+        "sienų šlifavimas q4 (80–120 grit, 100% paviršius)",
+}
+
 
 def _tier_key(s: str | None) -> str:
     """Label with ONLY the height/Q-level tier suffixes stripped.
@@ -631,15 +652,32 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
         lab = (p.get("aprasymas") or "").strip().lower()
         if lab:
             prior_by_label.setdefault(lab, p)
+            # Also reachable under its post-split successor, so pass 1 (which is
+            # exact and therefore unambiguous about the tier) can carry the
+            # price instead of leaving it to the ambiguous pass 2.
+            renamed = _PAINT_SPLIT_EXACT_RENAMES.get(lab)
+            if renamed:
+                prior_by_label.setdefault(renamed, p)
 
     matched_prior: set[int] = set()
     matched_rebuilt: set[int] = set()
     for p in rebuilt:
-        prev = prior_by_label.get((p.get("aprasymas") or "").strip().lower())
+        lab = (p.get("aprasymas") or "").strip().lower()
+        prev = prior_by_label.get(lab)
         if prev is not None:
             _carry_edit(prev, p)
             matched_prior.add(id(prev))
             matched_rebuilt.add(id(p))
+            # Matched under a RENAME (the paint split), not under its own
+            # label: the row the user priced is gone from their sąmata, so
+            # declare where its money went. InteriorProject forwards exactly
+            # these notes to the browser-side merge as `serverRelabeled`, which
+            # is what stops it re-carrying the row we just folded.
+            if (prev.get("aprasymas") or "").strip().lower() != lab:
+                notes.append({"aprasymas": prev.get("aprasymas"),
+                              "reason": "relabeled",
+                              "into": p.get("aprasymas"),
+                              "kaina": p.get("kaina")})
 
     # Pass 2 — reunite prior lines with their renamed post-rebuild sibling.
     # STILL gated on `_has_user_edit`, and that gate is load-bearing in a way

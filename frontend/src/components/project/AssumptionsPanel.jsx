@@ -288,6 +288,11 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
             bendras_plotas_m2: rawData?.bendras_plotas_m2,
             v9_meta: rawData?.v9_meta,
             _overrides: rawData?._overrides,
+            // The eksplikacijos "Iš viso" the ceiling quantity is billed off
+            // (2026-09-02). Without it in the context a Prielaidos edit would
+            // rebuild the ceiling from the per-room sum instead and the number
+            // would jump for no reason the user can see.
+            _ceiling_anchor: rawData?._ceiling_anchor,
           },
         });
         if (reqId !== reqIdRef.current) return;  // superseded by a newer edit

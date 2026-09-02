@@ -225,7 +225,8 @@ def test_plyteliu_grindjuostes_do_not_double_count_the_mdf_line():
     mdf = _has(poz, "Grindjuosčių sumontavimas")
     tile = _has(poz, "Plytelių grindjuosčių supjovimas")
     assert len(mdf) == 1 and len(tile) == 1
-    assert mdf[0]["skyrius"] == "Sienų lubų glaistymas dažymas"
+    # Grindjuostės are wall work → the Sienų half of the 2026-09-02 split.
+    assert mdf[0]["skyrius"] == "Sienų glaistymas dažymas"
     assert mdf[0]["kiekis"] != tile[0]["kiekis"]
 
 

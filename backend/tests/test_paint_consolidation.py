@@ -2,9 +2,13 @@
 
 Collapses the per-coat split (Q1 / Q2 / šlifavimas / gruntavimas /
 dažymas-sluoksniai, for walls AND ceilings) into the contractor's combined
-line "Sienų, lubų glaistymas/dažymas (iki/virš 3m)" — matching Rangovas A
-samata items 16/17. Rotband stays its own line (item 15). The combined
-paintable area is unchanged (display-only change).
+line — matching Rangovas A samata items 16/17. Rotband stays its own line
+(item 15). The combined paintable area is unchanged (display-only change).
+
+2026-09-02 (contractor ask F3): the combined line is emitted PER SURFACE —
+"Sienų glaistymas/dažymas …" + "Lubų glaistymas/dažymas …" instead of one
+"Sienų, lubų …" line — because walls and ceilings are now two sections, two
+trades and two rates. Σ of the two still equals the old single line.
 """
 import os
 
@@ -38,16 +42,30 @@ def test_paint_consolidated_default_on():
            or ("dažymas (1 sluoksnis" in l) or ("dažymas (2 sluoksni" in l)
            or ("gruntavimas (1 sluoksnis" in l)]
     assert not bad, f"split paint lines still present: {bad}"
-    # exactly one consolidated glaistymas/dažymas work line (no >3m rooms here)
-    gd = [p for p in out["pozicijos"]
-          if p["aprasymas"].startswith("Sienų, lubų glaistymas/dažymas")]
-    assert len(gd) == 1, labels
-    # kiekis == combined walls + ceiling paint, counted ONCE (not summed coats)
+    # one consolidated work line PER SURFACE (no >3m rooms here)
+    sienos = [p for p in out["pozicijos"]
+              if p["aprasymas"].startswith("Sienų glaistymas/dažymas")]
+    lubos = [p for p in out["pozicijos"]
+             if p["aprasymas"].startswith("Lubų glaistymas/dažymas")]
+    assert len(sienos) == 1 and len(lubos) == 1, labels
+    assert sienos[0]["skyrius"] == "Sienų glaistymas dažymas"
+    assert lubos[0]["skyrius"] == "Lubų glaistymas dažymas"
+    # each surface counted ONCE (not summed coats), and together they still add
+    # up to the old single line's area
     r = rooms[0]
+    assert abs(sienos[0]["kiekis"] - r["walls_paintable_m2"]) < 0.5, sienos
+    assert abs(lubos[0]["kiekis"] - r["ceiling_paintable_m2"]) < 0.5, lubos
     expected = round(r["walls_paintable_m2"] + r["ceiling_paintable_m2"], 2)
-    assert abs(gd[0]["kiekis"] - expected) < 0.5, f"{gd[0]['kiekis']} vs {expected}"
-    # materials preserved (not lost to consolidation)
-    assert gd[0].get("_medziagos"), "materials not preserved on consolidated line"
+    assert abs(sienos[0]["kiekis"] + lubos[0]["kiekis"] - expected) < 0.5
+    # materials preserved (not lost to consolidation), and split — never doubled
+    assert sienos[0].get("_medziagos"), "materials not preserved on the walls line"
+    assert lubos[0].get("_medziagos"), "materials not preserved on the ceiling line"
+    def _mat(rows, name):
+        return next(m["kiekis"] for m in rows if m["aprasymas"] == name)
+    glaistas_total = round(sum(float(x.get("glaistas_kg") or 0) for x in rooms), 2)
+    assert abs(_mat(sienos[0]["_medziagos"], "Glaistas (pradinis + baigiamasis)")
+               + _mat(lubos[0]["_medziagos"], "Glaistas (pradinis + baigiamasis)")
+               - glaistas_total) < 0.05
     # Rotband stays a separate line (contractor item 15)
     assert any("Rotband" in l for l in labels), labels
 
@@ -69,10 +87,18 @@ def test_high_room_gets_iki_and_virs_3m_lines():
     rooms = [_room(plotas_m2=20.0, perimetras_m=18.0, lubu_aukstis_m=2.7),
              _room(plotas_m2=30.0, perimetras_m=22.0, lubu_aukstis_m=3.4)]
     out = _build_pozicijos_from_rooms(_parsed(rooms))
-    gd = [p["aprasymas"] for p in out["pozicijos"]
-          if p["aprasymas"].startswith("Sienų, lubų glaistymas/dažymas")]
-    assert any("iki 3m" in l.lower() for l in gd), f"expected an iki-3m line: {gd}"
-    assert any("virš 3m" in l.lower() for l in gd), f"expected a virš-3m line: {gd}"
+    for surf in ("Sienų glaistymas/dažymas", "Lubų glaistymas/dažymas"):
+        gd = [p["aprasymas"] for p in out["pozicijos"]
+              if p["aprasymas"].startswith(surf)]
+        assert any("iki 3m" in l.lower() for l in gd), f"expected an iki-3m line: {gd}"
+        assert any("virš 3m" in l.lower() for l in gd), f"expected a virš-3m line: {gd}"
+    # Combined area is still the sum of both surfaces across both tiers.
+    total = round(sum(float(p["kiekis"]) for p in out["pozicijos"]
+                      if "glaistymas/dažymas" in p["aprasymas"]
+                      and p.get("vnt") == "m2"), 2)
+    expected = round(sum(r["walls_paintable_m2"] + r["ceiling_paintable_m2"]
+                         for r in rooms), 2)
+    assert abs(total - expected) < 0.05, f"{total} vs {expected}"
 
 
 def test_led_niche_consolidated_default_on():

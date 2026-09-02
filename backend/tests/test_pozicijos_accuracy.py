@@ -81,7 +81,7 @@ def test_kampai_emitted_as_single_line():
     rooms = [_room([], perimetras_m=20.0)]
     out = _build_pozicijos_from_rooms(_parsed(rooms))
     kampai_lines = [p for p in out["pozicijos"] if "kamp" in p["aprasymas"].lower()
-                    and p.get("skyrius") == "Sienų lubų glaistymas dažymas"]
+                    and p.get("skyrius") == "Sienų glaistymas dažymas"]
     labels = [p["aprasymas"] for p in kampai_lines]
     assert "Glaistymo kampai vidiniai" not in labels, labels
     assert "Glaistymo kampai išoriniai" not in labels, labels
