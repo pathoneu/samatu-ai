@@ -8,6 +8,7 @@ repo.
 from __future__ import annotations
 
 import io
+import json
 import sys
 import time
 import uuid
@@ -425,6 +426,138 @@ def test_crud_round_trip(as_user):
     assert client.delete(f"/api/price-lists/{pid}").status_code == 404
 
 
+# ── bounded request bodies (F6, 2026-09-02 review) ───────────────────────────
+
+def test_an_oversize_upload_is_refused_on_its_declared_length(as_user):
+    """`await file.read()` used to materialise the whole part and only THEN
+    compare it to the cap. Content-Length is checked first now."""
+    client = as_user(USER_A)
+    blob = b"PK" + b"0" * (pl_mod.MAX_UPLOAD_BYTES + 1)
+    r = client.post("/api/price-lists/parse-xlsx", files={"file": ("k.xlsx", blob)})
+    assert r.status_code == 413
+    assert "per didelis" in r.json()["detail"]
+
+
+def test_an_oversize_upload_is_refused_without_a_content_length(as_user):
+    """Chunked / spoofed Content-Length: the stream-level guard has to hold on
+    its own, or the header check is the only check."""
+    client = as_user(USER_A)
+    blob = b"PK" + b"0" * (pl_mod.MAX_UPLOAD_BYTES + 1)
+
+    def _chunks():
+        yield (b'--b\r\nContent-Disposition: form-data; name="file"; '
+               b'filename="k.xlsx"\r\nContent-Type: application/octet-stream'
+               b"\r\n\r\n")
+        yield blob
+        yield b"\r\n--b--\r\n"
+
+    r = client.post("/api/price-lists/parse-xlsx", content=_chunks(),
+                    headers={"content-type": "multipart/form-data; boundary=b"})
+    assert r.status_code == 413
+
+
+def test_a_put_body_over_the_cap_is_refused_before_it_is_parsed(as_user):
+    """`payload: dict = Body(...)` parsed every byte before MAX_ITEMS_PER_LIST
+    could fire, so the count cap bounded nothing that mattered."""
+    client = as_user(USER_A)
+    body = b'{"name":"x","items":[' + b'{"aprasymas":"a","kaina":1},' * 700_000 + b'{}]}'
+    assert len(body) > pl_mod.MAX_PUT_BODY_BYTES
+    r = client.put(f"/api/price-lists/{uuid.uuid4()}", content=body,
+                   headers={"content-type": "application/json"})
+    assert r.status_code == 413
+
+
+def test_too_many_items_is_refused(as_user):
+    """MAX_ITEMS_PER_LIST had zero coverage."""
+    client = as_user(USER_A)
+    items = [{"aprasymas": f"Darbas {i}", "kaina": 1.0}
+             for i in range(pl_mod.MAX_ITEMS_PER_LIST + 1)]
+    r = client.put(f"/api/price-lists/{uuid.uuid4()}",
+                   json={"name": "Didelis", "items": items})
+    assert r.status_code == 413
+    assert "per daug eilučių" in r.json()["detail"]
+
+    # One under the cap is accepted, so the limit is a limit and not a wall.
+    r = client.put(f"/api/price-lists/{uuid.uuid4()}",
+                   json={"name": "Ribinis", "items": items[:10]})
+    assert r.status_code == 200
+
+
+def test_a_single_item_cannot_be_unbounded(as_user):
+    """The count cap says nothing about the SIZE of a row: one item carrying a
+    multi-megabyte aprašymas walked past it, got json.dumps'd into SQLite under
+    the global write lock, and came back on every list read."""
+    client = as_user(USER_A)
+    pid = str(uuid.uuid4())
+    r = client.put(f"/api/price-lists/{pid}", json={
+        "name": "N" * 5_000,
+        "company_name": "C" * 5_000,
+        "items": [{"skyrius": "S" * 5_000, "aprasymas": "A" * 500_000,
+                   "mato_vnt": "m" * 5_000, "kaina": 7.5}],
+    })
+    assert r.status_code == 200, r.text
+    saved = r.json()
+    item = saved["items"][0]
+    assert len(item["aprasymas"]) == 400          # same cap the xlsx importer uses
+    assert len(item["skyrius"]) == 200
+    assert len(item["mato_vnt"]) == 32
+    assert item["kaina"] == 7.5                   # the real value survives
+    assert len(saved["name"]) == 200
+    assert len(saved["company_name"]) == 200
+
+
+def test_an_unknown_item_field_survives_but_is_bounded(as_user):
+    """`applyPriceList.unitOf` still reads a legacy `vnt`, so dropping fields we
+    do not recognise would quietly un-unit an old list."""
+    client = as_user(USER_A)
+    pid = str(uuid.uuid4())
+    r = client.put(f"/api/price-lists/{pid}", json={
+        "name": "Senas",
+        "items": [{"aprasymas": "Sienų dažymas", "kaina": 7.5, "vnt": "m²",
+                   "pastaba": "P" * 5_000}],
+    })
+    assert r.status_code == 200, r.text
+    item = r.json()["items"][0]
+    assert item["vnt"] == "m²"
+    assert len(item["pastaba"]) == pl_mod.MAX_ITEM_VALUE_LEN
+
+
+@pytest.mark.parametrize("items,expected", [
+    ([["not", "a", "dict"]], 400),
+    ([{"aprasymas": {"nested": "object"}}], 400),
+    ([{"aprasymas": ["nested", "list"]}], 400),
+    ([{f"k{i}": "v" for i in range(pl_mod.MAX_ITEM_KEYS + 1)}], 400),
+])
+def test_malformed_items_are_refused(as_user, items, expected):
+    client = as_user(USER_A)
+    r = client.put(f"/api/price-lists/{uuid.uuid4()}",
+                   json={"name": "x", "items": items})
+    assert r.status_code == expected
+
+
+def test_a_non_finite_price_never_reaches_the_stored_json(as_user):
+    """Python's json parser accepts bare NaN/Infinity and json.dumps writes them
+    straight back — invalid JSON that no browser can read back."""
+    client = as_user(USER_A)
+    pid = str(uuid.uuid4())
+    r = client.put(f"/api/price-lists/{pid}",
+                   content=b'{"name":"x","items":[{"aprasymas":"a","kaina":NaN}]}',
+                   headers={"content-type": "application/json"})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["kaina"] is None
+    with _db._conn() as c:
+        raw = c.execute("SELECT items FROM price_lists WHERE id = ?", (pid,)).fetchone()[0]
+    assert "NaN" not in raw
+    json.loads(raw)          # strict-mode parse, as a browser would
+
+
+def test_a_malformed_json_body_is_a_400_not_a_500(as_user):
+    client = as_user(USER_A)
+    r = client.put(f"/api/price-lists/{uuid.uuid4()}", content=b"{not json",
+                   headers={"content-type": "application/json"})
+    assert r.status_code == 400
+
+
 def test_bad_id_is_rejected(as_user):
     client = as_user(USER_A)
     r = client.put("/api/price-lists/../../etc/passwd", json={"name": "x"})
@@ -457,9 +590,14 @@ def test_other_users_lists_are_invisible_and_unwritable(as_user):
 
     b = as_user(USER_B)
     assert b.get("/api/price-lists").json()["price_lists"] == []
-    # Overwriting someone else's list is a 403, not a silent takeover.
-    assert b.put(f"/api/price-lists/{pid}", json={"name": "Pavogta"}).status_code == 403
-    # Deleting is a 404 — we never confirm that the id exists.
+    # Overwriting someone else's list is refused, and refused as a 404: a 403
+    # would confirm the id exists, and the message must never carry db.py's
+    # English "User X does not own price list Y". DELETE has always 404'd for
+    # that reason — the pair stays symmetric. (F13b, 2026-09-02 review.)
+    r = b.put(f"/api/price-lists/{pid}", json={"name": "Pavogta"})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Kainynas nerastas"
+    assert USER_A["id"] not in r.text and "does not own" not in r.text
     assert b.delete(f"/api/price-lists/{pid}").status_code == 404
     # …and A still owns it, unmodified.
     assert a.get("/api/price-lists").json()["price_lists"][0]["name"] == "A slaptas"

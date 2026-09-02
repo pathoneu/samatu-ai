@@ -20,13 +20,14 @@ row's owner, NULL-owner rows included — the 2026-06-19 write-barrier lesson).
 from __future__ import annotations
 
 import io
+import json
 import logging
 import unicodedata
 import uuid
 import zipfile
 from typing import Any
 
-from fastapi import APIRouter, Body, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 import auth as _auth
@@ -45,6 +46,25 @@ MAX_ROWS = 20_000
 # a blank line above it.
 HEADER_SCAN_ROWS = 5
 MAX_ITEMS_PER_LIST = 50_000
+
+# Per-row bounds for a PUT. `aprasymas` matches what the importer already
+# truncates to (see parse_xlsx_items); the rest are new — a PUT body is
+# attacker-shaped in a way a spreadsheet cell is not.
+_ITEM_STR_CAPS: dict[str, int] = {
+    "skyrius": 200,
+    "aprasymas": 400,
+    "mato_vnt": 32,
+}
+MAX_ITEM_VALUE_LEN = 200      # any field we do not know by name
+MAX_ITEM_KEY_LEN = 64
+MAX_ITEM_KEYS = 16
+MAX_NAME_LEN = 200            # db.upsert_price_list truncates `name` to this too
+MAX_CREATED_DATE_LEN = 64     # an ISO-8601 timestamp, not a free-text column
+
+# Ceiling for a PUT body. MAX_ITEMS_PER_LIST rows of the shape above serialise
+# to roughly 150-200 B each, so a full-size legitimate kainynas lands near 10 MB
+# and this leaves headroom without letting the endpoint buffer arbitrarily.
+MAX_PUT_BODY_BYTES = 16 * 1024 * 1024
 
 # ── Decompression budget (2026-09-02 review, F3) ─────────────────────────────
 # The 5 MB upload cap bounds the ZIP, not what comes OUT of it. openpyxl does
@@ -166,6 +186,119 @@ def _check_zip_budget(data: bytes) -> None:
         if total > MAX_UNCOMPRESSED_BYTES:
             log.warning("xlsx rejected: members total %d B", total)
             raise too_big
+
+
+# ── Bounded request bodies (2026-09-02 review, F6) ───────────────────────────
+_UPLOAD_CHUNK = 256 * 1024
+# A multipart part carries a boundary line plus two short headers around the
+# file. 8 KB of slack keeps a file sitting exactly on the cap from being
+# refused for its own wrapper.
+_MULTIPART_SLACK = 8 * 1024
+
+_TOO_LARGE_LT = ("Failas per didelis (daugiau nei "
+                 f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB)")
+
+
+async def _read_upload_capped(request: Request, file: UploadFile) -> bytes:
+    """Read the uploaded part, refusing to buffer more than MAX_UPLOAD_BYTES.
+
+    Same shape as `main._read_body_capped`: check the declared Content-Length
+    first (cheap reject, don't even start), then bound the actual read, because
+    the header can be absent on a chunked transfer or simply wrong. The previous
+    `await file.read()` materialised the WHOLE part and only then measured it —
+    the cap could not fire until the memory was already spent.
+    """
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            if int(cl) > MAX_UPLOAD_BYTES + _MULTIPART_SLACK:
+                raise HTTPException(status_code=413, detail=_TOO_LARGE_LT)
+        except ValueError:
+            pass  # malformed header — the stream-level guard below still holds
+
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        try:
+            chunk = await file.read(_UPLOAD_CHUNK)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("price list upload read failed: %r", exc)
+            raise HTTPException(status_code=400,
+                                detail="Nepavyko nuskaityti failo") from exc
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=_TOO_LARGE_LT)
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _read_json_body_capped(request: Request, cap: int) -> Any:
+    """Bounded JSON body. `payload: dict = Body(...)` parsed the whole thing
+    into a dict BEFORE any of our limits ran, so MAX_ITEMS_PER_LIST could only
+    fire once the memory had been spent. Reuses main's streaming reader."""
+    try:
+        from main import _read_body_capped
+    except Exception as exc:  # noqa: BLE001 - no safe uncapped fallback exists
+        log.error("body reader unavailable: %r", exc)
+        raise HTTPException(status_code=500,
+                            detail="Serverio klaida — bandykite vėliau") from exc
+    raw = await _read_body_capped(request, cap)
+    if not raw:
+        raise HTTPException(status_code=400, detail="Tuščias užklausos turinys")
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400,
+                            detail="Netinkamas užklausos turinys") from exc
+
+
+def _sanitize_items(items: list[Any]) -> list[dict[str, Any]]:
+    """Bound every value in a price-list row before it is serialised and stored.
+
+    MAX_ITEMS_PER_LIST bounds the COUNT only — one row carrying a 15 MB
+    `aprasymas` walks straight past it, gets json.dumps'd into SQLite under the
+    process-global _DB_LOCK, and comes back out on every GET /api/price-lists.
+    Bound the row the way the xlsx importer already bounds what it produces.
+
+    Unknown keys are KEPT (capped): `applyPriceList.unitOf` still reads a legacy
+    `vnt` alongside `mato_vnt`, so silently dropping what we do not recognise
+    would quietly un-unit an old list. Nested values are refused — no importer
+    has ever produced one, and unbounded nesting is the whole problem.
+    """
+    out: list[dict[str, Any]] = []
+    for raw in items:
+        if not isinstance(raw, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Netinkama kainyno eilutė — laukiama „aprašymas“ ir "
+                       "„kaina“ laukų.")
+        if len(raw) > MAX_ITEM_KEYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kainyno eilutėje per daug laukų (daugiau nei "
+                       f"{MAX_ITEM_KEYS}).")
+        item: dict[str, Any] = {}
+        for key, value in raw.items():
+            k = str(key)[:MAX_ITEM_KEY_LEN]
+            if isinstance(value, str):
+                item[k] = value[:_ITEM_STR_CAPS.get(k, MAX_ITEM_VALUE_LEN)]
+            elif value is None or isinstance(value, bool):
+                item[k] = value
+            elif isinstance(value, (int, float)):
+                f = float(value)
+                # NaN/inf survive json.loads via Python's lenient parser and then
+                # json.dumps writes them back as bare NaN/Infinity — invalid JSON
+                # that no browser can read. Drop them to null.
+                item[k] = value if f == f and abs(f) != float("inf") else None
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Netinkama kainyno eilutės reikšmė — laukiamas "
+                           "tekstas arba skaičius.")
+        out.append(item)
+    return out
 
 
 def _norm_header(value: Any) -> str:
@@ -360,17 +493,9 @@ async def api_parse_xlsx(request: Request, file: UploadFile = File(...)) -> dict
             status_code=400,
             detail="Senas .xls formatas nepalaikomas — „Excel“ programoje "
                    "pasirinkite „Įrašyti kaip“ → .xlsx.")
-    try:
-        data = await file.read()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("price list upload read failed: %r", exc)
-        raise HTTPException(status_code=400, detail="Nepavyko nuskaityti failo") from exc
+    data = await _read_upload_capped(request, file)
     if not data:
         raise HTTPException(status_code=400, detail="Failas tuščias")
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Failas per didelis (daugiau nei {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)")
     # xlsx is a zip container; anything else fails openpyxl anyway, but saying so
     # up front beats a stack-trace-shaped error message.
     if not data[:2] == b"PK":
@@ -396,6 +521,9 @@ async def api_parse_xlsx(request: Request, file: UploadFile = File(...)) -> dict
 @router.get("")
 def api_list_price_lists(request: Request) -> dict[str, Any]:
     user = _auth.require_user(request)
+    # A GET returns every item of every list the caller owns — a megabyte-scale
+    # response served from SQLite, so it gets a bucket like the writes do.
+    _rate_limit_user(user, "read")
     try:
         return {"price_lists": _db.list_price_lists(user_id=user["id"])}
     except Exception as exc:  # noqa: BLE001
@@ -405,28 +533,61 @@ def api_list_price_lists(request: Request) -> dict[str, Any]:
 
 
 @router.put("/{price_list_id}")
-def api_upsert_price_list(request: Request, price_list_id: str,
-                          payload: dict = Body(...)) -> dict[str, Any]:
+async def api_upsert_price_list(request: Request,
+                                price_list_id: str) -> dict[str, Any]:
     user = _auth.require_user(request)
-    if not isinstance(payload, dict) or not payload:
-        raise HTTPException(status_code=400, detail="Tuščias užklausos turinys")
     try:
         uuid.UUID(str(price_list_id))
     except ValueError:
         # Ids are generated with crypto.randomUUID() client-side; refusing
         # anything else keeps the primary key from becoming a free-text sink.
         raise HTTPException(status_code=400, detail="Netinkamas kainyno ID")
+
+    # Read + parse the body OURSELVES rather than through `payload: dict =
+    # Body(...)`, which buffered and parsed every byte before a single limit of
+    # ours could fire. (F6.)
+    payload = await _read_json_body_capped(request, MAX_PUT_BODY_BYTES)
+    if not isinstance(payload, dict) or not payload:
+        raise HTTPException(status_code=400, detail="Tuščias užklausos turinys")
+
     items = payload.get("items")
     if items is not None and not isinstance(items, list):
         raise HTTPException(status_code=400, detail="Laukas „items“ turi būti sąrašas")
-    if isinstance(items, list) and len(items) > MAX_ITEMS_PER_LIST:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Kainyne per daug eilučių (daugiau nei {MAX_ITEMS_PER_LIST})")
+    if isinstance(items, list):
+        if len(items) > MAX_ITEMS_PER_LIST:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Kainyne per daug eilučių (daugiau nei {MAX_ITEMS_PER_LIST})")
+        payload["items"] = _sanitize_items(items)
+
+    # The scalar fields land in TEXT columns verbatim; bound them here so the
+    # row cannot become a storage sink either.
+    for field, cap in (("name", MAX_NAME_LEN),
+                       ("company_name", MAX_NAME_LEN),
+                       ("created_date", MAX_CREATED_DATE_LEN),
+                       ("created_at", MAX_CREATED_DATE_LEN)):
+        value = payload.get(field)
+        if isinstance(value, str):
+            payload[field] = value[:cap]
+        elif value is not None and field in ("name", "company_name"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Laukas „{field}“ turi būti tekstas")
+
+    _rate_limit_user(user, "write")
     try:
-        return _db.upsert_price_list(price_list_id, payload, user_id=user["id"])
+        # SQLite write behind the process-global _DB_LOCK — off the event loop,
+        # since this handler had to become async to read its own body.
+        return await run_in_threadpool(
+            _db.upsert_price_list, price_list_id, payload, user["id"])
     except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
+        # 404, not 403: `str(exc)` used to leak db.py's English
+        # "User X does not own price list Y", which both broke the LT-only rule
+        # and answered "does this id exist?" for a stranger. DELETE already
+        # 404s for exactly that reason — keep the pair symmetric. (F13b.)
+        log.warning("price list write refused id=%s user=%s: %s",
+                    price_list_id, user.get("id"), exc)
+        raise HTTPException(status_code=404, detail="Kainynas nerastas") from exc
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -439,6 +600,7 @@ def api_upsert_price_list(request: Request, price_list_id: str,
 @router.delete("/{price_list_id}")
 def api_delete_price_list(request: Request, price_list_id: str) -> dict[str, Any]:
     user = _auth.require_user(request)
+    _rate_limit_user(user, "write")
     try:
         deleted = _db.delete_price_list(price_list_id, user_id=user["id"])
     except Exception as exc:  # noqa: BLE001
