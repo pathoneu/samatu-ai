@@ -29,7 +29,7 @@ import {
   Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
   CircleDollarSign, PencilRuler, Target, Sliders, Star,
 } from 'lucide-react';
-import { getPriceLists } from '@/lib/projectStore';
+import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch } from '@/lib/applyPriceList';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
@@ -1126,9 +1126,18 @@ function ApplyPriceListButton({ project, onProjectChange }) {
   useEffect(() => {
     // Default kainynas first: it is the one the contractor reaches for, and the
     // one the automatic fill already used.
-    const lists = [...getPriceLists()].sort(
-      (a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0));
-    setPriceLists(lists);
+    const readCache = () => setPriceLists(
+      [...getPriceLists()].sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0)));
+    readCache();
+    // …and refresh from the backend the first time this session. Without it, a
+    // user who signs in on a second device and opens a project straight from
+    // the dashboard sees "Kainynas dar neįkeltas" even though his lists are
+    // sitting on the server — the cache is only filled by the Kainynai page.
+    let alive = true;
+    pullPriceListsFromBackend()
+      .then(() => { if (alive) readCache(); })
+      .catch(() => { /* cache still shows whatever this browser has */ });
+    return () => { alive = false; };
   }, [open]);
 
   useEffect(() => {

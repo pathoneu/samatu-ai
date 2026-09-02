@@ -66,6 +66,20 @@ _HEADER_MAP: dict[str, str] = {
 }
 
 
+def _rate_limit(request: Request, endpoint: str) -> None:
+    """Key the shared sliding-window limiter by client IP. Parsing a workbook is
+    CPU work behind a login, so the size caps alone do not stop one account from
+    looping it. Imported lazily — main includes this router. Best-effort: a
+    limiter hiccup must never block a legitimate upload. (Mirrors
+    api/cv_tools._rate_limit, F4 2026-07-04.)"""
+    try:
+        from main import _check_rate_limit
+    except Exception:  # noqa: BLE001 - limiter unavailable in unit-test apps
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip, f"price-lists-{endpoint}")
+
+
 def _norm_header(value: Any) -> str:
     """Fold a header cell to its comparison key: lowercase, accents dropped,
     everything that is not a letter or digit removed."""
@@ -243,6 +257,7 @@ async def api_parse_xlsx(request: Request, file: UploadFile = File(...)) -> dict
     """Parse an uploaded .xlsx kainynas. Stateless — the client decides whether
     to save the result, exactly like the CSV path does."""
     _auth.require_user(request)          # 401 when not logged in
+    _rate_limit(request, "parse-xlsx")
     name = (file.filename or "").lower()
     if name.endswith(".xls"):
         raise HTTPException(
@@ -271,9 +286,11 @@ async def api_parse_xlsx(request: Request, file: UploadFile = File(...)) -> dict
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
-def _owner_filter(user: dict) -> str | None:
-    """Admins read across users; everyone else is scoped to their own rows."""
-    return None if user.get("is_admin") else user["id"]
+# NOTE: unlike the project routes, admins get NO cross-user access here. The
+# project routes grant it because the admin dashboard needs it; there is no
+# admin view of price lists, so every verb below is scoped to the caller's own
+# rows. Least privilege, and it keeps list/delete symmetric — an asymmetry there
+# is exactly how an IDOR gets written by accident later.
 
 
 @router.get("")
@@ -323,7 +340,7 @@ def api_upsert_price_list(request: Request, price_list_id: str,
 def api_delete_price_list(request: Request, price_list_id: str) -> dict[str, Any]:
     user = _auth.require_user(request)
     try:
-        deleted = _db.delete_price_list(price_list_id, user_id=_owner_filter(user))
+        deleted = _db.delete_price_list(price_list_id, user_id=user["id"])
     except Exception as exc:  # noqa: BLE001
         log.error("price list delete failed id=%s: %r", price_list_id, exc)
         raise HTTPException(status_code=500,

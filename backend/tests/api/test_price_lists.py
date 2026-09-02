@@ -186,6 +186,19 @@ def test_upload_requires_auth():
         assert r.status_code == 401
 
 
+def test_parse_endpoint_is_rate_limited(as_user, monkeypatch):
+    """Parsing a workbook is CPU work behind a login — the size caps alone do
+    not stop one account from looping it."""
+    seen = []
+    import main
+    monkeypatch.setattr(main, "_check_rate_limit",
+                        lambda ip, endpoint: seen.append(endpoint))
+    client = as_user(USER_A)
+    client.post("/api/price-lists/parse-xlsx",
+                files={"file": ("k.xlsx", _wb_bytes(STANDARD_ROWS))})
+    assert seen == ["price-lists-parse-xlsx"]
+
+
 def test_parse_endpoint_round_trip(as_user):
     client = as_user(USER_A)
     r = client.post("/api/price-lists/parse-xlsx",
@@ -300,6 +313,24 @@ def test_default_flag_is_scoped_to_the_owner(as_user):
 
 
 # ── db layer ─────────────────────────────────────────────────────────────────
+
+def test_admins_get_no_cross_user_access(as_user):
+    """There is no admin view of kainynai — an admin session must see and touch
+    only its own, so the list/delete pair can never drift into an IDOR."""
+    a = as_user(USER_A)
+    pid = str(uuid.uuid4())
+    a.put(f"/api/price-lists/{pid}", json={"name": "A privatus", "items": []})
+
+    admin = {"id": "pl-test-admin", "email": "admin@example.test", "is_admin": True}
+    app = FastAPI()
+    app.include_router(pl_mod.router)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_auth, "require_user", lambda request: dict(admin))
+        client = TestClient(app)
+        assert client.get("/api/price-lists").json()["price_lists"] == []
+        assert client.delete(f"/api/price-lists/{pid}").status_code == 404
+    assert a.get("/api/price-lists").json()["price_lists"][0]["name"] == "A privatus"
+
 
 def test_null_owner_rows_cannot_be_hijacked():
     """The 2026-06-19 write-barrier lesson, applied to price lists: an
