@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { recompute } from '../../lib/recomputeApi';
 import { parseLtNumber } from '@/lib/parseLtNumber';
+import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
 // keystroke fired its own request and the answers raced (2026-07-27 audit).
@@ -340,6 +341,19 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
     return Number(room.walls_paintable_m2 || 0) > 0;
   };
 
+  // Per-room ĮTEMPIAMOS LUBOS (2026-09-02 contractor ask). A stretch ceiling is
+  // a separate trade stretched under a raw slab, so the room's ceiling
+  // glaistymas/gruntavimas/dažymas/šlifavimas is work nobody performs — the
+  // backend drops it from the sąmata. Karnizas, LED nišos, GKP lubos and
+  // grindjuostės stay. Absent key = dažomos, so nothing changes until the
+  // user actually flips a room.
+  const setStretchCeiling = (roomNr, stretch) => {
+    const next = withStretchCeiling(safeAssumptions, roomNr, stretch);
+    onChange(next);
+    handleRecompute('stretch_ceiling_override', next.stretch_ceiling_override);
+  };
+  const isStretchCeiling = (room) => isStretchCeilingNr(safeAssumptions, room.nr);
+
   const rooms = panelRooms(rawData);
   const avgH  = rooms.length > 0
     ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
@@ -595,6 +609,46 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
                       <span className="truncate">{room.pavadinimas || room.nr}</span>
                       <span className={`shrink-0 text-[10px] font-medium ${painted ? 'text-primary' : 'text-muted-foreground'}`}>
                         {painted ? t('project.assumptions.wallsPaintOn') : t('project.assumptions.wallsPaintOff')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Lubų apdaila per kambarį — dažomos vs įtempiamos (2026-09-02).
+              Įtempiamos lubos = atskiras darbas; tos patalpos lubų glaistymas,
+              gruntavimas, dažymas ir šlifavimas iškrenta iš sąmatos. Karnizas,
+              LED nišos, GKP lubos ir grindjuostės nekeičiami. */}
+          {rooms.length > 0 && (
+            <div className="py-2">
+              <p className="text-sm text-foreground mb-1">
+                {t('project.assumptions.stretchCeilingLabel')}
+              </p>
+              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                {t('project.assumptions.stretchCeilingNote')}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {rooms.map(room => {
+                  const stretch = isStretchCeiling(room);
+                  return (
+                    <button
+                      key={room.nr}
+                      onClick={() => setStretchCeiling(room.nr, !stretch)}
+                      title={t(stretch ? 'project.assumptions.stretchCeilingOffTitle' : 'project.assumptions.stretchCeilingOnTitle', {
+                        room: room.pavadinimas || room.nr,
+                      })}
+                      aria-pressed={stretch}
+                      className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${
+                        stretch
+                          ? 'bg-primary/10 border-primary/40 text-foreground'
+                          : 'bg-card border-border text-muted-foreground hover:border-foreground/30'
+                      }`}
+                    >
+                      <span className="truncate">{room.pavadinimas || room.nr}</span>
+                      <span className={`shrink-0 text-[10px] font-medium ${stretch ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {stretch ? t('project.assumptions.stretchCeilingOn') : t('project.assumptions.stretchCeilingOff')}
                       </span>
                     </button>
                   );

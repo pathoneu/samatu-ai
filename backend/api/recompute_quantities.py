@@ -64,6 +64,15 @@ _ASSUMPTION_FIELDS = {
     # patalpa.nr → 0.0 (raw) / 1.0 (painted). Flips walls_paint in the room's
     # rules and recomputes the paint fields, same live path as ceiling height.
     "walls_paint_override",
+    # 2026-09-02: per-room ĮTEMPIAMOS LUBOS. Keyed by patalpa.nr → 1
+    # (įtempiamos) / 0 (dažomos); absent means dažomos. A flagged room drops out
+    # of the lubų glaistymas/gruntavimas/dažymas/šlifavimas lines (both height
+    # tiers) — a stretch membrane is a separate trade and none of that work
+    # happens under it. Karnizas / LED nišos / GKP lubos / grindjuostės are
+    # untouched. Read by the canonical builder through `_overrides`
+    # (extractor/vision_call._stretch_ceiling_nrs), so it needs no per-room
+    # geometry recompute here.
+    "stretch_ceiling_override",
     # 2026-07-29: concealed-vs-surface mixer. The builder splits a POTINKINIS
     # mixer into its rough-in + trim pair and says so as a disclosed assumption
     # (nothing we read tells us which it is). CLAUDE.md's rule — every

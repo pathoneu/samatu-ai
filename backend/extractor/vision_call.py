@@ -1570,6 +1570,46 @@ _PAINT_SPLIT_PREFIXES = (
 )
 
 
+# ── Įtempiamos lubos, per kambarį (2026-09-02 contractor ask F1) ─────────────
+#
+# A stretch-ceiling room gets NO ceiling skim / prime / paint / sanding: the
+# membrane is a separate trade stretched under a raw slab, so every one of those
+# m² would be work nobody performs. Deliberately NOT touched (founder scoped
+# this to "išimti lubų dažymą" only): lubų karnizas, LED nišos, GKP lubos,
+# grindjuostės — all of those still happen in a room with a stretch ceiling.
+#
+# Assumption key `stretch_ceiling_override`: {room nr: 1 (įtempiamos) | 0
+# (dažomos)}. ABSENT means dažomos, so a project whose owner never opens the
+# toggle produces byte-identical quantities to before this feature.
+def _stretch_ceiling_nrs(parsed: dict) -> set[str]:
+    """Room numbers the user marked as įtempiamos lubos, as a set of strings."""
+    raw = (parsed.get("_overrides") or {}).get("stretch_ceiling_override")
+    if not isinstance(raw, dict):
+        return set()
+    out: set[str] = set()
+    for nr, val in raw.items():
+        try:
+            if float(val) >= 0.5:
+                out.add(str(nr).strip())
+        except (TypeError, ValueError):
+            continue  # a malformed flag must never break the whole build
+    out.discard("")
+    return out
+
+
+def _is_stretch_ceiling(room: dict, stretch_nrs: set[str]) -> bool:
+    if not stretch_nrs:
+        return False
+    return str(room.get("nr") or "").strip() in stretch_nrs
+
+
+def _ceiling_paint_m2(room: dict, stretch_nrs: set[str]) -> float:
+    """The room's PAINTED ceiling area — 0 when its ceiling is įtempiamos."""
+    if _is_stretch_ceiling(room, stretch_nrs):
+        return 0.0
+    return float(room.get("ceiling_paintable_m2") or 0)
+
+
 def _consolidate_paint_enabled() -> bool:
     """Feature-flag gate for paint-line consolidation (default ON)."""
     try:
@@ -1601,8 +1641,9 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     if not members:
         return
 
+    stretch_nrs = _stretch_ceiling_nrs(parsed)
     walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
-    lubos_paint = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint = round(sum(_ceiling_paint_m2(r, stretch_nrs) for r in rooms), 2)
     dazymo_total = round(walls_paint + lubos_paint, 2)
     if dazymo_total <= 0:
         parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
@@ -1621,7 +1662,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         iki-3m line. A genuinely high room (≥3 m) still sends all its paint to
         virš-3m."""
         w = float(r.get("walls_paintable_m2") or 0)
-        c = float(r.get("ceiling_paintable_m2") or 0)
+        c = _ceiling_paint_m2(r, stretch_nrs)
         if _is_high(r.get("lubu_aukstis_m")):
             return w + c
         xw = float(r.get("extra_walls_virs_3m_m2") or 0)
@@ -1955,13 +1996,24 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     SAL = "skaiciuota_is_brezinio"
 
     # Walls vs lubos split aggregates (per-room values from calc_room_quantities)
+    stretch_nrs = _stretch_ceiling_nrs(parsed)
     walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
-    lubos_paint = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
-    dazymo_total = walls_paint + lubos_paint
+    # Every ceiling vs only the ones that actually get painted. They differ only
+    # when the user marked rooms as įtempiamos lubos in Prielaidos.
+    lubos_paint_all = round(sum(float(r.get("ceiling_paintable_m2") or 0) for r in rooms), 2)
+    lubos_paint = round(sum(_ceiling_paint_m2(r, stretch_nrs) for r in rooms), 2)
 
-    # Glaistas/gruntas/dažai per medium — split proportionally to walls vs lubos
-    walls_share = (walls_paint / dazymo_total) if dazymo_total > 0 else 0.5
-    lubos_share = 1 - walls_share if dazymo_total > 0 else 0.5
+    # Glaistas/gruntas/dažai per medium — split proportionally to walls vs lubos.
+    # The shares are anchored on the FULL paintable area (`_dazymo_all`), not on
+    # the billed one: dividing by the shrunken total would push walls_share
+    # toward 1.0, so marking a ceiling as įtempiamos would INCREASE the wall
+    # putty. Anchored this way the ceiling's material simply leaves the sąmata
+    # with its work. With no stretch rooms `_ceiling_keep` is exactly 1.0 and
+    # both shares are bit-identical to the pre-2026-09-02 numbers.
+    _dazymo_all = walls_paint + lubos_paint_all
+    walls_share = (walls_paint / _dazymo_all) if _dazymo_all > 0 else 0.5
+    _ceiling_keep = (lubos_paint / lubos_paint_all) if lubos_paint_all > 0 else 0.0
+    lubos_share = (1 - walls_share) * _ceiling_keep if _dazymo_all > 0 else 0.5
     glaistas_total = _sum("glaistas_kg")
     dazai_total = _sum("dazai_l")
     gruntas_total = _sum("gruntas_l")
@@ -2089,7 +2141,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # per pastolių surcharge'us ir didesnį darbo laiką dėl aukšcio.
         from .universal_rules import is_high_ceiling as _is_high
         lubos_virs_3m = round(sum(
-            float(r.get("ceiling_paintable_m2") or 0) for r in rooms
+            _ceiling_paint_m2(r, stretch_nrs) for r in rooms
             if _is_high(r.get("lubu_aukstis_m"))
         ), 2)
         if lubos_virs_3m > 0:
