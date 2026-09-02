@@ -258,3 +258,16 @@ test('findRowById refuses to resolve a duplicated id to the wrong row', () => {
   assert.equal(findRowById(null, { id: 'x' }), null);
   assert.equal(findRowById([], null), null);
 });
+
+test('rollUpIsAuthoritative: the builder-measured flag wins over the op heuristic', () => {
+  const plainSum = [{ op: 'sum', label: 'Σ 3 patalpų', value: 30 }];
+  // A plain Σ chain whose contributions the builder found NOT to add up (it
+  // measured against kiekis) → authoritative chain, no Σ affordance.
+  assert.equal(rollUpIsAuthoritative(plainSum, { contributions_sum_to_total: false }), true);
+  // …and an anchored chain the builder measured as adding up → not authoritative.
+  const anchored = [{ op: 'anchor', label: 'Iš lentelės', value: 100 }];
+  assert.equal(rollUpIsAuthoritative(anchored, { contributions_sum_to_total: true }), false);
+  // No flag (older blobs) → the heuristic as before.
+  assert.equal(rollUpIsAuthoritative(anchored, {}), true);
+  assert.equal(rollUpIsAuthoritative(plainSum, {}), false);
+});

@@ -99,6 +99,50 @@ export function materialsLast(rows) {
  * able to prove the price transferred. Verified 2026-07-28: un-folding is what
  * keeps 320 € on the books when the backend can't see the money.
  */
+/**
+ * Re-establish `id` uniqueness on the MERGE OUTPUT — the JS twin of the
+ * backend's `_reassign_duplicate_ids` (api/recompute_quantities.py). The
+ * builder mints unique ids for the rebuilt list only; pass 3 then appends
+ * carried orphans keeping the ids they were saved with, and an orphan can
+ * legitimately carry a live row's id (a priced legacy label whose id folds
+ * onto its successor). Two rows with one id are indistinguishable to the
+ * next merge's pass 0, to the ripple diff and to a React key.
+ *
+ * THE RULE (mirrors the backend exactly):
+ *   · two claiming passes — first every row NOT flagged
+ *     `_orphaned_after_rebuild`, in list order, then every carried orphan, in
+ *     list order — so the rebuilt canonical row keeps the clean id and the
+ *     orphan takes the suffix;
+ *   · a row with no id is skipped (legacy blobs stay untouched);
+ *   · claiming `base`: take it if free, else the first free `${base}-${n}`
+ *     counting UP from n = 2 — counting up (not "position among duplicates")
+ *     stays collision-free when an orphan already carries a `-2` id.
+ * Returns a new array; rows that move get a copied object.
+ */
+export function reassignDuplicateIds(rows) {
+  const used = new Set();
+  const claim = (base) => {
+    if (!used.has(base)) { used.add(base); return base; }
+    let n = 2;
+    while (used.has(`${base}-${n}`)) n += 1;
+    const next = `${base}-${n}`;
+    used.add(next);
+    return next;
+  };
+  const out = (rows || []).slice();
+  for (const orphans of [false, true]) {
+    out.forEach((row, i) => {
+      if (!row || typeof row !== 'object') return;
+      if (Boolean(row._orphaned_after_rebuild) !== orphans) return;
+      const base = String(row.id ?? '').trim();
+      if (!base) return;
+      const claimed = claim(base);
+      if (claimed !== base) out[i] = { ...row, id: claimed };
+    });
+  }
+  return out;
+}
+
 export function normLabel(s) {
   // Built on tierKey so both sides recognise the SAME tier vocabulary. Before
   // 2026-07-28 this stripped only the 'iki/virš 3m' suffix, so a rebuilt
@@ -337,7 +381,7 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
       user_edit: hasMoney,
     });
   }
-  return materialsLast(merged);
+  return reassignDuplicateIds(materialsLast(merged));
 }
 
 /** Rows the rebuild could not reproduce — the ones the user must be told about. */

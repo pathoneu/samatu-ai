@@ -501,3 +501,38 @@ test('rows with no id at all behave exactly as before', () => {
   assert.equal(out[0].kaina, 5);
   assert.equal(carriedOrphans(notes).length, 1);
 });
+
+// ── id uniqueness after the merge (JS twin of backend `_reassign_duplicate_ids`) ──
+import { reassignDuplicateIds } from './mergeDarbuSarasas.js';
+
+test('reassignDuplicateIds: the rebuilt row keeps the clean id, the orphan takes -2', () => {
+  const rows = [
+    { id: 'abc', aprasymas: 'Nauja', _orphaned_after_rebuild: true },   // orphan listed FIRST
+    { id: 'abc', aprasymas: 'Nauja' },                                   // canonical rebuilt row
+    { id: 'xyz', aprasymas: 'Kita' },
+  ];
+  const out = reassignDuplicateIds(rows);
+  assert.equal(out[1].id, 'abc');      // canonical keeps the clean id regardless of order
+  assert.equal(out[0].id, 'abc-2');    // orphan renamed
+  assert.equal(out[2].id, 'xyz');
+  assert.equal(rows[0].id, 'abc');     // input not mutated
+});
+
+test('reassignDuplicateIds: counts up past an id that already carries a suffix', () => {
+  const rows = [
+    { id: 'abc' },
+    { id: 'abc-2', _orphaned_after_rebuild: true },
+    { id: 'abc', _orphaned_after_rebuild: true },
+  ];
+  const ids = reassignDuplicateIds(rows).map(r => r.id);
+  assert.deepEqual(ids, ['abc', 'abc-2', 'abc-3']);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test('reassignDuplicateIds: rows without ids are left alone', () => {
+  const rows = [{ aprasymas: 'sena' }, { id: '', aprasymas: 'tuščias' }, { id: 'k1' }];
+  const out = reassignDuplicateIds(rows);
+  assert.equal(out[0].id, undefined);
+  assert.equal(out[1].id, '');
+  assert.equal(out[2].id, 'k1');
+});

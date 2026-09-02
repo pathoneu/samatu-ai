@@ -1278,7 +1278,8 @@
         "share": "share",
         "coefficient": "coefficient",
         "constant": "constant",
-        "anchor": "from table"
+        "anchor": "from table",
+        "round": "rounding"
       },
       "notASum": "The per-room figures show what the quantity is assembled from; the chain above decides the final number, so they do not add up to it.",
       "notASumAnchor": "The quantity comes from the room schedule; the per-room figures come from the drawing, so they do not add up to the total."

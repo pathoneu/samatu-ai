@@ -74,7 +74,7 @@ export default function LedgerTree({
   const { shown, hiddenCount, total } = splitContributions(all, TOP_CONTRIBUTIONS);
   const contributions = showAll ? sortedContributions(all) : shown;
   const skipped = excludedOf(row);
-  const notASum = rollUpIsAuthoritative(rollUp);
+  const notASum = rollUpIsAuthoritative(rollUp, row);
 
   const toggleRoom = (key) => setOpenRooms((prev) => {
     const next = new Set(prev);

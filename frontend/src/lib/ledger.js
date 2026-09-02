@@ -40,7 +40,8 @@ const TERM_DRIVERS = {
   'pusiniai kampai': 'height',
   'angų atbrailos': 'openings',
   'perimetras': 'perimeter',
-  'perimetras be durų': 'perimeter',
+  'perimetras be durų': 'perimeter',   // legacy blobs (pre 2026-09-02 evening)
+  'durys': 'openings',
   'atliekos 10 %': 'perimeter',
 };
 
@@ -135,7 +136,13 @@ const NON_ADDITIVE_OPS = new Set(['anchor', 'cap', 'share', 'coefficient', 'cons
  * than its rooms add up to. In both cases the UI must present the contributions
  * as supporting detail, never as an addition the reader can check in their head.
  */
-export function rollUpIsAuthoritative(rollUp) {
+export function rollUpIsAuthoritative(rollUp, row) {
+  // The builder measures this directly (`contributions_sum_to_total`, since
+  // 2026-09-02 evening): Σ contributions reproduces `kiekis` to ±0,01 or it
+  // doesn't. Prefer the measurement over the op heuristic when it is present.
+  if (row && typeof row.contributions_sum_to_total === 'boolean') {
+    return !row.contributions_sum_to_total;
+  }
   if (!Array.isArray(rollUp) || rollUp.length === 0) return false;
   if (rollUp[0]?.op !== 'sum') return true;
   return rollUp.some(step => NON_ADDITIVE_OPS.has(step?.op));

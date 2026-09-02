@@ -53,6 +53,8 @@ Ground truth = the contractor's real sąmatos:
 
 **RULE: never change *billed quantities* without measuring against these.** The deterministic math already matches the contractor within ~1% on correct inputs — the remaining gap is Vision *detection*, not the formulas. An unverified formula "fix" is a regression risk.
 
+**Provenance is an accuracy invariant too (2026-09-02).** Any change to the builder must keep `backend/tests/test_contribution_ledger.py` green — it replays every row's `roll_up` over its `contributions` on all corpus fixtures and fails if the ledger stops reproducing `kiekis`. If you wire a new family into the ledger, add it there (and to the LT-string vocabulary guard). To eyeball Patikra locally: start `backend-dev` + `frontend-dev` from `.claude/launch.json` (restart the backend after backend edits — no `--reload`), open a local project, toggle anything in Prielaidos (the rebuilt list carries ids + ledger), then click a row → tree, and use the right-hand PATIKRA rail (card → „Pataisyti" → Prielaidos focus → recompute → „Perskaičiuota: N eilučių" → „Įsiminta"). The shipped demo snapshot carries no ledger on disk until it is recomputed.
+
 ## Deploy / billing (dev-relevant bits — full launch steps in `RUNBOOK.md`)
 
 - `BILLING_ENABLED` defaults `'0'` (dormant). Don't flip without the pre-flight: Stripe secret + webhook secret + price IDs present, webhook signature verified live, and `usage_events` logging confirmed (a silent-fail there could let a user drain the API budget uncharged).
