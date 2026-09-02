@@ -23,9 +23,11 @@ import io
 import logging
 import unicodedata
 import uuid
+import zipfile
 from typing import Any
 
 from fastapi import APIRouter, Body, File, HTTPException, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 import auth as _auth
 import db as _db
@@ -43,6 +45,33 @@ MAX_ROWS = 20_000
 # a blank line above it.
 HEADER_SCAN_ROWS = 5
 MAX_ITEMS_PER_LIST = 50_000
+
+# ── Decompression budget (2026-09-02 review, F3) ─────────────────────────────
+# The 5 MB upload cap bounds the ZIP, not what comes OUT of it. openpyxl does
+# not stream xl/sharedStrings.xml — it decompresses the whole member — so a
+# 647 KB workbook whose sharedStrings deflates to 580 MB returned HTTP 200 in
+# 8.7 s having taken half a gigabyte of RSS with it. At the 5 MB cap that is
+# ~4.5 GB, i.e. an OOM kill of the single uvicorn worker.
+#
+# The fix is to read the ZIP's CENTRAL DIRECTORY first (`infolist()` decompresses
+# nothing) and refuse anything whose declared uncompressed sizes blow a budget.
+# An under-declared size is not an escape hatch: CPython's zipfile truncates a
+# member's output at the declared `file_size`, so the declaration is an upper
+# bound on what can actually be read either way.
+MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
+MAX_MEMBER_UNCOMPRESSED_BYTES = 10 * 1024 * 1024
+# A workbook is a couple of dozen parts; hundreds means someone is trying to
+# make the *count* the bomb instead of the size.
+MAX_ZIP_MEMBERS = 512
+
+# Widest column we will look at. The header vocabulary lives in the first
+# handful of columns, and without this openpyxl pads every row out to whatever
+# `<dimension>` declares — a forged `A1:XFD1048576` turned a 4.8 KB upload into
+# 4.8 s of CPU building 16384-wide tuples before the row cap fired.
+MAX_COLS = 64
+# Hard stop for the row iterator, one row past what we would accept anyway, so
+# the 413 below still fires but openpyxl never walks a forged million-row sheet.
+MAX_SCAN_ROWS = MAX_ROWS + HEADER_SCAN_ROWS + 1
 
 # Same vocabulary as the CSV parser's `headerMap` in pages/PriceLists.jsx, keyed
 # by the diacritics-folded, punctuation-stripped form so "Aprašymas", "APRASYMAS"
@@ -67,17 +96,76 @@ _HEADER_MAP: dict[str, str] = {
 
 
 def _rate_limit(request: Request, endpoint: str) -> None:
-    """Key the shared sliding-window limiter by client IP. Parsing a workbook is
-    CPU work behind a login, so the size caps alone do not stop one account from
-    looping it. Imported lazily — main includes this router. Best-effort: a
-    limiter hiccup must never block a legitimate upload. (Mirrors
-    api/cv_tools._rate_limit, F4 2026-07-04.)"""
+    """Key the shared sliding-window limiter by a NON-spoofable client key.
+
+    Parsing a workbook is CPU work behind a login, so the size caps alone do not
+    stop one account from looping it. The key comes from `main._client_key`, NOT
+    `request.client.host`: production runs uvicorn with
+    ``--forwarded-allow-ips='*'``, which makes `.host` the LEFTMOST
+    X-Forwarded-For value — client-controlled, and rotating it walks straight
+    past a per-IP bucket. `_client_key` takes the rightmost (trusted-proxy) hop.
+
+    Imported lazily — main includes this router. Best-effort: a limiter hiccup
+    must never block a legitimate upload.
+    """
+    try:
+        from main import _check_rate_limit, _client_key
+    except Exception:  # noqa: BLE001 - limiter unavailable in unit-test apps
+        return
+    _check_rate_limit(_client_key(request), f"price-lists-{endpoint}")
+
+
+def _rate_limit_user(user: dict, endpoint: str) -> None:
+    """Per-ACCOUNT bucket for the CRUD writes.
+
+    An IP bucket is the wrong shape here: every write serialises against the
+    process-global `_DB_LOCK` in db.py, and a loop of large-`items` PUTs from
+    one logged-in account is a self-inflicted stall no matter which address it
+    arrives from (and behind NAT an IP bucket punishes the office next door).
+    Key on the user id — the one thing an authenticated caller cannot rotate.
+    """
     try:
         from main import _check_rate_limit
     except Exception:  # noqa: BLE001 - limiter unavailable in unit-test apps
         return
-    client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(client_ip, f"price-lists-{endpoint}")
+    _check_rate_limit(f"user:{user.get('id') or 'unknown'}", f"price-lists-{endpoint}")
+
+
+def _check_zip_budget(data: bytes) -> None:
+    """Refuse a workbook whose members would decompress past the budget.
+
+    Reads only the ZIP central directory — no member is decompressed — so this
+    is microseconds regardless of how big the bomb claims to be. See the
+    MAX_UNCOMPRESSED_BYTES note above for why the declared sizes are trustworthy
+    as an upper bound.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            infos = zf.infolist()
+    except Exception as exc:  # noqa: BLE001 - BadZipFile and friends
+        log.info("xlsx container unreadable: %r", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Netinkamas failo formatas — įkelkite .xlsx failą.") from exc
+
+    too_big = HTTPException(
+        status_code=413,
+        detail=(f"„Excel“ failas išskleistas užima per daug vietos (daugiau nei "
+                f"{MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB). Palikite tik "
+                "kainyno lapą ir įrašykite failą iš naujo."))
+    if len(infos) > MAX_ZIP_MEMBERS:
+        log.warning("xlsx rejected: %d zip members", len(infos))
+        raise too_big
+    total = 0
+    for info in infos:
+        size = int(getattr(info, "file_size", 0) or 0)
+        if size > MAX_MEMBER_UNCOMPRESSED_BYTES:
+            log.warning("xlsx rejected: member %r declares %d B", info.filename, size)
+            raise too_big
+        total += size
+        if total > MAX_UNCOMPRESSED_BYTES:
+            log.warning("xlsx rejected: members total %d B", total)
+            raise too_big
 
 
 def _norm_header(value: Any) -> str:
@@ -144,6 +232,10 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
         raise HTTPException(status_code=500,
                             detail="Excel skaitytuvas neprieinamas serveryje") from exc
 
+    # BEFORE load_workbook: openpyxl reads sharedStrings whole, so the budget
+    # has to be settled from the central directory first (F3).
+    _check_zip_budget(data)
+
     try:
         # read_only + data_only: we want the CALCULATED values, never formulas,
         # and we never want the whole styled workbook in memory.
@@ -165,7 +257,11 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
         # afterwards the sheet object no longer has a live reader behind it.
         sheet_title = ws.title
 
-        rows_iter = ws.iter_rows(values_only=True)
+        # Explicit max_col/max_row: read-only openpyxl otherwise sizes every row
+        # from the sheet's own `<dimension>`, which the uploader writes. See the
+        # MAX_COLS note — a forged dimension is a CPU vector, not a hint.
+        rows_iter = ws.iter_rows(values_only=True,
+                                 max_col=MAX_COLS, max_row=MAX_SCAN_ROWS)
         head: list[tuple[Any, ...]] = []
         for row in rows_iter:
             head.append(row)
@@ -281,7 +377,11 @@ async def api_parse_xlsx(request: Request, file: UploadFile = File(...)) -> dict
         raise HTTPException(
             status_code=400,
             detail="Netinkamas failo formatas — įkelkite .xlsx failą.")
-    return parse_xlsx_items(data)
+    # OFF the event loop. `parse_xlsx_items` is seconds of synchronous CPU on a
+    # hostile workbook and railway.toml starts ONE uvicorn worker, so running it
+    # here froze /health, every login and every in-flight /extract-interior
+    # stream for the duration. (F3, 2026-09-02 review.)
+    return await run_in_threadpool(parse_xlsx_items, data)
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────

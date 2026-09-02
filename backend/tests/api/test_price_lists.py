@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import io
 import sys
+import time
 import uuid
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -36,6 +38,25 @@ def _wb_bytes(rows: list[list]) -> bytes:
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _rebuild_zip(source: bytes, replace: dict[str, bytes],
+                 extra: dict[str, bytes] | None = None) -> bytes:
+    """Copy a workbook zip, swapping/adding named members.
+
+    Used to build the hostile workbooks below. They are assembled IN-TEST from
+    invented content — there is no fixture file to check in and nothing that
+    could carry a contractor's data.
+    """
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(source)) as zin, \
+            zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zo:
+        for name in zin.namelist():
+            zo.writestr(name, replace.get(name, zin.read(name)))
+        for name, blob in (extra or {}).items():
+            if name not in zin.namelist():
+                zo.writestr(name, blob)
+    return out.getvalue()
 
 
 STANDARD_ROWS = [
@@ -133,6 +154,93 @@ def test_garbage_bytes_are_a_400():
     assert exc.value.status_code == 400
 
 
+# ── resource exhaustion (F3, 2026-09-02 review) ──────────────────────────────
+#
+# Every fixture above is a well-formed openpyxl Workbook, which is exactly the
+# input that never hurts us. These four are the hostile shapes: the upload cap
+# bounds the ZIP, not what comes out of it, and the sheet's own `<dimension>`
+# used to decide how much work we did per row.
+
+def _sharedstrings_bomb(declared_mb: int = 64) -> bytes:
+    """A workbook whose xl/sharedStrings.xml deflates to hundreds of MB.
+
+    Measured before the fix: a 647 KB upload of this shape returned HTTP 200 in
+    8.7 s having added ~580 MB of RSS. openpyxl does not stream that member.
+    """
+    payload = (b'<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats'
+               b'.org/spreadsheetml/2006/main" count="1" uniqueCount="1">'
+               b'<si><t>' + b"A" * (declared_mb * 1024 * 1024) + b'</t></si></sst>')
+    return _rebuild_zip(_wb_bytes(STANDARD_ROWS),
+                        {"xl/sharedStrings.xml": payload},
+                        {"xl/sharedStrings.xml": payload})
+
+
+def test_a_decompression_bomb_is_refused_before_it_is_decompressed():
+    blob = _sharedstrings_bomb()
+    # Small enough to sail past every earlier guard: PK magic, well under the
+    # 5 MB upload cap, and only a handful of rows so MAX_ROWS never fires.
+    assert blob[:2] == b"PK"
+    assert len(blob) < pl_mod.MAX_UPLOAD_BYTES
+
+    t0 = time.perf_counter()
+    with pytest.raises(HTTPException) as exc:
+        pl_mod.parse_xlsx_items(blob)
+    elapsed = time.perf_counter() - t0
+
+    assert exc.value.status_code == 413
+    assert "per daug vietos" in exc.value.detail          # Lithuanian, actionable
+    # The point of reading the central directory is that the refusal costs
+    # nothing. A second here would mean we decompressed something.
+    assert elapsed < 1.0, f"took {elapsed:.2f}s — the budget check decompressed"
+
+
+def test_a_zip_with_absurdly_many_members_is_refused():
+    extra = {f"xl/pad/{i}.xml": b"<x/>" for i in range(pl_mod.MAX_ZIP_MEMBERS + 20)}
+    blob = _rebuild_zip(_wb_bytes(STANDARD_ROWS), {}, extra)
+    with pytest.raises(HTTPException) as exc:
+        pl_mod.parse_xlsx_items(blob)
+    assert exc.value.status_code == 413
+
+
+_FORGED_SHEET = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    # 16384 columns × 1048576 rows, declared by the uploader.
+    '<dimension ref="A1:XFD1048576"/><sheetData>'
+    '<row r="1"><c r="A1" t="inlineStr"><is><t>Aprašymas</t></is></c>'
+    '<c r="B1" t="inlineStr"><is><t>Kaina</t></is></c></row>'
+    '<row r="2"><c r="A2" t="inlineStr"><is><t>Sienų dažymas</t></is></c>'
+    '<c r="B2"><v>7.5</v></c></row>'
+    # One real row at the very bottom: openpyxl fills the gap with an empty row
+    # per index, each as wide as the declared dimension.
+    '<row r="1048576"><c r="A1048576"><v>1</v></c></row>'
+    '</sheetData></worksheet>'
+).encode()
+
+
+def test_a_forged_sheet_dimension_cannot_buy_cpu_time():
+    """4.8 KB of upload bought 4.8 s of CPU before the row cap fired, because
+    every padded row was sized from the file's own `<dimension>`."""
+    blob = _rebuild_zip(_wb_bytes(STANDARD_ROWS),
+                        {"xl/worksheets/sheet1.xml": _FORGED_SHEET})
+    t0 = time.perf_counter()
+    with pytest.raises(HTTPException) as exc:
+        pl_mod.parse_xlsx_items(blob)
+    elapsed = time.perf_counter() - t0
+    assert exc.value.status_code == 413
+    assert elapsed < 1.0, f"took {elapsed:.2f}s — the dimension still sizes the work"
+
+
+def test_an_honest_wide_sheet_still_reads_its_first_columns():
+    """The column cap must bound work, not truncate a real kainynas: the four
+    columns we look for are always at the left edge."""
+    rows = [["Skyrius", "Aprašymas", "Vnt.", "Kaina"] + [f"pastaba {i}" for i in range(20)],
+            ["Dažymas", "Sienų dažymas", "m²", "7,50"] + ["x"] * 20]
+    out = pl_mod.parse_xlsx_items(_wb_bytes(rows))
+    assert out["items"] == [{"skyrius": "Dažymas", "aprasymas": "Sienų dažymas",
+                             "mato_vnt": "m²", "kaina": 7.5}]
+
+
 # ── endpoints ────────────────────────────────────────────────────────────────
 
 USER_A = {"id": "pl-test-user-a", "email": "a@example.test", "is_admin": False}
@@ -186,17 +294,74 @@ def test_upload_requires_auth():
         assert r.status_code == 401
 
 
-def test_parse_endpoint_is_rate_limited(as_user, monkeypatch):
+def test_parse_endpoint_is_rate_limited(as_user):
     """Parsing a workbook is CPU work behind a login — the size caps alone do
-    not stop one account from looping it."""
-    seen = []
+    not stop one account from looping it.
+
+    Assert the OUTCOME, not a label: the previous version of this test only
+    checked that a string reached a stubbed limiter, which would still pass if
+    the bucket never filled. Fill it for real and demand the 429.
+    """
     import main
-    monkeypatch.setattr(main, "_check_rate_limit",
-                        lambda ip, endpoint: seen.append(endpoint))
     client = as_user(USER_A)
-    client.post("/api/price-lists/parse-xlsx",
-                files={"file": ("k.xlsx", _wb_bytes(STANDARD_ROWS))})
-    assert seen == ["price-lists-parse-xlsx"]
+    # An empty part is refused before any parsing work, which keeps this loop
+    # cheap while still consuming a bucket slot per request — and proves the
+    # limiter runs BEFORE the body is touched.
+    for i in range(main._RATE_LIMIT_PER_MIN):
+        r = client.post("/api/price-lists/parse-xlsx",
+                        files={"file": ("k.xlsx", b"")})
+        assert r.status_code == 400, f"request {i + 1}: {r.status_code}"
+    r = client.post("/api/price-lists/parse-xlsx",
+                    files={"file": ("k.xlsx", _wb_bytes(STANDARD_ROWS))})
+    assert r.status_code == 429
+    assert "Per daug užklausų" in r.json()["detail"]
+
+
+def test_the_limiter_keys_on_the_hop_the_caller_cannot_forge(monkeypatch):
+    """Production runs uvicorn with --forwarded-allow-ips='*', so
+    `request.client.host` IS the leftmost X-Forwarded-For value — the caller
+    writes it, and rotating it empties the bucket every request. The key must
+    come from the RIGHTMOST hop, appended by our own proxy."""
+    import main
+    seen: list[str] = []
+    monkeypatch.setattr(main, "_check_rate_limit",
+                        lambda key, endpoint: seen.append(key))
+
+    app = FastAPI()
+    app.include_router(pl_mod.router)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_auth, "require_user", lambda request: dict(USER_A))
+        client = TestClient(app)
+        client.post("/api/price-lists/parse-xlsx",
+                    files={"file": ("k.xlsx", b"")},
+                    headers={"x-forwarded-for": "203.0.113.7, 10.0.0.9"})
+    assert seen == ["10.0.0.9"], seen
+
+
+def test_cv_tools_limiter_shares_the_same_key(monkeypatch):
+    """api/cv_tools carried the identical `request.client.host` bug and is the
+    file the price-list code was copied from — fix both or the next copy
+    reintroduces it."""
+    import main
+    import api.cv_tools as cv_mod
+    seen: list[str] = []
+    monkeypatch.setattr(main, "_check_rate_limit",
+                        lambda key, endpoint: seen.append(key))
+
+    class _Req:
+        headers = {"x-forwarded-for": "203.0.113.7, 10.0.0.9"}
+        client = type("C", (), {"host": "203.0.113.7"})()
+
+    cv_mod._rate_limit(_Req(), "magic-wand")
+    assert seen == ["10.0.0.9"], seen
+
+
+def test_the_bomb_is_refused_over_HTTP_with_a_lithuanian_message(as_user):
+    client = as_user(USER_A)
+    r = client.post("/api/price-lists/parse-xlsx",
+                    files={"file": ("k.xlsx", _sharedstrings_bomb())})
+    assert r.status_code == 413
+    assert "per daug vietos" in r.json()["detail"]
 
 
 def test_parse_endpoint_round_trip(as_user):
