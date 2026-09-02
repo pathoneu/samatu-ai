@@ -126,6 +126,21 @@ def _num_field(raw, default: float, degradations: list, field: str,
         return float(default)
 
 
+def _non_negative(value: float, default: float, degradations: list, field: str,
+                  room: str | None = None) -> float:
+    """A quantity may not be negative. `_num_field` parses "-40" happily, and a
+    negative dažomas plotas propagated straight into the paint split, the
+    materials and the totals — a sąmata that SUBTRACTS work. Clamp and say so."""
+    if value >= 0:
+        return value
+    entry = {"field": field, "reason": "negative_value",
+             "value": str(value)[:40], "fallback": default}
+    if room is not None:
+        entry["room"] = room
+    degradations.append(entry)
+    return float(default)
+
+
 def _calc_input(room: dict) -> dict:
     """Room dict prepared for ``calc_room_quantities`` — the SAME contract the
     extraction pipeline uses (``vision_call._recompute_per_room_via_python``)
@@ -281,11 +296,13 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                 _degrade(degradations, nr, "walls_paint_override",
                          "recompute_failed", stage="walls_paint_override",
                          error=str(exc)[:120])
-        walls = _num_field(
+        walls = _non_negative(_num_field(
             room.get("dazomas_plotas_m2") or room.get("walls_paintable_m2") or _MISSING,
+            0.0, degradations, "dazomas_plotas_m2", room=nr),
             0.0, degradations, "dazomas_plotas_m2", room=nr)
-        ceiling = _num_field(
+        ceiling = _non_negative(_num_field(
             room.get("lubu_dazomas_plotas_m2") or room.get("ceiling_paintable_m2") or _MISSING,
+            0.0, degradations, "lubu_dazomas_plotas_m2", room=nr),
             0.0, degradations, "lubu_dazomas_plotas_m2", room=nr)
         # 2026-09-02: the room's TOTAL paint litres come from the canonical
         # `_calc_dazai_liters` — the same function the extraction pipeline uses
@@ -306,8 +323,13 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
         # extraction pipeline writes.
         from extractor.vision_call import _calc_dazai_liters
         total_l = _calc_dazai_liters(walls + ceiling, paint_class=paint_class)
-        w_raw = (walls / cov_walls) if walls else 0.0
-        c_raw = (ceiling / cov_ceil) if ceiling else 0.0
+        # A zero coverage rate would be a ZeroDivisionError here — a 500 on a
+        # live recompute. It cannot come from `paint_coverage_for_class` today,
+        # but the split must not be the thing that discovers otherwise: with no
+        # usable rate, divide the litres by AREA instead of by coverage, which
+        # is the same answer whenever the two surfaces share a rate.
+        w_raw = (walls / cov_walls) if (walls and cov_walls) else (walls or 0.0)
+        c_raw = (ceiling / cov_ceil) if (ceiling and cov_ceil) else (ceiling or 0.0)
         denom = w_raw + c_raw
         walls_l = round(total_l * w_raw / denom, 2) if denom else 0.0
         room["dazai_l"] = walls_l
@@ -535,14 +557,30 @@ def _tier_key(s: str | None) -> str:
     return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
 
 
+# The paint split at the TIER-STRIPPED level. `_PAINT_SPLIT_EXACT_RENAMES` above
+# only fires on the full label, which is what pass 1 needs; pass 2 works on
+# `_norm_label` keys, and without the rename there a legacy priced
+# "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)" whose ceiling was lowered
+# below 3 m normalized to a key NO rebuilt row carries — measured: the priced row
+# came back as an orphan and BOTH new rows came back unpriced. With it, pass 2's
+# one-to-one guard reunites it with the walls line, and still refuses (two
+# candidates) when both tier lines exist — that case is pass 1's, by exact label.
+_PAINT_SPLIT_TIER_RENAMES = {
+    "sienų, lubų glaistymas/dažymas": "sienų glaistymas/dažymas",
+    "sienų, lubų šlifavimas": "sienų šlifavimas",
+}
+
+
 def _norm_label(s: str | None) -> str:
     """Height/Q-level-independent label key: strip the tier suffixes whose text
     flips when a ceiling crosses 3 m or the glaistymo lygis changes, so a priced
     line can be matched to its post-rebuild sibling. Also collapses the LED
-    glaistymas/dažymas pair onto its consolidated label."""
+    glaistymas/dažymas pair onto its consolidated label, and renames the
+    pre-split combined paint labels onto their walls successor."""
     base = _tier_key(s)
     if _LED_PAIR_RE.match(base):
         return _LED_CONSOLIDATED
+    base = _PAINT_SPLIT_TIER_RENAMES.get(base, base)
     return _LEGACY_LABEL_MAP.get(base, base)
 
 
@@ -551,6 +589,25 @@ def _has_user_edit(p: dict) -> bool:
             or p.get("manual_override") is True
             or p.get("quantity_source") == "manual_override"
             or bool(p.get("override_locked")))
+
+
+def _has_user_edit_beyond_kainynas(p: dict) -> bool:
+    """`_has_user_edit`, except that a price the KAINYNAS filled in is not the
+    user's hand.
+
+    THE OVER-BILLING (2026-09-02): pass 3 keeps a superseded tier line whenever
+    the row carries a user edit, and `_has_user_edit` reads ANY non-zero kaina as
+    one. That was harmless while rows arrived unpriced — the fold worked. Since
+    the automatic fill prices every row at extraction, EVERY row looked edited:
+    lowering a ceiling left the old "(virš 3m aukščio)" line carried as a priced
+    orphan next to its own re-tiered successor, and the client was billed 240 m²
+    of the 200 m² he has. An AI-matched price must not veto a fold; a hand-typed
+    one still does, and so does a corrected quantity or a gesture lock."""
+    if p.get("kaina_source") == "kainynas":
+        return (p.get("manual_override") is True
+                or p.get("quantity_source") == "manual_override"
+                or bool(p.get("override_locked")))
+    return _has_user_edit(p)
 
 
 _TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
@@ -605,6 +662,9 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
         kaina = row.get("kaina")
         if kaina not in (None, 0):
             p["kaina"] = kaina
+            for key in _PRICE_PROVENANCE_KEYS:
+                if row.get(key) is not None:
+                    p[key] = row[key]
             kiekis = p.get("kiekis")
             if isinstance(kiekis, (int, float)):
                 p["suma"] = round(float(kiekis) * float(kaina), 2)
@@ -617,6 +677,13 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
             if row.get("ai_kiekis_original") is not None:
                 p["ai_kiekis_original"] = row["ai_kiekis_original"]
     return n
+
+
+# Where a price CAME FROM. Travels with `kaina` everywhere the money travels —
+# the carry, the compat emit and the darbu_sarasas hydration — because the UI's
+# "hand-typed prices are left alone" guarantee is enforced on `kaina_source`
+# alone, and a rebuild that drops it silently unprotects the price.
+_PRICE_PROVENANCE_KEYS = ("kaina_source", "kaina_match_score")
 
 
 def _carry_edit(prev: dict, p: dict) -> None:
@@ -640,6 +707,35 @@ def _carry_edit(prev: dict, p: dict) -> None:
         kiekis = p.get("kiekis")
         p["suma"] = (round(float(kiekis) * float(prev["kaina"]), 2)
                      if isinstance(kiekis, (int, float)) else prev.get("suma"))
+        # …WITH its provenance. `kaina_source` was in neither carry set, so a
+        # hand-typed price came back from the first recompute unlabelled and the
+        # next "Taikyti kainyną" overwrote it — the exact opposite of what the
+        # button's own footnote promises. It also tells pass 3 whether a price
+        # is the user's hand or the kainynas's guess.
+        for key in _PRICE_PROVENANCE_KEYS:
+            if prev.get(key) is not None:
+                p[key] = prev[key]
+
+
+# Literal copy of `extractor.vision_call.SK_MEDZIAGOS`, copied rather than
+# imported to keep this module free of the heavy extractor import at load time
+# (the same choice eval_harness.py made). Kept in step by
+# test_medziagos_section.
+_MEDZIAGOS_SKYRIUS = "Medžiagos"
+
+
+def _materials_last(rows: list[dict]) -> list[dict]:
+    """Stable-partition the shopping list to the foot of the sąmata.
+
+    `SKYRIUS_ORDER[Medžiagos] = 11` is decorative: the builder appends the
+    section AFTER its sort, and pass 3 below appends carried orphans after
+    everything. So a priced orphan of a section that no longer exists sat BELOW
+    the shopping list, which is supposed to be the last thing the contractor
+    reads. Stable, so nothing else moves."""
+    work, mats = [], []
+    for r in rows:
+        (mats if (r.get("skyrius") or "") == _MEDZIAGOS_SKYRIUS else work).append(r)
+    return work + mats if mats else rows
 
 
 def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
@@ -683,18 +779,22 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
     if notes is None:
         notes = []
     if not prior:
-        return rebuilt
+        return _materials_last(rebuilt)
     prior_by_label: dict[str, dict] = {}
     for p in prior:
         lab = (p.get("aprasymas") or "").strip().lower()
         if lab:
             prior_by_label.setdefault(lab, p)
-            # Also reachable under its post-split successor, so pass 1 (which is
-            # exact and therefore unambiguous about the tier) can carry the
-            # price instead of leaving it to the ambiguous pass 2.
-            renamed = _PAINT_SPLIT_EXACT_RENAMES.get(lab)
-            if renamed:
-                prior_by_label.setdefault(renamed, p)
+    # Aliases in a SECOND pass. Registering them in the loop above let a legacy
+    # row that happens to come FIRST in the list shadow a row already carrying
+    # the post-split label: the walls line then inherited the legacy 9 €/m² and
+    # the user's real 12 €/m² row was carried back as an orphan. A row's own
+    # label always wins; a rename only fills a key nobody claimed.
+    for p in prior:
+        lab = (p.get("aprasymas") or "").strip().lower()
+        renamed = _PAINT_SPLIT_EXACT_RENAMES.get(lab)
+        if renamed:
+            prior_by_label.setdefault(renamed, p)
 
     matched_prior: set[int] = set()
     matched_rebuilt: set[int] = set()
@@ -766,7 +866,12 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
     for p in prior:
         if id(p) in matched_prior:
             continue
-        edited = _has_user_edit(p)
+        # `edited` decides whether a row survives being superseded; `has_money`
+        # is what the user is TOLD about. They differ on exactly one row: a line
+        # the kainynas priced, which carries money but is not a reason to keep a
+        # duplicate of work that legitimately moved tier.
+        edited = _has_user_edit_beyond_kainynas(p)
+        has_money = _has_user_edit(p)
         # Legacy sanitary line the split replaced. Emitted as `relabeled` (not
         # `superseded_by_tier`) on purpose: InteriorProject.jsx forwards exactly
         # the `relabeled` notes to the frontend merge as `serverRelabeled`, and
@@ -787,8 +892,8 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
         rebuilt.append({**p, "_orphaned_after_rebuild": True})
         notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
                       "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),
-                      "user_edit": edited})
-    return rebuilt
+                      "user_edit": has_money})
+    return _materials_last(rebuilt)
 
 
 @router.post("/recompute-quantities")
@@ -891,7 +996,13 @@ def recompute(
     # and the exports read) is silently price-free. (2026-07-28 P0.)
     _CARRY_KEYS = ("kaina", "suma", "manual_override", "quantity_source",
                    "ai_kiekis_original", "override_locked",
-                   "_orphaned_after_rebuild")
+                   "_orphaned_after_rebuild",
+                   # WHERE the price came from. Without it the compat row — the
+                   # one the Kiekiai table and the exports read, and the one the
+                   # frontend writes back onto the project — came back with the
+                   # money but not the 'manual' flag that protects it, so the
+                   # next "Taikyti kainyną" overwrote a hand-typed price.
+                   *_PRICE_PROVENANCE_KEYS)
     if len(darbu_sarasas) == len(pozicijos):
         for row, poz in zip(darbu_sarasas, pozicijos):
             for key in _CARRY_KEYS:

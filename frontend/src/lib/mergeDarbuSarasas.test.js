@@ -293,3 +293,163 @@ test('a priced material keeps its price across the next rebuild', () => {
   assert.equal(out[0].kiekis, 180, 'the quantity is the rebuild’s, the price is the user’s');
   assert.equal(out[0].suma, 162);
 });
+
+// ── the kainynas fill must not turn a benign tier fold into over-billing ─────
+//
+// Before the automatic price fill (2026-09-02) every row arrived unpriced, so
+// pass 3's "an un-edited superseded tier line is dropped" rule fired and a
+// lowered ceiling simply re-tiered the work. Now `autoFillFromDefaultPriceList`
+// prices EVERY matched row at extraction, `hasUserEdit` reads any non-zero
+// kaina as the user's hand, and the same edit left the old (virš 3m) line on
+// the books next to its own successor — 240 m² billed where 200 m² exist.
+
+const FOLD_KEPT = 'Sienų glaistymas/dažymas (iki 3m aukščio)';
+const FOLD_GONE = 'Sienų glaistymas/dažymas (virš 3m aukščio)';
+
+function foldCase(kainaSource) {
+  const price = kainaSource ? { kaina: 7.5, kaina_source: kainaSource } : { kaina: 7.5 };
+  return {
+    rebuilt: [{ aprasymas: FOLD_KEPT, kiekis: 240, vnt: 'm2' }],
+    old: [
+      { aprasymas: FOLD_KEPT, kiekis: 200, vnt: 'm2', ...price },
+      { aprasymas: FOLD_GONE, kiekis: 40, vnt: 'm2', ...price },
+    ],
+  };
+}
+
+const billed = (rows) => Math.round(
+  rows.reduce((s, r) => s + (Number(r.kiekis) || 0), 0) * 100) / 100;
+
+test('a kainynas price does not veto a tier fold (240 m², billed once)', () => {
+  const { rebuilt, old } = foldCase('kainynas');
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, old, notes);
+  assert.equal(billed(out), 240, JSON.stringify(out.map((r) => [r.aprasymas, r.kiekis])));
+  assert.equal(out.filter((r) => r._orphaned_after_rebuild).length, 0,
+    'the re-tiered line came back as a priced orphan — the client pays twice');
+  assert.deepEqual(
+    notes.filter((n) => n.aprasymas === FOLD_GONE).map((n) => n.reason),
+    ['superseded_by_tier']);
+  // …and the contractor does not lose the price either.
+  assert.equal(out[0].kaina, 7.5);
+  assert.equal(out[0].suma, 1800);
+});
+
+test('an unpriced fold still folds', () => {
+  const { rebuilt, old } = foldCase(null);
+  for (const o of old) delete o.kaina;
+  assert.equal(billed(mergeDarbuSarasasEdits(rebuilt, old)), 240);
+});
+
+test('a hand-typed price still vetoes the fold', () => {
+  const { rebuilt, old } = foldCase('manual');
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.deepEqual(
+    out.filter((r) => r._orphaned_after_rebuild).map((r) => r.aprasymas), [FOLD_GONE]);
+});
+
+test('a corrected quantity vetoes the fold even when the kainynas priced it', () => {
+  const { rebuilt, old } = foldCase('kainynas');
+  old[1].manual_override = true;
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.deepEqual(
+    out.filter((r) => r._orphaned_after_rebuild).map((r) => r.aprasymas), [FOLD_GONE]);
+});
+
+test('the fold transfers the price when only the old tier was priced', () => {
+  const rebuilt = [{ aprasymas: FOLD_KEPT, kiekis: 240, vnt: 'm2' }];
+  const old = [{ aprasymas: FOLD_GONE, kiekis: 40, vnt: 'm2',
+                 kaina: 7.5, kaina_source: 'kainynas' }];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].kaina, 7.5);
+  assert.equal(out[0].kaina_source, 'kainynas');
+});
+
+// ── a hand-typed price keeps its 'manual' flag across a rebuild ──────────────
+
+test('price provenance survives the merge', () => {
+  const old = [
+    { aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 15, kaina_source: 'manual' },
+    { aprasymas: 'Lubų dažymas', kiekis: 50, kaina: 7,
+      kaina_source: 'kainynas', kaina_match_score: 0.92 },
+  ];
+  const rebuilt = [
+    { aprasymas: 'Sienų dažymas', kiekis: 110 },
+    { aprasymas: 'Lubų dažymas', kiekis: 50 },
+  ];
+  const by = Object.fromEntries(
+    mergeDarbuSarasasEdits(rebuilt, old).map((r) => [r.aprasymas, r]));
+  assert.equal(by['Sienų dažymas'].kaina_source, 'manual');
+  assert.equal(by['Lubų dažymas'].kaina_source, 'kainynas');
+  assert.equal(by['Lubų dažymas'].kaina_match_score, 0.92);
+});
+
+// ── the paint split must not orphan a priced legacy row ─────────────────────
+
+test('a legacy merged paint row survives a tiered → untiered rebuild', () => {
+  const old = [{ aprasymas: 'Sienų, lubų glaistymas/dažymas (virš 3m aukščio)',
+                 kiekis: 100, kaina: 9 }];
+  const rebuilt = [
+    { aprasymas: 'Sienų glaistymas/dažymas', kiekis: 120 },
+    { aprasymas: 'Lubų glaistymas/dažymas', kiekis: 60 },
+  ];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  const by = Object.fromEntries(out.map((r) => [r.aprasymas, r]));
+  assert.equal(by['Sienų glaistymas/dažymas'].kaina, 9);
+  // the ceiling half comes back unpriced — visible and correct
+  assert.equal(by['Lubų glaistymas/dažymas'].kaina, undefined);
+  assert.equal(out.filter((r) => r._orphaned_after_rebuild).length, 0);
+});
+
+test('a legacy tier line lands on its own tier when both exist', () => {
+  const old = [{ aprasymas: 'Sienų, lubų glaistymas/dažymas (virš 3m aukščio)',
+                 kiekis: 100, kaina: 9 }];
+  const rebuilt = [
+    { aprasymas: 'Sienų glaistymas/dažymas (iki 3m aukščio)', kiekis: 120 },
+    { aprasymas: 'Sienų glaistymas/dažymas (virš 3m aukščio)', kiekis: 60 },
+  ];
+  const by = Object.fromEntries(
+    mergeDarbuSarasasEdits(rebuilt, old).map((r) => [r.aprasymas, r]));
+  assert.equal(by['Sienų glaistymas/dažymas (virš 3m aukščio)'].kaina, 9);
+  assert.equal(by['Sienų glaistymas/dažymas (iki 3m aukščio)'].kaina, undefined);
+});
+
+test('the tier rename still refuses to guess a tier', () => {
+  const old = [{ aprasymas: 'Sienų, lubų glaistymas/dažymas', kiekis: 100, kaina: 9 }];
+  const rebuilt = [
+    { aprasymas: 'Sienų glaistymas/dažymas (iki 3m aukščio)', kiekis: 120 },
+    { aprasymas: 'Sienų glaistymas/dažymas (virš 3m aukščio)', kiekis: 60 },
+  ];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.ok(out.filter((r) => !r._orphaned_after_rebuild).every((r) => r.kaina == null));
+  const carried = out.filter((r) => r._orphaned_after_rebuild);
+  assert.equal(carried.length, 1);
+  assert.equal(carried[0].kaina, 9);
+});
+
+test('a legacy row never shadows a row that owns the new label', () => {
+  const old = [
+    { aprasymas: 'Sienų, lubų glaistymas/dažymas', kiekis: 100, kaina: 9 },
+    { aprasymas: 'Sienų glaistymas/dažymas', kiekis: 120, kaina: 12 },
+  ];
+  const rebuilt = [{ aprasymas: 'Sienų glaistymas/dažymas', kiekis: 120 }];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  const walls = out.find((r) => r.aprasymas === 'Sienų glaistymas/dažymas'
+    && !r._orphaned_after_rebuild);
+  assert.equal(walls.kaina, 12, 'the legacy row shadowed the user’s own row');
+});
+
+// ── the shopping list stays at the foot of the sąmata ───────────────────────
+
+test('a carried orphan never lands below the shopping list', () => {
+  const old = [{ aprasymas: 'Ventiliacijos ortakiai', kiekis: 12, kaina: 30,
+                 skyrius: 'Ventiliacijos darbai' }];
+  const rebuilt = [
+    { aprasymas: 'Sienų dažymas', kiekis: 100, skyrius: 'Sienų glaistymas dažymas' },
+    { aprasymas: 'Dažai sienoms', kiekis: 20, skyrius: 'Medžiagos' },
+  ];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.equal(out[out.length - 1].skyrius, 'Medžiagos',
+    JSON.stringify(out.map((r) => [r.aprasymas, r.skyrius])));
+});

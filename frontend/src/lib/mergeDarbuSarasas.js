@@ -44,6 +44,50 @@ const LEGACY_EXACT_RENAMES = {
 };
 
 /**
+ * The same rename at the TIER-STRIPPED level — the JS twin of the backend's
+ * `_PAINT_SPLIT_TIER_RENAMES`. The exact map above only fires on a full label,
+ * which is what pass 1 needs; pass 2 works on `normLabel` keys, and without the
+ * rename there a legacy priced '… (virš 3m aukščio)' row whose ceiling was
+ * lowered normalized to a key NO rebuilt row carries — measured: the priced row
+ * came back as an orphan and BOTH new rows came back unpriced. With it, pass 2's
+ * one-to-one guard reunites it with the walls line and still refuses when two
+ * tier lines share the key (that case belongs to pass 1, by exact label).
+ */
+const LEGACY_TIER_RENAMES = {
+  'sienų, lubų glaistymas/dažymas': 'sienų glaistymas/dažymas',
+  'sienų, lubų šlifavimas': 'sienų šlifavimas',
+};
+
+/** The section the shopping list lives in — mirror of `SK_MEDZIAGOS`. */
+export const MEDZIAGOS_SKYRIUS = 'Medžiagos';
+
+/**
+ * Where a price CAME FROM. Travels with `kaina` everywhere the money travels,
+ * because the UI's "hand-typed prices are left alone" guarantee is enforced on
+ * `kaina_source` alone — a merge that drops it silently unprotects the price.
+ * Mirror of the backend's `_PRICE_PROVENANCE_KEYS`.
+ */
+const PRICE_PROVENANCE_KEYS = ['kaina_source', 'kaina_match_score'];
+
+/**
+ * Stable-partition the shopping list to the foot of the sąmata. Mirror of the
+ * backend's `_materials_last`.
+ *
+ * `SKYRIUS_ORDER[Medžiagos] = 11` is decorative — the builder appends the
+ * section AFTER its sort — and pass 3 below appends carried orphans after
+ * everything, so a priced orphan of a section that no longer exists sat BELOW
+ * the shopping list that is supposed to close the sąmata.
+ */
+export function materialsLast(rows) {
+  const work = [];
+  const mats = [];
+  for (const r of rows) {
+    ((r?.skyrius || '') === MEDZIAGOS_SKYRIUS ? mats : work).push(r);
+  }
+  return mats.length ? work.concat(mats) : rows;
+}
+
+/**
  * Height/Q/coat-independent key: strip the 'iki/virš 3m' tier suffix, Q-level
  * and '(N sluoksnis)' so a price survives a label change on recompute (e.g. a
  * paint line flips iki<->virš 3m when a ceiling height crosses 3.0m). Used by
@@ -61,7 +105,8 @@ export function normLabel(s) {
   // '… (standartinis aukštis)' line kept a distinct key while the backend
   // folded it — the two normalizers disagreed and pass 2 assigned a price the
   // backend deliberately refuses to guess at (two rebuilt lines could own it).
-  return tierKey(s)
+  const base = tierKey(s);
+  return (LEGACY_TIER_RENAMES[base] || base)
     .normalize('NFKD').replace(/[̀-ͯ]/g, '')             // drop accents
     .replace(/\bq[1-4]\b/g, '')                                    // drop Q-level
     .replace(/\(\s*\d+\s*sluoksn[^)]*\)/g, '')                     // drop '(N sluoksnis)'
@@ -94,6 +139,30 @@ export function hasUserEdit(p) {
 }
 
 /**
+ * `hasUserEdit`, except that a price the KAINYNAS filled in is not the user's
+ * hand. The JS twin of the backend's `_has_user_edit_beyond_kainynas`.
+ *
+ * THE OVER-BILLING (2026-09-02): pass 3 keeps a superseded tier line whenever
+ * the row carries a user edit, and `hasUserEdit` reads ANY non-zero kaina as
+ * one. That was harmless while rows arrived unpriced — the fold worked. Since
+ * `autoFillFromDefaultPriceList` prices every matched row at extraction, EVERY
+ * row looked edited: lowering a ceiling left the old '(virš 3m aukščio)' line on
+ * the books next to its own re-tiered successor, and the client was billed
+ * 240 m² of the 200 m² he has. An AI-matched price must not veto a fold; a
+ * hand-typed one still does, and so do a corrected quantity and a gesture lock.
+ */
+export function hasUserEditBeyondKainynas(p) {
+  if (!p) return false;
+  if (p.kaina_source === 'kainynas') {
+    return p.manual_override === true
+      || p.quantity_source === 'manual_override'
+      || !!p.override_locked
+      || p.source === 'Pažymėjus brėžinyje';
+  }
+  return hasUserEdit(p);
+}
+
+/**
  * @param {Array}  rebuilt  freshly-computed rows from the backend
  * @param {Array}  old      the rows currently in the project (user's prices etc.)
  * @param {Array} [notes]   optional out-param: one entry per carried/suppressed
@@ -116,7 +185,14 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     const k = _lc(o.aprasymas);
     if (!k) continue;
     if (!oldByLabel.has(k)) oldByLabel.set(k, o);
-    const renamed = LEGACY_EXACT_RENAMES[k];
+  }
+  // Aliases in a SECOND pass. Registered in the loop above, a legacy row that
+  // happens to come FIRST in the list claimed the post-split key and the user's
+  // own row — the one already carrying that label — was carried back as an
+  // orphan while the walls line inherited the legacy price. A row's own label
+  // always wins; a rename only fills a key nobody claimed.
+  for (const o of oldList) {
+    const renamed = LEGACY_EXACT_RENAMES[_lc(o.aprasymas)];
     if (renamed && !oldByLabel.has(renamed)) oldByLabel.set(renamed, o);
   }
   const matchedOld = new Set();  // old items already consumed (by object identity)
@@ -151,6 +227,14 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     if (kaina != null) {
       out.kaina = kaina;
       out.suma = (kiekis || 0) * kaina;
+      // …WITH its provenance. `kaina_source` was in neither carry set, so a
+      // hand-typed price came back from the first recompute unlabelled and the
+      // next „Taikyti kainyną" overwrote it — the exact opposite of what that
+      // button's own footnote promises. It also tells pass 3 whether a price is
+      // the user's hand or the kainynas's guess.
+      for (const key of PRICE_PROVENANCE_KEYS) {
+        if (oldItem[key] != null) out[key] = oldItem[key];
+      }
     }
     return out;
   };
@@ -200,7 +284,12 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
   }
   for (const o of oldList) {
     if (matchedOld.has(o)) continue;
-    const edited = hasUserEdit(o);
+    // `edited` decides whether a row survives being superseded; `hasMoney` is
+    // what the user is TOLD about. They differ on exactly one row: a line the
+    // kainynas priced, which carries money but is not a reason to keep a
+    // duplicate of work that legitimately moved tier.
+    const edited = hasUserEditBeyondKainynas(o);
+    const hasMoney = hasUserEdit(o);
     if (!edited && rebuiltTierKeys.has(tierKey(o.aprasymas))) {
       // Un-edited line whose work is still listed under a sibling tier label —
       // the rebuild re-tiered it, nothing was lost.
@@ -213,10 +302,10 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
       aprasymas: o.aprasymas,
       kiekis: o.kiekis,
       kaina: o.kaina,
-      user_edit: edited,
+      user_edit: hasMoney,
     });
   }
-  return merged;
+  return materialsLast(merged);
 }
 
 /** Rows the rebuild could not reproduce — the ones the user must be told about. */

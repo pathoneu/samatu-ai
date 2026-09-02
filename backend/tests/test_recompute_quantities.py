@@ -383,3 +383,208 @@ def test_degradations_are_objects_not_bare_strings(monkeypatch):
     stale = [d for d in degs if d.get("reason") == "stale_quantities"]
     assert len(stale) == 1
     assert "seni kiekiai" in stale[0]["message"]
+
+
+# ── the kainynas fill must not turn a benign tier fold into over-billing ─────
+#
+# Before the automatic price fill (2026-09-02) every row arrived unpriced, so
+# pass 3's "an un-edited superseded tier line is dropped" rule fired and a
+# lowered ceiling simply re-tiered the work. Now `autoFillFromDefaultPriceList`
+# prices EVERY matched row at extraction, `_has_user_edit` reads any non-zero
+# kaina as the user's hand, and the same edit left the old (virš 3m) line on the
+# books next to its own successor — 240 m² billed where 200 m² exist.
+
+_FOLD_PRIOR_LABEL = "Sienų glaistymas/dažymas (virš 3m aukščio)"
+_FOLD_KEPT_LABEL = "Sienų glaistymas/dažymas (iki 3m aukščio)"
+
+
+def _fold_case(source):
+    """A ceiling lowered below 3 m: 200 + 40 m² across two tiers becomes 240 m²
+    on one. `source` is what filled the prices."""
+    price = {"kaina": 7.5} if source is None else {"kaina": 7.5, "kaina_source": source}
+    prior = [
+        {"aprasymas": _FOLD_KEPT_LABEL, "kiekis": 200.0, "vnt": "m2", **price},
+        {"aprasymas": _FOLD_PRIOR_LABEL, "kiekis": 40.0, "vnt": "m2", **price},
+    ]
+    rebuilt = [{"aprasymas": _FOLD_KEPT_LABEL, "kiekis": 240.0, "vnt": "m2"}]
+    return rebuilt, prior
+
+
+def _billed(rows):
+    return round(sum(float(r.get("kiekis") or 0) for r in rows), 2)
+
+
+def test_a_kainynas_price_does_not_veto_a_tier_fold():
+    """THE OVER-BILLING. 240 m² of wall, billed once."""
+    from api.recompute_quantities import _merge_user_edits
+    notes = []
+    out = _merge_user_edits(*_fold_case("kainynas"), notes)
+    assert _billed(out) == 240.0, [(r["aprasymas"], r["kiekis"]) for r in out]
+    assert not [r for r in out if r.get("_orphaned_after_rebuild")], \
+        "the re-tiered line came back as a priced orphan — the client pays twice"
+    assert [n["reason"] for n in notes if n["aprasymas"] == _FOLD_PRIOR_LABEL] \
+        == ["superseded_by_tier"]
+    # …and the contractor does not lose the price either.
+    assert out[0]["kaina"] == 7.5
+    assert out[0]["suma"] == 1800.0
+
+
+def test_an_unpriced_fold_still_folds():
+    """The pre-kainynas behaviour, pinned so the fix is not a special case."""
+    from api.recompute_quantities import _merge_user_edits
+    rebuilt, prior = _fold_case(None)
+    for p in prior:
+        p.pop("kaina")
+    assert _billed(_merge_user_edits(rebuilt, prior)) == 240.0
+
+
+def test_a_hand_typed_price_still_vetoes_the_fold():
+    """The other half of the rule: deciding that a line the user PRICED HIMSELF
+    is obsolete is not a call this merge gets to make silently."""
+    from api.recompute_quantities import _merge_user_edits
+    out = _merge_user_edits(*_fold_case("manual"))
+    carried = [r for r in out if r.get("_orphaned_after_rebuild")]
+    assert [r["aprasymas"] for r in carried] == [_FOLD_PRIOR_LABEL]
+
+
+def test_a_corrected_quantity_vetoes_the_fold_even_when_kainynas_priced():
+    from api.recompute_quantities import _merge_user_edits
+    rebuilt, prior = _fold_case("kainynas")
+    prior[1]["manual_override"] = True
+    out = _merge_user_edits(rebuilt, prior)
+    assert [r["aprasymas"] for r in out if r.get("_orphaned_after_rebuild")] \
+        == [_FOLD_PRIOR_LABEL]
+
+
+def test_the_fold_transfers_the_price_when_only_the_old_tier_was_priced():
+    """No sibling to inherit from: pass 2's one-to-one match must move the
+    kainynas price onto the re-tiered successor, or the fold silently unprices
+    the row it folded."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": _FOLD_PRIOR_LABEL, "kiekis": 40.0, "vnt": "m2",
+              "kaina": 7.5, "kaina_source": "kainynas"}]
+    rebuilt = [{"aprasymas": _FOLD_KEPT_LABEL, "kiekis": 240.0, "vnt": "m2"}]
+    out = _merge_user_edits(rebuilt, prior)
+    assert len(out) == 1 and out[0]["kaina"] == 7.5
+    assert out[0]["kaina_source"] == "kainynas"
+
+
+# ── a hand-typed price keeps its 'manual' flag across a rebuild ──────────────
+
+def test_price_provenance_survives_the_merge():
+    """`kaina_source` is the ONLY thing standing between a hand-typed price and
+    the next "Taikyti kainyną". Dropping it on rebuild made the UI's own promise
+    ("Rankomis įvestos kainos lieka nepakeistos") false on the first recompute."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų dažymas", "kiekis": 100.0, "kaina": 15.0,
+              "kaina_source": "manual"},
+             {"aprasymas": "Lubų dažymas", "kiekis": 50.0, "kaina": 7.0,
+              "kaina_source": "kainynas", "kaina_match_score": 0.92}]
+    rebuilt = [{"aprasymas": "Sienų dažymas", "kiekis": 110.0},
+               {"aprasymas": "Lubų dažymas", "kiekis": 50.0}]
+    out = {p["aprasymas"]: p for p in _merge_user_edits(rebuilt, prior)}
+    assert out["Sienų dažymas"]["kaina_source"] == "manual"
+    assert out["Lubų dažymas"]["kaina_source"] == "kainynas"
+    assert out["Lubų dažymas"]["kaina_match_score"] == 0.92
+
+
+def test_price_provenance_survives_the_endpoint():
+    """End-to-end through the compat emit — `darbu_sarasas` is what the Kiekiai
+    table and every export read, and what the browser writes back onto the
+    project. It used to come back with the money but not the flag protecting
+    it."""
+    label = "Sienų glaistymas/dažymas (virš 3m aukščio)"
+    payload = {
+        "rooms": [_living_room(h=2.8)],
+        "pozicijos": [{"aprasymas": label, "vnt": "m2", "kiekis": 40.0,
+                       "kaina": 15.0, "kaina_source": "manual"}],
+        "edits": [{"field": "lubu_auksciai", "new_value": {"1": 3.2}}],
+        "current_assumptions": {},
+        "context": {"detected_symbols_summary": {"rozetes": 7}},
+    }
+    body = client.post("/api/recompute-quantities", json=payload).json()
+    row = next(r for r in body["darbu_sarasas"] if r["aprasymas"] == label)
+    assert row["kaina"] == 15.0
+    assert row["kaina_source"] == "manual", row
+    poz = next(p for p in body["pozicijos"] if p["aprasymas"] == label)
+    assert poz["kaina_source"] == "manual", poz
+
+
+# ── the paint split must not orphan a priced legacy row ─────────────────────
+
+def test_a_legacy_merged_paint_row_survives_a_tiered_to_untiered_rebuild():
+    """A project priced under the pre-split "Sienų, lubų glaistymas/dažymas
+    (virš 3m aukščio)" whose ceiling is lowered: the rebuild emits the two
+    untiered successors. Before the tier-level rename the legacy row matched
+    NEITHER and came back as an orphan with both new rows unpriced."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)",
+              "kiekis": 100.0, "kaina": 9.0}]
+    rebuilt = [{"aprasymas": "Sienų glaistymas/dažymas", "kiekis": 120.0},
+               {"aprasymas": "Lubų glaistymas/dažymas", "kiekis": 60.0}]
+    out = {p["aprasymas"]: p for p in _merge_user_edits(rebuilt, prior)}
+    assert out["Sienų glaistymas/dažymas"]["kaina"] == 9.0
+    # The ceiling half comes back unpriced — visible and correct, the contractor
+    # now prices the two trades apart, which is why he asked for the split.
+    assert out["Lubų glaistymas/dažymas"].get("kaina") in (None, 0)
+    assert not any(p.get("_orphaned_after_rebuild") for p in out.values())
+
+
+def test_a_legacy_tier_line_lands_on_its_own_tier_when_both_exist():
+    """Both tier lines rebuilt: the EXACT rename (pass 1) knows which tier the
+    legacy row was, so the price lands there and nowhere else. This is why the
+    tier-level rename above may be loose — the unambiguous case never reaches
+    it."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas (virš 3m aukščio)",
+              "kiekis": 100.0, "kaina": 9.0}]
+    rebuilt = [{"aprasymas": "Sienų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 120.0},
+               {"aprasymas": "Sienų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 60.0}]
+    out = {p["aprasymas"]: p for p in _merge_user_edits(rebuilt, prior)}
+    assert out["Sienų glaistymas/dažymas (virš 3m aukščio)"]["kaina"] == 9.0
+    assert out["Sienų glaistymas/dažymas (iki 3m aukščio)"].get("kaina") in (None, 0)
+
+
+def test_the_tier_rename_still_refuses_to_guess_a_tier():
+    """An UNTIERED legacy row against two rebuilt tier lines: the renamed key
+    matches both, so pass 2 must fill neither and the row is carried with its
+    money instead of being spent on a coin flip."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Sienų, lubų glaistymas/dažymas",
+              "kiekis": 100.0, "kaina": 9.0}]
+    rebuilt = [{"aprasymas": "Sienų glaistymas/dažymas (iki 3m aukščio)", "kiekis": 120.0},
+               {"aprasymas": "Sienų glaistymas/dažymas (virš 3m aukščio)", "kiekis": 60.0}]
+    out = _merge_user_edits(rebuilt, prior)
+    assert all(p.get("kaina") in (None, 0)
+               for p in out if not p.get("_orphaned_after_rebuild"))
+    carried = [p for p in out if p.get("_orphaned_after_rebuild")]
+    assert len(carried) == 1 and carried[0]["kaina"] == 9.0
+
+
+def test_a_legacy_row_never_shadows_a_row_that_owns_the_new_label():
+    """The rename alias is registered in a SECOND pass. Registered inline, a
+    legacy row appearing FIRST claimed the post-split key and the user's real
+    row was carried back as an orphan — with the wrong price on the walls."""
+    from api.recompute_quantities import _merge_user_edits
+    prior = [
+        {"aprasymas": "Sienų, lubų glaistymas/dažymas", "kiekis": 100.0, "kaina": 9.0},
+        {"aprasymas": "Sienų glaistymas/dažymas", "kiekis": 120.0, "kaina": 12.0},
+    ]
+    rebuilt = [{"aprasymas": "Sienų glaistymas/dažymas", "kiekis": 120.0}]
+    out = _merge_user_edits(rebuilt, prior)
+    walls = next(p for p in out if p["aprasymas"] == "Sienų glaistymas/dažymas"
+                 and not p.get("_orphaned_after_rebuild"))
+    assert walls["kaina"] == 12.0, "the legacy row shadowed the user's own row"
+
+
+# ── the shopping list stays at the foot of the sąmata ───────────────────────
+
+def test_a_carried_orphan_never_lands_below_the_shopping_list():
+    from api.recompute_quantities import _merge_user_edits
+    prior = [{"aprasymas": "Ventiliacijos ortakiai", "kiekis": 12.0, "kaina": 30.0,
+              "skyrius": "Ventiliacijos darbai"}]
+    rebuilt = [{"aprasymas": "Sienų dažymas", "kiekis": 100.0, "skyrius": "Sienų glaistymas dažymas"},
+               {"aprasymas": "Dažai sienoms", "kiekis": 20.0, "skyrius": "Medžiagos"}]
+    out = _merge_user_edits(rebuilt, prior)
+    assert [p["skyrius"] for p in out][-1] == "Medžiagos", \
+        [(p["aprasymas"], p["skyrius"]) for p in out]
