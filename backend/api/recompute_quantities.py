@@ -616,23 +616,35 @@ def _has_user_edit_beyond_kainynas(p: dict) -> bool:
 _TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
 
 
-def _price_index(darbu_sarasas: list[dict]) -> dict[str, dict]:
-    """label-key → priced/edited darbu_sarasas row.
+def _price_key_for_id(pid) -> str:
+    """Namespace an `id` so it can never collide with a label key."""
+    return f"\x1fid\x1f{str(pid).strip()}"
 
-    Indexed three ways because the same line appears under slightly different
-    text in the two lists: exact lowercased label, the height-independent
-    `_norm_label`, and the label with a trailing parenthetical removed
-    (`_emit_v8_compat_fields` appends `(pastaba)` to the darbu_sarasas label,
-    e.g. tile size, so its text is LONGER than the pozicija's)."""
+
+def _price_index(darbu_sarasas: list[dict]) -> dict[str, dict]:
+    """id/label-key → priced/edited darbu_sarasas row.
+
+    Indexed FOUR ways. The stable `id` (2026-09-02) is the only one that is not
+    a guess about wording — it survives a rename, a re-section and a Q-level
+    relabel — so `_hydrate_prices_from_darbu_sarasas` tries it first and falls
+    back to the three label keys for every project saved before ids existed:
+    exact lowercased label, the height-independent `_norm_label`, and the label
+    with a trailing parenthetical removed (`_emit_v8_compat_fields` appends
+    `(pastaba)` to the darbu_sarasas label, e.g. tile size, so its text is
+    LONGER than the pozicija's)."""
     idx: dict[str, dict] = {}
     for row in darbu_sarasas or []:
         if not isinstance(row, dict) or not _has_user_edit(row):
             continue
         lab = (row.get("aprasymas") or row.get("pavadinimas") or "").strip()
-        if not lab:
+        pid = str(row.get("id") or "").strip()
+        if not lab and not pid:
             continue
-        for key in (lab.lower(), _norm_label(lab),
-                    _TRAILING_PAREN_RE.sub("", lab).strip().lower()):
+        keys = [_price_key_for_id(pid)] if pid else []
+        if lab:
+            keys += [lab.lower(), _norm_label(lab),
+                     _TRAILING_PAREN_RE.sub("", lab).strip().lower()]
+        for key in keys:
             if key:
                 idx.setdefault(key, row)
     return idx
@@ -656,10 +668,15 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
         if not isinstance(p, dict) or _has_user_edit(p):
             continue
         lab = (p.get("aprasymas") or "").strip()
-        if not lab:
+        pid = str(p.get("id") or "").strip()
+        if not lab and not pid:
             continue
-        row = (idx.get(lab.lower()) or idx.get(_norm_label(lab))
-               or idx.get(_TRAILING_PAREN_RE.sub("", lab).strip().lower()))
+        # The id first: it is the one key that does not depend on the two lists
+        # agreeing about wording.
+        row = idx.get(_price_key_for_id(pid)) if pid else None
+        if row is None and lab:
+            row = (idx.get(lab.lower()) or idx.get(_norm_label(lab))
+                   or idx.get(_TRAILING_PAREN_RE.sub("", lab).strip().lower()))
         if row is None:
             continue
         kaina = row.get("kaina")
@@ -741,6 +758,61 @@ def _materials_last(rows: list[dict]) -> list[dict]:
     return work + mats if mats else rows
 
 
+def _reassign_duplicate_ids(rows: list[dict]) -> int:
+    """Re-establish `id` uniqueness on the MERGE OUTPUT. Returns how many moved.
+
+    `assign_position_ids` runs inside the builder, so it only ever sees the
+    rebuilt list. Pass 3 then appends carried orphans keeping the ids they were
+    saved with, and an orphan can legitimately carry a live row's id — a priced
+    legacy label whose id folds onto its successor through `LEGACY_LABEL_KEYS`,
+    for instance. Two rows with one id are indistinguishable to the price index,
+    to the next merge's pass 0 and to a React key, so the duplicate is renamed
+    here rather than shipped.
+
+    THE RULE (mirror this exactly in `frontend/src/lib/mergeDarbuSarasas.js`):
+
+      · rows are claimed in TWO passes — first every row that is NOT flagged
+        `_orphaned_after_rebuild`, in list order, then every carried orphan, in
+        list order. So the rebuilt canonical row always keeps the clean id and
+        the orphan is the one that takes a suffix;
+      · a row with no id is skipped (legacy blobs stay untouched);
+      · claiming `base`: take it if free, else the first free `f"{base}-{n}"`
+        counting up from n = 2. The counting-up (rather than "position among
+        duplicates") is what keeps it collision-free when an orphan already
+        carries a `-2` id from an earlier build.
+
+    Same `-N` shape as `extractor/position_id.assign_position_ids`, so an id
+    minted here and one minted there are indistinguishable downstream.
+    """
+    used: set[str] = set()
+    moved = 0
+
+    def _claim(base: str) -> str:
+        if base not in used:
+            used.add(base)
+            return base
+        n = 2
+        while f"{base}-{n}" in used:
+            n += 1
+        used.add(f"{base}-{n}")
+        return f"{base}-{n}"
+
+    for orphans in (False, True):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if bool(row.get("_orphaned_after_rebuild")) is not orphans:
+                continue
+            base = str(row.get("id") or "").strip()
+            if not base:
+                continue
+            claimed = _claim(base)
+            if claimed != base:
+                row["id"] = claimed
+                moved += 1
+    return moved
+
+
 def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
                       notes: list | None = None) -> list[dict]:
     """After a canonical pozicijos rebuild (ceiling/assumption edit), carry the
@@ -784,6 +856,10 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
 
     `notes` (optional, out-param): appended with one dict per carried orphan /
     suppressed line so the endpoint can DISCLOSE what wasn't recomputed.
+
+    Finally `_reassign_duplicate_ids` re-establishes `id` uniqueness over the
+    OUTPUT: pass 3 appends orphans carrying the ids they were saved with, and
+    `assign_position_ids` only ever saw the rebuilt list.
     """
     if notes is None:
         notes = []
@@ -932,7 +1008,9 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
         notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
                       "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),
                       "user_edit": has_money})
-    return _materials_last(rebuilt)
+    out = _materials_last(rebuilt)
+    _reassign_duplicate_ids(out)
+    return out
 
 
 @router.post("/recompute-quantities")

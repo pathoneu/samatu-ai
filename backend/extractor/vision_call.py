@@ -955,9 +955,27 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "contributions": p.get("contributions"),
             "excluded": p.get("excluded"),
             "roll_up": p.get("roll_up"),
+            # …and whether adding the room rows up reaches the billed number.
+            # False on an anchored ceiling (the chain starts from the
+            # eksplikacija's own total) and on a capped line, so a renderer can
+            # suppress a „Σ" affordance that would contradict the headline.
+            _ledger.SUM_FLAG_KEY: p.get(_ledger.SUM_FLAG_KEY),
             "_assumption": p.get("_assumption"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
+
+    # …and now DROP the ledger from `pozicijos`. The rows above hold the very
+    # same list objects, so the evidence is not copied, it is moved: the blob
+    # was carrying two copies of every contribution (≈12 kB of the demo
+    # project's ≈220 kB, and it grows with the room count), and only the
+    # `darbu_sarasas` copy is ever read — both live tables, the row-detail panel
+    # and the exports read that list. `id` stays: the merge's pass 0 and the
+    # price index key on it. Nothing downstream reads a ledger key off
+    # `pozicijos` (the eval sums `kiekis`; the exporters read `eilutes`).
+    for p in parsed.get("pozicijos") or []:
+        if isinstance(p, dict):
+            for key in (*_ledger.LEDGER_KEYS, _ledger.SUM_FLAG_KEY):
+                p.pop(key, None)
 
     # v8_totals — mirrored santrauka with V8 key names
     s = parsed.get("santrauka") or {}
@@ -1711,6 +1729,35 @@ def _room_dazai_l(room: dict) -> float:
 # anchor, and the per-room sum is used exactly as before.
 _ANCHOR_TOLERANCE = 0.30   # ±30% of Σ room plotai — outside that it isn't ours
 
+# WHY a room is out of a line, in the contractor's words (2026-09-02 review,
+# finding 10). The room carries the CODE — named by `universal_rules` at the
+# branch that fired — and these map it to a sentence that says which input to go
+# and change. „Šios patalpos sienos nedažomos" only restated the outcome; it is
+# kept as the fallback for a room from an older engine, which carries no code.
+_WALLS_OUT_LT = {
+    "override": ("Pažymėta, kad šios patalpos sienos nedažomos — pakeisti "
+                 "galima Prielaidų skydelyje"),
+    "full_tile": "Visos sienos dengiamos plytelėmis",
+    "paskirtis": ("Pagal patalpos paskirtį sienos neapdailinamos — jei "
+                  "dažomos, pažymėkite Prielaidų skydelyje"),
+    "geometrija": "Nepavyko nustatyti sienų ploto — patikrinkite matmenis",
+}
+_GRIND_OUT_LT = {
+    "plyteles": "Grindys klojamos plytelėmis — grindjuosčių nėra",
+    "betonas": "Betoninės grindys be apdailos — grindjuosčių nėra",
+    "sienos": "Sienos neapdailinamos, todėl grindjuosčių nėra",
+    "perimetras": ("Durų pločiai apima visą patalpos perimetrą — patikrinkite "
+                   "matmenis"),
+}
+# Same for the ceiling side (`_ceiling_paint_source`).
+_CEILING_OUT_LT = {
+    "override_off": ("Pažymėta, kad šios patalpos lubos nedažomos — pakeisti "
+                     "galima Prielaidų skydelyje"),
+    "unfinished_room_standard": ("Pagal patalpos paskirtį lubos "
+                                 "neapdailinamos — jei dažomos, pažymėkite "
+                                 "Prielaidų skydelyje"),
+}
+
 
 def _lt_num(v: float) -> str:
     """`165.61` → `165,61` — LT decimal comma, for strings the user reads."""
@@ -2173,16 +2220,20 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
                 why = ("Dažoma sienų dalis — likusi dengiama plytelėmis"
                        if 0 < float(r.get("_walls_paint_factor") or 1) < 1
                        else "Sienos dažomos")
-                why_not = ("Visos sienos dengiamos plytelėmis"
-                           if r.get("_walls_full_tile")
-                           else "Šios patalpos sienos nedažomos")
+                why_not = _WALLS_OUT_LT.get(
+                    r.get("_walls_unpainted_reason"),
+                    "Visos sienos dengiamos plytelėmis"
+                    if r.get("_walls_full_tile")
+                    else "Šios patalpos sienos nedažomos")
             else:
                 full = round(_ceiling_paint_m2(r, stretch_nrs), 2)
                 virs_r = round(min(vc, full), 2)
                 why = "Lubos dažomos"
-                why_not = ("Įtempiamos lubos — glaistymo ir dažymo darbų nėra"
-                           if _is_stretch_ceiling(r, stretch_nrs)
-                           else "Šios patalpos lubos nedažomos")
+                why_not = (
+                    "Įtempiamos lubos — glaistymo ir dažymo darbų nėra"
+                    if _is_stretch_ceiling(r, stretch_nrs)
+                    else _CEILING_OUT_LT.get(r.get("_ceiling_paint_source"),
+                                             "Šios patalpos lubos nedažomos"))
             value = {"all": full, "virs": virs_r}.get(tier, round(full - virs_r, 2))
             if full <= 0:
                 # A PREDICATE left this room out — that is what the contractor
@@ -2207,9 +2258,16 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             return [_ledger.sum_step(contribs, label)]
         # Anchored ceiling: a stated total minus the rooms nobody paints. NOT
         # Σ-decomposable by construction — that is the honest answer.
+        # The note has to SAY that the Σ below does not add up to the total —
+        # otherwise the panel shows per-room metres beside a headline they do
+        # not reach and the contractor is left to guess which one is wrong.
+        # `contributions_sum_to_total` (set by `_ledger.attach`) is the machine
+        # half of the same disclosure.
         steps = [_ledger.step(
             "anchor", f"Eksplikacijos „{_lubos_meta['label']}\"",
-            _lubos_meta["total"], "Patalpų lentelės suma iš brėžinio")]
+            _lubos_meta["total"],
+            "Patalpų kiekiai — iš brėžinio, o bendras kiekis imamas iš "
+            "patalpų eksplikacijos lentelės, todėl patalpų suma jam nelygi")]
         running = float(_lubos_meta["total"])
         for amount, name in ((_lubos_meta["stretch_m2"], "įtempiamos lubos"),
                              (_lubos_meta["unpainted_m2"], "nedažomos lubos")):
@@ -2539,6 +2597,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     Plytelių klijavimas, Hidroizoliacija, Santechnikos darbai, Elektros
     instaliacijos darbai, Pridėtiniai elementai. Each line has skyrius/aprasymas/vnt/kiekis
     matching the original schema so downstream `_emit_v8_compat_fields` still works.
+
+    MUTATES `parsed` AND THE ROOM DICTS INSIDE IT — audit flags
+    (`_grindjuosciu_capped`), `_meta`, `warnings` and the LED/tile bookkeeping
+    are written back onto the caller's own objects. Two builds off one dict are
+    therefore NOT independent: a test that shares a module-scoped blob makes the
+    first build decide what the second one sees (2026-09-02 review finding 2).
+    Hand it a fresh `json.loads` per build.
     """
     rooms = parsed.get("patalpos") or []
     if not rooms:
@@ -2869,16 +2934,31 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         for r in rooms:
             _gm = round(float(r.get("grindjuosciu_m") or 0), 2)
             if _gm <= 0:
-                _g_excluded.append(_ledger.excluded(r, (
+                _g_excluded.append(_ledger.excluded(r, _GRIND_OUT_LT.get(
+                    r.get("_grindjuosciu_praleista"),
                     "Grindys klojamos plytelėmis — grindjuosčių nėra"
                     if float(r.get("plyteles_grindys_m2") or 0) > 0
                     else "Šios patalpos grindjuosčių sąmatoje nėra")))
                 continue
-            _baze = r.get("_grindjuosciu_baze_m")
+            # THREE INDEPENDENTLY PERSISTED TERMS, not a residual. The old pair
+            # was `baze` and `gm − baze`, which adds up to `gm` whatever either
+            # number does — `terms_or_none` could never catch a regression in
+            # it. These come from three separate fields, so the equation only
+            # closes while `perimetras − durys == bazė` and `bazė × 1,10 == gm`
+            # both still hold; when they don't, the terms are dropped rather
+            # than shown wrong (which is what a room from an older engine, with
+            # no `_grindjuosciu_duru_m`, gets).
+            _baze, _duru = (r.get("_grindjuosciu_baze_m"),
+                            r.get("_grindjuosciu_duru_m"))
+            _perim = r.get("perimetras_m")
             _terms = None
-            if _baze is not None:
-                _terms = {"perimetras be durų": round(float(_baze), 2),
-                          "atliekos 10 %": round(_gm - float(_baze), 2)}
+            if _baze is not None and _duru is not None and _perim is not None:
+                _terms = {
+                    "perimetras": round(float(_perim), 2),
+                    # `or 0.0` so a doorless room reads „0,00", never „−0,00".
+                    "durys": -round(float(_duru), 2) or 0.0,
+                    "atliekos 10 %": round(float(_baze) * 0.10, 2),
+                }
             _g_contribs.append(_ledger.contribution(
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
         _g_roll = [_ledger.sum_step(_g_contribs,
@@ -2892,6 +2972,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 f"Kiekvienos patalpos dalis sumažinta iki {_pct:.0f} %. "
                 "Bendros sienos priklauso dviem patalpoms, todėl "
                 "perimetrų suma jas suskaičiuoja dukart."))
+        # Two lines, two ledgers. They must not SHARE the lists or the dicts
+        # inside them: a consumer that edits one row's contribution (a merge
+        # carrying a correction, a serializer normalising a value) would silently
+        # rewrite the other row's evidence too.
+        def _g_copy() -> tuple[list[dict], list[dict], list[dict]]:
+            return ([dict(c) for c in _g_contribs],
+                    [dict(e) for e in _g_excluded],
+                    [dict(s) for s in _g_roll])
+
         pozicijos.extend([
             _ledger.attach(
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
@@ -2899,11 +2988,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                  "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
                  "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
                  "medziagos_vnt": "m"},
-                _g_contribs, _g_excluded, list(_g_roll)),
+                *_g_copy()),
             _ledger.attach(
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
                  "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
-                _g_contribs, _g_excluded, list(_g_roll)),
+                *_g_copy()),
         ])
 
     karnizas_total = _sum("lubu_karnizo_m")

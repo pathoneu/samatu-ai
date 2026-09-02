@@ -1444,6 +1444,25 @@ def calc_room_quantities(room: dict,
     # extraction once that ships.
     walls_paintable = walls_paintable + extra_walls_m2 + extra_walls_virs_3m_m2
 
+    # WHICH predicate left this room out of the paint lines (2026-09-02).
+    # Named HERE, where it was decided, from the branch's own state — the
+    # contribution ledger used to say „Šios patalpos sienos nedažomos", which
+    # only restates that the room has no paint. The contractor's question is
+    # which input to go and change. See `vision_call._paint_rooms` for the
+    # sentences these codes map to; a room from an older engine carries none and
+    # falls back to the generic line.
+    walls_unpainted_reason = None
+    if walls_paintable <= 0:
+        if (walls_paint_factor_override is not None
+                and float(walls_paint_factor_override) <= 0):
+            walls_unpainted_reason = "override"
+        elif is_full_tile:
+            walls_unpainted_reason = "full_tile"
+        elif walls_paint_factor <= 0:
+            walls_unpainted_reason = "paskirtis"
+        else:
+            walls_unpainted_reason = "geometrija"
+
     # Lubos. Sprint §2A.3: support sloped/vaulted/coffered geometry beyond flat.
     # Vision-emitted lubu_tipas (read off the drawing) overrides the paskirtis
     # default — for example Tambūras / vonia / san can all have GKP suspended
@@ -1768,6 +1787,19 @@ def calc_room_quantities(room: dict,
         else 0
     )
     grindjuostes = grindjuostes_base * 1.10  # +10% waste (NRM2 §27)
+    # …and which predicate zeroed it, for the same reason as the walls one
+    # above: „Šios patalpos grindjuosčių sąmatoje nėra" restates the outcome
+    # instead of naming the input the contractor would go and change.
+    grindjuosciu_praleista = None
+    if grindjuostes_base <= 0:
+        if tile_floor:
+            grindjuosciu_praleista = "plyteles"
+        elif floor_type_for_grindjuostes == "concrete":
+            grindjuosciu_praleista = "betonas"
+        elif walls_paint_factor <= 0:
+            grindjuosciu_praleista = "sienos"
+        else:
+            grindjuosciu_praleista = "perimetras"
 
     # PVC/parketas/laminatas grindys
     floor_type = rt_rules.get("floor")
@@ -1857,6 +1889,10 @@ def calc_room_quantities(room: dict,
         "_grindjuosciu_baze_m": round(grindjuostes_base, 2),
         "_grindjuosciu_duru_m": round(
             door_widths_total if grindjuostes_base > 0 else 0.0, 2),
+        # The predicate that left this room out of the grindjuosčių lines, or
+        # None when it is in them. Same contract as `_walls_unpainted_reason`.
+        "_grindjuosciu_praleista": grindjuosciu_praleista,
+        "_walls_unpainted_reason": walls_unpainted_reason,
         # 2026-06-05: silikonavimas_m — Kampų silikonavimas (corner sealant).
         # Wet rooms (vonia/wc/san) only. Multiplier 2.3 is the data-derived
         # median across projects where the AI extract caught the wet rooms:
