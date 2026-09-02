@@ -32,6 +32,7 @@ import {
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
 import { insertRowInSection, manualRowId, nextEilNr } from '@/lib/darbuRows';
+import { findRowById } from '@/lib/ledger';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
 // A well-formed number over the cap gets magnitude advice, not format advice —
@@ -567,15 +568,12 @@ export default function ProjectMainView({
   const currentReview = useMemo(() => getFirstReviewRow(darbai), [darbai]);
 
   // The open ledger panel holds a captured row; every price keystroke replaces
-  // the array under it. Re-derive by id so it never shows a stale quantity.
-  const openDetailRow = useMemo(() => {
-    if (!detailRow) return null;
-    const key = detailRow.id || detailRow._id;
-    const fresh = key
-      ? darbai.find(r => (r.id || r._id) === key)
-      : darbai.find(r => r.eil_nr === detailRow.eil_nr && r.aprasymas === detailRow.aprasymas);
-    return fresh || detailRow;
-  }, [detailRow, darbai]);
+  // the array under it. Re-derive so it never shows a stale quantity —
+  // `findRowById` refuses an ambiguous match rather than resolving a duplicated
+  // id to whichever row came first.
+  const openDetailRow = useMemo(
+    () => (detailRow ? findRowById(darbai, detailRow) || detailRow : null),
+    [detailRow, darbai]);
 
   useEffect(() => {
     if (currentReview) setReviewDraftQty(String(currentReview.kiekis ?? 0).replace('.', ','));

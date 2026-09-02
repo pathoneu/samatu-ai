@@ -14,7 +14,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, MapPin, Settings2, Sigma } from 'lucide-react';
 import {
-  contributionsOf, excludedOf, hasLedger, ledgerFallback, ltNumber, ltQuantity,
+  anchorNote, contributionsOf, excludedOf, hasAnchorStep, hasLedger,
+  ledgerFallback, ltNumber, ltQuantity, rollUpIsAuthoritative,
   sortedContributions, splitContributions, termDriver, termEntries,
 } from '@/lib/ledger';
 
@@ -73,6 +74,7 @@ export default function LedgerTree({
   const { shown, hiddenCount, total } = splitContributions(all, TOP_CONTRIBUTIONS);
   const contributions = showAll ? sortedContributions(all) : shown;
   const skipped = excludedOf(row);
+  const notASum = rollUpIsAuthoritative(rollUp);
 
   const toggleRoom = (key) => setOpenRooms((prev) => {
     const next = new Set(prev);
@@ -155,6 +157,16 @@ export default function LedgerTree({
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">
             {t('project.ledger.roomsCount', { count: total })}
           </p>
+          {/* When an anchor / cap / share is in the chain, these rooms explain
+              the number without adding up to it. Say so before the list, or a
+              contractor adds the column and finds a "mistake" that is not one. */}
+          {notASum && (
+            <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">
+              {anchorNote(rollUp) || t(hasAnchorStep(rollUp)
+                ? 'project.ledger.notASumAnchor'
+                : 'project.ledger.notASum')}
+            </p>
+          )}
           <ul
             className="rounded-sm overflow-hidden"
             style={{ border: '1px solid hsl(var(--border))' }}

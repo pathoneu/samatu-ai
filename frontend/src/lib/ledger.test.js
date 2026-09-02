@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   contributionsOf, excludedOf, findRoom, hasLedger, isAreaRead, isHeightRead,
-  isManualRow, ledgerFallback, ltEur, ltNumber, ltQuantity, rollUpHeadline,
-  sortedContributions, sourceLabel, splitContributions, termEntries, termShare,
-  unitLabel,
+  anchorNote, findRowById, isManualRow, ledgerFallback, ltEur, ltNumber,
+  ltQuantity, rollUpHeadline, rollUpIsAuthoritative, sortedContributions,
+  sourceLabel, splitContributions, termEntries, termShare, unitLabel,
 } from './ledger.js';
 
 // The kampai line from the Beržų demo blob, rebuilt through the real builder.
@@ -185,4 +185,76 @@ test('findRoom matches on string-vs-number room numbers', () => {
   assert.equal(findRoom(rooms, '999'), null);
   assert.equal(findRoom(rooms, null), null);
   assert.equal(findRoom(null, '103'), null);
+});
+
+// The anchored ceiling: the eksplikacija's own „Iš viso" minus the rooms nobody
+// paints. Its contributions are the drawing's per-room figures and their Σ is
+// deliberately NOT the billed quantity.
+const CEILING_ANCHORED = {
+  id: 'ceil01',
+  mato_vnt: 'm²',
+  kiekis: 141.31,
+  contributions: [
+    { room_nr: '102', room_name: 'Svetainė', value: 50.5, unit: 'm2' },
+    { room_nr: '110', room_name: 'Miegamasis', value: 23.97, unit: 'm2' },
+  ],
+  excluded: [],
+  roll_up: [
+    { op: 'anchor', label: 'Eksplikacijos „Iš viso"', value: 165.61,
+      note: 'Patalpų lentelės suma iš brėžinio' },
+    { op: 'sum', label: '− įtempiamos lubos', value: 141.31, note: 'Atimta 24,30 m²' },
+  ],
+};
+
+test('a chain with an anchor is authoritative, a plain Σ is not', () => {
+  assert.equal(rollUpIsAuthoritative(CEILING_ANCHORED.roll_up), true);
+  assert.equal(rollUpIsAuthoritative(GRINDJUOSTES_ROLL_UP), true);   // cap
+  assert.equal(rollUpIsAuthoritative(KAMPAI.roll_up), false);        // plain Σ
+  assert.equal(rollUpIsAuthoritative([
+    { op: 'sum', label: 'Σ 3 patalpų', value: 10 },
+    { op: 'sum', label: 'Suapvalinta', value: 10.01 },
+  ]), false);
+  assert.equal(rollUpIsAuthoritative([]), false);
+  assert.equal(rollUpIsAuthoritative(null), false);
+});
+
+test('the anchor step lends the panel its own explanation', () => {
+  assert.equal(anchorNote(CEILING_ANCHORED.roll_up), 'Patalpų lentelės suma iš brėžinio');
+  // No note written yet → the caller falls back to its own generic sentence.
+  assert.equal(anchorNote([{ op: 'anchor', label: 'x', value: 1 }]), null);
+  assert.equal(anchorNote(KAMPAI.roll_up), null);
+  assert.equal(anchorNote(null), null);
+});
+
+test('the anchored ceiling is never presented as the sum of its rooms', () => {
+  // 50,50 + 23,97 = 74,47, and the line bills 141,31. Nothing in the module
+  // may produce that Σ, and the chain still ends on the billed number.
+  const headline = rollUpHeadline(CEILING_ANCHORED.roll_up, CEILING_ANCHORED.mato_vnt);
+  assert.ok(headline.endsWith('141,31 m²'));
+  assert.ok(!headline.includes('74,47'));
+});
+
+test('findRowById refuses to resolve a duplicated id to the wrong row', () => {
+  const rows = [
+    { id: 'dup', aprasymas: 'Dažymo kampų montavimas', skyrius: 'A', kiekis: 1 },
+    { id: 'dup', aprasymas: 'Grindjuosčių dažymas', skyrius: 'B', kiekis: 2 },
+    { id: 'uniq', aprasymas: 'Vienintelė', skyrius: 'A', kiekis: 3 },
+  ];
+  // A unique id resolves.
+  assert.equal(findRowById(rows, { id: 'uniq' }).kiekis, 3);
+  // A duplicated id falls through to the label pair, which IS unique here.
+  assert.equal(
+    findRowById(rows, { id: 'dup', aprasymas: 'Grindjuosčių dažymas', skyrius: 'B' }).kiekis, 2);
+  // Duplicated id AND no distinguishing label → no match at all, never a guess.
+  assert.equal(findRowById(rows, { id: 'dup' }), null);
+  // Old blobs with no id still match on the label pair.
+  assert.equal(findRowById(rows, { aprasymas: 'Vienintelė', skyrius: 'A' }).kiekis, 3);
+  // Two rows sharing a label as well → unresolvable.
+  const twins = [
+    { id: 'a', aprasymas: 'Nauja eilutė', skyrius: 'A' },
+    { id: 'b', aprasymas: 'Nauja eilutė', skyrius: 'A' },
+  ];
+  assert.equal(findRowById(twins, { aprasymas: 'Nauja eilutė', skyrius: 'A' }), null);
+  assert.equal(findRowById(null, { id: 'x' }), null);
+  assert.equal(findRowById([], null), null);
 });

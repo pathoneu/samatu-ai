@@ -1285,7 +1285,9 @@
         "coefficient": "koeficientas",
         "constant": "pastovus",
         "anchor": "iš lentelės"
-      }
+      },
+      "notASum": "Patalpų skaičiai rodo, iš ko surinktas kiekis; galutinį skaičių nustato skaičiavimo eiga aukščiau, todėl jų suma su juo nesutampa.",
+      "notASumAnchor": "Kiekis imtas iš eksplikacijos lentelės; patalpų skaičiai — iš brėžinio, todėl jų suma su bendru kiekiu nesutampa."
     }
   },
   "shared": {

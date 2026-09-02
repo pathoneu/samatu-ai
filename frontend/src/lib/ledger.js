@@ -122,6 +122,58 @@ export function rollUpHeadline(rollUp, unit) {
     .join(' → ');
 }
 
+// Ops that state an external fact rather than derive one from the rooms. When
+// any of them is in the chain, `Σ contributions` is NOT the billed quantity.
+const NON_ADDITIVE_OPS = new Set(['anchor', 'cap', 'share', 'coefficient', 'constant']);
+
+/**
+ * True when the chain — not the contributions — is the number.
+ *
+ * The anchored ceiling bills the eksplikacija's own „Iš viso" minus the rooms
+ * nobody paints, so its `contributions[]` are the drawing's per-room figures and
+ * their Σ is deliberately NOT `kiekis`; a capped grindjuostės line bills less
+ * than its rooms add up to. In both cases the UI must present the contributions
+ * as supporting detail, never as an addition the reader can check in their head.
+ */
+export function rollUpIsAuthoritative(rollUp) {
+  if (!Array.isArray(rollUp) || rollUp.length === 0) return false;
+  if (rollUp[0]?.op !== 'sum') return true;
+  return rollUp.some(step => NON_ADDITIVE_OPS.has(step?.op));
+}
+
+/** True when the quantity is a stated total, not one assembled from the rooms. */
+export function hasAnchorStep(rollUp) {
+  return (rollUp || []).some(s => s?.op === 'anchor');
+}
+
+/** The `anchor` step's own explanation, when the builder wrote one. */
+export function anchorNote(rollUp) {
+  const step = (rollUp || []).find(s => s?.op === 'anchor');
+  return step?.note || null;
+}
+
+/**
+ * The live row behind a captured one — but ONLY when the match is unambiguous.
+ *
+ * A merge can carry an orphaned prior row that keeps an id the rebuilt row also
+ * has, so a duplicated id must never be allowed to resolve to "some row with
+ * that id": it would silently show one line's ledger under another line's name.
+ * A duplicate falls back to the label pair, exactly like an old blob with no id
+ * at all, and an unresolvable row keeps the captured copy.
+ */
+export function findRowById(rows, row) {
+  if (!row) return null;
+  const list = rows || [];
+  const key = row.id || row._id;
+  if (key) {
+    const hits = list.filter(r => (r.id || r._id) === key);
+    if (hits.length === 1) return hits[0];
+  }
+  const byLabel = list.filter(r =>
+    r.aprasymas === row.aprasymas && (r.skyrius || '') === (row.skyrius || ''));
+  return byLabel.length === 1 ? byLabel[0] : null;
+}
+
 /** Contributions biggest-first — the order a contractor audits in. */
 export function sortedContributions(contributions) {
   return [...(contributions || [])].sort(

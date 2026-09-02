@@ -24,6 +24,7 @@ import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { updateProject } from '@/lib/projectStore';
 import { adjustPositionQuantity, updatePositionQuantity } from '@/lib/quantityOverride';
 import { getQuantitySourceKind, getQuantitySourceLabel } from '@/lib/takeoffWorkflow';
+import { findRowById } from '@/lib/ledger';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import RowDetailPanel from './RowDetailPanel';
@@ -358,16 +359,12 @@ export default function WorkspacePanel({
   const handleRowClick = useCallback((row) => setDetailRow(row), []);
 
   // The panel holds a captured row; a recompute or a price edit replaces the
-  // array under it. Re-derive by id so the open panel never shows stale numbers.
-  const openDetailRow = useMemo(() => {
-    if (!detailRow) return null;
-    const rows = project.darbu_sarasas || [];
-    const key = detailRow.id || detailRow._id;
-    const fresh = key
-      ? rows.find(r => (r.id || r._id) === key)
-      : rows.find(r => r.eil_nr === detailRow.eil_nr && r.aprasymas === detailRow.aprasymas);
-    return fresh || detailRow;
-  }, [detailRow, project.darbu_sarasas]);
+  // array under it. Re-derive so the open panel never shows stale numbers —
+  // `findRowById` refuses an ambiguous match rather than resolving a duplicated
+  // id to whichever row came first.
+  const openDetailRow = useMemo(
+    () => (detailRow ? findRowById(project.darbu_sarasas, detailRow) || detailRow : null),
+    [detailRow, project.darbu_sarasas]);
 
   // Latest project, for a callback that fires LATER than the render that made
   // it (the delete-undo toast action).
@@ -917,7 +914,10 @@ const PositionGroup = memo(function PositionGroup({
       </button>
       {!collapsed && group.rows.map((row, idx) => (
         <PositionRow
-          key={`${row.eil_nr || idx}-${row.aprasymas}`}
+          /* id + index, never a bare id: a merge can carry an orphaned prior
+             row that keeps an id the rebuilt row also has, and React would
+             then reuse one row's editor state under the other's numbers. */
+          key={`${row.id || row.eil_nr || 'r'}-${idx}`}
           row={row}
           showProvenance={showProvenance}
           onClick={() => onRowClick?.(row)}
