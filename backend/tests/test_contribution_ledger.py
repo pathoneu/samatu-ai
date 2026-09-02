@@ -14,7 +14,6 @@ edit refreshes the ledger instead of leaving a stale one on the row.
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -174,6 +173,43 @@ def test_kampai_terms_are_the_four_addends(blob):
         assert abs(sum(c["terms"].values()) - c["value"]) <= 0.02
 
 
+def test_grindjuostes_terms_are_three_real_numbers_not_a_residual(blob):
+    """perimetras − durys + atliekos 10 %. The old pair was `bazė` and
+    `gm − bazė`: a residual that adds up to `gm` whatever either number does, so
+    `terms_or_none` could never fail on it. These three come from three
+    separately persisted fields, so the equation closes only while
+    `perimetras − durys == bazė` and `bazė × 1,10 == gm` both still hold."""
+    row = next(r for r in _recomputed_build(blob)
+               if r["aprasymas"] == "Grindjuosčių sumontavimas")
+    withterms = [c for c in row["contributions"] if c.get("terms")]
+    assert withterms, "no room could explain its skirting metres"
+    for c in withterms:
+        assert set(c["terms"]) == {"perimetras", "durys", "atliekos 10 %"}
+        assert c["terms"]["durys"] <= 0, "the door widths are a deduction"
+        assert str(c["terms"]["durys"]) != "-0.0", "a doorless room reads 0,00"
+        assert abs(sum(c["terms"].values()) - c["value"]) <= 0.02
+
+
+def _skirting_terms(perimetras: float):
+    """One room's skirting terms, straight out of the builder."""
+    out = _build_pozicijos_from_rooms({"patalpos": [{
+        "nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+        "plotas_m2": 20.0, "perimetras_m": perimetras, "lubu_aukstis_m": 2.7,
+        "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
+        "grindjuosciu_m": 16.0, "_grindjuosciu_baze_m": 14.55,
+        "_grindjuosciu_duru_m": 0.85, "elementai": []}], "santrauka": {}})
+    row = next(r for r in out["pozicijos"]
+               if r["aprasymas"] == "Grindjuosčių sumontavimas")
+    return row["contributions"][0].get("terms")
+
+
+def test_a_drifted_perimeter_drops_the_skirting_terms(blob):
+    """The regression the residual pair could not catch: the room's own
+    perimeter no longer explains the base the skirting was billed off."""
+    assert _skirting_terms(15.40) is not None      # 15,40 − 0,85 = 14,55 ✓
+    assert _skirting_terms(21.00) is None          # drifted → no equation shown
+
+
 def test_stale_sub_terms_are_dropped_rather_than_shown_wrong():
     """A room saved by an older engine carries three of the four addends. An
     equation that visibly does not add up is worse than no equation."""
@@ -272,6 +308,30 @@ def test_a_room_with_no_painted_walls_is_excluded_with_a_reason(blob):
         assert e["room_nr"] or e["room_name"]
 
 
+# The strings that only restate the outcome („this room's walls aren't
+# painted"). They survive as the fallback for a room from an older engine, but
+# nothing the CURRENT engine computes may still land on one.
+_RESTATES_THE_PREDICATE = (
+    "Šios patalpos sienos nedažomos",
+    "Šios patalpos lubos nedažomos",
+    "Šios patalpos grindjuosčių sąmatoje nėra",
+)
+
+
+@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+                         ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
+def test_an_excluded_room_names_the_predicate_not_the_outcome(fixture: Path):
+    """„Šios patalpos sienos nedažomos" tells the contractor what he can already
+    see — the room is missing. The reason has to name the input he would go and
+    change: the room-type standard, his own Prielaidos toggle, the tiles."""
+    rows = _recomputed_build(json.loads(fixture.read_text(encoding="utf-8")))
+    reasons = [e["excluded_because"] for r in _ledgered(rows)
+               for e in r["excluded"]]
+    assert reasons, f"{fixture.parent.name}: no room is excluded anywhere"
+    for s in reasons:
+        assert s not in _RESTATES_THE_PREDICATE, s
+
+
 def test_rooms_label_reads_like_lithuanian():
     assert rooms_label(1) == "Σ 1 patalpos"
     assert rooms_label(2) == "Σ 2 patalpų"
@@ -293,6 +353,7 @@ def test_darbu_sarasas_carries_the_ledger(blob):
     rot = next(r for r in out["darbu_sarasas"]
                if r["aprasymas"] == "Sienų lyginimas Knauf Rotband")
     assert rot["_assumption"], "the 19 rows carrying an assumption still can't show it"
+
 
 
 def test_sections_are_untouched_by_the_ledger(blob):
@@ -336,11 +397,10 @@ def test_a_prielaidos_edit_rebuilds_the_ledger(blob):
 
 # ── the strings a contractor reads ──────────────────────────────────────────
 
-BANNED = re.compile(
-    r"Berž|Rangovas [A-D]|rangovo samat|rangovą|\(\d+ projekt|projektai\)"
-    r"|\bvs\b|%/|recall|etalon|kalibruota|ginčytin|Ekstrakcij|Gretimyb"
-    r"|pradinis pass|archetip|low confidence|Vision|žinomai|Sprint|TODO",
-    re.IGNORECASE)
+# ONE vocabulary source. This file used to carry a second copy of the pattern,
+# which is a guard that silently stops guarding the moment the canonical one
+# gains a token.
+from test_confidence_reasons_are_for_the_user import BANNED  # noqa: E402
 
 
 @pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
