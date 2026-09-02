@@ -228,18 +228,19 @@ requirements (openpyxl — check if present), i18n, tests both sides.
 - "Numatytasis" star toggle in PriceLists UI → `is_default` (one per user).
 
 **Part C — matching + apply.**
-- `kainynasMatch.js` (pure, heavily unit-tested): normalize using the EXISTING
-  `normLabel`/`tierKey` from mergeDarbuSarasas (import, don't fork) + strip
-  diacritics/punctuation, token-set similarity. Fill rules: exact normalized
-  match → fill; similarity ≥ 0.65 AND unit matches (m²==m2 etc. — normalize
-  units) → fill as "panaši" (flagged in preview); unit mismatch → NEVER fill;
-  two candidates within 0.05 similarity → ambiguous, don't fill, list it.
-  NEVER overwrite a non-empty/user-entered price (kaina > 0 or price-touched
-  flag if one exists).
-- Manual: "Užpildyti kainas iš kainyno" button in the project view (near
-  export/prielaidos controls) → dialog: pick list (default preselected),
-  preview (n exact / n similar / n unmatched with row names), Apply → toast
-  summary; unmatched stay empty.
+- DISCOVERY (2026-09-02 recon): `frontend/src/lib/applyPriceList.js` ALREADY
+  implements `applyPriceListToPositions` with fuzzy matching, `kaina_source
+  'manual'` never-overwrite protection, and tests; ProjectMainView already has
+  `ApplyPriceListButton` (Sprint 9, ~line 1120). Do NOT write a new matcher —
+  AUDIT and extend the existing one: read its similarity + unit handling first;
+  add whatever is missing of: unit-mismatch never fills; "tokia pati arba
+  panaši" tiering (exact vs similar reported separately); ambiguity guard (two
+  candidates too close → skip + list). Reuse `normLabel`/`tierKey` from
+  mergeDarbuSarasas if its normalization is weaker. Extend its test file.
+- Manual apply: upgrade the existing ApplyPriceListButton dropdown minimally —
+  default list pre-marked (star), and the apply toast gains counts for exact /
+  similar / unmatched. (A full preview dialog only if cheap; the button applies
+  immediately today and says so — keep that contract.)
 - Auto: when a NEW extraction's darbu_sarasas first lands (and only then — not
   on every recompute), if a default kainynas exists, run the same matcher on
   empty-priced rows, apply, and show the summary toast with an "Peržiūrėti"
