@@ -195,18 +195,43 @@ def test_grindjuostes_state_the_cap_instead_of_hiding_it(blob):
     # The contributions stay the rooms' RAW metres: the whole point of the cap
     # step is that the contractor can see the number it clipped.
     assert abs(sum(c["value"] for c in row["contributions"]) - raw) <= 0.01
+    # …which is exactly why a „Σ" beside the headline would contradict it.
+    assert row["contributions_sum_to_total"] is False
 
 
-def test_an_anchored_ceiling_says_anchor_not_sum(blob):
+def test_the_two_grindjuostes_lines_do_not_share_one_evidence_list(blob):
+    """They are built from the same rooms and used to be handed the SAME list
+    objects, so editing one row's evidence rewrote the other's."""
+    rows = _build(blob)
+    a = next(r for r in rows if r["aprasymas"] == "Grindjuosčių sumontavimas")
+    b = next(r for r in rows if r["aprasymas"] == "Grindjuosčių dažymas")
+    for key in ("contributions", "excluded", "roll_up"):
+        assert a[key] is not b[key], key
+        for x, y in zip(a[key], b[key]):
+            assert x is not y, key
+    a["contributions"][0]["value"] = -1.0
+    assert b["contributions"][0]["value"] != -1.0
+
+
+@pytest.mark.parametrize("anchor_scale,sums_to_total",
+                         [(1.0, True), (1.10, False)],
+                         ids=["anchor-equals-rooms", "anchor-above-rooms"])
+def test_an_anchored_ceiling_says_anchor_not_sum(blob, anchor_scale, sums_to_total):
     """T3 of the contractor batch made the ceiling quantity `eksplikacijos „Iš
     viso" − įtempiamos lubos`. A ledger that claimed it was a Σ would be lying,
-    and the guard above would fail."""
+    and the guard above would fail.
+
+    The `anchor-above-rooms` case is the real one: the table totals area the
+    enumerated rooms do not cover, so the per-room figures genuinely do NOT add
+    up to the billed number — and the payload has to say so, in prose on the
+    anchor step and as `contributions_sum_to_total` for a renderer."""
     rooms = blob["patalpos"]
     parsed = {k: v for k, v in blob.items()
               if k not in ("darbu_sarasas", "pozicijos")}
     parsed["pozicijos"] = []
     parsed["_ceiling_anchor"] = {
-        "total_area_m2": round(sum(float(r.get("plotas_m2") or 0) for r in rooms), 2),
+        "total_area_m2": round(sum(float(r.get("plotas_m2") or 0)
+                                   for r in rooms) * anchor_scale, 2),
         "label": "Iš viso"}
     parsed["_overrides"] = {**(parsed.get("_overrides") or {}),
                             "stretch_ceiling_override": {"110": 1}}
@@ -221,6 +246,17 @@ def test_an_anchored_ceiling_says_anchor_not_sum(blob):
         # …and the room whose ceiling nobody paints is NAMED, not just missing.
         assert any(e["room_nr"] == "110" and "Įtempiamos" in e["excluded_because"]
                    for e in row["excluded"]), row["excluded"]
+        # An anchored line still NAMES its rooms — and says, both in prose and
+        # as a flag a renderer reads, whether adding them up reaches the total.
+        assert row["contributions"], "an anchored line still names its rooms"
+        assert row["contributions_sum_to_total"] is (
+            abs(sum(c["value"] for c in row["contributions"])
+                - float(row["kiekis"])) <= 0.01)
+        note = row["roll_up"][0].get("note") or ""
+        assert "eksplikacijos lentelės" in note and "nelygi" in note, note
+    # The table above the rooms puts its extra area on the iki-3 m line, so at
+    # least one line's rooms stop adding up — and it must SAY so.
+    assert all(r["contributions_sum_to_total"] for r in ceiling) is sums_to_total
 
 
 def test_a_room_with_no_painted_walls_is_excluded_with_a_reason(blob):

@@ -955,6 +955,11 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             "contributions": p.get("contributions"),
             "excluded": p.get("excluded"),
             "roll_up": p.get("roll_up"),
+            # …and whether adding the room rows up reaches the billed number.
+            # False on an anchored ceiling (the chain starts from the
+            # eksplikacija's own total) and on a capped line, so a renderer can
+            # suppress a „Σ" affordance that would contradict the headline.
+            _ledger.SUM_FLAG_KEY: p.get(_ledger.SUM_FLAG_KEY),
             "_assumption": p.get("_assumption"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
@@ -2207,9 +2212,16 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             return [_ledger.sum_step(contribs, label)]
         # Anchored ceiling: a stated total minus the rooms nobody paints. NOT
         # Σ-decomposable by construction — that is the honest answer.
+        # The note has to SAY that the Σ below does not add up to the total —
+        # otherwise the panel shows per-room metres beside a headline they do
+        # not reach and the contractor is left to guess which one is wrong.
+        # `contributions_sum_to_total` (set by `_ledger.attach`) is the machine
+        # half of the same disclosure.
         steps = [_ledger.step(
             "anchor", f"Eksplikacijos „{_lubos_meta['label']}\"",
-            _lubos_meta["total"], "Patalpų lentelės suma iš brėžinio")]
+            _lubos_meta["total"],
+            "Patalpų kiekiai — iš brėžinio, o bendras kiekis imamas iš "
+            "patalpų eksplikacijos lentelės, todėl patalpų suma jam nelygi")]
         running = float(_lubos_meta["total"])
         for amount, name in ((_lubos_meta["stretch_m2"], "įtempiamos lubos"),
                              (_lubos_meta["unpainted_m2"], "nedažomos lubos")):
@@ -2899,6 +2911,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 f"Kiekvienos patalpos dalis sumažinta iki {_pct:.0f} %. "
                 "Bendros sienos priklauso dviem patalpoms, todėl "
                 "perimetrų suma jas suskaičiuoja dukart."))
+        # Two lines, two ledgers. They must not SHARE the lists or the dicts
+        # inside them: a consumer that edits one row's contribution (a merge
+        # carrying a correction, a serializer normalising a value) would silently
+        # rewrite the other row's evidence too.
+        def _g_copy() -> tuple[list[dict], list[dict], list[dict]]:
+            return ([dict(c) for c in _g_contribs],
+                    [dict(e) for e in _g_excluded],
+                    [dict(s) for s in _g_roll])
+
         pozicijos.extend([
             _ledger.attach(
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
@@ -2906,11 +2927,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                  "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
                  "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
                  "medziagos_vnt": "m"},
-                _g_contribs, _g_excluded, list(_g_roll)),
+                *_g_copy()),
             _ledger.attach(
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
                  "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
-                _g_contribs, _g_excluded, list(_g_roll)),
+                *_g_copy()),
         ])
 
     karnizas_total = _sum("lubu_karnizo_m")
