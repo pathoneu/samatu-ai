@@ -28,6 +28,7 @@ import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interior
 import { mergeDarbuSarasasEdits, carriedOrphans } from '@/lib/mergeDarbuSarasas';
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
+import { buildRecomputeContext } from '@/lib/recomputeContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -779,6 +780,11 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           bendras_plotas_m2: newRooms.reduce(
             (s, r) => s + (Number(r.plotas_m2) || 0), 0,
           ),
+          // Same reader context /api/recompute-quantities sends — without it
+          // this path rebuilt the ceiling off the per-room sum (dropping the
+          // eksplikacijos anchor) and lost the door/fixture/tile lines.
+          _ceiling_anchor: project._ceiling_anchor,
+          context: buildRecomputeContext(project),
         }),
       });
       if (!res.ok) {

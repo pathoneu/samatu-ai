@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { recompute } from '../../lib/recomputeApi';
 import { parseLtNumber } from '@/lib/parseLtNumber';
+import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
@@ -281,19 +282,9 @@ export default function AssumptionsPanel({ assumptions, onChange, prielaidos, ra
           // Reader/extraction context so a ceiling-height edit rebuilds the
           // canonical pozicijos (paint iki/virš split, kampai…) without losing
           // the door/fixture/symbol lines. (2026-06-17 recompute fix.)
-          context: {
-            _door_types: rawData?._door_types,
-            detected_symbols_summary: rawData?.detected_symbols_summary,
-            _plyteliu_specs: rawData?._plyteliu_specs,
-            bendras_plotas_m2: rawData?.bendras_plotas_m2,
-            v9_meta: rawData?.v9_meta,
-            _overrides: rawData?._overrides,
-            // The eksplikacijos "Iš viso" the ceiling quantity is billed off
-            // (2026-09-02). Without it in the context a Prielaidos edit would
-            // rebuild the ceiling from the per-room sum instead and the number
-            // would jump for no reason the user can see.
-            _ceiling_anchor: rawData?._ceiling_anchor,
-          },
+          // One helper shared with /recompute-interior's caller so the two
+          // recompute paths cannot drift (lib/recomputeContext.js).
+          context: buildRecomputeContext(rawData),
         });
         if (reqId !== reqIdRef.current) return;  // superseded by a newer edit
         revertRef.current = null;
