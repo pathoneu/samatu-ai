@@ -453,3 +453,51 @@ test('a carried orphan never lands below the shopping list', () => {
   assert.equal(out[out.length - 1].skyrius, 'Medžiagos',
     JSON.stringify(out.map((r) => [r.aprasymas, r.skyrius])));
 });
+
+// ── pass 0: the stable id (2026-09-02, Patikra P0) ──────────────────────────
+
+test('pass 0 carries a price across a RELABEL when both rows share an id', () => {
+  const old = [{ id: 'abc123abc123', aprasymas: 'Sienų šlifavimas', kiekis: 100, kaina: 7 }];
+  const rebuilt = [{
+    id: 'abc123abc123',
+    aprasymas: 'Sienų šlifavimas Q4 (80–120 grit, 100% paviršius)',
+    kiekis: 100,
+  }];
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, old, notes);
+  assert.equal(out.length, 1, 'the relabeled row was carried alongside its successor');
+  assert.equal(out[0].kaina, 7);
+  assert.equal(notes.filter((n) => n.reason === 'relabeled').length, 1);
+});
+
+test('pass 0 never spends one old row on two rebuilt rows', () => {
+  const old = [{ id: 'dup', aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 5 }];
+  const rebuilt = [
+    { id: 'dup', aprasymas: 'Sienų dažymas', kiekis: 100 },
+    { id: 'dup', aprasymas: 'Sienų dažymas', kiekis: 100 },
+  ];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.equal(out.filter((r) => r.kaina === 5).length, 1);
+});
+
+test('an id mismatch falls through to the label passes, unchanged', () => {
+  const old = [{ id: 'rnk-aaaa', aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 5 }];
+  const rebuilt = [{ id: 'bbbb', aprasymas: 'Sienų dažymas', kiekis: 110 }];
+  const out = mergeDarbuSarasasEdits(rebuilt, old);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].kaina, 5);
+  assert.equal(out[0].kiekis, 110);
+});
+
+test('rows with no id at all behave exactly as before', () => {
+  const old = [
+    { aprasymas: 'Sienų dažymas', kiekis: 100, kaina: 5 },
+    { aprasymas: 'Rozetės / jungiklio pajungimas', kiekis: 52, kaina: 12 },
+  ];
+  const rebuilt = [{ aprasymas: 'Sienų dažymas', kiekis: 110 }];
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, old, notes);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].kaina, 5);
+  assert.equal(carriedOrphans(notes).length, 1);
+});

@@ -474,13 +474,10 @@ def _apply_gesture_edits(rooms: list[dict], pozicijos: list[dict],
     return out_rooms, pozicijos
 
 
-_TIER_SUFFIX_RE = re.compile(
-    r"\s*\((?:iki|virš)\s*3\s*m[^)]*\)"          # (iki 3m aukščio) / (virš 3 m aukščio)
-    r"|\s*\(standartinis aukštis\)"               # GKP tier label
-    r"|\s*—\s*papildomas darbas dėl aukščio"      # height-premium tail
-    r"|\s*q4\s*\([^)]*\)",                         # Q4 sanding suffix
-    re.IGNORECASE,
-)
+# The tier vocabulary lives in `extractor/position_id` — the stable-id hash and
+# this price index MUST strip the same suffixes or a re-tiered line gets a new
+# id AND a new price key at once. One definition, imported, never re-typed.
+from extractor.position_id import _TIER_SUFFIX_RE, tier_key as _tier_key  # noqa: E402
 
 
 # The canonical builder folds 'LED nišų glaistymas' + 'LED nišų dažymas' into one
@@ -544,17 +541,14 @@ _PAINT_SPLIT_EXACT_RENAMES = {
 }
 
 
-def _tier_key(s: str | None) -> str:
-    """Label with ONLY the height/Q-level tier suffixes stripped.
-
-    Two labels sharing a tier key describe the same work at different ceiling
-    tiers ('… (iki 3m aukščio)' vs '… (virš 3m aukščio)' vs '… (standartinis
-    aukštis)'). Used by the orphan pass to tell a legitimately RE-TIERED line
-    (the work is still in the list, under the sibling label) from a line the
-    rebuild simply cannot produce (corner beads, whole electrical sections).
-    Deliberately does NOT fold the LED pair — 'LED nišų dažymas' is a distinct
-    work item from the consolidated line, so it must still be carried."""
-    return _TIER_SUFFIX_RE.sub("", (s or "").strip().lower()).strip()
+# `_tier_key` (imported above) — label with ONLY the height/Q-level tier
+# suffixes stripped. Two labels sharing a tier key describe the same work at
+# different ceiling tiers ('… (iki 3m aukščio)' vs '… (virš 3m aukščio)' vs
+# '… (standartinis aukštis)'). Used by the orphan pass to tell a legitimately
+# RE-TIERED line (the work is still in the list, under the sibling label) from a
+# line the rebuild simply cannot produce (corner beads, whole electrical
+# sections). Deliberately does NOT fold the LED pair — 'LED nišų dažymas' is a
+# distinct work item from the consolidated line, so it must still be carried.
 
 
 # The paint split at the TIER-STRIPPED level. `_PAINT_SPLIT_EXACT_RENAMES` above
@@ -744,7 +738,13 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
     user's manual edits forward from the prior pozicijos so the rebuild doesn't
     silently revert them.
 
-    Two-pass match:
+    Four-pass match:
+      0. STABLE ID (2026-09-02) — both sides carry `id` only when both were built
+         by the current builder (`extractor/position_id`), so this pass is a
+         no-op on every project saved before ids existed and the label passes
+         below stay the fallback forever. The id already folds the renames the
+         label maps below spell out (the sienų/lubų split, the sanitary split,
+         the Q-level suffix), so it agrees with them rather than racing them.
       1. EXACT aprasymas — handles the common case and the simultaneously-present
          iki/virš tier pair in mixed-height projects (no collision).
       2. HEIGHT-INDEPENDENT fallback for any prior edited line left unmatched
@@ -798,9 +798,39 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
 
     matched_prior: set[int] = set()
     matched_rebuilt: set[int] = set()
+
+    # Pass 0 — stable id. Only fires when BOTH rows carry one; an old blob has
+    # none and drops straight through to the label passes.
+    prior_by_id: dict[str, dict] = {}
+    for p in prior:
+        pid = str(p.get("id") or "").strip()
+        if pid:
+            prior_by_id.setdefault(pid, p)
+    if prior_by_id:
+        for p in rebuilt:
+            pid = str(p.get("id") or "").strip()
+            prev = prior_by_id.get(pid) if pid else None
+            if prev is None or id(prev) in matched_prior:
+                continue
+            _carry_edit(prev, p)
+            matched_prior.add(id(prev))
+            matched_rebuilt.add(id(p))
+            if ((prev.get("aprasymas") or "").strip().lower()
+                    != (p.get("aprasymas") or "").strip().lower()):
+                # Same row, new wording — say where the money went, exactly as
+                # the label passes do, so the browser-side merge folds it too.
+                notes.append({"aprasymas": prev.get("aprasymas"),
+                              "reason": "relabeled",
+                              "into": p.get("aprasymas"),
+                              "kaina": p.get("kaina")})
+
     for p in rebuilt:
+        if id(p) in matched_rebuilt:
+            continue
         lab = (p.get("aprasymas") or "").strip().lower()
         prev = prior_by_label.get(lab)
+        if prev is not None and id(prev) in matched_prior:
+            prev = None
         if prev is not None:
             _carry_edit(prev, p)
             matched_prior.add(id(prev))

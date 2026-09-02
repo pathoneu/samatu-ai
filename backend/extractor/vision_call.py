@@ -25,6 +25,7 @@ from .prompt import (
     ZOOM_DPI, ZOOM_MAX_DIM, ZOOM_PADDING_PCT,
 )
 from models_config import model_for
+from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
 
 _ENV_TRUTHY = {"1", "true", "yes", "on"}
@@ -911,6 +912,11 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             aprasymas = f"{aprasymas} ({pastaba})"
         darbu_sarasas.append({
             "eil_nr": i,
+            # The row's durable name (2026-09-02, Patikra P0). `eil_nr` is a
+            # position in a list — it changes whenever a line appears above —
+            # so nothing may key on it; `id` survives a rebuild, a re-section
+            # and a Q-level relabel. See extractor/position_id.py.
+            "id": p.get("id"),
             "skyrius": skyrius,
             "skyrius_label": skyrius,
             "skyrius_enum": _SKYRIUS_ENUM.get(skyrius, "extras"),
@@ -3695,6 +3701,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # work row into ONE "Medžiagos" section at the end. Runs AFTER
     # apply_confidence so each material inherits its parent work's final tier.
     _extract_medziagos_section(parsed)
+
+    # 2026-09-02 (Patikra P0): ONE id pass, dead last — every row is now in its
+    # final section under its final label, so the hash is the row's durable name
+    # for the price carry, the audit panel and the post-recompute diff.
+    assign_position_ids(parsed.get("pozicijos") or [])
     return parsed
 
 

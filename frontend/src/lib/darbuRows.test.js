@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { insertRowInSection, nextEilNr, rowSection } from './darbuRows.js';
+import { insertRowInSection, manualRowId, nextEilNr, rowSection } from './darbuRows.js';
 
 const OTHER = 'Kiti darbai';
 
@@ -45,4 +45,12 @@ test('nextEilNr: max + 1, not length + 1 (deletion gaps)', () => {
 test('nextEilNr: tolerates missing/garbage eil_nr', () => {
   assert.equal(nextEilNr([{ eil_nr: null }, { eil_nr: 'x' }, {}]), 1);
   assert.equal(nextEilNr([]), 1);
+});
+
+test('manualRowId: unique, and never mistakable for a computed row id', () => {
+  const a = manualRowId();
+  const b = manualRowId();
+  assert.notEqual(a, b);
+  assert.ok(a.startsWith('rnk-'), a);
+  assert.ok(a.length > 8);
 });

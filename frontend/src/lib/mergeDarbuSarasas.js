@@ -196,6 +196,7 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     if (renamed && !oldByLabel.has(renamed)) oldByLabel.set(renamed, o);
   }
   const matchedOld = new Set();  // old items already consumed (by object identity)
+  const matchedNew = new Set();  // rebuilt indexes already matched by pass 0
   // Rows the server folded into another line are already represented (with
   // their price) in `rebuilt` — consume them so neither pass re-uses them.
   if (Array.isArray(serverRelabeled) && serverRelabeled.length) {
@@ -238,12 +239,43 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     }
     return out;
   };
+  // Pass 0 — stable id (2026-09-02, Patikra P0). The JS twin of the backend's
+  // id pass. Both sides carry `id` only when both came out of the current
+  // builder (`extractor/position_id.py`), so this is a no-op on every project
+  // saved before ids existed and the label passes below remain the fallback
+  // forever. The id already folds the same renames the label maps above spell
+  // out, so it agrees with them rather than racing them.
+  const merged = rebuilt.slice();
+  const oldById = new Map();
+  for (const o of oldList) {
+    const k = String(o?.id || '').trim();
+    if (k && !oldById.has(k)) oldById.set(k, o);
+  }
+  if (oldById.size) {
+    merged.forEach((newItem, i) => {
+      const k = String(newItem?.id || '').trim();
+      if (!k) return;
+      const oldItem = oldById.get(k);
+      if (!oldItem || matchedOld.has(oldItem)) return;
+      matchedOld.add(oldItem);
+      matchedNew.add(i);
+      merged[i] = carry(newItem, oldItem);
+      if (_lc(oldItem.aprasymas) !== _lc(newItem.aprasymas)) {
+        notes.push({
+          reason: 'relabeled',
+          aprasymas: oldItem.aprasymas,
+          into: newItem.aprasymas,
+        });
+      }
+    });
+  }
   // Pass 1 — exact lowercased-label match (unchanged behaviour).
-  const merged = rebuilt.map((newItem) => {
+  merged.forEach((newItem, i) => {
+    if (matchedNew.has(i)) return;
     const oldItem = oldByLabel.get(_lc(newItem.aprasymas));
-    if (!oldItem) return newItem;
+    if (!oldItem || matchedOld.has(oldItem)) return;
     matchedOld.add(oldItem);
-    return carry(newItem, oldItem);
+    merged[i] = carry(newItem, oldItem);
   });
   // Pass 2 — rescue prices for lines whose label changed on rebuild. Match
   // still-unpriced rebuilt lines to unconsumed old PRICED/edited lines by the

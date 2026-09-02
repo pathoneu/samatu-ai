@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
-import { insertRowInSection, nextEilNr } from '@/lib/darbuRows';
+import { insertRowInSection, manualRowId, nextEilNr } from '@/lib/darbuRows';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
 // A well-formed number over the cap gets magnitude advice, not format advice —
@@ -631,6 +631,7 @@ export default function ProjectMainView({
   const handleAddRow = () => {
     const next = {
       eil_nr: darbai.length + 1,
+      id: manualRowId(),
       aprasymas: t('project.mainView.newRow'),
       mato_vnt: 'm²',
       kiekis: 0,
@@ -647,6 +648,7 @@ export default function ProjectMainView({
   const handleAddRowInSection = (cat) => {
     const next = {
       eil_nr: nextEilNr(darbai),
+      id: manualRowId(),
       aprasymas: t('project.mainView.newRow'),
       mato_vnt: 'm²',
       kiekis: 0,

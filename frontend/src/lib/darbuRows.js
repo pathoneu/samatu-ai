@@ -30,3 +30,23 @@ export function insertRowInSection(darbai, cat, newRow, otherLabel) {
 export function nextEilNr(darbai) {
   return (darbai || []).reduce((m, d) => Math.max(m, Number(d.eil_nr) || 0), 0) + 1;
 }
+
+/**
+ * A durable id for a HAND-ADDED row (2026-09-02, Patikra P0).
+ *
+ * Every computed row carries a hash of its section + label (backend
+ * `extractor/position_id.py`), which is what the recompute merge now matches on
+ * first. A hand-added row is never produced by that builder, so it needs no
+ * agreement with the hash — it needs to be unique and to survive every rebuild
+ * in the row object the merge carries forward. Hence a random id under its own
+ * `rnk-` (rankinė) prefix: two rows both called „Nauja eilutė" in one section
+ * stay distinguishable, and a hand-typed label that happens to equal a computed
+ * one cannot silently inherit that row's identity — it falls through to the
+ * label passes exactly as it does today.
+ */
+export function manualRowId() {
+  const rnd = globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+    : Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(-4);
+  return `rnk-${rnd}`;
+}
