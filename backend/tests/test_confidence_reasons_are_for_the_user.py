@@ -1,7 +1,7 @@
 """Every _confidence_reason a contractor can see must guide, never confess.
 
 2026-08-31, founder catch on the live review queue: a row read "Formulė
-kalibruota pagal 1 rangovo samatą (Beržų) — … tikslumas nepatvirtintas
+kalibruota pagal 1 rangovo samatą (Kliento) — … tikslumas nepatvirtintas
 (reikia daugiau etalonų)". Three failures in one string: it LEAKS another
 client's project name to every future user, it quotes our benchmark
 methodology (sample counts, error pairs) as if the number were copied from
