@@ -236,7 +236,7 @@ test('spreadOverlappingMarkers: solo markers keep their true anchor', () => {
 });
 
 test('spreadOverlappingMarkers: identical centroids fan out horizontally, nr-ordered', () => {
-  // duplicated flood-fill polygons → 3 rooms share one centroid (Beržų 103/108/109 case)
+  // duplicated flood-fill polygons → 3 rooms share one centroid (Objektas A 103/108/109 case)
   const m = spreadOverlappingMarkers([
     { nr: '109', cx: 648, cy: 506 },
     { nr: '103', cx: 648, cy: 506 },

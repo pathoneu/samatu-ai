@@ -65,7 +65,7 @@ test('inverseRotatePctPoint: round-trips rotatePctPoint for every quarter turn',
 });
 
 test('inverseRotatePctPoint: display click on a 90-display page maps back to mediabox', () => {
-  // Mirror of the verified room-102 forward mapping on the Beržų /Rotate-270
+  // Mirror of the verified room-102 forward mapping on the Objektas A /Rotate-270
   // sheet (displayed as mediabox rotated 90° CW): mediabox (0.30, 0.34) shows
   // at display (0.66, 0.30). A click at display (0.66, 0.30) must therefore
   // land back at mediabox (0.30, 0.34).

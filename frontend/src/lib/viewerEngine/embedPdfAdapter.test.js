@@ -51,7 +51,7 @@ test('toViewport(toPdf(sp)) round-trips screen points for all rotations', () => 
   }
 });
 
-// The verified Beržų anchor: room 102 sits at mediabox pct (0.30, 0.34) on a
+// The verified Objektas A anchor: room 102 sits at mediabox pct (0.30, 0.34) on a
 // reported-/Rotate-270 sheet. The base render is now rotated to the TRUE /Rotate
 // (270°), so the display map is rotatePctPoint(x,y,270) = (y, 1-x):
 // (0.30,0.34) -> (0.34, 0.70). Browser-verified 2026-07-09 — room 102's zone

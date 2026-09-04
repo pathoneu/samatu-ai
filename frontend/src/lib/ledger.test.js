@@ -8,7 +8,7 @@ import {
   sourceLabel, splitContributions, termEntries, termShare, unitLabel,
 } from './ledger.js';
 
-// The kampai line from the Beržų demo blob, rebuilt through the real builder.
+// The kampai line from the Objektas A demo blob, rebuilt through the real builder.
 const KAMPAI = {
   id: '012ed8ac98ad',
   aprasymas: 'Dažymo kampų montavimas',

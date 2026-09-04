@@ -113,8 +113,8 @@ test('autoPageScales: page_nr rooms are honoured via the shared roomPageOf', () 
   assert.ok(out[3]);
 });
 
-test('autoPageScales: the Beržų demo page 2 still auto-calibrates to ~1:105', () => {
-  // 5 traced rooms, real values from backend/data/demo-berzu-24-snapshot-20260714.json
+test('autoPageScales: the Objektas A demo page 2 still auto-calibrates to ~1:105', () => {
+  // 5 traced rooms, real values from backend/data/demo-objektas-a-snapshot-20260714.json
   // (frac = polygon_pct shoelace area, m2 from the eksplikacija).
   const W = 1191.24, H = 842.04;
   const mk = (frac, m2) => {

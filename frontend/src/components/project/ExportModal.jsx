@@ -201,7 +201,7 @@ export default function ExportModal({ open, onClose, project }) {
     setLoading(action);
     try {
       // Unicode-aware — the old ASCII \w stripped Lithuanian letters
-      // ("Beržų g. 24" → "Ber g 24"). Same sanitizer as ExportDropdown.
+      // ("Ąžuolų g. 24" → "uol g 24"). Same sanitizer as ExportDropdown.
       const safeName = sanitizeExportFilename(project.name);
       if (action === 'excel') {
         await downloadFromBackend('generate-excel', project, `${safeName}.xlsx`);

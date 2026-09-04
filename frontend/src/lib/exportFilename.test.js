@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { sanitizeExportFilename } from './exportFilename.js';
 
 test('sanitizeExportFilename: keeps Lithuanian diacritics', () => {
-  assert.equal(sanitizeExportFilename('Beržų g. 24'), 'Beržų g. 24');
+  assert.equal(sanitizeExportFilename('Ąžuolų g. 24'), 'Ąžuolų g. 24');
   assert.equal(
     sanitizeExportFilename('Ąžuolų alėja 5 — Šiaulių įstaiga'),
     'Ąžuolų alėja 5 Šiaulių įstaiga',

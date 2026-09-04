@@ -214,7 +214,7 @@ export default function InteriorWorkspace({
     // auto-traced boundary.
     // 2026-07-02: re-enabled after the multi-seed accuracy lift (label seed +
     // bbox-centroid) + seed-inside-polygon guard + ground-truth benchmark gate
-    // (Phase A: Beržų auto >= 8, wrong_room_fills = 0 on every project). The
+    // (Phase A: Objektas A auto >= 8, wrong_room_fills = 0 on every project). The
     // detector now traces walls where confident and emits a label-anchored
     // marker_pct where it can't — never a fabricated coarse rectangle.
     const AUTO_DETECT_POLYGONS = true;
