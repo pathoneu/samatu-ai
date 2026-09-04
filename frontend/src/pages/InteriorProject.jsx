@@ -1113,6 +1113,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               </button>
             </div>
           <AssumptionsPanel
+            bare
             defaultOpen={true}
             title={t('project.interior.assumptionsTitle')}
             assumptions={project._overrides || {}}

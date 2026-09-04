@@ -27,12 +27,11 @@ import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import WorkspacePanel from './WorkspacePanel';
-import OnboardingTooltips from './OnboardingTooltips';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { getProject, updateProject } from '@/lib/projectStore';
-import { buildPageMetaDict, missingInteriorTypes } from '@/lib/pageTypes';
+import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 
 const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_needed'];
@@ -164,7 +163,12 @@ export default function InteriorWorkspace({
   // brightens the matching zone (panel → canvas half of the hover sync).
   const [hiddenRoomNrs, setHiddenRoomNrs] = useState(() => new Set());
   const [hoveredRoomNr, setHoveredRoomNr] = useState(null);
-  const effectiveFocusedPage = localFocusedPage ?? focusedPage;
+  // Open on the first PLAN page. Page 1 of a real interior set is a marketing
+  // render whose scale reads „nekalibruotas"; the plan on page 2 auto-seeds its
+  // own scale. Landing on the cover asks the contractor to work out that the
+  // app opened the wrong page before he has done anything. (Design §4.)
+  const defaultPage = useMemo(() => firstPlanPage(project), [project.puslapiai, project.v8_pages, project.patalpos]);
+  const effectiveFocusedPage = localFocusedPage ?? focusedPage ?? defaultPage;
   // Re-derive the focused room from the LIVE patalpos by nr — the focusedRoom
   // prop / local state is a captured object and can carry a stale polygon after
   // auto-detect upgrades the room's polygon_pct. Always render the latest.
@@ -388,8 +392,6 @@ export default function InteriorWorkspace({
     // + the step footer 64 + slack. The footer must stay on screen — it holds
     // the step's one big button.
     <div className="flex flex-col md:flex-row h-[calc(100vh-244px)] min-h-[520px] border border-border rounded-lg overflow-hidden bg-background relative">
-      {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
-      <OnboardingTooltips />
       {/* Phase C-1 Task 24: coarse-pointer (touch) view-only notice. It lived in
           the Konva PdfViewer, which was deleted (dc9a230) — the component
           survived with zero imports, so touch users got no warning at all.

@@ -499,7 +499,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
 // literally fought the user's navigation. Jump ONCE per new target; re-arm
 // only when the focus object itself changes (clicking a room again re-jumps).
 function FocusScroller({ documentId, focusedRoom, focusedPage }) {
-  const { provides: scrollApi } = useScroll(documentId);
+  const { provides: scrollApi, state: scroll } = useScroll(documentId);
   // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
   // zone layer and this scroller must never disagree about a room's page.
   const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
@@ -511,6 +511,38 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
     doneRef.current = targetPage;
     scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
   }, [targetPage, scrollApi]);
+
+  // THE JUMP CAN LAND ON NOTHING (2026-09-04, measured). `scrollToPage` is
+  // callable before the pages have been measured, and calling it then computes
+  // an offset of ~0 for every page: on a cold open the plugin's currentPage
+  // became 2 while the viewport sat on the cover (scrollTop 4 of 9566, page 2
+  // really starting at 784). Because the jump above fires exactly once per
+  // target, that wasted call also consumed it, so a project would silently open
+  // on its marketing render.
+  //
+  // So: confirm, and retry a bounded few times if it did not take. It stops the
+  // moment the viewport is off page 1 — which is also what makes it safe. A
+  // user who scrolls anywhere during that first second has left page 1, so this
+  // can never fight him (founder bug 2026-07-25 "scrolls by itself").
+  const retriesRef = useRef(0);
+  useEffect(() => { retriesRef.current = 0; }, [focusedRoom, focusedPage]);
+  useEffect(() => {
+    if (!targetPage || targetPage <= 1 || !scrollApi?.scrollToPage) return;
+    if (retriesRef.current >= 8) return;
+    // Read the METRICS, never `currentPage`: the failed jump already wrote 2
+    // into currentPage, so trusting it would report success on a viewport that
+    // never moved (which is exactly how this bug hid). Empty metrics = the
+    // pages are not measured yet; page 1 = the viewport is still on the cover.
+    // Anything else means it landed, or the user scrolled — both stop us.
+    const m = scroll?.pageVisibilityMetrics;
+    const measured = Array.isArray(m) && m.length > 0;
+    if (measured && visiblePageOf(scroll) !== 1) return;
+    const id = setTimeout(() => {
+      retriesRef.current += 1;
+      scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'auto' });
+    }, 300);
+    return () => clearTimeout(id);
+  }, [targetPage, scrollApi, scroll]);
   return null;
 }
 

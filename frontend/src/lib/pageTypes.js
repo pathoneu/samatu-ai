@@ -124,3 +124,50 @@ export function missingInteriorTypes(puslapiai) {
   const present = new Set(puslapiai.map(p => p?.tipas).filter(Boolean));
   return EXPECTED_INTERIOR_TYPES.filter(t => !present.has(t));
 }
+
+// ── Where the drawing should OPEN ────────────────────────────────────────────
+
+// The page types a contractor means by „brėžinys". A cover render, a
+// specification table and a site plan are none of them.
+const PLAN_TYPES = ['floor_plan', 'ceiling_plan', 'wall_elevation', 'section'];
+
+/**
+ * The page the viewer should open on — the first PLAN, never the cover.
+ *
+ * Measured on the 11-room dev project: page 1 is a marketing render of a
+ * kitchen, the plan starts on page 2, and the scale on page 1 reads
+ * „nekalibruotas" while page 2 auto-seeds „~1:109". Landing on the cover asks
+ * a 52-year-old contractor to work out that the app has opened the wrong page
+ * before he has done anything at all.
+ *
+ * Order of preference: a classified plan page → the page the eksplikacija was
+ * read from → the first page any room says it lives on → page 1. Every step is
+ * a fact already stored on the project; nothing new is computed.
+ *
+ * @param {object} project
+ * @returns {number} 1-based page number, always ≥ 1
+ */
+export function firstPlanPage(project) {
+  const pages = Array.isArray(project?.puslapiai) ? project.puslapiai
+    : Array.isArray(project?.v8_pages) ? project.v8_pages : [];
+  const numbered = pages
+    .map((p) => ({ nr: Number(p?.nr ?? p?.page ?? p?.puslapio_nr), tipas: p?.tipas || p?.type }))
+    .filter((p) => Number.isFinite(p.nr) && p.nr >= 1);
+
+  for (const wanted of PLAN_TYPES) {
+    const hit = numbered.filter((p) => p.tipas === wanted).sort((a, b) => a.nr - b.nr)[0];
+    if (hit) return hit.nr;
+  }
+
+  const eks = Number(project?._eksplikacija?.eksplikacija_source_page
+    ?? project?.eksplikacija_source_page);
+  if (Number.isFinite(eks) && eks >= 1) return eks;
+
+  const rooms = project?.v8_rooms || project?.patalpos || [];
+  const roomPages = rooms
+    .map((r) => Number(r?.puslapio_nr ?? r?.page_nr))
+    .filter((n) => Number.isFinite(n) && n >= 1);
+  if (roomPages.length) return Math.min(...roomPages);
+
+  return 1;
+}

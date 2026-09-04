@@ -213,6 +213,10 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
 export default function AssumptionsPanel({
   assumptions, onChange, prielaidos, rawData, pozicijos, darbuSarasas,
   onRecomputed, defaultOpen = false, title,
+  // `bare` = rendered inside the Nustatymai drawer, which supplies its own
+  // title and close button; the panel's collapsible header would print the
+  // heading twice and offer a collapse that makes no sense in a drawer.
+  bare = false,
   // Patikra (2026-09-02): {field, roomNr, nonce} — the control „Pataisyti" or a
   // sanity warning sent the user here to change. The nonce is what makes a
   // SECOND jump to the same field scroll again.
@@ -238,7 +242,12 @@ export default function AssumptionsPanel({
   // showcase. Live editing/recompute stays fully functional on real projects.
   const isDemo = !!(rawData?.is_demo);
   const sienos_storis_m = safeAssumptions.sienos_storis_m;
-  const glaistimo_lygis = safeAssumptions.glaistimo_lygis;
+  // A settings screen where NOTHING is selected tells the contractor his
+  // sąmata was built with no putty level at all. Fall back to what the
+  // extraction actually used, then to the LT default Q2 — the one the copy
+  // calls „įprasta". (Design principle 4.)
+  const glaistimo_lygis = safeAssumptions.glaistimo_lygis
+    ?? prielaidos?.glaistimo_lygis ?? 'Q2';
   const lubu_auksciai = safeAssumptions.lubu_auksciai || {};
   const walls_paint_override = safeAssumptions.walls_paint_override || {};
   const custom_windows = safeAssumptions.custom_windows;
@@ -416,7 +425,8 @@ export default function AssumptionsPanel({
     : 2.80;
 
   return (
-    <div ref={rootRef} className="border border-border rounded-xl overflow-hidden">
+    <div ref={rootRef} className={bare ? '' : 'border border-border rounded-xl overflow-hidden'}>
+      {!bare && (
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/40 transition-colors"
         onClick={() => setOpen(v => !v)}
@@ -434,9 +444,10 @@ export default function AssumptionsPanel({
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
+      )}
 
-      {open && (
-        <div className={`px-4 pb-4 pt-3 space-y-1${isDemo ? ' pointer-events-none' : ''}`}>
+      {(open || bare) && (
+        <div className={`${bare ? '' : 'px-4 '}pb-4 pt-1 space-y-1${isDemo ? ' pointer-events-none' : ''}`}>
 
           {/* Intro: explain that edits live-recalculate everything in the
               right panel (Kiekiai). On the view-only sample, explain instead
@@ -473,42 +484,31 @@ export default function AssumptionsPanel({
             </div>
           )}
 
-          {/* Sienos storis */}
-          <Row
-            label={t('project.assumptions.wallThickness')}
-            note={t('project.assumptions.wallThicknessNote')}
-          >
-            <NumberInput
-              value={sienos_storis_m}
-              onChange={v => { setField('sienos_storis_m', v); handleRecompute('sienos_storis_m', v); }}
-              min={0.05} max={0.50} step={0.01} unit="m"
-              label={t('project.assumptions.wallThickness')}
-              hint={t('project.assumptions.wallThicknessHint')}
-              errorMessage={t('project.assumptions.wallThicknessRangeErr', {
-                min: ltDecimal('0.05'), max: ltDecimal('0.50'),
-              })}
-            />
-          </Row>
-
           {/* Glaistymo lygis */}
           <Row
             label={t('project.assumptions.puttyLevel')}
             note={t('project.assumptions.puttyLevelNote')}
           >
-            <div className="flex gap-1">
+            {/* Design §3, word for word: „Q2 — po matiniais dažais (įprasta)"
+                / „Q3 — po pusiau blizgiais" / „Q4 — po blizgiais, pilnas
+                glaistymas". Q1 stays reachable (it is under heavy wallpaper and
+                a real choice) but is named the same way. A bare Q1–Q4 chip row
+                is a spec-sheet, not a question a contractor can answer. */}
+            <div className="flex flex-col items-stretch gap-1.5 w-full">
               {['Q1','Q2','Q3','Q4'].map(q => (
                 <button
                   key={q}
                   onClick={() => { setField('glaistimo_lygis', q); handleRecompute('glaistimo_lygis', q); }}
                   title={t(`project.assumptions.puttyLevelTitles.${q}`)}
                   aria-pressed={glaistimo_lygis === q}
-                  className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                  className={`text-left rounded border transition-colors ${
                     glaistimo_lygis === q
-                      ? 'bg-primary text-primary-foreground border-primary'
+                      ? 'bg-primary/10 text-foreground border-primary font-medium'
                       : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
                   }`}
+                  style={{ minHeight: 44, padding: '0 12px', fontSize: 15 }}
                 >
-                  {q}
+                  {t(`project.assumptions.puttyLevelPlain.${q}`)}
                 </button>
               ))}
             </div>
@@ -540,11 +540,12 @@ export default function AssumptionsPanel({
                     }}
                     title={t(`project.assumptions.concealedTitles.${val}`)}
                     aria-pressed={on}
-                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                    className={`rounded border font-medium transition-colors ${
                       on
-                        ? 'bg-primary text-primary-foreground border-primary'
+                        ? 'bg-primary/10 text-foreground border-primary'
                         : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
                     }`}
+                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
                   >
                     {lbl}
                   </button>
@@ -552,6 +553,42 @@ export default function AssumptionsPanel({
               })}
             </div>
           </Row>
+
+          {/* Sienos storis */}
+          <Row
+            label={t('project.assumptions.wallThickness')}
+            note={t('project.assumptions.wallThicknessNote')}
+          >
+            <NumberInput
+              value={sienos_storis_m}
+              onChange={v => { setField('sienos_storis_m', v); handleRecompute('sienos_storis_m', v); }}
+              min={0.05} max={0.50} step={0.01} unit="m"
+              label={t('project.assumptions.wallThickness')}
+              hint={t('project.assumptions.wallThicknessHint')}
+              errorMessage={t('project.assumptions.wallThicknessRangeErr', {
+                min: ltDecimal('0.05'), max: ltDecimal('0.50'),
+              })}
+            />
+          </Row>
+
+          {/* ── Per-room settings ────────────────────────────────────────
+              Design §4 says these belong on the room's own sheet, not in a
+              project-wide settings panel. They stay HERE until that sheet
+              exists: the room grid (RoomsGrid/RoomCard) edits plotas,
+              perimetras and paskirtis but exposes no height, no walls-painted
+              and no stretch-ceiling toggle, and it is not reachable from the
+              UI at all. Removing them now would delete the only way to fix a
+              defaulted 2,80 m. Move them the day the room sheet ships. */}
+          {rooms.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-border">
+              <h3 className="text-foreground font-medium" style={{ fontSize: 15 }}>
+                {t('project.assumptions.perRoomHeading')}
+              </h3>
+              <p className="text-muted-foreground mt-0.5" style={{ fontSize: 13 }}>
+                {t('project.assumptions.perRoomNote')}
+              </p>
+            </div>
+          )}
 
           {/* Lubų aukštis per kambarį */}
           {rooms.length > 0 && (
@@ -573,7 +610,10 @@ export default function AssumptionsPanel({
                 <Input
                   type="text"
                   inputMode="decimal"
-                  defaultValue=""
+                  /* „Lubų aukštis, jei žinote" from the upload screen lands
+                     here — the one place the upload copy promises it will. */
+                  defaultValue={Number(rawData?.lubu_aukstis_default_m) > 0
+                    ? ltDecimal(Number(rawData.lubu_aukstis_default_m).toFixed(2)) : ''}
                   placeholder={ltDecimal(avgH.toFixed(2))}
                   step={0.05}
                   onBlur={e => {
