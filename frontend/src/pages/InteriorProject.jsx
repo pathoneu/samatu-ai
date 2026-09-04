@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
@@ -261,7 +261,7 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
 
 export const STEPS = ['brezinys', 'patikra', 'samata', 'siusti'];
 
-function StepBar({ step, setStep, hasPdf }) {
+export function StepBar({ step, setStep, hasPdf }) {
   const { t } = useTranslation();
   const icons = {
     brezinys: MapIcon, patikra: ClipboardCheck, samata: ListChecks, siusti: Send,
@@ -739,7 +739,24 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // ONE path, four steps (design „Rimo kelionė" §2). `step` replaced the old
   // three-tab set: 'main' → 'samata', 'eksport' → 'siusti', and the AI-chat tab
   // became a small button in the bottom-right corner.
-  const [step, setStep]         = useState(() => 'brezinys');
+  // The room check sheet lives on its own route (/project/:id/patikra) and
+  // hands the contractor back here with `?step=samata`, so the step is read
+  // from the URL once on mount. 'patikra' itself is never a local step: asking
+  // for it navigates to the sheet (see goStep).
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { id: routeProjectId } = useParams();
+  const [step, setStep]         = useState(() => {
+    const q = searchParams.get('step');
+    return q && STEPS.includes(q) && q !== 'patikra' ? q : 'brezinys';
+  });
+  const goStep = useCallback((id) => {
+    if (id === 'patikra') {
+      navigate(`/project/${routeProjectId || projectProp?.id}/patikra`);
+      return;
+    }
+    setStep(id);
+  }, [navigate, routeProjectId, projectProp?.id]);
   // Prielaidos used to be a full-screen tab: the panel's own intro promised the
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
@@ -1017,7 +1034,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       />
 
       <StepBar
-        step={step} setStep={setStep}
+        step={step} setStep={goStep}
         hasPdf={!!pdfUrl}
       />
 
@@ -1138,6 +1155,12 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               const nextProject = {
                 ...project,
                 patalpos: result.rooms || project.patalpos,
+                // `v8_rooms` is what the panel and the room sheet READ when it
+                // has rooms; leaving it stale meant the next edit was seeded
+                // from pre-recompute rooms (2026-09-04, found by the room sheet).
+                ...(Array.isArray(project.v8_rooms) && project.v8_rooms.length && result.rooms
+                  ? { v8_rooms: result.rooms }
+                  : {}),
                 pozicijos: result.pozicijos || project.pozicijos,
                 // The Kiekiai table, top-bar totals and export all read
                 // darbu_sarasas — keep it in sync with the recomputed quantities,
@@ -1702,12 +1725,12 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       {/* ── The step's own exit: „Atgal" + ONE big button ────────────────── */}
       <StepFooter
         step={step}
-        setStep={setStep}
+        setStep={goStep}
         nextLabel={step === 'siusti' ? null : t(`project.steps.next.${step}`)}
         nextTitle={step === 'siusti' ? null : t(`project.steps.nextTitles.${step}`)}
         onNext={() => {
           const i = STEPS.indexOf(step);
-          if (i >= 0 && i < STEPS.length - 1) setStep(STEPS[i + 1]);
+          if (i >= 0 && i < STEPS.length - 1) goStep(STEPS[i + 1]);
         }}
       >
         {/* „Klausti apie projektą" — was a top-level tab, now a small button in

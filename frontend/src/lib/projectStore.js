@@ -773,14 +773,23 @@ export function markRoomVerified(projectId, roomNr) {
   const projects = getProjects();
   const proj = projects.find((p) => p.id === projectId);
   if (!proj) return;
-  const patalpos = Array.isArray(proj.patalpos) ? [...proj.patalpos] : [];
-  const idx = patalpos.findIndex((r) => String(r.nr) === String(roomNr));
-  if (idx < 0) return;
-  patalpos[idx] = {
-    ...patalpos[idx],
-    user_verified_at: new Date().toISOString(),
-  };
-  updateProject(projectId, { patalpos });
+  // Stamp BOTH room arrays: the panel/sheet read `v8_rooms` when it has rooms
+  // (see AssumptionsPanel.panelRooms), so stamping `patalpos` alone left the
+  // room-sheet counter at „0 iš 11" after a verification (2026-09-04).
+  const stamp = new Date().toISOString();
+  const patch = {};
+  let found = false;
+  for (const key of ['patalpos', 'v8_rooms']) {
+    const rooms = Array.isArray(proj[key]) ? [...proj[key]] : null;
+    if (!rooms) continue;
+    const idx = rooms.findIndex((r) => String(r?.nr) === String(roomNr));
+    if (idx < 0) continue;
+    rooms[idx] = { ...rooms[idx], user_verified_at: stamp };
+    patch[key] = rooms;
+    found = true;
+  }
+  if (!found) return;
+  updateProject(projectId, patch);
   // Trigger downstream recompute (matches the pattern from updateRoomPolygon).
   if (typeof window !== 'undefined') {
     window.dispatchEvent(

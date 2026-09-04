@@ -53,6 +53,7 @@ import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import FactRow from '@/components/roomsheet/FactRow';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
+import { StepBar } from '@/pages/InteriorProject';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
   + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
@@ -330,7 +331,7 @@ export default function RoomSheet() {
                 verified: progress.verified, total: progress.total,
               })}
             </p>
-            <button type="button" className={BIG} onClick={() => navigate(`/project/${id}`)}>
+            <button type="button" className={BIG} onClick={() => navigate(`/project/${id}?step=samata`)}>
               {t('project.roomSheet.finishCta')}
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -350,6 +351,12 @@ export default function RoomSheet() {
 
   return (
     <div className="flex min-h-full flex-col bg-background text-[16px]">
+      {/* The same four steps as the project page — this sheet IS step 2. */}
+      <StepBar
+        step="patikra"
+        hasPdf
+        setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
+      />
       <RoomSheetStrip
         title={roomTitle(room) || String(roomNr)}
         progress={progress}
