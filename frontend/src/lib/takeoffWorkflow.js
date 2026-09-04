@@ -60,10 +60,23 @@ function hasAnyPrice(rows = []) {
   return rows.some(row => Number(row?.kaina) > 0);
 }
 
+/**
+ * A checklist row is the honest TODO the builder emits when it cannot compute a
+ * quantity ("— m · suveskite ilgį"): kiekis is null (or the source says so).
+ * There is nothing to VERIFY on it — „Teisinga" would be meaningless — so it
+ * never becomes a Patikra card; it is offered separately as „Suveskite patys".
+ * (2026-09-04: 60 of them sat on top of a 67-row queue and hid the real risk.)
+ */
+export function isChecklistRow(row) {
+  if (!row) return false;
+  if (row.saltinis === 'checklist') return true;
+  return row.kiekis == null;
+}
+
 export function rankReviewRows(rows = []) {
   const usePrices = hasAnyPrice(rows);
   return rows
-    .filter(needsTakeoffReview)
+    .filter(row => needsTakeoffReview(row) && !isChecklistRow(row))
     .map(row => ({ row, impact: getRowImpact(row, usePrices) }))
     .sort((a, b) =>
       (b.impact - a.impact)
@@ -92,7 +105,11 @@ export function selectReviewQueue(rows = [], { maxGeltona = 5, exclude = null } 
   const primarySum = primary.reduce((sum, row) => sum + getRowImpact(row, true), 0);
   const shareOfTotal = usePrices && totalSum > 0 ? primarySum / totalSum : null;
 
-  return { ranked, primary, rest, usePrices, shareOfTotal };
+  // Rows the builder could not quantify — listed apart, never as claims.
+  const pool = exclude ? rows.filter(row => !exclude(row)) : rows;
+  const checklist = pool.filter(row => isChecklistRow(row) && !isRowVerified(row));
+
+  return { ranked, primary, rest, checklist, usePrices, shareOfTotal };
 }
 
 export function getFirstReviewRow(rows = []) {
@@ -158,7 +175,11 @@ export function isRowVerified(row) {
  * by kiekis before that (`usePrices` says which, so the UI can be honest).
  * An empty project reads 0, never 100.
  */
-export function trustMeter(rows = []) {
+export function trustMeter(allRows = []) {
+  // Checklist rows have no quantity to trust or distrust — they are the
+  // contractor's own input, not a claim — so they are neither in the numerator
+  // nor the denominator.
+  const rows = (allRows || []).filter(row => !isChecklistRow(row));
   const usePrices = hasAnyPrice(rows);
   let total = 0;
   let verified = 0;
@@ -188,7 +209,7 @@ export function trustMeter(rows = []) {
 /** What the rows still waiting for review are worth. */
 export function unverifiedRisk(rows = []) {
   const usePrices = hasAnyPrice(rows);
-  const pending = rows.filter(needsTakeoffReview);
+  const pending = rows.filter(row => needsTakeoffReview(row) && !isChecklistRow(row));
   return {
     usePrices,
     count: pending.length,

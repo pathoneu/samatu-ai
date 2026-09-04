@@ -400,6 +400,40 @@ export default function ReviewQueueSidebar({
               )}
             </>
           )}
+          {/* Rows the builder could not quantify. Not claims — nothing to
+              confirm — so they never take the card; the only verb is to fill
+              the quantity in. (2026-09-04: they used to top the queue.) */}
+          {queue.checklist.length > 0 && (
+            <>
+              <div
+                className="px-3 py-1.5 text-muted-foreground uppercase tracking-wide font-medium"
+                style={{
+                  fontSize: 9,
+                  background: 'hsl(var(--bg-1) / 0.5)',
+                  borderTop: '1px solid hsl(var(--border) / 0.5)',
+                  borderBottom: '1px solid hsl(var(--border) / 0.3)',
+                }}
+                title={t('project.patikra.fillYourselfNote')}
+              >
+                {t('project.patikra.fillYourself', { count: queue.checklist.length })}
+              </div>
+              {queue.checklist.map((p, i) => (
+                <ReviewRow
+                  key={`chk-${rowKey(p)}-${i}`}
+                  conf={p.confidence}
+                  reason={cleanUserText(p._confidence_reason)}
+                  primary={p.aprasymas || 'Pozicija'}
+                  secondary={p.skyrius || p.kategorija || '—'}
+                  meta={null}
+                  reasonHint="Kiekis neaptiktas — įrašykite patys"
+                  onClick={onOpenRowDetail ? () => onOpenRowDetail(p) : () => handlePositionClick(p)}
+                  onAccept={null}
+                  onReject={null}
+                  onEdit={onOpenRowDetail ? () => onOpenRowDetail(p) : null}
+                />
+              ))}
+            </>
+          )}
         </>
       )}
     </div>

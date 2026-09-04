@@ -1338,7 +1338,9 @@
         "santechnika_potinkinis": "Mixer installation"
       },
       "riskNoPrices": "The euro figure appears once prices are entered",
-      "trustTitleRows": "Checked by hand: {{verified}} of {{total}} rows. Before prices exist the share counts rows — quantities in different units cannot be added. Only human confirmation raises it."
+      "trustTitleRows": "Checked by hand: {{verified}} of {{total}} rows. Before prices exist the share counts rows — quantities in different units cannot be added. Only human confirmation raises it.",
+      "fillYourself": "Fill in yourself ({{count}})",
+      "fillYourselfNote": "These quantities could not be read from the drawing — enter them yourself."
     }
   },
   "shared": {

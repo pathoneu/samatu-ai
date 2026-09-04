@@ -457,3 +457,23 @@ test('the meter counts rows, not mixed units, before prices exist', () => {
   // reads countShare instead. Pinned so nobody swaps them back.
   assert.ok(meter.share < 0.02);
 });
+
+// ── checklist rows (kiekis null) never become Patikra cards ─────────────────
+import { isChecklistRow, rankReviewRows as _rank, selectReviewQueue as _select, trustMeter as _meter, unverifiedRisk as _risk } from './takeoffWorkflow.js';
+
+test('a checklist row is never ranked as a claim, and is offered separately', () => {
+  const rows = [
+    { id: 'a', eil_nr: 1, aprasymas: 'GKP dėžučių montavimas — suveskite ilgį', kiekis: null, mato_vnt: 'm', confidence: 'raudona', saltinis: 'checklist' },
+    { id: 'b', eil_nr: 2, aprasymas: 'Sienų lyginimas', kiekis: 126.77, kaina: 8.5, mato_vnt: 'm²', confidence: 'geltona' },
+    { id: 'c', eil_nr: 3, aprasymas: 'Dažymo kampų montavimas', kiekis: 356.8, kaina: 0, mato_vnt: 'm', confidence: 'raudona' },
+  ];
+  assert.equal(isChecklistRow(rows[0]), true);
+  assert.equal(isChecklistRow(rows[1]), false);
+  const ranked = _rank(rows);
+  assert.deepEqual(ranked.map(r => r.id), ['b', 'c']);       // € first, checklist gone
+  const q = _select(rows);
+  assert.deepEqual(q.checklist.map(r => r.id), ['a']);
+  assert.equal(q.ranked.includes(rows[0]), false);
+  assert.equal(_risk(rows).count, 2);
+  assert.equal(_meter(rows).totalCount, 2);                  // not a claim → not in the meter
+});

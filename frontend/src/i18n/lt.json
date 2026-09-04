@@ -1344,7 +1344,9 @@
         "santechnika_potinkinis": "Maišytuvų montavimas"
       },
       "riskNoPrices": "Rizika eurais bus matoma įvedus kainas",
-      "trustTitleRows": "Patikrinta ranka: {{verified}} iš {{total}} eilučių. Kol nėra kainų, dalis skaičiuojama eilutėmis — kiekių su skirtingais matavimo vienetais sudėti negalima. Kelia tik žmogaus patvirtinimas."
+      "trustTitleRows": "Patikrinta ranka: {{verified}} iš {{total}} eilučių. Kol nėra kainų, dalis skaičiuojama eilutėmis — kiekių su skirtingais matavimo vienetais sudėti negalima. Kelia tik žmogaus patvirtinimas.",
+      "fillYourself": "Suveskite patys ({{count}})",
+      "fillYourselfNote": "Šių eilučių kiekio brėžinyje nepavyko nustatyti — įrašykite jį patys."
     }
   },
   "shared": {
