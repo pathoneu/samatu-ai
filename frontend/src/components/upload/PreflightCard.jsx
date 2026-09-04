@@ -50,21 +50,38 @@ export default function PreflightCard({
       <div className="flex items-start gap-3">
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone.accent}`} aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          {/* Facts first: pages and the honest time expectation. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">
+          {/* The diagnosis line, in the shape the design asks for: „17 lapų ·
+              interjero brėžinių ~9 psl. · skaičiuosime apie 15–25 min."
+              Only facts the probe actually measured go on this line. It does
+              NOT say „yra kambarių lentelė" — the preflight counts table-like
+              pages but cannot tell an eksplikacija from any other table, and a
+              confident claim about the room table is exactly the claim a
+              contractor would rely on. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-foreground" style={{ fontSize: 15 }}>
+            <span className="font-medium tabular-nums">
               {t('newProject.preflight.pages', { n: card.pageCount })}
             </span>
+            {card.interiorPages > 0 && (
+              <>
+                <span aria-hidden className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">
+                  {t('newProject.preflight.interiorPages', { n: card.interiorPages })}
+                </span>
+              </>
+            )}
             {card.estMinutes && (
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3 w-3" aria-hidden="true" />
-                {t('newProject.preflight.duration', { value: card.estMinutes })}
-              </span>
+              <>
+                <span aria-hidden className="text-muted-foreground">·</span>
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('newProject.preflight.duration', { value: card.estMinutes })}
+                </span>
+              </>
             )}
           </div>
 
           {/* The guess. */}
-          <p className="mt-1.5 text-sm text-foreground">{t(verdictKey(card.verdict))}</p>
+          <p className="mt-1.5 text-foreground" style={{ fontSize: 15 }}>{t(verdictKey(card.verdict))}</p>
 
           {card.reason && (
             <p className="mt-1.5 text-sm font-medium text-destructive">{card.reason}</p>

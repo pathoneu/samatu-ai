@@ -1362,7 +1362,7 @@
         "brezinys": "Drawing and rooms — the plan, the rooms, and measuring straight on the drawing",
         "patikra": "Check — review what was read from the drawing and fix what is wrong",
         "samata": "Estimate — your rows, quantities and prices",
-        "siusti": "Send — Excel, a PDF for the client, or e-mail"
+        "siusti": "Send — Excel, a client PDF, or a link you send yourself"
       },
       "brezinysAttachTitle": "Drawing — no PDF is attached to this project yet; you can upload it here",
       "back": "Back",
@@ -1375,7 +1375,7 @@
       "nextTitles": {
         "brezinys": "Go to the check step — review what was read from the drawing",
         "patikra": "Go to the estimate — enter your prices there",
-        "samata": "Go to sending — Excel, a client PDF or e-mail"
+        "samata": "Go to sending — Excel, a client PDF or a link"
       },
       "help": "Help: call us",
       "helpTitle": "Call support on {{phone}}",
@@ -1386,12 +1386,15 @@
     },
     "send": {
       "title": "Send the estimate",
-      "subtitle": "Excel in your own template, a PDF for the client, or a link by e-mail.",
-      "checkNoQty": "{{count}} rows have no quantity and will be skipped. Send?",
-      "checkNoPrice": "{{count}} rows have no price and will be sent with an empty cell. Send?",
-      "checkOk": "All {{count}} rows have a quantity. Ready to send.",
-      "emailBold": "By e-mail: ",
-      "emailDesc": "creates a link you can send to the client — they see the estimate in a browser."
+      "subtitle": "Excel in your own template, a PDF for the client, or a link you send yourself.",
+      "emailBold": "A link for the client: ",
+      "emailDesc": "creates a link you can send to the client — they see the estimate in a browser but cannot change anything.",
+      "checkNoQty_one": "{{count}} row has no quantity and will be skipped. Send?",
+      "checkNoQty_other": "{{count}} rows have no quantity and will be skipped. Send?",
+      "checkNoPrice_one": "{{count}} row has no price and will be sent with an empty cell. Send?",
+      "checkNoPrice_other": "{{count}} rows have no price and will be sent with empty cells. Send?",
+      "checkOk_one": "The one row has a quantity. Ready to send.",
+      "checkOk_other": "All {{count}} rows have a quantity. Ready to send."
     }
   },
   "shared": {
@@ -1635,7 +1638,7 @@
     "retry": "Try again",
     "backToProjects": "Back to projects",
     "title": "New project",
-    "subtitle": "Upload a construction project drawing (PDF). Pathon will automatically detect the type and extract quantities.",
+    "subtitle": "The app reads the drawing and prepares the quantities. You check them and enter your prices.",
     "typeLabel": "Project type",
     "typeHint": "The type decides which quantities the AI reads from the drawing.",
     "hideOtherTypes": "− Hide other types",
@@ -1654,10 +1657,10 @@
     "companyPlaceholder": "e.g. Statyba Ltd.",
     "pdfLabel": "Project PDF",
     "uploadLabel": "PDF — construction project drawing",
-    "startAnalysis": "Start analysis",
-    "startAnalysisTitle": "The uploaded drawing will be read and quantities calculated automatically",
+    "startAnalysis": "Calculate the quantities",
+    "startAnalysisTitle": "Read the drawing and prepare the quantities",
     "startAnalysisDisabledTitle": "Upload the project PDF first",
-    "startAnalysisHint": "Analysis takes up to 30 min., depending on drawing size. You can keep this window open or close it — we'll notify you when it's done and the project will appear in your list.",
+    "startAnalysisHint": "It takes about 20 minutes. You can close this window — the work continues on the server and the project appears in your list by itself.",
     "cancelTitle": "The analysis will stop and the PDF will have to be uploaded again",
     "errStalled": "The analysis stalled (no server response for 7 min). Please retry — if it repeats, let us know.",
     "errTimeout": "The analysis exceeded the 45 min limit. Try a smaller PDF or let us know.",
@@ -1668,10 +1671,10 @@
     "preflight": {
       "checking": "Checking the file…",
       "pages": "{{n}} pages",
-      "duration": "Analysis will take {{value}}",
+      "duration": "about {{value}}",
       "disclaimer": "A quick guess from the PDF text, not an analysis result.",
       "continue": "Continue",
-      "continueTitle": "Start the analysis with this file",
+      "continueTitle": "Calculate quantities with this file",
       "pickAnother": "Choose another file",
       "pickAnotherTitle": "Remove this file and upload another",
       "overrideBlock": "Analyse the first 100 pages anyway",
@@ -1679,11 +1682,34 @@
       "verdict": {
         "interior_plan": "This looks like an interior design project — the kind we read best.",
         "table_only": "This looks like a bill-of-quantities table rather than a drawing — the analysis will most likely find no rooms. Continue anyway?",
-        "photo_or_scan": "This PDF appears to have no text layer — scanned or photographs. The analysis may still work, but it will be slower and less accurate.",
+        "photo_or_scan": "This PDF is photos or scans with no text. The quantities will still be calculated, but they will need a closer check.",
         "facade_or_site": "These look like facade or site drawings rather than interior plans — the analysis will most likely find no rooms. Continue anyway?",
         "mixed_bundle": "This looks like a full technical project — the interior sheets are only part of the file. The analysis will read every page.",
         "unknown": "We could not tell what kind of drawings these are. The analysis may still work."
-      }
+      },
+      "interiorPages": "~{{n}} interior sheets"
+    },
+    "q": {
+      "objectLabel": "What kind of property?",
+      "objectNote": "Used in the project name — it does not change any quantity.",
+      "object": {
+        "butas": "Flat",
+        "namas": "House",
+        "komercines": "Commercial space"
+      },
+      "ceilingLabel": "Ceiling height, if you know it",
+      "ceilingPlaceholder": "2.80",
+      "ceilingNote": "2.80 m — the usual one. You can leave it empty: heights come from the drawing. Your number waits in settings — one click applies it wherever the drawing gives no height.",
+      "familiesLabel": "What should be counted?",
+      "family": {
+        "apdaila": "Wall and ceiling finishing",
+        "grindys": "Floors",
+        "plyteles": "Tiling",
+        "santechnika": "Plumbing",
+        "elektra": "Electrics"
+      },
+      "familiesAllNote": "All ticked. Untick one and its rows will not be in the estimate (nor the materials bought for them).",
+      "familiesSomeOffNote": "Rows from the unticked areas will not be in the estimate, along with their materials. Sections that belong to no area (ventilation, for example) always stay."
     }
   },
   "upload": {
@@ -1691,11 +1717,11 @@
       "defaultLabel": "PDF or Excel file",
       "errNoFile": "No file selected.",
       "errBadFormat": "Invalid format. Allowed only: {{formats}}.",
-      "errTooBig": "File too large ({{size}} MB). Maximum 50 MB.",
+      "errTooBig": "File too large ({{size}} MB). Maximum 200 MB.",
       "aria": "Select the project file",
       "dragPrefix": "Drag a file here or ",
       "dragChoose": "choose",
-      "maxSize": "Max 50 MB",
+      "maxSize": "Max 200 MB",
       "clearFile": "Remove the file and choose another"
     },
     "processing": {
@@ -1706,9 +1732,9 @@
     },
     "stream": {
       "reading": "Reading the drawing…",
-      "recognizing": "Recognizing rooms…",
-      "refiningRooms": "Refining dimensions room by room…",
-      "summing": "Adding up quantities…",
+      "recognizing": "Looking for rooms…",
+      "refiningRooms": "Refining measurements room by room…",
+      "summing": "Adding up the quantities…",
       "pages": "{{count}} pages",
       "roomsIdentified": "{{count}} rooms identified",
       "roomsProgress": "{{done}} / {{total}} rooms",
@@ -1718,8 +1744,13 @@
       "finishingOnServer": "Finishing on the server…",
       "finishingFor": "{{s}}s more — still analysing",
       "handoffNote": "Analysis continues on the server",
-      "canLeave": "You can close this window — the project will appear in your list.",
-      "warningLabel": "Warning:"
+      "canLeave": "You can close this window — the work continues on the server and the project appears in your “Projektai” list by itself.",
+      "warningLabel": "Warning:",
+      "readingPages": "Reading the drawing — {{count}} sheets",
+      "foundRooms": "Found {{count}} rooms",
+      "refiningProgress": "Refining measurements — {{done}} of {{total}} rooms",
+      "elapsedMin": "{{min}} min {{sec}} s elapsed",
+      "estimate": "expected about {{value}}"
     }
   },
   "billing": {

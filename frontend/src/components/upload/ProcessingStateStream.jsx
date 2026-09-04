@@ -30,6 +30,10 @@ PHASE_INDEX.finishing = PHASE_INDEX.post;
 
 export default function ProcessingStateStream({
   phase, progress, elapsed, error, recovering = false, recoverySec = 0,
+  // The preflight's own duration estimate („15–25 min"). Shown beside the
+  // elapsed counter so the wait has a horizon — an honest range the probe
+  // measured, never a fake countdown to a second we cannot know.
+  estMinutes = '',
 }) {
   const { t } = useTranslation();
   const currentStep = PHASE_INDEX[phase] ?? 0;
@@ -48,22 +52,25 @@ export default function ProcessingStateStream({
     const step = PHASES[i];
     const isDone = i < currentStep;
     const isActive = i === currentStep && !error;
-    const Icon = step.icon;
 
+    // The step's LABEL carries its own count where the stream gives us one:
+    // „Skaitau brėžinį — 17 lapų", „Radau 11 patalpų", „Tikslinu matmenis —
+    // 4 iš 11 kambarių". A progress bar with no words is what the design
+    // forbids. The old second line repeated the same number under it, so a
+    // detail is now rendered ONLY where the label says nothing extra.
+    let label = t(step.labelKey);
     let detail = null;
     if (step.id === 'rendering' && pageCount && (isActive || isDone)) {
-      detail = t('upload.stream.pages', { count: pageCount });
+      label = t('upload.stream.readingPages', { count: pageCount });
     } else if (step.id === 'pass1' && rooms.length > 0) {
-      detail = t('upload.stream.roomsIdentified', { count: rooms.length });
+      label = t('upload.stream.foundRooms', { count: rooms.length });
     } else if (step.id === 'zoom' && zoomTotal > 0) {
-      detail = t('upload.stream.roomsProgress', { done: zoomDone, total: zoomTotal });
-    } else if (step.id === 'post' && recovering) {
+      label = t('upload.stream.refiningProgress', { done: zoomDone, total: zoomTotal });
+    }
+    if (step.id === 'post' && recovering) {
+      label = t('upload.stream.finishingOnServer');
       detail = t('upload.stream.finishingFor', { s: recoverySec });
     }
-
-    const label = (step.id === 'post' && recovering)
-      ? t('upload.stream.finishingOnServer')
-      : t(step.labelKey);
 
     return (
       <motion.div
@@ -198,16 +205,29 @@ export default function ProcessingStateStream({
             </span>
             {t('upload.stream.handoffNote')}
           </div>
-          <div className="mt-1.5 text-[11px] text-muted-foreground">
-            {t('upload.stream.canLeave')}
-          </div>
         </motion.div>
       )}
 
+      {/* Elapsed + the honest horizon. „Liko 4 min" would be a number we do
+          not have; „praėjo 6 min · numatyta 15–25 min" is one we do. */}
       {elapsed != null && !error && (
-        <div className="mt-4 text-[11px] text-muted-foreground tabular-nums">
-          {t('upload.stream.seconds', { count: elapsed })}
+        <div className="mt-4 text-center text-muted-foreground tabular-nums" style={{ fontSize: 13 }}>
+          {t('upload.stream.elapsedMin', { min: Math.floor(elapsed / 60), sec: elapsed % 60 })}
+          {estMinutes && (
+            <> · {t('upload.stream.estimate', { value: estMinutes })}</>
+          )}
         </div>
+      )}
+
+      {/* „Galite uždaryti" belongs on the screen from the first second, not
+          only after a socket hand-off — the whole point is that he goes to
+          dinner. It says exactly what will happen: the project appears in the
+          list by itself. It does NOT promise an e-mail; nothing in this
+          product sends one. */}
+      {!error && (
+        <p className="mt-2 max-w-md text-center text-muted-foreground" style={{ fontSize: 14 }}>
+          {t('upload.stream.canLeave')}
+        </p>
       )}
     </div>
   );

@@ -1371,7 +1371,7 @@
         "brezinys": "Brėžinys ir patalpos — čia matote planą, patalpas ir galite pamatuoti tiesiai brėžinyje",
         "patikra": "Patikra — peržiūrite, ką programa perskaitė iš brėžinio, ir pataisote, kas netinka",
         "samata": "Sąmata — jūsų eilutės, kiekiai ir kainos",
-        "siusti": "Siųsti — Excel, PDF klientui arba el. paštu"
+        "siusti": "Siųsti — Excel, PDF klientui arba nuoroda, kurią nusiųsite pats"
       },
       "brezinysAttachTitle": "Brėžinys — šiam projektui PDF dar neprisegtas; čia galėsite jį įkelti",
       "back": "Atgal",
@@ -1384,7 +1384,7 @@
       "nextTitles": {
         "brezinys": "Pereiti į patikrą — ten peržiūrėsite, ką programa perskaitė iš brėžinio",
         "patikra": "Pereiti į sąmatą — ten įrašysite kainas",
-        "samata": "Pereiti į siuntimą — Excel, PDF klientui arba el. paštas"
+        "samata": "Pereiti į siuntimą — Excel, PDF klientui arba nuoroda"
       },
       "help": "Pagalba: paskambinti",
       "helpTitle": "Paskambinti pagalbos numeriu {{phone}}",
@@ -1395,12 +1395,18 @@
     },
     "send": {
       "title": "Siųsti sąmatą",
-      "subtitle": "Excel savo šablonu, PDF klientui arba nuoroda el. paštu.",
-      "checkNoQty": "{{count}} eilutės be kiekio bus praleistos. Siųsti?",
-      "checkNoPrice": "{{count}} eilutės be kainos bus išsiųstos su tuščiu langeliu. Siųsti?",
-      "checkOk": "Visos {{count}} eilutės turi kiekį. Galima siųsti.",
-      "emailBold": "El. paštu: ",
-      "emailDesc": "sukuriama nuoroda, kurią galite nusiųsti klientui — jis mato sąmatą naršyklėje."
+      "subtitle": "Excel savo šablonu, PDF klientui arba nuoroda, kurią nusiųsite pats.",
+      "emailBold": "Nuoroda klientui: ",
+      "emailDesc": "sukuriama nuoroda, kurią galite nusiųsti klientui — jis mato sąmatą naršyklėje, bet nieko keisti negali.",
+      "checkNoQty_one": "{{count}} eilutė be kiekio bus praleista. Siųsti?",
+      "checkNoQty_few": "{{count}} eilutės be kiekio bus praleistos. Siųsti?",
+      "checkNoQty_other": "{{count}} eilučių be kiekio bus praleista. Siųsti?",
+      "checkNoPrice_one": "{{count}} eilutė be kainos bus išsiųsta su tuščiu langeliu. Siųsti?",
+      "checkNoPrice_few": "{{count}} eilutės be kainos bus išsiųstos su tuščiais langeliais. Siųsti?",
+      "checkNoPrice_other": "{{count}} eilučių be kainos bus išsiųsta su tuščiais langeliais. Siųsti?",
+      "checkOk_one": "Vienintelė eilutė turi kiekį. Galima siųsti.",
+      "checkOk_few": "Visos {{count}} eilutės turi kiekį. Galima siųsti.",
+      "checkOk_other": "Visos {{count}} eilučių turi kiekį. Galima siųsti."
     }
   },
   "shared": {
@@ -1644,7 +1650,7 @@
     "retry": "Bandyti dar kartą",
     "backToProjects": "Grįžti į projektus",
     "title": "Naujas projektas",
-    "subtitle": "Įkelkite statybų projekto brėžinį (PDF). Pathon automatiškai atpažins tipą ir išskirs kiekius.",
+    "subtitle": "Programa perskaito brėžinį ir paruošia kiekius. Jūs patikrinate ir įrašote kainas.",
     "typeLabel": "Projekto tipas",
     "typeHint": "Nuo tipo priklauso, kokius kiekius AI skaičiuos iš brėžinio.",
     "hideOtherTypes": "− Paslėpti kitus tipus",
@@ -1663,10 +1669,10 @@
     "companyPlaceholder": "Pvz., UAB Statyba",
     "pdfLabel": "Projekto PDF",
     "uploadLabel": "PDF — statybų projekto brėžinys",
-    "startAnalysis": "Pradėti analizę",
-    "startAnalysisTitle": "Įkeltas brėžinys bus perskaitytas ir kiekiai suskaičiuoti automatiškai",
+    "startAnalysis": "Skaičiuoti kiekius",
+    "startAnalysisTitle": "Perskaityti brėžinį ir paruošti kiekius",
     "startAnalysisDisabledTitle": "Pirmiausia įkelkite projekto PDF",
-    "startAnalysisHint": "Analizė trunka iki 30 min. — priklauso nuo brėžinio dydžio. Langą galite palikti atvirą arba uždaryti: baigę pranešime, o projektas pats atsiras sąraše.",
+    "startAnalysisHint": "Truks apie 20 minučių. Galite uždaryti langą — skaičiavimas tęsiasi serveryje, o projektas pats atsiras sąraše „Projektai“.",
     "cancelTitle": "Analizė bus nutraukta, o PDF teks įkelti iš naujo",
     "errStalled": "Analizė sustojo (7 min be atsako iš serverio). Pabandykite dar kartą — jei kartojasi, praneškite mums.",
     "errTimeout": "Analizė viršijo 45 min limitą. Pabandykite mažesnį PDF arba praneškite mums.",
@@ -1677,10 +1683,10 @@
     "preflight": {
       "checking": "Tikriname failą…",
       "pages": "{{n}} psl.",
-      "duration": "Analizė truks {{value}}",
+      "duration": "skaičiuosime apie {{value}}",
       "disclaimer": "Tai greitas spėjimas iš PDF teksto, ne analizės rezultatas.",
       "continue": "Tęsti",
-      "continueTitle": "Pradėti analizę su šiuo failu",
+      "continueTitle": "Skaičiuoti kiekius su šiuo failu",
       "pickAnother": "Pasirinkti kitą failą",
       "pickAnotherTitle": "Pašalinti šį failą ir įkelti kitą",
       "overrideBlock": "Vis tiek analizuoti pirmus 100 psl.",
@@ -1688,11 +1694,34 @@
       "verdict": {
         "interior_plan": "Atrodo, kad tai interjero projektas — tokius brėžinius skaitome geriausiai.",
         "table_only": "Atrodo, kad tai kiekių žiniaraščio lentelė, o ne brėžinys — analizė greičiausiai neras patalpų. Tęsti vis tiek?",
-        "photo_or_scan": "Atrodo, kad PDF neturi teksto sluoksnio — skenuotas arba nuotraukos. Analizė gali pavykti, bet bus lėtesnė ir mažiau tiksli.",
+        "photo_or_scan": "Šis PDF — nuotraukos arba skenuoti lapai be teksto. Kiekius paskaičiuosim, bet tikrinti reikės atidžiau.",
         "facade_or_site": "Atrodo, kad tai fasadų arba sklypo brėžiniai, ne interjero planai — analizė greičiausiai neras patalpų. Tęsti vis tiek?",
         "mixed_bundle": "Atrodo, kad tai pilnas techninis projektas — interjero brėžiniai sudaro tik dalį failo. Analizė perskaitys visus puslapius.",
         "unknown": "Nepavyko atpažinti, kokie tai brėžiniai. Analizė vis tiek gali pavykti."
-      }
+      },
+      "interiorPages": "interjero brėžinių ~{{n}} psl."
+    },
+    "q": {
+      "objectLabel": "Koks objektas?",
+      "objectNote": "Naudosime projekto pavadinime — skaičiavimo nekeičia.",
+      "object": {
+        "butas": "Butas",
+        "namas": "Namas",
+        "komercines": "Komercinės patalpos"
+      },
+      "ceilingLabel": "Lubų aukštis, jei žinote",
+      "ceilingPlaceholder": "2,80",
+      "ceilingNote": "2,80 m — kaip dažniausiai. Galite palikti tuščią: aukštį imsime iš brėžinio. Jūsų įrašytas skaičius lauks nustatymuose — pritaikysite vienu spustelėjimu ten, kur brėžinys aukščio nenurodo.",
+      "familiesLabel": "Ką skaičiuoti?",
+      "family": {
+        "apdaila": "Sienų ir lubų apdaila",
+        "grindys": "Grindys",
+        "plyteles": "Plytelės",
+        "santechnika": "Santechnika",
+        "elektra": "Elektra"
+      },
+      "familiesAllNote": "Visi pažymėti. Nuėmus — tų eilučių sąmatoje nebus (kartu su joms priklausančiomis medžiagomis).",
+      "familiesSomeOffNote": "Nuimtų sričių eilučių sąmatoje nebus — kartu su joms priklausančiomis medžiagomis. Skyriai, kurie nepatenka nė į vieną sritį (pvz. ventiliacija), lieka visada."
     }
   },
   "upload": {
@@ -1700,11 +1729,11 @@
       "defaultLabel": "PDF arba Excel failas",
       "errNoFile": "Failas nepasirinktas.",
       "errBadFormat": "Netinkamas formatas. Tinka tik: {{formats}}.",
-      "errTooBig": "Failas per didelis ({{size}} MB). Maksimumas 50 MB.",
+      "errTooBig": "Failas per didelis ({{size}} MB). Maksimumas 200 MB.",
       "aria": "Pasirinkti projekto failą",
       "dragPrefix": "Vilkite failą čia arba ",
       "dragChoose": "pasirinkite",
-      "maxSize": "Maks. 50 MB",
+      "maxSize": "Maks. 200 MB",
       "clearFile": "Pašalinti failą ir pasirinkti kitą"
     },
     "processing": {
@@ -1714,10 +1743,10 @@
       "summing": "Sudedame kiekius..."
     },
     "stream": {
-      "reading": "Skaitome brėžinį…",
-      "recognizing": "Atpažįstame patalpas…",
-      "refiningRooms": "Tiksliname matmenis kambarys po kambario…",
-      "summing": "Sudedame kiekius…",
+      "reading": "Skaitau brėžinį…",
+      "recognizing": "Ieškau patalpų…",
+      "refiningRooms": "Tikslinu matmenis kambarys po kambario…",
+      "summing": "Skaičiuoju kiekius…",
       "pages": "{{count}} puslapių",
       "roomsIdentified": "{{count}} patalpos identifikuotos",
       "roomsProgress": "{{done}} / {{total}} kambarių",
@@ -1727,8 +1756,13 @@
       "finishingOnServer": "Užbaigiame serveryje…",
       "finishingFor": "dar {{s}} s — analizė tęsiasi",
       "handoffNote": "Analizė tęsiasi serveryje",
-      "canLeave": "Šį langą galite uždaryti — projektas pats atsiras sąraše.",
-      "warningLabel": "Įspėjimas:"
+      "canLeave": "Galite uždaryti šį langą — skaičiavimas tęsiasi serveryje, o projektas pats atsiras sąraše „Projektai“.",
+      "warningLabel": "Įspėjimas:",
+      "readingPages": "Skaitau brėžinį — {{count}} lapų",
+      "foundRooms": "Radau {{count}} patalpų",
+      "refiningProgress": "Tikslinu matmenis — {{done}} iš {{total}} kambarių",
+      "elapsedMin": "praėjo {{min}} min {{sec}} s",
+      "estimate": "numatyta apie {{value}}"
     }
   },
   "billing": {

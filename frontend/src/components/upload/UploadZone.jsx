@@ -30,7 +30,13 @@ export default function UploadZone({
 
   // Client-side guard so a wrong type / oversized file fails INSTANTLY instead
   // of after a ~30s server round-trip ending in a backend error. (2026-06-19)
-  const MAX_BYTES = 50 * 1024 * 1024;
+  //
+  // 200 MB, matching backend `MAX_PDF_SIZE_BYTES` (main.py:26). It used to be
+  // 50 MB with copy that said so, which refused files the server would have
+  // accepted — a contractor with a 120 MB scanned set was told his own drawing
+  // was too big by a browser that never asked. (2026-09-04. The >50 MB
+  // scale-hint skip in NewProject is a separate, deliberate guard and stays.)
+  const MAX_BYTES = 200 * 1024 * 1024;
   const validateFile = useCallback((file) => {
     if (!file) return t('upload.zone.errNoFile');
     const allowed = accept.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);

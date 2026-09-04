@@ -10,6 +10,8 @@ import PreflightCard from '@/components/upload/PreflightCard';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
+import { WORK_FAMILIES, filterRowsByFamilies } from '@/lib/workFamilies';
+import { parseLtNumber } from '@/lib/parseLtNumber';
 import {
   createProject, updateProject, getPriceLists, pullPriceListsFromBackend,
   markPriceFillPending,
@@ -307,6 +309,13 @@ export default function NewProject() {
   const [uploadResetToken, setUploadResetToken] = useState(0);
   const preflightRunRef = useRef(0);
   const [projTypeChoice, setProjType]   = useState('interior');
+  // ── E1's three optional questions (design „Rimo kelionė" §E1). Every one has
+  // a named default, so pressing „Skaičiuoti kiekius" without touching any of
+  // them is a sensible answer, not a gap. What each one actually does is
+  // written next to it — no control here claims more than it delivers.
+  const [objektas, setObjektas]         = useState('butas');
+  const [ceilingHeight, setCeilingHeight] = useState('');
+  const [families, setFamilies]         = useState(() => new Set(WORK_FAMILIES));
   // Default interior subtype, no setter — UI selector removed 2026-05-13.
   const [interiorSubtype] = useState('naujas');
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
@@ -602,11 +611,27 @@ export default function NewProject() {
         // as a warning, and the user lands in the viewer where "Taisyti zoną"
         // and manual room-add actually work.
         const zeroRooms = json.patalpos.length === 0;
+        // „Ką skaičiuoti?" — the families he unticked are removed from the
+        // sąmata, which is exactly what the checkbox promised. The filter is
+        // conservative by construction: a section belonging to no family is
+        // never dropped (see lib/workFamilies.js).
+        const keptRows = filterRowsByFamilies(json.darbu_sarasas, [...families]);
+        // „Lubų aukštis, jei žinote" — kept as the project's own default so the
+        // Nustatymai height field opens on HIS number instead of 2,80. It is
+        // not applied behind his back: the quantities still come from what the
+        // drawing said, and one click in Nustatymai pushes his value through
+        // the live recompute.
+        const ceilingDefault = parseLtNumber(ceilingHeight);
         project = createProject(await withAutoPrices({
           ...json,
+          darbu_sarasas:   keptRows,
           name:            projectName || json.projektas || t('newProject.defaultNameInterior'),
           company_name:    companyName,
           tipas:           'interjeras',
+          objektas_tipas:  objektas,
+          skaiciuoti_families: [...families],
+          ...(Number.isFinite(ceilingDefault) && ceilingDefault > 0
+            ? { lubu_aukstis_default_m: ceilingDefault } : {}),
           rows:            [],
           total_rows:      json.patalpos.length,
           total_value:     0,
@@ -839,6 +864,7 @@ export default function NewProject() {
             elapsed={streamElapsed}
             recovering={recovering}
             recoverySec={recoverySec}
+            estMinutes={preflight?.est_minutes || ''}
             error={error}
           />
         ) : (
@@ -1006,6 +1032,115 @@ export default function NewProject() {
           />
         </div>
 
+        {/* ── Trys klausimai, visi su numatytais atsakymais (design §E1).
+               Only for an interior project — the hidden advanced types have
+               their own maths and none of these three answers reaches them. */}
+        {projTypeChoice === 'interior' && (
+          <div className="space-y-5 border-t border-border pt-5">
+
+            {/* 1 · Koks objektas? */}
+            <fieldset>
+              <legend className="text-foreground font-medium" style={{ fontSize: 16 }}>
+                {t('newProject.q.objectLabel')}
+              </legend>
+              <p className="text-muted-foreground mt-0.5" style={{ fontSize: 14 }}>
+                {t('newProject.q.objectNote')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {['butas', 'namas', 'komercines'].map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setObjektas(id)}
+                    aria-pressed={objektas === id}
+                    title={t(`newProject.q.object.${id}`)}
+                    className={`rounded border transition-colors ${
+                      objektas === id
+                        ? 'border-primary bg-primary/10 text-foreground font-medium'
+                        : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
+                    }`}
+                    style={{ minHeight: 44, padding: '0 16px', fontSize: 15 }}
+                  >
+                    {t(`newProject.q.object.${id}`)}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {/* 2 · Lubų aukštis, jei žinote */}
+            <div>
+              <Label htmlFor="ceiling-height" className="text-foreground font-medium" style={{ fontSize: 16 }}>
+                {t('newProject.q.ceilingLabel')}
+              </Label>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <Input
+                  id="ceiling-height"
+                  type="text"
+                  inputMode="decimal"
+                  value={ceilingHeight}
+                  onChange={(e) => setCeilingHeight(e.target.value)}
+                  placeholder={t('newProject.q.ceilingPlaceholder')}
+                  title={t('newProject.q.ceilingNote')}
+                  className="bg-card border-border"
+                  style={{ width: 130, minHeight: 44, fontSize: 15 }}
+                />
+                <span className="text-muted-foreground" style={{ fontSize: 15 }}>m</span>
+              </div>
+              <p className="text-muted-foreground mt-1.5" style={{ fontSize: 14 }}>
+                {t('newProject.q.ceilingNote')}
+              </p>
+            </div>
+
+            {/* 3 · Ką skaičiuoti? — every one ticked; unticking says what it costs */}
+            <fieldset>
+              <legend className="text-foreground font-medium" style={{ fontSize: 16 }}>
+                {t('newProject.q.familiesLabel')}
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {WORK_FAMILIES.map((id) => {
+                  const on = families.has(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      onClick={() => setFamilies((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id); else next.add(id);
+                        return next;
+                      })}
+                      title={t(`newProject.q.family.${id}`)}
+                      className={`inline-flex items-center gap-2 rounded border transition-colors ${
+                        on
+                          ? 'border-primary bg-primary/10 text-foreground font-medium'
+                          : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
+                      }`}
+                      style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
+                    >
+                      <span
+                        aria-hidden
+                        className={`inline-flex items-center justify-center rounded-sm border ${
+                          on ? 'border-primary bg-primary text-primary-foreground' : 'border-border'
+                        }`}
+                        style={{ width: 18, height: 18, fontSize: 12 }}
+                      >
+                        {on ? '✓' : ''}
+                      </span>
+                      {t(`newProject.q.family.${id}`)}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-muted-foreground mt-1.5" style={{ fontSize: 14 }}>
+                {families.size === WORK_FAMILIES.length
+                  ? t('newProject.q.familiesAllNote')
+                  : t('newProject.q.familiesSomeOffNote')}
+              </p>
+            </fieldset>
+          </div>
+        )}
+
         <div>
           <Button
             onClick={handleCreate}
@@ -1015,20 +1150,21 @@ export default function NewProject() {
                 : file ? t('newProject.startAnalysisTitle')
                   : t('newProject.startAnalysisDisabledTitle')
             }
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-12"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+            style={{ minHeight: 52, fontSize: 17 }}
           >
             <Rocket className="w-5 h-5 mr-2" />
             {t('newProject.startAnalysis')}
           </Button>
           {/* Time expectation. Extraction is minutes, not seconds (an Objektas A-class
-              drawing runs ~19 min — see IDLE_ABORT_MS above). A bare "Pradėti
-              analizę" + rocket reads as instant, so contractors closed the tab.
+              drawing runs ~19 min — see IDLE_ABORT_MS above). A bare „Skaičiuoti
+              kiekius" reads as instant, so contractors closed the tab.
               (2026-07-28 explainability pass.)
-              Hidden once the preflight card is up: this line says "iki 30 min"
-              unconditionally, and printing that under a card that just said
-              "virš valandos" is worse than saying nothing. */}
+              Hidden once the preflight card is up: this line gives a generic
+              duration, and printing it under a card that just said "virš
+              valandos" is worse than saying nothing. */}
           {!card && (
-            <p className="mt-2 text-xs text-muted-foreground text-center">
+            <p className="mt-2 text-muted-foreground text-center" style={{ fontSize: 14 }}>
               {t('newProject.startAnalysisHint')}
             </p>
           )}
