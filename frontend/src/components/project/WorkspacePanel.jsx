@@ -101,6 +101,9 @@ const WET_PASKIRTYS = new Set(['vonia', 'wc', 'san', 'san_mazgas', 'skalbykla'])
 
 export default function WorkspacePanel({
   project,
+  // 'brezinys' — the drawing step: rooms + measurements, no check rail.
+  // 'patikra'  — the check step: the rail leads, rooms and measurements follow.
+  mode = 'patikra',
   onJumpToPage,
   onJumpToProvenance,
   onProjectChange,
@@ -449,7 +452,10 @@ export default function WorkspacePanel({
 
       {/* ── Scrollable content: Peržiūra + Patalpos + Kiekiai ──────────── */}
       <div className="flex-1 overflow-y-auto">
-        {/* PERŽIŪRA — confidence-driven review queue (Sprint G2) */}
+        {/* PATIKRA — the guided check loop. It belongs to step 2 only: on the
+            drawing step the contractor is looking at his plan, not being asked
+            to audit it. (Design §2 — one job per step.) */}
+        {mode === 'patikra' && (
         <ReviewQueueSidebar
           rooms={allRooms}
           positions={project.darbu_sarasas || []}
@@ -479,6 +485,7 @@ export default function WorkspacePanel({
             }
           } : null}
         />
+        )}
 
         {/* PATALPOS section */}
         <SectionHeader

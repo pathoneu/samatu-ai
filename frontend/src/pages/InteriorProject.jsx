@@ -8,7 +8,8 @@ import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map as MapIcon, ListChecks, MessageSquare, Download, Sliders, ArrowLeft, Trash2, Pencil,
+  Map as MapIcon, ListChecks, MessageSquare, Sliders, ArrowLeft, Trash2, Pencil,
+  ArrowRight, ClipboardCheck, Send, Phone,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -71,6 +72,32 @@ function ConfidenceDot({ level }) {
   );
 }
 
+// ── „Pagalba: paskambinti" ────────────────────────────────────────────────────
+//
+// Design §E0: „žmogus telefone šiame etape vertesnis už bet kokį vedlį."
+// The number is deployment config (VITE_SUPPORT_PHONE), never a literal in the
+// source: an out-of-date hard-coded number is worse than no number at all, so
+// with the variable unset this renders nothing.
+
+export function SupportPhoneLink({ compact = false }) {
+  const { t } = useTranslation();
+  const raw = (import.meta.env.VITE_SUPPORT_PHONE || '').trim();
+  if (!raw) return null;
+  const dial = raw.replace(/[^+0-9]/g, '');
+  return (
+    <a
+      href={`tel:${dial}`}
+      title={t('project.steps.helpTitle', { phone: raw })}
+      className="inline-flex items-center gap-1.5 rounded border border-border-strong bg-card text-foreground/85 hover:bg-muted/50 transition-colors shrink-0"
+      style={{ minHeight: 44, padding: '0 12px', fontSize: 14, fontWeight: 500 }}
+    >
+      <Phone className="w-4 h-4 shrink-0" aria-hidden />
+      <span>{t('project.steps.help')}</span>
+      {!compact && <span className="mono tabular hidden lg:inline">{raw}</span>}
+    </a>
+  );
+}
+
 // ── Project top bar (mirrors prototype/screen-project.jsx ProjectTopBar) ─
 //
 // 52px high single-row bar with: back arrow · project.name (13/600) ·
@@ -79,7 +106,7 @@ function ConfidenceDot({ level }) {
 // Always visible above tab bar — which is why the sanity pill lives here:
 // the project lands on Brėžinys and the full banner is on Kiekiai.
 
-function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onEksportuoti, onDelete, onRename, renameLocked = false, onShowSanity }) {
+function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onDelete, onRename, renameLocked = false, onShowSanity }) {
   const { t } = useTranslation();
   // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
   // creation — no rename control existed anywhere in the UI).
@@ -186,91 +213,157 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
         title={t('project.interior.prielaidosTitle')}
         className="flex items-center gap-1.5 rounded transition-colors hover:bg-muted/50"
         style={{
-          height: 30, padding: '0 12px',
+          minHeight: 44, padding: '0 14px',
           border: '1px solid hsl(var(--border-strong))',
           background: 'hsl(var(--card))',
-          fontSize: 12, fontWeight: 500,
+          fontSize: 14, fontWeight: 500,
           color: 'hsl(var(--foreground) / 0.85)',
         }}
       >
-        <Sliders className="w-3 h-3" /> {t('project.interior.prielaidos')}
+        <Sliders className="w-4 h-4" /> {t('project.interior.prielaidos')}
       </button>
-      <button
-        onClick={onEksportuoti}
-        title={t('project.interior.exportTitle')}
-        className="flex items-center gap-1.5 rounded transition-colors"
-        style={{
-          height: 30, padding: '0 12px',
-          background: 'hsl(var(--primary))',
-          color: 'hsl(var(--primary-foreground))',
-          fontSize: 12, fontWeight: 500,
-        }}
-      >
-        <Download className="w-3 h-3" /> {t('project.interior.export')}
-      </button>
+      {/* „Pagalba: paskambinti" is on EVERY project screen, top right — the one
+          affordance that works when nothing else is understood. */}
+      <SupportPhoneLink />
       {/* Sprint §FIX-4 (2026-04-29): delete button (icon-only) — soft-delete'as
-          per §28; projektas nukeliauja į Šiukšliadėžę 30d. retention. */}
+          per §28; projektas nukeliauja į Šiukšliadėžę 30d. retention.
+          Eksportas is no longer a top-bar button: it is step 4, „Siųsti". */}
       {onDelete && (
         <button
           onClick={onDelete}
           title={t('project.interior.deleteTitle')}
           className="flex items-center justify-center rounded transition-colors hover:bg-muted/50"
           style={{
-            height: 30, width: 30,
+            minHeight: 44, width: 44,
             border: '1px solid hsl(var(--border-strong))',
             background: 'hsl(var(--card))',
             color: 'hsl(var(--muted-foreground))',
           }}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-4 h-4" />
         </button>
       )}
     </div>
   );
 }
 
-// ── Tab bar ───────────────────────────────────────────────────────────────────
+// ── Step bar ──────────────────────────────────────────────────────────────────
+//
+// „Rimo kelionė" (2026-09-04): ONE path, FOUR steps, always visible —
+// Brėžinys → Patikra → Sąmata → Siųsti. Not tabs: a tab set says "these are
+// four unrelated places"; a numbered step row says "this is the order, and you
+// are here". Every step is clickable (nobody is ever trapped), the current one
+// is the loud one, and each step's own exit is ONE big button at the bottom.
+//
+// The Brėžinys step is ALWAYS present. Hiding it when a project has no PDF was
+// a dead end: the "prisegti brėžinį" affordance lives INSIDE that step, so a
+// project that lost its drawing could never get one back.
 
-function TabBar({ tab, setTab, hasPdf }) {
+export const STEPS = ['brezinys', 'patikra', 'samata', 'siusti'];
+
+function StepBar({ step, setStep, hasPdf }) {
   const { t } = useTranslation();
-  // `title` per tab: the labels are single nouns, so a first-time user cannot
-  // tell that Brėžinys is where measuring happens or that Kiekiai is the
-  // priceable sąmata. (2026-07-28 explainability pass.)
-  // The Brėžinys tab is ALWAYS present. Hiding it when a project has no PDF
-  // was a dead end: the "prisegti brėžinį" affordance lives INSIDE that tab, so
-  // a project that lost its drawing (or a recovered one, whose PDF the vanished
-  // browser never uploaded) could never get one back. Without a PDF the tab
-  // shows that recovery screen instead of the viewer. (2026-07-28, founder:
-  // "brezinys tab does not exist".)
-  const tabs = [
-    { id: 'brezinys', label: t('project.interior.tabBrezinys'),
-      title: hasPdf ? t('project.interior.tabBrezinysTitle')
-                    : t('project.interior.tabBrezinysAttachTitle'), Icon: MapIcon },
-    { id: 'main',     label: t('project.interior.tabKiekiai'), title: t('project.interior.tabKiekiaiTitle'),  Icon: ListChecks },
-    { id: 'aichat',   label: t('project.interior.tabAiChat'),  title: t('project.interior.tabAiChatTitle'),  Icon: MessageSquare },
-  ];
+  const icons = {
+    brezinys: MapIcon, patikra: ClipboardCheck, samata: ListChecks, siusti: Send,
+  };
+  const currentIdx = STEPS.indexOf(step);
   return (
-    <div className="flex items-center gap-0 border-b border-border overflow-x-auto" style={{ paddingLeft: 16 }}>
-      {tabs.map(tb => {
-        const Icon = tb.Icon;
-        const isActive = tab === tb.id;
+    <nav
+      aria-label={t('project.steps.navLabel')}
+      className="flex items-center border-b border-border overflow-x-auto bg-card"
+      style={{ paddingLeft: 12, paddingRight: 12, gap: 2 }}
+    >
+      {STEPS.map((id, i) => {
+        const Icon = icons[id];
+        const isActive = step === id;
+        const isDone = i < currentIdx;
         return (
-          <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            title={tb.title}
-            aria-current={isActive ? 'page' : undefined}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px flex items-center gap-2 shrink-0 whitespace-nowrap ${
-              isActive
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {tb.label}
-          </button>
+          <React.Fragment key={id}>
+            {i > 0 && (
+              <span aria-hidden className="text-muted-foreground/50 shrink-0" style={{ fontSize: 15 }}>›</span>
+            )}
+            <button
+              onClick={() => setStep(id)}
+              title={id === 'brezinys' && !hasPdf
+                ? t('project.steps.brezinysAttachTitle')
+                : t(`project.steps.titles.${id}`)}
+              aria-current={isActive ? 'step' : undefined}
+              /* 44 px tall, 16 px label — the whole product is aimed at 35–60
+                 year old eyes and hands (design §5). */
+              className={`flex items-center shrink-0 whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                isActive
+                  ? 'border-primary text-foreground font-semibold'
+                  : isDone
+                    ? 'border-transparent text-foreground/75 hover:text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+              style={{ minHeight: 44, padding: '0 14px', gap: 8, fontSize: 16 }}
+            >
+              <span
+                aria-hidden
+                className={`inline-flex items-center justify-center rounded-full shrink-0 ${
+                  isActive ? 'bg-primary text-primary-foreground'
+                           : 'bg-muted text-muted-foreground'
+                }`}
+                style={{ width: 22, height: 22, fontSize: 12, fontWeight: 600 }}
+              >
+                {i + 1}
+              </span>
+              <Icon className="w-4 h-4 shrink-0" aria-hidden />
+              {t(`project.steps.${id}`)}
+            </button>
+          </React.Fragment>
         );
       })}
+    </nav>
+  );
+}
+
+// ── Step footer — „Atgal" left, ONE big next-button right ─────────────────────
+//
+// Design §2: „kas toliau — vienas didelis mygtukas; atgal — visada galima".
+// Any keyboard shortcut is spelled out in Lithuanian next to it; we do NOT
+// bind Enter to the step advance here — inside Patikra, Enter belongs to the
+// room check sheet („Viskas teisinga — kitas kambarys").
+
+function StepFooter({ step, setStep, nextLabel, nextTitle, onNext, children }) {
+  const { t } = useTranslation();
+  const idx = STEPS.indexOf(step);
+  const prev = idx > 0 ? STEPS[idx - 1] : null;
+  return (
+    <div
+      className="flex items-center justify-between gap-3 flex-wrap border-t border-border bg-card"
+      style={{ padding: '10px 16px' }}
+    >
+      <button
+        type="button"
+        onClick={() => prev && setStep(prev)}
+        disabled={!prev}
+        title={prev ? t('project.steps.backTitle', { step: t(`project.steps.${prev}`) }) : undefined}
+        className="inline-flex items-center gap-2 rounded border border-border-strong bg-background text-foreground/85 hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:hover:bg-background"
+        style={{ minHeight: 44, padding: '0 16px', fontSize: 16 }}
+      >
+        <ArrowLeft className="w-4 h-4" aria-hidden />
+        {t('project.steps.back')}
+      </button>
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+      {children}
+      {nextLabel && (
+        <button
+          type="button"
+          onClick={onNext}
+          title={nextTitle}
+          className="inline-flex items-center gap-2 rounded font-semibold transition-colors"
+          style={{
+            minHeight: 44, padding: '0 22px', fontSize: 16,
+            background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))',
+          }}
+        >
+          {nextLabel}
+          <ArrowRight className="w-4 h-4" aria-hidden />
+        </button>
+      )}
+      </div>
     </div>
   );
 }
@@ -629,7 +722,7 @@ function DarbuSarasas({ items }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function InteriorProject({ project: projectProp, onAssumptionsChange, onDelete }) {
+export default function InteriorProject({ project: projectProp, onDelete }) {
   const { t } = useTranslation();
   // Local mirror of project prop — needed because RulesOverridePanel rewrites
   // big swaths of state via /recompute-interior. Keep prop sync via useEffect
@@ -643,19 +736,26 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   useEffect(() => () => flushProjectSaves(), []);
   const project = projectState;
   const setProject = setProjectState;
-  const [tab, setTab]           = useState(() => 'brezinys');
+  // ONE path, four steps (design „Rimo kelionė" §2). `step` replaced the old
+  // three-tab set: 'main' → 'samata', 'eksport' → 'siusti', and the AI-chat tab
+  // became a small button in the bottom-right corner.
+  const [step, setStep]         = useState(() => 'brezinys');
+  // Prielaidos used to be a full-screen tab: the panel's own intro promised the
+  // quantities recompute „dešinėje" while the takeover had hidden them. It is a
+  // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   // Bumped by the top-bar sanity pill. ProjectMainView watches it to scroll
   // the banner into view and force the loud groups open — otherwise the jump
-  // lands on the Kiekiai tab somewhere above the warnings the user clicked.
+  // lands on the Sąmata step somewhere above the warnings the user clicked.
   const [sanityFocus, setSanityFocus] = useState(0);
-  const showSanity = () => { setTab('main'); setSanityFocus(n => n + 1); };
+  const showSanity = () => { setStep('samata'); setSanityFocus(n => n + 1); };
   const [doubleSides, setDoubleSides] = useState(false);
-  const [gkMetodas, setGkMetodas]     = useState('tikslus');  // Task 9
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set()); // Task 6
   const [isRecomputing, setIsRecomputing] = useState(false);
   // page_classifications was V8 page_classifier output. New extractor doesn't
   // emit it; the 'puslapiai' tab that consumed it has been removed.
-  const [assumptions, setAssumptions] = useState({
+  const [assumptions] = useState({
     ...DEFAULT_ASSUMPTIONS,
     sienos_storis_m: project.prielaidos?.sienos_storis_m ?? 0.10,
     glaistimo_lygis: project.prielaidos?.glaistimo_lygis ?? 'Q2',
@@ -677,7 +777,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   // jump to the same field scroll again. (2026-09-02, Patikra.)
   const [assumptionFocus, setAssumptionFocus] = useState(null);
   const openAssumptions = (focus = null) => {
-    setTab('rules');
+    setAssumptionsOpen(true);
     setAssumptionFocus(focus
       ? { ...focus, nonce: (assumptionFocus?.nonce || 0) + 1 }
       : null);
@@ -722,22 +822,20 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       if (!revoked) {
         url = u;
         setPdfUrl(u);
-        // No stored PDF → TabBar drops the 'brezinys' tab, so the default tab
-        // pointed at a tab that isn't rendered: the user landed on "Brėžinys
-        // nepasiekiamas" with nothing highlighted. Fall back to the first
-        // VISIBLE tab. Also covers hasPdf turning false at runtime (project
-        // switch), because this effect re-runs per project.id.
-        // (2026-07-28 UX walkthrough.)
-        if (!u) setTab(cur => (cur === 'brezinys' ? 'main' : cur));
+        // No stored PDF → step 1 has nothing to show but the "įkelkite
+        // brėžinį" recovery screen, so land on the sąmata instead. Also covers
+        // hasPdf turning false at runtime (project switch), because this
+        // effect re-runs per project.id. (2026-07-28 UX walkthrough.)
+        if (!u) setStep(cur => (cur === 'brezinys' ? 'samata' : cur));
       } else if (u) {
         URL.revokeObjectURL(u);
       }
     }).catch((e) => {
       // No .catch was a dead end (2026-07-28 audit): a rejected IndexedDB read
-      // left the user on an empty 'brezinys' tab with no way out. Treat a
-      // failure exactly like "no stored PDF" — fall back to a visible tab.
+      // left the user on an empty 'brezinys' step with no way out. Treat a
+      // failure exactly like "no stored PDF".
       console.warn('[InteriorProject] PDF URL load failed:', e);
-      if (!revoked) setTab(cur => (cur === 'brezinys' ? 'main' : cur));
+      if (!revoked) setStep(cur => (cur === 'brezinys' ? 'samata' : cur));
     });
     return () => {
       revoked = true;
@@ -800,11 +898,6 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
   const hasGrindys  = (grindys.medžiagos || []).length > 0 || grindys.grindjuostes_m != null;
   const hasWall     = Object.keys(sienuApdaila).length > 0;
   const hasSkaiciai = Object.keys(sk).length > 0;
-
-  const handleAssumptionsChange = (next) => {
-    setAssumptions(next);
-    if (onAssumptionsChange) onAssumptionsChange(next);
-  };
 
   // Edit cascade — kai vartotojas pataiso patalpos primityvą (plotas, perimetras,
   // lubų aukštis, paskirtis), kviečiame backend'o /recompute-interior, kuris
@@ -913,9 +1006,8 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         totalNet={totalNet}
         totalGross={totalGross}
         reverseVat={reverseVat}
-        onPrielaidos={() => setTab('rules')}
+        onPrielaidos={() => openAssumptions()}
         onShowSanity={showSanity}
-        onEksportuoti={() => setTab('eksport')}
         onDelete={onDelete}
         onRename={(newName) => {
           const updated = updateProject(project.id, { name: newName });
@@ -924,17 +1016,22 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         renameLocked={!!project.is_demo}
       />
 
-      <TabBar
-        tab={tab} setTab={setTab}
+      <StepBar
+        step={step} setStep={setStep}
         hasPdf={!!pdfUrl}
       />
 
       <div className="flex-1 px-4 py-4 space-y-5">
 
-      {/* ── TAB: BRĖŽINYS (default — PDF viewer + AI overlay) ───────── */}
-      {tab === 'brezinys' && (
+      {/* ── STEP 1 · BRĖŽINYS — the drawing, its rooms, its measurements ── */}
+      {/* ── STEP 2 · PATIKRA — the same workspace with the check rail open.
+             ONE component, two entry points (never a parallel surface): the
+             room check sheet the next worker builds replaces the rail's card
+             in place, and both steps keep the drawing beside it. ─────────── */}
+      {(step === 'brezinys' || step === 'patikra') && (
         <InteriorWorkspace
           project={project}
+          mode={step}
           focusedPage={focusedPage}
           focusedRoom={focusedRoom}
           onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
@@ -943,8 +1040,8 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
           onProjectChange={(updated) => {
             updateProject(project.id, updated);
             setProject(updated);
-            // pdfUrl is only ever used as a boolean here (tab gating), so mint a
-            // blob URL ONLY when we don't have one. Doing it on every project
+            // pdfUrl is only ever used as a boolean here (step gating), so mint
+            // a blob URL ONLY when we don't have one. Doing it on every project
             // change leaked an object URL per edit — the old one was never
             // revoked and the effect's cleanup only knows about the first.
             if (!pdfUrl) {
@@ -955,8 +1052,8 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         />
       )}
 
-      {/* ── TAB: KIEKIAI (suvestinė + darbų sąrašas) ────────────────────── */}
-      {tab === 'main' && (
+      {/* ── STEP 3 · SĄMATA (jo lentelė, jo skyriai) ────────────────────── */}
+      {step === 'samata' && (
         <ProjectMainView
           project={project}
           onProjectChange={(updated) => {
@@ -968,10 +1065,10 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
             setProject(updated);
             updateProject(project.id, updated);
           }}
-          onShowDrawing={pdfUrl ? () => setTab('brezinys') : null}
+          onShowDrawing={pdfUrl ? () => setStep('brezinys') : null}
           onJumpToPage={pdfUrl ? (pageNr, room) => {
             focusOnRoom(pageNr, room);
-            setTab('brezinys');
+            setStep('brezinys');
           } : null}
           // A sanity warning about lubų aukštis is only actionable if the
           // control it names is one click away.
@@ -980,13 +1077,41 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         />
       )}
 
-      {/* ── TAB: PRIELAIDOS — per-room aukštis + glaistymo lygis + langai/durys ─
+      {/* ── NUSTATYMAI (ex-„Prielaidos") — a right-hand DRAWER, not a step.
+          It is not part of the four-step path: it is the place you are sent to
+          from a „Pataisyti", and you come straight back to where you were.
           2026-05-06: per user request, removed the heavier RulesOverridePanel
           (templates, LT library viewer, formula card, multi-floor multipliers,
-          duplicate Prielaidos header). AssumptionsPanel alone — the editable
-          inputs the user actually needs. */}
-      {tab === 'rules' && (
-        <div className="space-y-4">
+          duplicate header). AssumptionsPanel alone. */}
+      {assumptionsOpen && (
+        <div className="fixed inset-0 z-40 flex justify-end">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'hsl(var(--foreground) / 0.18)' }}
+            onClick={() => setAssumptionsOpen(false)}
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('project.interior.assumptionsTitle')}
+            className="relative h-full overflow-y-auto bg-background border-l border-border shadow-xl w-full sm:w-[520px] p-4 space-y-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-foreground" style={{ fontSize: 17 }}>
+                {t('project.interior.assumptionsTitle')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAssumptionsOpen(false)}
+                title={t('project.steps.settingsClose')}
+                aria-label={t('project.steps.settingsClose')}
+                className="inline-flex items-center justify-center rounded border border-border-strong bg-card text-foreground/80 hover:bg-muted/50"
+                style={{ minHeight: 44, minWidth: 44 }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           <AssumptionsPanel
             defaultOpen={true}
             title={t('project.interior.assumptionsTitle')}
@@ -1050,47 +1175,19 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               notifyBackendDegradations(result);
             }}
           />
-        </div>
-      )}
-
-      {/* ── TAB: AI CHAT — natural language Q&A apie projektą ──────────── */}
-      {tab === 'aichat' && (
-        <div className="border border-border rounded-xl bg-card p-6">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold mb-1">{t('project.interior.aiTitle')}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t('project.interior.aiDesc')}
-            </p>
-          </div>
-          <AiChat project={project} inline />
-        </div>
-      )}
-
-      {/* ── TAB: EKSPORTAS — Excel/PDF download ─────────────────────────── */}
-      {tab === 'eksport' && (
-        <div className="border border-border rounded-xl bg-card p-6 space-y-5">
-          <div>
-            <h2 className="text-base font-semibold mb-1">{t('project.interior.exportTitle')}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t('project.interior.exportDesc')}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ExportDropdown project={project} />
-            <ShareButton project={project} />
-            <span className="text-xs text-muted-foreground">
-              {t('project.interior.exportCount', { positions: (project.darbu_sarasas || []).length, rooms: (project.v8_rooms || project.patalpos || []).length })}
-            </span>
-          </div>
-          <div className="border-t border-border/50 pt-4 text-xs text-muted-foreground space-y-1">
-            <p><strong className="text-foreground">{t('project.interior.exportExcelBold')}</strong>{t('project.interior.exportExcelDesc')}</p>
-            <p><strong className="text-foreground">{t('project.interior.exportPdfBold')}</strong>{t('project.interior.exportPdfDesc')}</p>
           </div>
         </div>
       )}
 
-      {/* ── TAB: KIEKIAI ──────────────────────────────────────────────────── */}
-      {tab === 'kiekiai' && (
+      {/* ── STEP 4 · SIŲSTI — three actions and one sentence before sending ─ */}
+      {step === 'siusti' && (
+        <SendStep project={project} />
+      )}
+
+      {/* ── LEGACY BLOCK (unreachable) — the old V8 „Kiekiai" screen.
+             It is the only place RoomsGrid / RoomCard are mounted, so it stays
+             on disk for the room-check-sheet work; nothing routes to it. ──── */}
+      {step === 'roomsgrid_legacy' && (
         <>
           {/* V8 mastelio info — production-blocking sanity */}
           {project.v8_scale && (
@@ -1130,7 +1227,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               onPageClick={(pageNr) => {
                 if (pdfUrl) {
                   setFocusedPage(pageNr);
-                  setTab('brezinys');
+                  setStep('brezinys');
                 }
               }}
             />
@@ -1375,14 +1472,14 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               onShowOnPdf={(pageNr) => {
                 if (pdfUrl) {
                   setFocusedPage(pageNr);
-                  setTab('brezinys');
+                  setStep('brezinys');
                 }
               }}
               project={project}
               onJumpToPage={(pageNr) => {
                 if (pdfUrl) {
                   setFocusedPage(pageNr);
-                  setTab('brezinys');
+                  setStep('brezinys');
                 }
               }}
               onChange={handleRoomsChange}
@@ -1541,7 +1638,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
                   room={room}
                   project={project}
                   onJumpToPage={(pageNr) => {
-                    if (pdfUrl) { setFocusedPage(pageNr); setTab('brezinys'); }
+                    if (pdfUrl) { setFocusedPage(pageNr); setStep('brezinys'); }
                   }}
                 />
               ))}
@@ -1599,112 +1696,127 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
         </>
       )}
 
-      {/* TAB content for 'workspace' and 'prielaidos' was V8-era. Unreachable
-          from current TabBar; replaced by 'rules' tab using RulesOverridePanel
-          (see Phase 10). Retaining import lines for now in case re-introduced
-          via different feature. */}
-      {false && tab === 'prielaidos' && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Keisdami prielaidas, visi kiekiai persiskaičiuoja automatiškai.
-            {!rawData && (
-              <span className="text-amber-600 ml-1">
-                Šiam projektui nėra raw duomenų — atnaujink projektą nauja analize.
-              </span>
-            )}
-          </p>
-          <AssumptionsPanel
-            assumptions={assumptions}
-            onChange={handleAssumptionsChange}
-            prielaidos={prielaidos}
-            rawData={rawData}
-            onRecomputed={(result) => {
-              // Sprint 0 Fix 2 wire-through: merge backend-recomputed rooms +
-              // assumptions into project state. pozicijos intentionally NOT
-              // overwritten — Task 3 endpoint returns pozicijos:[] today; full
-              // pozicijos rebuild is Sprint 1 work.
-              setAssumptions(result.assumptions);
-              setProject(prev => ({
-                ...prev,
-                raw_calc_data: prev.raw_calc_data
-                  ? { ...prev.raw_calc_data, patalpos: result.rooms }
-                  : prev.raw_calc_data,
-                prielaidos: { ...(prev.prielaidos || {}), ...result.assumptions },
-              }));
-            }}
+      </div>
+
+      {/* ── The step's own exit: „Atgal" + ONE big button ────────────────── */}
+      <StepFooter
+        step={step}
+        setStep={setStep}
+        nextLabel={step === 'siusti' ? null : t(`project.steps.next.${step}`)}
+        nextTitle={step === 'siusti' ? null : t(`project.steps.nextTitles.${step}`)}
+        onNext={() => {
+          const i = STEPS.indexOf(step);
+          if (i >= 0 && i < STEPS.length - 1) setStep(STEPS[i + 1]);
+        }}
+      >
+        {/* „Klausti apie projektą" — was a top-level tab, now a small button in
+            the bottom-right corner beside the step's own button. A side door,
+            never a step: a contractor must not think the chat is work he owes.
+            In the footer rather than floating over it, so it can never cover
+            the one button the step is asking him to press. */}
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          title={t('project.steps.chatTitle')}
+          className="inline-flex items-center gap-2 rounded border border-border-strong bg-card text-foreground/85 hover:bg-muted/60 transition-colors"
+          style={{ minHeight: 44, padding: '0 14px', fontSize: 14, fontWeight: 500 }}
+        >
+          <MessageSquare className="w-4 h-4" aria-hidden />
+          {t('project.steps.chat')}
+        </button>
+      </StepFooter>
+
+      {chatOpen && (
+        <div className="fixed inset-0 z-40 flex items-end justify-end p-4 sm:p-6">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'hsl(var(--foreground) / 0.18)' }}
+            onClick={() => setChatOpen(false)}
+            aria-hidden
           />
-
-          {/* Summary of current assumptions */}
-          <div className="bg-card border border-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold mb-3">Dabartinės prielaidos</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-0">
-              <QtyRow label="Sienos storis" value={assumptions.sienos_storis_m} unit="m" />
-              <QtyRow label="Glaistymo lygis" value={null} />
-              {assumptions.glaistimo_lygis && (
-                <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-                  <span className="text-sm text-muted-foreground">Glaistymo lygis</span>
-                  <Badge variant="outline">{assumptions.glaistimo_lygis}</Badge>
-                </div>
-              )}
-              <QtyRow
-                label="Langai"
-                value={
-                  assumptions.custom_windows != null
-                    ? assumptions.custom_windows.length
-                    : (prielaidos.langai_vnt ?? 0)
-                }
-                unit="vnt"
-              />
-              <QtyRow
-                label="Durys"
-                value={
-                  assumptions.custom_doors != null
-                    ? assumptions.custom_doors.length
-                    : (prielaidos.durys_vnt ?? 0)
-                }
-                unit="vnt"
-              />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('project.steps.chat')}
+            className="relative w-full sm:w-[460px] max-h-[80vh] overflow-y-auto rounded-lg border border-border bg-card shadow-xl p-4"
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <h2 className="font-semibold text-foreground" style={{ fontSize: 16 }}>
+                  {t('project.steps.chat')}
+                </h2>
+                <p className="text-muted-foreground" style={{ fontSize: 13 }}>
+                  {t('project.interior.aiDesc')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChatOpen(false)}
+                title={t('project.steps.chatClose')}
+                aria-label={t('project.steps.chatClose')}
+                className="inline-flex items-center justify-center rounded border border-border-strong bg-background text-foreground/80 hover:bg-muted/50 shrink-0"
+                style={{ minHeight: 44, minWidth: 44 }}
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </div>
-
-          {/* Task 9: GK calculation method toggle */}
-          <div className="bg-card border border-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold mb-2">GK lapų skaičiavimo metodas</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Tikslus: sienų plotas atėmus angas ÷ 3 m² + 10%. <br />
-              Praktinis: visas perimetras × aukštis BE angų atėmimo — nes iškirptos dalys = atliekos + pjovimo darbas.
-            </p>
-            <div className="flex gap-2">
-              {['tikslus', 'praktinis'].map(m => (
-                <button
-                  key={m}
-                  onClick={() => setGkMetodas(m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    gkMetodas === m
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                  }`}
-                >
-                  {m === 'tikslus' ? 'Tikslus' : 'Praktinis'}
-                </button>
-              ))}
-            </div>
-            {prielaidos.langai_source === 'niches' && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-3">
-                ✓ Langai nustatyti iš užuolaidų nišų ({prielaidos.langai_vnt} vnt.)
-              </p>
-            )}
-            {prielaidos.langai_source === 'room_defaults' && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                ⚠ Langai — standartiniai pagal patalpų tipą
-              </p>
-            )}
+            <AiChat project={project} inline />
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-        {/* Floating AI CHAT — paslėpta MVP versijoj (Sprint 1, Q6) */}
-        {/* <AiChat project={project} /> */}
+// ── STEP 4 · SIŲSTI ───────────────────────────────────────────────────────────
+//
+// Design §E5: three actions and, before sending, ONE sentence — not a list of
+// warnings. „3 eilutės be kiekio bus praleistos. Siųsti?"
+
+function SendStep({ project }) {
+  const { t } = useTranslation();
+  const rows = project.darbu_sarasas || [];
+  const noQty = rows.filter((r) => !Number(r?.kiekis)).length;
+  const noPrice = rows.filter((r) => Number(r?.kiekis) && !Number(r?.kaina)).length;
+  return (
+    <div className="border border-border rounded-xl bg-card p-6 space-y-5">
+      <div>
+        <h2 className="font-semibold text-foreground" style={{ fontSize: 17 }}>
+          {t('project.send.title')}
+        </h2>
+        <p className="text-muted-foreground mt-1" style={{ fontSize: 15 }}>
+          {t('project.send.subtitle')}
+        </p>
+      </div>
+
+      {/* The one sentence before sending. Never a wall of warnings. */}
+      <p
+        className="rounded border px-3 py-2.5"
+        style={{
+          fontSize: 15,
+          borderColor: (noQty || noPrice)
+            ? 'hsl(var(--conf-med) / 0.45)' : 'hsl(var(--border))',
+          background: (noQty || noPrice)
+            ? 'hsl(var(--conf-med) / 0.08)' : 'hsl(var(--muted) / 0.3)',
+          color: 'hsl(var(--foreground))',
+        }}
+      >
+        {noQty > 0
+          ? t('project.send.checkNoQty', { count: noQty })
+          : noPrice > 0
+            ? t('project.send.checkNoPrice', { count: noPrice })
+            : t('project.send.checkOk', { count: rows.length })}
+      </p>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <ExportDropdown project={project} />
+        <ShareButton project={project} />
+      </div>
+
+      <div className="border-t border-border/50 pt-4 text-muted-foreground space-y-1" style={{ fontSize: 14 }}>
+        <p><strong className="text-foreground">{t('project.interior.exportExcelBold')}</strong>{t('project.interior.exportExcelDesc')}</p>
+        <p><strong className="text-foreground">{t('project.interior.exportPdfBold')}</strong>{t('project.interior.exportPdfDesc')}</p>
+        <p><strong className="text-foreground">{t('project.send.emailBold')}</strong>{t('project.send.emailDesc')}</p>
       </div>
     </div>
   );

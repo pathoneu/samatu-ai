@@ -1348,6 +1348,47 @@
       "fillYourself": "Suveskite patys ({{count}})",
       "fillYourselfNote": "Šių eilučių kiekio brėžinyje nepavyko nustatyti — įrašykite jį patys.",
       "toastRippleNoPriceYet": "Perskaičiuota: {{count}} eilučių · kainų dar nėra"
+    },
+    "steps": {
+      "navLabel": "Projekto žingsniai",
+      "brezinys": "Brėžinys",
+      "patikra": "Patikra",
+      "samata": "Sąmata",
+      "siusti": "Siųsti",
+      "titles": {
+        "brezinys": "Brėžinys ir patalpos — čia matote planą, patalpas ir galite pamatuoti tiesiai brėžinyje",
+        "patikra": "Patikra — peržiūrite, ką programa perskaitė iš brėžinio, ir pataisote, kas netinka",
+        "samata": "Sąmata — jūsų eilutės, kiekiai ir kainos",
+        "siusti": "Siųsti — Excel, PDF klientui arba el. paštu"
+      },
+      "brezinysAttachTitle": "Brėžinys — šiam projektui PDF dar neprisegtas; čia galėsite jį įkelti",
+      "back": "Atgal",
+      "backTitle": "Grįžti į žingsnį „{{step}}“",
+      "next": {
+        "brezinys": "Brėžinį peržiūrėjau — į patikrą",
+        "patikra": "Patikra baigta — į sąmatą",
+        "samata": "Sąmata paruošta — siųsti"
+      },
+      "nextTitles": {
+        "brezinys": "Pereiti į patikrą — ten peržiūrėsite, ką programa perskaitė iš brėžinio",
+        "patikra": "Pereiti į sąmatą — ten įrašysite kainas",
+        "samata": "Pereiti į siuntimą — Excel, PDF klientui arba el. paštas"
+      },
+      "help": "Pagalba: paskambinti",
+      "helpTitle": "Paskambinti pagalbos numeriu {{phone}}",
+      "chat": "Klausti apie projektą",
+      "chatTitle": "Užduoti klausimą apie šį projektą — atsakymas remsis jūsų brėžiniu ir kiekiais",
+      "chatClose": "Uždaryti klausimų langą",
+      "settingsClose": "Uždaryti nustatymus"
+    },
+    "send": {
+      "title": "Siųsti sąmatą",
+      "subtitle": "Excel savo šablonu, PDF klientui arba nuoroda el. paštu.",
+      "checkNoQty": "{{count}} eilutės be kiekio bus praleistos. Siųsti?",
+      "checkNoPrice": "{{count}} eilutės be kainos bus išsiųstos su tuščiu langeliu. Siųsti?",
+      "checkOk": "Visos {{count}} eilutės turi kiekį. Galima siųsti.",
+      "emailBold": "El. paštu: ",
+      "emailDesc": "sukuriama nuoroda, kurią galite nusiųsti klientui — jis mato sąmatą naršyklėje."
     }
   },
   "shared": {

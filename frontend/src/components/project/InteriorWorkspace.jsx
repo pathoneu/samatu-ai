@@ -129,6 +129,10 @@ function viewerEngineIsEmbed() {
 
 export default function InteriorWorkspace({
   project,
+  // 'brezinys' (step 1) or 'patikra' (step 2). ONE component, two steps: the
+  // drawing is identical, only the right-hand panel changes emphasis — step 1
+  // is the rooms + measurements, step 2 is the check list. (Design §2.)
+  mode = 'brezinys',
   focusedPage = null,
   focusedRoom = null,
   onJumpToPage = null,
@@ -380,7 +384,10 @@ export default function InteriorWorkspace({
   }, []);
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-180px)] min-h-[600px] border border-border rounded-lg overflow-hidden bg-background relative">
+    // 244 px of chrome above/below: top bar 52 + step bar 46 + page padding 32
+    // + the step footer 64 + slack. The footer must stay on screen — it holds
+    // the step's one big button.
+    <div className="flex flex-col md:flex-row h-[calc(100vh-244px)] min-h-[520px] border border-border rounded-lg overflow-hidden bg-background relative">
       {/* Sprint H8: 3-step onboarding overlay (auto-skips after first time) */}
       <OnboardingTooltips />
       {/* Phase C-1 Task 24: coarse-pointer (touch) view-only notice. It lived in
@@ -592,6 +599,7 @@ export default function InteriorWorkspace({
       >
         <WorkspacePanel
           project={project}
+          mode={mode}
           onOpenAssumptions={onOpenAssumptions}
           lastRipple={lastRipple}
           focusedRoomNr={effectiveFocusedRoom?.nr ?? null}

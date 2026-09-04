@@ -1342,6 +1342,47 @@
       "fillYourself": "Fill in yourself ({{count}})",
       "fillYourselfNote": "These quantities could not be read from the drawing — enter them yourself.",
       "toastRippleNoPriceYet": "Recalculated: {{count}} rows · no prices yet"
+    },
+    "steps": {
+      "navLabel": "Project steps",
+      "brezinys": "Drawing",
+      "patikra": "Check",
+      "samata": "Estimate",
+      "siusti": "Send",
+      "titles": {
+        "brezinys": "Drawing and rooms — the plan, the rooms, and measuring straight on the drawing",
+        "patikra": "Check — review what was read from the drawing and fix what is wrong",
+        "samata": "Estimate — your rows, quantities and prices",
+        "siusti": "Send — Excel, a PDF for the client, or e-mail"
+      },
+      "brezinysAttachTitle": "Drawing — no PDF is attached to this project yet; you can upload it here",
+      "back": "Back",
+      "backTitle": "Back to step “{{step}}”",
+      "next": {
+        "brezinys": "Drawing reviewed — go to check",
+        "patikra": "Check finished — go to the estimate",
+        "samata": "Estimate ready — send it"
+      },
+      "nextTitles": {
+        "brezinys": "Go to the check step — review what was read from the drawing",
+        "patikra": "Go to the estimate — enter your prices there",
+        "samata": "Go to sending — Excel, a client PDF or e-mail"
+      },
+      "help": "Help: call us",
+      "helpTitle": "Call support on {{phone}}",
+      "chat": "Ask about this project",
+      "chatTitle": "Ask a question about this project — the answer uses your drawing and quantities",
+      "chatClose": "Close the questions panel",
+      "settingsClose": "Close settings"
+    },
+    "send": {
+      "title": "Send the estimate",
+      "subtitle": "Excel in your own template, a PDF for the client, or a link by e-mail.",
+      "checkNoQty": "{{count}} rows have no quantity and will be skipped. Send?",
+      "checkNoPrice": "{{count}} rows have no price and will be sent with an empty cell. Send?",
+      "checkOk": "All {{count}} rows have a quantity. Ready to send.",
+      "emailBold": "By e-mail: ",
+      "emailDesc": "creates a link you can send to the client — they see the estimate in a browser."
     }
   },
   "shared": {
