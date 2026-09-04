@@ -375,6 +375,7 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     merged.push({ ...o, _orphaned_after_rebuild: true });
     notes.push({
       reason: 'orphan_carried',
+      id: o.id,
       aprasymas: o.aprasymas,
       kiekis: o.kiekis,
       kaina: o.kaina,
@@ -387,6 +388,26 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
 /** Rows the rebuild could not reproduce — the ones the user must be told about. */
 export function carriedOrphans(notes) {
   return (notes || []).filter((n) => n && n.reason === 'orphan_carried');
+}
+
+/**
+ * Only the rows that became orphans THIS rebuild. A row already flagged
+ * `_orphaned_after_rebuild` in the prior list is carried again every time —
+ * announcing it every time turned a one-off notice into a permanent alarm on
+ * every project built by an older engine (2026-09-04: "30 pozicijų nebuvo
+ * perskaičiuotos" on every Prielaidos toggle). Labels are matched by id when
+ * both sides carry one, else by label.
+ */
+export function newlyCarriedOrphans(notes, priorRows) {
+  const priorOrphanIds = new Set();
+  const priorOrphanLabels = new Set();
+  (priorRows || []).forEach((r) => {
+    if (!r || !r._orphaned_after_rebuild) return;
+    if (r.id) priorOrphanIds.add(String(r.id));
+    priorOrphanLabels.add(_lc(r.aprasymas));
+  });
+  return carriedOrphans(notes).filter((n) =>
+    !(n.id && priorOrphanIds.has(String(n.id))) && !priorOrphanLabels.has(_lc(n.aprasymas)));
 }
 
 export default mergeDarbuSarasasEdits;

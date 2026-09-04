@@ -536,3 +536,19 @@ test('reassignDuplicateIds: rows without ids are left alone', () => {
   assert.equal(out[1].id, '');
   assert.equal(out[2].id, 'k1');
 });
+
+import { newlyCarriedOrphans } from './mergeDarbuSarasas.js';
+
+test('newlyCarriedOrphans: an already-orphaned prior row is not announced again', () => {
+  const notes = [
+    { reason: 'orphan_carried', id: 'old-1', aprasymas: 'Sienų pirminis glaistymas Q1' },
+    { reason: 'orphan_carried', aprasymas: 'Nauja pasenusi eilutė' },
+    { reason: 'relabeled', aprasymas: 'kažkas kita' },
+  ];
+  const prior = [
+    { id: 'old-1', aprasymas: 'Sienų pirminis glaistymas Q1', _orphaned_after_rebuild: true },
+    { id: 'live', aprasymas: 'Nauja pasenusi eilutė' },   // was live → orphaned NOW → news
+  ];
+  assert.deepEqual(newlyCarriedOrphans(notes, prior).map(n => n.aprasymas), ['Nauja pasenusi eilutė']);
+  assert.equal(newlyCarriedOrphans(notes, []).length, 2);   // no prior flags → all are news
+});

@@ -702,7 +702,7 @@
       "exportTitle": "Export the bid",
       "recomputeErr": "Recompute error",
       "toastRecomputed": "Quantities recalculated",
-      "toastOrphansCarried": "{{n}} item(s) were not recalculated under the new assumptions — originals kept: {{labels}}",
+      "toastOrphansCarried": "{{n}} rows from an older estimate are no longer updated — this engine does not compute them, so they were left as they were ({{labels}}). They are marked “outdated row” — you can remove them.",
       "toastRecomputeErr": "Error recalculating: {{msg}}",
       "assumptionsTitle": "Ceiling height and putty level",
       "aiTitle": "AI questions about the project",

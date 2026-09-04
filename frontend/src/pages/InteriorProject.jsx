@@ -25,7 +25,7 @@ import ShareButton from '@/components/project/ShareButton';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { updateProject, getProject, flushProjectSaves, logCorrection } from '@/lib/projectStore';
 import { calculateInteriorQuantities, DEFAULT_ASSUMPTIONS } from '@/lib/interiorCalc';
-import { mergeDarbuSarasasEdits, carriedOrphans } from '@/lib/mergeDarbuSarasas';
+import { mergeDarbuSarasasEdits, newlyCarriedOrphans } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
@@ -859,7 +859,7 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
       updateProject(project.id, merged);
       setProject(merged);
       toast.success(t('project.interior.toastRecomputed'));
-      notifyCarriedOrphans(carriedOrphans(notes).map((n) => n.aprasymas), t);
+      notifyCarriedOrphans(newlyCarriedOrphans(notes, project.darbu_sarasas).map((n) => n.aprasymas), t);
     } catch (e) {
       console.error('Edit cascade failed:', e);
       toast.error(t('project.interior.toastRecomputeErr', { msg: e.message }));
@@ -1028,10 +1028,18 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
               // On this path the BACKEND already carried the orphans (it holds the
               // prior pozicijos), so its degradation entry is the authoritative
               // list; the local merge only adds rows the backend never saw.
-              notifyCarriedOrphans([
-                ...backendCarriedPositions(result),
-                ...carriedOrphans(notes).map((n) => n.aprasymas),
-              ], t);
+              {
+                // Backend-carried labels are ALL carried orphans; drop the ones
+                // that were already orphans before this rebuild (see
+                // newlyCarriedOrphans) so the notice fires once, not forever.
+                const already = new Set((project.darbu_sarasas || [])
+                  .filter((r) => r && r._orphaned_after_rebuild)
+                  .map((r) => String(r.aprasymas || '').toLowerCase()));
+                notifyCarriedOrphans([
+                  ...backendCarriedPositions(result).filter((l) => !already.has(String(l || '').toLowerCase())),
+                  ...newlyCarriedOrphans(notes, project.darbu_sarasas).map((n) => n.aprasymas),
+                ], t);
+              }
               notifyBackendDegradations(result);
             }}
           />

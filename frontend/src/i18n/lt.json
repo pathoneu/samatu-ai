@@ -708,7 +708,7 @@
       "exportTitle": "Eksportuoti pasiūlymą",
       "recomputeErr": "Perskaičiavimo klaida",
       "toastRecomputed": "Kiekiai perskaičiuoti",
-      "toastOrphansCarried": "{{n}} pozicijų nebuvo perskaičiuotos pagal naujas prielaidas — paliktos originalios: {{labels}}",
+      "toastOrphansCarried": "{{n}} senesnės sąmatos eilutės nebeatnaujinamos — šis variklis jų nebeskaičiuoja, todėl paliktos kaip buvo ({{labels}}). Jos pažymėtos „pasenusi eilutė“ — galite pašalinti.",
       "toastRecomputeErr": "Klaida persiskaičiuojant: {{msg}}",
       "assumptionsTitle": "Lubų aukštis ir glaistymo lygis",
       "aiTitle": "AI klausimai apie projektą",
