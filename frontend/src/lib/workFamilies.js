@@ -56,10 +56,12 @@ const rowSectionOf = (row) => row?.skyrius || row?.kategorija || '';
  * @returns {Array<object>} a new array; the input is never mutated
  */
 export function filterRowsByFamilies(rows, selected) {
-  const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
   const keep = new Set(Array.isArray(selected) ? selected : WORK_FAMILIES);
-  // Nothing unticked → nothing to do (and no chance of an accidental drop).
-  if (WORK_FAMILIES.every((f) => keep.has(f))) return list;
+  // Nothing unticked → hand back exactly what came in, including a non-array.
+  // The call site spreads the result onto the project, so returning [] for an
+  // absent list would replace "no list yet" with "an empty sąmata".
+  if (WORK_FAMILIES.every((f) => keep.has(f))) return rows;
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
 
   const dropped = [];
   const survivors = list.filter((row) => {

@@ -42,6 +42,14 @@ test('filterRowsByFamilies: everything ticked changes nothing', () => {
   assert.equal(out.length, ROWS.length);
 });
 
+test('filterRowsByFamilies: with nothing unticked, an absent list stays absent', () => {
+  // The call site spreads the result onto the project blob. Turning `undefined`
+  // into `[]` here would replace "no list yet" with "an empty sąmata".
+  assert.equal(filterRowsByFamilies(undefined, WORK_FAMILIES), undefined);
+  assert.equal(filterRowsByFamilies(null, WORK_FAMILIES), null);
+  assert.equal(filterRowsByFamilies(ROWS, WORK_FAMILIES), ROWS);
+});
+
 test('filterRowsByFamilies: unticking one family removes exactly its sections', () => {
   const out = filterRowsByFamilies(ROWS, WORK_FAMILIES.filter(f => f !== 'elektra'));
   assert.equal(out.find(r => r.skyrius === 'Elektros instaliacijos darbai'), undefined);
