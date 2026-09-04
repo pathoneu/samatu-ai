@@ -6,12 +6,15 @@ it — the #1 "browser tool vs cloud product" gap from the commercial audit. Thi
 persists the bytes server-side; the browser cache becomes an optimization, not the
 only copy.
 
-Two interchangeable backends, chosen by environment:
-  - R2Storage      — Cloudflare R2 (S3-compatible, via boto3) when all R2_* env
-                     vars are set. Zero egress, scales with success.
-  - LocalDiskStorage — a directory under backend/data/pdf_store. Used in dev + the
-                     test suite; needs no credentials, so everything below is fully
-                     testable without R2.
+Two interchangeable backends, chosen by environment (see `r2_decision`):
+  - R2Storage      — Cloudflare R2 (S3-compatible, via boto3) when the four R2_*
+                     vars are set AND this process is allowed to use them
+                     (ENV=production, or an explicit STORAGE_BACKEND=r2). Zero
+                     egress, scales with success.
+  - LocalDiskStorage — a directory under backend/data/pdf_store. The default for
+                     dev + the test suite EVEN WHEN R2 credentials are present;
+                     needs no credentials, so everything below is fully testable
+                     without R2.
 
 Keys are namespaced, e.g. "projects/<project_id>.pdf".
 """
@@ -186,41 +189,84 @@ _instance: _Backend | None = None
 _R2_VARS = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
 
 
+def r2_decision() -> tuple[bool, str]:
+    """(use_r2, why) — the whole backend-selection rule, pure over os.environ.
+
+    2026-09-04. Credentials alone used to be the rule: any machine with the four
+    R2_* vars wrote to the PRODUCTION bucket. `backend/.env` carries them, so a
+    dev server and the whole test suite did exactly that — 35 test-seed objects
+    landed in the live `projects/` prefix on 09-02 and 09-04, mixed in with real
+    customers' drawings. Presence of a credential is not consent to use it.
+
+    R2 is now used only when something SAYS this process is allowed to write to
+    the real bucket:
+      · ENV=production            — a deploy, and
+      · STORAGE_BACKEND=r2        — an explicit opt-in (a staging box, or a
+                                    developer deliberately testing R2)
+    and `STORAGE_BACKEND=local` opts out even in production — the ERROR below
+    still fires there, so opting prod out cannot be done quietly.
+    """
+    explicit = (os.environ.get("STORAGE_BACKEND") or "").strip().lower()
+    if explicit == "local":
+        return False, "STORAGE_BACKEND=local"
+    missing = [v for v in _R2_VARS if not os.environ.get(v)]
+    if missing:
+        return False, f"R2 not configured, missing: {', '.join(missing)}"
+    if explicit == "r2":
+        return True, "STORAGE_BACKEND=r2"
+    if os.environ.get("ENV") == "production":
+        return True, "ENV=production"
+    return False, ("R2 credentials present but unused — neither ENV=production "
+                   "nor STORAGE_BACKEND=r2, so this process must not write to "
+                   "the production bucket")
+
+
 def selected_backend_name() -> str:
     """'r2' | 'local' — what get_storage() would pick (cheap, no side effects).
     Surfaced by /api/admin/v2/system-health so a misconfigured prod is visible."""
-    return "r2" if all(os.environ.get(v) for v in _R2_VARS) else "local"
+    return "r2" if r2_decision()[0] else "local"
 
 
 def get_storage() -> _Backend:
-    """Process-wide storage backend. R2 when configured, else local disk.
+    """Process-wide storage backend. R2 when `r2_decision()` allows it, else
+    local disk.
 
     2026-07-27 audit (finding 7): the fallback to local disk was SILENT — a prod
     deploy missing one R2_* var kept "working" while every uploaded PDF went to
-    ephemeral container disk. It now says which backend it picked, and shouts
-    (ERROR) when production lands on local disk."""
+    ephemeral container disk. It says which backend it picked, and shouts
+    (ERROR) when production lands on local disk.
+
+    2026-09-04: which backend and WHY, on one line, every time — because the
+    dangerous case is not a missing credential, it is a present one being used
+    by a machine that should not have been writing to the live bucket."""
     global _instance
     with _lock:
         if _instance is not None:
             return _instance
-        acct = os.environ.get("R2_ACCOUNT_ID")
-        ak = os.environ.get("R2_ACCESS_KEY_ID")
-        sk = os.environ.get("R2_SECRET_ACCESS_KEY")
-        bucket = os.environ.get("R2_BUCKET")
-        if acct and ak and sk and bucket:
-            _instance = R2Storage(acct, ak, sk, bucket)
-            log.info("storage backend: R2 (bucket=%s)", bucket)
+        use_r2, why = r2_decision()
+        if use_r2:
+            _instance = R2Storage(
+                os.environ["R2_ACCOUNT_ID"], os.environ["R2_ACCESS_KEY_ID"],
+                os.environ["R2_SECRET_ACCESS_KEY"], os.environ["R2_BUCKET"])
+            log.info("storage backend: R2 (bucket=%s) — %s",
+                     os.environ["R2_BUCKET"], why)
         else:
             root = os.environ.get("LOCAL_STORAGE_DIR") or str(
                 data_path("pdf_store", pathlib.Path(__file__).parent / "data" / "pdf_store")
             )
             _instance = LocalDiskStorage(root)
-            missing = [v for v in _R2_VARS if not os.environ.get(v)]
-            msg = "storage backend: LOCAL DISK at %s — R2 disabled, missing: %s"
+            msg = "storage backend: LOCAL DISK at %s — %s"
             if os.environ.get("ENV") == "production":
-                log.error(msg + " | PRODUCTION uploads are NOT durable", root, missing)
+                # Unchanged and deliberate: prod on local disk is data loss
+                # waiting to happen, whatever the reason.
+                log.error(msg + " | PRODUCTION uploads are NOT durable", root, why)
+            elif all(os.environ.get(v) for v in _R2_VARS):
+                # Credentials present, deliberately not used — routine, so INFO.
+                log.info(msg, root, why)
             else:
-                log.warning(msg, root, missing)
+                # A partial/absent R2 config is a real misconfiguration on any
+                # machine that meant to have one: keep it at WARNING.
+                log.warning(msg, root, why)
         return _instance
 
 

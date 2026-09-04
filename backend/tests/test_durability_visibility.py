@@ -57,6 +57,10 @@ def test_r2_selection_is_logged_at_info(monkeypatch, caplog):
     for k, v in (("R2_ACCOUNT_ID", "acct"), ("R2_ACCESS_KEY_ID", "ak"),
                  ("R2_SECRET_ACCESS_KEY", "sk"), ("R2_BUCKET", "samatu-pdfs")):
         monkeypatch.setenv(k, v)
+    # 2026-09-04: credentials are no longer permission — see storage.r2_decision
+    # and tests/test_storage_backend_gate.py. This test is about the LOG LINE,
+    # so it opts in explicitly rather than pretending to be production.
+    monkeypatch.setenv("STORAGE_BACKEND", "r2")
     storage.reset_storage_for_test()
     with caplog.at_level(logging.INFO, logger="samatu.storage"):
         assert storage.get_storage().name == "R2Storage"
@@ -68,10 +72,16 @@ def test_r2_selection_is_logged_at_info(monkeypatch, caplog):
 
 def test_selected_backend_name_matches_selection(monkeypatch):
     _no_r2(monkeypatch)
+    monkeypatch.delenv("STORAGE_BACKEND", raising=False)
     assert storage.selected_backend_name() == "local"
     for k, v in (("R2_ACCOUNT_ID", "a"), ("R2_ACCESS_KEY_ID", "b"),
                  ("R2_SECRET_ACCESS_KEY", "c"), ("R2_BUCKET", "d")):
         monkeypatch.setenv(k, v)
+    # 2026-09-04: the four vars are necessary but no longer sufficient — a dev
+    # box carries them and was writing to the live bucket. Full matrix in
+    # tests/test_storage_backend_gate.py.
+    assert storage.selected_backend_name() == "local"
+    monkeypatch.setenv("STORAGE_BACKEND", "r2")
     assert storage.selected_backend_name() == "r2"
     monkeypatch.delenv("R2_BUCKET")           # one missing var → local, silently before
     assert storage.selected_backend_name() == "local"
