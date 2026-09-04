@@ -1003,6 +1003,157 @@ def delete_price_list(price_list_id: str, user_id: str) -> bool:
         return cur.rowcount > 0
 
 
+# ── Sąmatų šablonai / family templates (2026-09-04) ──────────────────────────
+#
+# The contractor's OWN sąmata as the skeleton of our output: his section order
+# and, per section, the families he bills. Derived by
+# `extractor/samata_template.py` from his parsed sąmatas and rendered over a
+# project by `render_samata`.
+#
+# WHY ITS OWN TABLE rather than a JSON column on `price_lists`. The two look
+# similar — both are a per-user artefact the contractor brings with him — and
+# they are not the same thing:
+#   · different lifecycle: a kainynas is imported whole and replaced; a template
+#     GROWS, merged one sąmata at a time (`merge_samata`), and its `sources`
+#     list is load-bearing for `seen_in` → „įprasta"/„kartais";
+#   · different shape: `price_lists.items` is a flat array with a strict
+#     four-field contract that `api/price_lists._sanitize_items` owns; a template
+#     is a nested sections→families tree validated by
+#     `samata_template.validate_template`. Bolting one onto the other would make
+#     one row two things and force that sanitiser to grow a second, unrelated
+#     branch — exactly how the NULL-owner widening bug got written the first time;
+#   · different cardinality per project: a project renders through ONE template
+#     but may price against any kainynas.
+# What is deliberately COPIED from price_lists is the part that matters for
+# safety: `_require_user_id` on every function, the NULL-owner write barrier,
+# and exclusive `is_default` inside the one connection that holds _DB_LOCK.
+
+def list_samata_templates(user_id: str) -> list[dict]:
+    """All of one user's templates, newest first."""
+    _require_user_id(user_id)
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM samata_templates WHERE user_id = ? "
+            "ORDER BY created_at DESC", (user_id,)).fetchall()
+        return [_samata_template_row_to_dict(r) for r in rows]
+
+
+def _samata_template_row_to_dict(row) -> dict:
+    d = dict(row)
+    for field, empty in (("sections", []), ("sources", [])):
+        raw = d.pop(field, None)
+        try:
+            value = json.loads(raw or ("[]" if isinstance(empty, list) else "{}"))
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            # Same reasoning as get_project / _price_list_row_to_dict: a corrupt
+            # blob must not read as an EMPTY template, which would silently
+            # render every sąmata as our own row list under our own labels.
+            log.error("samata template %s has a corrupt %s blob (%s)",
+                      d.get("id"), field, exc)
+            value = empty
+            d["_sections_corrupt"] = True
+        d[field] = value if isinstance(value, list) else empty
+    d["is_default"] = bool(d.get("is_default"))
+    d["total_families"] = sum(len(s.get("families") or [])
+                              for s in d["sections"] if isinstance(s, dict))
+    d["created_date"] = d.get("created_at")
+    return d
+
+
+def get_samata_template(template_id: str, user_id: str) -> dict | None:
+    _require_user_id(user_id)
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM samata_templates WHERE id = ? AND user_id = ?",
+            (template_id, user_id)).fetchone()
+        return _samata_template_row_to_dict(row) if row else None
+
+
+def get_default_samata_template(user_id: str) -> dict | None:
+    """The template a project renders through when none is named.
+
+    Falls back to the newest one: a user with exactly one template — the common
+    case — should never have to pass an id.
+    """
+    _require_user_id(user_id)
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM samata_templates WHERE user_id = ? "
+            "ORDER BY is_default DESC, created_at DESC LIMIT 1",
+            (user_id,)).fetchone()
+        return _samata_template_row_to_dict(row) if row else None
+
+
+def _read_samata_template(c, template_id: str) -> dict | None:
+    """Owner-agnostic read on an OPEN connection — only `upsert_samata_template`
+    calls it, reading back the row it just wrote inside the same transaction."""
+    row = c.execute("SELECT * FROM samata_templates WHERE id = ?",
+                    (template_id,)).fetchone()
+    return _samata_template_row_to_dict(row) if row else None
+
+
+def upsert_samata_template(template_id: str, payload: dict,
+                           user_id: str) -> dict:
+    """Insert or full-replace one template. `is_default` is exclusive per user."""
+    _require_user_id(user_id)
+    now = _now_iso()
+    name = (payload.get("name") or "Rangovo šablonas").strip()[:200]
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        sections = []
+    sources = payload.get("sources")
+    if not isinstance(sources, list):
+        sources = []
+    is_default = 1 if payload.get("is_default") else 0
+    with _conn() as c:
+        existing = c.execute(
+            "SELECT created_at, user_id FROM samata_templates WHERE id = ?",
+            (template_id,)).fetchone()
+        if existing:
+            # No `user_id and …` guard — an empty owner must not skip the
+            # barrier, and a legacy NULL-owner row stays unwritable.
+            if existing["user_id"] != user_id:
+                raise PermissionError(
+                    f"User {user_id} does not own samata template {template_id}")
+            created_at = existing["created_at"]
+            owner = existing["user_id"]
+        else:
+            created_at = (payload.get("created_date")
+                          or payload.get("created_at") or now)
+            owner = user_id
+        c.execute("""
+            INSERT INTO samata_templates
+                (id, user_id, name, sections, sources, n_projects, is_default,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name,
+                sections=excluded.sections,
+                sources=excluded.sources,
+                n_projects=excluded.n_projects,
+                is_default=excluded.is_default,
+                updated_at=excluded.updated_at
+        """, (template_id, owner, name,
+              json.dumps(sections, ensure_ascii=False),
+              json.dumps(sources, ensure_ascii=False),
+              int(payload.get("n_projects") or len(sources)),
+              is_default, created_at, now))
+        if is_default and owner:
+            c.execute(
+                "UPDATE samata_templates SET is_default = 0, updated_at = ? "
+                " WHERE user_id = ? AND id != ?", (now, owner, template_id))
+        return _read_samata_template(c, template_id) or {}
+
+
+def delete_samata_template(template_id: str, user_id: str) -> bool:
+    _require_user_id(user_id)
+    with _conn() as c:
+        cur = c.execute(
+            "DELETE FROM samata_templates WHERE id = ? AND user_id = ?",
+            (template_id, user_id))
+        return cur.rowcount > 0
+
+
 def _migrate_schema() -> None:
     """Idempotent column additions for existing DBs created before auth.
     SQLite ALTER TABLE only supports ADD COLUMN — keep migrations append-only."""
@@ -1146,6 +1297,26 @@ def _migrate_schema() -> None:
                 updated_at   TEXT NOT NULL
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_price_lists_user ON price_lists(user_id, created_at DESC)")
+        # samata_templates (2026-09-04): the contractor's own sąmata as the
+        # skeleton of our output — his sections, his labels per family. See the
+        # block above `list_samata_templates` for why this is its own table and
+        # not a column on price_lists. `user_id` is nullable for the same reason
+        # projects' is (SAMATU_AUTH_DISABLED single-tenant mode has no owner);
+        # the upsert enforces the NULL-owner write barrier either way.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS samata_templates (
+                id           TEXT PRIMARY KEY,
+                user_id      TEXT,
+                name         TEXT NOT NULL,
+                sections     TEXT NOT NULL,     -- JSON array (sections→families)
+                sources      TEXT NOT NULL,     -- JSON array of sąmata names
+                n_projects   INTEGER NOT NULL DEFAULT 0,
+                is_default   INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_samata_templates_user "
+                  "ON samata_templates(user_id, created_at DESC)")
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────
