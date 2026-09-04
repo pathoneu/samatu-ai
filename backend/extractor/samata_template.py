@@ -753,14 +753,21 @@ def render_samata(template: dict,
 
     consumed: set[int] = set()
     out: list[dict] = []
-    seen_ids: dict[str, int] = {}
     blank_note = NOTE_BLANK if (rooms or []) else NOTE_NO_ROOMS
+
+    # Pre-claimed with every app-row id, because a „Kita" row keeps ITS OWN id —
+    # that is the key a typed price and a „Teisinga ✓" already hang on — so a
+    # template row that happens to hash the same must be the one to move.
+    used_ids: set[str] = {str(r["id"]) for r in rows if r.get("id")}
 
     def _row_id(section_label: str, label: str) -> str:
         base = position_id(section_label, label)
-        n = seen_ids.get(base, 0)
-        seen_ids[base] = n + 1
-        return base if n == 0 else f"{base}-{n + 1}"
+        candidate, n = base, 1
+        while candidate in used_ids:
+            n += 1
+            candidate = f"{base}-{n}"
+        used_ids.add(candidate)
+        return candidate
 
     for sec in (template or {}).get("sections") or []:
         s_label = _norm(sec.get("label")) or EXTRA_SECTION

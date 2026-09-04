@@ -251,6 +251,9 @@ def api_render_project(request: Request, project_id: str) -> dict[str, Any]:
     """
     # Auth + ownership FIRST, before anything reads a {URL_id}-keyed store.
     user = _auth.require_owned_project(request, project_id)
+    # A blob read plus a full render is real CPU behind a login, and it is a
+    # POST a client can loop; same per-account bucket as the writes.
+    _rate_limit_user(user, "read")
     template = resolve_template(user, request.query_params.get("template_id"))
     include_optional = request.query_params.get("include_optional") != "0"
 

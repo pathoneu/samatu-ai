@@ -354,6 +354,20 @@ def test_rows_carry_the_export_shape_with_unique_sequential_numbering():
                           "id", "saltinis", "_sablonas", "_pildymas"}
 
 
+def test_a_kita_row_keeps_its_own_id_and_the_template_row_moves():
+    """That id is what a typed price and a „Teisinga ✓" already hang on, so a
+    template row that hashes the same must be the one to take a suffix."""
+    t = build_template(FIVE)
+    clash = st.position_id("Alfa darbai", "Widget montavimas")
+    rows = render_samata(t, [_app("Something we invented", "m", 5.0, id=clash)],
+                         rooms=[{"nr": "1"}])
+    kita = next(r for r in rows if r["skyrius"] == EXTRA_SECTION)
+    widget = next(r for r in rows if r["_sablono_eile"] == "c:widget")
+    assert kita["id"] == clash
+    assert widget["id"] != clash
+    assert len({r["id"] for r in rows}) == len(rows)
+
+
 def test_a_price_rides_along_from_the_row_that_filled_the_cell():
     t = build_template(FIVE)
     rows = render_samata(t, [_app("Widget assembly", "vnt", 10.0, kaina=3.5,
