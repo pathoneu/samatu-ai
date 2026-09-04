@@ -26,6 +26,57 @@ Both run `calc_room_quantities` → `_build_pozicijos_from_rooms`. Frontend `onR
 - **Keystone guard:** `backend/tests/test_contribution_ledger.py::test_every_ledger_replays_to_its_kiekis` replays `roll_up` over `contributions` on every corpus fixture and must reproduce `kiekis` to ±0,01 (a `round` step is only allowed within max(0,05; 0,1 %)). User-facing ledger strings go through the same guide-don't-confess vocabulary guard as confidence reasons.
 - **Renderers:** `RowDetailPanel` + `LedgerTree.jsx` (the evaluated tree; treats `roll_up` as authoritative whenever `contributions_sum_to_total` is false), `ReviewQueueSidebar` + `PatikraCard.jsx` (the guided loop: € risk queue via `lib/takeoffWorkflow.rankReviewRows`, „Jautriausia vieta", „Teisinga ✓"/„Pataisyti" → `AssumptionsPanel focusField`, ripple diff by id, „Įsiminta" counter from the `corrections` table, trust meter). Pure helpers live in `lib/ledger.js` / `lib/takeoffWorkflow.js` and never re-sum the ledger client-side.
 
+## Room facts + evidence (the check sheet, 2026-09-04)
+
+The founder direction after the council: *"perfect the CHECKING so it still saves time — not with AI dots, with normal explanations showing how, where, what."* Two read-only endpoints serve that screen. Neither computes a quantity; both only re-present what the pipeline already stored.
+
+**`GET /api/projects/{id}/rooms/{room_nr}/facts`** (`backend/api/room_facts.py`, logic in `backend/extractor/room_facts.py`) — auth + owner-scoped exactly like `/api/projects/{id}`, `404` for an unknown project **or** room, and the response passes through `user_text.scrub_prose` on the way out (`sentence` and `formula` are in `PROSE_KEYS`).
+
+```jsonc
+{ "room": { "nr", "name", "page", "polygon_pct": [[x,y],…]|null,
+            "marker_pct": [x,y]|null, "region_pct": [x0,y0,x1,y1]|null },
+  "facts": [ { "key": "plotas|perimetras|aukstis|apdaila|angos|grindys",
+               "value", "unit": "m²|m|vnt.|null",
+               "status": "read|assumed|missing",
+               "source": { "kind": "eksplikacija|planas|pjuvis|apdailos_lentele"
+                                 + "|duru_zinynas|grindu_planas|prielaida|nera",
+                           "page": int|null, "rect_pct": [x0,y0,x1,y1]|null },
+               "sentence": "<plain LT, guide-don't-confess>",
+               "crop_url": "/api/projects/{id}/evidence?page=…&rect=…&dpi=…"|null,
+               "editable": { "field", "kind": "number|choice|count" },
+               "details": [ … ]        // openings only: per-type count + mm sizes
+             } ],
+  "quantities": [ { "row_id", "aprasymas", "unit", "value",
+                    "terms": {…}|null, "formula": "<LT, real numbers>"|null,
+                    "geometry": "polygon|marker|none", "included_because" } ],
+  "excluded":   [ { "row_id", "aprasymas", "reason" } ],
+  "ledger_available": bool }
+```
+
+Four contract rules a renderer must not blur:
+- **`source.kind` is where the VALUE came from; `source.page` + `rect_pct` are where to LOOK.** They differ on purpose for openings: sizes come from the durų žiniaraštis (`kind: "duru_zinynas"`) while the crop frames the room, because the *count* is what he checks.
+- **A rectangle is only ever offered on the page it was measured on** (`room_facts.region_on_page`). Cross-page ⇒ `rect_pct: null` and the crop is the whole sheet — "read this drawing", not "look exactly here". The 2026-05 browser-side highlight is the post-mortem (`EksplikacijaSourcePopover.jsx`).
+- **`status`** — `read` = a reader, a table or the user produced it; `assumed` = a default we chose (the sentence says what and why); `missing` = no value. `grindys` is `assumed` on every room without an explicit override, because **no lane reads a floor finish** — it is `ROOM_TYPE_RULES[paskirtis]["floor"]`.
+- **`quantities` come from `darbu_sarasas[].contributions` only** — never `pozicijos` (the compat emit *moves* the ledger), never re-derived from labels. `terms` where the family emits them (kampai, grindjuostės); the paint family emits none, so its `formula` states the share honestly instead of inventing a decomposition. A `cap`/`anchor`/`share` roll-up step is appended to the sentence **in both branches** — a room's own addition can be perfectly explained and still not be what the line bills. `ledger_available: false` means the project was last recomputed before 2026-09-02: say "not computed yet", not "this room contributes nothing".
+
+**`GET /api/projects/{id}/evidence?page=N&rect=x0,y0,x1,y1&dpi=110`** (`backend/api/evidence.py`) — a PNG of that page region (rect in page-percent, 0–1, padded to a legibility floor). `?room=<nr>` is shorthand for the room's polygon bbox, else its printed-number marker ± margin; a room with no geometry is a **404**, not a blank image. Owner-scoped, rate-limited on `_client_key` like the other heavy handlers, plain `def` (threadpool) because it is poppler + Pillow, dpi clamped to 40–160 **and** further reduced so no page exceeds 4000 px on its long edge. Cached on disk under `data_path("evidence_cache", …)` keyed by (project, page, rect, dpi), evicted oldest-first past 256 MB; ETag ⇒ 304. `404 "Brėžinys nerastas"` when the project predates durable PDF storage.
+
+⚠️ **The eksplikacija row bbox is `[x0, top, x1, bottom]` in PDF points from the page TOP** (pdfplumber's frame), with `eksplikacija_page_{width,height}_pdf` alongside — pdf2image rasterises from the top too, so the conversion is a plain division and **a y-flip "fix" would mirror the row to the wrong end of the sheet**.
+
+⚠️ **Never key an eksplikacija crop on the top-level `eksplikacija_source_page`.** That field is Vision's own guess; the deterministic reader that produced the bbox records its page separately. Measured on one corpus project they disagree (model 1, reader 2). Order: room `eksplikacija_source_page` → `_eksplikacija.eksplikacija_source_page` / the row's own `page` → top-level.
+
+**Which evidence exists on which blob generation** — the endpoint degrades, it does not lie:
+
+| Evidence | Since | Older blobs |
+|---|---|---|
+| `eksplikacija_row_bbox` + page dims (pdfplumber lane only) | 2026-08-23 | `rect_pct: null`, crop = the eksplikacija page |
+| per-room `eksplikacija_source_page` | 2026-09-04 | falls back to `_eksplikacija`, then the top-level guess |
+| `_height_marker_evidence` `{page, points[{x_pct,y_pct}]}` | P0 T3 | page-only crop of the section / ceiling plan |
+| per-room `_apdailos_page` / `_apdailos_pages` | 2026-09-04 | `_meta.apdailos_page`, then the first classified `finish_schedule` / `wall_elevation` |
+| per-opening `_schedule_page` | 2026-09-04 | the first classified `door_window_schedule` page |
+| contribution ledger on `darbu_sarasas` | 2026-09-02 | `ledger_available: false` |
+| opening coordinates | — | **never** — `elementai` has no geometry; the crop is the room |
+
 ## Export flow
 
 `ExportModal` builds `{projektas, eilutes, prielaidos, patalpos}` (maps `darbu_sarasas → eilutes`) → `POST /export/excel` | `/export/pdf` → `generate_excel` / `generate_pdf` (`main.py`). Excel uses **live formulas** (`=SUBTOTAL`, `=ROUND(...*0.21)`) so the contractor can edit quantities/prices in Excel and totals recompute.
