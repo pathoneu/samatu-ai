@@ -19,7 +19,15 @@
 - [ ] Project output in his layout: his sections + his labels; our quantity only where a ledgered/verifiable family maps; **blank typable cell** everywhere else (never a guessed number in his row); export in that layout.
 - [ ] Contractor session (end of week 2) on his own project: scorecard + template; ≥ 20 correction rows written; record which rows he reaches for first.
 
-## Week 3 — the correction product (2-minute loop)
+## Founder direction 2026-09-04 (after the council): evidence-first checking, no "AI dots"
+"We may never reach 100 % accuracy, so perfect the CHECKING so it still saves time — not with AI dots, with normal explanations showing how, where, what." The checking surface is therefore the product's core loop, designed as **the AI showing its homework**:
+- **Room check sheet** (one per room, in drawing order): the drawing auto-framed on the room; 6 facts with an EVIDENCE CROP each — area (eksplikacija row crop), perimeter (dimension strings highlighted on the plan when a text layer exists; outline otherwise), height (section/marker crop, or an explicit „neradau — skaičiuoju 2,80, įrašykite" blank), finishes (finish-table row crop), openings (plan crop with numbered marks + schedule sizes), floor (floor-plan legend crop); the per-room contributions strip („iš šio kambario sąmatoje …"); one-click „Viskas teisinga — kitas" (Enter).
+- **Then „Bendri faktai"** (eksplikacijos Iš viso, symbol counts with the plan crop and a „suskaičiuok pats" fallback, wall thickness) and **„Jūsų eilutės"** (template rows the drawing cannot answer, blank, remembered for the next project).
+- **Confidence dots go out of the primary UI**; a missing/assumed fact is a blank field with the reason in plain Lithuanian. Uncertainty may still order the walk internally.
+- Evidence sources we already persist: room marker (11/11) + polygon (5/11) + page; `eksplikacija_row_bbox` (since 08-23); height-marker page + x/y (P0 T3); finish/door schedule pages. Missing: opening coordinates (show the plan crop), dimension-string positions on scans (show the outline). Crops: server-side `GET /api/projects/{id}/evidence/{room_nr}/{fact}` via pdf2image region crop (cached) — or client-side framing in the EmbedPDF viewer.
+- Time model to validate with the contractor: manual ≈ 2–3 min/room vs ≈ 15 s (AI right) / 45 s (AI wrong) — the pitch is "checking is faster than counting" even at 60 % accuracy.
+
+## Week 3 — the correction product (2-minute loop) → becomes the room check sheet above
 - [ ] Resurrect the room grid beside the drawing (`RoomsGrid.jsx`/`RoomCard.jsx` out of the unreachable `kiekiai` tab): area, perimeter, height, add/remove room — the four impossible scenarios become ≤ 10 s each.
 - [ ] Room-first Patikra with **per-input-family verification**: confirming a room verifies only room-derived rows (paint, ceilings, floors, skirting, corners); opening-derived rows (angokraščiai, door prep) get their own confirm step — they must never inherit a ✓ from rooms.
 - [ ] Visible ripple with undo; bulk height edit; keyboard flow.
