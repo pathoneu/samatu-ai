@@ -101,6 +101,31 @@ TEMPLATE_VERSION = 1
 # empty sheet. See `_status_for`.
 DEFAULT_ON_MIN_SOURCES = 2
 
+# A family is ITEMISED when he has billed it on more than one line in at least
+# one sąmata (`n_rows > seen_in`) — his own evidence that he thinks of it as
+# several lines — and the render then gives it one row per matching app row
+# instead of one summed row.
+#
+# WHY (measured, `research/2026-09-04-template-holdout.md`): collapsing an
+# itemised family was the only thing the template made WORSE. He bills GKP
+# ceilings by carcass height, tiles by format, the shower mixer by concealed vs
+# exposed part; our engine computes the matching split. Handing him ONE summed
+# line means the paired row reads „way off" (a sum against one of his lines)
+# and his other lines read „missing — granularity" — 11 rows and 3,6 pp of the
+# ±10 % share across two projects. It is also the wrong ANSWER: he cannot split
+# 154,97 m² back into the 2,8 m and 3,4 m carcasses, and those are different
+# work at different rates, while he can always add two of our lines together.
+#
+# The threshold is his behaviour, not a tuned number. An average („he usually
+# splits it") was tried first at 1,5 and missed every family in this corpus,
+# which he splits in one project of three or four — the split follows the
+# DRAWING (two ceiling heights, three tile formats), not a habit. The second
+# condition is ours: we only itemise when we actually computed more than one
+# line for the family, so a family he splits and we do not still lands on one
+# row.
+def _is_itemised(n_rows: int, seen_in: int) -> bool:
+    return bool(seen_in) and n_rows > seen_in
+
 EXTRA_SECTION = "Kita (iš brėžinio)"
 
 STATUS_DEFAULT = "įprasta"
@@ -386,6 +411,10 @@ def _assemble(acc: dict, name: str) -> dict:
             "sources": sorted(fam["sources"]),
             "seen_in": seen_in,
             "n_rows": fam["n_rows"],
+            # How many LINES he bills this family on per sąmata, and whether he
+            # has ever used more than one. See `_is_itemised`.
+            "rows_per_project": round(fam["n_rows"] / seen_in, 3) if seen_in else 1.0,
+            "itemised": _is_itemised(fam["n_rows"], seen_in),
             "section_rows": dict(sorted(fam["sections"].items())),
             "order": (round(fam["_order_sum"] / fam["_order_n"] / _ORDER_SCALE, 6)
                       if fam["_order_n"] else 1.0),
@@ -651,6 +680,30 @@ def _app_price(row: dict) -> float | None:
     return f if f == f and abs(f) != float("inf") and f != 0 else None
 
 
+_TRAILING_PAREN_RE = re.compile(r"\(([^()]*)\)\s*$")
+
+
+def _qualifier(app_label: str, *, short: bool) -> str | None:
+    """What tells two lines of ONE itemised family apart.
+
+    `short` takes our label's trailing parenthetical („virš 3 m aukščio",
+    „120×60") when it has one — the readable form. The caller falls back to
+    `short=False`, our whole wording, when the short forms collide. `None` for
+    an empty label; the caller then keeps his label bare.
+    """
+    label = _norm(app_label)
+    if not label:
+        return None
+    if not short:
+        # Our whole wording, flattened: it goes inside a parenthesis after HIS
+        # label, and „…dažymas (Sienų glaistymas/dažymas (iki 3m aukščio))" is
+        # a nested paren in a document that reaches his client.
+        return _WS_RE.sub(" ", label.replace(" (", ", ").replace("(", ", ")
+                          .replace(")", "")).strip(" ,")
+    hit = _TRAILING_PAREN_RE.search(label)
+    return (hit.group(1).strip() or None) if hit else label
+
+
 def _unit_ok(family_unit: Any, row: dict) -> bool:
     """Unit-compatible, or the family's unit is one we cannot canonicalise.
 
@@ -727,70 +780,103 @@ def render_samata(template: dict,
                           if concept and concept in by_key else [])
             usable = [i for i in candidates
                       if _app_qty(rows[i]) is not None and _unit_ok(f_unit, rows[i])]
-            fillable = [i for i in usable if is_fillable(rows[i])]
 
-            source_ids: list[str] = []
-            source_labels: list[str] = []
-            kiekis: float | None = None
-            siulomas: float | None = None
-            kaina: float | None = None
-            kaina_source: Any = None
-            note: str | None = None
-
-            if fillable:
-                pildymas = FILL_DONE
-                kiekis = round(sum(_app_qty(rows[i]) or 0.0 for i in fillable), 3)
-                used = fillable
-            elif usable:
-                pildymas = FILL_SUGGESTED
-                siulomas = round(sum(_app_qty(rows[i]) or 0.0 for i in usable), 3)
-                note = NOTE_UNVERIFIED
-                used = usable
+            # A family HE itemises gets one row per app row instead of one
+            # summed row — see ITEMISED_MIN_ROWS. `usable` is a subset of
+            # `candidates`; a concept row we could not use (no quantity,
+            # incompatible unit) is never consumed, so it still reaches „Kita"
+            # rather than vanishing.
+            if fam.get("itemised") and len(usable) > 1:
+                cells = [[i] for i in usable]
             else:
-                pildymas = FILL_EMPTY
-                note = blank_note
-                used = []
+                cells = [usable]
 
-            for i in used:
-                consumed.add(i)
-                rid = rows[i].get("id")
-                if rid:
-                    source_ids.append(str(rid))
-                source_labels.append(_app_name(rows[i]))
-                if kaina is None:
-                    p = _app_price(rows[i])
-                    if p is not None:
-                        kaina = p
-                        kaina_source = rows[i].get("kaina_source")
-            # `usable` is a subset of `candidates`; a concept row we could not
-            # use (no quantity, incompatible unit) is NOT consumed here so it
-            # still reaches „Kita" rather than vanishing.
+            # HIS label repeats verbatim on every line of an itemised family, so
+            # each row carries the detail that tells them apart. Our labels
+            # normally end in it („(virš 3 m aukščio)", „(120×60)"); when those
+            # parentheticals COLLIDE — the walls and the ceilings both split
+            # „iki 3 m" / „virš 3 m" — they distinguish nothing and the whole
+            # label is used instead. Two rows may never render the same text.
+            qualifiers: list[str | None] = [None] * len(cells)
+            if len(cells) > 1:
+                short = [_qualifier(_app_name(rows[c[0]]), short=True)
+                         for c in cells]
+                if len(set(short)) == len(short) and all(short):
+                    qualifiers = short
+                else:
+                    qualifiers = [_qualifier(_app_name(rows[c[0]]), short=False)
+                                  for c in cells]
 
-            row = {
-                "skyrius": s_label,
-                "aprasymas": f_label,
-                "mato_vnt": f_unit,
-                "vnt": f_unit,
-                "kiekis": kiekis,
-                "kaina": kaina,
-                "id": _row_id(s_label, f_label),
-                # ── source flags ──────────────────────────────────────────
-                "saltinis": "rangovo_sablonas",
-                "_sablonas": True,
-                "_sablono_eile": fam.get("key"),
-                "_daznumas": fam.get("daznumas") or STATUS_DEFAULT,
-                "_numatytoji": default_on,
-                "_pildymas": pildymas,
-                "_pastaba": note,
-                "_siulomas_kiekis": siulomas,
-                "_saltinio_id": source_ids,
-                "_saltinio_eilutes": source_labels,
-            }
-            if kaina is not None and kiekis is not None:
-                row["suma"] = round(kiekis * kaina, 2)
-            if kaina_source is not None:
-                row["kaina_source"] = kaina_source
-            out.append(row)
+            for cell, qualifier in zip(cells, qualifiers):
+                fillable = [i for i in cell if is_fillable(rows[i])]
+                source_ids: list[str] = []
+                source_labels: list[str] = []
+                kiekis: float | None = None
+                siulomas: float | None = None
+                kaina: float | None = None
+                kaina_source: Any = None
+                note: str | None = None
+
+                if fillable:
+                    pildymas = FILL_DONE
+                    kiekis = round(sum(_app_qty(rows[i]) or 0.0 for i in fillable), 3)
+                    used = fillable
+                elif cell:
+                    pildymas = FILL_SUGGESTED
+                    siulomas = round(sum(_app_qty(rows[i]) or 0.0 for i in cell), 3)
+                    note = NOTE_UNVERIFIED
+                    used = cell
+                else:
+                    pildymas = FILL_EMPTY
+                    note = blank_note
+                    used = []
+
+                for i in used:
+                    consumed.add(i)
+                    rid = rows[i].get("id")
+                    if rid:
+                        source_ids.append(str(rid))
+                    source_labels.append(_app_name(rows[i]))
+                    if kaina is None:
+                        p = _app_price(rows[i])
+                        if p is not None:
+                            kaina = p
+                            kaina_source = rows[i].get("kaina_source")
+
+                label = f"{f_label} ({qualifier})" if qualifier else f_label
+
+                row = {
+                    "skyrius": s_label,
+                    "aprasymas": label,
+                    "mato_vnt": f_unit,
+                    "vnt": f_unit,
+                    "kiekis": kiekis,
+                    "kaina": kaina,
+                    "id": _row_id(s_label, label),
+                    # ── source flags ──────────────────────────────────────
+                    "saltinis": "rangovo_sablonas",
+                    "_sablonas": True,
+                    "_sablono_eile": fam.get("key"),
+                    # The rendered row wears HIS wording, which the concept
+                    # table's `app` patterns are not written against — so it
+                    # states its own family, and `row_scorecard.app_concept_of`
+                    # reads it. Without this a rendered sheet scores as entirely
+                    # unmapped and the hold-out measurement is unreadable.
+                    "_concept": concept if (concept and concept in by_key) else None,
+                    "_daznumas": fam.get("daznumas") or STATUS_DEFAULT,
+                    "_numatytoji": default_on,
+                    "_pildymas": pildymas,
+                    "_pastaba": note,
+                    "_patikslinimas": qualifier,
+                    "_siulomas_kiekis": siulomas,
+                    "_saltinio_id": source_ids,
+                    "_saltinio_eilutes": source_labels,
+                }
+                if kaina is not None and kiekis is not None:
+                    row["suma"] = round(kiekis * kaina, 2)
+                if kaina_source is not None:
+                    row["kaina_source"] = kaina_source
+                out.append(row)
 
     for i, r in enumerate(rows):
         if i in consumed:
@@ -809,10 +895,14 @@ def render_samata(template: dict,
             "saltinis": r.get("saltinis") or "skaiciuota_is_brezinio",
             "_sablonas": False,
             "_sablono_eile": None,
+            # A „Kita" row keeps OUR label, so the regex still reads it right —
+            # but stating the concept keeps the whole sheet scored one way.
+            "_concept": concept_of[i],
             "_daznumas": None,
             "_numatytoji": True,
             "_pildymas": FILL_DONE if is_fillable(r) else FILL_SUGGESTED,
             "_pastaba": None if is_fillable(r) else NOTE_UNVERIFIED,
+            "_patikslinimas": None,
             "_siulomas_kiekis": None,
             "_saltinio_id": [str(r["id"])] if r.get("id") else [],
             "_saltinio_eilutes": [label],
@@ -916,6 +1006,12 @@ def validate_template(payload: Any) -> dict:
                 "sources": _sources(fam.get("sources")),
                 "seen_in": seen_in,
                 "n_rows": n_rows,
+                # Derived, never trusted from the wire: `itemised` decides
+                # whether the render splits a family into one row per app row,
+                # and a hand-set `true` on a family he bills once would fan a
+                # single line of his into several of ours.
+                "rows_per_project": round(n_rows / seen_in, 3) if seen_in else 1.0,
+                "itemised": _is_itemised(n_rows, seen_in),
                 "section_rows": _counts(fam.get("section_rows"), MAX_KEY_LEN),
                 "order": _number(fam.get("order")),
                 "_order_sum": max(0, int(_number(fam.get("_order_sum"), 0))),

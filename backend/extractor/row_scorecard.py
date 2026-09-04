@@ -179,10 +179,26 @@ def app_concept_of(app_rows: Sequence[dict],
     stops one app row being counted inside two concepts (e.g. "LED nišų
     glaistymas/dažymas" matches both `nisos_led_dazymas` and the generic
     `dazymas`) and double-counting its quantity.
+
+    A row that already KNOWS its concept says so in `_concept`, and that wins
+    over the regex — a sheet rendered through the contractor's template carries
+    HIS wording, which the `app` patterns are not written against, so scoring it
+    by label would read every row as unmapped. The key is still checked against
+    the table, so a stray value can name a concept but never invent one.
+    `pozicijos[]` and `darbu_sarasas[]` never carry the field, so the corpus
+    numbers are untouched.
     """
-    return [next((c.key for c in table
-                  if c.app is not None and c.app.search(_app_name(p))), None)
-            for p in app_rows]
+    keys = {c.key for c in table}
+    out: list[str | None] = []
+    for p in app_rows:
+        declared = p.get("_concept")
+        if isinstance(declared, str) and declared in keys:
+            out.append(declared)
+            continue
+        out.append(next((c.key for c in table
+                         if c.app is not None and c.app.search(_app_name(p))),
+                        None))
+    return out
 
 
 # ── App-row accessors ─────────────────────────────────────────────────────────

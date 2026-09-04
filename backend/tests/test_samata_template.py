@@ -367,6 +367,95 @@ def test_a_price_rides_along_from_the_row_that_filled_the_cell():
     assert widget["suma"] == 35.0
 
 
+# ── Itemised families ────────────────────────────────────────────────────────
+# He bills GKP ceilings by carcass height, tiles by format, a mixer by concealed
+# vs exposed part. Collapsing those into one summed cell was the ONLY thing the
+# hold-out showed the template making worse — see the note on `_is_itemised`.
+
+SPLIT = [
+    _samata("s1", [("Alfa darbai", [("Gizmo klijavimas žemai", "m2", 10.0),
+                                    ("Gizmo klijavimas aukštai", "m2", 20.0)])]),
+    _samata("s2", [("Alfa darbai", [("Gizmo klijavimas", "m2", 30.0)])]),
+]
+
+
+def test_a_family_he_has_ever_split_is_itemised():
+    t = build_template(SPLIT)
+    fam = next(f for s in t["sections"] for f in s["families"]
+               if f["key"] == "c:gizmo")
+    assert fam["n_rows"] == 3 and fam["seen_in"] == 2
+    assert fam["itemised"] is True
+
+
+def test_a_family_he_always_bills_once_is_not():
+    t = build_template([SPLIT[1], _samata("s3", [
+        ("Alfa darbai", [("Gizmo klijavimas", "m2", 31.0)])])])
+    fam = next(f for s in t["sections"] for f in s["families"]
+               if f["key"] == "c:gizmo")
+    assert fam["itemised"] is False
+
+
+def test_an_itemised_family_emits_one_row_per_app_row_under_his_label():
+    t = build_template(SPLIT)
+    rows = render_samata(t, [_app("Gizmo bonding (iki 3m)", "m2", 11.0),
+                             _app("Gizmo bonding (virš 3m)", "m2", 21.0)],
+                         rooms=[{"nr": "1"}])
+    gizmo = [r for r in rows if r["_sablono_eile"] == "c:gizmo"]
+    assert len(gizmo) == 2
+    # HIS wording, plus the detail that tells the two lines apart.
+    assert {r["aprasymas"] for r in gizmo} == {
+        "Gizmo klijavimas (iki 3m)", "Gizmo klijavimas (virš 3m)"}
+    assert [r["_siulomas_kiekis"] for r in gizmo] == [11.0, 21.0]
+    assert len({r["id"] for r in gizmo}) == 2
+
+
+def test_a_family_he_never_splits_stays_one_summed_row():
+    t = build_template([SPLIT[1], _samata("s3", [
+        ("Alfa darbai", [("Gizmo klijavimas", "m2", 31.0)])])])
+    rows = render_samata(t, [_app("Gizmo bonding A", "m2", 11.0),
+                             _app("Gizmo bonding B", "m2", 21.0)],
+                         rooms=[{"nr": "1"}])
+    gizmo = [r for r in rows if r["_sablono_eile"] == "c:gizmo"]
+    assert len(gizmo) == 1
+    assert gizmo[0]["_siulomas_kiekis"] == 32.0
+    assert gizmo[0]["_patikslinimas"] is None
+
+
+def test_we_only_itemise_when_we_have_more_than_one_line_to_show():
+    t = build_template(SPLIT)
+    rows = render_samata(t, [_app("Gizmo bonding", "m2", 11.0)],
+                         rooms=[{"nr": "1"}])
+    gizmo = [r for r in rows if r["_sablono_eile"] == "c:gizmo"]
+    assert len(gizmo) == 1 and gizmo[0]["_patikslinimas"] is None
+
+
+def test_colliding_qualifiers_fall_back_to_the_whole_label_without_nesting():
+    """Walls and ceilings both split „iki 3m"/„virš 3m", so the parentheticals
+    distinguish nothing — and the long form must not nest parentheses in a
+    document that reaches his client."""
+    t = build_template(SPLIT)
+    rows = render_samata(t, [_app("Sienų gizmo (iki 3m)", "m2", 1.0),
+                             _app("Lubų gizmo (iki 3m)", "m2", 2.0)],
+                         rooms=[{"nr": "1"}])
+    labels = [r["aprasymas"] for r in rows if r["_sablono_eile"] == "c:gizmo"]
+    assert len(labels) == len(set(labels)) == 2
+    for lab in labels:
+        assert lab.count("(") == 1 and lab.count(")") == 1
+
+
+def test_an_itemised_row_keeps_its_own_verification_state():
+    """One line of a split family may be confirmed while the other is not —
+    the confirmed one fills, the other stays blank."""
+    t = build_template(SPLIT)
+    rows = render_samata(t, [
+        _app("Gizmo bonding (iki 3m)", "m2", 11.0, user_verified_at="2026-09-04"),
+        _app("Gizmo bonding (virš 3m)", "m2", 21.0)], rooms=[{"nr": "1"}])
+    gizmo = {r["aprasymas"]: r for r in rows if r["_sablono_eile"] == "c:gizmo"}
+    assert gizmo["Gizmo klijavimas (iki 3m)"]["kiekis"] == 11.0
+    assert gizmo["Gizmo klijavimas (virš 3m)"]["kiekis"] is None
+    assert gizmo["Gizmo klijavimas (virš 3m)"]["_siulomas_kiekis"] == 21.0
+
+
 def test_optional_families_can_be_left_out():
     t = build_template(FIVE)
     everything = render_samata(t, [], rooms=[{"nr": "1"}])
