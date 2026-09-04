@@ -33,6 +33,11 @@ def test_factory_selects_r2_when_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "ak")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "sk")
     monkeypatch.setenv("R2_BUCKET", "bucket")
+    # 2026-09-04: credentials alone no longer select R2 — a dev box and this
+    # suite both carry them via backend/.env and were writing into the live
+    # bucket. A process must also SAY it may (ENV=production, or this).
+    # The full matrix lives in tests/test_storage_backend_gate.py.
+    monkeypatch.setenv("STORAGE_BACKEND", "r2")
     storage.reset_storage_for_test()
     s = storage.get_storage()      # builds the boto3 client; no network call yet
     assert s.name == "R2Storage"

@@ -16,6 +16,36 @@ Written 2026-07-06 (Fable 5 handoff). Pairs with [`ARCHITECTURE.md`](ARCHITECTUR
 - **Backend:** `cd backend && ../venv/bin/uvicorn main:app --port 8000` (`main.py` calls `load_dotenv()` → reads `backend/.env`).
 - Vite proxies `/api`, `/extract-interior`, `/export/*` to :8000 (`frontend/vite.config.js`).
 
+### Storage: dev and tests write to LOCAL DISK, even with R2 credentials loaded
+
+`backend/.env` carries the four `R2_*` vars, and until 2026-09-04 their mere
+presence selected R2 — so a dev server and the whole test suite wrote into the
+**production bucket** (35 test-seed objects landed in the live `projects/`
+prefix on 09-02/09-04, mixed in with real customers' drawings).
+
+`storage.r2_decision()` now needs a second signal that this process may use the
+bucket. Precedence, top wins:
+
+| Env | Backend |
+|---|---|
+| `STORAGE_BACKEND=local` | local disk (even in production — the ERROR below still fires) |
+| any `R2_*` var missing | local disk (**WARNING**, names the missing vars) |
+| `STORAGE_BACKEND=r2` | R2 |
+| `ENV=production` | R2 |
+| otherwise (your machine) | local disk (**INFO**, says the credentials are present and deliberately unused) |
+
+Every start logs one line saying which backend and why; production on local disk
+is still an **ERROR** (`PRODUCTION uploads are NOT durable`). To exercise the
+real R2 path deliberately: `STORAGE_BACKEND=r2 ../venv/bin/uvicorn main:app`
+— and remember that writes land in the live bucket. Local objects go to
+`backend/data/pdf_store` (or `LOCAL_STORAGE_DIR`). Matrix:
+`backend/tests/test_storage_backend_gate.py`.
+
+> Related, **not** fixed: `backup_scheduler.is_enabled()` still defaults on
+> whenever `R2_BUCKET` is set, so a dev box runs the nightly DB backup. It is now
+> harmless — `backup.py` goes through `get_storage()`, so the snapshot lands on
+> local disk — just pointless. Set `SAMATU_NIGHTLY_BACKUP=0` to silence it.
+
 ### ⚠️ The gotcha that WILL waste an hour: the dev backend has no `--reload`.
 After you edit backend code, the running uvicorn keeps serving the **old** code.
 Symptom: the frontend gets `400 Unknown field '…'`, or "my change didn't take."
