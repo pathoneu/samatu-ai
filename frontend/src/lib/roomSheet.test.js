@@ -7,7 +7,9 @@ import {
   factNeedsInput, factTone, findRowForQuantity, hasCornerTerms, isRoomVerified,
   isWholeSheet, orderFacts, prefillValue, progressSummary, rippleText,
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
-  summarizeRipple, termRows,
+  summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
+  pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings,
+  firstPageOfType, setSymbolCount, symbolPageTypes, symbolRows,
 } from './roomSheet.js';
 
 const SAMPLE = JSON.parse(
@@ -198,6 +200,82 @@ test('termRows keeps the emitted order and drops non-numbers', () => {
   assert.deepEqual(termRows(null), []);
 });
 
+// ── Placing an overlay on the returned crop ─────────────────────────────────
+// Mirrors backend/api/evidence.py::_padded. The expected numbers below were
+// confirmed against the live endpoint on 2026-09-04: returned pixel size ÷
+// predicted padded size is the same page constant across five rects.
+
+test('the crop is the requested rect grown by the pad, not the rect itself', () => {
+  assert.deepEqual(paddedCropRect([0.2, 0.2, 0.4, 0.4]).map((v) => v.toFixed(4)),
+    ['0.1880', '0.1880', '0.4120', '0.4120']);
+  assert.deepEqual(paddedCropRect([0.4071, 0.5147, 0.6071, 0.7147]).map((v) => v.toFixed(4)),
+    ['0.3951', '0.5027', '0.6191', '0.7267']);
+});
+
+test('a thin table row is grown to the legibility floor, centred', () => {
+  const r = paddedCropRect([0.61, 0.34, 0.92, 0.36]);
+  assert.deepEqual(r.map((v) => v.toFixed(4)), ['0.5980', '0.3275', '0.9320', '0.3725']);
+  assert.ok(Math.abs((r[3] - r[1]) - CROP_MIN_H_PCT) < 1e-9, 'height floor');
+});
+
+test('a point-sized rect is grown to both floors', () => {
+  const r = paddedCropRect([0.5, 0.5, 0.5, 0.5]);
+  assert.ok(Math.abs((r[2] - r[0]) - CROP_MIN_W_PCT) < 1e-9);
+  assert.ok(Math.abs((r[3] - r[1]) - CROP_MIN_H_PCT) < 1e-9);
+});
+
+test('a crop running off the sheet slides back in, it does not squash', () => {
+  const r = paddedCropRect([0.0, 0.0, 0.2, 0.2]);
+  assert.equal(r[0], 0);
+  assert.equal(r[1], 0);
+  // width is preserved (0.224), not clipped to 0.212
+  assert.ok(Math.abs((r[2] - r[0]) - 0.224) < 1e-9);
+  const far = paddedCropRect([0.9, 0.9, 1.0, 1.0]);
+  assert.equal(far[2], 1);
+  assert.ok(Math.abs((far[2] - far[0]) - 0.124) < 1e-9);
+});
+
+test('a full page asks for and gets the full page', () => {
+  assert.deepEqual(paddedCropRect([0, 0, 1, 1]), [0, 0, 1, 1]);
+});
+
+test('paddedCropRect falls back to the whole page on junk', () => {
+  assert.deepEqual(paddedCropRect(null), [0, 0, 1, 1]);
+  assert.deepEqual(paddedCropRect([1, 2]), [0, 0, 1, 1]);
+  assert.deepEqual(paddedCropRect(['a', 0, 1, 1]), [0, 0, 1, 1]);
+  // a reversed rect is normalised, not rejected
+  assert.deepEqual(paddedCropRect([0.4, 0.4, 0.2, 0.2]).map((v) => v.toFixed(4)),
+    ['0.1880', '0.1880', '0.4120', '0.4120']);
+});
+
+test('a page point maps to its place inside the crop', () => {
+  const crop = [0.2, 0.2, 0.6, 0.6];
+  const mid = pageToCropPct([0.4, 0.4], crop);
+  assert.equal(mid.inside, true);
+  assert.ok(Math.abs(mid.x - 0.5) < 1e-9 && Math.abs(mid.y - 0.5) < 1e-9);
+  assert.deepEqual(pageToCropPct([0.2, 0.2], crop), { x: 0, y: 0, inside: true });
+});
+
+test('a point outside the crop is reported, never clamped onto the edge', () => {
+  const crop = [0.2, 0.2, 0.6, 0.6];
+  const out = pageToCropPct([0.9, 0.4], crop);
+  assert.equal(out.inside, false);
+  assert.ok(out.x > 1, 'the real position is kept so the caller can decide');
+  assert.equal(pageToCropPct([0.4, 0.4], [0.5, 0.5, 0.5, 0.5]).inside, false);
+  assert.equal(pageToCropPct(null, crop).inside, false);
+});
+
+test('a polygon with nothing inside the crop yields no overlay at all', () => {
+  const crop = [0.2, 0.2, 0.6, 0.6];
+  assert.equal(polygonToCropPct([[0.9, 0.9], [0.95, 0.95]], crop), null);
+  assert.equal(polygonToCropPct([], crop), null);
+  assert.equal(polygonToCropPct(null, crop), null);
+  const on = polygonToCropPct([[0.3, 0.3], [0.9, 0.9]], crop);
+  assert.equal(on.length, 2);
+  assert.equal(on[0].inside, true);
+  assert.equal(on[1].inside, false);
+});
+
 // ── What may honestly be overridden ─────────────────────────────────────────
 
 const ROWS = [
@@ -268,6 +346,101 @@ test('an override is refused when the legacy key would hit two rows', () => {
   assert.equal(legacyKeyIsUnique(twins, twins[0]), false);
   assert.equal(legacyKeyIsUnique(twins, twins[2]), true);
   assert.equal(legacyKeyIsUnique(twins, null), false);
+});
+
+// ── Opening counts ──────────────────────────────────────────────────────────
+// Shaped like a real room's `elementai`: two windows, two doors, one LED niche.
+
+const ELEMENTAI = [
+  { tipas: 'langas', kiekis: 1, plotis_mm: 2200, aukstis_mm: 2000, _exterior: true },
+  { tipas: 'langas', kiekis: 1, plotis_mm: 1400, aukstis_mm: 2000, _exterior: true },
+  { tipas: 'duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2100, _exterior: false },
+  { tipas: 'nisa_LED', kiekis: 1, ilgis_m: 3.6, _niche_type: 'ceiling_led' },
+];
+
+test('a stepper moves the opening it belongs to, matched on tipas + both sizes', () => {
+  const next = adjustOpeningCount(ELEMENTAI, { tipas: 'langas', plotis_mm: 1400, aukstis_mm: 2000 }, 1);
+  assert.equal(next[0].kiekis, 1, 'the other window is untouched');
+  assert.equal(next[1].kiekis, 2);
+  assert.equal(next[2].kiekis, 1);
+});
+
+test('a LED niche is never decremented by a door or window stepper', () => {
+  const next = adjustOpeningCount(ELEMENTAI, { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100 }, -1);
+  assert.equal(next[2].kiekis, 0);
+  assert.equal(next[3].kiekis, 1, 'nisa_LED must stay');
+  assert.equal(next[3].tipas, 'nisa_LED');
+});
+
+test('a count never goes below zero', () => {
+  const once = adjustOpeningCount(ELEMENTAI, { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100 }, -1);
+  const twice = adjustOpeningCount(once, { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100 }, -1);
+  assert.equal(twice[2].kiekis, 0);
+});
+
+test('only the first of two identical entries moves', () => {
+  const twins = [
+    { tipas: 'duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2100 },
+    { tipas: 'duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2100 },
+  ];
+  const next = adjustOpeningCount(twins, twins[0], 1);
+  assert.deepEqual(next.map((e) => e.kiekis), [2, 1]);
+});
+
+test('an unmatched detail changes nothing', () => {
+  const next = adjustOpeningCount(ELEMENTAI, { tipas: 'langas', plotis_mm: 999, aukstis_mm: 1 }, 1);
+  assert.deepEqual(next.map((e) => e.kiekis), [1, 1, 1, 1]);
+  assert.deepEqual(adjustOpeningCount(null, {}, 1), []);
+});
+
+test('the openings total counts doors and windows, not niches', () => {
+  assert.equal(countOpenings(ELEMENTAI), 3);
+  assert.equal(countOpenings([]), 0);
+  assert.equal(countOpenings(null), 0);
+});
+
+// ── Shared facts ────────────────────────────────────────────────────────────
+
+const PAGES = [
+  { nr: 1, tipas: 'title_page' },
+  { nr: 2, tipas: 'floor_plan' },
+  { nr: 4, tipas: 'plumbing' },
+  { nr: 5, tipas: 'electrical' },
+  { nr: 6, tipas: 'ceiling_plan' },
+  { nr: 7, tipas: 'electrical' },
+];
+
+test('a symbol family is shown on the drawing it was counted on', () => {
+  assert.equal(firstPageOfType(PAGES, symbolPageTypes('rozetes')), 5);
+  assert.equal(firstPageOfType(PAGES, symbolPageTypes('klozetai')), 4);
+  assert.equal(firstPageOfType(PAGES, symbolPageTypes('led_juostos')), 6);
+});
+
+test('a missing sheet falls back down the chain, never to a wrong one', () => {
+  const noCeiling = PAGES.filter((p) => p.tipas !== 'ceiling_plan');
+  assert.equal(firstPageOfType(noCeiling, symbolPageTypes('led_juostos')), 5);
+  assert.equal(firstPageOfType([], symbolPageTypes('rozetes')), null);
+  assert.equal(firstPageOfType(null, ['electrical']), null);
+  assert.deepEqual(symbolPageTypes('nezinomas'), ['floor_plan']);
+});
+
+test('shared facts drop the zero counts — an absence is not a fact to check', () => {
+  const rows = symbolRows({
+    detected_symbols_summary: { rozetes: 52, radiatoriai: 0, klozetai: 2 },
+    puslapiai: PAGES,
+  });
+  assert.deepEqual(rows.map((r) => r.key), ['rozetes', 'klozetai']);
+  assert.deepEqual(rows.map((r) => r.page), [5, 4]);
+  assert.deepEqual(symbolRows({}), []);
+  assert.deepEqual(symbolRows({ detected_symbols_summary: 'nope' }), []);
+});
+
+test('a corrected symbol count is a whole number and never negative', () => {
+  assert.deepEqual(setSymbolCount({ rozetes: 52 }, 'rozetes', 51), { rozetes: 51 });
+  assert.deepEqual(setSymbolCount({ rozetes: 52 }, 'rozetes', -3), { rozetes: 0 });
+  assert.deepEqual(setSymbolCount({ rozetes: 52 }, 'rozetes', 4.6), { rozetes: 5 });
+  assert.deepEqual(setSymbolCount(null, 'rozetes', 2), { rozetes: 2 });
+  assert.deepEqual(setSymbolCount({ a: 1 }, 'b', 'x'), { a: 1, b: 0 });
 });
 
 // ── The ripple ──────────────────────────────────────────────────────────────

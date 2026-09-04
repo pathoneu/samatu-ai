@@ -224,6 +224,75 @@ export function termRows(terms) {
     .map(([label, value]) => ({ label, value: Number(value) }));
 }
 
+// ── Placing an overlay on a crop ────────────────────────────────────────────
+
+/**
+ * The evidence endpoint does NOT render the rectangle you ask for — it grows it
+ * by PAD_PCT, then up to a legibility floor, then slides it back inside the
+ * sheet. Overlay coordinates arrive in PAGE percent, so drawing them on the
+ * returned image without reproducing that growth puts every mark in the wrong
+ * place. These mirror `backend/api/evidence.py::_padded` exactly.
+ *
+ * ⚠️ The three constants below are a copy. If they move in evidence.py they
+ * must move here in the same commit, or the outline slides off its room.
+ * Verified against the live endpoint 2026-09-04: for five rects (including
+ * both floors firing) the returned pixel size divided by the predicted padded
+ * size is the same page constant to within integer rounding.
+ */
+export const CROP_PAD_PCT = 0.012;
+export const CROP_MIN_W_PCT = 0.10;
+export const CROP_MIN_H_PCT = 0.045;
+
+export function paddedCropRect(rect) {
+  if (!Array.isArray(rect) || rect.length !== 4) return [0, 0, 1, 1];
+  let [x0, y0, x1, y1] = rect.map(Number);
+  if (![x0, y0, x1, y1].every(Number.isFinite)) return [0, 0, 1, 1];
+  if (x1 < x0) [x0, x1] = [x1, x0];
+  if (y1 < y0) [y0, y1] = [y1, y0];
+  x0 -= CROP_PAD_PCT; y0 -= CROP_PAD_PCT;
+  x1 += CROP_PAD_PCT; y1 += CROP_PAD_PCT;
+  if (x1 - x0 < CROP_MIN_W_PCT) {
+    const cx = (x0 + x1) / 2;
+    x0 = cx - CROP_MIN_W_PCT / 2; x1 = cx + CROP_MIN_W_PCT / 2;
+  }
+  if (y1 - y0 < CROP_MIN_H_PCT) {
+    const cy = (y0 + y1) / 2;
+    y0 = cy - CROP_MIN_H_PCT / 2; y1 = cy + CROP_MIN_H_PCT / 2;
+  }
+  // Slide, don't squash — the requested region must stay inside the crop.
+  if (x0 < 0) { x1 = Math.min(1, x1 - x0); x0 = 0; }
+  if (x1 > 1) { x0 = Math.max(0, x0 - (x1 - 1)); x1 = 1; }
+  if (y0 < 0) { y1 = Math.min(1, y1 - y0); y0 = 0; }
+  if (y1 > 1) { y0 = Math.max(0, y0 - (y1 - 1)); y1 = 1; }
+  return [Math.max(0, x0), Math.max(0, y0), Math.min(1, x1), Math.min(1, y1)];
+}
+
+/**
+ * A page-percent point as a percentage of the rendered crop. `inside` is false
+ * when the point falls outside the image — the renderer then draws nothing
+ * rather than a mark clamped to the edge, which would point at the wrong place.
+ */
+export function pageToCropPct(point, cropRect) {
+  const [x0, y0, x1, y1] = cropRect;
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (!(w > 0) || !(h > 0) || !Array.isArray(point)) {
+    return { x: 0, y: 0, inside: false };
+  }
+  const x = (Number(point[0]) - x0) / w;
+  const y = (Number(point[1]) - y0) / h;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: 0, y: 0, inside: false };
+  return { x, y, inside: x >= 0 && x <= 1 && y >= 0 && y <= 1 };
+}
+
+/** A whole polygon mapped onto the crop; null when nothing lands inside it. */
+export function polygonToCropPct(polygon, cropRect) {
+  const pts = (Array.isArray(polygon) ? polygon : [])
+    .map((p) => pageToCropPct(p, cropRect));
+  if (!pts.length || !pts.some((p) => p.inside)) return null;
+  return pts;
+}
+
 // ── Editing a quantity: what is honestly possible ───────────────────────────
 
 /**
@@ -276,6 +345,110 @@ export function legacyKeyIsUnique(rows, row) {
   const key = legacyRowKey(row);
   if (key == null) return false;
   return (rows || []).filter((r) => legacyRowKey(r) === key).length === 1;
+}
+
+// ── Opening counts ──────────────────────────────────────────────────────────
+
+/**
+ * The `angos` fact's `details[]` are a VIEW of the room's `elementai`; the count
+ * is edited on `elementai`, so the two must be joined. There is no id to join
+ * on, so the key is what both carry: tipas + the two mm sizes.
+ *
+ * `elementai` also holds entries the fact never shows — LED niches among them.
+ * Matching on the size triple keeps those untouched; matching on `tipas` alone
+ * would eventually decrement a niche.
+ */
+function sameOpening(el, detail) {
+  return String(el?.tipas ?? '') === String(detail?.tipas ?? '')
+    && Number(el?.plotis_mm ?? NaN) === Number(detail?.plotis_mm ?? NaN)
+    && Number(el?.aukstis_mm ?? NaN) === Number(detail?.aukstis_mm ?? NaN);
+}
+
+/**
+ * `elementai` with one opening's count moved by `delta`, clamped at zero.
+ * Only the FIRST match moves — two identical entries are two separate rows in
+ * the fact list, and the stepper the user pressed belongs to one of them.
+ */
+export function adjustOpeningCount(elementai, detail, delta) {
+  const list = Array.isArray(elementai) ? elementai : [];
+  const step = Number(delta) || 0;
+  let done = false;
+  return list.map((el) => {
+    if (done || !sameOpening(el, detail)) return el;
+    done = true;
+    const next = Math.max(0, (Number(el.kiekis) || 0) + step);
+    return { ...el, kiekis: next };
+  });
+}
+
+/** Total openings after an adjustment — what the fact's value will become. */
+export function countOpenings(elementai, kinds = ['langas', 'duris']) {
+  return (Array.isArray(elementai) ? elementai : [])
+    .filter((el) => kinds.includes(String(el?.tipas ?? '')))
+    .reduce((sum, el) => sum + (Number(el.kiekis) || 0), 0);
+}
+
+// ── Shared facts (the „Bendri dalykai" step) ────────────────────────────────
+
+/**
+ * Which drawing a symbol family was counted on, most specific first. The count
+ * itself lives in `detected_symbols_summary` with no page on it, so this is the
+ * mapping that lets the panel show the right sheet — and the reason a fallback
+ * chain exists rather than one guess: a project may have no ceiling plan, and a
+ * crop of the wrong sheet is worse than a crop of a plausible one.
+ */
+const SYMBOL_PAGES = {
+  rozetes: ['electrical'],
+  jungikliai: ['electrical'],
+  sviestuvai: ['ceiling_plan', 'electrical'],
+  pakabinami_sviestuvai: ['ceiling_plan', 'electrical'],
+  led_juostos: ['ceiling_plan', 'electrical'],
+  difuzoriai: ['ceiling_plan', 'plumbing'],
+  kondicionieriai: ['ceiling_plan', 'electrical'],
+  klozetai: ['plumbing'],
+  praustuves: ['plumbing'],
+  vonios: ['plumbing'],
+  trapai: ['plumbing'],
+  wc_remai: ['plumbing'],
+  gyvatukai: ['plumbing'],
+  radiatoriai: ['plumbing'],
+};
+
+export function symbolPageTypes(key) {
+  return SYMBOL_PAGES[key] || ['floor_plan'];
+}
+
+/** The first page of any of `types`, in the order given. */
+export function firstPageOfType(pages, types) {
+  const list = Array.isArray(pages) ? pages : [];
+  for (const tipas of types || []) {
+    const hit = list.find((p) => p && p.tipas === tipas);
+    if (hit) return Number(hit.nr) || null;
+  }
+  return null;
+}
+
+/**
+ * The shared facts worth a check, as rows. A zero count is dropped: „Radiatoriai
+ * 0" is not a fact he can check against a drawing, it is the absence of one.
+ */
+export function symbolRows(project) {
+  const summary = project?.detected_symbols_summary;
+  if (!summary || typeof summary !== 'object') return [];
+  const pages = project?.puslapiai || project?.v8_pages || [];
+  return Object.entries(summary)
+    .filter(([, v]) => Number(v) > 0)
+    .map(([key, value]) => ({
+      key,
+      value: Number(value),
+      page: firstPageOfType(pages, symbolPageTypes(key)),
+    }));
+}
+
+/** `detected_symbols_summary` with one family's count changed, clamped at 0. */
+export function setSymbolCount(summary, key, value) {
+  const n = Math.max(0, Math.round(Number(value) || 0));
+  return { ...(summary || {}), [key]: n };
 }
 
 // ── The ripple ──────────────────────────────────────────────────────────────

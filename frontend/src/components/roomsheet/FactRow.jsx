@@ -1,0 +1,262 @@
+/**
+ * FactRow — one thing the program read, with the pixels it read it from.
+ *
+ * Layout is the founder's sheet: crop | value + sentence | two verbs. The two
+ * verbs are the whole point — „Teisinga" costs a click, „Pataisyti" opens the
+ * editor the fact's own `editable.kind` calls for. No confidence dot: an
+ * `assumed` or `missing` fact is an amber row with a field already showing and
+ * the reason written out, which is the thing a dot never managed to say.
+ *
+ * Every stored sentence goes through `cleanUserText` on the way to the screen —
+ * nothing stored is trusted in a renderer (the 2026-09-04 trust guard).
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Check, Minus, Pencil, Plus } from 'lucide-react';
+import { ltNumber } from '@/lib/ledger';
+import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
+import { cleanUserText } from '@/lib/userText';
+import { factNeedsInput, factTone, isWholeSheet, prefillValue } from '@/lib/roomSheet';
+import EvidenceCrop from './EvidenceCrop';
+
+const LABEL_KEY = {
+  plotas: 'factPlotas',
+  perimetras: 'factPerimetras',
+  aukstis: 'factAukstis',
+  apdaila: 'factApdaila',
+  angos: 'factAngos',
+  grindys: 'factGrindys',
+};
+
+const PASKIRTIS = [
+  'gyvenamoji', 'miegamoji', 'virtuve', 'vonia', 'wc', 'koridorius',
+  'drabuzine', 'skalbykla', 'tamburas', 'garazas', 'sandeliukas',
+  'katiline', 'laiptine',
+];
+
+const BTN = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 '
+  + 'rounded-[2px] border px-3 text-[14px] font-semibold transition-colors '
+  + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+function mm(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? ltNumber(n / 1000, 2) : '—';
+}
+
+export default function FactRow({
+  fact, room, busy = false, verified = false,
+  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening,
+}) {
+  const { t } = useTranslation();
+  const attention = factTone(fact?.status) === 'attention';
+  const [editing, setEditing] = useState(() => factNeedsInput(fact));
+  const [draft, setDraft] = useState(() => prefillValue(fact));
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    setEditing(factNeedsInput(fact));
+    setDraft(prefillValue(fact));
+  }, [fact]);
+
+  useEffect(() => {
+    if (editing && fact?.editable?.kind === 'number') inputRef.current?.focus();
+  }, [editing, fact?.editable?.kind]);
+
+  const label = t(`project.roomSheet.${LABEL_KEY[fact?.key] || 'factPlotas'}`);
+  const sentence = cleanUserText(fact?.sentence || '');
+  const kind = fact?.editable?.kind;
+  const field = fact?.editable?.field;
+
+  const value = fact?.unit
+    ? `${ltNumber(fact.value, fact.key === 'angos' ? 0 : 2)} ${fact.unit}`
+    : String(fact?.value ?? '—');
+
+  const commitNumber = () => {
+    const num = parseLtNumber(draft);
+    if (!isValidAmount(num)) return;
+    onSaveNumber?.(field, num);
+    setEditing(false);
+  };
+
+  return (
+    <div
+      className={`grid grid-cols-[104px_minmax(0,1fr)] gap-3 border-t border-border px-4 py-3
+        sm:grid-cols-[104px_minmax(0,1fr)_auto]
+        ${attention ? 'border-l-[3px] border-l-[hsl(var(--conf-med))] bg-[hsl(var(--conf-med)/0.08)]' : ''}`}
+    >
+      <EvidenceCrop
+        fact={fact}
+        alt={`${label} — ${t('project.roomSheet.sourcePage', { page: fact?.source?.page })}`}
+        imgClassName="h-[68px] object-cover object-top"
+      />
+
+      <div className="min-w-0">
+        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className={`font-mono text-[16px] font-semibold leading-snug
+          ${attention ? 'text-[hsl(var(--conf-med))]' : 'text-foreground'}`}
+        >
+          {value}
+        </p>
+        {sentence && (
+          <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{sentence}</p>
+        )}
+        {isWholeSheet(fact) && (
+          <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+            {t('project.roomSheet.wholeSheetWhy')}
+          </p>
+        )}
+
+        {/* Openings: the count and the sizes, because the plan cannot mark them. */}
+        {fact?.key === 'angos' && Array.isArray(fact.details) && fact.details.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {fact.details.map((d, i) => (
+              <li
+                key={`${d.tipas}-${d.plotis_mm}-${d.aukstis_mm}-${i}`}
+                className="flex flex-wrap items-center gap-2 font-mono text-[14px]"
+              >
+                <span>
+                  {t('project.roomSheet.openingRow', {
+                    count: d.kiekis,
+                    name: d.pavadinimas || d.tipas,
+                    size: t('project.roomSheet.openingSize', {
+                      width: mm(d.plotis_mm), height: mm(d.aukstis_mm),
+                    }),
+                  })}
+                </span>
+                <span className="font-sans text-[13px] text-muted-foreground">
+                  {d.is_zinyno
+                    ? t('project.roomSheet.openingsFromSchedule')
+                    : t('project.roomSheet.openingsAssumed')}
+                </span>
+                {editing && kind === 'count' && (
+                  <span className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onAdjustOpening?.(d, -1)}
+                      aria-label={t('project.roomSheet.countMinus')}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-[2px] border border-border bg-card disabled:opacity-50"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onAdjustOpening?.(d, 1)}
+                      aria-label={t('project.roomSheet.countPlus')}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-[2px] border border-border bg-card disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Number editor — aukštis, plotas, perimetras. */}
+        {editing && kind === 'number' && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`f-${fact.key}`}>
+              {t(`project.roomSheet.edit${fact.key === 'aukstis' ? 'Aukstis'
+                : fact.key === 'plotas' ? 'Plotas' : 'Perimetras'}`)}
+            </label>
+            <input
+              id={`f-${fact.key}`}
+              ref={inputRef}
+              value={draft}
+              inputMode="decimal"
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitNumber(); }
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              className="h-11 w-28 rounded-[2px] border border-[hsl(var(--conf-med))] bg-card px-2 text-right font-mono text-[16px]"
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={commitNumber}
+              className={`${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            >
+              {busy ? t('project.roomSheet.saving') : t('project.roomSheet.save')}
+            </button>
+          </div>
+        )}
+
+        {/* Choice editor — sienos (dažomos / nedažomos) and patalpos paskirtis,
+            each with the consequence written next to it, not hidden in a tooltip. */}
+        {editing && kind === 'choice' && field === 'walls_paint_override' && (
+          <div className="mt-2">
+            <div className="flex flex-wrap gap-2">
+              {[['1', 'wallsPainted'], ['0', 'wallsRaw']].map(([v, key]) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => { onSaveChoice?.(field, Number(v)); setEditing(false); }}
+                  className={`${BTN} border-border bg-card hover:bg-muted disabled:opacity-50`}
+                >
+                  {t(`project.roomSheet.${key}`)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+              {t('project.roomSheet.wallsConsequence')}
+            </p>
+          </div>
+        )}
+
+        {editing && kind === 'choice' && field === 'paskirtis' && (
+          <div className="mt-2">
+            <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`p-${fact.key}`}>
+              {t('project.roomSheet.paskirtisLabel')}
+            </label>
+            <select
+              id={`p-${fact.key}`}
+              disabled={busy}
+              defaultValue={room?.paskirtis || 'gyvenamoji'}
+              onChange={(e) => { onSaveChoice?.(field, e.target.value); setEditing(false); }}
+              className="ml-2 h-11 rounded-[2px] border border-border bg-card px-2 text-[16px]"
+            >
+              {PASKIRTIS.map((p) => (
+                <option key={p} value={p}>{t(`project.roomSheet.paskirtis_${p}`)}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+              {t('project.roomSheet.paskirtisConsequence')}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="col-span-2 flex items-start gap-2 sm:col-span-1 sm:flex-col sm:items-end">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onAccept}
+          className={`${BTN} ${verified
+            ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+            : 'border-border bg-card hover:bg-muted'} disabled:opacity-50`}
+        >
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {t('project.roomSheet.correct')}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setEditing((v) => !v)}
+          className={`${BTN} border-border bg-card hover:bg-muted disabled:opacity-50`}
+        >
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          {editing ? t('project.roomSheet.cancel') : t('project.roomSheet.fix')}
+        </button>
+      </div>
+    </div>
+  );
+}
