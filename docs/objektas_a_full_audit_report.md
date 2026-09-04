@@ -1,8 +1,8 @@
-# Beržų g. 24 — Full pipeline audit report
+# Objektas A — Full pipeline audit report
 
 **Date:** 2026-06-05
 **Branch:** `viewer-rebuild` (commit `c613415`)
-**Project:** Beržų g. 24, MAK Group A1675
+**Project:** Objektas A, MAK Group A1675
 **Contractor truth:** Rangovas A, captured 2026-05-26/27
 **Cost incurred:** $0.00 (no new Vision calls — used cached extract +
 parsed the contractor samata PDF)
@@ -24,9 +24,9 @@ parsed the contractor samata PDF)
 
 ## 1. Contractor samata structure (Phase 1)
 
-Parsed `docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf`
-into `ground_truth/berzas/contractor_samata_parsed.json` via
-`scripts/parse_berzas_samata.py`:
+Parsed `docs/superpowers/fixtures/2026-05-26-objektas-a/samata-truth.pdf`
+into `ground_truth/objektas_a/contractor_samata_parsed.json` via
+`scripts/parse_objektas_a_samata.py`:
 
 | Section | Line items |
 |---|---|
@@ -68,7 +68,7 @@ lives in a later commit on `week1-canonical-execution`).
 
 ## 3. Determinism (Phase 4)
 
-Two consecutive `eval_harness.py --use-gt-inputs --project berzas`
+Two consecutive `eval_harness.py --use-gt-inputs --project objektas_a`
 runs, diffed on every per-room and headline-metric line:
 
 ```
@@ -82,7 +82,7 @@ isolated by the `--use-gt-inputs` mode.
 
 ## 4. Per-metric accuracy vs contractor truth (Phase 6)
 
-`eval_harness.py --use-gt-inputs --project berzas`:
+`eval_harness.py --use-gt-inputs --project objektas_a`:
 
 | Metric | Truth | AI | Δ% | Target | Status |
 |---|---:|---:|---:|---:|---|

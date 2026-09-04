@@ -14,4 +14,4 @@ Surfaced by the calc-library test-pinning pass (commit `fde0b47`). These are **f
 - **#2** — a 5-minute check that grindjuostės waste is applied exactly once end-to-end (calc → UI → export). If the UI table already adds it, no change; if not, it's missing.
 - **#3** — leave as-is (conservative) or align to 1.8× if you want tighter paint numbers.
 
-None of these are urgent or block launch; they're accuracy refinements. Do them as a batch when you're back, against the contractor-validated fixture (Beržų g. 24) so any change is measured, not guessed.
+None of these are urgent or block launch; they're accuracy refinements. Do them as a batch when you're back, against the contractor-validated fixture (Objektas A) so any change is measured, not guessed.

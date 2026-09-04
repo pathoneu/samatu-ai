@@ -7,15 +7,15 @@
 | | Opus 5 | Fable 5.1 |
 |---|---:|---:|
 | Mean per-project MAE (4 projects) | **29.38 %** | 29.14 % |
-| Beržų — the only contractor-verified truth | **5.23 %** | 10.66 % |
-| Čiurlionio | **36.95 %** | 48.97 % |
-| Lazūnų | 35.41 % | **17.75 %** |
+| Objektas A — the only contractor-verified truth | **5.23 %** | 10.66 % |
+| Objektas C | **36.95 %** | 48.97 % |
+| Objektas D | 35.41 % | **17.75 %** |
 | Objektas B | 39.91 % | 39.20 % |
 | Cost, 4 projects | **$10.79** | $25.76 (2.4×) |
 | Wall time | **77 min** | 94 min (+22 %) |
 
-- The mean is a statistical tie (0.24 pt on single runs — well inside run-to-run Vision variance; note the fresh Opus 5 numbers for Čiurlionio/Lazūnų differ hugely from the frozen-extract `--recompute` scores, which is the known fresh-read variance, not a regression). Per project the picture is a coin flip: Fable wins one, loses two, ties one.
-- On the ONE project with contractor ground truth (Beržų) Fable 5.1 is twice as far off: LED nišos +43 % (Opus +15 %), angokraščiai −25 % (Opus +1 %), GKP lubos virš 3 m +15 % (Opus −2 %). Ceiling and floor total exact on both — the eksplikacija anchor fired live on both runs (165.61), which incidentally is the first live confirmation of the anchor shipped today.
+- The mean is a statistical tie (0.24 pt on single runs — well inside run-to-run Vision variance; note the fresh Opus 5 numbers for Objektas C/Objektas D differ hugely from the frozen-extract `--recompute` scores, which is the known fresh-read variance, not a regression). Per project the picture is a coin flip: Fable wins one, loses two, ties one.
+- On the ONE project with contractor ground truth (Objektas A) Fable 5.1 is twice as far off: LED nišos +43 % (Opus +15 %), angokraščiai −25 % (Opus +1 %), GKP lubos virš 3 m +15 % (Opus −2 %). Ceiling and floor total exact on both — the eksplikacija anchor fired live on both runs (165.61), which incidentally is the first live confirmation of the anchor shipped today.
 - Slower everywhere that matters: the doors reader took 3× longer (360 s vs 125 s summed), zoom +15 %, apdailos +18 %.
 - Price: output tokens dominate our bill (~200k output per corpus pass ≈ $10 at Fable's $50/MTok alone), so the cheaper cache reads ($0.25 vs $0.50) cannot offset the 2× output rate — measured 2.4× total.
 
@@ -26,7 +26,7 @@
 | Use | Verdict now | Why / what would change it |
 |---|---|---|
 | Vision Pass-1 / Pass-2 / drawing readers | **No** | Measured above. Re-test only when ≥3 human-verified truth projects exist (the contractor's incoming projects), 2 runs per model, and only if Opus shows a *systematic* miss. |
-| Effort tier `xhigh`/`max` | Untested lever | Anthropic claims Fable 5.1's edge appears at higher effort; we ran the default `high`. One Beržų probe at `effort=max` (~€8, slower) is the only remaining cheap experiment — worth it ONLY if the contractor's projects surface misses Opus cannot fix. |
+| Effort tier `xhigh`/`max` | Untested lever | Anthropic claims Fable 5.1's edge appears at higher effort; we ran the default `high`. One Objektas A probe at `effort=max` (~€8, slower) is the only remaining cheap experiment — worth it ONLY if the contractor's projects surface misses Opus cannot fix. |
 | `chat` role (project AI chat) | Maybe, unmeasured | Low volume, reasoning-heavy, cost per answer small. A/B with real contractor questions once there are some; not before. |
 | Correction-pattern analysis (`learn_from_corrections`, calibration promotion) | Good fit, later | Offline reasoning over correction logs; Batch API (−50 %) makes the price irrelevant. Needs a corrections corpus first (today: ~empty). |
 | Symbol / legend reader probe | Candidate, deferred | Already parked until ≥15 human-verified projects (`SAMATU_MODEL_SYMBOLS` exists). |
@@ -41,7 +41,7 @@
 - A = **claude-opus-5** (4 run(s))
 - B = **claude-fable-5-1** (4 run(s))
 
-## berzas
+## objektas_a
 
 | Metric | Unit | Truth | claude-opus-5 | claude-fable-5-1 | %err claude-opus-5 | %err claude-fable-5-1 |
 |---|---|---:|---:|---:|---:|---:|
@@ -63,7 +63,7 @@
 | Šiukšlių išvežimas | m³ | 12.00 | — | — | — | — |
 | **MAE** | % | | | | **5.23** | **10.66** |
 
-## ciurliu
+## objektas_c
 
 | Metric | Unit | Truth | claude-opus-5 | claude-fable-5-1 | %err claude-opus-5 | %err claude-fable-5-1 |
 |---|---|---:|---:|---:|---:|---:|
@@ -79,7 +79,7 @@
 | Angokraščiai | m | 34.53 | 44.80 | 35.50 | +29.74% | +2.81% |
 | **MAE** | % | | | | **36.95** | **48.97** |
 
-## lazunu
+## objektas_d
 
 | Metric | Unit | Truth | claude-opus-5 | claude-fable-5-1 | %err claude-opus-5 | %err claude-fable-5-1 |
 |---|---|---:|---:|---:|---:|---:|
@@ -121,9 +121,9 @@
 
 | Project | claude-opus-5 | claude-fable-5-1 |
 |---|---:|---:|
-| berzas | 5.23 | 10.66 |
-| ciurliu | 36.95 | 48.97 |
-| lazunu | 35.41 | 17.75 |
+| objektas_a | 5.23 | 10.66 |
+| objektas_c | 36.95 | 48.97 |
+| objektas_d | 35.41 | 17.75 |
 | objektas_b | 39.91 | 39.20 |
 | **mean** | **29.38** | **29.14** |
 

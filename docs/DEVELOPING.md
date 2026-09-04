@@ -42,13 +42,13 @@ Fix: `pkill -f "uvicorn main:app"` and relaunch — or run with `--reload` while
 ## Run the extractor on a real PDF ($ + slow)
 
 `cd backend && RUN_ID=x ../venv/bin/python scripts/variance_run.py`
-→ loads `.env`, runs `extract_interior` on the Beржų fixture, dumps `/tmp/opus48_berzas_run<id>.json`.
+→ loads `.env`, runs `extract_interior` on the Objektas A fixture, dumps `/tmp/opus48_objektas_a_run<id>.json`.
 **~$2.37/project, ~12 min** on the Opus 4.8 full pipeline (voting + zoom + readers). That's the real per-project COGS — don't re-run casually.
 
 ## Measure accuracy BEFORE claiming an accuracy change works
 
 Ground truth = the contractor's real sąmatos:
-- **Beржų** — `docs/superpowers/fixtures/2026-05-26-berzu-g-24/` (`samata-truth.pdf`, `gap-analysis-2026-07-05.md`, `app-output-2026-07-05-opus48.json`).
+- **Objektas A** — `docs/superpowers/fixtures/2026-05-26-objektas-a/` (`samata-truth.pdf`, `gap-analysis-2026-07-05.md`, `app-output-2026-07-05-opus48.json`).
 - **Objektas B** — `ground_truth/objektas_b/`.
 
 **RULE: never change *billed quantities* without measuring against these.** The deterministic math already matches the contractor within ~1% on correct inputs — the remaining gap is Vision *detection*, not the formulas. An unverified formula "fix" is a regression risk.

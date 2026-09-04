@@ -1,15 +1,15 @@
 # Foreign-project ablations — how the pipeline behaves on drawings we have never seen (2026-08-23)
 
-**Why:** every accuracy figure Pathon has ever reported comes from 4 projects (2 of them the launch contractor's own), and every production run so far used the best of them (Beržų, 3.10%). There is **no out-of-sample interior PDF anywhere** — not on disk, not in the production DB (checked 2026-08-22). The contractor is on vacation without his files. So instead of guessing how a foreign project behaves, we manufactured the ways one differs from Beržų while keeping Beržų's contractor-verified truth: every run is a measurement against real numbers.
+**Why:** every accuracy figure Pathon has ever reported comes from 4 projects (2 of them the launch contractor's own), and every production run so far used the best of them (Objektas A, 3.10%). There is **no out-of-sample interior PDF anywhere** — not on disk, not in the production DB (checked 2026-08-22). The contractor is on vacation without his files. So instead of guessing how a foreign project behaves, we manufactured the ways one differs from Objektas A while keeping Objektas A's contractor-verified truth: every run is a measurement against real numbers.
 
-**Tooling:** `scripts/build_berzas_ablations.py`; registry slugs `berzas_bundle`, `berzas_no_eksplikacija`, `berzas_no_isklotines`, `berzas_flat150` (flag `ablation_of: berzas` — excluded from the corpus average, scored one at a time with `venv/bin/python eval_harness.py --project <slug> --vision`, ~€2.50 each). PDFs are untracked like every client-named fixture.
+**Tooling:** `scripts/build_objektas_a_ablations.py`; registry slugs `objektas_a_bundle`, `objektas_a_no_eksplikacija`, `objektas_a_no_isklotines`, `objektas_a_flat150` (flag `ablation_of: objektas_a` — excluded from the corpus average, scored one at a time with `venv/bin/python eval_harness.py --project <slug> --vision`, ~€2.50 each). PDFs are untracked like every client-named fixture.
 
 ## Scoreboard
 
 | Variant | Simulates | Headline MAE | Notes |
 |---|---|---|---|
-| Clean Beržų | reference | **3.10%** | corpus extract |
-| `bundle` — Beržų's 17 sheets appended behind 37 architectural sheets of another building | what a contractor actually uploads | **34.67% → 5.13%** | foreign eksplikacija joined by nr → `eksplikacija_guard` fix (commit 53fd20b) |
+| Clean Objektas A | reference | **3.10%** | corpus extract |
+| `bundle` — Objektas A's 17 sheets appended behind 37 architectural sheets of another building | what a contractor actually uploads | **34.67% → 5.13%** | foreign eksplikacija joined by nr → `eksplikacija_guard` fix (commit 53fd20b) |
 | `no_isklotines` — wall elevations removed | plans without išklotinės | **5.63%** | finish reader falls to the apdailos plan only |
 | `flat150` — every page rasterised at 150 DPI, no text layer | scanned / iLovePDF re-export | **11.69% → 1.51%** | text-blind reader locators → Pass-1 classification fallback (same commit) |
 | `no_eksplikacija` — room table removed from ALL nine plan sheets | plan with no room schedule | **15.37%** | areas become round `wall_dim_calc` guesses; room identities drift; confidence correctly medium/low |
@@ -28,9 +28,9 @@ Areas, heights, LED and floor were exact (Vision read the table from the image),
 
 ## Finding 3 — the room table is the load-bearing input (no_eksplikacija)
 
-With no schedule anywhere, areas come from `wall_dim_calc` and are round integers (7.0, 52.0, 20.0): the model is estimating, not measuring. Per-room errors −63%…+87%; total floor +8%. Room identities drift with it (104 Darbo kambarys → "Vonia (svečių)", which also flips its finishes). Confidence came back medium/low, so the honest review queue flags them — this is the product working as designed, not a pipeline bug. The deterministic answer (area from dimension chains on the plan) is the Čiurlių-class problem and remains open.
+With no schedule anywhere, areas come from `wall_dim_calc` and are round integers (7.0, 52.0, 20.0): the model is estimating, not measuring. Per-room errors −63%…+87%; total floor +8%. Room identities drift with it (104 Darbo kambarys → "Vonia (svečių)", which also flips its finishes). Confidence came back medium/low, so the honest review queue flags them — this is the product working as designed, not a pipeline bug. The deterministic answer (area from dimension chains on the plan) is the Objektas C-class problem and remains open.
 
-**Methodology lesson:** the first no-eksplikacija build removed the table from p2 only and scored 6.5% — Beržų repeats the table on all nine plan sheets and the reader found the next copy. An ablation is only valid once the signal is verified gone from *every* page; `plotas_saltinis=eksplikacija` with exact truth values after an ablation means the ablation failed.
+**Methodology lesson:** the first no-eksplikacija build removed the table from p2 only and scored 6.5% — Objektas A repeats the table on all nine plan sheets and the reader found the next copy. An ablation is only valid once the signal is verified gone from *every* page; `plotas_saltinis=eksplikacija` with exact truth values after an ablation means the ablation failed.
 
 ## What a foreign project will do
 

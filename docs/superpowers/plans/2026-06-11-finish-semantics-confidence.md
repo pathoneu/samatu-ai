@@ -7,7 +7,7 @@
 **Contractor-anchored success criteria:**
 - Objektas B: "Sienų dekoravimas molio tinku" emitted (~160 m² target when apdailos re-read live); combined paint error shrinks from +62.8% toward ±15%.
 - False-green rate (exp1b, confidence-aware): 50%/60% → **<25%** on both projects, with error recall by flags ≥70%.
-- Zero regression on berzas paint (−6.6%) and the 772+ test suite.
+- Zero regression on objektas_a paint (−6.6%) and the 772+ test suite.
 
 **Architecture:** (1) apdailos vocabulary gains molio_tinkas/kita_danga categories; universal_rules apdailos branch splits molio area OUT of walls_paintable into a new per-room `molio_tinko_m2`; pozicijos emit the decor line. (2) `merge_apdailos_into_rooms` propagates self-reported "low confidence" → `_apdailos_confidence`. (3) New `extractor/confidence.py` post-pass stamps every pozicija with `confidence` + `_confidence_reason`: per-class calibration table (classes with measured systematic bias → geltona), apdailos low-conf rooms → finish-derived lines geltona, voting flags → geometry-derived lines geltona. (4) apdailos page-finder excludes VIZUALIZACIJA pages, collects all candidates. (5) Verify: offline re-score both saved voted extracts; live cheap re-read of the objektas_b apdailos page only (merge → recompute → re-score).
 

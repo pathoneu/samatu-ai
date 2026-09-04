@@ -14,7 +14,7 @@
 
 - **The coordinate bridge already exists but was never shown.** `frontend/src/lib/planOverlayGeometry.js:89` `getPolygonPctPoints(polygon, { renderedWidth, renderedHeight })` converts fractional `polygon_pct` → screen pixels; `getBboxPctRect(bbox, renderedSize)` (line 11) does the same for `bbox_pct`. `AiRoomOverlay.jsx` is **not mounted** and filters on `polygon_pdf` (which extraction never produces), so nothing renders today. Phase 1 wires the pct bridge into a visible layer.
 - **Confidence logic is audited — reuse it, don't reinvent.** `frontend/src/lib/areaConfidence.js:36` `computeAreaConfidence(room)` returns `{ confidence: 'high'|'medium'|'low'|'unknown', ... }`. Key behavior (verified lines 64-87): a single `eksplikacija` source → **`high`** (deterministic pdfplumber); a single `vision` source → **`low`**; `plotas_m2 == null` → **`unknown`**; `user_verified_at` → **`high`**.
-- **Area confidence ≠ location confidence.** Most Beržų g. 24 rooms have `plotas_saltinis: 'eksplikacija'` (area is trustworthy → green dot) yet `polygon_source: 'synthesized_from_bbox'` (shape is approximate → dashed border). Encoding these as two axes is the honest core of Phase 1 (spec §9: "never a fabricated polygon").
+- **Area confidence ≠ location confidence.** Most Objektas A rooms have `plotas_saltinis: 'eksplikacija'` (area is trustworthy → green dot) yet `polygon_source: 'synthesized_from_bbox'` (shape is approximate → dashed border). Encoding these as two axes is the honest core of Phase 1 (spec §9: "never a fabricated polygon").
 - **The "Tikrinti pirmiausia" worklist already exists.** `frontend/src/components/project/ReviewQueueSidebar.jsx` (mounted inside `WorkspacePanel.jsx`) already filters low/medium-confidence rooms, sorts them, and calls `onJumpToPage(page, room)`. Phase 1 does **not** rebuild it — it makes those jumps land on a *visible* highlighted zone (via the focused-room path already in `PlanViewer`) and closes the reverse (canvas→panel) direction.
 - **The test runner is lib-only.** `frontend/package.json:13` → `"test:units": "node --test src/lib/*.test.js"` (node:test + node:assert/strict). There is **no** component-test harness (no Vitest/Jest). Therefore: **all testable logic lives in `src/lib/` pure functions (TDD there); every JSX/wiring task is verified in the real app** (spec §10 mandates real-`InteriorWorkspace` verification — the lesson from the reverted measurement viewer).
 
@@ -704,10 +704,10 @@ In the `<PlanViewer …>` element (`InteriorWorkspace.jsx:303`), add two props a
 
 - [ ] **Step 2: Real-app verification — the core Phase 1 gate**
 
-This is the mandatory real-`InteriorWorkspace` check (spec §10). Use the running dev server and a real logged-in project (the contractor-validated **Beržų g. 24** fixture — memory `project_contractor_pdf_fixture`).
+This is the mandatory real-`InteriorWorkspace` check (spec §10). Use the running dev server and a real logged-in project (the contractor-validated **Objektas A** fixture — memory `project_contractor_pdf_fixture`).
 
 1. Start/confirm the frontend dev server (`cd frontend && npm run dev`) and the backend, and log in.
-2. Open the Beržų g. 24 interior project → **Brėžinys** tab → `InteriorWorkspace`.
+2. Open the Objektas A interior project → **Brėžinys** tab → `InteriorWorkspace`.
 3. Confirm on the floor-plan page:
    - [ ] Rooms appear as translucent colored zones with a white label chip (name + area). Colors differ by paskirtis (e.g. miegamasis blue, vonia cyan, virtuvė amber).
    - [ ] Each chip has a confidence dot: **green** for eksplikacija-sourced areas; amber/red only where the room is medium/low.
@@ -799,7 +799,7 @@ In the room-row map (`WorkspacePanel.jsx:280-294`), mark and style the focused r
 
 - [ ] **Step 3: Real-app verification**
 
-On the Beržų g. 24 project in `InteriorWorkspace`:
+On the Objektas A project in `InteriorWorkspace`:
 - [ ] Click a room zone on the canvas → the matching room row in the panel now highlights (left accent bar + tint) and scrolls into view.
 - [ ] Click a panel room row → the canvas focuses that zone (Task 6 behavior) AND the row stays highlighted — selection is consistent in both directions.
 - [ ] Press `Esc` (existing behavior) clears the canvas marker; confirm the panel highlight is acceptable to leave until another room is selected (no crash / no stuck state).
@@ -826,7 +826,7 @@ Expected: PASS — all `src/lib/*.test.js` including the new `roomZones.test.js`
 
 - [ ] **Step 2: Ground-truth visual acceptance (spec §10)**
 
-On Beržų g. 24 in the real `InteriorWorkspace`:
+On Objektas A in the real `InteriorWorkspace`:
 - [ ] The displayed room areas match the žiniaraštis / panel values (the viewer shows the SAME numbers the engine already computed — no parallel math). Spot-check a couple of rooms' `m²` chip vs the panel row.
 - [ ] Confidence flags are correct: eksplikacija rooms = green dot; any vision-only or disagreeing rooms = amber/red and also present in the "Peržiūra" worklist.
 - [ ] Synthesized-polygon rooms are dashed; nothing is presented as a precise polygon that isn't.
@@ -850,7 +850,7 @@ Add a short memory note (`project_ai_takeoff_viewer_phase1.md` + `MEMORY.md` poi
 - **§4.6 / §7 bidirectional sync** → panel→canvas (existing focusedRoom path, Task 6), canvas→panel focus (Task 6) + panel row highlight (Task 7).
 - **§5 "reuse coordinate bridge / confidence / no new math"** → `getPolygonPctPoints` + `getBboxPctRect` + `computeAreaConfidence` reused; no new quantities.
 - **§9 room-with-no-geometry = bbox+label, never fabricated polygon; missing ones surfaced** → bbox fallback is dashed + "apytikslė"; `countRoomsMissingGeometry` chip (Task 3/4).
-- **§10 lib unit tests for the coordinate bridge + confidence + synthesized-flag; mandatory real-app verification** → Tasks 1-3 (node:test) + Tasks 6-8 (real `InteriorWorkspace`, Beržų g. 24).
+- **§10 lib unit tests for the coordinate bridge + confidence + synthesized-flag; mandatory real-app verification** → Tasks 1-3 (node:test) + Tasks 6-8 (real `InteriorWorkspace`, Objektas A).
 - **§6 "lead with surfacing, NOT auto-tracing; no new detection"** → confirmed: Phase 1 only renders already-computed data. Detection/correction/counter are Phases 2-4, out of scope here.
 - **Method-name consistency:** `buildRoomZone` / `buildPageRoomZones` / `countRoomsMissingGeometry` / `roomZoneColor` / `confidenceHex` used identically across lib, tests, and `RoomZoneLayer`. `onRoomZoneClick` (PlanViewer prop) ↔ `onRoomClick` (RoomZoneLayer prop) mapping is explicit in Task 5 step 3.
 - **No placeholders:** every code step shows complete code; every run step shows the command + expected result.

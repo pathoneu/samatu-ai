@@ -1,4 +1,4 @@
-# Beržų line-by-line audit — app output vs Rangovas A samata
+# Objektas A line-by-line audit — app output vs Rangovas A samata
 
 **Created 2026-06-06.** Every-line compare of the app's 62 pozicijos vs the contractor's 53-line samata, reading the actual calc code. Living document.
 
@@ -69,10 +69,10 @@ these drawings, so the honest output is the checklist row.
 
 **The deterministic math is SOUND.** The two remaining "deterministic-looking" gaps are actually **Vision**, not code:
 - **iki/virš-3m split skew** (iki +22%, virš −28%, *combined accurate*): the split method is whole-room, identical to the contractor's. The skew is 100% from Vision room-dims — the app marks only Svetainė (3.40m) as >3m; the contractor's high zone is bigger (Vision got Svetainė smaller than reality and/or missed a 2nd tall room). NOT a split bug.
-- **durų angų / beapvadinės durys −56%** (17.1 vs 39.2): Vision tagged 3 doors `pasleptos_duris` but the contractor prepped ~7. Vision under-classifies frameless doors. NOT deterministic — forcing "all interior doors frameless" would overfit berzas.
+- **durų angų / beapvadinės durys −56%** (17.1 vs 39.2): Vision tagged 3 doors `pasleptos_duris` but the contractor prepped ~7. Vision under-classifies frameless doors. NOT deterministic — forcing "all interior doors frameless" would overfit objektas_a.
 
 **True remaining gaps are ALL Vision recall/stability** (the "double down on vision" bucket):
-1. Room dims / ceiling heights → iki/virš split + combined paint −10…−14% on objektas_b/ciurliu/lazunu
+1. Room dims / ceiling heights → iki/virš split + combined paint −10…−14% on objektas_b/objektas_c/objektas_d
 2. Frameless-door classification (3 vs ~7)
 3. Symbol undercounts: praustuves 3<5, difuzoriai 6<15, sviestuvai 35<38, skylių 40<56
 4. Run-to-run instability (kampai fresh 325 vs cached 501 — wall_adjacency bails silently)
@@ -103,7 +103,7 @@ The user uploads a project → app produces kampai **325** ; contractor truth **
 
 ## 🚨 2026-06-09 PART 2 — THE BENCHMARK WAS MEASURING LOST CODE (live A/B + .pyc forensics)
 
-A live re-extraction of the berzas PDF (single-pass production, `/tmp/berzas_A_single_pass.json`)
+A live re-extraction of the objektas_a PDF (single-pass production, `/tmp/objektas_a_A_single_pass.json`)
 vs the cached benchmark extract exposed that **production is massively degraded vs the benchmark,
 because several pipeline passes silently broke and the benchmark reads pre-breakage cached extracts.**
 
@@ -120,7 +120,7 @@ because several pipeline passes silently broke and the benchmark reads pre-break
    So for weeks: no `sienu_apdailos_breakdown` → calc falls to the legacy paskirtis path that hardcodes
    `walls_paint=0` for tamburas/garazas and full-tile-clips wet rooms → **−41% walls paint**; and no
    door recount → doors stuck at pass-1's 9–10 (truth 14).
-   **The commit that claimed "Beržų MAE 3.25%→1.15%" (`c91dd3b`) depended entirely on these two
+   **The commit that claimed "Objektas A MAE 3.25%→1.15%" (`c91dd3b`) depended entirely on these two
    uncommitted modules.** The benchmark still reports ~1.1–2% because `eval_harness --totals-only`
    reads the *cached* `ai_extract.json` that was built when the modules existed locally.
    → **FIXED 2026-06-09**: both modules reconstructed faithfully from the surviving `.pyc` (verbatim
@@ -140,15 +140,15 @@ because several pipeline passes silently broke and the benchmark reads pre-break
    and applies adjacency there.
 
 **Benchmark integrity (CRITICAL, confirmed):** `eval_harness --totals-only` scores against the
-enriched cached `ai_extract.json`, NOT fresh production. Honest berzas headline MAE ≈ **14.95%**, not
+enriched cached `ai_extract.json`, NOT fresh production. Honest objektas_a headline MAE ≈ **14.95%**, not
 the published 1.99% — a **~7.5× understatement** on enrichment-dependent projects. The "~3× overall"
-across all 11 projects is plausible but UNVERIFIED (fresh extracts exist only for berzas). **TODO**:
+across all 11 projects is plausible but UNVERIFIED (fresh extracts exist only for objektas_a). **TODO**:
 regenerate every `ground_truth/<slug>/ai_extract.json` with the restored pipeline, OR flag any extract
 lacking apdailos/adjacency markers as `stale_enriched` and exclude it from the headline MAE. Also: the
-eval "honest filter" silently drops headline metrics a fresh extract emits as exactly 0.0 — for non-berzas
+eval "honest filter" silently drops headline metrics a fresh extract emits as exactly 0.0 — for non-objektas_a
 projects that would HIDE a collapsed metric; remove/flag that when scoring real production extracts.
 
-**Live re-verification of the full restoration: in progress (`/tmp/berzas_restore_verify.log`).**
+**Live re-verification of the full restoration: in progress (`/tmp/objektas_a_restore_verify.log`).**
 
 ### 2026-06-09 PART 3 — benchmark-honesty regeneration ATTEMPTED, blocked on API credit
 
@@ -160,24 +160,24 @@ pipeline"). Backed up all cached extracts → `eval_runs/cached_baseline_backup_
 (`eval_harness.py`): a *fresh* extract emitting `0.0` vs a real >0 truth now scores
 as the genuine −100% collapse **and** prints a `🔴 COLLAPSED METRICS` footnote
 (silent-drop kept only for legacy `replay`). Wrote `scripts/regenerate_truth_extracts.py`
-(`run_vision_on_truth_set.py` can't refresh berzas — it filters out `has_cached_extract`).
+(`run_vision_on_truth_set.py` can't refresh objektas_a — it filters out `has_cached_extract`).
 
 **The live run ran out of Anthropic API credit after $2.31.** Result:
-- ✅ **ciurliu, lazunu** regenerated honestly. ciurliu MAE **11.53% → 27.42%** (enriched
-  cache overstated accuracy **2.4×**, partly a lost room 7→6). lazunu **10.61% → 10.24%**
+- ✅ **objektas_c, objektas_d** regenerated honestly. objektas_c MAE **11.53% → 27.42%** (enriched
+  cache overstated accuracy **2.4×**, partly a lost room 7→6). objektas_d **10.61% → 10.24%**
   (enrichment barely mattered there).
-- ⚠️ **berzas** died on voting round 3; apdailos+doors passes failed → paint-degraded
+- ⚠️ **objektas_a** died on voting round 3; apdailos+doors passes failed → paint-degraded
   artifact → **rolled back to enriched baseline** (not scored — its collapse was a credit
   artifact, not the pipeline).
 - ❌ **objektas_b, romainiai** never written (all Vision calls 400'd) → enriched baseline.
 
 So the benchmark is **partially honest** (overall 6.658% → 9.479%, a mixed figure).
-**To finish: top up credits, re-run `scripts/regenerate_truth_extracts.py --only berzas`
+**To finish: top up credits, re-run `scripts/regenerate_truth_extracts.py --only objektas_a`
 (+ objektas_b, romainiai), then `eval_harness.py --totals-only`.**
 
 ---
 
-> ⚠️ VALUES below are from the **cached** berzas extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the tables above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 corrections.** Per-line fresh-vs-cached deltas TBD.
+> ⚠️ VALUES below are from the **cached** objektas_a extract AND a no-symbols `_build_pozicijos` call. **Several findings below are corrected by the tables above — do not act on the verdict/per-line claims without cross-checking the 2026-06-09 corrections.** Per-line fresh-vs-cached deltas TBD.
 
 
 ## Verdict
@@ -362,7 +362,7 @@ LOW priority:
 7. Verify "Lubų karnizo" 115.71 (×2 lines) is real — contractor quotes NO ceiling cornice anywhere in the samata. If the design has no karnizas, the app is inventing ~€700 of montavimas+dažymas from karnizas_total. Gate karnizas on actual detection, not a default.
 
 
-## SECTION 3 — Plytelių klijavimas (contractor items 24–36) vs app skyrius "Plytelių klijavimas + Hidroizoliacija + Grindys". App output = /tmp/berzas_app_lines.json (== ground_truth/berzas/ai_extract.json). Code: backend/extractor/vision_call.py _build_pozicijos_from_rooms L1443–1726 (tiles/hidro/grindys) + universal_rules.py calc_room_quantities L532–1034. Contractor truth: ground_truth/berzas/contractor_samata_parsed.json + truth.json gt_totals.
+## SECTION 3 — Plytelių klijavimas (contractor items 24–36) vs app skyrius "Plytelių klijavimas + Hidroizoliacija + Grindys". App output = /tmp/objektas_a_app_lines.json (== ground_truth/objektas_a/ai_extract.json). Code: backend/extractor/vision_call.py _build_pozicijos_from_rooms L1443–1726 (tiles/hidro/grindys) + universal_rules.py calc_room_quantities L532–1034. Contractor truth: ground_truth/objektas_a/contractor_samata_parsed.json + truth.json gt_totals.
 
 
 ### Per-line
@@ -400,7 +400,7 @@ nr | samata item | samata kiekis vnt | app match | app kiekis | STATUS | note
 
 
 ### Missing in app
-1) Item 27+28 Didžiaformačių plytelių klijavimas (4.48 + 8.7 = 13.18 m²): app emits ZERO. The large-format path (vision_call.py L1506) requires parsed["_plyteliu_specs"] entries with format_label "didžiaformatė"; the berzas extract has none, so didzformat_count=0 and BOTH didžiaformatė lines are suppressed. Large-format tile is a real cost premium (2-3× labor) — this is a material miss, ~13 m² of premium tilework invisible.
+1) Item 27+28 Didžiaformačių plytelių klijavimas (4.48 + 8.7 = 13.18 m²): app emits ZERO. The large-format path (vision_call.py L1506) requires parsed["_plyteliu_specs"] entries with format_label "didžiaformatė"; the objektas_a extract has none, so didzformat_count=0 and BOTH didžiaformatė lines are suppressed. Large-format tile is a real cost premium (2-3× labor) — this is a material miss, ~13 m² of premium tilework invisible.
 
 2) Item 28 specifically — large-format tile on NICHE REVEALS (angokraščiai). App has no concept of tiled niche/opening reveals at all. 8.7 m² missing.
 
@@ -599,7 +599,7 @@ H4. Basin (praustuvė) count tied to toilet count (-60%, biggest santechnika gap
 
 H5. Kampai instability + redundant triple-emission (the two known items). WRONG #1 (fragility): "Dažymo kampų montavimas" = 501.3 m matches contractor 493.35 ONLY with cached adjacency; fresh extraction drops to 325 m (-34%) because pusiniai_m = n_partition_walls × H (universal_rules.py:923) silently zeroes when the flaky wall_adjacency pass finds no neighbours (gated by count_partition_corners default True, line 909). WRONG #2 (double-count): "Glaistymo kampai vidiniai" 350.91 (×0.7) + "Glaistymo kampai išoriniai" 150.39 (×0.3) = 501.3 = the SAME total re-emitted whole as "Dažymo kampų montavimas" (vision_call.py:1236-1249) → the same metrai are billable twice. FIX: (a) make pusiniai robust — don't silently zero when adjacency bails (fall back to a perimeter-based estimate); (b) resolve the legacy "+ perim" double-add at universal_rules.py:931; (c) collapse the vidiniai+išoriniai+montavimas triple into one labour line + one explicit material line so 501 m isn't priced ~2×, matching contractor's single line 19.
 
-H6. Large-format tile = 0 (items 27+28, 13.18 m² missing premium tilework). WRONG: "Didžiaformačių plytelių klijavimas" not emitted. CODE: vision_call.py:1502 didzformat_count requires _plyteliu_specs entries with format_label "didžiaformatė"; berzas extract has none → count 0 → line suppressed (vision_call.py:1506). FIX: add a fallback so detected large tiles (from tile schedule / Vision format read) still emit even with empty _plyteliu_specs; add a niche-reveal tile concept for item 28 (8.7 m²).
+H6. Large-format tile = 0 (items 27+28, 13.18 m² missing premium tilework). WRONG: "Didžiaformačių plytelių klijavimas" not emitted. CODE: vision_call.py:1502 didzformat_count requires _plyteliu_specs entries with format_label "didžiaformatė"; objektas_a extract has none → count 0 → line suppressed (vision_call.py:1506). FIX: add a fallback so detected large tiles (from tile schedule / Vision format read) still emit even with empty _plyteliu_specs; add a niche-reveal tile concept for item 28 (8.7 m²).
 
 === MEDIUM ===
 

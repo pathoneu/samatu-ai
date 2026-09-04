@@ -14,31 +14,31 @@ Cost metering was **Pass-1-only** until 2026-07-04 — it ignored every sub-read
 
 | Project | Pass-1 €/proj | Character |
 |---|---|---|
-| lazūnu | 0.47 | small, text-rich |
-| čiurlių | 0.51 | raster |
-| beržu | 1.07 | typical text-rich apartment |
-| bacvevičiaus | 2.80 | 65-page, text-free (worst-case commercial) |
+| objektas_d | 0.47 | small, text-rich |
+| objektas_c | 0.51 | raster |
+| objektas_a | 1.07 | typical text-rich apartment |
+| objektas_b | 2.80 | 65-page, text-free (worst-case commercial) |
 | **avg** | **1.21** | |
 
 **MEASURED true cost** (2026-07-04, complete meter, locked config, 3 representative projects):
 
 | Project | Pass-1 € | sub-calls € | **TRUE €** | ×mult | dominant sub-costs |
 |---|---|---|---|---|---|
-| lazūnu (small) | 0.35 | 0.34 | **0.69** | 1.95× | eksplikacija, door_type×3 |
-| čiurlių (raster) | 0.45 | 0.30 | **0.75** | 1.67× | zoom×8, doors |
-| beržu (typical apt) | 1.04 | 1.32 | **2.36** | 2.26× | apdailos €0.34, eksplikacija €0.35, door_type×3 €0.31, fixtures×3 |
-| bacvevičiaus (worst, *extrapolated*) | 2.80 | — | **~5.8** | ~2.06× | — |
+| objektas_d (small) | 0.35 | 0.34 | **0.69** | 1.95× | eksplikacija, door_type×3 |
+| objektas_c (raster) | 0.45 | 0.30 | **0.75** | 1.67× | zoom×8, doors |
+| objektas_a (typical apt) | 1.04 | 1.32 | **2.36** | 2.26× | apdailos €0.34, eksplikacija €0.35, door_type×3 €0.31, fixtures×3 |
+| objektas_b (worst, *extrapolated*) | 2.80 | — | **~5.8** | ~2.06× | — |
 
-**The measured multiplier is ~2.06× Pass-1 — higher than the 1.34–1.76× literature estimate.** Sub-readers cost more than expected; on a full apartment (beržu) they *more than double* Pass-1.
+**The measured multiplier is ~2.06× Pass-1 — higher than the 1.34–1.76× literature estimate.** Sub-readers cost more than expected; on a full apartment (objektas_a) they *more than double* Pass-1.
 
 **Planning figures (measured):**
 - **Small/simple project:** €0.7
-- **Typical full apartment (beržu — the realistic paying-customer project):** **€2.36**
+- **Typical full apartment (objektas_a — the realistic paying-customer project):** **€2.36**
 - **Corpus average (skewed by 2 tiny projects):** €1.27
 - **Worst-case large commercial (rare):** ~€5.8
 - **Conservative planning COGS:** **€2.36** (a real estimator's projects skew to full apartments, not single rooms)
 
-> Reducible: sub-reader voting (door_type ×3, fixtures ×3) triples those readers' cost, and beržu shows a €0.35 eksplikacija *Vision* call on a text-rich PDF that pdfplumber should arguably handle free. ~€0.5–0.7/project looks recoverable without touching accuracy — a follow-up cost lever (see §5).
+> Reducible: sub-reader voting (door_type ×3, fixtures ×3) triples those readers' cost, and objektas_a shows a €0.35 eksplikacija *Vision* call on a text-rich PDF that pdfplumber should arguably handle free. ~€0.5–0.7/project looks recoverable without touching accuracy — a follow-up cost lever (see §5).
 
 ---
 
@@ -119,6 +119,6 @@ This is *good news* for margins — no 21% haircut on the tiers above.
 - **Studio €149/35** — ✅ approved (2026-07-04). Trimmed quota 40→35 to clear the floor at measured cost (45%). 35/mo is still high volume.
 - **Free trial** — company-code-gated, no card at launch (server-persistent entitlement, §3a); card-on-file escalation built-but-off.
 - **Unused monthly quota** — ⏸ founder deferred (billing is dormant; decide before activation). Build quota **policy-driven, default use-it-or-lose-it**, so rollover is a config flip not a rewrite. Light-user right-sizing (one-off + downgrade nudge) ships regardless.
-- **Cost lever (follow-up):** ~€0.5–0.7/project looks recoverable (drop door_type/fixtures sub-reader voting ×3→×1; stop the eksplikacija Vision call on text-rich PDFs). If pursued, beržu drops ~€2.36→~€1.8 and €149/40 clears 40% on its own — an alternative to trimming Studio's quota. Touches the accuracy pipeline, so measure before shipping.
+- **Cost lever (follow-up):** ~€0.5–0.7/project looks recoverable (drop door_type/fixtures sub-reader voting ×3→×1; stop the eksplikacija Vision call on text-rich PDFs). If pursued, objektas_a drops ~€2.36→~€1.8 and €149/40 clears 40% on its own — an alternative to trimming Studio's quota. Touches the accuracy pipeline, so measure before shipping.
 
 Next (after the Studio pick): W3.3 builds Stripe Checkout (one-off + subscriptions) + webhooks + the LT PVM sąskaita-faktūra generator + the trial anti-abuse gate, all behind `BILLING_ENABLED` (default OFF = today's behavior exactly).

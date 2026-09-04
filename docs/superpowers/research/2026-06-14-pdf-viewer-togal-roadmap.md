@@ -13,7 +13,7 @@
 
 ## The critique's correction — SEQUENCING (this is the load-bearing part)
 The roadmap crowned a **verification walkthrough** as #1. The critique killed that ordering, correctly:
-- **Measured 50% false-green rate** (Beržų, `2026-06-11-experiments-results.md`). A fast ✓/✗ sweep over a list where *half the greens are wrong* trains the founder to **rubber-stamp confidently-wrong numbers** — speed *amplifies* the error. A correct halo can't catch a right-polygon/wrong-number failure.
+- **Measured 50% false-green rate** (Objektas A, `2026-06-11-experiments-results.md`). A fast ✓/✗ sweep over a list where *half the greens are wrong* trains the founder to **rubber-stamp confidently-wrong numbers** — speed *amplifies* the error. A correct halo can't catch a right-polygon/wrong-number failure.
 - This is exactly the **validate-first** verdict from today's councils (`2026-06-14-council-backend-vs-frontend.md`).
 - The **keystone — `build_ground_truth.py` — still does not exist** (council named it 3×). The viewer's verify-loop is worthless until the numbers it surfaces are human-calibrated AND reproducible (kampai still swings 333/386/420).
 

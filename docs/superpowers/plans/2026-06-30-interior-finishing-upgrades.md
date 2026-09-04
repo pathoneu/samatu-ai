@@ -776,7 +776,7 @@ git commit -m "feat(extractor): attach per-room measurement expressions to outpu
 - Map pozicija → expression by `skyrius`/`aprasymas` keyword (e.g. "dažymas" rows → `dazomos_sienos`, "lubų" rows → `lubos`, "grindjuostės" → `grindjuostes`). For aggregate lines spanning multiple rooms, show "Σ N patalpų" and list each room's expression in the popover.
 - Lithuanian label: **"Matavimas"**. Example rendered: `Matavimas: perim 18.0 m × h 2.7 m − angos 1.8 m² = 46.8 m²`.
 
-**Test strategy:** Vite component render test if one exists for `ProjectMainView`; otherwise manual browser verification on the contractor fixture (Beržų g. 24) — confirm a paint row shows its expression and the numbers match the displayed `kiekis`. Document the screenshot check in the commit message.
+**Test strategy:** Vite component render test if one exists for `ProjectMainView`; otherwise manual browser verification on the contractor fixture (Objektas A) — confirm a paint row shows its expression and the numbers match the displayed `kiekis`. Document the screenshot check in the commit message.
 
 ---
 

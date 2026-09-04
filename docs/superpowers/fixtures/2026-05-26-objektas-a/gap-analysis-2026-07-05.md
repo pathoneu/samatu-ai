@@ -1,4 +1,4 @@
-# Gap analysis — Beržų g. 24 — FRESH MEASURED RUN (2026-07-05)
+# Gap analysis — Objektas A — FRESH MEASURED RUN (2026-07-05)
 
 **Supersedes** `gap-analysis.md` (2026-05-27, now 5+ weeks + an engine generation stale).
 **Engine:** Opus 4.8, native-PDF pass-1, voting on, 9 zoom passes (1 applied), apdailos+doors+door_type+fixtures readers.
@@ -28,10 +28,10 @@
 
 ## The headline finding: the big money gap is an ASSUMPTION, not a bug
 
-`ROOM_TYPE_RULES["garazas"]` = `walls_paint: 0.0, ceiling_type: "betonas"` — the app **defaults to a raw/unfinished garage**. Beržų's garage is **finished**: contractor paints its walls (31,45 m²) and GKPs its ceiling (~10 m²), all at the 3,4 m tier. That ≈41 m² is essentially the **entire** virš-3m gap.
+`ROOM_TYPE_RULES["garazas"]` = `walls_paint: 0.0, ceiling_type: "betonas"` — the app **defaults to a raw/unfinished garage**. Objektas A's garage is **finished**: contractor paints its walls (31,45 m²) and GKPs its ceiling (~10 m²), all at the 3,4 m tier. That ≈41 m² is essentially the **entire** virš-3m gap.
 
 - Vision read the garage **correctly** at H=3,4 m. This is not a detection miss.
-- Garages genuinely vary (Beржų finished; Objektas B raw — the default was tuned to Objektas B).
+- Garages genuinely vary (Objektas A finished; Objektas B raw — the default was tuned to Objektas B).
 - There is **already** a `garazas_painted` Setup-Wizard override (`translate_user_prefs_to_room_rules`).
 - → This is a **project-specific assumption with an existing override**, not a silent calc bug. Do NOT blind-flip the default (would break raw-garage projects). Better: infer garage finishing from the išklotinės, and/or surface it as a prominent, one-click assumption.
 

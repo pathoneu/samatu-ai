@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python (FastAPI, OpenCV `cv2`, numpy, pdfplumber, pdf2image), pytest for backend; React/JSX, SVG overlay, `node --test` for frontend lib, Playwright for JSX/browser.
 
-**Empirical baseline (measured 2026-07-02 on Beržų g. 24 p2, 11 rooms):** seeds 11/11; default single-label-seed flood-fill = **8/11 auto** (101/103/104/105/111 tight & correct; 102 leaky-low; 108/109 corridor slivers; 106/107/110 fail). A wider multi-seed grid already reaches **10/11** with 108/109 flipping to high-confidence correct rooms. Only 110 (label far from room) and 102 (big-room leak) stay hard. The current DB reality: 193 rooms → 11 real polygons, 113 `synthesized_from_bbox` coarse rects, 66 bbox-only, 3 no-geo.
+**Empirical baseline (measured 2026-07-02 on Objektas A p2, 11 rooms):** seeds 11/11; default single-label-seed flood-fill = **8/11 auto** (101/103/104/105/111 tight & correct; 102 leaky-low; 108/109 corridor slivers; 106/107/110 fail). A wider multi-seed grid already reaches **10/11** with 108/109 flipping to high-confidence correct rooms. Only 110 (label far from room) and 102 (big-room leak) stay hard. The current DB reality: 193 rooms → 11 real polygons, 113 `synthesized_from_bbox` coarse rects, 66 bbox-only, 3 no-geo.
 
 **Accuracy gate (respect the founder's 2026-06-17 disable decision):** Phase B (re-enable auto-detect) MUST NOT land until Phase A's benchmark (Task A5) proves the improved detector's auto-solve rate and area-error are **at least as good as** the recorded baseline on every ground-truth project, with **zero wrong-room fills** (the seed-inside-polygon guard). If the benchmark regresses on any project, stop and report — do not flip the flag.
 
@@ -360,7 +360,7 @@ git commit -m "feat(cv): auto_room_polygon multi-seed + seed-inside-polygon guar
         n_auto += 1
 ```
 
-- [ ] **Step 3: Manually smoke-test the endpoint against the Beржų fixture**
+- [ ] **Step 3: Manually smoke-test the endpoint against the Objektas A fixture**
 
 Run (backend venv active, from repo root):
 
@@ -370,7 +370,7 @@ import io, json, numpy as np, cv2
 from extractor.cv_polygon import auto_room_polygon
 from extractor.room_seeds import locate_room_seeds, calibrate_page_scale, bbox_centroid_seed
 import page_raster_cache as c
-pdf=open('../docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf','rb').read()
+pdf=open('../docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf','rb').read()
 raster=c.render_grayscale_from_bytes(pdf,2); h,w=raster.shape[:2]
 plot={'101':11.01,'102':50.54,'103':9.64,'104':13.51,'105':10.67,'106':6.84,'107':6.59,'108':12.68,'109':12.71,'110':23.97,'111':7.45}
 seeds=locate_room_seeds(pdf,1,list(plot)); 
@@ -501,13 +501,13 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run the benchmark**
 
 Run: `cd backend && python scripts/bench_room_polygons.py`
-Expected: one line per ground-truth project with `auto/manual/mean_area_err/wrong_room_fills`. **The Beржų line should show `auto >= 8` and `wrong_room_fills = 0`.** Record the numbers.
+Expected: one line per ground-truth project with `auto/manual/mean_area_err/wrong_room_fills`. **The Objektas A line should show `auto >= 8` and `wrong_room_fills = 0`.** Record the numbers.
 
 - [ ] **Step 3: Apply the accuracy GATE (decision, not code)**
 
-Compare against the baseline recorded in this plan's header and in `backend/tests/test_room_polygon_detect.py` (Beржų auto >= 7 was the prior bar; the improved detector should hold or beat it). Requirements to proceed to Phase B:
+Compare against the baseline recorded in this plan's header and in `backend/tests/test_room_polygon_detect.py` (Objektas A auto >= 7 was the prior bar; the improved detector should hold or beat it). Requirements to proceed to Phase B:
 - `wrong_room_fills == 0` on **every** project (the guard must never let a fill land in the wrong room).
-- Beржų `auto >= 8` and no other project regresses below its prior recorded auto count.
+- Objektas A `auto >= 8` and no other project regresses below its prior recorded auto count.
 
 If any project regresses or shows a wrong-room fill, STOP and report the numbers — do not start Phase B. (Tuning levers if needed: widen the `seed_grid` half-window in `auto_room_polygon`, or loosen/tighten `area_err_max`. Re-run the benchmark after any tuning.)
 
@@ -779,7 +779,7 @@ Replace the geometry `<polygon>/<rect>` conditional (lines 78-100) with a three-
 
 - [ ] **Step 4: Verify in the real viewer with Playwright (JSX has no unit harness)**
 
-Bring up the stack and confirm markers render (reuse the verification pattern from the rotation fix: copy the Beржų PDF to `frontend/public/`, mount `TakeoffViewer` on a probe page or the real InteriorWorkspace, navigate to page 2). Confirm: traced rooms show solid outlines; unsolved rooms show a small dashed ring with their number at the printed label; no coarse dashed rectangles remain. Capture a screenshot for the reviewer.
+Bring up the stack and confirm markers render (reuse the verification pattern from the rotation fix: copy the Objektas A PDF to `frontend/public/`, mount `TakeoffViewer` on a probe page or the real InteriorWorkspace, navigate to page 2). Confirm: traced rooms show solid outlines; unsolved rooms show a small dashed ring with their number at the printed label; no coarse dashed rectangles remain. Capture a screenshot for the reviewer.
 
 - [ ] **Step 5: Commit**
 
@@ -851,8 +851,8 @@ git commit -m "feat(viewer): in-viewer 'Taisyti zoną' click-to-fill for un-trac
 
 - [ ] Backend unit tests green: `cd backend && python -m pytest tests/test_cv_polygon.py tests/test_cv_polygon_seeds.py tests/test_room_seeds_bbox.py tests/test_room_polygon_detect.py -q`
 - [ ] Frontend lib tests green: `cd frontend && node --test src/lib/roomZones.test.js src/lib/viewerEngine/*.test.js`
-- [ ] Benchmark re-run recorded: `cd backend && python scripts/bench_room_polygons.py` — Beржų `auto >= 8`, `wrong_room_fills = 0` on every project.
-- [ ] Real-app Playwright pass: open the Beржų interior project in the default (EmbedPDF) viewer — traced rooms show solid outlines, un-traced rooms show circled-number markers at the printed labels, no coarse dashed rectangles, "Taisyti zoną" corrects a room and persists.
+- [ ] Benchmark re-run recorded: `cd backend && python scripts/bench_room_polygons.py` — Objektas A `auto >= 8`, `wrong_room_fills = 0` on every project.
+- [ ] Real-app Playwright pass: open the Objektas A interior project in the default (EmbedPDF) viewer — traced rooms show solid outlines, un-traced rooms show circled-number markers at the printed labels, no coarse dashed rectangles, "Taisyti zoną" corrects a room and persists.
 - [ ] Update memory `project_ai_takeoff_viewer_phase1.md`: accurate-polygon tiers shipped + benchmark numbers + auto-detect re-enabled.
 
 ---

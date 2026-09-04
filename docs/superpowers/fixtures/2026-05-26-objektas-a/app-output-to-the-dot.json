@@ -7,7 +7,7 @@
     {
       "nr": 1,
       "tipas": "title_page",
-      "pavadinimas": "Interjero projektas - Beržų g. 24",
+      "pavadinimas": "Interjero projektas - Objektas A",
       "confidence": "high",
       "pastabos": ""
     },
@@ -1033,7 +1033,7 @@
     "radiatoriai": 0,
     "gyvatukai": 2
   },
-  "pastabos": "Premium vieno aukšto namo interjero projektas, Beržų g. 24. Bendras plotas 165.61 m². Svetainė/virtuvė atviros erdvės su +3400 lubomis. Kiti kambariai +2800. LED nišos visose pagrindinėse patalpose (LD-1, LD-2, LD-3 tipai). Plytelės iki lubų visose drėgnose patalpose. Paslėptos durys koridoriuje. Virtuvės sala su Kronoceramiche Lux Venna 2800x1200 plokštėmis.",
+  "pastabos": "Premium vieno aukšto namo interjero projektas, Objektas A. Bendras plotas 165.61 m². Svetainė/virtuvė atviros erdvės su +3400 lubomis. Kiti kambariai +2800. LED nišos visose pagrindinėse patalpose (LD-1, LD-2, LD-3 tipai). Plytelės iki lubų visose drėgnose patalpose. Paslėptos durys koridoriuje. Virtuvės sala su Kronoceramiche Lux Venna 2800x1200 plokštėmis.",
   "warnings": [
     {
       "level": "INFO",

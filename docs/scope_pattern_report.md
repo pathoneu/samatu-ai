@@ -65,7 +65,7 @@ promotion gate has industry-wide signal.
 
 ## Project × Metric matrix
 
-| metric | berzas | objektas_b | ciurliu | romainiai | sernu | lazunu |
+| metric | objektas_a | objektas_b | objektas_c | romainiai | sernu | objektas_d |
 |---|---|---|---|---|---|---|
 | `angokrasciu_m` | 89.39 | 94.02 | 34.53 | 23.80 | 85.45 | 31.80 |
 | `ceiling_paint_total_m2` | 165.60 | — | — | — | — | — |
@@ -175,10 +175,10 @@ Project-specific scope items. Don't expect these to yield global promotion candi
 
 - **Combined paint** (`dazymo_walls_plus_ceilings_combined_m2`) is present in 6/6 projects — the strongest cross-project headline metric.
   Values range 151–585 m² (median 406); the spread reflects project size, not error.
-- **Angokraščiai** (`angokrasciu_m`) present in 6/6. rangovas uses two distinct line items in some projects: 'Angokraščių apdirbimas GKP' AND 'Durų angų paruošimas' — these aren't always merged (see Objektas B and Lazūnų).
+- **Angokraščiai** (`angokrasciu_m`) present in 6/6. rangovas uses two distinct line items in some projects: 'Angokraščių apdirbimas GKP' AND 'Durų angų paruošimas' — these aren't always merged (see Objektas B and Objektas D).
 - **LED nišos** present in 5/6. Two projects (`sernu`, `romainiai` only profiliai) don't have a Nišų-formavimas line — interior style varies.
 - **GKP virš 3m** present in only 2/6 — most projects are single-tier ceilings. The virš-3m split is a feature of larger houses, not a universal metric.
-- **Plytelės sienos+grindys combined** present in 3/6 — three projects use this combined unit, Beržų splits into separate sienos and grindys, romainiai has no tile work at all.
+- **Plytelės sienos+grindys combined** present in 3/6 — three projects use this combined unit, Objektas A splits into separate sienos and grindys, romainiai has no tile work at all.
 
 ## What this means for the calibration_learner
 

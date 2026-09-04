@@ -7,7 +7,7 @@
     {
       "nr": 1,
       "tipas": "title_page",
-      "pavadinimas": "INTERJERO PROJEKTAS - Gyvenamojo namo Beržų g. 24",
+      "pavadinimas": "INTERJERO PROJEKTAS - Gyvenamojo namo Objektas A",
       "confidence": "high",
       "pastabos": ""
     },
@@ -976,7 +976,7 @@
     "radiatoriai": 0,
     "gyvatukai": 2
   },
-  "pastabos": "Premium klasės gyvenamasis namas Beržų g. 24, 165.61m². 11 patalpų. Svetainė/virtuvė 50.54m² su +3400 lubų aukščiu ir gausa LED nišų. Vonios su pilna apdaila plytelėmis iki lubų (Kronosceramiche Lux Venna 2800x1200, Living Ceramics Vonn). Grindys: parketlentės ~135m² gyvenamosiose, plytelės sanitariniuose. Daug paslėptų durų (beapvadinių).",
+  "pastabos": "Premium klasės gyvenamasis namas Objektas A, 165.61m². 11 patalpų. Svetainė/virtuvė 50.54m² su +3400 lubų aukščiu ir gausa LED nišų. Vonios su pilna apdaila plytelėmis iki lubų (Kronosceramiche Lux Venna 2800x1200, Living Ceramics Vonn). Grindys: parketlentės ~135m² gyvenamosiose, plytelės sanitariniuose. Daug paslėptų durų (beapvadinių).",
   "warnings": [
     {
       "level": "INFO",

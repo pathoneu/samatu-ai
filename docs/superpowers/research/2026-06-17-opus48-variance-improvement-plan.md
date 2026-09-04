@@ -1,6 +1,6 @@
 # Opus 4.8 migration — variance findings + improvement plan (2026-06-17)
 
-After migrating the whole pipeline to Opus 4.8, ran the Beržų fixture 3× (voting on) + a 12-agent review/research/council. The variance data and the code review tell one story.
+After migrating the whole pipeline to Opus 4.8, ran the Objektas A fixture 3× (voting on) + a 12-agent review/research/council. The variance data and the code review tell one story.
 
 ## The killer finding: the residuals are VARIANCE, not bias
 
@@ -31,7 +31,7 @@ After migrating the whole pipeline to Opus 4.8, ran the Beržų fixture 3× (vot
 **#5 (optional) — Zoom pass effort high→medium + skip low-voter-spread rooms.** ~96s for 1 refinement. Identical numbers, faster. **S–M.**
 
 ## Leave FROZEN (anti-N=2-fitting — unanimous)
-- **kampai** (`universal_rules.py:1054` `kampai += perim` unconditional; `n_walls_estimate` never set so `4×H`+`perim` always both present). Structurally wrong AND calibrated to Beržų 493.35. Decompose only after N≥3–5 human-confirmed corner counts (wire `n_outer_corners` from `cv_polygon.auto_room_polygon`); it will read WORSE on the AI oracle — that's honest.
+- **kampai** (`universal_rules.py:1054` `kampai += perim` unconditional; `n_walls_estimate` never set so `4×H`+`perim` always both present). Structurally wrong AND calibrated to Objektas A 493.35. Decompose only after N≥3–5 human-confirmed corner counts (wire `n_outer_corners` from `cv_polygon.auto_room_polygon`); it will read WORSE on the AI oracle — that's honest.
 - **rotband** (0.30 area share). Wall thickness does NOT fix it (it's an area share, not a length). Freeze until GKP/masonry split + human truth.
 - **silikonavimas** (`perim × 2.3`), paint/LED (inside noise floor — report ranges, never chase).
 - **Garažas 0.7988 factor** — a 0.9% residual chased to 4 decimals; revert once per-class bands land.

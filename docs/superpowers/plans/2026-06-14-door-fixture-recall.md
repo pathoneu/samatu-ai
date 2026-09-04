@@ -2,7 +2,7 @@
 
 > REQUIRED SUB-SKILL: superpowers:executing-plans. Checkbox steps.
 
-**Goal:** Fix the two measured recalls on Beržų (frameless doors −74% / 10.2 vs 39.2 m; fixtures −29% / sinks 3-vs-5) by reading door TYPE and fixture COUNT from **text on the drawing** (tags, annotations, labels — ~90% Claude regime) instead of classifying/counting glyphs (~40% regime, and door type is structurally NOT in the glyph). Reconcile against the plan-detected counts and **surface disagreement as a confidence flag — never silently pick a winner**.
+**Goal:** Fix the two measured recalls on Objektas A (frameless doors −74% / 10.2 vs 39.2 m; fixtures −29% / sinks 3-vs-5) by reading door TYPE and fixture COUNT from **text on the drawing** (tags, annotations, labels — ~90% Claude regime) instead of classifying/counting glyphs (~40% regime, and door type is structurally NOT in the glyph). Reconcile against the plan-detected counts and **surface disagreement as a confidence flag — never silently pick a winner**.
 
 **Council (5/5 unanimous) + deep research (cited) + repo premise-check converged on this.** Rejected: premium-"all frameless" heuristic (N=2 overfit → invisible green over-count), `max(plan,schedule)` silent merge (over-inflates when text over-lists), more voting (variance ≠ recall), zero-shot detectors (line-art weak; our cv2 over-counted 100×).
 
@@ -35,9 +35,9 @@
 - [ ] In the skylių/fixture path, where counts come from `detected_symbols_summary`: when a fixture-label read (or the existing symbols) disagrees with the wet-room-derived expectation, **surface** rather than silently use the lower. Minimal first slice: when `detected_symbols_summary` fixture count < n_wet_rooms-implied minimum, flag the dependent lines geltona with the discrepancy. (Full sanitary-label reader deferred — fixtures have no clean count table; lower ROI than doors.)
 - [ ] Test: low symbol count vs wet-room expectation → dependent pozicija flagged geltona.
 
-### Task 4: live verification on Beržų (+ objektas_b)
+### Task 4: live verification on Objektas A (+ objektas_b)
 **Files:** `scripts/verify_door_recall.py`
-- [ ] Run `read_door_types` live on the Beržų PDF; assert beapvadinės moves from 2 toward ~8 (contractor 39.2 m ÷ ~5 m ≈ 8). Compare reconciled "Durų angų paruošimas beapvadinėms durims" vs contractor 39.2.
+- [ ] Run `read_door_types` live on the Objektas A PDF; assert beapvadinės moves from 2 toward ~8 (contractor 39.2 m ÷ ~5 m ≈ 8). Compare reconciled "Durų angų paruošimas beapvadinėms durims" vs contractor 39.2.
 - [ ] Re-score the full voted extract with the reconciliation wired; confirm the durys line improves and is flagged honestly; **zero regression** on the already-good quantities (paint, kampai, GKP).
 - [ ] Write results to `docs/superpowers/research/2026-06-14-door-recall-results.md` — directional (oracle is AI-parsed), with the 🟡-reconciliation surfaced.
 

@@ -23,6 +23,6 @@ backend/data/pdf_store
 backend/data/cv_cache
 backend/data/annotations
 backend/data/calibrations
-backend/data/demo-berzu-24-snapshot-20260714.json
+backend/data/demo-objektas-a-snapshot-20260714.json
 backend/test_pdfs
 backend/logs
