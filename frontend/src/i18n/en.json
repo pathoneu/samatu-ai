@@ -1520,7 +1520,8 @@
       "sym_radiatoriai": "Radiators",
       "sym_gyvatukai": "Towel radiators",
       "symCount": "{{count}} pcs.",
-      "symNoPage": "I cannot name the sheet they were counted on."
+      "symNoPage": "I cannot name the sheet they were counted on.",
+      "legendCornersCount": "corners from the outline ({{count}})"
     }
   },
   "shared": {

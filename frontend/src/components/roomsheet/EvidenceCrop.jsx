@@ -43,7 +43,9 @@ export default function EvidenceCrop({
             decoding="async"
             onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
-            className={`block w-full ${imgClassName}`}
+            // A whole-sheet crop cropped again to a thumbnail shows nothing but
+            // the sheet's white margin; `contain` at least renders as a page.
+            className={`block w-full ${whole ? 'h-[68px] object-contain' : imgClassName}`}
           />
         )}
       </div>

@@ -34,13 +34,15 @@ import { toast } from 'sonner';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import {
-  getProject, markRoomVerified, pullProjectsFromBackend, updateProject,
+  flushProjectSaves, getProject, markRoomVerified, pullProjectsFromBackend,
+  updateProject,
 } from '@/lib/projectStore';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
-  adjustOpeningCount, canOverrideWholeRow, orderFacts, progressSummary,
-  rippleText, roomIndex, roomTitle, roomsInDrawingOrder, setSymbolCount,
+  adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, orderFacts,
+  progressSummary, rippleText, roomIndex, roomTitle, roomsInDrawingOrder,
+  setSymbolCount, stampVerified,
 } from '@/lib/roomSheet';
 import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched,
@@ -165,7 +167,12 @@ export default function RoomSheet() {
     setProject(next);
     updateProject(project.id, next);
     setRipple(rippleText(diffDarbuSarasas(prior, next.darbu_sarasas || []), t));
-    loadFacts();
+    // The facts endpoint reads the STORED blob, and `updateProject` writes on a
+    // debounce. Refetching straight away raced the write and redrew the card
+    // with the pre-edit numbers while the ripple underneath announced the new
+    // ones — measured in the browser: the height was already 3,10 server-side
+    // and the card still read „iki 3m". Flush first, then re-read.
+    return flushProjectSaves().then(loadFacts, loadFacts);
   }, [project, t, loadFacts]);
 
   const run = useCallback(async (work) => {
@@ -184,11 +191,11 @@ export default function RoomSheet() {
   const saveNumber = useCallback((field, value) => run(async () => {
     if (field === 'lubu_auksciai') {
       const next = { ...((project?._overrides || {}).lubu_auksciai || {}), [String(roomNr)]: value };
-      land(await saveAssumptionEdit(project, 'lubu_auksciai', next));
+      await land(await saveAssumptionEdit(project, 'lubu_auksciai', next));
       return;
     }
     // plotas_m2 / perimetras_m live on the room, so they go the room-edit way.
-    land(await saveRoomEdit(project, patchRoom(project, roomNr, { [field]: value })),
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { [field]: value })),
       { fromInterior: true });
   }), [run, project, roomNr, land]);
 
@@ -198,16 +205,16 @@ export default function RoomSheet() {
         ...((project?._overrides || {}).walls_paint_override || {}),
         [String(roomNr)]: Number(value),
       };
-      land(await saveAssumptionEdit(project, 'walls_paint_override', next));
+      await land(await saveAssumptionEdit(project, 'walls_paint_override', next));
       return;
     }
-    land(await saveRoomEdit(project, patchRoom(project, roomNr, { paskirtis: value })),
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { paskirtis: value })),
       { fromInterior: true });
   }), [run, project, roomNr, land]);
 
   const adjustOpening = useCallback((detail, delta) => run(async () => {
     const elementai = adjustOpeningCount(room?.elementai, detail, delta);
-    land(await saveRoomEdit(project, patchRoom(project, roomNr, { elementai })),
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { elementai })),
       { fromInterior: true });
   }), [run, project, room, roomNr, land]);
 
@@ -232,11 +239,11 @@ export default function RoomSheet() {
     updateProject(project.id, withCount);
     // The builder reads the symbol counts out of the recompute context, so a
     // plain rebuild is what turns the corrected count into corrected rows.
-    land(await recomputeUntouched(withCount));
+    await land(await recomputeUntouched(withCount));
   }), [run, project, land]);
 
   const doRecompute = useCallback(() => run(async () => {
-    land(await recomputeUntouched(project));
+    await land(await recomputeUntouched(project));
   }), [run, project, land]);
 
   // ── Moving on ─────────────────────────────────────────────────────────────
@@ -248,9 +255,20 @@ export default function RoomSheet() {
 
   const acceptRoom = useCallback(() => {
     if (busy || !room) return;
-    markRoomVerified(id, room.nr);
+    markRoomVerified(id, room.nr);       // canonical write: patalpos + the event
     const fresh = getProject(id);
-    if (fresh) setProject(fresh);
+    if (!fresh) { advance(); return; }
+    // …and the same stamp on `v8_rooms`, which the store does not touch and this
+    // walk reads first. Without it the strip kept saying „Patikrinta 0 iš 11".
+    const at = (fresh.patalpos || [])
+      .find((r) => String(r?.nr) === String(room.nr))?.user_verified_at;
+    if (at && Array.isArray(fresh.v8_rooms) && fresh.v8_rooms.length) {
+      const next = { ...fresh, v8_rooms: stampVerified(fresh.v8_rooms, room.nr, at) };
+      updateProject(id, next);
+      setProject(next);
+    } else {
+      setProject(fresh);
+    }
     advance();
   }, [busy, room, id, advance]);
 
@@ -326,6 +344,9 @@ export default function RoomSheet() {
   const quantities = facts?.quantities || [];
   const excluded = facts?.excluded || [];
   const allSeen = factList.length > 0 && factList.every((f) => seen.has(f.key));
+  // Exactly what the plan pane draws — so a quantity line only promises to have
+  // marked the corners when there are dots on the drawing to look at.
+  const cornersOnPlan = cornersFromPolygon(facts?.room?.polygon_pct).length > 0;
 
   return (
     <div className="flex min-h-full flex-col bg-background text-[16px]">
@@ -431,6 +452,7 @@ export default function RoomSheet() {
                   busy={busy}
                   overridden={overridden.has(q.row_id)}
                   canOverride={canOverrideWholeRow(q, project.darbu_sarasas || [], roomNr)}
+                  cornersOnPlan={cornersOnPlan}
                   onOverride={(v) => overrideQuantity(q, v)}
                   onExpandChange={setHighlightCorners}
                 />

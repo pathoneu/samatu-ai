@@ -30,6 +30,10 @@ import {
 import { evidenceUrl } from '@/lib/roomSheetApi';
 
 const FULL_PAGE = [0, 0, 1, 1];
+// Above this many direction changes the labels overlap into noise on a small
+// room, so the count moves to the legend and the dots stay unlabelled. They are
+// still every corner the outline has — nothing is dropped, only the lettering.
+const MAX_LABELLED_CORNERS = 8;
 
 export default function RoomPlanPane({ room, projectId, highlightCorners = false }) {
   const { t } = useTranslation();
@@ -41,8 +45,11 @@ export default function RoomPlanPane({ room, projectId, highlightCorners = false
     if (page == null) return { src: null, crop: FULL_PAGE };
     const r = region.map((v) => Number(v).toFixed(4)).join(',');
     return {
+      // 160 is the endpoint's dpi ceiling. A small room still renders a small
+      // PNG (the crop is a fraction of the sheet), so the pane upscales it —
+      // legible, but the sharpness ceiling lives in evidence.py, not here.
       src: evidenceUrl(`/api/projects/${encodeURIComponent(projectId)}`
-        + `/evidence?page=${page}&rect=${r}&dpi=140`),
+        + `/evidence?page=${page}&rect=${r}&dpi=160`),
       // The endpoint pads what it is given; the overlay must live in the SAME
       // rectangle the image actually covers.
       crop: paddedCropRect(region),
@@ -97,38 +104,42 @@ export default function RoomPlanPane({ room, projectId, highlightCorners = false
               strokeLinejoin="round"
             />
           )}
-          {corners.map((c) => (
-            <g key={c.label}>
-              <circle
-                cx={c.x * 100}
-                cy={c.y * 100}
-                r="1.6"
-                fill="hsl(var(--card))"
-                stroke="hsl(var(--accent-2))"
-                strokeWidth={highlightCorners ? '1.4' : '0.8'}
-                vectorEffect="non-scaling-stroke"
-              />
-            </g>
-          ))}
-          {marker?.inside && (
-            <circle
-              cx={marker.x * 100}
-              cy={marker.y * 100}
-              r="2.4"
-              fill="none"
-              stroke="hsl(var(--destructive))"
-              strokeWidth="1.2"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
         </svg>
 
-        {/* Corner labels sit in HTML, not SVG: the non-uniform viewBox scale
-            would squash SVG text into unreadable ovals. */}
+        {/* Dots, the room-number ring and the labels are HTML, not SVG. The
+            viewBox above is stretched onto the image (preserveAspectRatio
+            "none" is what keeps the polygon aligned), so an SVG circle drawn in
+            it comes out as an ellipse and SVG text as squashed ovals. Absolute
+            percentage positioning puts them in the same places and keeps them
+            round and readable. */}
         {corners.map((c) => (
           <span
+            key={c.label}
+            aria-hidden="true"
+            className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-card
+              ${highlightCorners ? 'h-3.5 w-3.5' : 'h-2.5 w-2.5'}`}
+            style={{
+              left: `${c.x * 100}%`,
+              top: `${c.y * 100}%`,
+              borderColor: 'hsl(var(--accent-2))',
+            }}
+          />
+        ))}
+        {marker?.inside && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+            style={{
+              left: `${marker.x * 100}%`,
+              top: `${marker.y * 100}%`,
+              borderColor: 'hsl(var(--destructive))',
+            }}
+          />
+        )}
+        {corners.length <= MAX_LABELLED_CORNERS && corners.map((c) => (
+          <span
             key={`lbl-${c.label}`}
-            className="pointer-events-none absolute -translate-x-1/2 translate-y-1 rounded-[2px] bg-card/90 px-1 font-mono text-[11px] leading-tight text-foreground"
+            className="pointer-events-none absolute -translate-x-1/2 translate-y-2 rounded-[2px] bg-card/90 px-1 font-mono text-[12px] leading-tight text-foreground"
             style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%` }}
           >
             {c.label}
@@ -152,7 +163,9 @@ export default function RoomPlanPane({ room, projectId, highlightCorners = false
               className="inline-block h-2.5 w-2.5 rounded-full border-2"
               style={{ borderColor: 'hsl(var(--accent-2))' }}
             />
-            {t('project.roomSheet.legendCorners')}
+            {corners.length <= MAX_LABELLED_CORNERS
+              ? t('project.roomSheet.legendCorners')
+              : t('project.roomSheet.legendCornersCount', { count: corners.length })}
           </li>
         )}
         {marker?.inside && (

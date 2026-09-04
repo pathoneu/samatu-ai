@@ -9,7 +9,8 @@ import {
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings,
-  firstPageOfType, setSymbolCount, symbolPageTypes, symbolRows,
+  firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
+  symbolRows,
 } from './roomSheet.js';
 
 const SAMPLE = JSON.parse(
@@ -67,9 +68,13 @@ test('assumed and missing share the attention tone; read is plain', () => {
 });
 
 test('an assumed fact prefills its default; a missing one opens empty', () => {
-  assert.equal(prefillValue({ status: 'assumed', value: 2.8 }), '2.8');
+  assert.equal(prefillValue({ status: 'assumed', value: 2.8 }), '2,8',
+    'the field must open with an LT decimal comma, like every other number');
+  assert.equal(prefillValue({ status: 'read', value: 23.97 }), '23,97');
   assert.equal(prefillValue({ status: 'missing', value: 2.8 }), '');
   assert.equal(prefillValue({ status: 'read', value: null }), '');
+  assert.equal(prefillValue({ status: 'read', value: 'parketas' }), 'parketas');
+  assert.equal(prefillValue(null), '');
 });
 
 // ── Whole sheet vs a real rectangle ─────────────────────────────────────────
@@ -136,6 +141,20 @@ test('roomIndex finds a room whether the nr is a string or a number', () => {
 test('verification comes off the room stamp', () => {
   assert.equal(isRoomVerified({ user_verified_at: '2026-09-04T08:00:00Z' }), true);
   assert.equal(isRoomVerified({}), false);
+});
+
+// projectStore.markRoomVerified stamps `patalpos` only, and this walk reads
+// `v8_rooms` first — so the second list has to be stamped too or the strip
+// keeps reading „Patikrinta 0 iš 11" after a room has been verified.
+test('the verification stamp can be mirrored onto the second room list', () => {
+  const v8 = [{ nr: '101' }, { nr: '102', user_verified_at: 'x' }];
+  const out = stampVerified(v8, '102', '2026-09-04T09:00:00Z');
+  assert.equal(out[0].user_verified_at, undefined);
+  assert.equal(out[1].user_verified_at, '2026-09-04T09:00:00Z');
+  assert.notEqual(out[1], v8[1], 'must not mutate the stored room in place');
+  assert.equal(stampVerified(v8, 102, 'z')[1].user_verified_at, 'z');
+  assert.deepEqual(stampVerified(null, '1', 'z'), []);
+  assert.deepEqual(stampVerified(v8, 'nope', 'z').map(isRoomVerified), [false, true]);
 });
 
 // ── Time estimate ───────────────────────────────────────────────────────────

@@ -1532,7 +1532,8 @@
       "sym_radiatoriai": "Radiatoriai",
       "sym_gyvatukai": "Gyvatukai",
       "symCount": "{{count}} vnt.",
-      "symNoPage": "Lapo, kuriame jie suskaičiuoti, nurodyti negaliu."
+      "symNoPage": "Lapo, kuriame jie suskaičiuoti, nurodyti negaliu.",
+      "legendCornersCount": "kampai iš kontūro ({{count}})"
     }
   },
   "shared": {

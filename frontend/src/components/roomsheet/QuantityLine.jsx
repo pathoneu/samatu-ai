@@ -23,7 +23,7 @@ import { hasCornerTerms, termRows } from '@/lib/roomSheet';
 
 export default function QuantityLine({
   quantity, canOverride = false, busy = false, overridden = false,
-  onOverride, onExpandChange,
+  cornersOnPlan = false, onOverride, onExpandChange,
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -31,7 +31,12 @@ export default function QuantityLine({
   const [draft, setDraft] = useState('');
 
   const terms = termRows(quantity?.terms);
-  const corners = hasCornerTerms(quantity?.terms);
+  // Counting corners in the arithmetic is not the same as HAVING corner dots to
+  // point at: a room with no outline has none. Promising a mark that is not on
+  // the drawing is the exact failure this screen exists to prevent, so the note
+  // needs both — the terms AND the dots. (Caught in the browser on a room whose
+  // polygon the extractor never produced.)
+  const corners = hasCornerTerms(quantity?.terms) && cornersOnPlan;
   const formula = cleanUserText(quantity?.formula || '');
   const because = cleanUserText(quantity?.included_because || '');
 

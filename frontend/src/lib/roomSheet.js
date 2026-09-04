@@ -63,10 +63,18 @@ export function factNeedsInput(fact) {
   return factTone(fact?.status) === 'attention';
 }
 
-/** `missing` has no value to prefill; `assumed` carries the default we chose. */
+/**
+ * `missing` has no value to prefill; `assumed` carries the default we chose.
+ * A number comes back with an LT decimal COMMA — `parseLtNumber` accepts either,
+ * but a field that opens showing "2.8" in an app that writes "2,8" everywhere
+ * else reads as someone else's number.
+ */
 export function prefillValue(fact) {
   if (!fact || fact.status === 'missing') return '';
-  return fact.value == null ? '' : String(fact.value);
+  if (fact.value == null) return '';
+  return typeof fact.value === 'number'
+    ? String(fact.value).replace('.', ',')
+    : String(fact.value);
 }
 
 /**
@@ -127,6 +135,22 @@ export function roomTitle(room) {
 
 export function isRoomVerified(room) {
   return Boolean(room?.user_verified_at);
+}
+
+/**
+ * The same `user_verified_at` stamp on the room in a second list.
+ *
+ * `projectStore.markRoomVerified` writes onto `patalpos` only, but a v8 blob
+ * carries BOTH lists and this walk reads `v8_rooms` first — so the canonical
+ * write alone left the counter reading „Patikrinta 0 iš 11" after a room was
+ * verified (seen in the browser). Mirroring here keeps the two lists agreeing
+ * without touching the store. If `markRoomVerified` ever stamps both, this
+ * becomes a harmless no-op rather than a conflict.
+ */
+export function stampVerified(rooms, roomNr, at) {
+  return (Array.isArray(rooms) ? rooms : []).map((r) => (
+    String(r?.nr) === String(roomNr) ? { ...r, user_verified_at: at } : r
+  ));
 }
 
 export function roomIndex(rooms, roomNr) {
