@@ -6,7 +6,7 @@ a shape the Annotator can render directly. Useful for:
 
   - Annotator overlay (place symbols as draggable icons over the PDF)
   - Quantity counts (rozetės/jungtukai/šviestuvai/difūzoriai per room)
-  - Quality signal for the eval — Beržų contractor truth has explicit
+  - Quality signal for the eval — Objektas A contractor truth has explicit
     counts (113 rozetės/jungtukai, 38 priglaistomi šviestuvai, etc.)
 """
 

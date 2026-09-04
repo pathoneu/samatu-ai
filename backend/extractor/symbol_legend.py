@@ -1,6 +1,6 @@
 """Deterministic symbol-LEGEND scanner ($0, no Vision call).
 
-WHY (2026-07-29, Beržų g. 24). The Vision symbol reader returned
+WHY (2026-07-29, Objektas A). The Vision symbol reader returned
 ``difuzoriai: 6`` for a 17-page interior project that draws no ventilation
 diffuser anywhere. The word appears exactly once, inside note 3 of the
 apšvietimo plan:
@@ -28,15 +28,15 @@ without any model call, and it fails SAFE in both directions:
   · prose containing a nominative → anchor found → today's behaviour, no worse.
 
 Verified across the benchmark corpus:
-    berzas      note-only "difuzorių"          → NOT defined  (contractor 15/21
+    objektas_a      note-only "difuzorių"          → NOT defined  (contractor 15/21
                                                   comes from the ventilation
                                                   dalis, absent from this PDF)
     objektas_b  legend "…padavimo difuzorius", → defined      (we read 18,
                 "…ištraukimo difuzorius"                       contractor 20)
-    lazunu      legend "Priglaistomi apvalūs   → defined      (we read 4,
+    objektas_d      legend "Priglaistomi apvalūs   → defined      (we read 4,
                  difuzoriai gipso kartono                      contractor 6)
                  lubose"
-    ciurliu     no mention                     → NOT defined  (we read 0 anyway)
+    objektas_c     no mention                     → NOT defined  (we read 0 anyway)
     romainiai   "Difuzorius Liger-22 2000mm"   → defined (KNOWN LIMITATION: that
                  in a lighting price table                  is an LED-profile
                                                             lens, a different

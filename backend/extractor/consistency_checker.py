@@ -12,7 +12,7 @@ Pure Python; zero Vision spend. Emits a structured report:
       "overall_status": "OK"|"REVIEW_NEEDED",
     }
 
-The intent is to surface silent failures (e.g. lazunu's 3 rooms vs
+The intent is to surface silent failures (e.g. objektas_d's 3 rooms vs
 truth ≥6 from eksplikacija) so downstream code can either re-trigger
 extraction or flag the project for human review.
 """

@@ -8,13 +8,13 @@ WHY THIS FILE EXISTS
     table shapes our four benchmark projects happen to use.
 
     Measured on the six fixture PDFs (scripts run 2026-08-23):
-        berzas      MISS  → MISS   (CAD title block, no real table)
+        objektas_a      MISS  → MISS   (CAD title block, no real table)
         objektas_b  MISS  → HIT 15 rooms, header path, areas byte-identical
                                    to the cached Vision read
-        ciurliu     MISS  → MISS   (raster A3, no text layer)
+        objektas_c     MISS  → MISS   (raster A3, no text layer)
         romainiai   HIT 11 → HIT 11 (unchanged, scan path)
         sernu       MISS  → MISS   (specialty drawings only)
-        lazunu      MISS  → HIT 4 rooms, single-cell path, areas byte-identical
+        objektas_d      MISS  → HIT 4 rooms, single-cell path, areas byte-identical
     Every area the deterministic parser now produces matches the cached Vision
     number exactly — it reproduces the same answer for $0 and without OCR
     variance. The eval gate (corpus MAE 7.82%) is unmoved because
@@ -232,7 +232,7 @@ def test_min_plotas_bound_is_still_enforced():
     assert _try_parse_row(["3", "Koridorius", "0,90"], 0, 7) is None
 
 
-# ── 5. SINGLE-CELL ROWS (the Lazūnų g. 6 shape) ────────────────────────────
+# ── 5. SINGLE-CELL ROWS (the Objektas D shape) ────────────────────────────
 @pytest.mark.parametrize("cell,nr,name,area", [
     ("01. Įėjimo koridorius 4.05", "01", "Įėjimo koridorius", 4.05),
     ("02. San. mazgas 4.00 m²", "02", "San. mazgas", 4.00),
@@ -296,7 +296,7 @@ def test_room_names_are_recognised(name, wide_on):
     "Naujai montuojamų g/k pertvarų planas",
 ])
 def test_title_block_noise_is_not_a_room_name(noise):
-    """These are verbatim cells pdfplumber returns from the berzas /
+    """These are verbatim cells pdfplumber returns from the objektas_a /
     objektas_b / sernu title blocks. A false positive here is how a title
     block becomes an eksplikacija."""
     assert _looks_like_room_name(noise) is False
@@ -392,7 +392,7 @@ def test_the_flag_is_off_by_default():
 
 
 def test_a_single_cell_row_is_refused_by_default():
-    """The lazūnų g. 6 shape. One cell of free text is also what a legend
+    """The Objektas D shape. One cell of free text is also what a legend
     line, a caption and a title block look like; with the flag off the parser
     refuses it exactly as it did before 2026-08-23 and falls through to
     Vision."""

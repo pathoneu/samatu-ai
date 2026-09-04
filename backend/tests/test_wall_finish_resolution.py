@@ -1,6 +1,6 @@
 """Wall-finish resolution — the 2026-07-28 paint-determinism defect.
 
-DEFECT (reproduced from two runs of the byte-identical 17-page Beržų g. 24
+DEFECT (reproduced from two runs of the byte-identical 17-page Objektas A
 PDF, same model, same code): per-room `dazymo_plotas_m2` swung by up to 350%
 between runs, in a patterned way — some rooms got exactly their FLOOR area
 (ceiling only), but DIFFERENT rooms each time.
@@ -18,7 +18,7 @@ has NO paintable wall) existed ONLY inside that branch:
 and the same branch also decided `walls_paint_factor`, flipping
 garažas / tambūras between "painted" and "ceiling only".
 
-CONTRACTOR TRUTH (Rangovas A, docs/superpowers/fixtures/2026-05-26-berzu-g-24/
+CONTRACTOR TRUTH (Rangovas A, docs/superpowers/fixtures/2026-05-26-objektas-a/
 contractor-notes-verbatim.md): §Dažymai bills "sienos žemos 278.67 + sienos
 aukštos 150.59 + garažo sienos 31.45" and lists rooms 107/111 ONLY under
 §Plytelės (grindys, sienos, silikonavimas) — no paint line at all.
@@ -45,7 +45,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _room(**kw):
-    """A Beržų-shaped wet room: 8.59 m², 12.4 m perimeter, 2.8 m ceiling."""
+    """A Objektas A-shaped wet room: 8.59 m², 12.4 m perimeter, 2.8 m ceiling."""
     r = {"nr": "107", "pavadinimas": "Vaikų san. mazgas", "paskirtis": "san",
          "plotas_m2": 8.59, "perimetras_m": 12.4, "lubu_aukstis_m": 2.8,
          "elementai": []}
@@ -135,7 +135,7 @@ def test_read_tile_height_is_not_flagged_as_an_assumption():
 def test_no_finish_data_means_room_type_standard_and_says_so(paskirtis):
     """Standard (ROOM_TYPE_RULES, mirrored by the Setup Wizard default):
     garages and entry lobbies are NOT painted. With no project finish data we
-    apply that standard — and disclose it, because Beržų proves it can be
+    apply that standard — and disclose it, because Objektas A proves it can be
     wrong by 31.45 m²."""
     q = calc_room_quantities(_room(nr="105", pavadinimas="Garažas",
                                    paskirtis=paskirtis, plotas_m2=10.67,
@@ -150,7 +150,7 @@ def test_no_finish_data_means_room_type_standard_and_says_so(paskirtis):
 @pytest.mark.parametrize("paskirtis", ["garazas", "tamburas"])
 def test_project_finish_data_overrides_the_standard_and_says_so(paskirtis):
     """PRECEDENCE: a confident apdailos read (project evidence) beats the
-    room-type standard — Beržų's contractor really does bill 31.45 m² of
+    room-type standard — Objektas A's contractor really does bill 31.45 m² of
     garage wall paint — but the user is told the standard was overridden."""
     q = calc_room_quantities(_room(
         nr="105", pavadinimas="Garažas", paskirtis=paskirtis,
@@ -182,7 +182,7 @@ def test_user_pref_flips_the_default_through_one_translation_path():
 # 4. Elevation over-read is full-tile evidence, not a licence to invent paint
 # ══════════════════════════════════════════════════════════════════════════
 def test_elevation_overread_means_full_tile_not_proportional_paint():
-    """Beržų 107 in ground_truth/berzas/ai_extract.json: the elevation
+    """Objektas A 107 in ground_truth/objektas_a/ai_extract.json: the elevation
     extractor read 46.32 m² of tile in a room with 30.80 m² of wall (it sums
     overlapping išklotinė strips). The old proportional clamp turned that
     overshoot into 10.32 m² of 'paint' on a bathroom the contractor never

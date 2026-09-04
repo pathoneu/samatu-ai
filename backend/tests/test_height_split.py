@@ -63,14 +63,14 @@ def test_gkp_room_above_3m_goes_to_virs_bucket():
 
 
 def test_betonas_ceiling_at_3m_is_not_gkp():
-    # Beržų garažas: H = 3.0 but lubu_tipas betonas → neither GKP bucket.
+    # Objektas A garažas: H = 3.0 but lubu_tipas betonas → neither GKP bucket.
     out = calc_room_quantities(_room(3.0, lubu_tipas="betonas", plotas=10.67))
     assert out["gkp_lubu_virs_3m_m2"] == 0
     assert out["gkp_lubu_standart_m2"] == 0
 
 
 def test_partial_high_ceiling_area_still_wins_over_nominal_height():
-    # Beržų miegamasis pattern: nominal 2.8 m with a 12.28 m² coffer at 3.4 m.
+    # Objektas A miegamasis pattern: nominal 2.8 m with a 12.28 m² coffer at 3.4 m.
     room = _room(2.8, plotas=23.97)
     room["high_ceiling_area_m2"] = 12.28
     out = calc_room_quantities(room)

@@ -1,6 +1,6 @@
 """Per-pozicija confidence post-pass (2026-06-11 experiments follow-up).
 
-Measured problem: FALSE-GREEN RATE was 50% (Beržų) / 60% (Rangovas B) — over
+Measured problem: FALSE-GREEN RATE was 50% (Objektas A) / 60% (Rangovas B) — over
 half of the quantities the UI presented as trustworthy were >10% wrong, and
 voting-disagreement flags caught only ~40% of errors because SYSTEMATIC errors
 agree across runs. Confidence therefore cannot come from run-agreement alone.
@@ -9,7 +9,7 @@ Three stacked signals, worst wins (žalia < geltona < raudona):
  1. CLASS CALIBRATION — quantity classes with measured systematic bias on the
     two contractor-anchored projects default to geltona, with the measured bias
     in the reason. (Calibration data: docs/superpowers/research/
-    2026-06-11-experiments-results.md; anchors = Beržų + Rangovas B.)
+    2026-06-11-experiments-results.md; anchors = Objektas A + Rangovas B.)
  2. FINISH PROVENANCE — finish-derived lines (glaistymas/dažymas, plytelės,
     Rotband, molio) demote to geltona when the apdailos reader self-reported
     guessing (`_apdailos_confidence == "low"`) on any contributing room.
@@ -30,7 +30,7 @@ _SEVERITY = {ZALIA: 0, GELTONA: 1, RAUDONA: 2}
 CLASS_RULES: list[tuple[str, str, str]] = [
     # USER-FACING STRINGS (rewritten 2026-08-31). The founder caught the old
     # ones on screen: they quoted benchmark error pairs ("−61%/−64% vs rangovo
-    # samatas (2 projektai)"), named a CLIENT project (Beržų) and spoke in
+    # samatas (2 projektai)"), named a CLIENT project (Objektas A) and spoke in
     # internal jargon ("Simbolių recall"). That is methodology confession, not
     # guidance — it tells a contractor "this number is tuned on someone else's
     # job and we don't trust it", and leaks another customer's project name

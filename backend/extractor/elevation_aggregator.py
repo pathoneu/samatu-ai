@@ -22,11 +22,11 @@ from typing import Any
 from .vision.elevation_extractor import ElevationPayload, ElevationPanel
 
 
-# Beržų-specific mapping. Each elevation page in the PDF carries a wall-
+# Objektas A-specific mapping. Each elevation page in the PDF carries a wall-
 # label letter family (a/b/c/d/e/f/g/h) corresponding to one or two real
 # rooms in the eksplikacija. The page-by-letter source of truth is the
 # puslapiai title row in app-output-to-the-dot.json.
-BERZAS_PAGE_LETTER_TO_ROOM = {
+OBJEKTAS_A_PAGE_LETTER_TO_ROOM = {
     11: {"a": "102"},                  # svetainė/virtuvė
     12: {"b": "104", "c": "106"},      # darbo, skalbykla
     13: {"d": "107"},                  # vaikų san.mazgas
@@ -70,13 +70,13 @@ def disambiguate_panel_room(
 
     Examples
     --------
-    >>> disambiguate_panel_room("bath-d1-d2", 13, BERZAS_PAGE_LETTER_TO_ROOM)
+    >>> disambiguate_panel_room("bath-d1-d2", 13, OBJEKTAS_A_PAGE_LETTER_TO_ROOM)
     '107'
-    >>> disambiguate_panel_room("bath-h1", 16, BERZAS_PAGE_LETTER_TO_ROOM)
+    >>> disambiguate_panel_room("bath-h1", 16, OBJEKTAS_A_PAGE_LETTER_TO_ROOM)
     '111'
-    >>> disambiguate_panel_room("kitchen-a1-a6-upper", 11, BERZAS_PAGE_LETTER_TO_ROOM)
+    >>> disambiguate_panel_room("kitchen-a1-a6-upper", 11, OBJEKTAS_A_PAGE_LETTER_TO_ROOM)
     '102'
-    >>> disambiguate_panel_room("no-letter-here", 13, BERZAS_PAGE_LETTER_TO_ROOM) is None
+    >>> disambiguate_panel_room("no-letter-here", 13, OBJEKTAS_A_PAGE_LETTER_TO_ROOM) is None
     True
     """
     parts = panel_id.split("-")

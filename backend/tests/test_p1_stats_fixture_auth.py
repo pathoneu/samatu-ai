@@ -2,7 +2,7 @@
 
 2026-07-04 pentest, pass 3, finding P1. `api/project_stats._load_project` returned
 from the ``?fixture=`` branch BEFORE `require_user` ran, so
-`GET /api/projects/{Bid}/stats?fixture=berzas` needed no auth and then read
+`GET /api/projects/{Bid}/stats?fixture=objektas_a` needed no auth and then read
 `data/annotations/{Bid}.json` + `data/calibrations/{Bid}.json` keyed by the
 attacker-supplied URL project_id — leaking tenant B's verification progress and
 calibration metadata (updated_at + applied-metric count derived from B's KNOWN
@@ -68,7 +68,7 @@ def _login(email):
 
 def test_p1_anon_with_fixture_rejected(env):
     """Anon GET with ?fixture= (the original PoC) → 401, no leak of B's stores."""
-    r = TestClient(app).get("/api/projects/proj-B/stats?fixture=berzas")
+    r = TestClient(app).get("/api/projects/proj-B/stats?fixture=objektas_a")
     assert r.status_code == 401, r.text
     # The 401 body must not carry B's calibration timestamp / verification counts.
     assert "1234567890" not in r.text
@@ -78,7 +78,7 @@ def test_p1_anon_with_fixture_rejected(env):
 def test_p1_cross_tenant_read_with_fixture_blocked(env):
     """A logged in, targets B's project WITH ?fixture= → 404 (no existence leak)."""
     att = _login("attacker@x.lt")
-    r = att.get("/api/projects/proj-B/stats?fixture=berzas")
+    r = att.get("/api/projects/proj-B/stats?fixture=objektas_a")
     assert r.status_code == 404, r.text
     assert "1234567890" not in r.text
     assert "confirmed" not in r.text
@@ -87,7 +87,7 @@ def test_p1_cross_tenant_read_with_fixture_blocked(env):
 def test_p1_owner_read_still_works_and_sees_own_stores(env):
     """The owner (with ?fixture= seeding the KŽ body) → 200; B's own stores load."""
     owner = _login("owner@x.lt")
-    r = owner.get("/api/projects/proj-B/stats?fixture=berzas")
+    r = owner.get("/api/projects/proj-B/stats?fixture=objektas_a")
     assert r.status_code == 200, r.text
     body = r.json()
     # Fixture KŽ body populated the room counts …

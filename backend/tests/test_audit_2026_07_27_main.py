@@ -582,7 +582,7 @@ _SHARE_BLOB = {
     "archetipas": "standart",
     "bendras_plotas_m2": 42.0,
     # ── fields that MUST NOT be shared ──
-    "pdf_name": "Klientas_Berzu24_KAINOS.pdf",
+    "pdf_name": "Klientas_Objektas_A_KAINOS.pdf",
     "measurements": [{"type": "area", "value": 12.3}],
     "warnings": [{"level": "ERROR", "message": "vidinis"}],
     "_lt_warnings": [{"level": "WARN", "message": "vidinis"}],
@@ -628,7 +628,7 @@ def test_shared_payload_leaks_no_internal_project_fields(tmp_path, monkeypatch):
         assert k not in data, f"{k} leaked into the public share payload"
     # and nothing internal survives at the top level either
     blob = str(body)
-    assert "Klientas_Berzu24_KAINOS.pdf" not in blob
+    assert "Klientas_Objektas_A_KAINOS.pdf" not in blob
     assert "klientas dar nesumokėjo" not in blob
     assert "marža 60%" not in blob
 

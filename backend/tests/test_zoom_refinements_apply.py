@@ -1,6 +1,6 @@
 """Regression tests for `_apply_zoom_refinements` (Pass-2 zoom merge).
 
-Context (2026-06-09): the berzas single-pass run logged "zoom pass: 9 attempted,
+Context (2026-06-09): the objektas_a single-pass run logged "zoom pass: 9 attempted,
 0 applied". The suspicion was that `_apply_zoom_refinements` was rejecting valid
 zoom-read ceiling heights via a confidence gate or threshold.
 
@@ -8,12 +8,12 @@ These tests pin the ACTUAL contract and document the real root cause:
 
   * `_apply_zoom_refinements` DOES apply a zoom-read ceiling height when the zoom
     returns one (so the apply-path is not the bug).
-  * On berzas, "0 applied" is a correct true-negative: every zoom envelope came
+  * On objektas_a, "0 applied" is a correct true-negative: every zoom envelope came
     back with `lubu_aukstis_m: null` and `*_saltinis: "unchanged"` because the
     cropped region is the FLOOR PLAN, and ceiling heights are not annotated on
-    the floor plan (they live in the pjūvis). The verbatim berzas envelope for
-    room 101 is inlined below as `BERZAS_ROOM_101_ZOOM` — straight from
-    /tmp/berzas_A_single_pass.json, the run that produced the 0-applied log.
+    the floor plan (they live in the pjūvis). The verbatim objektas_a envelope for
+    room 101 is inlined below as `OBJEKTAS_A_ROOM_101_ZOOM` — straight from
+    /tmp/objektas_a_A_single_pass.json, the run that produced the 0-applied log.
 
 If anyone later "fixes" the 0-applied symptom by loosening the gate so heights
 get applied regardless of whether the zoom actually read one, these tests fail —
@@ -27,11 +27,11 @@ import copy
 from extractor.vision_call import _apply_zoom_refinements
 
 
-# Verbatim zoom envelope for berzas room 101 (Tambūras), copied from
-# /tmp/berzas_A_single_pass.json — i.e. one of the 9 real Pass-2 zoom calls that
+# Verbatim zoom envelope for objektas_a room 101 (Tambūras), copied from
+# /tmp/objektas_a_A_single_pass.json — i.e. one of the 9 real Pass-2 zoom calls that
 # logged "0 applied". Note: confidence is "medium" (NOT "low"), the field IS
 # present, and its value is null. This is the real data the diagnosis rests on.
-BERZAS_ROOM_101_ZOOM = {
+OBJEKTAS_A_ROOM_101_ZOOM = {
     "patalpa_nr": "101",
     "perimetras_m": None,
     "perimetras_saltinis": "unchanged",
@@ -48,8 +48,8 @@ BERZAS_ROOM_101_ZOOM = {
 }
 
 
-def _berzas_room() -> dict:
-    """A berzas room as it enters the zoom loop: section-average height, because
+def _objektas_a_room() -> dict:
+    """A objektas_a room as it enters the zoom loop: section-average height, because
     Pass-1 did not structure a per-room height for it."""
     return {
         "nr": "101",
@@ -61,14 +61,14 @@ def _berzas_room() -> dict:
     }
 
 
-# ── The real berzas reality: null height → nothing applied ────────────────────
+# ── The real objektas_a reality: null height → nothing applied ────────────────────
 
-def test_berzas_null_height_envelope_applies_nothing():
+def test_objektas_a_null_height_envelope_applies_nothing():
     """The exact envelope that logged '0 applied'. height is null + sources are
     'unchanged' → no refinement, height stays at the section average. This is a
     CORRECT true-negative, not a gate/threshold bug."""
-    room = _berzas_room()
-    changed = _apply_zoom_refinements(room, copy.deepcopy(BERZAS_ROOM_101_ZOOM))
+    room = _objektas_a_room()
+    changed = _apply_zoom_refinements(room, copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM))
     assert changed is False
     assert room["lubu_aukstis_m"] == 2.82  # untouched
     assert room["lubu_aukstis_saltinis"] == "section_average"
@@ -83,8 +83,8 @@ def test_zoom_applies_real_ceiling_height():
     """When the zoom DOES return a ceiling height (non-null, non-low confidence),
     `_apply_zoom_refinements` applies it. Refutes the hypothesis that a threshold
     or confidence gate silently drops zoom-read heights."""
-    room = _berzas_room()
-    zoom = copy.deepcopy(BERZAS_ROOM_101_ZOOM)
+    room = _objektas_a_room()
+    zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
     zoom["lubu_aukstis_m"] = 3.0  # zoom read a real height this time
     changed = _apply_zoom_refinements(room, zoom)
     assert changed is True
@@ -94,9 +94,9 @@ def test_zoom_applies_real_ceiling_height():
 
 def test_zoom_applies_height_when_room_had_none():
     """old height is None → (old or 0) guard must not crash and must apply."""
-    room = _berzas_room()
+    room = _objektas_a_room()
     room["lubu_aukstis_m"] = None
-    zoom = copy.deepcopy(BERZAS_ROOM_101_ZOOM)
+    zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
     zoom["lubu_aukstis_m"] = 2.8
     changed = _apply_zoom_refinements(room, zoom)
     assert changed is True
@@ -108,8 +108,8 @@ def test_zoom_applies_height_when_room_had_none():
 def test_low_confidence_zoom_is_fully_gated():
     """confidence_zoom == 'low' → reject everything, even a populated height.
     Per the prompt, 'low' means no mm number was visible at all."""
-    room = _berzas_room()
-    zoom = copy.deepcopy(BERZAS_ROOM_101_ZOOM)
+    room = _objektas_a_room()
+    zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
     zoom["confidence_zoom"] = "low"
     zoom["lubu_aukstis_m"] = 3.0
     changed = _apply_zoom_refinements(room, zoom)
@@ -119,8 +119,8 @@ def test_low_confidence_zoom_is_fully_gated():
 
 def test_height_within_tolerance_not_applied():
     """A sub-5cm difference is noise, not a refinement — don't churn the value."""
-    room = _berzas_room()
-    zoom = copy.deepcopy(BERZAS_ROOM_101_ZOOM)
+    room = _objektas_a_room()
+    zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
     zoom["lubu_aukstis_m"] = 2.84  # 0.02 m from 2.82, below the 0.05 threshold
     changed = _apply_zoom_refinements(room, zoom)
     assert changed is False
@@ -128,6 +128,6 @@ def test_height_within_tolerance_not_applied():
 
 
 def test_none_zoom_result_applies_nothing():
-    room = _berzas_room()
+    room = _objektas_a_room()
     assert _apply_zoom_refinements(room, None) is False
     assert room["lubu_aukstis_m"] == 2.82

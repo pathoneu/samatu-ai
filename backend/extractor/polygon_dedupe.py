@@ -1,6 +1,6 @@
 """Server-side duplicate-fill resolution for auto room polygons.
 
-Root cause (Beržų demo, 2026-07-12): several room-number labels are printed as
+Root cause (Objektas A demo, 2026-07-12): several room-number labels are printed as
 CALLOUTS in the corridor (not inside their rooms), so their flood-fill seeds
 land in the same region and produce IDENTICAL polygons for different rooms
 (103/108/109 shared one corridor fill; 101/104 near-identical). Filling each

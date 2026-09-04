@@ -215,14 +215,14 @@ def detect_vendor_quote_pages(pdf_bytes: bytes) -> set[int]:
 #                         text chars   white_frac   sat_mean
 #   drawings (worst)         >= 493      >= 0.52      <= 8.0
 #   visualizations           == 0        <= 0.05      >= 19.8
-#   photo cover (berzas p1)  ==  5        0.335        25.11
+#   photo cover (objektas_a p1)  ==  5        0.335        25.11
 #
 # A page is dropped only when ALL THREE legs fire. Each leg alone would be
 # unsafe: a flattened CAD page has no text; a dark rendering of a dense
 # plan could be lowish-white; a colour-coded finish plan carries some
 # saturation. Together they describe a photograph and nothing else.
 #
-# berzas p1 is the tightest case in the corpus: white_frac 0.335 against a
+# objektas_a p1 is the tightest case in the corpus: white_frac 0.335 against a
 # 0.35 threshold, a margin of 0.015. It sits on the correct side, but a
 # slightly whiter cover would simply be KEPT — the failure direction is the
 # safe one, which is why the threshold was not tuned closer to it.
@@ -243,8 +243,8 @@ DRAWING_MAX_SAT_MEAN = 10.0    # drawings measured <= 8.0; renders >= 19.8
 # problem. BD/SA/VVN/E/ŠVOK are all interior-relevant.
 #
 # Honest recall note (measured 2026-07-29 across the 6-project corpus): the
-# lower-right antspaudas crop resolves a dalis code on berzas only (all SA);
-# ciurliu / lazunu / objektas_b return None on every page. So this rule is
+# lower-right antspaudas crop resolves a dalis code on objektas_a only (all SA);
+# objektas_c / objektas_d / objektas_b return None on every page. So this rule is
 # high-precision but low-recall, and it drops ZERO pages on today's corpus.
 # It is wired because it is free and correct, not because it is proven to
 # pay — no corpus page has ever exercised its positive branch.

@@ -53,7 +53,7 @@ def _reference_walls_paintable_m2(room: dict) -> float:
             door_count += int(el.get("kiekis") or 1)
 
     # Production engine uses DOOR_NET_DEDUCTION = 1.125 m² (the LT contractor
-    # convention: opening − reveal; calibrated to Beržų to-the-dot match,
+    # convention: opening − reveal; calibrated to Objektas A to-the-dot match,
     # documented in universal_rules.py source). The reference mirrors that.
     DOOR_NET_DEDUCTION = 1.125
     doors_deduction = door_count * DOOR_NET_DEDUCTION
@@ -66,7 +66,7 @@ def _reference_walls_paintable_m2(room: dict) -> float:
         tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
         # 2026-07-05 audit fix (bug 1): mirror the production floor — unknown
         # tile height falls back to the 2.0 m band, NOT the full room height.
-        # (No Beržų room fires this path, but keep the mirror faithful.)
+        # (No Objektas A room fires this path, but keep the mirror faithful.)
         tile_h_eff = tile_h if tile_h > 0 else 2.0
         is_full_tile = (tile_share >= 0.8 and tile_h_eff >= H * 0.95)
 
@@ -95,7 +95,7 @@ def _reference_walls_paintable_m2(room: dict) -> float:
 
 def _paskirtis_walls_paint_factor(paskirtis: str) -> float:
     """Mirror the production ROOM_TYPE_RULES walls_paint factor for the
-    paskirtys that appear in Beržų. Anything else → 1.0."""
+    paskirtys that appear in Objektas A. Anything else → 1.0."""
     return {
         "garazas": 0.0, "garažas": 0.0,
         "tamburas": 0.0, "tambūras": 0.0,
@@ -170,7 +170,7 @@ def _reference_plyteles_grindys(room: dict) -> float:
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 @pytest.fixture(scope="module")
 def truth():
-    p = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+    p = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
     return json.loads(p.read_text(encoding="utf-8"))
 
 
@@ -243,7 +243,7 @@ def test_per_room_walls_paintable_matches_reference(gt_rooms, app_parsed):
 
 
 def test_per_room_ceiling_paintable_matches_floor_area(gt_rooms, app_parsed):
-    """For all Beržų rooms (all flat ceilings), ceiling_paintable_m2 =
+    """For all Objektas A rooms (all flat ceilings), ceiling_paintable_m2 =
     plotas_m2. The CLAUDE.md formula is straight identity."""
     by_nr = {r["nr"]: r for r in app_parsed["patalpos"]}
     for gt_room in gt_rooms:

@@ -34,7 +34,7 @@ from main import app  # noqa: E402
 client = TestClient(app)
 
 SNAPSHOT = (Path(__file__).resolve().parents[1]
-            / "data" / "demo-berzu-24-snapshot-20260714.json")
+            / "data" / "demo-objektas-a-snapshot-20260714.json")
 
 
 @pytest.fixture(scope="module")

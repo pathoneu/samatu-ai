@@ -3,7 +3,7 @@
 The niche_locator does best-effort extraction from ceiling plans;
 when it returns nothing for a room type that typically HAS LED, we
 fill in an estimate based on per-room-type ratios derived from
-Beržų's contractor-validated data:
+Objektas A's contractor-validated data:
 
     paskirtis      LED-per-perimeter
     -----------    -----------------
@@ -28,11 +28,11 @@ Estimates are marked _source='statistical_inference', _confidence='low'
 so downstream consumers can distinguish them from extractor output.
 
 Validated impact (benchmark eval, verified 2026-06-05):
-  berzas       no change (all 0-LED rooms have ratio=0; LED -0.99%)
+  objektas_a       no change (all 0-LED rooms have ratio=0; LED -0.99%)
   objektas_b 26.61m → 44.97m (truth 54.98; -52% → -18.2%)
-  ciurliu      14.50m → 18.95m (truth 16.84; -13.9% → +12.5% — over-bills)
+  objektas_c      14.50m → 18.95m (truth 16.84; -13.9% → +12.5% — over-bills)
 
-The ciurliu case shows the risk: when a 0-LED room ACTUALLY has 0
+The objektas_c case shows the risk: when a 0-LED room ACTUALLY has 0
 LED (not just "Vision missed it"), this fallback over-bills. Here it
 fires on exactly 2 'san' wet rooms (perim × 0.27 = +4.45m) the
 contractor never billed, flipping -13.9% UNDER → +12.5% OVER. The
@@ -50,7 +50,7 @@ import re
 
 from .universal_rules import normalize_paskirtis
 
-# Empirical LED-per-perimeter-meter ratios computed from Beržų's
+# Empirical LED-per-perimeter-meter ratios computed from Objektas A's
 # contractor-validated room data (the only project with both clean
 # niche-locator output and verified per-room LED truth).
 LED_RATIO_BY_PASKIRTIS: dict[str, float] = {
@@ -63,16 +63,16 @@ LED_RATIO_BY_PASKIRTIS: dict[str, float] = {
     "wc":          0.27,
     "miegamoji":   0.17,
     "kabinetas":   0.18,
-    # Room types with no LED in Beržų (and unlikely elsewhere)
+    # Room types with no LED in Objektas A (and unlikely elsewhere)
     "tamburas":    0.00,
     "garazas":     0.00,
     "drabuzine":   0.00,
     "rubine":      0.00,
     "techpatalpa": 0.00,
     # 2026-08-23 vocabulary sweep — classes the normaliser can now produce
-    # that Beržų never contained. All 0.00 ON PURPOSE: inferring LED metres
+    # that Objektas A never contained. All 0.00 ON PURPOSE: inferring LED metres
     # into a room type we have zero contractor evidence for is exactly the
-    # fabrication the ciurliu over-bill taught us to avoid (see module
+    # fabrication the objektas_c over-bill taught us to avoid (see module
     # docstring). `holas` and `laiptine` are the two that plausibly DO carry
     # LED in premium projects — raise them only against measured truth, not
     # intuition.
@@ -96,10 +96,10 @@ MIN_INFERENCE_RATIO = 0.15  # below this, treat as "no LED expected"
 # is positive evidence about every room NOT on the list. Inferring a niche
 # into an excluded room contradicts a read we already trust elsewhere.
 #
-# Measured on the saved corpus (scripts/_diag_led.py, 2026-08-03): ciurliu
+# Measured on the saved corpus (scripts/_diag_led.py, 2026-08-03): objektas_c
 # carried two fabricated bathroom niches exactly this warning excludes —
 # LED +33.31% → −7.9%, project MAE 13.801 → 7.462, corpus 9.311 → 7.820.
-# berzas / objektas_b / lazunu emit no enumerating warning and are
+# objektas_a / objektas_b / objektas_d emit no enumerating warning and are
 # bit-identical, which is also the fail-closed contract: no enumeration →
 # this gate does nothing.
 
@@ -137,7 +137,7 @@ def drop_unenumerated_inferred_niches(parsed: dict) -> int:
         reads, not a fabrication, and stays.
       • No enumerating warning → nothing happens. A blanket "no inferred
         niches" was simulated and REJECTED (2026-08-03): it moves objektas_b
-        LED −18.2% → −51.6% and lazunu −2.5% → −46.7% — the inference lane
+        LED −18.2% → −51.6% and objektas_d −2.5% → −46.7% — the inference lane
         earns its keep everywhere the drawing doesn't say otherwise.
     """
     allowed = enumerated_led_rooms(parsed.get("warnings"))

@@ -31,16 +31,16 @@ _FLAG_DEFINITIONS = {
     # 2026-06-05: floor SYNTHETIC square perimeters (perim ≈ 4·√area) on plans
     # with NO eksplikacija table, for the wall-paint path only. Gated on
     # plotas_saltinis so eksplikacija/inline_label rooms are NEVER touched →
-    # zero regression on read-from-table projects (verified: berzas, objektas_b,
-    # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: ciurliu
-    # -20.3%→-13.5%, lazunu -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
+    # zero regression on read-from-table projects (verified: objektas_a, objektas_b,
+    # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: objektas_c
+    # -20.3%→-13.5%, objektas_d -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
     "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", True),
     # 2026-06-09: run the high-variance Pass-1 (+ adjacency) N times and
     # median-vote into one consensus extraction. Stabilises kampai (the
     # pusiniai term survives a single adjacency-bail run) and wires the
     # adjacency pass into production so n_partition_walls is populated on
     # real uploads (not just the offline benchmark).
-    # → DEFAULT ON after the live A/B on berzas (2026-06-09): voted vs single-pass
+    # → DEFAULT ON after the live A/B on objektas_a (2026-06-09): voted vs single-pass
     #   moved combined paint −5.4%→+2.3%, kampai −32%→−10.6%, recovered per-room
     #   ceiling heights [2.8,3.0,3.4] and n_partition_walls 0→34, at only +13%
     #   wall-clock (once-only downstream passes dominate; consensus already carried
@@ -72,7 +72,7 @@ _FLAG_DEFINITIONS = {
     # the model INVENTS the numbering, and two rounds can number the same rooms
     # differently — so the voter medians two DIFFERENT rooms, and the median of
     # two values is their mean, manufacturing a number no round produced.
-    # ciurliu (no eksplikacija) is the worst case in the corpus: round A's nr06
+    # objektas_c (no eksplikacija) is the worst case in the corpus: round A's nr06
     # is a 4.5 m2 bathroom, round B's nr06 is the 42 m2 open-plan living room
     # (confirmed independently by the adjacency pass: npw 2 vs 5), and the voter
     # emitted a 23.25 m2 "vonia" with an impossible perimeter. 25 of the 452
@@ -88,23 +88,23 @@ _FLAG_DEFINITIONS = {
     # rounds were RECONSTRUCTED from the saved `_vote.values` blocks. That
     # reconstruction is validated: fed back through the UNCHANGED voter it
     # reproduces the stored production rooms and the stored eval numbers
-    # exactly (ciurliu: 6/6 rooms identical, headline 7.462%, category 47.658%).
+    # exactly (objektas_c: 6/6 rooms identical, headline 7.462%, category 47.658%).
     #   * blast radius — of the 48 saved voted runs in the repo, 41 keep the nr
-    #     path and are byte-identical; the 7 that switch are ALL ciurliu (the
+    #     path and are byte-identical; the 7 that switch are ALL objektas_c (the
     #     one no-eksplikacija project in the corpus; 6 distinct files).
     #     Incoherent groups (two rooms >35% apart in area medianed together)
     #     go 2-6 -> 0 in every one of them.
-    #   * over those 6 distinct ciurliu runs: mean headline MAE
+    #   * over those 6 distinct objektas_c runs: mean headline MAE
     #     19.40% -> 16.50%, mean category MAE 47.13% -> 45.59%. Headline is
     #     better on 3 and worse on 3, but the wins are big (-4.7, -12.8, -2.3
     #     pp) and the losses small (+1.6, +0.4, +0.2 pp). Per-metric mean
     #     |error|: 7 better (lubos 26.6 -> 21.6, grindys 30.4 -> 25.6, kampai
     #     42.7 -> 41.0, combined paint 11.8 -> 8.4), 1 unchanged, 2 slightly
     #     worse (plytelės 42.7 -> 44.4, rotband 120.0 -> 120.4).
-    #   * lazunu: whole parsed dict bit-identical (table-anchored nrs).
+    #   * objektas_d: whole parsed dict bit-identical (table-anchored nrs).
     #
     # WHY IT IS STILL DEFAULT OFF. On the single named benchmark run
-    # (ground_truth/ciurliu) headline MAE goes 7.462% -> 9.077%. The whole
+    # (ground_truth/objektas_c) headline MAE goes 7.462% -> 9.077%. The whole
     # regression is one metric: sienų dažomas plotas -0.11% -> -3.88%. That
     # -0.11% is luck, not accuracy — the incoherent grouping inflates the
     # floored perimeter (perimeter_floor_synthetic takes max(perim, 4*sqrt(area)),
@@ -115,9 +115,9 @@ _FLAG_DEFINITIONS = {
     # output claims 92 m2 of tiling in a 93 m2 flat because it believes in a
     # 23.25 m2 bathroom that no round ever saw).
     # The offline replay ALSO cannot test the case that matters most: rooms that
-    # today fall out as singletons (ciurliu drops 8 of 20) would rejoin and vote
+    # today fall out as singletons (objektas_c drops 8 of 20) would rejoin and vote
     # 3-of-3, and their values were never saved. So the production delta is
-    # real but unmeasured. Flip this ON for one paid ciurliu + berzas A/B before
+    # real but unmeasured. Flip this ON for one paid objektas_c + objektas_a A/B before
     # making it the default. Enable: ENABLE_ROBUST_ROOM_MATCHING=1
     "robust_room_matching": ("ENABLE_ROBUST_ROOM_MATCHING", False),
     # 2026-08-23: the WIDENED acceptance paths of the deterministic
@@ -149,13 +149,13 @@ _FLAG_DEFINITIONS = {
     # its rooms 1-1…1-6 means a whole storey of real rooms is binned, silently.
     #
     # WHY A FLAG AND NOT A REVERT. The wide paths are not wrong in principle;
-    # they are untested. lazūnų g. 6 is a genuine single-column eksplikacija
+    # they are untested. Objektas D is a genuine single-column eksplikacija
     # that only the single-cell path can read, and its four areas match the
     # cached Vision read exactly. Keeping them behind a flag preserves that
     # work and lets it be re-enabled per project or after a real corpus is
     # built, without shipping the over-acceptance to a contractor now.
     #
-    # THE COST OF THE CONSERVATIVE DEFAULT: lazunu goes back to a pdfplumber
+    # THE COST OF THE CONSERVATIVE DEFAULT: objektas_d goes back to a pdfplumber
     # MISS and falls through to the Vision eksplikacija reader — one extra
     # paid sub-call on that one project shape, same numbers. That is the
     # trade: a known small cost against an unbounded silent-wrong-area risk.

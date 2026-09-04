@@ -31,7 +31,7 @@ def test_reattributes_tall_height_from_wet_room_to_living_room():
 
 
 def test_does_not_fire_when_tall_room_is_large_living():
-    # Beržų pattern: the tall room IS the large living room → leave alone.
+    # Objektas A pattern: the tall room IS the large living room → leave alone.
     rooms = [
         _r("1", "Svetainė/virtuvė", "gyvenamoji", 50.5, 3.4),
         _r("2", "Tambūras", "tamburas", 5.0, 2.8),

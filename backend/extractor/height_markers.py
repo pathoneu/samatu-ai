@@ -335,7 +335,7 @@ def salvage_heights_from_warnings(
 # kitos patalpos". Both readings lose the room→value pairing that the drawing
 # states explicitly by placing each altitude inside a room outline.
 #
-# Measured case — Beržų g. 24, page 6 (LUBŲ PLANAS). Its legend literally
+# Measured case — Objektas A, page 6 (LUBŲ PLANAS). Its legend literally
 # says "Lubų apačios altitudė, aukštis nuo grindų, mm", and the text layer
 # carries 14 positioned markers. Room 101 (Tambūras) is bracketed by two
 # `+3400`; the nearest `+2800` sits past the wall in 103/107. Three separate
@@ -368,7 +368,7 @@ POSITIONED_MAX_M = MAX_NARRATED_CEILING_M
 
 # Frame-agreement gate. Of the rooms that carry a polygon/bbox, this share
 # must have their own room-number label printed inside their own outline on
-# the marker page before we trust the two frames to be the same. Beržų scores
+# the marker page before we trust the two frames to be the same. Objektas A scores
 # 10/11 and 11/11 across runs; a section page or a mismatched sheet scores ~0.
 MIN_FRAME_AGREEMENT = 0.6
 MIN_AGREEING_ROOMS = 3
@@ -668,7 +668,7 @@ def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
 # `assign_markers_to_rooms` above is the precise lane, and it stays the
 # preferred one — a traced outline states exactly which room a point is in.
 # But it needs outlines, and it refuses to run unless the room numbers print
-# inside their own outlines on the marker page. On Beržų g. 24 only 1 of 11
+# inside their own outlines on the marker page. On Objektas A only 1 of 11
 # rooms carries any geometry at all, so `frame_agreement` scores 1/1, trips
 # MIN_AGREEING_ROOMS, and the corpus's richest marker sheet (14 altitudes
 # against 11 rooms) yields nothing. The lane has never once fired there.
@@ -679,13 +679,13 @@ def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
 # millimetres apart on one piece of paper.
 #
 # What it cannot do is see walls. A marker deep inside a narrow room can be
-# nearer to the neighbouring room's label than to its own (Beržų: the +3400
+# nearer to the neighbouring room's label than to its own (Objektas A: the +3400
 # at (540,202) is 68 pt from 104's label and 81 pt from 101's, and it belongs
 # to 101). So proximity alone is not enough, and this lane refuses rather
 # than guesses in exactly that case:
 #
 #   • DISTANCE CAP — a marker must be printed near the room it labels.
-#     Calibrated on Beržų p6: every honest marker is within 121 pt of its
+#     Calibrated on Objektas A p6: every honest marker is within 121 pt of its
 #     room number (0.083 of the page diagonal); the `+3100` legend key in the
 #     "Sutartiniai žymėjimai" box is 209 pt (0.144) from anything. The cap
 #     sits between them and is expressed as a fraction of the page DIAGONAL
@@ -695,12 +695,12 @@ def assign_markers_to_rooms(markers: list[dict], labels: list[dict],
 #     This is what stops the +3400 above from raising 104 to 3.4.
 #
 # Both thresholds are calibrated on one project. That is stated, not hidden:
-# they are deliberately loose enough to keep every honest Beržų marker and
+# they are deliberately loose enough to keep every honest Objektas A marker and
 # tight enough to reject its two known traps, and the lane is allowed only to
 # RAISE a height (see `vision_call`), so a miss costs coverage, never a
 # fabricated quantity.
 
-# Fractions of the page diagonal. Observed on Beržų p6: honest markers
+# Fractions of the page diagonal. Observed on Objektas A p6: honest markers
 # ≤0.083, legend key 0.144; closest honest margin 0.020, the known
 # cross-wall steal 0.008.
 MAX_LABEL_DISTANCE_FRAC = 0.12
@@ -897,7 +897,7 @@ def apply_positioned_marker_heights(parsed: dict, pdf_bytes: bytes,
     tokens = scan_positioned_page_tokens(pdf_bytes, tuple(pages))
     # Polygon containment first — a traced outline states which room a point
     # is in; proximity only infers it. The fallback exists because outlines
-    # are frequently absent (Beržų: 1 of 11 rooms).
+    # are frequently absent (Objektas A: 1 of 11 rooms).
     assign = assign_markers_to_rooms(
         tokens["markers"], tokens["labels"], rooms)
     method = "polygon_containment"
@@ -971,7 +971,7 @@ def apply_positioned_marker_heights(parsed: dict, pdf_bytes: bytes,
         room["_height_source"] = "positioned_marker"
         room["_height_marker_evidence"] = evidence.get(_norm_nr(nr_raw))
         # Survives `_apply_per_room_heights`, which returns fresh dicts and is
-        # NAME-keyed — Beržų alone has two rooms called "Berniuko kambarys".
+        # NAME-keyed — Objektas A alone has two rooms called "Berniuko kambarys".
         room["_height_marker_m"] = marker_h
         if prev is None or abs(prev - marker_h) >= _HEIGHT_EPS_M:
             changed.append({"nr": nr_raw, "from": prev, "to": marker_h})

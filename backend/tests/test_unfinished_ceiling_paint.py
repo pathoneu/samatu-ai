@@ -7,8 +7,8 @@ evidence — and 44.00 m² of painted CEILING. No estimator writes that split
 down, and the contractor bills neither (the only garage ceiling work on the
 pasiūlymas is item 3 "Laidų apsiuvimas garaže", 26.57 m² of wire boxing).
 
-The 2026-05-27 Beržų rule ("every ceiling type gets painted") stays intact for
-every finished room — including Beržų's OWN garage, which the contractor really
+The 2026-05-27 Objektas A rule ("every ceiling type gets painted") stays intact for
+every finished room — including Objektas A's OWN garage, which the contractor really
 does paint (31.45 m² of wall paint) and which therefore keeps its ceiling. The
 gate below only fires on a room the engine has already concluded is entirely
 unfinished, and it DISCLOSES the withheld area instead of dropping it.
@@ -84,7 +84,7 @@ def test_rule_is_not_garage_specific():
 
 # ── The gate stays shut ──────────────────────────────────────────────────
 def test_garage_with_apdailos_paint_keeps_its_ceiling():
-    """Beržų g. 24: Vision reads painted garage walls, contractor bills
+    """Objektas A: Vision reads painted garage walls, contractor bills
     31.45 m² of them. Evidence beats the standard on BOTH surfaces."""
     q = calc_room_quantities(_garage(
         sienu_apdailos_breakdown={"dazymas_share": 1.0, "plyteles_share": 0.0}))
@@ -95,9 +95,9 @@ def test_garage_with_apdailos_paint_keeps_its_ceiling():
 
 
 def test_garage_with_walls_paint_factor_override_keeps_its_ceiling():
-    """Beržų's GT garage carries walls_paint_factor_override=0.7988 (only 3 of
+    """Objektas A's GT garage carries walls_paint_factor_override=0.7988 (only 3 of
     4 walls finished). A human calibration must not silently cost the ceiling.
-    This is the branch that protects `--use-gt-inputs` on berzas."""
+    This is the branch that protects `--use-gt-inputs` on objektas_a."""
     q = calc_room_quantities(_garage(walls_paint_factor_override=0.7988))
     assert q["ceiling_paintable_m2"] == 44.0
     assert q["_ceiling_paint_source"] == "standard"

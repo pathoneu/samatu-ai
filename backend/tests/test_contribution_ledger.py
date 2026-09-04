@@ -37,7 +37,7 @@ from main import app  # noqa: E402
 
 client = TestClient(app)
 
-SNAPSHOT = ROOT / "data" / "demo-berzu-24-snapshot-20260714.json"
+SNAPSHOT = ROOT / "data" / "demo-objektas-a-snapshot-20260714.json"
 CORPUS = sorted((ROOT.parent / "ground_truth").glob("*/ai_extract.json"))
 
 

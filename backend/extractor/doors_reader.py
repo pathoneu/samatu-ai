@@ -7,7 +7,7 @@ LT interjero Vision pass-1 dažnai miss'ina:
   Vonia), o pats Koridorius lieka su 0 durų.
 - Slankiojančias / harmonika duris kurios atrodo netipiškai
 
-2026-05-27 (Berzas calibration): pass-1 grąžino 10 durų (durys_total), o per-room
+2026-05-27 (Objektas A calibration): pass-1 grąžino 10 durų (durys_total), o per-room
 elementai sum = 9. Kontraktoriaus truth = 14 durys (per item 18 "Durų angų
 paruošimas: 39,2 m" = 14 × 2,8 m). Trūko 4-5 durų, daugiausia exterior +
 koridoriaus.

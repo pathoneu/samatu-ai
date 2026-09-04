@@ -1,6 +1,6 @@
 """Line-coverage pass 2026-07-29 — the contractor lines we used to emit NOTHING for.
 
-Measured against Beržų g. 24 (`ground_truth/berzas/contractor_samata_parsed.json`,
+Measured against Objektas A (`ground_truth/objektas_a/contractor_samata_parsed.json`,
 53 priced lines): 13 of his lines had no counterpart in our kiekių žiniaraštis at
 all. `scripts/reconcile_samata_lines.py` scores the set; this file pins the
 behaviour those rows depend on.
@@ -88,10 +88,10 @@ def gkp_project() -> dict:
     }
 
 
-def _berzas() -> dict:
-    path = REPO / "ground_truth" / "berzas" / "ai_extract.json"
+def _objektas_a() -> dict:
+    path = REPO / "ground_truth" / "objektas_a" / "ai_extract.json"
     if not path.exists():
-        pytest.skip("berzas cached extract not present")
+        pytest.skip("objektas_a cached extract not present")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -134,7 +134,7 @@ def test_checklist_row_carries_no_price_or_sum(gkp_project):
         assert "medziagos_kiekis" not in p, p["aprasymas"]
 
 
-# ── 2. the bespoke-GKP block (berzas nr 4, 5, 6, 8, 12) ──────────────────────
+# ── 2. the bespoke-GKP block (objektas_a nr 4, 5, 6, 8, 12) ──────────────────────
 
 BESPOKE = [
     ("GKP „dėžučių“ montavimas ant lubų", "m"),      # nr 4  — 11.16 m
@@ -175,7 +175,7 @@ def test_ortakiu_dezute_gated_on_ducts(gkp_project):
     assert len(rows) == 1 and rows[0]["kiekis"] is None
 
 
-# ── 3. TRACK apšvietimas (berzas nr 11 + 21) ─────────────────────────────────
+# ── 3. TRACK apšvietimas (objektas_a nr 11 + 21) ─────────────────────────────────
 
 def test_track_pair_emitted_when_a_lighting_plan_was_read(gkp_project):
     poz = _run(gkp_project)["pozicijos"]
@@ -193,10 +193,10 @@ def test_track_absent_when_no_lighting_symbols(gkp_project):
     assert not _has(_run(p)["pozicijos"], "TRACK apšvietimo sistemos")
 
 
-# ── 4. plytelių grindjuostės (berzas nr 35, 22.72 m) ─────────────────────────
+# ── 4. plytelių grindjuostės (objektas_a nr 35, 22.72 m) ─────────────────────────
 
-def test_plyteliu_grindjuostes_matches_the_contractor_on_berzas():
-    poz = _build_pozicijos_from_rooms(_berzas())["pozicijos"]
+def test_plyteliu_grindjuostes_matches_the_contractor_on_objektas_a():
+    poz = _build_pozicijos_from_rooms(_objektas_a())["pozicijos"]
     rows = _has(poz, "Plytelių grindjuosčių supjovimas")
     assert len(rows) == 1
     line = rows[0]
@@ -221,7 +221,7 @@ def test_plyteliu_grindjuostes_skip_wet_rooms(gkp_project):
 
 def test_plyteliu_grindjuostes_do_not_double_count_the_mdf_line():
     """The MDF line is unchanged: tile-floor rooms were already 0 there."""
-    poz = _build_pozicijos_from_rooms(_berzas())["pozicijos"]
+    poz = _build_pozicijos_from_rooms(_objektas_a())["pozicijos"]
     mdf = _has(poz, "Grindjuosčių sumontavimas")
     tile = _has(poz, "Plytelių grindjuosčių supjovimas")
     assert len(mdf) == 1 and len(tile) == 1
@@ -230,7 +230,7 @@ def test_plyteliu_grindjuostes_do_not_double_count_the_mdf_line():
     assert mdf[0]["kiekis"] != tile[0]["kiekis"]
 
 
-# ── 5. the relabel (berzas nr 7) ─────────────────────────────────────────────
+# ── 5. the relabel (objektas_a nr 7) ─────────────────────────────────────────────
 
 _LEGACY_WC = "Dėžučių iš GKP formavimas WC mechanizmams paslėpti"
 _NEW_WC = "Pertvaros sutvirtinimas WC mechanizmams montuoti (GKP dėžutė)"

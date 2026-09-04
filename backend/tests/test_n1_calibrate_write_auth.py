@@ -56,7 +56,7 @@ def _login(email):
 def test_n1_anon_with_fixture_rejected(env):
     """Anon POST with ?fixture= (the original PoC) → 401, no file written."""
     r = TestClient(app).post(
-        "/api/projects/proj-B/calibrate?fixture=berzas",
+        "/api/projects/proj-B/calibrate?fixture=objektas_a",
         json={"overrides": {"led_nisos_m": 42.30}},
     )
     assert r.status_code == 401, r.text
@@ -67,7 +67,7 @@ def test_n1_cross_tenant_write_with_fixture_blocked(env):
     """A logged in, targets B's project WITH ?fixture= → 404, B's file untouched."""
     att = _login("attacker@x.lt")
     r = att.post(
-        "/api/projects/proj-B/calibrate?fixture=berzas",
+        "/api/projects/proj-B/calibrate?fixture=objektas_a",
         json={"overrides": {"led_nisos_m": 999.0}},
     )
     assert r.status_code == 404, r.text
@@ -78,7 +78,7 @@ def test_n1_forged_project_id_creates_no_file(env):
     """Arbitrary-file-write disk-DoS PoC: forged id → 404 and no {forged}.json."""
     att = _login("attacker@x.lt")
     r = att.post(
-        "/api/projects/attackerforged12345/calibrate?fixture=berzas",
+        "/api/projects/attackerforged12345/calibrate?fixture=objektas_a",
         json={"overrides": {"led_nisos_m": 1.0}},
     )
     assert r.status_code == 404, r.text
@@ -90,7 +90,7 @@ def test_n1_owner_write_still_works(env):
     """The owner (with ?fixture= seeding the baseline) → 200 and file written."""
     owner = _login("owner@x.lt")
     r = owner.post(
-        "/api/projects/proj-B/calibrate?fixture=berzas",
+        "/api/projects/proj-B/calibrate?fixture=objektas_a",
         json={"overrides": {"led_nisos_m": 42.30}},
     )
     assert r.status_code == 200, r.text

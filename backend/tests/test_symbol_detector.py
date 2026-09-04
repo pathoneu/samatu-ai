@@ -66,7 +66,7 @@ def test_counts_by_room_buckets_unassigned():
 
 def test_canonical_types_cover_lt_construction_taxonomy():
     """Sanity check: the 14 canonical tags map to the contractor sub-counts
-    Beržų's gap-analysis tracks (sockets/switches/lights/data/thermo/vent/
+    Objektas A's gap-analysis tracks (sockets/switches/lights/data/thermo/vent/
     water/drain). If we ever drop one, this test fails so the prompt and
     taxonomy stay in lockstep."""
     required = {"socket", "switch", "light_ceiling", "light_track", "vent_supply",

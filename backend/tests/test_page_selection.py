@@ -31,7 +31,7 @@ from extractor.page_filter import (
 
 DRAWING = {"white_frac": 0.70, "sat_mean": 2.0}      # typical LT brėžinys
 VISUALIZATION = {"white_frac": 0.01, "sat_mean": 40.0}  # 3D render
-PHOTO_COVER = {"white_frac": 0.33, "sat_mean": 25.1}    # measured: berzas p1
+PHOTO_COVER = {"white_frac": 0.33, "sat_mean": 25.1}    # measured: objektas_a p1
 
 
 def _pages(*signals: dict) -> list[dict]:
@@ -170,7 +170,7 @@ def test_unidentifiable_page_index_is_kept(stub_text):
 # ── the pages we DO drop ──────────────────────────────────────────────────
 
 def test_photographic_title_page_is_dropped(stub_text):
-    """Measured signals from berzas p1 — a full-bleed photo cover."""
+    """Measured signals from objektas_a p1 — a full-bleed photo cover."""
     stub_text([("group", None),
                ("PERTVARŲ PLANAS 101 Tambūras 2750", "SA")])
     sel = select_pass1_pages(b"pdf", _pages(PHOTO_COVER, DRAWING))

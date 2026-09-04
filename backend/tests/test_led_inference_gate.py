@@ -1,7 +1,7 @@
 """LED enumerated-exclusion gate — inferred niches must not contradict a read.
 
 Background (2026-08-03 accuracy decomposition): niche_inference injects
-statistical nisa_LED rows into rooms Vision returned empty. On ciurliu that
+statistical nisa_LED rows into rooms Vision returned empty. On objektas_c that
 fabricated LED into two bathrooms while a persisted warning EXPLICITLY listed
 the LED rooms as 01, 03, 04, 05 — the extract contradicting itself, +33.31%
 on the metric. The gate: when a warning both mentions LED niches and
@@ -94,7 +94,7 @@ def test_no_enumeration_drops_nothing_fails_closed():
 
 
 def test_gate_composes_with_inference_itself():
-    """End-to-end shape of the ciurliu defect: a bathroom with zero LED gets an
+    """End-to-end shape of the objektas_c defect: a bathroom with zero LED gets an
     inferred niche, then the gate removes it because the warning excludes the
     room. Net: as if inference never fired there."""
     rooms = [
@@ -112,7 +112,7 @@ def test_gate_composes_with_inference_itself():
 
 def test_recompute_tail_applies_the_gate():
     """The production hook: _recompute_per_room_via_python must clean saved
-    extracts (the ciurliu bathrooms are already baked into ai_extract.json),
+    extracts (the objektas_c bathrooms are already baked into ai_extract.json),
     so the gate has to live on the recompute path, not only at extraction."""
     parsed = _parsed([ENUM_WARNING], [
         {"nr": "06", "pavadinimas": "Vonia", "paskirtis": "san",

@@ -1,9 +1,9 @@
 """The eksplikacija table must belong to the rooms it is merged into.
 
 Fixture data is REAL: the rooms and the foreign table are verbatim from the
-2026-08-23 bundle ablation run (Beržų interior sheets appended behind SA-02,
-a different building), and the own table is Beržų's from
-ground_truth/berzas/ai_extract.json. Before the guard, the foreign table was
+2026-08-23 bundle ablation run (Objektas A interior sheets appended behind SA-02,
+a different building), and the own table is Objektas A's from
+ground_truth/objektas_a/ai_extract.json. Before the guard, the foreign table was
 merged by room number alone — "111 Tėvų vonia" got "111 LAUKO TERASA 66.47"
 — and headline MAE went 3.1% → 34.7% with every room NAME still correct.
 """

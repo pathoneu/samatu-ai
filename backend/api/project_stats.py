@@ -29,7 +29,7 @@ CALIB_ROOT = _storage.data_path(
     "calibrations", Path(__file__).resolve().parents[1] / "data" / "calibrations")
 
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
 
 router = APIRouter(prefix="/api/projects", tags=["stats"])
@@ -43,7 +43,7 @@ def _load_project(request: Request, project_id: str, fixture: str | None) -> dic
     ``require_user`` ran, and the handler then read
     ``data/annotations/{URL_id}.json`` + ``data/calibrations/{URL_id}.json``
     keyed by the attacker's URL project_id → an anonymous
-    ``GET /stats?fixture=berzas`` leaked another tenant's verification progress +
+    ``GET /stats?fixture=objektas_a`` leaked another tenant's verification progress +
     calibration metadata. The URL project_id is what keys those per-user stores,
     so it MUST be owned regardless of ``fixture``. The fixture may still seed the
     reference KŽ body, but never authorizes the store reads. Mirrors the N1

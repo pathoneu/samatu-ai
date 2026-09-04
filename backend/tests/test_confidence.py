@@ -75,16 +75,16 @@ def test_kampai_geltona_when_adjacency_present():
 
 def test_kampai_reason_discloses_calibration():
     # The kampai reason must honestly disclose it's calibrated to 1 contractor
-    # (the formula is fitted to Beržų 493.35 m with a +perim double-count), not
+    # (the formula is fitted to Objektas A 493.35 m with a +perim double-count), not
     # imply a clean validated geometric sum.
     out = _parsed([_room(n_partition_walls=3)])
     kampai = _find(out, "kampų montavimas")
     assert kampai["confidence"] == "geltona"
-    # The calibration confession ("kalibruota pagal 1 rangovo samatą (Beržų)")
+    # The calibration confession ("kalibruota pagal 1 rangovo samatą (Objektas A)")
     # leaked a client name and our methodology — the string now explains the
     # formula and the check instead.
     assert "kampus plane" in kampai["_confidence_reason"]
-    assert "Berž" not in kampai["_confidence_reason"]
+    assert "Objektas A" not in kampai["_confidence_reason"]
 
 
 def test_angokrasciai_flags_unread_opening_dims():

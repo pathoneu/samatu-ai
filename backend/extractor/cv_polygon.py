@@ -254,7 +254,7 @@ def auto_room_polygon(
                 # NB: we test the producing grid seed (sx, sy) — NOT the raw label
                 # centre — because on many LT plans the printed room-number label
                 # lands on ink / a callout geometrically OUTSIDE the room polygon
-                # (verified on Beržų 103-110), which would wrongly reject correct
+                # (verified on Objektas A 103-110), which would wrongly reject correct
                 # fills. The producing seed is always in the room's white basin, so
                 # this rejects only genuinely leaked/degenerate contours.
                 if not point_in_polygon_px(poly, sx, sy):

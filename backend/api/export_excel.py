@@ -30,7 +30,7 @@ from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
 
 # Same SAMATU_DATA_DIR root as api/calibrate.py writes to (2026-07-27 audit, 6).
@@ -67,7 +67,7 @@ def _load_project(request: Request, project_id: str, fixture: str | None) -> dic
     BEFORE the fixture branch. Previously ``?fixture=`` returned before
     ``require_user`` ran; the endpoint then called ``_load_calibration(project_id)``
     which reads ``data/calibrations/{URL_id}.json`` keyed by the attacker's URL
-    project_id, so an anonymous ``POST /export-excel?fixture=berzas`` produced an
+    project_id, so an anonymous ``POST /export-excel?fixture=objektas_a`` produced an
     XLSX leaking another tenant's secret calibration ``user_value`` totals (their
     KNOWN category quantities). The URL project_id keys that per-user store, so it
     MUST be owned regardless of ``fixture``. Fixture may seed the reference body

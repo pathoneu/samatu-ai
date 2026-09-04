@@ -35,7 +35,7 @@ from extractor.vision_call import _elementai_to_counts
 REPO_ROOT = Path(__file__).resolve().parents[2]
 import json
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
 
 router = APIRouter(prefix="/api/projects", tags=["room-recalc"])

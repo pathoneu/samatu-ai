@@ -7,7 +7,7 @@ INTERMITTENT — whether a thinking block is emitted varies run to run — so
 the same PDF succeeds one minute and degrades the next.
 
 Measured 2026-07-29: the apdailos (išklotinių) reader hit this mid-run on
-berzas. It reads per-room wall finishes, so when it dies every room falls
+objektas_a. It reads per-room wall finishes, so when it dies every room falls
 back to paskirtis defaults — the garažas walls (31.45 m² of real paint)
 drop out entirely and `Sienų dažomas plotas` lands 31% low. Headline MAE
 on that run was 12.996% against 6.116% for the same pipeline with the

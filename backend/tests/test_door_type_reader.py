@@ -73,7 +73,7 @@ def test_agree_is_green():
 
 
 def test_reader_higher_raises_and_flags_yellow():
-    # The Beržų case: glyph tagged 2, text annotations/tags say ~8 → raise + flag.
+    # The Objektas A case: glyph tagged 2, text annotations/tags say ~8 → raise + flag.
     r = reconcile_frameless(plan_frameless=2, reader_frameless=8,
                             bendras_tipas=None, n_interior_doors=10, archetipas="premium")
     assert r["count"] == 8                      # raised to the text count

@@ -10,7 +10,7 @@ flow'e po pass-1, kad pakeistume hardcoded `walls_paint` heuristics
 (`tamburas: 0`, `garazas: 0`, ir t.t.) realiu projekto specifikuotu apdailos
 plotu.
 
-2026-05-27 — pirma versija (Berzas fixture testas: -11,6% → -4,3% walls accuracy).
+2026-05-27 — pirma versija (Objektas A fixture testas: -11,6% → -4,3% walls accuracy).
 
 RECONSTRUCTED 2026-06-09: the original .py was never committed and was lost;
 this is rebuilt from the surviving cpython-314.pyc (verbatim SYSTEM_PROMPT,
@@ -35,7 +35,7 @@ from .response_text import response_text
 
 # 2026-07-29 — THE INTERMITTENT-FAILURE FIX. 4096 was too snug for THIS reader
 # and it was truncating the answer mid-JSON on most runs:
-#   measured on berzas (11 rooms, 12 išklotinių pages)
+#   measured on objektas_a (11 rooms, 12 išklotinių pages)
 #     - full answer  ≈ 6 344 chars ≈ 2 400 output tokens
 #     - the ONE success (10:38) reported output_tokens = 2 776 → thinking was
 #       only ~370 tokens that run; it fit under 4 096 by ~1 300 tokens
@@ -175,7 +175,7 @@ def _find_apdailos_pages(pdf_bytes: bytes, pages_meta=None) -> list[int]:
     TEXT-BLIND FALLBACK (2026-08-23, flattened-scan ablation): the title-word
     scan below needs a text layer. On a rasterised re-export (iLovePDF-style,
     common for LT drawings) it finds nothing, this reader silently returned
-    `skipped`, every room fell to paskirtis finish defaults, and Beržų's wall
+    `skipped`, every room fell to paskirtis finish defaults, and Objektas A's wall
     paint came out −31.6% — while Pass-1 had classified p10 finish_schedule
     and p11–17 wall_elevation perfectly from the images. So when the text scan
     yields nothing, use that classification (same pattern as

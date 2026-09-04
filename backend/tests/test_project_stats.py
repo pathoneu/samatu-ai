@@ -43,7 +43,7 @@ def client(tmp_path, monkeypatch):
 
 
 def test_stats_on_fixture_returns_counts(client):
-    r = client.get("/api/projects/test/stats?fixture=berzas")
+    r = client.get("/api/projects/test/stats?fixture=objektas_a")
     assert r.status_code == 200
     body = r.json()
     assert body["rooms"]["count"] == 11
@@ -52,7 +52,7 @@ def test_stats_on_fixture_returns_counts(client):
 
 
 def test_stats_confidence_distribution_buckets(client):
-    body = client.get("/api/projects/test/stats?fixture=berzas").json()
+    body = client.get("/api/projects/test/stats?fixture=objektas_a").json()
     conf = body["rooms"]["confidence_distribution"]
     # All buckets present (high/medium/low) regardless of fixture content
     for k in ("high", "medium", "low"):
@@ -62,7 +62,7 @@ def test_stats_confidence_distribution_buckets(client):
 
 
 def test_stats_verification_state_default_empty(client):
-    body = client.get("/api/projects/test/stats?fixture=berzas").json()
+    body = client.get("/api/projects/test/stats?fixture=objektas_a").json()
     v = body["verification"]
     # No annotations file for "test" project → unverified == rooms count
     assert v["unverified"] == body["rooms"]["count"]
@@ -71,7 +71,7 @@ def test_stats_verification_state_default_empty(client):
 
 
 def test_stats_calibration_default_empty(client):
-    body = client.get("/api/projects/test/stats?fixture=berzas").json()
+    body = client.get("/api/projects/test/stats?fixture=objektas_a").json()
     assert body["calibration"]["applied_metrics"] == 0
     assert body["calibration"]["updated_at"] is None
 
@@ -82,8 +82,8 @@ def test_stats_unknown_fixture_404(client):
 
 
 def test_stats_includes_santrauka_snapshot(client):
-    body = client.get("/api/projects/test/stats?fixture=berzas").json()
+    body = client.get("/api/projects/test/stats?fixture=objektas_a").json()
     s = body["santrauka"]
-    # The Beržų to-the-dot fixture has these fields populated
+    # The Objektas A to-the-dot fixture has these fields populated
     assert "dazymo_plotas_total_m2" in s
     assert s["dazymo_plotas_total_m2"] > 0

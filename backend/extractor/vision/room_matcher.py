@@ -10,7 +10,7 @@ INVENTS the numbering, and two rounds can number the same rooms differently.
 The voter then medians two different rooms together — and the median of two
 values is their MEAN, so it manufactures a number no round ever produced.
 
-Measured on the saved ciurliu round data (ground_truth/ciurliu/ai_extract.json,
+Measured on the saved objektas_c round data (ground_truth/objektas_c/ai_extract.json,
 `_vote.values`, no eksplikacija — `rooms_in_table: 0`):
 
     nr   round A (plotas/perim/npw)   round B (plotas/perim/npw)   voted
@@ -22,7 +22,7 @@ Measured on the saved ciurliu round data (ground_truth/ciurliu/ai_extract.json,
     06    4.5 /  8.5 / 2              42.0 / 26.0 / 5              23.25  DIFFERENT
 
 Round A's numbering maps 1:1 onto the six physical rooms the adjacency pass
-found (ground_truth/ciurliu/adjacency.json — Miegamasis npw=2, Vonia prie
+found (ground_truth/objektas_c/adjacency.json — Miegamasis npw=2, Vonia prie
 miegamojo npw=3, Kambarys ŠR npw=3, Svetainė-virtuvė npw=5, Kambarys PR npw=3,
 Vonia prie lauko durų npw=2). Round B's does not: its nr06 carries npw=5 and
 42 m², i.e. it is the Svetainė-virtuvė. So the voter averaged a 4.5 m² bathroom
@@ -42,7 +42,7 @@ Two paths, chosen automatically:
    unique inside each run, identical across all runs, AND geometrically
    coherent (no nr-group contains two rooms whose areas differ by more than
    `AREA_VETO`). This reproduces the current behaviour bit-for-bit on every
-   eksplikacija-anchored project (berzas, objektas_b, lazunu: areas are read
+   eksplikacija-anchored project (objektas_a, objektas_b, objektas_d: areas are read
    from the table and are identical across rounds, so coherence is trivially
    satisfied).
 
@@ -59,7 +59,7 @@ Two paths, chosen automatically:
    with another room from its own round.
 
 Perimeter is deliberately NOT a veto: the corpus contains rounds that report
-perimetras_m = 0 for every room (eval_runs/2026-07-04_20-32-12_berzas_vision),
+perimetras_m = 0 for every room (eval_runs/2026-07-04_20-32-12_objektas_a_vision),
 which is a failed read, not a different room.
 
 Pure functions: no I/O, no API, deterministic.
@@ -78,7 +78,7 @@ from typing import Any
 #   legitimate run-to-run jitter tops out at 0.333 (28/30/42 on one open-plan
 #   room) and is <= 0.077 at the 90th percentile;
 #   identity collisions start at 0.438 and run to 0.893.
-# 0.35 sits in the gap. Raising it past 0.45 lets ciurliu's 40-vs-13 pair back
+# 0.35 sits in the gap. Raising it past 0.45 lets objektas_c's 40-vs-13 pair back
 # in; lowering it past 0.25 starts splitting genuine jitter.
 AREA_VETO = 0.35
 # Normalised blended cost above which a pair is left unmatched. With every

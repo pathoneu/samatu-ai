@@ -257,7 +257,7 @@ def test_recompute_invalid_field_returns_400():
 
 
 # ── Per-room finishing override (walls_paint) — 2026-07-05 ────────────────────
-# Beржų garage: some garages/tambūrai are finished (painted walls) though they
+# Objektas A garage: some garages/tambūrai are finished (painted walls) though they
 # default to raw. The AssumptionsPanel toggle flips walls_paint per room and
 # recomputes the paint geometry through the same live path as ceiling height.
 

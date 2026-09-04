@@ -140,7 +140,7 @@ ROOM_NR_PATTERN_CONSERVATIVE = re.compile(
     r"^[A-ZĄČĘĖĮŠŲŪŽ]?[-]?\d+(?:[.\-]\w+)?$")
 # Back-compat name for direct importers.
 ROOM_NR_PATTERN = ROOM_NR_PATTERN_WIDE
-# One cell holding "01. Įėjimo koridorius 4.05 m²" — the lazūnų g. 6 shape,
+# One cell holding "01. Įėjimo koridorius 4.05 m²" — the Objektas D shape,
 # where the whole eksplikacija is a single-column table.
 SINGLE_CELL_ROW_RE = re.compile(
     r"^\s*(?P<nr>[A-ZĄČĘĖĮŠŲŪŽ]{0,3}[-. ]?\d+(?:[.\-/]\w{1,4})*)[.)]?\s+"
@@ -601,12 +601,12 @@ def _try_parse_row(
         source = "header"
     else:
         # -- Single-cell path (WIDE only) ---------------------------------
-        # "01. Ijimo koridorius 4.05 m2" in ONE cell -- the Lazunu g. 6 shape,
+        # "01. Ijimo koridorius 4.05 m2" in ONE cell -- the Objektas D shape,
         # where the entire eksplikacija is a one-column table. The old
         # `len(cells) < 2` guard rejected every such row outright, and with
         # the flag off it does again: one cell of free text is also what a
         # legend line, a title block and a drawing caption look like, and the
-        # regex cannot tell them apart. lazunu goes back to a pdfplumber MISS
+        # regex cannot tell them apart. objektas_d goes back to a pdfplumber MISS
         # and falls through to Vision -- see feature_flags.py.
         filled = [c.strip() for c in cells if c and c.strip()]
         if len(filled) < 2 and not wide:

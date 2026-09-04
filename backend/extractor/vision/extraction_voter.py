@@ -76,7 +76,7 @@ def default_min_votes(n_runs: int, *, robust: bool = True) -> int:
     same number for both matchers at every n >= 2. It is kept in the signature
     because the reason each matcher wants a floor differs — the legacy nr
     matcher needs one because it SPLITS a physical room across two groups when
-    the rounds number rooms differently (the ciurliu failure), so a 1-vote
+    the rounds number rooms differently (the objektas_c failure), so a 1-vote
     threshold would let both halves survive and double-count the area; the
     robust matcher needs one because two rounds cannot corroborate each other.
     If the robust matcher ever earns a lower threshold at n >= 3 it belongs
@@ -114,7 +114,7 @@ def match_rooms(runs: list[list[dict]], *, min_votes: int | None = None,
     numbering on a plan with no eksplikacija), rooms are matched by an optimal
     assignment on geometry + name + bbox instead of by nr, so two DIFFERENT
     rooms are never medianed together. See room_matcher.__doc__ for the
-    ciurliu evidence.
+    objektas_c evidence.
     """
     if robust is None:
         robust = _robust_matching_enabled()

@@ -1,7 +1,7 @@
 """Every _confidence_reason a contractor can see must guide, never confess.
 
 2026-08-31, founder catch on the live review queue: a row read "Formulė
-kalibruota pagal 1 rangovo samatą (Beržų) — … tikslumas nepatvirtintas
+kalibruota pagal 1 rangovo samatą (Objektas A) — … tikslumas nepatvirtintas
 (reikia daugiau etalonų)". Three failures in one string: it LEAKS another
 client's project name to every future user, it quotes our benchmark
 methodology (sample counts, error pairs) as if the number were copied from
@@ -21,7 +21,7 @@ from extractor.confidence import CLASS_RULES, _OVERBILLING_RULES, apply_confiden
 
 # Client identifiers, benchmark bookkeeping, internal jargon, dev-speak.
 BANNED = re.compile(
-    r"Berž|Rangovas [A-D]|rangovo samat|rangovą|\(\d+ projekt|projektai\)"
+    r"Objektas [A-F]\b|Rangovas [A-D]|rangovo samat|rangovą|\(\d+ projekt|projektai\)"
     r"|\bvs\b|%/|recall|etalon|kalibruota|ginčytin|Ekstrakcij|Gretimyb"
     r"|pradinis pass|archetip|low confidence|Vision|žinomai|Sprint|TODO",
     re.IGNORECASE)

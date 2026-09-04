@@ -1,6 +1,6 @@
 """Vision pass — detect built-in furniture that excludes wall paint area.
 
-Per the council R3 verdict: the residual +4.15 m² wall overshoot on Beržų
+Per the council R3 verdict: the residual +4.15 m² wall overshoot on Objektas A
 is most likely a built-in wardrobe / kitchen cabinet / shower cubicle
 that the contractor excludes from paint area. This module reads a
 furniture-layout page (BALDŲ PLANAS) and emits the per-wall built-in

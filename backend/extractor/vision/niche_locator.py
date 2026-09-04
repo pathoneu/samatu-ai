@@ -2,7 +2,7 @@
 that the main floor-plan + ceiling-plan extractor missed.
 
 The main vision_call pipeline reads niches as part of the elementai list,
-but Beržų showed Vision missing niches in several rooms (Tambūras,
+but Objektas A showed Vision missing niches in several rooms (Tambūras,
 Koridorius, Darbo, Garažas per gap-analysis.md). This pass uses a single,
 narrow prompt against the ceiling-plan page (luburiu planas) so the model
 isn't distracted by walls / doors / windows / furniture.
@@ -46,7 +46,7 @@ class NicheRecord:
     # and wall_led are billed as LED (`_calc_nisu_metrai_m` filters by
     # tipas == 'nisa_LED'). partition_niche and similar wall recesses are
     # tracked as nisa_partition so they're visible downstream but excluded
-    # from the LED metric. This was the source of Beržų's +10m over-count
+    # from the LED metric. This was the source of Objektas A's +10m over-count
     # before the 2026-06-05 audit — every niche the locator returned was
     # being billed as LED regardless of type. See audit/niche_locator_rerun.json.
     _TYPE_TO_TIPAS = {
@@ -83,7 +83,7 @@ class NicheList:
         """Group niches by room_nr (primary key). Niches that have no
         room_nr but DO have a room_name land under the special key
         "__name__:<name>" so the fold can match by name when the
-        ceiling plan doesn't show room numbers (e.g., Ciurliu's
+        ceiling plan doesn't show room numbers (e.g., Objektas C's
         Apšvietimo planas only shows room labels, not nrs).
         """
         out: dict[str, list[NicheRecord]] = {}
@@ -212,7 +212,7 @@ def fold_niches_into_rooms(
 
     2026-06-05 audit note: a confidence-weighted variant was tried but
     didn't help because the locator's current prompt over-extracts on
-    Beržų (52m vs 42m truth) and under-extracts on Objektas B (23m
+    Objektas A (52m vs 42m truth) and under-extracts on Objektas B (23m
     vs 55m truth). The locator finds real niches the main pass misses
     but also catches curtain/non-LED niches the contractor doesn't
     bill. The root fix is at the prompt level (precision/recall tuning)

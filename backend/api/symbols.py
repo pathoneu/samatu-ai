@@ -5,7 +5,7 @@ page (or any specific page when ``?page=N`` is supplied) and returns the
 result as JSON. Cached on disk via the Vision cache, so subsequent calls
 are free.
 
-Fixture mode (``?fixture=berzas``) operates on the contractor PDF directly
+Fixture mode (``?fixture=objektas_a``) operates on the contractor PDF directly
 without DB lookup. The endpoint requires auth in non-fixture mode.
 """
 
@@ -24,7 +24,7 @@ from extractor.vision.symbol_detector import detect_symbols
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf",
 }
 
 router = APIRouter(prefix="/api/projects", tags=["symbols"])

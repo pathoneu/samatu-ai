@@ -8,8 +8,8 @@ The output drives the tile_calculator, which produces exact per-room tile
 area and paint area instead of the percentage-of-perimeter approximation
 the current ``apdailos_breakdown`` path uses.
 
-Status: scaffold + JSON parser. Live wiring lands when a Beržų-grade
-fixture with elevation pages arrives (the Beržų PDF has elevation panels
+Status: scaffold + JSON parser. Live wiring lands when an Objektas A-grade
+fixture with elevation pages arrives (the Objektas A PDF has elevation panels
 on pages 11–16, but they're rendered in one of several formats and Phase 4
 prompt-iteration is not yet done).
 """

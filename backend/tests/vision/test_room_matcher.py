@@ -1,7 +1,7 @@
 """Unit tests for identity-safe room matching across voting rounds.
 
-Offline, $0. The scenarios are taken from the saved ciurliu round data
-(ground_truth/ciurliu/ai_extract.json `_vote.values`) — see
+Offline, $0. The scenarios are taken from the saved objektas_c round data
+(ground_truth/objektas_c/ai_extract.json `_vote.values`) — see
 extractor/vision/room_matcher.__doc__ for the full table.
 """
 import pytest
@@ -45,7 +45,7 @@ def test_bbox_iou():
 
 
 # ── the hard area veto ───────────────────────────────────────────────────
-def test_area_veto_blocks_the_ciurliu_bathroom_living_room_pair():
+def test_area_veto_blocks_the_objektas_c_bathroom_living_room_pair():
     """4.5 m2 vonia vs 42 m2 open plan: identical nr AND identical name must
     not be enough to match them."""
     a = room("06", "Vonia prie lauko durų", 4.5, 8.5, paskirtis="san")
@@ -66,7 +66,7 @@ def test_pair_cost_none_when_nothing_comparable():
 
 # ── the nr-path trust gate ───────────────────────────────────────────────
 def test_nr_path_trusted_when_table_anchored():
-    """lazunu shape: same nrs everywhere, areas read from the eksplikacija."""
+    """objektas_d shape: same nrs everywhere, areas read from the eksplikacija."""
     runs = [[room("01", "Įėjimo koridorius", 4.05, 8.4),
              room("02", "San. mazgas", 4.0, 8.2)] for _ in range(3)]
     assert rm.nr_key_is_trustworthy(runs) is True
@@ -82,7 +82,7 @@ def test_nr_path_trusted_across_nr_formats():
 
 
 def test_nr_path_rejected_when_numbering_is_geometrically_incoherent():
-    """The ciurliu failure: both runs number 01..03, but run B's 03 is a
+    """The objektas_c failure: both runs number 01..03, but run B's 03 is a
     different room. Labels agree, rooms do not."""
     runs = [[room("01", "Miegamasis", 14.5, 15.4),
              room("02", "Vonia", 4.5, 8.5),
@@ -120,7 +120,7 @@ def test_nr_path_rejected_on_duplicate_nr_inside_a_run():
 
 
 # ── the swap case, end to end ────────────────────────────────────────────
-CIURLIU_A = [
+OBJEKTAS_C_A = [
     room("01", "Miegamasis", 14.5, 15.4, paskirtis="miegamoji"),
     room("02", "Vonia prie miegamojo", 4.5, 8.5, paskirtis="san"),
     room("03", "Kambarys 1", 13.5, 14.8, paskirtis="miegamoji"),
@@ -129,7 +129,7 @@ CIURLIU_A = [
     room("06", "Vonia prie lauko durų", 4.5, 8.5, paskirtis="san"),
 ]
 # Round B numbered the same six rooms differently: its 06 is the open plan.
-CIURLIU_B = [
+OBJEKTAS_C_B = [
     room("01", "Miegamasis", 16.5, 16.4, paskirtis="miegamoji"),
     room("02", "Vonia prie miegamojo", 4.5, 8.5, paskirtis="san"),
     room("03", "Kambarys 1", 14.5, 15.6, paskirtis="miegamoji"),
@@ -143,15 +143,15 @@ def _voted_areas(groups):
     return sorted(round(vote_room_group(g)["plotas_m2"], 2) for g in groups)
 
 
-def test_old_matcher_reproduces_the_ciurliu_swap():
+def test_old_matcher_reproduces_the_objektas_c_swap():
     """Documents the bug this module exists to fix: the nr key medians a
     4.5 m2 bathroom with a 42 m2 living room into a 23.25 m2 room."""
-    groups = match_rooms([CIURLIU_A, CIURLIU_B], robust=False)
+    groups = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=False)
     assert 23.25 in _voted_areas(groups)
 
 
 def test_robust_matcher_pairs_by_geometry_not_by_invented_nr():
-    groups = match_rooms([CIURLIU_A, CIURLIU_B], robust=True)
+    groups = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=True)
     assert len(groups) == 6
     assert _voted_areas(groups) == [4.5, 4.75, 13.25, 14.0, 15.5, 41.0]
     # and no group mixes two identities
@@ -161,19 +161,19 @@ def test_robust_matcher_pairs_by_geometry_not_by_invented_nr():
 
 
 def test_robust_matcher_never_puts_two_rooms_of_one_run_in_a_group():
-    groups = match_rooms([CIURLIU_A, CIURLIU_B], robust=True)
+    groups = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=True)
     for g in groups:
         ids = [id(r) for r in g]
         assert len(ids) == len(set(ids))
         # identity, not equality: A[1] and B[1] are equal dicts (the one room
         # both rounds read the same way), so `in` would count them twice.
-        assert sum(1 for r in g if any(r is x for x in CIURLIU_A)) <= 1
-        assert sum(1 for r in g if any(r is x for x in CIURLIU_B)) <= 1
+        assert sum(1 for r in g if any(r is x for x in OBJEKTAS_C_A)) <= 1
+        assert sum(1 for r in g if any(r is x for x in OBJEKTAS_C_B)) <= 1
 
 
 def test_robust_matching_is_deterministic():
-    a = match_rooms([CIURLIU_A, CIURLIU_B], robust=True)
-    b = match_rooms([CIURLIU_A, CIURLIU_B], robust=True)
+    a = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=True)
+    b = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=True)
     assert _voted_areas(a) == _voted_areas(b)
     # order too, not just the multiset
     assert [r["nr"] for g in a for r in g] == [r["nr"] for g in b for r in g]
@@ -267,7 +267,7 @@ def test_two_runs_still_require_unanimity_under_the_legacy_matcher(monkeypatch):
 
 # ── flag wiring ──────────────────────────────────────────────────────────
 def test_voting_records_which_matcher_ran(monkeypatch):
-    runs = [{"patalpos": list(CIURLIU_A)}, {"patalpos": list(CIURLIU_B)}]
+    runs = [{"patalpos": list(OBJEKTAS_C_A)}, {"patalpos": list(OBJEKTAS_C_B)}]
     monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "0")
     assert vote_extraction(runs)["_voting"]["matcher"] == "nr_key"
     monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "1")
@@ -285,14 +285,14 @@ def test_flag_off_reproduces_the_pre_flag_matcher_exactly(monkeypatch):
     `_room_key` with a constant that collapses all twelve rooms into one
     bucket still satisfied it. These six numbers do not.
 
-    They are the legacy nr-key matcher's known ciurliu *mis*-pairing (23.25 =
+    They are the legacy nr-key matcher's known objektas_c *mis*-pairing (23.25 =
     the average of B's 13.0 "Kambarys 2" and A's 40.0 open plan, joined on
     nr="04"). That is the behaviour we are pinning: the flag exists to fix it,
     and until it is on, nothing may change it by accident.
     """
     monkeypatch.setenv("ENABLE_ROBUST_ROOM_MATCHING", "0")
-    on_flag = match_rooms([CIURLIU_A, CIURLIU_B])
-    explicit = match_rooms([CIURLIU_A, CIURLIU_B], robust=False)
+    on_flag = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B])
+    explicit = match_rooms([OBJEKTAS_C_A, OBJEKTAS_C_B], robust=False)
     assert _voted_areas(on_flag) == _voted_areas(explicit)
     assert _voted_areas(on_flag) == [4.5, 9.25, 14.0, 15.5, 23.25, 26.5]
     assert [[r["nr"] for r in g] for g in on_flag] == [
@@ -302,7 +302,7 @@ def test_flag_off_reproduces_the_pre_flag_matcher_exactly(monkeypatch):
 
 
 def test_table_anchored_project_is_untouched_by_the_flag(monkeypatch):
-    """berzas/lazunu shape: identical areas from the eksplikacija, so the nr
+    """objektas_a/objektas_d shape: identical areas from the eksplikacija, so the nr
     path holds and the flag changes nothing at all."""
     runs = [[room(f"1{i:02d}", f"K{i}", 10.0 + i, 13.0 + i + j * 0.2)
              for i in range(1, 6)] for j in range(3)]

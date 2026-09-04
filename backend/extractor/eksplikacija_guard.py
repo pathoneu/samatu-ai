@@ -1,9 +1,9 @@
 """Is this eksplikacija table actually THESE rooms' table?
 
-Born from the 2026-08-23 "bundle" ablation: Beržų's 17 interior sheets were
+Born from the 2026-08-23 "bundle" ablation: Objektas A's 17 interior sheets were
 appended behind 37 architectural sheets of a DIFFERENT building, and the
 eksplikacija reader returned the first table it saw — SA-02's room schedule.
-The merge then joined rows BY NUMBER ALONE, so Beržų's "111 Tėvų vonia" was
+The merge then joined rows BY NUMBER ALONE, so Objektas A's "111 Tėvų vonia" was
 assigned SA-02's "111 LAUKO TERASA = 66.47 m²", tagged as a confident
 eksplikacija read. Headline MAE 3.1% → 34.7% with every room name correct.
 

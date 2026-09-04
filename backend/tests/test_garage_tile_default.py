@@ -1,7 +1,7 @@
 """Garage floor-tile default (2026-07-04).
 
 Evidence: both contractor-validated fixtures tile the garage floor —
-Beržų bills 10.10 m² (notes p105 grindys; the GT file previously needed
+Objektas A bills 10.10 m² (notes p105 grindys; the GT file previously needed
 tile_floor_override=True to hit truth) and Objektas B bills garage
 tiling explicitly (pasiūlymas items 40-43). The old default (tile_floor
 False) made every vision run report 0 m² garage floor tile, which was
@@ -37,7 +37,7 @@ def test_garage_tile_floor_override_false_still_wins():
 
 
 def test_garage_exact_area_override_still_wins():
-    # Beržų truth: 10.10 m² of the 10.67 m² slab is tiled.
+    # Objektas A truth: 10.10 m² of the 10.67 m² slab is tiled.
     out = calc_room_quantities(_garazas(plyteles_grindys_m2_override=10.1))
     assert out["plyteles_grindys_m2"] == 10.1
 

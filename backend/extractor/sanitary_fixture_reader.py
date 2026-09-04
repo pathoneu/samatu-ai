@@ -2,10 +2,10 @@
 on the santechnikos (plumbing) plan.
 
 WHY (2026-06-14, deep research #3): the main pass under-counts repeated sanitary
-symbols (Beržų praustuvės read 3, truth 5) because a single "how many sinks?"
+symbols (Objektas A praustuvės read 3, truth 5) because a single "how many sinks?"
 glance blurs dense symbols. Asking Claude to ENUMERATE each fixture as a list and
 counting len() removes the blurry-glance error (FSC-147: point→label→count beats
-bare-number counting). Live probe on Beržų: 3 → 4 praustuvės.
+bare-number counting). Live probe on Objektas A: 3 → 4 praustuvės.
 
 This does NOT solve fixture detection (no clean fixture schedule exists in LT TP
 PDFs — research confirmed); it's a modest, honest recall bump. Counts are
@@ -41,17 +41,17 @@ MAX_TOKENS = 16384
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
 from .response_text import response_text
 # `bide` added 2026-07-29: the contractor bills "Bide dušiukų potinkinės dalies
-# įrengimas" + "…virštinkinės dalies montavimas" on berzas AND objektas_b, and
+# įrengimas" + "…virštinkinės dalies montavimas" on objektas_a AND objektas_b, and
 # no reader produced the count — the emit layer could only raise a kiekis=null
 # checklist row. It is enumerable (see the prompt below), so it is a fixture,
 # not a TODO.
 # `plautuves` added 2026-07-29: the prompt used to say "praustuvės/kriauklės",
-# and "kriauklė" covers a KITCHEN sink — so a live probe on berzas enumerated
+# and "kriauklė" covers a KITCHEN sink — so a live probe on objektas_a enumerated
 # the virtuvės and skalbyklos plautuvės inside praustuves_count (4 = 2 real
 # praustuvės + 2 plautuvės, 3/3 voting rounds agreeing). The emit layer bills
 # "Plautuvės montavimas" off a separate room-type count, so on any project with
 # a room classified `virtuve` the same sink was billed twice. Praustuvė and
-# plautuvė are separate contractor lines (lazunu nr 32/33 bills both), so they
+# plautuvė are separate contractor lines (objektas_d nr 32/33 bills both), so they
 # get separate keys here and each line consumes exactly one of them.
 _FIXTURE_KEYS = ("praustuves", "plautuves", "klozetai", "vonios", "dusai",
                  "wc_remai", "bide")
@@ -129,7 +129,7 @@ def _find_sanitary_pages(pdf_bytes: bytes, pages_meta: list[dict] | None = None,
     sat at 23-24 — and those two are the apšvietimo planas, i.e. that project
     has no plumbing sheet at all. On objektas_b it burned one of the two slots
     on the baldų planas (page 2). Both cases count fixtures off a drawing that
-    is not a plumbing plan. berzas is unaffected (page 4 is classified
+    is not a plumbing plan. objektas_a is unaffected (page 4 is classified
     `plumbing` and is the only hit either way).
     """
     role: dict[int, str] = {}

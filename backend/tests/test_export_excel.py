@@ -45,7 +45,7 @@ def client(tmp_path, monkeypatch):
 
 
 def test_export_returns_xlsx_with_ai_sheet(client):
-    r = client.post("/api/projects/test/export-excel?fixture=berzas")
+    r = client.post("/api/projects/test/export-excel?fixture=objektas_a")
     assert r.status_code == 200
     assert "spreadsheetml" in r.headers["content-type"]
     wb = load_workbook(io.BytesIO(r.content), data_only=True)
@@ -58,7 +58,7 @@ def test_export_returns_xlsx_with_ai_sheet(client):
 
 
 def test_export_ai_sheet_carries_real_numbers(client):
-    r = client.post("/api/projects/test/export-excel?fixture=berzas")
+    r = client.post("/api/projects/test/export-excel?fixture=objektas_a")
     wb = load_workbook(io.BytesIO(r.content), data_only=True)
     ws = wb["AI Sąmata"]
     # Find the dazymo row by label and check the AI column has a number > 0
@@ -73,7 +73,7 @@ def test_export_ai_sheet_carries_real_numbers(client):
 
 
 def test_export_includes_per_room_block(client):
-    r = client.post("/api/projects/test/export-excel?fixture=berzas")
+    r = client.post("/api/projects/test/export-excel?fixture=objektas_a")
     wb = load_workbook(io.BytesIO(r.content), data_only=True)
     ws = wb["AI Sąmata"]
     # The per-room block has header "Patalpos"; scan for it
@@ -86,7 +86,7 @@ def test_export_includes_per_room_block(client):
 
 
 def test_export_without_calibration_has_no_second_sheet(client):
-    r = client.post("/api/projects/no-calibration-yet/export-excel?fixture=berzas")
+    r = client.post("/api/projects/no-calibration-yet/export-excel?fixture=objektas_a")
     wb = load_workbook(io.BytesIO(r.content), data_only=True)
     assert wb.sheetnames == ["AI Sąmata"]
 

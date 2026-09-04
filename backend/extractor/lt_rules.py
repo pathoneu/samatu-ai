@@ -227,10 +227,10 @@ def apply_lt_sanity(parsed: dict) -> dict:
         # Wall-finish assumptions (2026-07-28). calc_room_quantities records
         # WHY a room's walls ended up painted / not painted / fully tiled in
         # `_wall_finish_assumptions`. Those decisions move hundreds of m² of
-        # paint (Beržų garažas 31.45 m²; a full-tile bathroom ±31 m²), so they
+        # paint (Objektas A garažas 31.45 m²; a full-tile bathroom ±31 m²), so they
         # must reach the user instead of living in a debug field.
         # WARN for the two materially risky cases — an ASSUMED tile zone in a
-        # wet room, and walls excluded from paint entirely (Beržų garažas:
+        # wet room, and walls excluded from paint entirely (Objektas A garažas:
         # 31.45 m² of real work the standard says doesn't exist). Everything
         # else is disclosure, not an alarm.
         notes = r.get("_wall_finish_assumptions") or []
@@ -258,7 +258,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
     # The positioned-marker lane (`height_markers.assign_markers_to_rooms`)
     # reads the altitude PRINTED INSIDE each room on the lubų planas. Rooms it
     # could not reach kept a project-wide reading — the exact generalisation
-    # ("+2800 visos kitos patalpos") that buried Beržų room 101's real 3.4 m
+    # ("+2800 visos kitos patalpos") that buried Objektas A room 101's real 3.4 m
     # through two production runs. Name both groups; the second is the list
     # worth a human glance.
     marker_rooms = [r for r in rooms
@@ -321,7 +321,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
     # nominally ≤3 m room (coffer, soffit step, double-height slice) is
     # missing from it, and so is the scaffolding it implies.
     #
-    # Beržų g. 24 is the measured case: contractor "sienos aukštos" 150.59 +
+    # Objektas A is the measured case: contractor "sienos aukštos" 150.59 +
     # "lubos aukštos" 62.82 m² vs the 103.15 + 50.54 m² the one >3 m room on
     # the drawings can account for. 59.72 m² of real above-3m work that the
     # readers never see. This warning is the honest form of that gap — the
@@ -354,7 +354,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
 
     # ── Off-perimeter partitions are never counted (2026-07-29) ──────────
     # walls_gross = perim × H. A paintable partition that does not lie on the
-    # room outline (Beržų room 110's 6.24 m² "pertvara miegamajam galvūgaliui")
+    # room outline (Objektas A room 110's 6.24 m² "pertvara miegamajam galvūgaliui")
     # contributes nothing unless someone supplies `extra_walls_m2`. Disclose
     # once per project rather than per room — the engine cannot say WHICH
     # room hides one.

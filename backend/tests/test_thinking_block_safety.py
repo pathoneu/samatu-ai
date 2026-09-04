@@ -4,7 +4,7 @@ Opus 5 has extended thinking ON by default, so `resp.content[0]` is often a
 ThinkingBlock with no `.text`. Every site that did `resp.content[0].text`
 died with AttributeError — INTERMITTENTLY, because whether a thinking block
 is emitted varies run to run. Measured cost: the apdailos reader died
-mid-run on berzas, every room fell back to paskirtis defaults, 31.45 m² of
+mid-run on objektas_a, every room fell back to paskirtis defaults, 31.45 m² of
 real garage paint vanished and headline MAE went 6.116% → 12.996%.
 
 This test fails the build if any extractor reaches into content[0].text
