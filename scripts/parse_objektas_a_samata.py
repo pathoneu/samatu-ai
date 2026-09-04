@@ -1,6 +1,6 @@
-"""Parse the contractor's Beržų g. 24 samata-truth.pdf into structured JSON.
+"""Parse the contractor's Objektas A samata-truth.pdf into structured JSON.
 
-Produces ground_truth/berzas/contractor_samata_parsed.json with one
+Produces ground_truth/objektas_a/contractor_samata_parsed.json with one
 record per samata line item. Drops the 2-row header (column names +
 sub-units), keeps section markers (rows where `Eil. Nr.` is empty AND
 `Darbų aprašymai` starts with "Skyrius"), parses numeric kiekis
@@ -16,8 +16,8 @@ from pathlib import Path
 import pdfplumber
 
 REPO = Path(__file__).resolve().parent.parent
-PDF = REPO / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf"
-OUT = REPO / "ground_truth/berzas/contractor_samata_parsed.json"
+PDF = REPO / "docs/superpowers/fixtures/2026-05-26-objektas-a/samata-truth.pdf"
+OUT = REPO / "ground_truth/objektas_a/contractor_samata_parsed.json"
 
 
 def _lt_num(s: str | None) -> float | None:
@@ -79,7 +79,7 @@ def parse_pdf(pdf_path: Path) -> dict:
 
     return {
         "source": str(pdf_path.relative_to(REPO)),
-        "project": "Beržų g. 24",
+        "project": "Objektas A",
         "contractor": "Rangovas A",
         "n_line_items": len(line_items),
         "sections": sections,

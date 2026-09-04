@@ -1,6 +1,6 @@
 {
   "$schema_version": 1,
-  "project_id": "berzas",
+  "project_id": "objektas_a",
   "purpose": "Audit log of corrections applied to gt_dimensions / overrides AFTER the original Vision extract. Every entry must have a 'reason' that is verifiable from contractor notes or formula derivation — NEVER eval-fitting.",
   "corrections": [
     {

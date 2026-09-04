@@ -1,7 +1,7 @@
 {
   "$schema_version": 1,
-  "project_id": "lazunu",
-  "name": "Lazūnų g. 6 (Butas)",
+  "project_id": "objektas_d",
+  "name": "Objektas D (Butas)",
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf",
@@ -87,7 +87,7 @@
       "value": 109.29,
       "confidence": "derived",
       "source": "derived: dazymo_walls_plus_ceilings_combined 150.57 − billed GKP ceilings 41.28 (item 1)",
-      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Beržų)."
+      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Objektas A)."
     },
     "ceiling_paint_total_m2": {
       "value": 41.28,

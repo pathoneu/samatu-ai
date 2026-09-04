@@ -1,8 +1,8 @@
 """compare_pipelines.py — diff OLD extractor vs NEW (dim → graph → assembler).
 
 Usage:
-  python compare_pipelines.py --from-extract docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json
-  python compare_pipelines.py --live  docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf   # $$$
+  python compare_pipelines.py --from-extract docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json
+  python compare_pipelines.py --live  docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf   # $$$
 
 Phase-2 stop gate: the NEW pipeline's per-room perimeters must match the OLD
 pipeline's perimeters within 0.5%, AND the run must be deterministic across

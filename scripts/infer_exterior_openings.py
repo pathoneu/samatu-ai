@@ -1,6 +1,6 @@
 """Infer ``_exterior`` flags on gt_dimensions openings via principled rules.
 
-Vision's per-opening _exterior flag is unreliable on Beržų — some panoramic
+Vision's per-opening _exterior flag is unreliable on Objektas A — some panoramic
 windows on the facade weren't flagged. Rather than re-running Vision (cost),
 we infer from drawing context: opening dimensions + room type are strong
 signals for exterior-vs-interior on Lithuanian residential plans.
@@ -124,7 +124,7 @@ def infer_room_exteriors(room: dict, *, partition_count: int | None = None) -> t
 
 
 def main(argv: list[str]) -> int:
-    project_id = argv[1] if len(argv) > 1 else "berzas"
+    project_id = argv[1] if len(argv) > 1 else "objektas_a"
     path = REPO_ROOT / "ground_truth" / project_id / "truth.json"
     if not path.exists():
         print(f"ERR: {path} not found")

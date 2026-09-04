@@ -1,4 +1,4 @@
-"""Per-room perimeter audit on the Beržų gt_dimensions.
+"""Per-room perimeter audit on the Objektas A gt_dimensions.
 
 The truth.json doesn't carry contractor-validated per-room perimeters
 (the user notes mention "perimetras_m" is yellow confidence per the
@@ -42,7 +42,7 @@ def compactness(perim_m: float, area_m2: float) -> float:
 
 
 def main() -> int:
-    truth_path = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+    truth_path = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
     truth = json.loads(truth_path.read_text(encoding="utf-8"))
 
     rows: list[dict] = []
@@ -64,7 +64,7 @@ def main() -> int:
             "H": H, "compactness": comp, "conf": conf, "flag": flag,
         })
 
-    print("\nPer-room perimeter audit — Beržų")
+    print("\nPer-room perimeter audit — Objektas A")
     print("─" * 96)
     print(f"  {'nr':<4} {'name':<24} {'perim (m)':>10} {'area (m²)':>10} "
           f"{'H (m)':>6} {'P/√A':>6} {'confidence':<12} {'note'}")

@@ -150,7 +150,7 @@ def main() -> int:
     obs.append(f"- **Angokraščiai** (`angokrasciu_m`) present in {n_angok}/6. Rangovas uses "
                f"two distinct line items in some projects: 'Angokraščių apdirbimas GKP' "
                f"AND 'Durų angų paruošimas' — these aren't always merged (see Objektas B "
-               f"and Lazūnų).")
+               f"and Objektas D).")
 
     # LED coverage
     led = matrix.get("led_nisos_m", {})
@@ -169,7 +169,7 @@ def main() -> int:
     plyt = matrix.get("plyteles_sienos_grindys_combined_m2", {})
     n_plyt = sum(1 for v in plyt.values() if v is not None)
     obs.append(f"- **Plytelės sienos+grindys combined** present in {n_plyt}/6 — three projects "
-               f"use this combined unit, Beržų splits into separate sienos and grindys, "
+               f"use this combined unit, Objektas A splits into separate sienos and grindys, "
                f"romainiai has no tile work at all.")
 
     for o in obs:

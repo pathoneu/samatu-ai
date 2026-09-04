@@ -1,10 +1,10 @@
-"""Build the 2026-08-22 Beržų ablation PDFs — 'synthetic foreign projects' with
+"""Build the 2026-08-22 Objektas A ablation PDFs — 'synthetic foreign projects' with
 KNOWN truth.
 
 We have no out-of-sample interior PDF, so we manufacture the ways a foreign
-project differs from Beržų while keeping Beržų's contractor-verified truth:
+project differs from Objektas A while keeping Objektas A's contractor-verified truth:
 
-  bundle           SA-02 (37 pp architectural part) + Beržų (17 pp) = 54 pp —
+  bundle           SA-02 (37 pp architectural part) + Objektas A (17 pp) = 54 pp —
                    the interior sheets buried inside a full technical project,
                    which is what a contractor actually uploads.
   no_eksplikacija  page 2 rasterised with the PATALPŲ EKSPLIKACIJA table whited
@@ -28,9 +28,9 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SRC = ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+SRC = ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
 SA02 = ROOT / "backend/test_pdfs/SA-02.pdf"
-OUT = ROOT / "docs/superpowers/fixtures/2026-08-22-berzas-ablations"
+OUT = ROOT / "docs/superpowers/fixtures/2026-08-22-objektas-a-ablations"
 FONT = ROOT / "backend/assets/fonts/DejaVuSans.ttf"
 OUT.mkdir(parents=True, exist_ok=True)
 pdfmetrics.registerFont(TTFont("DejaVu", str(FONT)))
@@ -70,7 +70,7 @@ def _raster_page_pdf(src: pathlib.Path, page_no: int, dpi: int,
 
 
 def build_no_eksplikacija():
-    """The table is NOT only on p2: Beržų repeats the PATALPŲ EKSPLIKACIJA in
+    """The table is NOT only on p2: Objektas A repeats the PATALPŲ EKSPLIKACIJA in
     the title block of EVERY plan sheet (p2–p10, verified 2026-08-23 — the
     first build removed one of nine copies and the reader simply found the
     next). Rasterise every page whose text layer carries the header, white
@@ -93,7 +93,7 @@ def build_no_eksplikacija():
                                         (float(pl.width), float(pl.height)))
             writer.add_page(PdfReader(io.BytesIO(page_pdf)).pages[0])
             n_done += 1
-    out = OUT / "berzas_no_eksplikacija.pdf"
+    out = OUT / "objektas_a_no_eksplikacija.pdf"
     writer.write(str(out))
     print(f"no_eksplikacija: {out.name} — table removed on {n_done} pages (image + text layer)")
 
@@ -104,7 +104,7 @@ def build_no_isklotines():
         if 10 <= i <= 15:          # pages 11..16 (1-based) = išklotinės
             continue
         writer.add_page(page)
-    out = OUT / "berzas_no_isklotines.pdf"; writer.write(str(out))
+    out = OUT / "objektas_a_no_isklotines.pdf"; writer.write(str(out))
     print(f"no_isklotines: {out.name} — {len(writer.pages)} pages (dropped 11–16)")
 
 
@@ -112,8 +112,8 @@ def build_bundle():
     writer = PdfWriter()
     for p in PdfReader(str(SA02)).pages: writer.add_page(p)
     for p in PdfReader(str(SRC)).pages: writer.add_page(p)
-    out = OUT / "berzas_bundle.pdf"; writer.write(str(out))
-    print(f"bundle: {out.name} — {len(writer.pages)} pages (SA-02 37 + Beržų 17, interior last)")
+    out = OUT / "objektas_a_bundle.pdf"; writer.write(str(out))
+    print(f"bundle: {out.name} — {len(writer.pages)} pages (SA-02 37 + Objektas A 17, interior last)")
 
 
 def build_flat150():
@@ -123,7 +123,7 @@ def build_flat150():
     for i in range(len(reader.pages)):
         page_pdf = _raster_page_pdf(SRC, i + 1, 150, None, None, sizes[i])
         writer.add_page(PdfReader(io.BytesIO(page_pdf)).pages[0])
-    out = OUT / "berzas_flat150.pdf"; writer.write(str(out))
+    out = OUT / "objektas_a_flat150.pdf"; writer.write(str(out))
     print(f"flat150: {out.name} — {len(writer.pages)} pages rasterised, no text layer")
 
 

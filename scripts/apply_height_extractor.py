@@ -34,8 +34,8 @@ def _pick_title_block_page(ai: dict) -> int:
 
 
 def _resolve_pdf(slug: str, entry: dict) -> Path:
-    if slug == "berzas":
-        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    if slug == "objektas_a":
+        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     return REPO_ROOT / entry["project_pdf"]
 
 

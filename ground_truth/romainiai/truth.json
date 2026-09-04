@@ -1,7 +1,7 @@
 {
   "$schema_version": 1,
   "project_id": "romainiai",
-  "name": "Romainiai (Objektas C)",
+  "name": "Objektas E",
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Objektas C INTERJERAS 4.1-5.1 punktas.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf",
@@ -18,7 +18,7 @@
       "height_fusion_found_the_right_value_and_refused_to_apply_it": "_height_fusion recorded signal source='explicit', value_m=3.0, confidence='high', evidence='ŠVARUS LUBŲ AUKŠTIS: 300cm' — then updated 0 rooms and 'preserved' 3.71 in all 20. height_fusion.apply_fused_height_to_rooms skips any room whose current height is not in VISION_DEFAULT_HEIGHTS_M, on the assumption that a non-default value means Vision read something specific. A hallucinated value is also non-default, so garbage outranks a high-confidence explicit annotation. NOT fixed here (shared engine, outside this audit's lane)."
     },
     "metric_mapping_defects": {
-      "angokrasciu_m": "Truth wires ONLY pasiūlymas item 9 (23.8 m, window/opening reveals). Item 6 'Durų angų paruošimas beapvadinėms durims' (23.92 m) sits in the unused key doors_atkosai_m. The app metric angokrasciu_gkp_m_total is Σ over ALL doors (W+2H) + interior windows (W+2H) = 64.0 m, i.e. doors AND windows. berzas maps both contractor lines ('samata-truth item 13/14 (atkosai)' → 89.39, scoring +0.13%); romainiai maps one. Against 23.8+23.92=47.72 the app reads +34.1%, not +168.9%. Do not read the +168.9% as an extraction error of that size.",
+      "angokrasciu_m": "Truth wires ONLY pasiūlymas item 9 (23.8 m, window/opening reveals). Item 6 'Durų angų paruošimas beapvadinėms durims' (23.92 m) sits in the unused key doors_atkosai_m. The app metric angokrasciu_gkp_m_total is Σ over ALL doors (W+2H) + interior windows (W+2H) = 64.0 m, i.e. doors AND windows. objektas_a maps both contractor lines ('samata-truth item 13/14 (atkosai)' → 89.39, scoring +0.13%); romainiai maps one. Against 23.8+23.92=47.72 the app reads +34.1%, not +168.9%. Do not read the +168.9% as an extraction error of that size.",
       "pasleptu_duru_staktos_m": "FIXED 2026-07-29 in the harness, not here. The accessor read santrauka['pasleptu_duru_staktu_m_total'], a dead key that is 0.0 on all five benchmark projects (universal_rules accumulates it from a per-room field that nothing writes — prompt.py forbids Vision from emitting it). The quantity is real and IS produced, as the pozicija 'Durų angų paruošimas beapvadinėms durims' = 5.1 m. Score moved −100.00% → +2.00%. CAVEAT: 5.1 m is the app's single tagged pasleptos_duris (900×2100) and matches truth item 7 (5.0) numerically, but the app's pozicija carries item 6's NAME (23.92 m). The +2% may be a naming coincidence — treat it as 'no longer measuring a dead key', not as a validated agreement.",
       "rotband_lyginimas_m2": "The app value is a fixed 30%-of-walls_paintable share (0.30 × 936.81 = 281.04), one of the harness's three FROZEN formulas (kampai / rotband / silikonavimas, thaw at N≥3 human-confirmed values). It is not an independent read, so this metric re-expresses the wall-area error rather than measuring rotband extraction."
     },

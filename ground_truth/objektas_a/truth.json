@@ -1,11 +1,11 @@
 {
   "$schema_version": 1,
-  "project_id": "berzas",
-  "name": "Beržų g. 24",
-  "pdf_path": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf",
+  "project_id": "objektas_a",
+  "name": "Objektas A",
+  "pdf_path": "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf",
   "source": {
-    "notes_md": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/contractor-notes-verbatim.md",
-    "samata_pdf": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf",
+    "notes_md": "docs/superpowers/fixtures/2026-05-26-objektas-a/contractor-notes-verbatim.md",
+    "samata_pdf": "docs/superpowers/fixtures/2026-05-26-objektas-a/samata-truth.pdf",
     "contractor": "Rangovas A",
     "date_collected": "2026-05-26"
   },

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile the app's emitted SANITARY FITTING lines against the contractor's.
 
-WHY (2026-07-29): on Beržų g. 24 the app emitted 5 vnt of mixer/sprayer
+WHY (2026-07-29): on Objektas A the app emitted 5 vnt of mixer/sprayer
 installation work against the contractor's 22 — a −77% aggregate. The cause was
 not a reading failure: the contractor bills the LT-conventional PAIR for every
 concealed (potinkinis) mixer — the in-wall body during rough-in, the visible
@@ -13,7 +13,7 @@ emitted Santechnikos-darbai lines onto the contractor's line items, so the
 before/after is a number and not a claim.
 
 Usage:
-    ./venv/bin/python scripts/reconcile_sanitary_lines.py                # berzas
+    ./venv/bin/python scripts/reconcile_sanitary_lines.py                # objektas_a
     ./venv/bin/python scripts/reconcile_sanitary_lines.py objektas_b
     ./venv/bin/python scripts/reconcile_sanitary_lines.py --all
 """
@@ -32,15 +32,15 @@ sys.path.insert(0, str(REPO / "backend"))
 # EXCLUDES single-job items (klozetas, WC rėmas, gyvatukas, skalbimo mašina,
 # sifonas, latakas, plautuvė) so the number isn't inflated by lines that were
 # never in dispute.
-# The `sistem` alternate catches ciurliu nr 1-2 ("Potinkinės dušo/praustuvo
+# The `sistem` alternate catches objektas_c nr 1-2 ("Potinkinės dušo/praustuvo
 # SISTEMOS įrengimas") — the same concealed mixer work billed as one bundled
-# line instead of a pair. Without it ciurliu reads as "no sanitary lines".
+# line instead of a pair. Without it objektas_c reads as "no sanitary lines".
 FAMILIES = {
     "praustuve": {
         "lt": "Praustuvės maišytuvas",
         "contractor": re.compile(r"praustuv\w*\s+(maišytuv|sistem)", re.I),
         # The contractor's "praustuvo maišytuvas" bucket is EVERY sink mixer in
-        # the house, kitchen and laundry included: berzas bills 5 of them
+        # the house, kitchen and laundry included: objektas_a bills 5 of them
         # against 2 bathrooms, and carries no separate virtuvės-maišytuvas line
         # at all. Since 2026-07-29 we bill that same work under two labels —
         # `praustuves` is bathroom-only and the kitchen/laundry sink mixer goes
@@ -78,7 +78,7 @@ def _is_fitting_line(name: str) -> bool:
       · '… rėmo montavimas' is the in-wall carrier frame, billed separately and
         never in dispute.
       · a pure '… privedimas' line (objektas_b nr 93/94) is pipe routing with no
-        fitting installed. It must NOT swallow berzas nr 40, whose full text is
+        fitting installed. It must NOT swallow objektas_a nr 40, whose full text is
         '… potinkinės dalies montavimas, kanalizacijos privedimas' — that IS the
         rough-in half. Hence: prep-only counts as prep, prep-plus-install counts
         as install.
@@ -124,7 +124,7 @@ def app_fittings(slug: str, *, rebuild: bool = True,
     unsplit=True  → today's builder with `santechnika_potinkinis` forced off,
       i.e. the one-line-per-fixture shape this change replaced, on the SAME
       inputs. That is the honest before/after control: the stored column can
-      differ for reasons that have nothing to do with the split (berzas's cache
+      differ for reasons that have nothing to do with the split (objektas_a's cache
       predates the RC1 basin-count fix, so it says 2 where the symbol count
       says 3).
     """
@@ -210,7 +210,7 @@ def main() -> int:
         slugs = sorted(p.parent.name for p in
                        (REPO / "ground_truth").glob("*/ai_extract.json"))
     else:
-        slugs = args or ["berzas"]
+        slugs = args or ["objektas_a"]
     for slug in slugs:
         report(slug)
     return 0

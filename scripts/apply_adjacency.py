@@ -19,7 +19,7 @@ Per-project gates (user pre-authorized via 2026-06-01 spec section 5.2):
 
 Usage:
   python scripts/apply_adjacency.py                  # all projects
-  python scripts/apply_adjacency.py --only ciurliu   # one project
+  python scripts/apply_adjacency.py --only objektas_c   # one project
   python scripts/apply_adjacency.py --dry-run        # parse only, no Vision
 """
 
@@ -35,17 +35,17 @@ import yaml
 
 # Per-project gates (set from contractor scope variance observed in N=4 sprint)
 PROJECTS_KEEP_WINDOWS_INTERIOR: set[str] = {
-    # The Beržų +0.13% angokraščiai accuracy was a --use-gt-inputs math
+    # The Objektas A +0.13% angokraščiai accuracy was a --use-gt-inputs math
     # mode number using contractor-provided dimensions. In production
     # (Vision-extracted elementai), the windows-exterior heuristic gives
-    # Beržų -12.69%, which is BETTER than the +54.86% obtained by
-    # gating windows interior. Hence: no Beržų gate; heuristic universal.
+    # Objektas A -12.69%, which is BETTER than the +54.86% obtained by
+    # gating windows interior. Hence: no Objektas A gate; heuristic universal.
 }
 PROJECTS_SKIP_PARTITION_CORNERS = {
-    # Ciurliu's contractor truth = 201.86m kampai. With partition corners
+    # Objektas C's contractor truth = 201.86m kampai. With partition corners
     # included, AI overshoots to 274.82m = +36%. Without, AI = 224.06 =
-    # +11%. The closer-to-zero option is to skip partitions on ciurliu.
-    "ciurliu",
+    # +11%. The closer-to-zero option is to skip partitions on objektas_c.
+    "objektas_c",
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -71,8 +71,8 @@ def _load_pdf_floor_image(project_pdf: Path, scale_source_page: int | None) -> t
 
 
 def _resolve_project_pdf(slug: str, ai: dict, registry_entry: dict) -> Path | None:
-    if slug == "berzas":
-        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    if slug == "objektas_a":
+        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     return REPO_ROOT / registry_entry["project_pdf"]
 
 
@@ -83,8 +83,8 @@ def process_project(slug: str, dry_run: bool = False) -> dict:
         return {"slug": slug, "status": "unknown_slug"}
 
     # Locate AI extract
-    if slug == "berzas":
-        ai_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json"
+    if slug == "objektas_a":
+        ai_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json"
     else:
         ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
     if not ai_path.exists():
@@ -151,9 +151,9 @@ def process_project(slug: str, dry_run: bool = False) -> dict:
     (out_dir / "adjacency.json").write_text(
         json.dumps(adj.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    # For berzas, also write into ground_truth/berzas
-    if slug == "berzas":
-        ai_path = REPO_ROOT / "ground_truth" / "berzas" / "ai_extract.json"
+    # For objektas_a, also write into ground_truth/objektas_a
+    if slug == "objektas_a":
+        ai_path = REPO_ROOT / "ground_truth" / "objektas_a" / "ai_extract.json"
     ai["_adjacency_applied"] = {
         "page_used": page_used,
         "summary": summary,

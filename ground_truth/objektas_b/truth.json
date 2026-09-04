@@ -46,7 +46,7 @@
     "dazymo_walls_plus_ceilings_combined_m2": {
       "value": 493.03,
       "confidence": "green",
-      "source": "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Beržų convention"
+      "source": "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Objektas A convention"
     },
     "dazymo_iki_3m_m2": {
       "value": 424.75,
@@ -137,7 +137,7 @@
       "value": 349.84,
       "confidence": "derived",
       "source": "derived: dazymo_walls_plus_ceilings_combined 493.03 − billed GKP ceilings (74.91 + 68.28 = 143.19)",
-      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity holds exactly on Beržų: GKP 102.78+62.82 = 165.60 = contractor ceiling paint; and here item 17 dažymo virš 3m = 68.28 = GKP virš 3m exactly). Clay-plastered walls (item 18, 160 m²) are billed separately and are NOT in this paint figure."
+      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity holds exactly on Objektas A: GKP 102.78+62.82 = 165.60 = contractor ceiling paint; and here item 17 dažymo virš 3m = 68.28 = GKP virš 3m exactly). Clay-plastered walls (item 18, 160 m²) are billed separately and are NOT in this paint figure."
     },
     "ceiling_paint_total_m2": {
       "value": 143.19,

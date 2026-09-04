@@ -1,8 +1,8 @@
-"""Experiment 2 — text-derived vs geometry-derived quantities on Beržų.
+"""Experiment 2 — text-derived vs geometry-derived quantities on Objektas A.
 
 Two probes (live Vision, ~$0.3 total), then offline lane analysis:
 
-PROBE A (full-page, current pipeline delivery): berzas floor page rendered the
+PROBE A (full-page, current pipeline delivery): objektas_a floor page rendered the
 way Pass-1 sees it (≤2000px). Ask ONLY for transcription of per-room dimension
 strings (no visual estimation).
 PROBE B (tiled delivery): same page at 300 DPI cut into 4 overlapping tiles,
@@ -30,8 +30,8 @@ sys.path.insert(0, str(REPO / "backend"))
 from dotenv import load_dotenv  # noqa: E402
 load_dotenv(REPO / "backend" / ".env")
 
-PDF = REPO / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
-CACHED = REPO / "ground_truth/berzas/ai_extract.json"
+PDF = REPO / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
+CACHED = REPO / "ground_truth/objektas_a/ai_extract.json"
 OUT = REPO / "eval_runs/2026-06-11_experiments"
 FLOOR_PAGE = 2
 TRUTH_WALLS = 460.71   # contractor: sienos žemos 278.67 + aukštos 150.59 + garažas 31.45

@@ -62,7 +62,7 @@ def build_quantities(extract: dict, slug: str) -> list[dict]:
         return next((r for r in rooms if str(r.get("nr")) == nr), None)
 
     Q: list[dict] = []
-    if slug == "berzas":
+    if slug == "objektas_a":
         Q = [
             dict(name="floor_total", app=floor, truth=165.64, inputs=[]),
             dict(name="ceiling_paint", app=ceil, truth=165.6, inputs=[]),

@@ -2,7 +2,7 @@
 
 Usage:
     python eval_harness.py --use-gt-inputs            # bypass Vision, feed GT primitives
-    python eval_harness.py --use-gt-inputs --project berzas
+    python eval_harness.py --use-gt-inputs --project objektas_a
     python eval_harness.py --replay <extract.json>    # diff a saved extractor output
     python eval_harness.py --vision                   # call the real Vision pipeline ($$)
 
@@ -30,12 +30,12 @@ EVAL_RUNS_ROOT = REPO_ROOT / "eval_runs"
 
 # ── Registry ───────────────────────────────────────────────────────────────────
 REGISTRY: dict[str, dict[str, str]] = {
-    "berzas": {
-        "name": "Beržų g. 24",
-        "truth_path": "ground_truth/berzas/truth.json",
-        "pdf_path": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf",
+    "objektas_a": {
+        "name": "Objektas A",
+        "truth_path": "ground_truth/objektas_a/truth.json",
+        "pdf_path": "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf",
         # Cached known-good Vision extract used by --replay if Vision is not called.
-        "replay_path": "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+        "replay_path": "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
     },
 }
 
@@ -45,17 +45,17 @@ sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 def _merge_registry_yaml() -> None:
     """W1.2: fold ground_truth/registry.yaml projects into REGISTRY so
-    single-project modes (``--project ciurliu --vision``) reach every
-    benchmark project, not just the hardcoded berzas entry. The YAML key
+    single-project modes (``--project objektas_c --vision``) reach every
+    benchmark project, not just the hardcoded objektas_a entry. The YAML key
     ``project_pdf`` maps to the in-file ``pdf_path``. Hardcoded entries win
-    (berzas keeps its replay_path)."""
+    (objektas_a keeps its replay_path)."""
     reg_path = GROUND_TRUTH_ROOT / "registry.yaml"
     if not reg_path.exists():
         return
     try:
         import yaml
         reg = yaml.safe_load(reg_path.read_text(encoding="utf-8")) or {}
-    except Exception as exc:  # malformed registry — single-project berzas still works
+    except Exception as exc:  # malformed registry — single-project objektas_a still works
         print(f"  ⚠ registry.yaml not merged: {exc}")
         return
     for entry in reg.get("projects") or []:
@@ -239,7 +239,7 @@ METRICS: dict[str, dict[str, Any]] = {
     "plyteles_sienos_grindys_combined_m2": {
         # Rangovas A bills wall+floor tiling as combined m² lines (per tile
         # format). Compare against our grindys+sienos sum. Projects with
-        # per-surface truth (berzas) keep the split metrics above instead.
+        # per-surface truth (objektas_a) keep the split metrics above instead.
         "label": "Plytelės (sienos+grindys kartu)",
         "accessor": lambda p: round(
             _santrauka_get(p, "plyteles_grindys_m2_total")
@@ -250,7 +250,7 @@ METRICS: dict[str, dict[str, Any]] = {
     "pvc_grindys_m2": {
         # Engine bucket = non-tile finished floor covering (rt_rules floor ==
         # "parquet" family: PVC / parketas / laminatas). Truth wires the
-        # project's covering line (ciurliu/lazunu: PVC; objektas_b: parketas).
+        # project's covering line (objektas_c/objektas_d: PVC; objektas_b: parketas).
         "label": "Grindų danga (PVC/parketas)",
         "accessor": lambda p: _santrauka_get(p, "pvc_grindys_m2_total"),
         "unit": "m²",
@@ -1264,7 +1264,7 @@ def _print_collapsed_footnote(per_project_summary: list[dict]) -> None:
     """Loudly list any FRESH-production (ai_extract) headline metrics that
     collapsed to 0.0 against a real >0 truth. These ARE counted in the MAE
     (as ~-100% fails) but a single dilution-resistant average can still bury
-    a total collapse, so we name them explicitly. Without this, a non-berzas
+    a total collapse, so we name them explicitly. Without this, a non-objektas_a
     project silently emitting 0 for combined paint would vanish from the
     honest score (the old behaviour this replaces)."""
     flagged = [(s["slug"], s.get("metrics_collapsed") or [])
@@ -1340,7 +1340,7 @@ def _partition_headline_metrics(results, ai_mode):
         contractor measured something. SCORE it (lands as a ~-100% fail) AND
         flag it in `collapsed` so it can never hide behind the project
         average. Silently dropping it (the old behaviour) would let a
-        non-berzas project's collapsed headline metric vanish from the honest
+        non-objektas_a project's collapsed headline metric vanish from the honest
         MAE — see docs/superpowers/research/2026-06-09-benchmark-honesty-regen.md.
 
     Any other ai_mode (e.g. use_gt_inputs) scores everything as-is.
@@ -1440,8 +1440,8 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
             continue
         # ABLATIONS (2026-08-22): synthetic variants of a corpus project that
         # share its truth file. Scored individually (--project X --vision),
-        # never averaged — four Beržų variants would quadruple its weight and
-        # turn the corpus MAE into a Beržų MAE.
+        # never averaged — four Objektas A variants would quadruple its weight and
+        # turn the corpus MAE into an Objektas A MAE.
         if entry.get("ablation_of"):
             per_project_summary.append({
                 "slug": slug, "status": "excluded_ablation",
@@ -1571,7 +1571,7 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
 
 def _infer_slug_from_run_name(name: str) -> str | None:
     """Infer the project slug from a run-dir name like
-    ``2026-07-03_11-16-18_berzas_vision``. Longest slug wins so future
+    ``2026-07-03_11-16-18_objektas_a_vision``. Longest slug wins so future
     slugs that contain another slug as a substring can't mis-match."""
     hits = [slug for slug in REGISTRY if f"_{slug}_" in f"_{name}_"]
     return max(hits, key=len) if hits else None
@@ -1791,7 +1791,7 @@ def human_corpus_summary() -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sąmatų AI evaluation harness")
     ap.add_argument("--project", default=None,
-                    help="project id in REGISTRY (default: berzas; for "
+                    help="project id in REGISTRY (default: objektas_a; for "
                          "--rescore it is inferred from the run-dir name)")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--use-gt-inputs", action="store_true",
@@ -1931,7 +1931,7 @@ def main() -> int:
         mode = "vision"
     else:
         mode = "use_gt_inputs"  # default: cheapest, safest
-    return run_one(args.project or "berzas", mode,
+    return run_one(args.project or "objektas_a", mode,
                    estimate_exterior=args.estimate_exterior,
                    apply_calibration=args.apply_calibration,
                    track_drift=args.track_drift,

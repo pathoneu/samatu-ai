@@ -109,9 +109,9 @@ def main() -> int:
 
 <h2>Honest disclosure</h2>
 <ul>
-  <li>The <code>--use-gt-inputs</code> mode (math correctness only) shows Beržų MAE 0.68%.</li>
+  <li>The <code>--use-gt-inputs</code> mode (math correctness only) shows Objektas A MAE 0.68%.</li>
   <li>The <code>--totals-only</code> mode (production pipeline incl Vision drift)
-      shows Beržų MAE {mae:.2f}%. <strong>This is the user-facing accuracy.</strong></li>
+      shows Objektas A MAE {mae:.2f}%. <strong>This is the user-facing accuracy.</strong></li>
   <li>5 of 6 projects show <em>no_ai_side</em>: no cached extract and no
       <code>gt_dimensions</code> populated. To bring them into this baseline,
       either run Vision extraction (~$2–10/project for the larger TPs) or

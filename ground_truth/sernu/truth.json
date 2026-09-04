@@ -1,8 +1,8 @@
 {
   "$schema_version": 1,
   "project_id": "sernu",
-  "name": "Šernų g. 18B, Kaunas",
-  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf",
+  "name": "Objektas F",
+  "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_objektas_f_plyteles_2025 04 02.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
     "contractor": "Rangovas A",

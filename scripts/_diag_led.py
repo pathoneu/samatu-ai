@@ -51,7 +51,7 @@ def apply_gate(parsed):
     return parsed, src, dropped
 
 
-for slug in ["berzas", "objektas_b", "ciurliu", "lazunu"]:
+for slug in ["objektas_a", "objektas_b", "objektas_c", "objektas_d"]:
     raw = json.loads((ROOT / f"ground_truth/{slug}/ai_extract.json")
                      .read_text(encoding="utf-8"))
     out = {}

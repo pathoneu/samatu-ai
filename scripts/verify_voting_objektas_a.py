@@ -1,4 +1,4 @@
-"""Live A/B verification of N-pass extraction voting on the Beržų fixture.
+"""Live A/B verification of N-pass extraction voting on the Objektas A fixture.
 
 Runs extract_interior twice on the SAME PDF:
   A) single-pass (ENABLE_EXTRACTION_VOTING=0) — reproduces the production bug
@@ -9,7 +9,7 @@ Writes both results to /tmp (NEVER overwrites the cached benchmark extract) and
 prints kampai / combined-paint / n_partition_walls vs contractor truth (493.35
 kampai, 584.81 combined paint).
 
-Usage: venv/bin/python scripts/verify_voting_berzas.py
+Usage: venv/bin/python scripts/verify_voting_objektas_a.py
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ sys.path.insert(0, str(REPO / "backend"))
 from dotenv import load_dotenv  # noqa: E402
 load_dotenv(REPO / "backend" / ".env")
 
-PDF = REPO / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+PDF = REPO / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
 TRUTH_KAMPAI = 493.35
 TRUTH_PAINT = 584.81
 
@@ -105,7 +105,7 @@ def run(label: str, voting: bool, n: int = 3) -> dict:
         "n_partition_walls_total": _npw_total(result),
         "voting_meta": result.get("_voting"),
     }
-    (Path("/tmp") / f"berzas_{label}.json").write_text(
+    (Path("/tmp") / f"objektas_a_{label}.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  ✓ {dt:.0f}s · {out['n_rooms']} rooms", flush=True)
     print(f"    kampai            = {out['kampai']:.2f}  (truth {TRUTH_KAMPAI}, "
@@ -138,9 +138,9 @@ def main() -> int:
             print(f"  {r['label']:16} kampai={r['kampai']:7.2f}  "
                   f"paint={r['combined_paint']:7.2f}  npw={r['n_partition_walls_total']:3d}  "
                   f"({r['seconds']:.0f}s)", flush=True)
-    (Path("/tmp") / "berzas_voting_ab_summary.json").write_text(
+    (Path("/tmp") / "objektas_a_voting_ab_summary.json").write_text(
         json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("\nSaved → /tmp/berzas_voting_ab_summary.json", flush=True)
+    print("\nSaved → /tmp/objektas_a_voting_ab_summary.json", flush=True)
     return 0
 
 

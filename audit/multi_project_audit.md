@@ -7,7 +7,7 @@
 ## TL;DR
 
 The user's instinct was right. There IS a systematic Vision bug, but
-it's **not the +0.61% Beržų combined-paint gap the council was
+it's **not the +0.61% Objektas A combined-paint gap the council was
 chasing**. It's LED niches under-counted by 5–55% on every project,
 and the root cause is one line in `backend/extractor/vision/page_dispatch.py`.
 
@@ -15,15 +15,15 @@ and the root cause is one line in `backend/extractor/vision/page_dispatch.py`.
 
 | Project | Combined paint | Walls | Ceiling | LED niches | MAE |
 |---|---:|---:|---:|---:|---:|
-| **berzas** | -4.75% | -4.18% | +0.02% | **-5.44%** | 2.88% |
+| **objektas_a** | -4.75% | -4.18% | +0.02% | **-5.44%** | 2.88% |
 | **objektas_b** | -0.80% | (n/e) | (n/e) | **-54.75%** | **27.77%** |
-| **ciurliu** | -20.33% | (n/e) | (n/e) | **-28.74%** | **24.53%** |
+| **objektas_c** | -20.33% | (n/e) | (n/e) | **-28.74%** | **24.53%** |
 | romainiai | excluded (scope mismatch) | | | | |
 | sernu | excluded (no architectural plan) | | | | |
-| lazunu | excluded (partial input) | | | | |
+| objektas_d | excluded (partial input) | | | | |
 
 (n/e = not emitted: the production pipeline's santrauka doesn't
-surface these fields for non-Beržų projects yet.)
+surface these fields for non-Objektas-A projects yet.)
 
 ## Phase 2: contractor samatas parsed (zero cost)
 
@@ -32,28 +32,28 @@ registry and produces `ground_truth/<slug>/contractor_samata_parsed.json`:
 
 | Project | Line items | With qty | Sections |
 |---|---:|---:|---:|
-| berzas | 58 | 53 | 5 |
+| objektas_a | 58 | 53 | 5 |
 | objektas_b | 121 | 111 | 8 |
-| ciurliu | 44 | 36 | 7 |
+| objektas_c | 44 | 36 | 7 |
 | romainiai | 16 | 15 | 1 |
 | sernu | 32 | 28 | 3 |
-| lazunu | 58 | 50 | 8 |
+| objektas_d | 58 | 50 | 8 |
 
-Each samata has explicit LED-niche line items (Beržų #3+#5+#23,
+Each samata has explicit LED-niche line items (Objektas A #3+#5+#23,
 Objektas B #4+#27+#29, etc.), all with units `m` or `b/m`.
 
 ## Phase 4: the pattern
 
 ```
 project         LED truth  AI extract     diff   diff %
-berzas              42.30      40.00       -2.30   -5.44%
+objektas_a              42.30      40.00       -2.30   -5.44%
 objektas_b        54.98      24.88      -30.10  -54.75%
-ciurliu             16.84      12.00       -4.84  -28.74%
+objektas_c             16.84      12.00       -4.84  -28.74%
 ```
 
 **LED is systematically under-counted on every project that ran
 through the pipeline.** Sign is always negative. Magnitude scales with
-project size: small project (ciurliu) misses 30%, medium (berzas)
+project size: small project (objektas_c) misses 30%, medium (objektas_a)
 misses 5% (helped by prior manual niche-locator fold), large
 (objektas_b) misses 55%.
 
@@ -70,20 +70,20 @@ Root cause is **explicitly documented in the code** at
 > ...For now it's import-and-test-only — `extract_interior` is
 > unchanged. **Wiring it into prod is a config-flag flip away.**"
 
-We now have N=4 (berzas, objektas_b, ciurliu, lazunu). The
+We now have N=4 (objektas_a, objektas_b, objektas_c, objektas_d). The
 constraint in the comment is satisfied. **Wiring
 `dispatch_secondary_passes(...)` with `ceiling_plan → niche_locator`
 into `extract_interior` is the actionable fix.**
 
 Expected impact:
-- berzas: -5.44% → ~-1.66% (the prior session's manual fold achieved this)
+- objektas_a: -5.44% → ~-1.66% (the prior session's manual fold achieved this)
 - objektas_b: -54.75% → likely below -10% (the niche_locator finds
   niches missed by the main pass; bigger gain on bigger projects)
-- ciurliu: -28.74% → likely below -10%
+- objektas_c: -28.74% → likely below -10%
 - Cost: $0.30-0.50 per ceiling_plan page × ~1-2 pages per project =
   $0.30-1.00 per project at extraction time
 
-## The +0.61% Beržų combined paint gap is separate
+## The +0.61% Objektas A combined paint gap is separate
 
 In `--use-gt-inputs` mode (calculator only, no Vision noise):
 
@@ -92,7 +92,7 @@ In `--use-gt-inputs` mode (calculator only, no Vision noise):
 | Combined paint | 584.81 | 588.38 | +0.61% |
 | Walls | 460.71 | 464.86 | +0.90% |
 
-This +0.61% on Beržų is the calculator working from truth.json's
+This +0.61% on Objektas A is the calculator working from truth.json's
 gt_dimensions. Per the prior council pass, gt_dimensions themselves
 are Vision-derived (yellow confidence in truth.json: "perimetras,
 lubu_aukstis, elementai are yellow"). The +0.61% is the cumulative
@@ -110,12 +110,12 @@ floor on N=1 truth."** Not the same as the LED-niches systemic bug.
 - **Phase 3 line-by-line tables for every project**: started but not
   completed. The 4-project LED comparison above is the most actionable
   cross-project pattern; the remaining categories (tiles, GKP, corners)
-  on objektas_b/ciurliu would require running the same systematic
-  comparison with objektas_b's 121-item + ciurliu's 44-item samatas
+  on objektas_b/objektas_c would require running the same systematic
+  comparison with objektas_b's 121-item + objektas_c's 44-item samatas
   against ai_extract.json. ~1-2 hrs of mechanical work.
 - **Phase 5 fix application**: the niche-locator wiring needs careful
   code + tests; not committing without explicit OK.
-- **Phase 6 per-room decomposition of Beržų's +0.61%**: skipped because
+- **Phase 6 per-room decomposition of Objektas A's +0.61%**: skipped because
   the gap is from yellow-confidence gt_dimensions, not from
   calculator math — per-room decomposition would just measure
   Vision noise.

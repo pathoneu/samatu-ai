@@ -44,7 +44,7 @@ def _load_dotenv(path: Path) -> None:
 
 PROMPT_PATH = REPO_ROOT / "prompts" / "perimeter_cot.txt"
 
-# Beržų rooms to test, with cached bboxes from earlier bbox_locator run.
+# Objektas A rooms to test, with cached bboxes from earlier bbox_locator run.
 TARGET_ROOMS = ["102", "110", "108"]  # Svetainė, Miegamasis, Berniuko-1
 
 
@@ -58,7 +58,7 @@ def main() -> int:
     from extractor.vision.dimension_extractor import _decode_response_json
     import anthropic
 
-    pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     pdf_bytes = pdf_path.read_bytes()
     pages = pdf_to_b64_images(pdf_bytes, max_pages=2)
     floor_b64 = pages[1]['image_b64']
@@ -67,7 +67,7 @@ def main() -> int:
     by_nr = {r.nr: r for r in bb.rooms}
 
     # Existing per-room perim from the gt_dimensions
-    truth = json.loads((REPO_ROOT / "ground_truth/berzas/truth.json").read_text())
+    truth = json.loads((REPO_ROOT / "ground_truth/objektas_a/truth.json").read_text())
     existing_perim = {str(r["nr"]): float(r.get("perimetras_m") or 0)
                       for r in truth["gt_dimensions"]}
 
@@ -158,7 +158,7 @@ def main() -> int:
     cost_usd = (cost_in / 1_000_000) * 15 + (cost_out / 1_000_000) * 75
     print(f"\nTotal Vision: in_tokens={cost_in}, out_tokens={cost_out}, est_cost=${cost_usd:.2f}")
 
-    out_path = REPO_ROOT / "eval_runs" / "berzas_cot_pilot.json"
+    out_path = REPO_ROOT / "eval_runs" / "objektas_a_cot_pilot.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(results, ensure_ascii=False, indent=2))
     print(f"Saved: {out_path}")
