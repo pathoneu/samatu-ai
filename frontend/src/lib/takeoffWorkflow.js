@@ -171,6 +171,30 @@ export function isRowVerified(row) {
 }
 
 /**
+ * The one line under the sąmata, in the contractor's own words:
+ *
+ *   „42 eilutės iš brėžinio, patikrintos 38 · 5 jūsų · 3 be kiekio“
+ *
+ * Four counts, no jargon, no percentage. `mine` is the rows he typed himself —
+ * they carry the `rnk-` (rankinė) id `darbuRows.manualRowId` mints, which is
+ * the only durable marker that survives a rebuild. `noQty` is the honest part:
+ * rows nobody could give a number to, which he must fill in or delete before
+ * the sąmata goes out.
+ */
+export function summarizeSamataRows(rows = []) {
+  const all = Array.isArray(rows) ? rows.filter(Boolean) : [];
+  const isMine = (r) => String(r?.id || r?._id || '').startsWith('rnk-');
+  const fromDrawingRows = all.filter((r) => !isMine(r));
+  return {
+    total: all.length,
+    fromDrawing: fromDrawingRows.length,
+    verified: fromDrawingRows.filter(isRowVerified).length,
+    mine: all.length - fromDrawingRows.length,
+    noQty: all.filter((r) => !(Number(r?.kiekis) > 0)).length,
+  };
+}
+
+/**
  * Share of the sąmata that has been verified by hand — by € once prices exist,
  * by kiekis before that (`usePrices` says which, so the UI can be honest).
  * An empty project reads 0, never 100.

@@ -1077,7 +1077,19 @@
       "undo": "Atšaukti",
       "clickToEditPrice": "Spustelėkite ir įveskite kainą. Enter — įrašyti ir pereiti prie kitos eilutės, Esc — atsisakyti.",
       "addRowToSectionTitle": "Pridėti eilutę į skyrių „{{section}}“",
-      "openLedgerTitle": "Spustelėkite — pamatysite, kaip šis skaičius suskaičiuotas"
+      "openLedgerTitle": "Spustelėkite — pamatysite, kaip šis skaičius suskaičiuotas",
+      "pricesTitle": "Kainos",
+      "pricesNote": "Kiekiai jau paskaičiuoti. Liko įrašyti savo įkainius — arba užpildyti iš kainyno.",
+      "pricesManual": "arba įveskite pats: spustelėkite kainos langelį lentelėje, įrašykite ir spauskite Enter — atsidarys kitos eilutės kaina.",
+      "rowSummary_one": "Iš brėžinio — {{count}} eilutė · patikrinta {{verified}}",
+      "rowSummary_few": "Iš brėžinio — {{count}} eilutės · patikrinta {{verified}}",
+      "rowSummary_other": "Iš brėžinio — {{count}} eilučių · patikrinta {{verified}}",
+      "rowSummaryMine_one": "{{count}} eilutė — jūsų įrašyta",
+      "rowSummaryMine_few": "{{count}} eilutės — jūsų įrašytos",
+      "rowSummaryMine_other": "{{count}} eilučių — jūsų įrašytos",
+      "rowSummaryNoQty_one": "{{count}} eilutė be kiekio — įrašykite arba ištrinkite",
+      "rowSummaryNoQty_few": "{{count}} eilutės be kiekio — įrašykite arba ištrinkite",
+      "rowSummaryNoQty_other": "{{count}} eilučių be kiekio — įrašykite arba ištrinkite"
     },
     "assumptions": {
       "widthPlaceholder": "plotis",

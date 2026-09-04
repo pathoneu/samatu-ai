@@ -23,11 +23,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { calcClaudeCostUSD } from '@/lib/pricing';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
-  Edit2, Check, X, Trash2, AlertCircle, Search, ClipboardCheck,
-  CircleDollarSign, PencilRuler, Target, Sliders, Star, Sigma,
+  Edit2, Check, X, Trash2, AlertCircle, Search, Sliders, Star, Sigma,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
@@ -48,21 +46,18 @@ import ExportDropdown from './ExportDropdown';
 import ReextractButton from './ReextractButton';
 import RowDetailPanel from './RowDetailPanel';
 import SanityWarningsBanner from './SanityWarningsBanner';
-import { useAuth } from '@/lib/authContext';
 import { createSession } from '@/lib/telemetry';
 import {
-  acceptPositionQuantity,
   adjustPositionQuantity,
   updatePositionQuantity,
 } from '@/lib/quantityOverride';
 import {
   TAKEOFF_FILTER_MODES,
   filterTakeoffRows,
-  getFirstReviewRow,
   getQuantitySourceKind,
   getQuantitySourceLabel,
   getRowTargetPage,
-  summarizeTakeoffWorkflow,
+  summarizeSamataRows,
 } from '@/lib/takeoffWorkflow';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -362,7 +357,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); adjustQty(-1); }}
-                className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-red-400 hover:text-red-400 transition-all"
+                className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-red-400 hover:text-red-400 transition-all"
                 title={t('project.mainView.subtract1')}
               >
                 −
@@ -388,7 +383,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); adjustQty(1); }}
-                className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-emerald-400 hover:text-emerald-400 transition-all"
+                className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-emerald-400 hover:text-emerald-400 transition-all"
                 title={t('project.mainView.add1')}
               >
                 +
@@ -463,7 +458,11 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
       <td className="px-3 py-2 text-sm font-semibold text-right tabular-nums">
         {item.kaina ? fmtEur(itemSuma) : '—'}
       </td>
-      <td className="px-3 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Always visible, never hover-only: a control a 52-year-old contractor
+          can only find by sweeping the mouse over a 118-row table is a control
+          he does not have (design §5). It is also what made the row 85 px tall
+          — in a 64 px column the three buttons wrapped onto three lines. */}
+      <td className="px-3 py-2 text-right whitespace-nowrap text-muted-foreground/70">
         {onOpenLedger && (
           <button onClick={() => onOpenLedger(item)}
             className="p-1 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded mr-1"
@@ -504,7 +503,6 @@ export default function ProjectMainView({
   onOpenAssumptions, focusSanityNonce = 0,
 }) {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
 
   // P0 (2026-07-27): "Pritaikyti kainyną" / re-extract push a NEW darbu_sarasas
@@ -550,24 +548,18 @@ export default function ProjectMainView({
   // Re-derived from the live array below so a recompute under an open panel
   // refreshes it instead of freezing yesterday's number on screen.
   const [detailRow, setDetailRow] = useState(null);
-  const [reviewDraftQty, setReviewDraftQty] = useState('');
+  // Search stays (118 rows is a lot to scroll); the four filter chips and the
+  // four stat tiles above the table are gone — design §4.
   const [takeoffQuery, setTakeoffQuery] = useState('');
-  const [takeoffMode, setTakeoffMode] = useState(TAKEOFF_FILTER_MODES.all);
 
   const visibleDarbai = useMemo(() => filterTakeoffRows(darbai, {
     query: takeoffQuery,
-    mode: takeoffMode,
-  }), [darbai, takeoffQuery, takeoffMode]);
+    mode: TAKEOFF_FILTER_MODES.all,
+  }), [darbai, takeoffQuery]);
   const grouped = useMemo(() => groupByCategory(visibleDarbai, t('project.mainView.otherWorks')), [visibleDarbai, t]);
   const categories = Object.keys(grouped);
-  const workflowSummary = useMemo(() => summarizeTakeoffWorkflow(project, {
-    hasPdf: !!onShowDrawing,
-  }), [project, onShowDrawing]);
-  const reviewRows = useMemo(
-    () => filterTakeoffRows(darbai, { mode: TAKEOFF_FILTER_MODES.review }),
-    [darbai],
-  );
-  const currentReview = useMemo(() => getFirstReviewRow(darbai), [darbai]);
+  // The one honest line under the table (design §E4).
+  const rowSummary = useMemo(() => summarizeSamataRows(darbai), [darbai]);
 
   // The open ledger panel holds a captured row; every price keystroke replaces
   // the array under it. Re-derive so it never shows a stale quantity —
@@ -576,10 +568,6 @@ export default function ProjectMainView({
   const openDetailRow = useMemo(
     () => (detailRow ? findRowById(darbai, detailRow) || detailRow : null),
     [detailRow, darbai]);
-
-  useEffect(() => {
-    if (currentReview) setReviewDraftQty(String(currentReview.kiekis ?? 0).replace('.', ','));
-  }, [currentReview?._id, currentReview?.eil_nr, currentReview?.aprasymas, currentReview?.kiekis]);
 
   const totals = useMemo(() => {
     let darbo = 0, medz = 0, count = 0;
@@ -621,13 +609,6 @@ export default function ProjectMainView({
   const handleRowChange = (idx, newItem) => {
     const updated = [...darbai];
     updated[idx] = newItem;
-    setDarbai(updated);
-    onProjectChange?.({ ...project, darbu_sarasas: updated });
-  };
-
-  const updateRowsById = (updater, row) => {
-    const rowId = row._id || `${row.eil_nr}-${row.aprasymas}`;
-    const updated = updater(darbai, rowId);
     setDarbai(updated);
     onProjectChange?.({ ...project, darbu_sarasas: updated });
   };
@@ -693,24 +674,6 @@ export default function ProjectMainView({
   };
 
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
-  const reviewTargetPage = currentReview ? getRowTargetPage(currentReview, project) : null;
-
-  // Review-queue quantity fix — LT comma / spaced thousands aware.
-  const applyReviewQty = () => {
-    const qty = parseLtNumber(reviewDraftQty);
-    if (!isValidAmount(qty)) {
-      toast.error(t(invalidAmountKey(qty)));
-      return;
-    }
-    updateRowsById((rows, rowId) => updatePositionQuantity(rows, rowId, qty), currentReview);
-  };
-
-  const filterButtons = [
-    { mode: TAKEOFF_FILTER_MODES.all, label: t('project.mainView.filterAll'), count: darbai.length },
-    { mode: TAKEOFF_FILTER_MODES.review, label: t('project.mainView.filterReview'), count: workflowSummary.reviewRows },
-    { mode: TAKEOFF_FILTER_MODES.missing_price, label: t('project.mainView.filterMissingPrice'), count: workflowSummary.missingPrices },
-    { mode: TAKEOFF_FILTER_MODES.manual, label: t('project.mainView.filterManual'), count: workflowSummary.manualOverrides },
-  ];
 
   return (
     <div className="space-y-4">
@@ -748,9 +711,10 @@ export default function ProjectMainView({
               </div>
             </div>
 
-            {/* Right: apply pricelist + re-extract + export */}
+            {/* Right: re-read the drawing + export. „Užpildyti iš kainyno"
+                moved down into the prices block, where the choice is
+                explained instead of hiding in a toolbar. */}
             <div className="flex items-center gap-2 shrink-0">
-              <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
               <ReextractButton project={project} onComplete={onProjectChange} />
               <ExportDropdown project={projectWithDarbai} />
             </div>
@@ -791,256 +755,6 @@ export default function ProjectMainView({
           />
         )}
       </div>
-
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md border border-border bg-background flex items-center justify-center">
-              <Target className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-foreground">{t('project.mainView.takeoffControl')}</div>
-              <div className="text-xs text-muted-foreground">
-                {t('project.mainView.takeoffSummary', { positions: workflowSummary.totalRows, rooms: workflowSummary.totalRooms, area: fmt(workflowSummary.totalArea) })}
-              </div>
-            </div>
-          </div>
-          {/* 2026-05-06: Paruošimas % bar removed — misleading when prices
-              not entered (always read 50%). 'AI ženklai / Prielaidos' counter
-              kept; gives user a sense of what AI inferred vs read directly. */}
-          {(workflowSummary.aiSymbolRows > 0 || workflowSummary.assumptionRows > 0) && (
-            <div className="text-[11px] text-muted-foreground">
-              {t('project.mainView.aiSymbols')}<span className="mono tabular text-foreground">{workflowSummary.aiSymbolRows}</span>
-              <span className="mx-1.5">·</span>
-              {t('project.mainView.assumptionsCounter')}<span className="mono tabular text-foreground">{workflowSummary.assumptionRows}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <button
-              type="button"
-              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.review)}
-              title={t('project.mainView.cardReviewTitle')}
-              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ClipboardCheck className="w-3.5 h-3.5" />
-                {t('project.mainView.cardReview')}
-              </div>
-              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.reviewRows}</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.missing_price)}
-              title={t('project.mainView.cardMissingPriceTitle')}
-              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-amber-400 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <CircleDollarSign className="w-3.5 h-3.5" />
-                {t('project.mainView.cardMissingPrice')}
-              </div>
-              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.missingPrices}</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTakeoffMode(TAKEOFF_FILTER_MODES.manual)}
-              title={t('project.mainView.cardManualTitle')}
-              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-emerald-400 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <PencilRuler className="w-3.5 h-3.5" />
-                {t('project.mainView.cardManual')}
-              </div>
-              <div className="mt-1 mono tabular text-lg font-semibold text-foreground">{workflowSummary.manualOverrides}</div>
-            </button>
-            <button
-              type="button"
-              onClick={onShowDrawing || undefined}
-              disabled={!onShowDrawing}
-              title={onShowDrawing ? t('project.mainView.cardDrawingTitle') : t('project.mainView.cardDrawingDisabledTitle')}
-              className="text-left rounded-md border border-border bg-background px-3 py-2 hover:border-primary transition-colors disabled:opacity-50 disabled:hover:border-border"
-            >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Eye className="w-3.5 h-3.5" />
-                {t('project.mainView.cardDrawing')}
-              </div>
-              <div className="mt-1 text-sm font-semibold text-foreground">
-                {workflowSummary.hasPdf ? (workflowSummary.totalPages ? t('project.mainView.pdfPages', { count: workflowSummary.totalPages }) : t('project.mainView.pdfFallback')) : t('project.mainView.attachPdf')}
-              </div>
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-2 min-w-[260px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                value={takeoffQuery}
-                onChange={e => setTakeoffQuery(e.target.value)}
-                placeholder={t('project.mainView.searchPositions')}
-                aria-label={t('project.mainView.searchPositions')}
-                title={t('project.mainView.searchPositionsTitle')}
-                className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none focus:border-primary"
-              />
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {filterButtons.map(btn => (
-                <button
-                  key={btn.mode}
-                  type="button"
-                  onClick={() => setTakeoffMode(btn.mode)}
-                  title={t(`project.mainView.filterTitles.${btn.mode}`, { defaultValue: t('project.mainView.filterFallbackTitle') })}
-                  aria-pressed={takeoffMode === btn.mode}
-                  className={`h-8 px-2.5 rounded-md border text-xs transition-colors ${
-                    takeoffMode === btn.mode
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                  }`}
-                >
-                  {btn.label} <span className="mono tabular">{btn.count}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {currentReview ? (
-        <div className="border border-amber-400/40 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-4 py-3 flex items-center gap-3">
-          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300 font-semibold">
-              {t('project.mainView.reviewMode', { count: reviewRows.length })}
-            </div>
-            <div className="text-sm text-foreground truncate">
-              {currentReview.eil_nr}. {currentReview.aprasymas}
-              <span className="text-muted-foreground ml-2">
-                {t('project.mainView.reviewLabel', { label: getQuantitySourceLabel(currentReview), qty: fmt(currentReview.kiekis), unit: currentReview.mato_vnt || '' })}
-              </span>
-            </div>
-            {(currentReview.review_reason || currentReview._confidence_reason) && (
-              <div className="text-xs text-amber-800 dark:text-amber-200 truncate">
-                {currentReview.review_reason || currentReview._confidence_reason}
-              </div>
-            )}
-          </div>
-          <input
-            value={reviewDraftQty}
-            onChange={e => setReviewDraftQty(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') applyReviewQty(); }}
-            className="w-24 h-8 px-2 border border-border bg-background rounded text-sm text-right tabular-nums"
-            aria-label={t('project.mainView.fixQtyTitle')}
-            title={t('project.mainView.fixQtyHint')}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-border"
-            title={t('project.mainView.fixTitle')}
-            onClick={applyReviewQty}
-          >
-            {t('project.mainView.fix')}
-          </Button>
-          <Button
-            size="sm"
-            title={t('project.mainView.confirmTitle')}
-            onClick={() => updateRowsById(acceptPositionQuantity, currentReview)}
-          >
-            {t('project.mainView.confirm')}
-          </Button>
-          {onJumpToPage && reviewTargetPage && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border"
-              title={t('project.mainView.sourceTitle', { page: reviewTargetPage })}
-              onClick={() => onJumpToPage(reviewTargetPage, currentReview)}
-            >
-              {t('project.mainView.source')}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="border border-emerald-500/25 bg-emerald-50 dark:bg-emerald-950/15 rounded-lg px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300">
-          {t('project.mainView.allReviewed')}
-        </div>
-      )}
-
-      {/* Analizės metadata — tik admin'ams (debugging). Eiliniam vartotojui
-          šitos technikos detalės nedomina ir gadina trust'ą. */}
-      {isAdmin && project._meta && (
-        <details className="text-xs text-muted-foreground -mt-2 group">
-          <summary className="cursor-pointer hover:text-foreground select-none inline-flex items-center gap-2">
-            <span>{t('project.mainView.analysisDetails')}</span>
-            {project._meta.elapsed_s && (
-              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                {Math.round(project._meta.elapsed_s)}s
-              </span>
-            )}
-          </summary>
-          <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 p-3 bg-muted/30 rounded text-[11px] tabular-nums">
-            {project._meta.elapsed_s != null && <><span>{t('project.mainView.duration')}</span><span>{project._meta.elapsed_s}s</span></>}
-            {project._meta.input_tokens != null && <><span>{t('project.mainView.inputTokens')}</span><span>{project._meta.input_tokens.toLocaleString()}</span></>}
-            {project._meta.output_tokens != null && <><span>{t('project.mainView.outputTokens')}</span><span>{project._meta.output_tokens.toLocaleString()}</span></>}
-            {project._meta.cache_read_tokens != null && project._meta.cache_read_tokens > 0 && (
-              <><span>{t('project.mainView.cacheHit')}</span><span>{project._meta.cache_read_tokens.toLocaleString()} ({(project._meta.cache_read_tokens / (project._meta.input_tokens || 1) * 100).toFixed(0)}%)</span></>
-            )}
-            {project._meta.zoom_attempted != null && <><span>{t('project.mainView.refinements')}</span><span>{project._meta.zoom_applied} / {project._meta.zoom_attempted}</span></>}
-            {project._meta.zoom_elapsed_s != null && <><span>{t('project.mainView.refinementDuration')}</span><span>{project._meta.zoom_elapsed_s}s</span></>}
-            {project._meta.pages_sent != null && <><span>{t('project.mainView.pages')}</span><span>{project._meta.pages_sent}</span></>}
-            {project._meta.model && <><span>{t('project.mainView.model')}</span><span>{project._meta.model}</span></>}
-            {project._meta.input_tokens != null && (() => {
-              // Sprint §AUDIT (2026-04-29): use shared pricing module
-              const cost = calcClaudeCostUSD(project._meta);
-              return <><span>{t('project.mainView.cost')}</span><span>${cost.toFixed(2)}</span></>;
-            })()}
-          </div>
-        </details>
-      )}
-
-      {/* AI rasti simboliai (Diena 4) — kuriose brėžiniuose ką AI Vision aptiko */}
-      {(() => {
-        const sym = project.v9_meta?.symbols_detected
-                  || project.detected_symbols_summary
-                  || (project.detected_symbols?.by_type
-                      ? Object.fromEntries(
-                          Object.entries(project.detected_symbols.by_type)
-                            .map(([k, v]) => [k, v.total]))
-                      : null);
-        if (!sym || Object.keys(sym).length === 0) return null;
-
-        const symLabel = (k) => {
-          const key = `project.mainView.symbols.${k}`;
-          const translated = t(key);
-          return translated === key ? k : translated;
-        };
-
-        return (
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold text-foreground">
-                {t('project.mainView.aiSymbolsFound')}
-              </h3>
-              <Badge variant="secondary" className="text-[10px] font-normal">
-                {Object.values(sym).reduce((a, b) => a + (b || 0), 0)} {t('project.mainView.totalSuffix')}
-              </Badge>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-2 text-xs">
-              {Object.entries(sym)
-                .filter(([, v]) => v && v > 0)
-                .sort(([, a], [, b]) => b - a)
-                .map(([k, v]) => (
-                  <div key={k} className="flex items-baseline justify-between border-b border-border/40 pb-1">
-                    <span className="text-muted-foreground truncate pr-2">{symLabel(k)}</span>
-                    <strong className="text-foreground tabular-nums">{v}</strong>
-                  </div>
-                ))}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* PATALPŲ SUVESTINĖ — collapsible */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -1102,7 +816,7 @@ export default function ProjectMainView({
                           <span className="inline-flex items-center gap-1.5">
                             {r.pavadinimas}
                             {canJump && (
-                              <Eye className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <Eye className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
                             )}
                           </span>
                         </td>
@@ -1120,20 +834,59 @@ export default function ProjectMainView({
         )}
       </div>
 
-      {/* DARBŲ SĄRAŠAS — grupuotas pagal skyrius */}
+      {/* KAINOS — „Užpildyti iš mano kainyno" / „Įvesiu pats" (design §3).
+          A choice with its consequence written next to it, not a hidden
+          dropdown in a toolbar: the two ways prices get into the sąmata, said
+          out loud, with the default one named. */}
+      <div className="bg-card border border-border rounded-xl p-4">
+        <h2 className="font-semibold text-foreground" style={{ fontSize: 16 }}>
+          {t('project.mainView.pricesTitle')}
+        </h2>
+        <p className="text-muted-foreground mt-0.5" style={{ fontSize: 14 }}>
+          {t('project.mainView.pricesNote')}
+        </p>
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
+          <span className="text-muted-foreground" style={{ fontSize: 14 }}>
+            {t('project.mainView.pricesManual')}
+          </span>
+        </div>
+      </div>
+
+      {/* SĄMATOS EILUTĖS — grupuotos pagal skyrius */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-semibold text-foreground flex items-center gap-2" style={{ fontSize: 16 }}>
             <FileText className="w-4 h-4 text-muted-foreground" />
             {t('project.mainView.worksList')}
             <Badge variant="secondary" className="text-xs font-normal">
               {t('project.mainView.worksBadge', { count: darbai.length })}
             </Badge>
           </h2>
-          <Button variant="outline" size="sm" onClick={handleAddRow} title={t('project.mainView.addRowTitle')} className="gap-1.5 h-8 text-xs">
-            <Plus className="w-3.5 h-3.5" />
-            {t('project.mainView.addRow')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                value={takeoffQuery}
+                onChange={e => setTakeoffQuery(e.target.value)}
+                placeholder={t('project.mainView.searchPositions')}
+                aria-label={t('project.mainView.searchPositions')}
+                title={t('project.mainView.searchPositionsTitle')}
+                className="w-48 sm:w-60 pl-9 pr-3 rounded-md border border-border bg-background outline-none focus:border-primary"
+                style={{ minHeight: 44, fontSize: 15 }}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleAddRow}
+              title={t('project.mainView.addRowTitle')}
+              className="gap-1.5"
+              style={{ minHeight: 44, fontSize: 15 }}
+            >
+              <Plus className="w-4 h-4" />
+              {t('project.mainView.addRow')}
+            </Button>
+          </div>
         </div>
 
         {/* LT contractors habitually quote a work rate „su medžiagomis". Since
@@ -1163,7 +916,7 @@ export default function ProjectMainView({
                   <th className="px-3 py-2 text-right font-medium w-24">{t('project.mainView.colQty')}</th>
                   <th className="px-3 py-2 text-right font-medium w-24">{t('project.mainView.colPricePerUnit')}</th>
                   <th className="px-3 py-2 text-right font-medium w-28">{t('project.mainView.colTotal')}</th>
-                  <th className="w-16" />
+                  <th className="w-32" />
                 </tr>
               </thead>
               <tbody>
@@ -1227,17 +980,45 @@ export default function ProjectMainView({
             </table>
           </div>
         )}
+
+        {/* ONE line, his words, no percentage (design §E4). It says what the
+            sąmata is made of and what still needs him — nothing about how it
+            was produced. */}
+        {darbai.length > 0 && (
+          <div
+            className="px-4 py-3 border-t border-border text-foreground/85"
+            style={{ fontSize: 15 }}
+          >
+            {t('project.mainView.rowSummary', {
+              count: rowSummary.fromDrawing,
+              verified: rowSummary.verified,
+            })}
+            {rowSummary.mine > 0 && (
+              <> · {t('project.mainView.rowSummaryMine', { count: rowSummary.mine })}</>
+            )}
+            {rowSummary.noQty > 0 && (
+              <> · <span className="text-foreground font-medium">
+                {t('project.mainView.rowSummaryNoQty', { count: rowSummary.noQty })}
+              </span></>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bottom actions */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         {onShowDrawing && (
-          <Button variant="outline" onClick={onShowDrawing} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={onShowDrawing}
+            className="gap-2"
+            style={{ minHeight: 44, fontSize: 15 }}
+          >
             <Eye className="w-4 h-4" />
             {t('project.mainView.viewDrawing')}
           </Button>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground" style={{ fontSize: 13 }}>
           {t('project.mainView.accuracyNote')}
         </p>
       </div>

@@ -1071,7 +1071,16 @@
       "undo": "Undo",
       "clickToEditPrice": "Click to enter a price. Enter saves and moves to the next row, Esc cancels.",
       "addRowToSectionTitle": "Add a row to section “{{section}}”",
-      "openLedgerTitle": "Click to see how this number was calculated"
+      "openLedgerTitle": "Click to see how this number was calculated",
+      "pricesTitle": "Prices",
+      "pricesNote": "The quantities are done. What is left is your rates — typed in, or filled from a price list.",
+      "pricesManual": "or type them yourself: click a price cell in the table, type, and press Enter — the next row's price opens.",
+      "rowSummary_one": "From the drawing — {{count}} row · {{verified}} checked",
+      "rowSummary_other": "From the drawing — {{count}} rows · {{verified}} checked",
+      "rowSummaryMine_one": "{{count}} row is your own",
+      "rowSummaryMine_other": "{{count}} rows are your own",
+      "rowSummaryNoQty_one": "{{count}} row has no quantity — fill it in or delete it",
+      "rowSummaryNoQty_other": "{{count}} rows have no quantity — fill them in or delete them"
     },
     "assumptions": {
       "widthPlaceholder": "width",

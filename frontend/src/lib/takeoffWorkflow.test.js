@@ -477,3 +477,45 @@ test('a checklist row is never ranked as a claim, and is offered separately', ()
   assert.equal(_risk(rows).count, 2);
   assert.equal(_meter(rows).totalCount, 2);                  // not a claim → not in the meter
 });
+
+// ── summarizeSamataRows — the one line under the sąmata ──────────────────────
+
+test('summarizeSamataRows: counts drawing rows, checked rows, his own rows, and rows with no quantity', async () => {
+  const { summarizeSamataRows } = await import('./takeoffWorkflow.js');
+  const rows = [
+    { id: 'p1', kiekis: 12.5 },                              // from the drawing, unchecked
+    { id: 'p2', kiekis: 3, user_verified_at: '2026-09-04' }, // from the drawing, checked
+    { id: 'p3', kiekis: 8, _review_status: 'accepted' },     // from the drawing, checked
+    { id: 'p4', kiekis: 0 },                                 // from the drawing, no quantity
+    { id: 'rnk-abc', kiekis: 4 },                            // his own row
+    { id: 'rnk-def', kiekis: 0 },                            // his own row, no quantity
+  ];
+  const s = summarizeSamataRows(rows);
+  assert.equal(s.total, 6);
+  assert.equal(s.fromDrawing, 4);
+  assert.equal(s.verified, 2);
+  assert.equal(s.mine, 2);
+  assert.equal(s.noQty, 2);
+});
+
+test('summarizeSamataRows: a manual quantity counts as checked — he typed the number himself', async () => {
+  const { summarizeSamataRows } = await import('./takeoffWorkflow.js');
+  const s = summarizeSamataRows([{ id: 'p1', kiekis: 140, manual_override: true }]);
+  assert.equal(s.verified, 1);
+  assert.equal(s.mine, 0);   // the ROW came from the drawing; only its number is his
+});
+
+test('summarizeSamataRows: an empty or junk list reads zeros, never NaN', async () => {
+  const { summarizeSamataRows } = await import('./takeoffWorkflow.js');
+  for (const input of [[], null, undefined, [null, undefined]]) {
+    const s = summarizeSamataRows(input);
+    assert.deepEqual(s, { total: 0, fromDrawing: 0, verified: 0, mine: 0, noQty: 0 });
+  }
+});
+
+test('summarizeSamataRows: _id carries the rnk- marker too (rows that came back through a merge)', async () => {
+  const { summarizeSamataRows } = await import('./takeoffWorkflow.js');
+  const s = summarizeSamataRows([{ _id: 'rnk-xyz', kiekis: 2 }]);
+  assert.equal(s.mine, 1);
+  assert.equal(s.fromDrawing, 0);
+});
