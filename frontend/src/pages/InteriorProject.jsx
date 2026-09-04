@@ -697,6 +697,13 @@ export default function InteriorProject({ project: projectProp, onAssumptionsCha
     setLastRipple({ label, diff, at: new Date().toISOString(), ...extra });
     if (diff.count === 0) return;
     const delta = diff.deltaEur;
+    // "+0 €" on a project that has SOME prices but none on the rows that just
+    // moved reads as "nothing changed" — say the prices are missing instead.
+    const changedRowsPriced = (diff.changed || []).some(c => Number(c?.row?.kaina) > 0);
+    if (diff.usePrices && !changedRowsPriced) {
+      toast.success(t('project.patikra.toastRippleNoPriceYet', { count: diff.count }));
+      return;
+    }
     toast.success(diff.usePrices
       ? t('project.patikra.toastRipple', {
         count: diff.count,

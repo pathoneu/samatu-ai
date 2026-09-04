@@ -303,7 +303,10 @@ function rowSum(row) {
  * section+label pair, and anything still unmatched counts as added or removed.
  */
 export function diffDarbuSarasas(prior = [], next = []) {
-  const labelOf = row => `${row?.skyrius || ''} ${row?.aprasymas || ''}`;
+  // NUL as the separator: it cannot occur in a label, so 'A'+'BC' and 'AB'+'C'
+  // never collide. Written as an escape - a literal NUL byte in the source made
+  // grep/file treat this module as binary (2026-09-04).
+  const labelOf = row => `${row?.skyrius || ''}\u0000${row?.aprasymas || ''}`;
 
   const index = (rows) => {
     const byId = new Map();
