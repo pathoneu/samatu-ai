@@ -588,3 +588,31 @@ def test_a_carried_orphan_never_lands_below_the_shopping_list():
     out = _merge_user_edits(rebuilt, prior)
     assert [p["skyrius"] for p in out][-1] == "Medžiagos", \
         [(p["aprasymas"], p["skyrius"]) for p in out]
+
+
+# ── 2026-09-04: verification survives a rebuild only when the number did ─────
+def test_verification_survives_when_quantity_unchanged_and_drops_when_it_moved():
+    from api.recompute_quantities import _carry_edit
+    prev = {"aprasymas": "X", "kiekis": 10.0, "user_verified_at": "2026-09-04T10:00:00Z",
+            "_review_status": "accepted"}
+    same = {"aprasymas": "X", "kiekis": 10.004}
+    _carry_edit(prev, same)
+    assert same["user_verified_at"] == "2026-09-04T10:00:00Z" and same["_review_status"] == "accepted"
+    moved = {"aprasymas": "X", "kiekis": 12.0}
+    _carry_edit(prev, moved)
+    assert "user_verified_at" not in moved and "_review_status" not in moved
+    owned = {"aprasymas": "X", "kiekis": 12.0}
+    _carry_edit({**prev, "manual_override": True}, owned)
+    assert owned["user_verified_at"] == "2026-09-04T10:00:00Z"  # user owns the number
+
+
+def test_hand_added_row_is_kept_not_orphaned():
+    from api.recompute_quantities import _merge_user_edits
+    rebuilt = [{"id": "abc", "aprasymas": "Sienų dažymas", "kiekis": 5, "skyrius": "S"}]
+    prior = [{"id": "rnk-1a2b3c", "aprasymas": "Mano eilutė", "kiekis": 3, "kaina": 10, "skyrius": "S"}]
+    notes = []
+    out = _merge_user_edits(rebuilt, prior, notes)
+    mine = next(r for r in out if r.get("id") == "rnk-1a2b3c")
+    assert mine.get("_orphaned_after_rebuild") is not True
+    assert any(n.get("reason") == "manual_row_kept" for n in notes)
+    assert not any(n.get("reason") == "orphan_carried" for n in notes)

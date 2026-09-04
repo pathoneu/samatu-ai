@@ -119,6 +119,31 @@ export function materialsLast(rows) {
  *     stays collision-free when an orphan already carries a `-2` id.
  * Returns a new array; rows that move get a copied object.
  */
+/**
+ * Verification („Teisinga ✓" / review status) certified a NUMBER, so it
+ * survives a rebuild only when that number survived (±0,01) or the row is a
+ * manual override the user owns. A row whose quantity moved returns to the
+ * queue; the ripple shows it. Mirrors backend `_carry_verification`. Before
+ * 2026-09-04 nothing carried these keys: one Prielaidos click erased every
+ * checkmark on the project.
+ */
+export const VERIFICATION_KEYS = ['user_verified_at', '_review_status', '_review_status_at'];
+
+function sameQuantity(a, b) {
+  const x = Number(a); const y = Number(b);
+  if (Number.isFinite(x) && Number.isFinite(y)) return Math.abs(x - y) <= 0.01;
+  return a === b;
+}
+
+export function carryVerification(oldItem, out) {
+  if (!oldItem || !VERIFICATION_KEYS.some((k) => oldItem[k] != null)) return out;
+  const owned = out.manual_override === true || out.override_locked === true;
+  if (owned || sameQuantity(oldItem.kiekis, out.kiekis)) {
+    for (const k of VERIFICATION_KEYS) if (oldItem[k] != null) out[k] = oldItem[k];
+  }
+  return out;
+}
+
 export function reassignDuplicateIds(rows) {
   const used = new Set();
   const claim = (base) => {
@@ -281,6 +306,7 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
         if (oldItem[key] != null) out[key] = oldItem[key];
       }
     }
+    carryVerification(oldItem, out);
     return out;
   };
   // Pass 0 — stable id (2026-09-02, Patikra P0). The JS twin of the backend's
@@ -370,6 +396,14 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
       // Un-edited line whose work is still listed under a sibling tier label —
       // the rebuild re-tiered it, nothing was lost.
       notes.push({ reason: 'superseded_by_tier', aprasymas: o.aprasymas });
+      continue;
+    }
+    if (String(o.id || '').startsWith('rnk-')) {
+      // Hand-added row: never rebuilt by construction, so it is kept as-is —
+      // not flagged „pasenusi eilutė" (2026-09-04 UX audit). Mirrors backend.
+      const { _orphaned_after_rebuild: _drop, ...kept } = o;
+      merged.push(kept);
+      notes.push({ reason: 'manual_row_kept', aprasymas: o.aprasymas });
       continue;
     }
     merged.push({ ...o, _orphaned_after_rebuild: true });

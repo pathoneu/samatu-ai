@@ -342,6 +342,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
         {editingQty ? (
           <input
             autoFocus
+            onFocus={(e) => e.target.select()}
             type="text"
             inputMode="decimal"
             value={draftQty}
@@ -411,6 +412,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
         {editingPrice ? (
           <input
             autoFocus
+            onFocus={(e) => e.target.select()}
             value={draftPrice}
             onChange={e => setDraftPrice(e.target.value)}
             onBlur={() => commitPrice(false)}

@@ -736,6 +736,34 @@ def _carry_edit(prev: dict, p: dict) -> None:
         for key in _PRICE_PROVENANCE_KEYS:
             if prev.get(key) is not None:
                 p[key] = prev[key]
+    # 3. Verification („Teisinga ✓" / review status). It certified a NUMBER, so
+    #    it survives only when that number survived the rebuild (or the row is a
+    #    manual override, whose number the user owns). A row whose quantity
+    #    moved goes back to the queue — the ripple shows it — instead of
+    #    carrying a checkmark for a value nobody looked at. Before 2026-09-04
+    #    nothing carried these keys at all: one Prielaidos click erased every
+    #    checkmark on the project (measured: 72 → 7 accepts → 71).
+    _carry_verification(prev, p)
+
+
+_VERIFICATION_KEYS = ("user_verified_at", "_review_status", "_review_status_at")
+
+
+def _same_quantity(a, b) -> bool:
+    try:
+        return abs(float(a) - float(b)) <= 0.01
+    except (TypeError, ValueError):
+        return a == b
+
+
+def _carry_verification(prev: dict, p: dict) -> None:
+    if not any(prev.get(k) is not None for k in _VERIFICATION_KEYS):
+        return
+    owned = p.get("manual_override") is True or p.get("override_locked") is True
+    if owned or _same_quantity(prev.get("kiekis"), p.get("kiekis")):
+        for k in _VERIFICATION_KEYS:
+            if prev.get(k) is not None:
+                p[k] = prev[k]
 
 
 # Literal copy of `extractor.vision_call.SK_MEDZIAGOS`, copied rather than
@@ -1005,6 +1033,16 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
             notes.append({"aprasymas": p.get("aprasymas"),
                           "reason": "superseded_by_tier"})
             continue
+        if str(p.get("id") or "").startswith("rnk-"):
+            # Hand-added („rankinė") row: the builder can never reproduce it,
+            # so carrying it is the contract, not a degradation. Flagging it
+            # „pasenusi eilutė" told the user his 30-second-old row was obsolete
+            # (2026-09-04 UX audit).
+            kept = {**p}
+            kept.pop("_orphaned_after_rebuild", None)
+            rebuilt.append(kept)
+            notes.append({"aprasymas": p.get("aprasymas"), "reason": "manual_row_kept"})
+            continue
         rebuilt.append({**p, "_orphaned_after_rebuild": True})
         notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
                       "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),
@@ -1115,6 +1153,8 @@ def recompute(
     _CARRY_KEYS = ("kaina", "suma", "manual_override", "quantity_source",
                    "ai_kiekis_original", "override_locked",
                    "_orphaned_after_rebuild",
+                   # verification state (2026-09-04) — see _carry_verification
+                   "user_verified_at", "_review_status", "_review_status_at",
                    # WHERE the price came from. Without it the compat row — the
                    # one the Kiekiai table and the exports read, and the one the
                    # frontend writes back onto the project — came back with the

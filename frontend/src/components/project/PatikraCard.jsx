@@ -136,6 +136,7 @@ export default function PatikraCard({
         <div className="mt-2.5 flex items-center gap-1.5">
           <input
             autoFocus
+            onFocus={(e) => e.target.select()}
             value={draftQty}
             onChange={e => setDraftQty(e.target.value)}
             onKeyDown={(e) => {

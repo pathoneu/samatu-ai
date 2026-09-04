@@ -552,3 +552,24 @@ test('newlyCarriedOrphans: an already-orphaned prior row is not announced again'
   assert.deepEqual(newlyCarriedOrphans(notes, prior).map(n => n.aprasymas), ['Nauja pasenusi eilutė']);
   assert.equal(newlyCarriedOrphans(notes, []).length, 2);   // no prior flags → all are news
 });
+
+import { carryVerification, mergeDarbuSarasasEdits as _mergeV } from './mergeDarbuSarasas.js';
+
+test('carryVerification: kept when the number survived, dropped when it moved, kept when owned', () => {
+  const prev = { kiekis: 10, user_verified_at: 't', _review_status: 'accepted' };
+  assert.equal(carryVerification(prev, { kiekis: 10.004 }).user_verified_at, 't');
+  assert.equal(carryVerification(prev, { kiekis: 12 }).user_verified_at, undefined);
+  assert.equal(carryVerification(prev, { kiekis: 12, manual_override: true }).user_verified_at, 't');
+});
+
+test('a hand-added rnk- row is carried without the „pasenusi" flag', () => {
+  const rebuilt = [{ id: 'abc', aprasymas: 'Sienų dažymas', kiekis: 5, skyrius: 'S' }];
+  const prior = [{ id: 'rnk-1a2b3c', aprasymas: 'Mano eilutė', kiekis: 3, kaina: 10, skyrius: 'S' }];
+  const notes = [];
+  const out = _mergeV(rebuilt, prior, notes);
+  const mine = out.find(r => r.id === 'rnk-1a2b3c');
+  assert.ok(mine);
+  assert.notEqual(mine._orphaned_after_rebuild, true);
+  assert.ok(notes.some(n => n.reason === 'manual_row_kept'));
+  assert.ok(!notes.some(n => n.reason === 'orphan_carried'));
+});

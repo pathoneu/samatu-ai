@@ -1094,6 +1094,7 @@ const PositionRow = memo(function PositionRow({
       {editingQty ? (
         <input
           autoFocus
+          onFocus={(e) => e.target.select()}
           value={draftQty}
           onChange={e => setDraftQty(e.target.value)}
           onBlur={commitQty}
@@ -1160,6 +1161,7 @@ const PositionRow = memo(function PositionRow({
       {editing ? (
         <input
           autoFocus
+          onFocus={(e) => e.target.select()}
           value={draftPrice}
           onChange={e => setDraftPrice(e.target.value)}
           onBlur={commit}

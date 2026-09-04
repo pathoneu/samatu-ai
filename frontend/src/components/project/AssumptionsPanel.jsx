@@ -91,7 +91,7 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
           inputMode="decimal"
           value={draft}
           step={step}
-          onFocus={() => setFocused(true)}
+          onFocus={(e) => { setFocused(true); e.target.select(); }}  // typing replaces, never appends (3,22,8)
           onBlur={() => setFocused(false)}
           onChange={handleChange}
           aria-invalid={invalid || undefined}
