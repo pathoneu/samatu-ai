@@ -394,6 +394,10 @@ from api.export_excel import router as export_excel_router
 from api.project_stats import router as project_stats_router
 # Kainynai — xlsx import + durable per-user price-list storage (2026-09-02).
 from api.price_lists import router as price_lists_router
+# The room check sheet (2026-09-04): six read facts per room + the quantities
+# that room contributes, and the PNG crop of the drawing behind each fact.
+from api.room_facts import router as room_facts_router
+from api.evidence import router as evidence_router
 
 load_dotenv()
 
@@ -711,6 +715,8 @@ app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
 app.include_router(project_stats_router)
 app.include_router(price_lists_router)
+app.include_router(room_facts_router)
+app.include_router(evidence_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

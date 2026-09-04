@@ -137,6 +137,63 @@ def test_contribution_ledger_strings_are_clean():
     assert seen > 10, "the ledger produced almost no prose — did it stop emitting?"
 
 
+def test_room_check_sheet_sentences_are_clean():
+    """The room check sheet (2026-09-04) is now the most-read prose we ship:
+    six source sentences per room plus a formula line per contributed
+    quantity, and the contractor reads them one after another while deciding
+    whether to trust the number beside them. Drive the builder over every
+    corpus fixture and put the whole harvest through both nets — this test's
+    BANNED regex AND the runtime guard, which additionally knows the
+    (gitignored) customer identifiers."""
+    import json
+    from pathlib import Path
+
+    from extractor import user_text
+    from extractor.room_facts import build_room_facts
+    from extractor.vision_call import (
+        _build_pozicijos_from_rooms, _emit_v8_compat_fields,
+        _recompute_per_room_via_python,
+    )
+
+    root = Path(__file__).resolve().parents[1]
+    fixtures = sorted((root.parent / "ground_truth").glob("*/ai_extract.json"))
+    assert fixtures, "no corpus fixture to scan — this test would pass vacuously"
+
+    seen = 0
+    for fixture in fixtures:
+        src = json.loads(fixture.read_text(encoding="utf-8"))
+        parsed = {k: v for k, v in src.items()
+                  if k not in ("darbu_sarasas", "pozicijos")}
+        parsed["pozicijos"] = []
+        parsed = _recompute_per_room_via_python(
+            parsed, parsed.get("_overrides") or {})
+        built = _emit_v8_compat_fields(_build_pozicijos_from_rooms(parsed))
+        project = {**parsed, "darbu_sarasas": built["darbu_sarasas"]}
+
+        for room in project.get("patalpos") or []:
+            payload = build_room_facts(project, room.get("nr"))
+            assert payload is not None
+            strings = []
+            for f in payload["facts"]:
+                strings.append(f["sentence"])
+                if isinstance(f.get("value"), str):
+                    strings.append(f["value"])
+            for q in payload["quantities"]:
+                strings += [s for s in (q.get("formula"),
+                                        q.get("included_because")) if s]
+            strings += [e["reason"] for e in payload["excluded"] if e.get("reason")]
+            seen += len(strings)
+            for s in strings:
+                m = BANNED.search(s)
+                assert not m, (f"banned token {m.group(0)!r} on "
+                               f"{fixture.parent.name} room "
+                               f"{room.get('nr')}: {s}")
+                assert not user_text.is_banned(s), (
+                    f"runtime guard rejected a check-sheet string on "
+                    f"{fixture.parent.name} room {room.get('nr')}: {s}")
+    assert seen > 100, "the check sheet produced almost no prose — did it stop?"
+
+
 def test_door_reconciliation_reasons_are_clean():
     """Drive every branch of reconcile_frameless and scan the reasons it
     actually returns — banning identifiers in source was the wrong net
