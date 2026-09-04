@@ -47,6 +47,7 @@ import {
   subscribeDismissals,
   withoutDismissed,
 } from '../../lib/sanityDismissals';
+import { cleanUserText } from '@/lib/userText';
 
 // Colours come from the semantic confidence tokens in index.css
 // (--conf-low red / --conf-med amber) — never raw bg-red-500/bg-gray-900,
@@ -273,7 +274,7 @@ export default function SanityWarningsBanner({
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="text-foreground">
                           {w.room && <strong className="mr-1">[{w.room}]</strong>}
-                          {w.message}
+                          {cleanUserText(w.message)}
                           {expected && (
                             <span className="text-muted-foreground">
                               {' '}{t('project.sanity.expectedInline', { expected })}
@@ -281,7 +282,7 @@ export default function SanityWarningsBanner({
                           )}
                         </div>
                         {w.hint && (
-                          <div className="text-muted-foreground">{w.hint}</div>
+                          <div className="text-muted-foreground">{cleanUserText(w.hint)}</div>
                         )}
                         {action === ACTION_PRIELAIDOS && onOpenAssumptions && (
                           <button

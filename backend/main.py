@@ -336,6 +336,7 @@ import io
 import os
 import math
 import asyncio
+from extractor import user_text as _user_text
 import hashlib
 from collections import defaultdict
 from datetime import datetime
@@ -414,6 +415,16 @@ app = FastAPI(
 )
 
 import backup_scheduler
+
+
+@app.on_event("startup")
+async def _startup_scrub_legacy_prose() -> None:
+    # Old project blobs carry prose an older engine wrote (see
+    # extractor/user_text.py). Rewrite them once; idempotent, ~ms per project.
+    try:
+        await asyncio.to_thread(db.scrub_all_projects)
+    except Exception as exc:  # noqa: BLE001 — never block startup on hygiene
+        log.warning("legacy prose scrub skipped: %r", exc)
 
 
 @app.on_event("startup")
@@ -1203,7 +1214,11 @@ def api_get_project(request: Request, project_id: str):
     p = db.get_project(project_id, user_id=user_filter)
     if not p:
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-    return p
+    # Nothing stored is trusted on screen: old blobs carry prose written by
+    # older engines (2026-09-02: a calibration confession naming another
+    # customer's project surfaced in a Patikra card). Scrubbed on the way out;
+    # db.scrub_all_projects rewrites them in place at startup as well.
+    return _user_text.scrub_prose(p)
 
 
 # ── Durable source-PDF storage (2026-06-21 durability track) ────────────────
@@ -6628,7 +6643,7 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
     parsed["status"] = "ok"
     parsed["_recomputed"] = True
-    return parsed
+    return _user_text.scrub_prose(parsed)
 
 
 @app.post("/v9/symbols/detect")

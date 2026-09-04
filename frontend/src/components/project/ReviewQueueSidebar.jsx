@@ -39,6 +39,7 @@ import {
   CONF_RAUDONA, normalizeConfidence, confidenceRank, confidenceLabel,
 } from '@/lib/confidence';
 import PatikraCard from './PatikraCard';
+import { cleanUserText } from '@/lib/userText';
 
 const TABLE_SOURCES = new Set([
   'eksplikacija', 'specifikacija', 'isklotines', 'lubu_planas',
@@ -365,7 +366,7 @@ export default function ReviewQueueSidebar({
                   <ReviewRow
                     key={`pos-${rowKey(p)}-${i}`}
                     conf={p.confidence}
-                    reason={p._confidence_reason}
+                    reason={cleanUserText(p._confidence_reason)}
                     primary={p.aprasymas || 'Pozicija'}
                     secondary={p.skyrius || p.kategorija || '—'}
                     meta={[

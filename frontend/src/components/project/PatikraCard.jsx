@@ -20,6 +20,7 @@ import { AlertTriangle, Check, MapPin, Pencil, Sigma } from 'lucide-react';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
 import { ltEur, ltNumber, ltQuantity, rollUpHeadline } from '@/lib/ledger';
 import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
+import { cleanUserText } from '@/lib/userText';
 
 export default function PatikraCard({
   row,
@@ -222,7 +223,7 @@ export default function PatikraCard({
 /** The sensitive input in one sentence, honest about where the value came from. */
 function SensitiveText({ sensitive, row }) {
   const { t } = useTranslation();
-  if (sensitive.kind === 'reason') return <>{sensitive.reason}</>;
+  if (sensitive.kind === 'reason') return <>{cleanUserText(sensitive.reason)}</>;
 
   const room = `${sensitive.roomNr} ${sensitive.roomName || ''}`.trim();
   const value = sensitive.value != null

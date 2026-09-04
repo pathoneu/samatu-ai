@@ -18,6 +18,7 @@ import {
   ledgerFallback, ltNumber, ltQuantity, rollUpIsAuthoritative,
   sortedContributions, splitContributions, termDriver, termEntries,
 } from '@/lib/ledger';
+import { cleanUserText } from '@/lib/userText';
 
 const TOP_CONTRIBUTIONS = 5;
 
@@ -142,7 +143,7 @@ export default function LedgerTree({
                 </div>
                 {step.note && (
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                    {step.note}
+                    {cleanUserText(step.note)}
                   </p>
                 )}
               </li>
@@ -206,7 +207,7 @@ export default function LedgerTree({
                       {c.included_because && (
                         <span className="block text-[10px] text-muted-foreground truncate"
                               title={c.included_because}>
-                          {c.included_because}
+                          {cleanUserText(c.included_because)}
                         </span>
                       )}
                     </span>
@@ -293,7 +294,7 @@ export default function LedgerTree({
               >
                 <span className="mono tabular mr-1.5">{e.room_nr}</span>
                 <span className="text-foreground/70">{e.room_name}</span>
-                {e.excluded_because && <span> — {e.excluded_because}</span>}
+                {e.excluded_because && <span> — {cleanUserText(e.excluded_because)}</span>}
               </li>
             ))}
           </ul>

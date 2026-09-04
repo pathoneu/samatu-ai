@@ -19,6 +19,7 @@ import {
 } from '@/lib/confidence';
 import { ltEur, ltQuantity } from '@/lib/ledger';
 import LedgerTree from './LedgerTree';
+import { cleanUserText } from '@/lib/userText';
 
 export default function RowDetailPanel({
   row,
@@ -109,7 +110,7 @@ export default function RowDetailPanel({
             </div>
             {row._confidence_reason && (
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {row._confidence_reason}
+                {cleanUserText(row._confidence_reason)}
               </p>
             )}
           </div>

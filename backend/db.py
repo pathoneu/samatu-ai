@@ -1789,3 +1789,28 @@ def _backfill_orphan_project_owners() -> int:
 init_schema()
 _migrate_schema()
 _backfill_orphan_project_owners()
+
+
+def scrub_all_projects() -> int:
+    """One-shot, idempotent: rewrite every stored project blob through
+    `extractor.user_text.scrub_prose` so no old prose (methodology confessions,
+    another customer's project name) survives in the database. Runs at startup;
+    only rows whose blob actually changes are written. Returns the count."""
+    from extractor.user_text import scrub_prose
+    changed = 0
+    with _conn() as c:
+        rows = c.execute("SELECT id, data FROM projects").fetchall()
+        for row in rows:
+            raw = row["data"]
+            try:
+                data = json.loads(raw or "{}")
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue  # corrupt blobs are the read path's problem, not ours
+            cleaned = scrub_prose(data)
+            if cleaned != data:
+                c.execute("UPDATE projects SET data = ? WHERE id = ?",
+                          (json.dumps(cleaned, ensure_ascii=False), row["id"]))
+                changed += 1
+    if changed:
+        log.warning("scrub_all_projects: rewrote %d project blob(s) carrying legacy prose", changed)
+    return changed

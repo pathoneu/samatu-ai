@@ -19,12 +19,15 @@ import pytest
 
 from extractor.confidence import CLASS_RULES, _OVERBILLING_RULES, apply_confidence
 
-# Client identifiers, benchmark bookkeeping, internal jargon, dev-speak.
+# Methodology confession / dev-speak lives in the runtime guard (one vocabulary
+# source); customer identifiers are NEVER written into the repo — they come from
+# the gitignored `backend/.confidential-terms` / SAMATU_CONFIDENTIAL_TERMS and
+# are folded in here when present (extractor/user_text.confidential_pattern).
+from extractor.user_text import JARGON, confidential_pattern  # noqa: E402
+
+_CONF = confidential_pattern()
 BANNED = re.compile(
-    r"Berž|Rangovas [A-D]|rangovo samat|rangovą|\(\d+ projekt|projektai\)"
-    r"|\bvs\b|%/|recall|etalon|kalibruota|ginčytin|Ekstrakcij|Gretimyb"
-    r"|pradinis pass|archetip|low confidence|Vision|žinomai|Sprint|TODO",
-    re.IGNORECASE)
+    JARGON.pattern + (f"|{_CONF.pattern}" if _CONF else ""), re.IGNORECASE)
 
 
 @pytest.mark.parametrize("needle,conf,reason",

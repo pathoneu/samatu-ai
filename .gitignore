@@ -95,3 +95,4 @@ frontend/test-results/
 # Runtime CV capture (siblings corrections/legends/predictions already ignored)
 data/symbol_training/
 ground_truth/*/results_rescored*.json
+backend/.confidential-terms

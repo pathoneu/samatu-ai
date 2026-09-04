@@ -7,6 +7,7 @@ swap the canonical view in one re-render.
 
 Spec: §4.5, §5.4
 """
+from extractor import user_text as _user_text
 import logging
 import re
 from fastapi import APIRouter, Depends, HTTPException
@@ -1191,6 +1192,10 @@ def recompute(
             "value": len(carried), "expected": None, "message": msg,
         })
 
+    # Carried orphans keep the prose they were saved with — scrub the output
+    # like the read path does (extractor/user_text.py).
+    pozicijos = _user_text.scrub_prose(pozicijos)
+    darbu_sarasas = _user_text.scrub_prose(darbu_sarasas)
     return {
         "rooms": rooms,
         "pozicijos": pozicijos,

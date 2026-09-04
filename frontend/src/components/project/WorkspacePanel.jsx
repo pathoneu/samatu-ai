@@ -34,6 +34,7 @@ import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
+import { cleanUserText } from '@/lib/userText';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -1012,7 +1013,7 @@ const PositionRow = memo(function PositionRow({
   // normalize, or engine-flagged rows render as confident green (P0 2026-08-03).
   const confTier = normalizeConfidence(row.confidence);
   const confClass = CONFIDENCE_DOT_CLASS[confTier];
-  const confTitle = `Pasitikėjimas: ${confidenceLabel(confTier)}${row._confidence_reason ? ` — ${row._confidence_reason}` : ''}`;
+  const confTitle = `Pasitikėjimas: ${confidenceLabel(confTier)}${row._confidence_reason ? ` — ${cleanUserText(row._confidence_reason)}` : ''}`;
   const sum = (row.kiekis || 0) * (row.kaina || 0);
   const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
   const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
@@ -1082,7 +1083,7 @@ const PositionRow = memo(function PositionRow({
       <div className="flex items-start gap-1.5 min-w-0">
         <span
           className="text-foreground/90 leading-snug break-words"
-          title={row.review_reason || row._confidence_reason || row.calculation_basis || sourceLabel}
+          title={cleanUserText(row.review_reason || row._confidence_reason || row.calculation_basis || sourceLabel)}
         >
           {row.aprasymas}
         </span>
