@@ -4,13 +4,13 @@ Most LT floor plans stamp each room's number ("105", "110", …) at its true
 in-plan location. That text centroid is the flood-fill seed goldmine — far more
 reliable than a coarse bbox center (most rooms have no bbox at all).
 
-Coordinate note (verified on Beržų): pdfplumber's page coordinate space matches
+Coordinate note (verified on Objektas A): pdfplumber's page coordinate space matches
 Poppler's rendered raster orientation 1:1 for /Rotate pages, so fractional
 (x_pct, y_pct) from pdfplumber maps directly onto the rendered raster — NO
 rotation transform needed.
 
 PDF-format caveat: this only fires on plans that print in-plan room numbers
-(Beržų yes; Lazūnų-style plans without them yield no seed → caller marks the
+(Objektas A yes; Objektas D-style plans without them yield no seed → caller marks the
 room 'manual_needed'). Always degrade gracefully.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ import pdfplumber
 _EKSPLIKACIJA_X_MAX_PCT = 0.10
 _NR_RE = re.compile(r"^\d{2,3}[a-zA-Z]?$")
 
-# Table-row signature (calibrated on the real Beržų sheet, 2026-07-12):
+# Table-row signature (calibrated on the real Objektas A sheet, 2026-07-12):
 # x-tightness alone CANNOT separate the eksplikacija table from in-plan labels
 # — rooms along one corridor wall also align within ~0.003 x. What separates
 # them is the ROW PITCH: table rows sit one text-line apart (y gap ≈ 0.012),

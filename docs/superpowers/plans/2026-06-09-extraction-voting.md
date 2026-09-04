@@ -385,7 +385,7 @@ The Pass-1 call (`vision_call.py:2148-2211`) is wrapped so that when `extraction
 
 **Files:** none (measurement only)
 
-- [ ] **Step 1:** Run berzas live WITH voting: `ENABLE_EXTRACTION_VOTING=1 VOTING_N=3 venv/bin/python scripts/run_vision_on_truth_set.py --only berzas` (or equivalent harness path). Capture kampai, combined paint, n_partition_walls_total.
+- [ ] **Step 1:** Run objektas_a live WITH voting: `ENABLE_EXTRACTION_VOTING=1 VOTING_N=3 venv/bin/python scripts/run_vision_on_truth_set.py --only objektas_a` (or equivalent harness path). Capture kampai, combined paint, n_partition_walls_total.
 - [ ] **Step 2:** Run it a SECOND time. Confirm run-to-run kampai delta is small (< ~5%) — the stability win. Record both.
 - [ ] **Step 3:** Confirm voted kampai lands near contractor truth (493) — i.e. pusiniai is now populated in production.
 - [ ] **Step 4:** Run `eval_harness.py --totals-only` on the voted extract; confirm no regression on paint/LED, and that kampai is now honestly representative.

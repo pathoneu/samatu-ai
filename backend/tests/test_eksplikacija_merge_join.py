@@ -1,6 +1,6 @@
 """Eksplikacija→room merge: match by NUMBER, never collapse duplicate names.
 
-Beržų g. 24 has rooms 108 and 109 both named "Berniuko kambarys". The old
+Objektas A has rooms 108 and 109 both named "Berniuko kambarys". The old
 name-keyed dict kept ONE row for that name, so both bedrooms inherited the
 same area; and a one-character drift in the table read ("san. mazgas" vs
 "san.mazgas") missed the row entirely, silently switching that room to the

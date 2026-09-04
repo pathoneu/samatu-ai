@@ -321,7 +321,7 @@ export function interiorMarkerAnchor(points) {
 }
 
 // ── Duplicate-polygon disqualification ──────────────────────────────────────
-// Real failure on the Beržų demo: flood-fill returned the IDENTICAL corridor
+// Real failure on the Objektas A demo: flood-fill returned the IDENTICAL corridor
 // polygon for rooms 103/108/109 (and near-identical for 101/104). Only one
 // claimant can be right; drawing all of them stacks zones and forces markers
 // into empty space. We keep the claimant whose known plotas_m2 best matches

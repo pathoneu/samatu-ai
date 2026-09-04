@@ -1067,7 +1067,7 @@
     },
     {
       "id": "P2",
-      "name": "Čiurlių g. 10, Bajorai Kauno r.",
+      "name": "Objektas C",
       "tipas": "naujos_statybos_namas",
       "data": "2026-02-12",
       "scope_type": "full_project",
@@ -1397,7 +1397,7 @@
     },
     {
       "id": "P3",
-      "name": "Romainiai, Kaunas",
+      "name": "Objektas E",
       "tipas": "naujos_statybos_namas",
       "data": "2026-01-15",
       "uzsakovas": "Objektas C",
@@ -1605,7 +1605,7 @@
     },
     {
       "id": "P4",
-      "name": "Šernų g. 18B, Kaunas (dokumentuose taip pat 18A)",
+      "name": "Objektas F",
       "tipas": "naujos_statybos_namas",
       "data": "2025-07-16",
       "architektai": "Aketuri Architektai",
@@ -1898,7 +1898,7 @@
     },
     {
       "id": "P5",
-      "name": "Lazūnų g. 6, Vilnius (butas)",
+      "name": "Objektas D (butas)",
       "tipas": "butas_reno_ar_nauja",
       "data": "2024-06-26",
       "dizainere": "Marija Orlovienė, strix.studio",

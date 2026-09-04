@@ -1,6 +1,6 @@
 """Per-room walls_paintable contribution audit.
 
-The Beržų walls total over-counts by +5.07 m² (465.78 vs truth 460.71 m²).
+The Objektas A walls total over-counts by +5.07 m² (465.78 vs truth 460.71 m²).
 There is no contractor per-room walls truth in the file, so this script
 surfaces:
 
@@ -29,7 +29,7 @@ from extractor.vision_call import _recompute_per_room_via_python, _recompute_san
 
 
 # Contractor-given per-room walls (when explicitly documented in notes).
-# Source: docs/superpowers/fixtures/2026-05-26-berzu-g-24/contractor-notes-verbatim.md
+# Source: docs/superpowers/fixtures/2026-05-26-objektas-a/contractor-notes-verbatim.md
 KNOWN_PER_ROOM_WALLS_TRUTH = {
     "105": 31.45,   # Garažo sienos
     # 110 Miegamasis: 6.24 LED partition + 47.44 high-zone walls + low-ceil walls
@@ -39,7 +39,7 @@ KNOWN_PER_ROOM_WALLS_TRUTH = {
 
 
 def main() -> int:
-    truth_path = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+    truth_path = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
     truth = json.loads(truth_path.read_text(encoding="utf-8"))
 
     rooms = []
@@ -58,7 +58,7 @@ def main() -> int:
                           for r in parsed["patalpos"])
     overshoot = rooms_walls_sum - truth_total
 
-    print(f"\nWalls audit — Beržų")
+    print(f"\nWalls audit — Objektas A")
     print(f"  Truth walls total                : {truth_total:.2f} m²")
     print(f"  App per-room walls_paintable sum : {rooms_walls_sum:.2f} m²")
     print(f"  Overshoot (app − truth)          : {overshoot:+.2f} m² "

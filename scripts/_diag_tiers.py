@@ -2,7 +2,7 @@
 virs-3m paint tiers and compare against the samata's item 16 / item 17.
 
 Two conventions exist in the SAME contractor's quotes:
-  · berzas item 17  = "Sienų, lubų glaistymas/dažymas (virš 3m)"  → walls INCLUDED
+  · objektas_a item 17  = "Sienų, lubų glaistymas/dažymas (virš 3m)"  → walls INCLUDED
   · objektas_b it17 = "Lubų glaistymas/dažymas (virš 3m aukščio)" → ceilings ONLY
 """
 import sys, json, copy, pathlib, io, contextlib
@@ -48,5 +48,5 @@ print(f"  iki-3m ceilings   {low_c:9.2f}   -> item16-equivalent (walls<=3 + ceil
 print(f"  virs-3m walls     {high_w:9.2f}")
 print(f"  virs-3m ceilings  {high_c:9.2f}")
 print(f"  item17 as CEILINGS ONLY (objektas_b wording) = {high_c:.2f}")
-print(f"  item17 as WALLS+CEILINGS (berzas wording)    = {high_w+high_c:.2f}")
+print(f"  item17 as WALLS+CEILINGS (objektas_a wording)    = {high_w+high_c:.2f}")
 print(f"  full combined (all walls + all ceilings)     = {low_w+high_w+low_c+high_c:.2f}")

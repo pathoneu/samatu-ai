@@ -27,9 +27,9 @@ class _Req:
 
 def test_fixture_served_outside_production(monkeypatch):
     monkeypatch.delenv("ENV", raising=False)
-    if not sym.FIXTURES["berzas"].exists():
-        pytest.skip("berzas fixture PDF not present in this checkout")
-    data = sym._resolve_pdf_bytes(_Req(), "any-project-id", "berzas")
+    if not sym.FIXTURES["objektas_a"].exists():
+        pytest.skip("objektas_a fixture PDF not present in this checkout")
+    data = sym._resolve_pdf_bytes(_Req(), "any-project-id", "objektas_a")
     assert data[:4] == b"%PDF"
 
 
@@ -42,9 +42,9 @@ def test_fixture_ignored_in_production(monkeypatch):
     monkeypatch.setattr(sym._db, "get_project", lambda pid, user_id=None: None)
 
     with pytest.raises(HTTPException) as e:
-        sym._resolve_pdf_bytes(_Req(), "victim-project-id", "berzas")
+        sym._resolve_pdf_bytes(_Req(), "victim-project-id", "objektas_a")
     assert e.value.status_code == 404
-    assert "berzas" not in str(e.value.detail)      # no fixture bytes, no fixture hint
+    assert "objektas_a" not in str(e.value.detail)      # no fixture bytes, no fixture hint
 
 
 def test_production_owner_path_still_serves_own_project(monkeypatch):
@@ -55,7 +55,7 @@ def test_production_owner_path_still_serves_own_project(monkeypatch):
                         lambda pid, user_id=None: {"id": pid})
     monkeypatch.setattr(sym._db, "get_project_pdf_bytes",
                         lambda pid, user_id=None: b"%PDF-own", raising=False)
-    assert sym._resolve_pdf_bytes(_Req(), "own-project", "berzas") == b"%PDF-own"
+    assert sym._resolve_pdf_bytes(_Req(), "own-project", "objektas_a") == b"%PDF-own"
 
 
 def test_unknown_fixture_still_404s(monkeypatch):

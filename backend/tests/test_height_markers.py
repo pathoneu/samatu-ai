@@ -152,7 +152,7 @@ def test_real_marker_followed_by_text_still_reads():
 def test_mm_grid_predicate():
     from extractor.height_markers import marker_is_on_mm_grid
     assert marker_is_on_mm_grid(3.4) is True
-    assert marker_is_on_mm_grid(2.82) is True     # lazūnų raw slab height
+    assert marker_is_on_mm_grid(2.82) is True     # objektas_d raw slab height
     assert marker_is_on_mm_grid(5.7) is True      # objektas_b double height
     assert marker_is_on_mm_grid(3.706) is False   # the phone number
     assert marker_is_on_mm_grid(None) is False
@@ -178,7 +178,7 @@ def test_narrated_double_height_still_salvages():
 
 
 def test_narrated_bare_marker_still_salvages():
-    """Beržų-style narration '+3400 lubas' must survive the guard."""
+    """Objektas A-style narration '+3400 lubas' must survive the guard."""
     from extractor.height_markers import salvage_heights_from_warnings
     rooms = [{"pavadinimas": "Svetainė/virtuvė"}]
     warnings = [{"level": "INFO",

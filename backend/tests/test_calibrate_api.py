@@ -85,9 +85,9 @@ def test_compute_factors_zero_ai_value_not_applied():
 
 
 def test_endpoint_returns_factors_on_fixture(client):
-    """Use the Beržų fixture (no auth needed)."""
+    """Use the Objektas A fixture (no auth needed)."""
     r = client.post(
-        "/api/projects/test1/calibrate?fixture=berzas",
+        "/api/projects/test1/calibrate?fixture=objektas_a",
         json={"overrides": {"dazymo_plotas_m2": 584.81, "led_nisos_m": 42.30}},
     )
     assert r.status_code == 200
@@ -115,7 +115,7 @@ def test_get_returns_stub_for_uncalibrated_project(client, dev_owned):
 
 def test_round_trip_put_then_get(client, dev_owned):
     payload = {"overrides": {"led_nisos_m": 42.30}}
-    r1 = client.post("/api/projects/round-trip-test/calibrate?fixture=berzas",
+    r1 = client.post("/api/projects/round-trip-test/calibrate?fixture=objektas_a",
                      json=payload)
     assert r1.status_code == 200
     r2 = client.get("/api/projects/round-trip-test/calibrate")
@@ -131,13 +131,13 @@ def test_invalid_project_id_rejected(client):
 
 
 def test_non_numeric_override_rejected(client):
-    r = client.post("/api/projects/x/calibrate?fixture=berzas",
+    r = client.post("/api/projects/x/calibrate?fixture=objektas_a",
                     json={"overrides": {"angokrasciai_m": "abc"}})
     assert r.status_code == 400
 
 
 def test_delete_clears_calibration(client, dev_owned):
-    client.post("/api/projects/to-delete-calib/calibrate?fixture=berzas",
+    client.post("/api/projects/to-delete-calib/calibrate?fixture=objektas_a",
                 json={"overrides": {"led_nisos_m": 42.30}})
     r = client.delete("/api/projects/to-delete-calib/calibrate")
     assert r.status_code == 200

@@ -745,7 +745,7 @@ def annotate_tile_elevation_evidence(parsed: dict) -> int:
     elevation measured this room's walls and found no tile at all". The third
     case looks identical to the second (`_tile_area_from_elevation_m2 == 0`),
     so a room the išklotinė proves is untiled fell through to the apdailos
-    colour-trace — which on Beržų g. 24 mistook the neighbouring bathroom's
+    colour-trace — which on Objektas A mistook the neighbouring bathroom's
     blue line for Skalbykla's and billed 20.58 m² of wall tile there.
 
     Pure annotation: reads `_wall_elevations` (saved in every extract), writes
@@ -1139,7 +1139,7 @@ def _resolve_paint_class_from_prefs(rules_or_overrides: dict | None) -> int:
 def _record_apdailos_meta(parsed: dict, result: dict, n_updated: int) -> None:
     """Write the apdailos reader's outcome into ``_meta`` on EVERY path.
 
-    2026-07-29 post-mortem: three of four paid berzas runs produced NO
+    2026-07-29 post-mortem: three of four paid objektas_a runs produced NO
     ``_meta.apdailos_*`` at all — the keys were written only on success, so a
     failed reader left the run artifact indistinguishable from a run where the
     reader had never existed. The failure reason lived exclusively inside a
@@ -1172,7 +1172,7 @@ def _warn_apdailos_degraded(parsed: dict, reason: str | None,
     2026-07-28: this reader is a SEPARATE Vision call and it can fail
     (network, no JSON, no išklotinių page). When it does, every room falls
     back to the paskirtis standard — garažas/tambūras walls drop OUT of the
-    paint total (Beržų truth: 31.45 m² of garage wall paint), and wet-room
+    paint total (Objektas A truth: 31.45 m² of garage wall paint), and wet-room
     finishes are assumed rather than read. Before this warning, that swing
     left NO trace in the saved project blob: two runs of the same PDF
     produced per-room paint areas differing by 350% and both looked clean.
@@ -1313,7 +1313,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
     # (2026-08-04): when a persisted warning ENUMERATES which rooms have LED
     # niches, statistically-inferred niches in the other rooms are fabrications
     # and must not survive any recompute — fresh extraction, eval rescore, or a
-    # user edit. Placed here (not only at inference time) so the two ciurliu
+    # user edit. Placed here (not only at inference time) so the two objektas_c
     # bathrooms already baked into saved extracts get cleaned too. Fails
     # closed: no enumerating warning → drops nothing. Never raises.
     try:
@@ -2137,7 +2137,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         2026-07-05 audit fix (bug 4): a room whose NOMINAL height is <3 m can
         still carry explicit above-3m surfaces — a feature/soffit wall
         (extra_walls_virs_3m_m2) or a raised ceiling coffer
-        (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
+        (high_ceiling_area_m2, e.g. Objektas A room 110: 47.44 m² wall + 12.28 m²
         ceiling above 3 m). Splitting by room height alone dumped those into the
         iki-3m line. A genuinely high room (≥3 m) still sends all its paint to
         virš-3m.
@@ -2382,7 +2382,7 @@ def _room_virs_3m_paint(room: dict) -> float:
     Same class as the 2026-07-05 audit bug 4 (paint iki/virš-3m split): a room
     whose NOMINAL height is <3 m can still carry explicit above-3m surfaces —
     a feature/soffit wall (extra_walls_virs_3m_m2) or a raised ceiling coffer
-    (high_ceiling_area_m2, e.g. Beržų room 110: 47.44 m² wall + 12.28 m²
+    (high_ceiling_area_m2, e.g. Objektas A room 110: 47.44 m² wall + 12.28 m²
     ceiling above 3 m over a 2.8 m room). Judging by room height alone drops
     those surfaces from every height-gated billed quantity (paint split,
     pastoliai). A genuinely high room (≥3 m) contributes all its paint.
@@ -2413,13 +2413,13 @@ def _room_virs_3m_paint(room: dict) -> float:
 # two site visits as one and silently under-bills the installer.
 #
 # EVIDENCE — 4 contractor sąmatos in ground_truth/ (all Rangovas A):
-#   berzas      nr 38-46  vonios / praustuvo / dušo / bidė maišytuvai — ALL
+#   objektas_a      nr 38-46  vonios / praustuvo / dušo / bidė maišytuvai — ALL
 #                         concealed, ALL split into potinkinė + virštinkinė
 #                         (1+1, 5+5, 2+2, 3+3 = 22 vnt; we emitted 5)
 #   objektas_b  nr 83-92  identical structure, identical line texts
-#   ciurliu     nr 1-2    "Potinkinės dušo/praustuvo sistemos įrengimas" —
+#   objektas_c     nr 1-2    "Potinkinės dušo/praustuvo sistemos įrengimas" —
 #                         concealed, but billed as ONE line each
-#   lazunu      nr 31     "Dušo maišytuvo sistemos montavimas ( ne potinkinės)"
+#   objektas_d      nr 31     "Dušo maišytuvo sistemos montavimas ( ne potinkinės)"
 #                         — explicitly SURFACE-mounted, one line
 # → concealed is the LT default (3 of 4 projects) but NOT universal. So the
 #   split is ON by default, DISCLOSED as an assumption, and overridable per
@@ -2672,7 +2672,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # pliko bloko/betono prieš glaistymą. NEAPPLIKUOJASI ant GKP pertvarų
         # (jos jau lygios).
         #
-        # 2026-06-09 re-calibration (Berzas fixture, contractor-verified):
+        # 2026-06-09 re-calibration (Objektas A fixture, contractor-verified):
         # kontraktoriaus samata = 138,69 m² Rotband ant 460,71 m² visų sienų
         # ploto = 30,1%. Ankstesnis 50% default'as buvo kalibruotas prieš KLAIDINGĄ
         # walls_paint=277,33 (nuo to laiko ištaisyta į ~448 m² — GT walls_paint
@@ -2832,7 +2832,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # calc_room_quantities (doors=W+2H, interior windows=W+2H, EXTERIOR windows=0
     # via is_exterior) instead of recomputing Σ(2H+W) inline. The inline version had
     # NO is_exterior check and over-quoted +54.8% on BOTH the SK_GD glaistymas and
-    # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Beržų; contractor 89.39).
+    # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Objektas A; contractor 89.39).
     angokrasciai_m = _sum("angokrasciu_gkp_m")
     pasleptu_duru_staktu_m = 0.0
     n_pasleptu_tagged = 0
@@ -2850,7 +2850,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
 
     # 2026-06-14: frameless-door RECONCILIATION (council 5/5 + research). The
-    # glyph pass under-tags frameless doors (Beržų 2 of ~8) because frame type
+    # glyph pass under-tags frameless doors (Objektas A 2 of ~8) because frame type
     # is NOT in the door symbol — it's in the drawing TEXT. door_type_reader reads
     # the tags/annotations ("skirta beapvadinėms durims"); _door_types carries the
     # reconciled count + a confidence flag. When the text count exceeds the tagged
@@ -3203,8 +3203,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # 2026-06-11: silikonavimas seals ALL tiled zones, not only paskirtis-wet
         # rooms — skalbyklos, and any room the apdailos reader marks substantially
         # tiled, are sealed too. Counting only vonia/wc/san under-counted on both
-        # anchors (berzas −39%, bacv −68%); adding tiled non-wet rooms recovers the
-        # defensible part (berzas −10%, bacv −55%) with the unchanged ×1.4
+        # anchors (objektas_a −39%, bacv −68%); adding tiled non-wet rooms recovers the
+        # defensible part (objektas_a −10%, bacv −55%) with the unchanged ×1.4
         # coefficient. (45°-pjovimas keeps WET-only perim — it didn't under-count.)
         def _is_tiled(r: dict) -> bool:
             if _pask(r) in WET:
@@ -3247,7 +3247,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # CALIBRATION 2026-07-25: the two emitted lines summed to ×1.4 of
             # wet perimeter while the calibrated per-room field
             # (universal_rules.silikonavimas_m, scored by the eval harness) is
-            # ×2.3 — and ground truth agrees: berzas gt_per_room 107 = 23.64 m
+            # ×2.3 — and ground truth agrees: objektas_a gt_per_room 107 = 23.64 m
             # on 11.0 m perim (×2.15), 111 = 31.74 on 12.0 (×2.65); the
             # rangovas samata line is 50.14 m where ×1.4 produced 30.38 (−39%)
             # and ×2.3 predicts 49.9 (−0.5%). Keep the documented 4:3 split,
@@ -3315,7 +3315,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "vnt": "vnt", "kiekis": n_showers, "saltinis": SAL,
             })
         # Lentynėliai iš plytelių dušo kabinoje — default 2 per vonia.
-        # 2026-05-27 fix (Berzas fixture): truth=5 vnt for 2 bathrooms (=2,5
+        # 2026-05-27 fix (Objektas A fixture): truth=5 vnt for 2 bathrooms (=2,5
         # per vonia). Anksčiau default 1 per vonia → 2 vnt (under by -60%).
         # User gali override per `lentyneliu_per_vonia`.
         n_full_vonia = sum(1 for r in rooms
@@ -3340,7 +3340,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         #
         # 2026-07-29 gap: `calc_room_quantities` zeroes `grindjuosciu_m` on any
         # tile_floor room, so those metres vanished from the sąmata entirely —
-        # this was NOT a taxonomy split of the MDF line (contractor berzas nr 35
+        # this was NOT a taxonomy split of the MDF line (contractor objektas_a nr 35
         # "Grindjuosčių supjovimas ir suklijavimas", 22.72 m, had NO counterpart
         # at all). Wet rooms are correctly excluded: their walls are tiled to
         # height, so there is no skirting — the contractor bills none either.
@@ -3379,7 +3379,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     #
     # 2026-07-29 RELABEL: the line used to read "Dėžučių iš GKP formavimas WC
     # mechanizmams paslėpti" — the same work, under a name no contractor
-    # samata uses, so a line-by-line reconciliation scored berzas nr 7
+    # samata uses, so a line-by-line reconciliation scored objektas_a nr 7
     # ("Pertvaros sutvirtinimas WC mechanizmams montuoti", 2 vnt — identical
     # driver, identical quantity) as MISSING. Renamed to his vocabulary with
     # our clarifier kept in the parenthetical. Projects priced under the old
@@ -3486,15 +3486,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Vonios — turi dušą + gyvatuką + dušo maišytuvą + lataką
     n_full_bathroom = n_vonia + n_san
     # 2026-06-06 (RC1): basins are NOT 1-per-wet-room — decouple from toilet count;
-    # use the detected praustuvė symbol count when higher (Beržų: 3 vs 2).
+    # use the detected praustuvė symbol count when higher (Objektas A: 3 vs 2).
     n_praustuves = max(n_wet_with_klozetas,
                        int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
     # Plautuvės (virtuvės/skalbyklos kriauklės) — a SEPARATE contractor line
-    # from the praustuvė (lazunu nr 32 "Plautuvės montavimas" alongside nr 33
+    # from the praustuvė (objektas_d nr 32 "Plautuvės montavimas" alongside nr 33
     # "Praustuvės montavimas"), so it needs a count of its own.
     # 2026-07-29: it used to ride on `n_virtuve` alone while the sanitary
     # reader was counting the same kitchen sink into `praustuves` ("praustuvės/
-    # kriauklės" — kriauklė covers a kitchen sink; live berzas probe: 2 of the
+    # kriauklės" — kriauklė covers a kitchen sink; live objektas_a probe: 2 of the
     # 4 "praustuvės" were the virtuvės + skalbyklos plautuvės). Any project
     # with a room classified `virtuve` therefore billed that sink twice — once
     # as a praustuvė, once as a plautuvė. Now `praustuves` is basin-only at
@@ -3505,11 +3505,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     n_plautuves = max(n_virtuve,
                       int((parsed.get("detected_symbols_summary") or {}).get("plautuves") or 0))
     # Bathtub mixer is a SEPARATE fixture from the shower mixer (contractor
-    # berzas 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
+    # objektas_a 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
     # maišytuvas").
     # 2026-07-29: it may NOT ride on `vonios`, whose main-prompt meaning is
     # "Vonios + dušo padėklai" — bathtubs and shower TRAYS in one integer. On
-    # lazunu that key reads 1 while the contractor bills no bathtub mixer at
+    # objektas_d that key reads 1 while the contractor bills no bathtub mixer at
     # all, only "Dušo maišytuvo sistemos montavimas (ne potinkinės)": the 1 is
     # the shower tray. Billing the wrong fixture is worse than billing neither,
     # so this line rides only on `vonios_kubilai` — the sanitary reader's
@@ -3523,11 +3523,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     vonia_unknown = _tubs_read is None and int(_sym.get("vonios") or 0) > 0
     # Bidė dušiukai — counted by the sanitary reader since 2026-07-29 (the
     # `bide` fixture key); the count lands in detected_symbols_summary via
-    # reconcile_fixture_counts. Contractor truth: 3 vnt on berzas AND on
+    # reconcile_fixture_counts. Contractor truth: 3 vnt on objektas_a AND on
     # objektas_b — a whole category we used to bill at zero. When no count
     # exists (reader skipped / no plumbing sheet) it stays a kiekis=null
     # checklist TODO so the miss is visible instead of silent. Never defaulted
-    # to 1-per-klozetas: berzas is billed 3 bidė against 2 klozetai, so that
+    # to 1-per-klozetas: objektas_a is billed 3 bidė against 2 klozetai, so that
     # ratio would be wrong by construction.
     n_bide = int(_sym.get("bide") or 0)
 
@@ -3597,7 +3597,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "skyrius": SK_SAN, "aprasymas": "Skalbimo mašinos sifono įrengimas",
                 "vnt": "vnt", "kiekis": n_skalbimo_sifonas, "saltinis": "paskirtis_default",
             })
-            # 2026-05-27 fix (Berzas fixture): truth has Skalbimo mašinos
+            # 2026-05-27 fix (Objektas A fixture): truth has Skalbimo mašinos
             # montavimas (=fizinis pajungimas + paruošimas), atskira nuo
             # sifono. App anksčiau visiškai praleisdavo.
             pozicijos.append({
@@ -3675,7 +3675,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
     # 2026-07-29 — a symbol count is only worth billing when the drawing
-    # DEFINES the symbol. On Beržų g. 24 the reader returned 6 difuzoriai for a
+    # DEFINES the symbol. On Objektas A the reader returned 6 difuzoriai for a
     # project whose legend has no diffuser glyph and whose only mention of the
     # word says their positions are still to be agreed; those 6 also fabricated
     # 30 m of Ø125 ortakiai below. `diffuser_count_is_anchored` reads the
@@ -3817,7 +3817,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # WHY these are checklist rows and not numbers: every item below is
     # described in the interjero projekto TEKSTE / išklotinėse, never in a
     # symbol legend and never as a dimension we can read. On the reference
-    # project (Beržų g. 24) they are SIX of the contractor's 53 priced lines —
+    # project (Objektas A) they are SIX of the contractor's 53 priced lines —
     # nr 4, 5, 6, 8, 11/21, 12 — and every one of them had no counterpart in
     # our output at all, so a contractor quoting from our sąmata discovered the
     # omission only after he had given the client a price.
@@ -3846,24 +3846,24 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     if gkp_total > 0 or nisu_total > 0:
         pozicijos.extend([
-            # berzas nr 4 — 11.16 m
+            # objektas_a nr 4 — 11.16 m
             _checklist(SK_GKP,
                        "GKP „dėžučių“ montavimas ant lubų (žeminimas, aukštinimas) — suveskite ilgį",
                        "m", "lubų planas — lubų lygių ribos (+2800 / +3400 žymos)"),
-            # berzas nr 5 — 9.11 m (ATSKIRA nuo LED nišų!)
+            # objektas_a nr 5 — 9.11 m (ATSKIRA nuo LED nišų!)
             _checklist(SK_GKP,
                        "Nišų pertvarose įrengimas (dušo, dekoro) — suveskite ilgį",
                        "m", "sienų išklotinės — įleistos nišos vonioje ir pertvarose"),
-            # berzas nr 6 — 6.24 m²
+            # objektas_a nr 6 — 6.24 m²
             _checklist(SK_GKP,
                        "Pertvarų storinimas (LED apšvietimui, galvūgaliui) — suveskite plotą",
                        "m2", "pertvarų planas + interjero vizualizacijos (galvūgalio, LED sienelės)"),
-            # berzas nr 8 — 9.64 m²
+            # objektas_a nr 8 — 9.64 m²
             _checklist(SK_GKP,
                        "Gipso kartono klijavimas sienai išlyginti — suveskite plotą",
                        "m2", "pertvarų planas / pjūviai — nelygios mūro sienos (katilinė, techninės patalpos)"),
         ])
-        # berzas nr 12 — 1 vnt. 2026-07-29: WAS gated on `ortakiai_total > 0`,
+        # objektas_a nr 12 — 1 vnt. 2026-07-29: WAS gated on `ortakiai_total > 0`,
         # which on the reference project was only ever true because a phantom
         # difuzoriai count fed the D125 fallback — so the legend gate above
         # silently killed a contractor line we DO cover.
@@ -3879,7 +3879,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 SK_GKP, "Dėžutės montavimas ortakiams paslėpti — suveskite kiekį",
                 "vnt", "vėdinimo planas — ortakių trasos po lubomis (garažas, techninės patalpos)"))
 
-    # berzas nr 11 + nr 21 — 20.06 m each. The rail IS drawn on the lubų planas,
+    # objektas_a nr 11 + nr 21 — 20.06 m each. The rail IS drawn on the lubų planas,
     # but as an unlabelled line, and no reader measures it; the pair (montavimas
     # + apdirbimas) mirrors how the contractor bills every priglaistomas
     # element. Gated on a ceiling-lighting read so it never appears on a
@@ -3919,7 +3919,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if bendras_plotas > 0:
         # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
         # Empirical ratio ~0.075 m³/m² for full vidaus apdaila.
-        # 2026-05-27 calibration (Berzas fixture): 12 m³ / 165,61 m² = 0,0725.
+        # 2026-05-27 calibration (Objektas A fixture): 12 m³ / 165,61 m² = 0,0725.
         # Anksčiau 0,06 davė 9,9 m³ (under by -17%).
         siuksliu_m3 = max(1.0, round(bendras_plotas * 0.075, 1))
         # Both of these were also billing themselves twice (m³ of waste as
@@ -4711,7 +4711,7 @@ def extract_interior(
     try:
         # MATCH BY NUMBER FIRST (2026-07-29). The old lookup keyed a dict on the
         # lowercased NAME, which broke two ways on real projects:
-        #   1. Duplicate names COLLAPSE. Beržų g. 24 has 108 and 109 both named
+        #   1. Duplicate names COLLAPSE. Objektas A has 108 and 109 both named
         #      "Berniuko kambarys" — the dict kept one row and BOTH bedrooms
         #      inherited that area, so one of them was silently wrong whenever
         #      the twins differ.
@@ -4728,7 +4728,7 @@ def extract_interior(
         # ── IS THIS TABLE EVEN OURS? (2026-08-23, bundle ablation) ──────────
         # A PDF that bundles the architectural part with the interior part
         # carries TWO room schedules, and the reader returns the first one it
-        # sees. Joining that by number alone gave Beržų's "111 Tėvų vonia" the
+        # sees. Joining that by number alone gave Objektas A's "111 Tėvų vonia" the
         # other building's "111 LAUKO TERASA 66.47 m²" as a confident read
         # (headline MAE 3.1% → 34.7%, every room NAME still correct). So:
         # judge the table by name agreement over nr-matched rows; if it is
@@ -5088,7 +5088,7 @@ def extract_interior(
     # Step 2.4.5 above reduces a whole sheet to ONE number (the largest
     # plausible marker) and Vision reduces the same sheet the other way
     # ("+2800 visos kitos patalpos"). Both throw away the pairing the drawing
-    # states explicitly: each altitude is PRINTED INSIDE a room. Beržų room
+    # states explicitly: each altitude is PRINTED INSIDE a room. Objektas A room
     # 101 is bracketed by two `+3400` on the lubų planas; three production
     # Vision runs read it 2.8 / 2.8 / 3.4 — a coin flip on 42.5 m² of high
     # wall. Reading the printed markers by position returns 3.4 on all three,
@@ -5096,7 +5096,7 @@ def extract_interior(
     #
     # Two lanes, in order: point-in-polygon when the rooms carry outlines,
     # else proximity to the room NUMBER printed on the same sheet. The second
-    # exists because the first is often starved — on Beržų exactly 1 of 11
+    # exists because the first is often starved — on Objektas A exactly 1 of 11
     # rooms has any geometry, so the frame gate scored 1/1 and the lane sat
     # inert on the corpus's richest marker sheet.
     #
@@ -5182,7 +5182,7 @@ def extract_interior(
         # Re-assert the POSITIONED-marker heights and tag them, so the UI shows
         # 🟢 (read directly off the drawing) rather than the generic per_room
         # tag. This runs AFTER `_apply_per_room_heights` on purpose: that pass
-        # is name-keyed, so two rooms sharing a name (Beržų has two "Berniuko
+        # is name-keyed, so two rooms sharing a name (Objektas A has two "Berniuko
         # kambarys") would otherwise both take whichever value landed in the
         # name map last. The marker is tied to a room NUMBER — re-asserting it
         # here makes the lane immune to that collapse. It returns fresh dicts,
@@ -5258,7 +5258,7 @@ def extract_interior(
         # (saltinis != "per_room"), the zoom pass is the ONLY recovery path; don't
         # skip it, else the room keeps the section-average height and the
         # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
-        # zoom-once regression where 10/11 berzas rooms got a uniform 2.82 m.)
+        # zoom-once regression where 10/11 objektas_a rooms got a uniform 2.82 m.)
         if (r.get("lubu_aukstis_saltinis") or "section_average") != "per_room":
             return False
         return True
@@ -5376,7 +5376,7 @@ def extract_interior(
     # page) and override the heuristic walls_paint per-room. This replaces
     # hardcoded defaults like `tamburas: walls_paint=0` with what the project
     # actually specifies — per the user directive "imam B iškart" (read from
-    # project, forget paskirtis-based heuristics). Berzas fixture simulation
+    # project, forget paskirtis-based heuristics). Objektas A fixture simulation
     # showed walls accuracy: -11,6% → -4,3% after this step.
     try:
         from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
@@ -5433,7 +5433,7 @@ def extract_interior(
     # Step 2.86: DOORS READER (2026-05-27).
     # Focused Vision pass on floor_plan to count ALL doors including exterior
     # (front, garage, terrace) and corridor doors that pass-1 systematically
-    # misses. Berzas fixture: pass-1 found 9 doors, truth = 14. With doors_reader
+    # misses. Objektas A fixture: pass-1 found 9 doors, truth = 14. With doors_reader
     # paint area gap closes from -1.2% to ±0.5% (to the dot).
     try:
         from .doors_reader import read_doors_from_plan, merge_doors_into_rooms
@@ -5474,7 +5474,7 @@ def extract_interior(
     # Step 2.865: DOOR-TYPE READER (2026-06-14, council 5/5 + research).
     # Frameless ("beapvadinės") door TYPE is structurally NOT in the door glyph —
     # it's in the drawing TEXT (tags LD-1, annotations "skirta beapvadinėms
-    # durims"). The glyph pass under-tags frameless doors (Beržų 2 of ~8 →
+    # durims"). The glyph pass under-tags frameless doors (Objektas A 2 of ~8 →
     # "Durų angų paruošimas" 10.2 m vs contractor 39.2 m). Read the text, reconcile
     # against the tagged count, RAISE + flag — never silently overwrite.
     try:
@@ -5529,7 +5529,7 @@ def extract_interior(
         _emit({"event": "door_types_error", "message": str(exc)})
 
     # Step 2.866: SANITARY FIXTURE READER (2026-06-14, research #3 point-list).
-    # The full-sheet pass under-counts dense sanitary symbols (Beržų praustuvės
+    # The full-sheet pass under-counts dense sanitary symbols (Objektas A praustuvės
     # 3, truth 5). A focused point-list-then-count read raises recall (3→4 live);
     # reconcile RAISES detected_symbols_summary to the higher count (the skylių
     # formula consumes it), never silently lowers. Modest, honest — fixtures have
@@ -5579,7 +5579,7 @@ def extract_interior(
     # backfill from secondary pages (lubu mazgai sections, apsvietimo
     # planas) when the primary's LED-room coverage is sparse.
     #
-    # Verified Beržų: -5.44% → -0.99% (primary alone). Secondary pages
+    # Verified Objektas A: -5.44% → -0.99% (primary alone). Secondary pages
     # would over-extract (light-wiring rectangles mis-read as LED), so
     # the COVERAGE_GATE skips them when primary already covers many
     # rooms. Objektas B: -54.75% → -51.60% (primary 4 rooms < gate,

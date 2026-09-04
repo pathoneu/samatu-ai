@@ -7639,7 +7639,7 @@ async def detect_room_polygons_endpoint(
 
     # Per-room seeds: primary = printed label (if found) else bbox centroid;
     # extra = the other. Same seeding drives BOTH calibration passes (pass-1
-    # label-only left ciurliu/romainiai with no samples → no area prior → unsafe
+    # label-only left objektas_c/romainiai with no samples → no area prior → unsafe
     # 'pick largest' fills; seeding pass-1 from bbox centroids too recovers scale).
     seeds_by_nr: dict[str, tuple[tuple[float, float], list]] = {}
     for nr in nrs:
@@ -7702,7 +7702,7 @@ async def detect_room_polygons_endpoint(
 
     # Post-pass (2026-07-12): fills are produced per-room with no cross-check,
     # so corridor-callout labels seed IDENTICAL polygons for different rooms
-    # (Beržų 103/108/109) and nothing catches it. Resolve duplicate clusters to
+    # (Objektas A 103/108/109) and nothing catches it. Resolve duplicate clusters to
     # a single owner and demote grossly mis-sized fills — an honest
     # manual_needed beats a confidently wrong polygon.
     from extractor.polygon_dedupe import resolve_duplicate_fills

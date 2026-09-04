@@ -317,7 +317,7 @@ ROOM_TYPE_RULES = {
     "tamburas":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
     "tambūras":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
     # 2026-07-04: tile_floor flipped False → True. Both contractor-validated
-    # fixtures tile the garage floor: Beržų bills 10.10 m² (notes p105
+    # fixtures tile the garage floor: Objektas A bills 10.10 m² (notes p105
     # grindys; GT previously needed a per-room tile_floor_override to hit
     # truth) and Rangovas B bills garage tiling explicitly (pasiūlymas items
     # 40-43: laiptų garaže įrengimas, plytelių pripjovimas prie trapo garaže,
@@ -337,7 +337,7 @@ ROOM_TYPE_RULES = {
     # emit had NO entry here, so `ROOM_TYPE_RULES.get(paskirtis) or
     # ROOM_TYPE_RULES["gyvenamoji"]` silently gave them living-room finishes.
     # For `kabinetas` / `techpatalpa` that fallback is defensible and both
-    # appear in the benchmark corpus (Beržų 104 "Darbo kambarys",
+    # appear in the benchmark corpus (Objektas A 104 "Darbo kambarys",
     # objektas_b 13 "Tech. patalpa/skalbykla"), so their entries below are
     # BYTE-EQUAL to gyvenamoji — this is documentation of the existing
     # behaviour, not a new claim about technical rooms. Revisit `techpatalpa`
@@ -871,7 +871,7 @@ def _resolve_deduction_standard(rules: dict | None) -> str:
 # L-shaped, so wall length — and wall paint — is systematically under-read. For
 # rooms whose AREA source is NOT a trusted table we floor the perimeter that
 # feeds walls_gross toward an elongated rectangle. The coefficient is calibrated
-# on the two no-eksplikacija benchmark projects (ciurliu, lazunu); both stay
+# on the two no-eksplikacija benchmark projects (objektas_c, objektas_d); both stay
 # UNDER contractor truth at this value, so there is no overshoot. Scoped to the
 # wall-paint path ONLY — kampai / grindjuostės / silikonavimas keep the MEASURED
 # perimeter because their multipliers (e.g. silikonavimas ×2.3) are calibrated
@@ -908,7 +908,7 @@ _UNKNOWN_TILE_BAND_M = 2.0
 # and, symmetrically, flipped garažas/tambūras between "painted" and
 # "ceiling only" because the same branch also decides walls_paint_factor.
 #
-# Contractor truth (Rangovas A, Beržų g. 24 — contractor-notes-verbatim.md
+# Contractor truth (Rangovas A, Objektas A — contractor-notes-verbatim.md
 # §Dažymai) lists paint for "sienos žemos / aukštos / garažo sienos" and NO
 # paint line for the two bathrooms (107/111 appear only under §Plytelės).
 #
@@ -1027,7 +1027,7 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         return out
 
     if elevation_says_no_tile(room):
-        # 2026-07-29 (Beržų g. 24, room 106 Skalbykla). The apdailos reader
+        # 2026-07-29 (Objektas A, room 106 Skalbykla). The apdailos reader
         # traces COLOUR-CODED wall lines off the išklotinių žymėjimo plan, and
         # on a shared partition the tiled neighbour's blue line sits ~2 mm from
         # the painted room's magenta one. It gave Skalbykla plyteles_share=0.7
@@ -1174,7 +1174,7 @@ def calc_room_quantities(room: dict,
 
     # Atimti angas (NRM2 / VOB / LT — see _opening_should_deduct above).
     # 2026-06-01 audit fix: `or 1` short-circuited explicit 0 → 1, inserting
-    # phantom openings in rooms that legitimately have none (Beržų room 104
+    # phantom openings in rooms that legitimately have none (Objektas A room 104
     # Darbo kambarys, elementai = 1 langas + 1 LED, NO doors). Use explicit
     # None check so 0 stays 0; missing key still defaults to 1.
     standard = _resolve_deduction_standard(rules)
@@ -1207,7 +1207,7 @@ def calc_room_quantities(room: dict,
     # the calculator falls through to the existing apdailos / paskirtis path.
     bathroom_default_h = float(room.get("_bathroom_paint_above_tile_m") or 0)
 
-    # 2026-05-27 Walls glaistymas/dažymas formula (Berzas calibration).
+    # 2026-05-27 Walls glaistymas/dažymas formula (Objektas A calibration).
     #
     # Contractor convention (Rangovas A samata items 16+17 "Sienų, lubų
     # glaistymas/dažymas iki/virš 3m"):
@@ -1227,7 +1227,7 @@ def calc_room_quantities(room: dict,
     # When `sienu_apdailos_breakdown` (from apdailos_reader p10) is present:
     # use the Vision-detected tile_share + tile_h to decide full-tile vs
     # mixed. Otherwise fall back to paskirtis heuristic (legacy).
-    # Door net deduction per contractor convention (Berzas to-the-dot
+    # Door net deduction per contractor convention (Objektas A to-the-dot
     # calibration, 2026-05-27):
     #   net_per_door = standard_door_opening − standard_door_reveal
     #                = 0.9 × 2.1 m² − (0.9 + 2 × 2.1) m × 0.15 m
@@ -1280,7 +1280,7 @@ def calc_room_quantities(room: dict,
         # overlapping išklotinė strips). That is the strongest possible
         # full-tile evidence — an over-read is not a licence to invent paint
         # area out of the overshoot. Bill the whole wall as tile, zero paint.
-        # (Beržų 107: elevation read 46.32 m² of tile in a room with 30.80 m²
+        # (Objektas A 107: elevation read 46.32 m² of tile in a room with 30.80 m²
         # of wall; the old proportional clamp emitted 10.32 m² of "paint" on
         # a bathroom the contractor never paints — see §Dažymai in
         # contractor-notes-verbatim.md.)
@@ -1342,7 +1342,7 @@ def calc_room_quantities(room: dict,
             # the paskirtis-default factor (which gates a room with NO apdaila
             # at all, like a raw garage). The walls_paint_factor_override is
             # the only mechanism that should reduce this default — used by
-            # contractor-specific calibrations (e.g. Beržų garažas at 0.822
+            # contractor-specific calibrations (e.g. Objektas A garažas at 0.822
             # because only 3 of 4 walls are finished).
             #
             # 2026-06-01 audit fix: prior code used
@@ -1368,7 +1368,7 @@ def calc_room_quantities(room: dict,
                 if rt_rules.get("walls_paint") == 0.0:
                     # The apdailos read (project evidence) is overriding a
                     # structural no-paint default (garažas / tambūras). That is
-                    # intentional — Beržų g. 24 contractor truth bills 31.45 m²
+                    # intentional — Objektas A contractor truth bills 31.45 m²
                     # of garage wall paint — but the user must SEE it, because
                     # it contradicts both the room-type standard and their own
                     # Setup Wizard default.
@@ -1421,7 +1421,7 @@ def calc_room_quantities(room: dict,
             if walls_paint_factor == 0.0:
                 # Mirror image of the apdailos-override note above: with NO
                 # project finish data we fall back to the room-type standard
-                # and quote ZERO wall paint. Beržų g. 24 shows what that costs
+                # and quote ZERO wall paint. Objektas A shows what that costs
                 # when it is wrong — the contractor bills 31.45 m² of garage
                 # wall paint the standard says doesn't exist.
                 wall_finish_notes.append(
@@ -1472,7 +1472,7 @@ def calc_room_quantities(room: dict,
     ceiling_type = (room.get("lubu_tipas") or rt_rules.get("ceiling_type") or "gkp").lower()
     ceiling_geometry = (room.get("ceiling_geometry") or "flat").lower()
     slope_angle_deg = float(room.get("slope_angle_deg") or 0)
-    # 2026-05-27 fix (Berzas fixture): all ceiling types get painted in
+    # 2026-05-27 fix (Objektas A fixture): all ceiling types get painted in
     # LT interior practice — including "pakabinamos" (suspended drywall =
     # painted bottom face) and "betonas" (often plastered + painted, e.g.
     # Tambūras entrance halls and Garažas in residential builds).
@@ -1535,7 +1535,7 @@ def calc_room_quantities(room: dict,
     # ── Wholly-unfinished room → the ceiling is not painted either ────────
     # (2026-07-29, Rangovas B / objektas_b)
     #
-    # The 2026-05-27 Beržų note above ("all ceiling types get painted")
+    # The 2026-05-27 Objektas A note above ("all ceiling types get painted")
     # anticipated its own exception: "the narrow case where ceiling is
     # intentionally left raw (industrial garage, raw basement)". This is that
     # case, and the engine already knows how to recognise it — it just wasn't
@@ -1555,7 +1555,7 @@ def calc_room_quantities(room: dict,
     # The gate is deliberately narrow — EVERY condition must hold:
     #   · the paskirtis standard says the room has no interior wall finish,
     #   · nothing overrode it (no apdailos read, no walls_paint_factor_override
-    #     — Beržų's garage IS painted and keeps its ceiling paint through both
+    #     — Objektas A's garage IS painted and keeps its ceiling paint through both
     #     the cached-Vision factor 1.0 and the GT override 0.7988),
     #   · the walls are unpainted because there is NO finish, not because they
     #     are tiled to the ceiling (a full-tile bathroom still gets a painted
@@ -1609,7 +1609,7 @@ def calc_room_quantities(room: dict,
     # is any paintable partition that does not lie on the room outline
     # (perim × H cannot see it).
     #
-    # Measured case — Beržų g. 24: the contractor bills 150.59 m² "sienos
+    # Measured case — Objektas A: the contractor bills 150.59 m² "sienos
     # aukštos" + 62.82 m² "lubos aukštos", while the only drawing-derived
     # >3 m room (102, H=3.4) supplies 103.15 + 50.54. 59.72 m² is billed
     # above 3 m that the drawings, as the readers see them, do not explain;
@@ -1662,7 +1662,7 @@ def calc_room_quantities(room: dict,
 
     # Kampai (LT samata convention — refined 2026-05-31).
     #
-    # Beržų contractor truth (Rangovas A item 19, 493.35 m total) breaks down
+    # Objektas A contractor truth (Rangovas A item 19, 493.35 m total) breaks down
     # into four sub-categories per contractor-notes-verbatim.md:
     #   • pusiniai kampai (semi-corners between rooms) — 110.28 m
     #   • durų angos (door reveal vertical edges) — 14 × 2.8 = 39.2 m
@@ -1705,7 +1705,7 @@ def calc_room_quantities(room: dict,
     # per-room/per-project flag remains for contractors who follow STR
     # strictly. Verified: when ``n_partition_walls`` is 0 (e.g. when the
     # adjacency pass found no neighbours), the contribution is zero so
-    # Beržų is unaffected by the default flip.
+    # Objektas A is unaffected by the default flip.
     count_partition_corners = bool(room.get("count_partition_corners", True))
 
     if walls_paint_factor > 0:
@@ -1736,7 +1736,7 @@ def calc_room_quantities(room: dict,
         kampai = 0.0
 
     # Angokraščiai (atkosai = reveal length around openings). Per CLAUDE.md
-    # §1.2 + Beržų contractor verdict (2026-06-01 rule-explorer Rule #1):
+    # §1.2 + Objektas A contractor verdict (2026-06-01 rule-explorer Rule #1):
     #
     #   ALL doors (interior + exterior)   → W + 2H reveal contour
     #     The door frame always sits INSIDE the room, with three sides
@@ -1755,7 +1755,7 @@ def calc_room_quantities(room: dict,
     # terrace 2750mm) and panoramic windows (2200-3300mm) contribute the
     # right reveal length.
     #
-    # Result on Beržų (rule-explorer #1): 89.51 m vs truth 89.39 m → +0.13%.
+    # Result on Objektas A (rule-explorer #1): 89.51 m vs truth 89.39 m → +0.13%.
     angokrasciu_m = 0.0
     for el in room.get("elementai") or []:
         tipas = (el.get("tipas") or "").lower()
@@ -1896,12 +1896,12 @@ def calc_room_quantities(room: dict,
         # 2026-06-05: silikonavimas_m — Kampų silikonavimas (corner sealant).
         # Wet rooms (vonia/wc/san) only. Multiplier 2.3 is the data-derived
         # median across projects where the AI extract caught the wet rooms:
-        #   berzas       truth 50.14 / wet_perim 23.00 = 2.18
-        #   ciurliu      truth 38.15 / wet_perim 16.50 = 2.31
+        #   objektas_a       truth 50.14 / wet_perim 23.00 = 2.18
+        #   objektas_c      truth 38.15 / wet_perim 16.50 = 2.31
         #   objektas_b truth 128.97 / wet_perim 34.40 = 3.75 (outlier;
         #     likely more fixture seams than typical, calibrator-territory)
-        # At 2.3: berzas +5.5%, ciurliu -0.1%, objektas_b -38%, lazunu -100%
-        #   (lazunu extract found no wet rooms — root cause separate).
+        # At 2.3: objektas_a +5.5%, objektas_c -0.1%, objektas_b -38%, objektas_d -100%
+        #   (objektas_d extract found no wet rooms — root cause separate).
         # Per-project tuning beyond ±15% is calibrator territory (use the
         # /calibrate endpoint), not a single-multiplier fix.
         "silikonavimas_m": round(perim * 2.3 if paskirtis in ("vonia", "wc", "san") else 0, 2),

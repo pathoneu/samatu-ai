@@ -9,7 +9,7 @@
 
 Sąmatų AI (LT construction cost-estimation app, 2-person startup, hosted Anthropic APIs, modest budget) drafted a technical strategy for analyzing flattened RASTER construction PDFs and asked the council to pressure-test it before committing months of build.
 
-**Constraints:** input format uncontrollable (messy raster re-exports); customers non-technical (pay = result); deterministic math layer verified accurate; N-pass voting just shipped and live-verified on the Beržų fixture (paint −25%→+2.3%, kampai −36%→−10.6%, +13% wall-clock).
+**Constraints:** input format uncontrollable (messy raster re-exports); customers non-technical (pay = result); deterministic math layer verified accurate; N-pass voting just shipped and live-verified on the Objektas A fixture (paint −25%→+2.3%, kampai −36%→−10.6%, +13% wall-clock).
 
 **Fresh research context (2026):** zero-shot VLMs cap at 42–51% on architectural drawings; fine-tuned YOLOv8 hits 82.5% mAP on scanned symbols; pure-VLM counting fails; agentic zoom helps but is fragile on noise; hosted-API determinism impossible (impose downstream); every funded competitor ships human-in-the-loop; accuracy leaders narrow scope; our own benchmark recently found to overstate production ~7.5× (AI-seeded ground truth).
 
@@ -44,7 +44,7 @@ You're optimizing the wrong variable. The product isn't "accurate extraction" �
 
 (c) Scaffold-over-model is correct *because* of the flywheel; fine-tunes are downstream of owning labels.
 
-(d) Competitors narrow because ground truth is per-domain, not because scaffolds aren't universal. Your thesis holds only at the speed you acquire validated fixtures per type — currently one (Beržų).
+(d) Competitors narrow because ground truth is per-domain, not because scaffolds aren't universal. Your thesis holds only at the speed you acquire validated fixtures per type — currently one (Objektas A).
 
 (f) Steelman: >90% autonomous doesn't require zero errors — it requires near-perfect recall on "I might be wrong." That's achievable; omniscient extraction isn't. Build the company that knows when it's guessing.
 
@@ -146,6 +146,6 @@ Amend the strategy:
 4. **Expansion:** each new vertical enters as a correction-first product; automate behind the corpus.
 
 ### The One Thing to Do First
-**Measure the false-green rate today:** take the voted Beržų extraction (and the other ground-truth projects), list every item the system would flag 🟢, and count how many are actually wrong vs contractor truth. One day, zero new infrastructure — and it tests the single assumption the entire product trust model stands on.
+**Measure the false-green rate today:** take the voted Objektas A extraction (and the other ground-truth projects), list every item the system would flag 🟢, and count how many are actually wrong vs contractor truth. One day, zero new infrastructure — and it tests the single assumption the entire product trust model stands on.
 
 *(Standing house rule applies: council output is hypothesis until empirically verified on real PDFs — and the recommended first step is exactly that verification.)*

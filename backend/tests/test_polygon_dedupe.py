@@ -1,6 +1,6 @@
 """Duplicate-fill resolution + table-column seed filtering (2026-07-12).
 
-Covers the Beržų failure exactly: corridor-callout labels seeded IDENTICAL
+Covers the Objektas A failure exactly: corridor-callout labels seeded IDENTICAL
 polygons for rooms 103/108/109; the eksplikacija table stacks room numbers in
 one vertical column that must never produce seeds.
 """
@@ -87,7 +87,7 @@ def test_table_column_occurrences_dropped_but_plan_labels_survive():
 
 
 def test_corridor_callout_stack_survives():
-    # Real Beržų geometry: labels along one corridor share x within ~0.003 but
+    # Real Objektas A geometry: labels along one corridor share x within ~0.003 but
     # their y gaps are ≥0.031 (rooms, not table rows) — MUST keep all seeds.
     cands = {
         "106": [(0.5382, 0.334)],

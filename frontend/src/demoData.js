@@ -1,6 +1,6 @@
 export const DEMO_PROJECT = {
-  "id": "demo-berzu-24",
-  "name": "Beržų g. 24 — pavyzdinis interjero projektas",
+  "id": "demo-objektas-a",
+  "name": "Objektas A — pavyzdinis interjero projektas",
   "company_name": "UAB Statybų Pavyzdys",
   "tipas": "interjeras",
   "archetipas": "premium",

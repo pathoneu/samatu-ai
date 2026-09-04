@@ -23,7 +23,7 @@ def client():
 
 def test_fixture_allowed_when_not_production(client, monkeypatch):
     monkeypatch.delenv("ENV", raising=False)
-    r = client.get("/api/projects/anything/room-graph?fixture=berzas")
+    r = client.get("/api/projects/anything/room-graph?fixture=objektas_a")
     assert r.status_code == 200, r.text
     assert r.json()["_source"] == "fixture"
 
@@ -37,6 +37,6 @@ def test_fixture_refused_in_production(client, monkeypatch):
     # In prod the fixture branch is skipped → falls through to require_user.
     monkeypatch.setattr(rg._auth, "require_user", _deny)
     monkeypatch.setenv("ENV", "production")
-    r = client.get("/api/projects/anything/room-graph?fixture=berzas")
+    r = client.get("/api/projects/anything/room-graph?fixture=objektas_a")
     assert r.status_code == 401           # authed path reached, not the fixture
     assert r.json().get("_source") != "fixture"

@@ -1,6 +1,6 @@
 [
   {
-    "slug": "berzas",
+    "slug": "objektas_a",
     "status": "ok",
     "pages_scanned": [
       6,
@@ -38,7 +38,7 @@
     "before_pct": -0.99,
     "after_pct": -0.99,
     "improvement_pp": 0.0,
-    "rerolled_to": "ground_truth/berzas/ai_extract_with_niches.json"
+    "rerolled_to": "ground_truth/objektas_a/ai_extract_with_niches.json"
   },
   {
     "slug": "objektas_b",
@@ -82,7 +82,7 @@
     "rerolled_to": "ground_truth/objektas_b/ai_extract_with_niches.json"
   },
   {
-    "slug": "ciurliu",
+    "slug": "objektas_c",
     "status": "ok",
     "pages_scanned": [
       3
@@ -104,6 +104,6 @@
     "before_pct": -28.74,
     "after_pct": -13.9,
     "improvement_pp": 14.85,
-    "rerolled_to": "ground_truth/ciurliu/ai_extract_with_niches.json"
+    "rerolled_to": "ground_truth/objektas_c/ai_extract_with_niches.json"
   }
 ]

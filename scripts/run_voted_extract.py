@@ -25,8 +25,8 @@ def main() -> int:
     reg = yaml.safe_load((REPO / "ground_truth/registry.yaml").read_text())
     entry = next(p for p in reg["projects"] if p["slug"] == slug)
     pdf = REPO / entry["project_pdf"]
-    if slug == "berzas" and not pdf.exists():
-        pdf = REPO / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    if slug == "objektas_a" and not pdf.exists():
+        pdf = REPO / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     print(f"[{slug}] PDF: {pdf.name} ({pdf.stat().st_size/1e6:.1f} MB)", flush=True)
 
     os.environ["ENABLE_EXTRACTION_VOTING"] = "1"

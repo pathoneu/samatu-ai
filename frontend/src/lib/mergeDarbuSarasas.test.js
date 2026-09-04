@@ -10,7 +10,7 @@ import {
 } from './mergeDarbuSarasas.js';
 
 const SNAPSHOT = new URL(
-  '../../../backend/data/demo-berzu-24-snapshot-20260714.json', import.meta.url,
+  '../../../backend/data/demo-objektas-a-snapshot-20260714.json', import.meta.url,
 );
 
 const money = (rows) => Math.round(

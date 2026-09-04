@@ -24,7 +24,7 @@ def client():
 def test_walls_payload_recomputes_perimeter(client):
     """Sending {walls: [...]} sums their lengths → new perim."""
     r = client.post(
-        "/api/projects/test/rooms/102/recalc?fixture=berzas",
+        "/api/projects/test/rooms/102/recalc?fixture=objektas_a",
         json={"walls": [
             {"wall_id": "w1", "length_mm": 8000},
             {"wall_id": "w2", "length_mm": 6000},
@@ -43,7 +43,7 @@ def test_walls_payload_recomputes_perimeter(client):
 def test_primitives_payload_overrides_keys(client):
     """Sending {primitives: {high_ceiling_area_m2: ...}} updates that field."""
     r = client.post(
-        "/api/projects/test/rooms/110/recalc?fixture=berzas",
+        "/api/projects/test/rooms/110/recalc?fixture=objektas_a",
         json={"primitives": {"high_ceiling_area_m2": 5.0}},
     )
     assert r.status_code == 200
@@ -56,21 +56,21 @@ def test_primitives_payload_overrides_keys(client):
 
 def test_unknown_room_404s(client):
     r = client.post(
-        "/api/projects/test/rooms/999/recalc?fixture=berzas",
+        "/api/projects/test/rooms/999/recalc?fixture=objektas_a",
         json={"walls": [{"wall_id": "w1", "length_mm": 1000}]},
     )
     assert r.status_code == 404
 
 
 def test_empty_body_400s(client):
-    r = client.post("/api/projects/test/rooms/102/recalc?fixture=berzas",
+    r = client.post("/api/projects/test/rooms/102/recalc?fixture=objektas_a",
                     json={})
     assert r.status_code == 400
 
 
 def test_invalid_walls_payload_400s(client):
     r = client.post(
-        "/api/projects/test/rooms/102/recalc?fixture=berzas",
+        "/api/projects/test/rooms/102/recalc?fixture=objektas_a",
         json={"walls": [{"missing": "length_mm"}]},
     )
     assert r.status_code == 400
@@ -80,7 +80,7 @@ def test_santrauka_delta_present_and_consistent(client):
     """Response carries prev/new santrauka + delta. The delta must equal
     new − prev for any present field."""
     r = client.post(
-        "/api/projects/test/rooms/102/recalc?fixture=berzas",
+        "/api/projects/test/rooms/102/recalc?fixture=objektas_a",
         json={"walls": [{"wall_id": "w1", "length_mm": 30000}]},  # halve the room
     )
     body = r.json()
@@ -94,7 +94,7 @@ def test_santrauka_delta_present_and_consistent(client):
 
 def test_response_shape_is_complete(client):
     r = client.post(
-        "/api/projects/test/rooms/102/recalc?fixture=berzas",
+        "/api/projects/test/rooms/102/recalc?fixture=objektas_a",
         json={"walls": [{"wall_id": "w1", "length_mm": 5000}]},
     )
     body = r.json()

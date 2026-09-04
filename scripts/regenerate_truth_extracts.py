@@ -3,28 +3,28 @@ CURRENT restored production pipeline LIVE, with N-pass voting ON (the default).
 
 WHY this exists (and why run_vision_on_truth_set.py is NOT enough):
   • run_vision_on_truth_set.py FILLS IN *missing* extracts — it filters out any
-    project with `has_cached_extract: true` (berzas) and so can never refresh the
+    project with `has_cached_extract: true` (objektas_a) and so can never refresh the
     enrichment-dependent originator.
-  • The cached ai_extract.json files were built (commit c91dd3b, "Beržų MAE
+  • The cached ai_extract.json files were built (commit c91dd3b, "Objektas A MAE
     3.25%→1.15%") when two now-reconstructed reader modules + the OFFLINE
     scripts/apply_adjacency.py enrichment + hand corrections existed. They are
     therefore MORE enriched than fresh production output, so eval_harness
     --totals-only (which scores against them) OVERSTATES production accuracy
-    (~7.5× on berzas: honest 14.95% vs published 1.99%).
+    (~7.5× on objektas_a: honest 14.95% vs published 1.99%).
   • This script overwrites them with HONEST fresh production output so the
     benchmark measures what a real user actually gets.
 
 The N-pass voting path (commits f26665f, 8fbb31e) already runs the adjacency
 pass inline on the resolved floor page, so fresh output reproduces
 n_partition_walls WITHOUT the offline apply_adjacency.py step. What it does NOT
-reproduce: hand corrections (e.g. berzas vision_corrections.json). That is the
+reproduce: hand corrections (e.g. objektas_a vision_corrections.json). That is the
 point — those are the enrichment we are removing from the benchmark.
 
 SAFETY:
   • REFUSES to run unless the backup dir exists (see BACKUP_DIR below). The
     cached extracts are the contractor-validated baseline; back them up first:
         mkdir -p eval_runs/cached_baseline_backup_2026-06-09
-        for s in berzas objektas_b ciurliu lazunu romainiai sernu; do
+        for s in objektas_a objektas_b objektas_c objektas_d romainiai sernu; do
           mkdir -p eval_runs/cached_baseline_backup_2026-06-09/$s
           cp -p ground_truth/$s/*.json eval_runs/cached_baseline_backup_2026-06-09/$s/
         done
@@ -36,7 +36,7 @@ SAFETY:
     benchmark scores). Use --include-missing to also fill projects lacking one.
 
 Usage:  venv/bin/python scripts/regenerate_truth_extracts.py
-        venv/bin/python scripts/regenerate_truth_extracts.py --only ciurliu
+        venv/bin/python scripts/regenerate_truth_extracts.py --only objektas_c
         venv/bin/python scripts/regenerate_truth_extracts.py --dry-run
 """
 from __future__ import annotations

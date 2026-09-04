@@ -9,7 +9,7 @@ WHY (2026-06-14, council 5/5 + deep research, verified on the real PDFs):
     beapvadinėms durims"), door tags (LD-1 ×7 / LD-2 ×3 / LD-3 ×2), and numbered
     notes ("18. Stumdomos durys"). Reading text is Claude's ~90% regime vs ~40%
     for drawing graphics.
-  - Measured failure it fixes: Beržų frameless doors tagged 2 of ~8 → "Durų angų
+  - Measured failure it fixes: Objektas A frameless doors tagged 2 of ~8 → "Durų angų
     paruošimas beapvadinėms durims" 10.2 m vs contractor 39.2 m.
 
 The result is RECONCILED against the glyph-detected count and any disagreement is

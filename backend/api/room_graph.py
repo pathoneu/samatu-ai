@@ -13,7 +13,7 @@ Scale factor: returned as ``page_scale_mm_per_pct`` for the floor-plan page.
 Computed from the saved dimension list when present; null when not yet
 available (the Annotator falls back to user calibration).
 
-Fixture mode (``?fixture=berzas``) reads the contractor-validated
+Fixture mode (``?fixture=objektas_a``) reads the contractor-validated
 to-the-dot extract directly so the Annotator can be demoed without a real
 upload + DB write.
 """
@@ -33,7 +33,7 @@ import auth as _auth
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
 
 router = APIRouter(prefix="/api/projects", tags=["room-graph"])
@@ -174,7 +174,7 @@ async def get_room_graph(
 ) -> dict[str, Any]:
     """Return per-room polygons + paint quantities for the Annotator overlay."""
     if fixture and os.environ.get("ENV") != "production":
-        # Demo / dev mode — no auth, no DB. Useful for the Beržų fixture.
+        # Demo / dev mode — no auth, no DB. Useful for the Objektas A fixture.
         # SECURITY (2026-07-15): gated to non-production. Even though this branch
         # reads only a fixed committed file (no per-tenant leak), serving a real
         # contractor project's geometry to ANONYMOUS callers on prod is not

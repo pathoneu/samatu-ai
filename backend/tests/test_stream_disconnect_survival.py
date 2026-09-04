@@ -138,7 +138,7 @@ def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
                  "headers": [], "client": ("127.0.0.1", 1234), "query_string": b"",
                  "app": main.app, "scheme": "http", "server": ("t", 80)}
         req = Request(scope, receive=lambda: asyncio.sleep(3600))
-        f = UploadFile(filename="berzu.pdf", file=io.BytesIO(b"%PDF-1.4\n" + b"x" * 400))
+        f = UploadFile(filename="objektas_a.pdf", file=io.BytesIO(b"%PDF-1.4\n" + b"x" * 400))
         resp = await main.extract_interior_stream_endpoint(req, files=[f], rules_override=None)
         it = resp.body_iterator
         # 1st event is the recovery id (announced before any work begins), 2nd
@@ -160,7 +160,7 @@ def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
     asyncio.run(drive())
     assert saved, "client disconnected mid-extraction and NOTHING was saved"
     assert saved["blob"]["_saved_by"] == "stream_disconnect_recovery"
-    assert saved["blob"]["name"] == "berzu"        # PDF stem, like the frontend
+    assert saved["blob"]["name"] == "objektas_a"        # PDF stem, like the frontend
     assert saved["blob"]["total_rows"] == 1
 
 
@@ -177,8 +177,8 @@ import pytest
     ("89603f43-Visi20techniniai2001.28.pdf", "Visi techniniai 01.28"),
     # already clean names survive untouched, diacritics included
     ("Visi techniniai 01.28.pdf", "Visi techniniai 01.28"),
-    ("Beržų g. 24.pdf", "Beržų g. 24"),
-    ("ab12cd34-Beržų g. 24.pdf", "Beržų g. 24"),
+    ("Objektas A.pdf", "Objektas A"),
+    ("ab12cd34-Objektas A.pdf", "Objektas A"),
     # YEARS MUST SURVIVE: one letter-anchored "20" is not an encoded space
     ("Butas2024.pdf", "Butas2024"),
     ("Namas2020metai.pdf", "Namas2020metai"),

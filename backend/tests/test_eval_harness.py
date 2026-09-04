@@ -1,7 +1,7 @@
 """Unit tests for eval_harness.py.
 
 These tests don't touch Vision: they exercise the GT-inputs path and the metric
-math against the Beržų truth file checked into the repo.
+math against the Objektas A truth file checked into the repo.
 """
 
 from __future__ import annotations
@@ -33,41 +33,41 @@ def harness():
 
 
 @pytest.fixture(scope="module")
-def berzas_truth(harness):
-    return harness._load_truth("berzas")
+def objektas_a_truth(harness):
+    return harness._load_truth("objektas_a")
 
 
-def test_truth_file_has_required_keys(berzas_truth):
-    assert "gt_dimensions" in berzas_truth
-    assert "gt_totals" in berzas_truth
-    assert "gt_per_room" in berzas_truth
-    assert len(berzas_truth["gt_dimensions"]) >= 10, "expect ≥10 rooms for Beržų"
+def test_truth_file_has_required_keys(objektas_a_truth):
+    assert "gt_dimensions" in objektas_a_truth
+    assert "gt_totals" in objektas_a_truth
+    assert "gt_per_room" in objektas_a_truth
+    assert len(objektas_a_truth["gt_dimensions"]) >= 10, "expect ≥10 rooms for Objektas A"
 
 
-def test_truth_contractor_invariants(berzas_truth):
+def test_truth_contractor_invariants(objektas_a_truth):
     """Cross-checks from contractor-notes-verbatim.md.
 
     iki_3m + virš_3m == combined (584.81); walls_paint + ceiling_paint == combined
     (within ~0.5 rounding because contractor items 16+17 only contain non-garage
     finished rooms while walls_paint_total includes the garage 31.45 m²)."""
-    g = berzas_truth["gt_totals"]
+    g = objektas_a_truth["gt_totals"]
     iki = g["dazymo_iki_3m_m2"]["value"]
     virs = g["dazymo_virs_3m_m2"]["value"]
     combined = g["dazymo_walls_plus_ceilings_combined_m2"]["value"]
     assert abs((iki + virs) - combined) < 0.05, f"{iki}+{virs} != {combined}"
 
 
-def test_use_gt_inputs_runs_and_emits_santrauka(harness, berzas_truth):
-    parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
+def test_use_gt_inputs_runs_and_emits_santrauka(harness, objektas_a_truth):
+    parsed = harness.run_pipeline_use_gt_inputs(objektas_a_truth)
     assert parsed.get("patalpos"), "patalpos must be populated"
     sant = parsed.get("santrauka") or {}
     assert "dazymo_plotas_total_m2" in sant
     assert sant["dazymo_plotas_total_m2"] > 0, "paint total should be > 0"
 
 
-def test_metric_evaluation_returns_status_per_truth_key(harness, berzas_truth):
-    parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
-    results = harness.evaluate(parsed, berzas_truth)
+def test_metric_evaluation_returns_status_per_truth_key(harness, objektas_a_truth):
+    parsed = harness.run_pipeline_use_gt_inputs(objektas_a_truth)
+    results = harness.evaluate(parsed, objektas_a_truth)
     keys = {r.truth_key for r in results}
     # Headline tier must be evaluated against truth
     assert "dazymo_walls_plus_ceilings_combined_m2" in keys
@@ -75,11 +75,11 @@ def test_metric_evaluation_returns_status_per_truth_key(harness, berzas_truth):
     assert "floor_total_m2" in keys
 
 
-def test_floor_area_matches_truth_within_one_percent(harness, berzas_truth):
+def test_floor_area_matches_truth_within_one_percent(harness, objektas_a_truth):
     """Floor area is the easiest invariant: sum of plotas_m2 should match contractor
     bendras_plotas 165.61 m² within 1%."""
-    parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
-    results = harness.evaluate(parsed, berzas_truth)
+    parsed = harness.run_pipeline_use_gt_inputs(objektas_a_truth)
+    results = harness.evaluate(parsed, objektas_a_truth)
     floor = [r for r in results if r.truth_key == "floor_total_m2"][0]
     assert floor.pct_error is not None
     assert abs(floor.pct_error) < 1.0, f"floor area drift {floor.pct_error}%"
@@ -98,7 +98,7 @@ def test_honest_filter_fresh_collapse_is_scored_and_flagged(harness):
     """A FRESH ai_extract emitting 0.0 vs a real >0 truth must NOT be silently
     dropped: it scores as the genuine -100% collapse AND is flagged in
     `collapsed`. Regression guard for the 2026-06-09 benchmark-honesty fix —
-    the original silent-drop hid collapsed metrics on non-berzas projects."""
+    the original silent-drop hid collapsed metrics on non-objektas_a projects."""
     results = [_mk_metric(harness, "CombinedPaint", 0.0, 388.0),  # collapse
                _mk_metric(harness, "LED", 22.45, 16.84)]          # normal
     scored, not_emitted, collapsed = harness._partition_headline_metrics(
@@ -172,9 +172,9 @@ def test_hidden_door_metric_reads_pozicija_not_the_dead_santrauka_key(harness):
     assert accessor({"santrauka": {}, "pozicijos": []}) is None
 
 
-def test_summary_shape(harness, berzas_truth):
-    parsed = harness.run_pipeline_use_gt_inputs(berzas_truth)
-    results = harness.evaluate(parsed, berzas_truth)
+def test_summary_shape(harness, objektas_a_truth):
+    parsed = harness.run_pipeline_use_gt_inputs(objektas_a_truth)
+    results = harness.evaluate(parsed, objektas_a_truth)
     s = harness._summarize(results)
     for k in (
         "headline_mae_pct", "headline_max_pct",
@@ -307,19 +307,19 @@ def test_summary_table_labels_frozen_rows(harness, capsys):
 
 
 def test_ablations_share_truth_but_never_enter_the_corpus_average(harness):
-    """2026-08-22: the Beržų ablation variants (synthetic 'foreign projects')
-    reuse ground_truth/berzas/truth.json. They must be scorable one at a time
+    """2026-08-22: the Objektas A ablation variants (synthetic 'foreign projects')
+    reuse ground_truth/objektas_a/truth.json. They must be scorable one at a time
     (--project X --vision) yet excluded from --totals-only, or four copies of
-    Beržų would quadruple its weight and the corpus MAE would become a Beržų
+    Objektas A would quadruple its weight and the corpus MAE would become an Objektas A
     MAE. `ablation_of` is the flag; the merge must carry it and the corpus
     loop must honour it."""
     import inspect
     reg = harness.REGISTRY
-    for slug in ("berzas_bundle", "berzas_no_eksplikacija",
-                 "berzas_no_isklotines", "berzas_flat150"):
+    for slug in ("objektas_a_bundle", "objektas_a_no_eksplikacija",
+                 "objektas_a_no_isklotines", "objektas_a_flat150"):
         assert slug in reg, f"{slug} missing from REGISTRY"
-        assert reg[slug]["ablation_of"] == "berzas"
-        assert reg[slug]["truth_path"] == reg["berzas"]["truth_path"]
+        assert reg[slug]["ablation_of"] == "objektas_a"
+        assert reg[slug]["truth_path"] == reg["objektas_a"]["truth_path"]
     src = inspect.getsource(harness.run_totals_only_multi)
     assert 'entry.get("ablation_of")' in src, "corpus loop must exclude ablations"
     assert "excluded_ablation" in src

@@ -1,10 +1,10 @@
-# Beržų pozicijos accuracy — Phase 1 (clean line-level fixes) Implementation Plan
+# Objektas A pozicijos accuracy — Phase 1 (clean line-level fixes) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (or subagent-driven-development) to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Fix the three highest-leverage, lowest-risk line-level inaccuracies found in the Beržų audit (RC3 angokraščiai duplicate formula, RC1 basin count, RC8/RC5 redundant kampai emission) — globally, validated against the Rangovas A samata.
+**Goal:** Fix the three highest-leverage, lowest-risk line-level inaccuracies found in the Objektas A audit (RC3 angokraščiai duplicate formula, RC1 basin count, RC8/RC5 redundant kampai emission) — globally, validated against the Rangovas A samata.
 
-**Architecture:** All three are localized edits in `backend/extractor/vision_call.py::_build_pozicijos_from_rooms`. Each consumes data the pipeline already computes (the calibrated `angokrasciu_gkp_m` field; `detected_symbols_summary`; `kampu_metrai`). No data-model changes. Each is independently testable + committable. Verified numbers in `docs/berzas_audit_notes.md`.
+**Architecture:** All three are localized edits in `backend/extractor/vision_call.py::_build_pozicijos_from_rooms`. Each consumes data the pipeline already computes (the calibrated `angokrasciu_gkp_m` field; `detected_symbols_summary`; `kampu_metrai`). No data-model changes. Each is independently testable + committable. Verified numbers in `docs/objektas_a_audit_notes.md`.
 
 **Tech Stack:** Python 3.14, pytest, `venv/bin/python`.
 
@@ -24,7 +24,7 @@
 - Modify: `backend/extractor/vision_call.py:1257-1287`
 - Test: `backend/tests/test_pozicijos_accuracy.py`
 
-**Why:** The bill recomputes `angokrasciai_m = Σ(2H+W)` inline (counts exterior openings → 138.42 m on berzas, +54.8%) and emits it on TWO lines (`SK_GD` glaistymas + `SK_GKP` apdirbimas). The pipeline already computes a per-room `angokrasciu_gkp_m` (excludes exterior); `_sum("angokrasciu_gkp_m")` = 78.05 m (−12.7% vs contractor 89.39 — far better than +54.8%). Use it.
+**Why:** The bill recomputes `angokrasciai_m = Σ(2H+W)` inline (counts exterior openings → 138.42 m on objektas_a, +54.8%) and emits it on TWO lines (`SK_GD` glaistymas + `SK_GKP` apdirbimas). The pipeline already computes a per-room `angokrasciu_gkp_m` (excludes exterior); `_sum("angokrasciu_gkp_m")` = 78.05 m (−12.7% vs contractor 89.39 — far better than +54.8%). Use it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -92,9 +92,9 @@ Then delete the now-unused import line 1254 (`from extractor.universal_rules imp
 Run: `venv/bin/python -m pytest backend/tests/test_pozicijos_accuracy.py::test_angokrasciai_uses_calibrated_field_not_inline -v`
 Expected: PASS.
 
-- [ ] **Step 5: Verify on berzas + no regression**
+- [ ] **Step 5: Verify on objektas_a + no regression**
 
-Run: `venv/bin/python3 -c "import json,sys; sys.path.insert(0,'backend'); from extractor.vision_call import _build_pozicijos_from_rooms; a=json.load(open('ground_truth/berzas/ai_extract.json')); o=_build_pozicijos_from_rooms({'patalpos':a['patalpos'],'santrauka':{}}); print([p['kiekis'] for p in o['pozicijos'] if 'Angokraščių' in p['aprasymas']])"`
+Run: `venv/bin/python3 -c "import json,sys; sys.path.insert(0,'backend'); from extractor.vision_call import _build_pozicijos_from_rooms; a=json.load(open('ground_truth/objektas_a/ai_extract.json')); o=_build_pozicijos_from_rooms({'patalpos':a['patalpos'],'santrauka':{}}); print([p['kiekis'] for p in o['pozicijos'] if 'Angokraščių' in p['aprasymas']])"`
 Expected: `[78.05, 78.05]` (was `[138.42, 138.42]`).
 Run: `venv/bin/python -m pytest backend/tests/ -q -k "not vision and not api and not integration and not endpoint"` → all pass (re-baseline any test asserting old 138.42).
 
@@ -113,7 +113,7 @@ git commit -m "fix(pozicijos): angokraščiai use calibrated field, not inline r
 - Modify: `backend/extractor/vision_call.py:1755-1758`
 - Test: `backend/tests/test_pozicijos_accuracy.py`
 
-**Why:** `Praustuvės maišytuvo montavimas` and `Praustuvės montavimas` use `n_wet_with_klozetas` (=2 on berzas), chaining basins to toilets. `detected_symbols_summary.praustuves` (=3) is the real basin count. Use `max(n_wet_with_klozetas, sym.praustuves)` so basins decouple from toilets (2→3; contractor 5 — residual is symbol recall).
+**Why:** `Praustuvės maišytuvo montavimas` and `Praustuvės montavimas` use `n_wet_with_klozetas` (=2 on objektas_a), chaining basins to toilets. `detected_symbols_summary.praustuves` (=3) is the real basin count. Use `max(n_wet_with_klozetas, sym.praustuves)` so basins decouple from toilets (2→3; contractor 5 — residual is symbol recall).
 
 - [ ] **Step 1: Write the failing test**
 

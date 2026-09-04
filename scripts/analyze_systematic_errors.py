@@ -51,9 +51,9 @@ def _load_all() -> list[dict]:
             continue
         ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"
         ai = json.loads(ai_path.read_text()) if ai_path.exists() else None
-        if ai is None and slug == "berzas":
-            # Fall back to cached replay for berzas
-            ai_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json"
+        if ai is None and slug == "objektas_a":
+            # Fall back to cached replay for objektas_a
+            ai_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json"
             if ai_path.exists():
                 ai = json.loads(ai_path.read_text())
         out.append({

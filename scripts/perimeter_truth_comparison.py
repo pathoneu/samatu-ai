@@ -1,7 +1,7 @@
 """Per-room perimeter audit — honest data only.
 
 This script surfaces the per-room perimeter data that exists in
-``ground_truth/berzas/truth.json``. CRITICAL HONESTY DISCLOSURE:
+``ground_truth/objektas_a/truth.json``. CRITICAL HONESTY DISCLOSURE:
 
   • truth.json's ``gt_dimensions[i].perimetras_m`` is **Vision-derived**
     (extracted by the production pipeline, then frozen into the truth
@@ -64,7 +64,7 @@ def compactness(perim: float, area: float) -> float:
 
 
 def main() -> int:
-    truth_path = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+    truth_path = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
     truth = json.loads(truth_path.read_text(encoding="utf-8"))
 
     rows = []
@@ -98,7 +98,7 @@ def main() -> int:
         })
 
     print()
-    print("Per-room perimeter audit — Beržų (honest)")
+    print("Per-room perimeter audit — Objektas A (honest)")
     print("─" * 110)
     print(f"  {'nr':<4} {'name':<22} {'AI perim':>9} {'area':>7} "
           f"{'H':>5} {'P/√A':>6} {'doors':>5} {'conf':<8} "

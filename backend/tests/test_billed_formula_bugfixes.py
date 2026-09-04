@@ -1,11 +1,11 @@
 """Synthetic edge-path tests for the 4 billed-quantity formula bugs found in
 the 2026-07-05 code audit (universal_rules.py / vision_call.py).
 
-Each bug changes BILLED quantities only in an edge path that the Beržų +
-Objektas B ground-truth fixtures do NOT exercise (verified: berzas fires 0
+Each bug changes BILLED quantities only in an edge path that the Objektas A +
+Objektas B ground-truth fixtures do NOT exercise (verified: objektas_a fires 0
 rooms for bugs 1/2/3, 1 room for bug 4). These synthetic tests pin the correct
 post-fix behaviour; the fixture regression is checked separately by
-test_calculator_audit.py (Beržų truth gate).
+test_calculator_audit.py (Objektas A truth gate).
 
 Bug map:
   1. apdailos-path tile_h_eff falls back to full room height when tile height
@@ -157,7 +157,7 @@ def test_bug4_sub3m_room_above3m_surfaces_go_to_virs_line():
     """A nominally 2.8 m room that carries an explicit >3m wall zone
     (extra_walls_virs_3m_m2) and a >3m ceiling coffer (high_ceiling_area_m2)
     must bill those areas under the virš-3m paint line, not iki-3m. This is the
-    Beržų room-110 pattern (47.44 m² wall + 12.28 m² ceiling above 3 m)."""
+    Objektas A room-110 pattern (47.44 m² wall + 12.28 m² ceiling above 3 m)."""
     room = _computed({
         "nr": "B", "paskirtis": "koridorius", "plotas_m2": 20.0,
         "perimetras_m": 18.0, "lubu_aukstis_m": 2.8, "n_doors": 1, "n_windows": 0,

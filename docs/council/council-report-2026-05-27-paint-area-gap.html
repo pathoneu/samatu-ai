@@ -229,7 +229,7 @@ footer {
 
 <header>
   <div class="eyebrow">LLM Council Session · 2026-05-27</div>
-  <h1>Closing the paint-area gap on Berzas project</h1>
+  <h1>Closing the paint-area gap on Objektas A project</h1>
   <div class="question">
     <strong>The question:</strong> How do I make Vision-extracted per-room perimeters from rasterized LT construction PDFs deterministic enough to close the remaining <strong>-0.78%</strong> gap on combined paint area? Current: 580.24 m². Contractor truth: 584.81 m². Or is this already noise-floor and should I ship?
   </div>
@@ -266,16 +266,16 @@ footer {
     </div>
     <ul>
       <li><strong>Roof V1.5 has <span class="formula">--use-gt-inputs</span> analog</strong> (commit 8e97f23) — already separates merger correctness from Vision drift in your own codebase. Adopt the same eval split for interior paint BEFORE any optimization.</li>
-      <li><strong>Stability test on Berzas alone</strong> — re-run the existing pipeline 5× on Berzas (~$2). Reveals whether 580.24 is a stable point estimate or itself wobbles ±2%. Determines if the gap is even measurable.</li>
+      <li><strong>Stability test on Objektas A alone</strong> — re-run the existing pipeline 5× on Objektas A (~$2). Reveals whether 580.24 is a stable point estimate or itself wobbles ±2%. Determines if the gap is even measurable.</li>
     </ul>
   </div>
 
   <div class="verdict-section">
     <h3><span class="marker">▸</span> The recommendation</h3>
-    <p><strong>Stop optimizing toward Berzas.</strong> The path forward:</p>
+    <p><strong>Stop optimizing toward Objektas A.</strong> The path forward:</p>
     <ol>
       <li><strong>Verify formula definition with contractor</strong> — non-negotiable, before anything else.</li>
-      <li><strong>Re-run Berzas 5×</strong> as a stability test (~$2). Measures actual variance of point estimate.</li>
+      <li><strong>Re-run Objektas A 5×</strong> as a stability test (~$2). Measures actual variance of point estimate.</li>
       <li><strong>Adopt the roof pipeline's <span class="formula">--use-gt-inputs</span> eval split</strong> for interior paint.</li>
       <li><strong>Get N=4</strong> contractor-validated LT PDFs.</li>
       <li><strong>Ship 580.24 with "tikrumas: ±3%" badge</strong> (CLAUDE.md §7 compliant).</li>
@@ -320,7 +320,7 @@ footer {
   <div class="advisor-card" style="grid-column: 1 / -1; border-color: var(--accent); border-width: 2px;">
     <div class="name">The Executor <span style="color: var(--good); font-weight: 700;">— strongest, picked by 4/5 reviewers</span></div>
     <div class="stance"><span class="verdict-tag tag-ship">Ship</span> with Monday plan</div>
-    <div>Ship 580.24 as PASS at ±3% acceptance. Run on 3 more LT PDFs (N=4). Add "tikrumas: ±3%" badge. Approach #8 ONLY if variance persists after N=4. Do NOT spend another week on Berzas — bottleneck is sample size.</div>
+    <div>Ship 580.24 as PASS at ±3% acceptance. Run on 3 more LT PDFs (N=4). Add "tikrumas: ±3%" badge. Approach #8 ONLY if variance persists after N=4. Do NOT spend another week on Objektas A — bottleneck is sample size.</div>
   </div>
 </div>
 
@@ -330,11 +330,11 @@ footer {
   <summary>The Contrarian — "p-hacking with LLMs"</summary>
   <div class="body">
     <p><strong>-0.78% on ONE PDF is not a signal. It's noise that happens to look like a target.</strong></p>
-    <p>Where's the rest of the test set? You have <em>one</em> contractor-validated project (Berzas). Your "584.81 m² truth" itself has uncertainty — did the contractor measure to the millimeter, or eyeball it? What's <em>his</em> run-to-run variance if you asked him to remeasure?</p>
+    <p>Where's the rest of the test set? You have <em>one</em> contractor-validated project (Objektas A). Your "584.81 m² truth" itself has uncertainty — did the contractor measure to the millimeter, or eyeball it? What's <em>his</em> run-to-run variance if you asked him to remeasure?</p>
     <p>The fatal flaw: you're optimizing against a single point estimate as if it were ground truth, when your measurement instrument (Vision) has ±2-3% variance. <strong>You cannot detect a 0.78% improvement with a ±2.5% instrument.</strong> This is p-hacking with LLMs.</p>
     <p>Worse questions avoided:</p>
     <ol>
-      <li>What's variance on the <em>next</em> PDF? Approach #8 might score 580 on Berzas and 540 elsewhere.</li>
+      <li>What's variance on the <em>next</em> PDF? Approach #8 might score 580 on Objektas A and 540 elsewhere.</li>
       <li>Is the contractor's 584.81 even right? Did he use the same door deduction formula (1.125 m²)? If 1.89, your "gap" is a definition mismatch.</li>
       <li>What does the customer pay for being wrong by 5 m²? Probably nothing — they re-quote on site anyway.</li>
     </ol>
@@ -367,7 +367,7 @@ footer {
       <li><strong>Confidence interval per room.</strong> Competitors ship single numbers and lie. You ship error bars and tell the truth. That's a moat, not a bug.</li>
       <li><strong>Targeted correction surface.</strong> Wobbly room → "tap to verify" badge → user draws polygon → variance collapses to 0.</li>
       <li><strong>Pricing leverage.</strong> Konservatyvus / Tikėtinas / Optimistinis columns. Contractors quote high, win low.</li>
-      <li><strong>Data flywheel.</strong> Every user correction trains priors per room-type. In 6 months Berzas becomes irrelevant.</li>
+      <li><strong>Data flywheel.</strong> Every user correction trains priors per room-type. In 6 months Objektas A becomes irrelevant.</li>
     </ol>
     <p><strong>Quantified uncertainty + one-click correction is a category.</strong> Stop closing the gap. Productize it.</p>
   </div>
@@ -392,12 +392,12 @@ footer {
     <p>You are at -0.78% inside ±2-3% Vision noise floor. Already inside the noise band. Can't measure your way out — next run could put you at +1.2%.</p>
     <p><strong>Monday morning:</strong></p>
     <ol>
-      <li><strong>Ship it.</strong> Lock 580.24 m² as PASS for Berzas. Acceptance criterion: ±3%, not ±0%.</li>
-      <li><strong>Run pipeline on 3 more real LT PDFs</strong> (not Berzas variants). N=1 → N=4. You don't know if -0.78% is the gap or lucky cancellation of +2%/-2.8% across rooms.</li>
+      <li><strong>Ship it.</strong> Lock 580.24 m² as PASS for Objektas A. Acceptance criterion: ±3%, not ±0%.</li>
+      <li><strong>Run pipeline on 3 more real LT PDFs</strong> (not Objektas A variants). N=1 → N=4. You don't know if -0.78% is the gap or lucky cancellation of +2%/-2.8% across rooms.</li>
       <li><strong>Add "tikrumas: ±3%" badge</strong> next to combined paint. Honest disclosure beats clever fixes — your own CLAUDE.md says so.</li>
       <li><strong>If after step 2 variance persists:</strong> approach #8 (Vision enumerates mm-dimensions → deterministic perim) is the only one with a clear Monday task. But do it AFTER N=4 data, not before.</li>
     </ol>
-    <p>What you do NOT do: spend another week on Berzas. Bottleneck is sample size, not algorithm.</p>
+    <p>What you do NOT do: spend another week on Objektas A. Bottleneck is sample size, not algorithm.</p>
   </div>
 </details>
 
@@ -415,12 +415,12 @@ footer {
 
 <div class="peer-review">
   <div class="lead">Critical miss flagged by 4/5 reviewers</div>
-  <div class="body"><strong>Door-deduction formula match check.</strong> Contrarian gestured at it then moved on. Berzas's 584.81 may have been computed with 1.89 m² per door (full opening) while we use 1.125 m² (opening − reveal at 0.15m wall). 14 × (1.89 − 1.125) = 10.71 m² difference — MORE than the residual 4.57 m². The "gap" might literally be a spec mismatch, not extraction error.</div>
+  <div class="body"><strong>Door-deduction formula match check.</strong> Contrarian gestured at it then moved on. Objektas A's 584.81 may have been computed with 1.89 m² per door (full opening) while we use 1.125 m² (opening − reveal at 0.15m wall). 14 × (1.89 − 1.125) = 10.71 m² difference — MORE than the residual 4.57 m². The "gap" might literally be a spec mismatch, not extraction error.</div>
 </div>
 
 <div class="peer-review">
   <div class="lead">Other misses (1 reviewer each)</div>
-  <div class="body"><strong>Roof V1.5 <span class="formula">--use-gt-inputs</span> analog</strong> already separates merger correctness from Vision drift in your own codebase (commit 8e97f23). Interior paint should adopt the same eval split BEFORE any further work. Also: re-running Berzas 5× costs ~$2 and immediately tells you if 580.24 is stable or wobbles ±2%.</div>
+  <div class="body"><strong>Roof V1.5 <span class="formula">--use-gt-inputs</span> analog</strong> already separates merger correctness from Vision drift in your own codebase (commit 8e97f23). Interior paint should adopt the same eval split BEFORE any further work. Also: re-running Objektas A 5× costs ~$2 and immediately tells you if 580.24 is stable or wobbles ±2%.</div>
 </div>
 
 <footer>

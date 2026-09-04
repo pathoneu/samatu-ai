@@ -19,7 +19,7 @@ Founder, rejecting a "click row → highlight one room" v1:
 
 > „cia su situ reikia labai stipriai pagalvoti, nes siaip skaiciuojasi viskas per visa nama/buta ir dazymo kampu montavimas ir visa kita."
 
-He is right, and the code proves it. On the reference project (Beržų g. 24, 11 rooms) the row **"Dažymo kampų montavimas — 501,30 m"** is
+He is right, and the code proves it. On the reference project (Objektas A, 11 rooms) the row **"Dažymo kampų montavimas — 501,30 m"** is
 `Σ over 11 rooms of (n_walls_estimate × H + Σ_openings(W + 2H) + n_partition_walls × H + perimetras)`
 — four different terms, over every room, three of which have no drawn object behind them at all. Highlighting "one room" answers none of the three demands. A row is not a place; it is a **filtered aggregate over the whole flat**.
 
@@ -46,7 +46,7 @@ The two halves of an audit chain already exist. **They are never joined.** That 
 
 ## 1.2 What `calc_room_quantities` persists per room
 
-`calc_room_quantities` (`universal_rules.py:1122`) returns a flat dict (`:1779–1857`) that is merged onto the room and saved in the project blob. Verified against a real blob (`backend/data/demo-berzu-24-snapshot-20260714.json`, 11 rooms) and a fresh extract (`ground_truth/berzas/ai_extract.json`).
+`calc_room_quantities` (`universal_rules.py:1122`) returns a flat dict (`:1779–1857`) that is merged onto the room and saved in the project blob. Verified against a real blob (`backend/data/demo-objektas-a-snapshot-20260714.json`, 11 rooms) and a fresh extract (`ground_truth/objektas_a/ai_extract.json`).
 
 **Inputs echoed back (auditable):**
 `plotas_m2`, `perimetras_m`, `lubu_aukstis_m`, `plotas_saltinis`, `lubu_aukstis_saltinis`, `door_area_m2`, `window_area_m2` (`:1855–1857`), `elementai[]`, `paskirtis`, `puslapio_nr`.
@@ -482,7 +482,7 @@ contractor feature batch lands).
 
 ## Sources
 
-**Code (this repo, `viewer-rebuild` @ `3d82131`):** cited inline as `path:line`. Position/decomposition figures were produced by re-running `_build_pozicijos_from_rooms` in-process over `backend/data/demo-berzu-24-snapshot-20260714.json` (11 rooms) with reader context from `ground_truth/berzas/ai_extract.json` — no Vision calls, no paid extraction.
+**Code (this repo, `viewer-rebuild` @ `3d82131`):** cited inline as `path:line`. Position/decomposition figures were produced by re-running `_build_pozicijos_from_rooms` in-process over `backend/data/demo-objektas-a-snapshot-20260714.json` (11 rooms) with reader context from `ground_truth/objektas_a/ai_extract.json` — no Vision calls, no paid extraction.
 
 **Prior internal work:** `docs/superpowers/specs/2026-04-26-bidirectional-plan-traceability-design.md` (the original spec — read §"Reverse direction" and the `trace_type` taxonomy), `docs/superpowers/specs/2026-05-02-pdf-viewer-trust-design.md`, `docs/superpowers/research/2026-05-02-competitor-viewer-ui-deep-dive.md`, `.../industry-takeoff-tools.md`, `.../2026-04-28-takeoff-standards-and-pdf-ux.md`, `.../2026-06-14-pdf-viewer-togal-roadmap.md` (the false-green measurement), `docs/ARCHITECTURE.md` §"The viewer stack" + §"Known fragilities".
 

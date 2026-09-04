@@ -263,7 +263,7 @@ def test_no_anchor_deduction_is_still_explained():
     for v in (full, dropped, billed):
         assert f"{v:.2f}".replace(".", ",") in reasons
     # Guide, don't confess — same vocabulary rule the reason guard enforces.
-    for banned in ("Berž", "kalibruot", "rangov", "etalon", "%/"):
+    for banned in ("Objektas A", "kalibruot", "rangov", "etalon", "%/"):
         assert banned.lower() not in reasons.lower()
 
 

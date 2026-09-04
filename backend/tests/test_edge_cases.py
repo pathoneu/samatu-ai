@@ -46,18 +46,18 @@ def test_single_garazas_bare_slab_gets_no_paint_at_all():
     History, because this assertion has now flipped twice:
 
     · 2026-04-29 — "no painting at all" (no evidence either way).
-    · 2026-05-31 (c91dd3b, Beržų MAE 3.25%→1.15%) — flipped to "walls no,
+    · 2026-05-31 (c91dd3b, Objektas A MAE 3.25%→1.15%) — flipped to "walls no,
       ceiling yes". base_ceiling_area = plotas for ALL ceiling types, because
-      Beržų's garažas room 105 (lubu_tipas=betonas) carries
+      Objektas A's garažas room 105 (lubu_tipas=betonas) carries
       ceiling_paintable_m2=10.67 inside dazymo_plotas_total_m2.
     · 2026-07-29 — back to "neither", for the BARE case only.
 
-    What the middle version missed: Beržų's garage is not bare. Its truth file
+    What the middle version missed: Objektas A's garage is not bare. Its truth file
     supplies sienu_apdailos_breakdown dazymas_share=1.0 and the contractor
     bills 31.45 m² of garage WALL paint — it is a finished room, so of course
     its ceiling is painted too, and it still is (see
     test_unfinished_ceiling_paint.test_garage_with_apdailos_paint_keeps_its_
-    ceiling, which pins exactly that). Beržų never said anything about a garage
+    ceiling, which pins exactly that). Objektas A never said anything about a garage
     with no finish data at all; the 2026-05-31 flip generalised from a room
     that did not fit.
 
@@ -67,8 +67,8 @@ def test_single_garazas_bare_slab_gets_no_paint_at_all():
     zero garage screed — the only ceiling work is item 3 "Laidų apsiuvimas
     garaže" (26.57 m² of wire boxing). The engine was quoting that room 0.00 m²
     of painted wall and 44.00 m² of painted ceiling: a split with no defender.
-    Corpus effect: objektas_b headline MAE 27.321% → 19.639%, berzas unmoved at
-    3.098% (and 0.642% on --use-gt-inputs), ciurliu/lazunu byte-identical.
+    Corpus effect: objektas_b headline MAE 27.321% → 19.639%, objektas_a unmoved at
+    3.098% (and 0.642% on --use-gt-inputs), objektas_c/objektas_d byte-identical.
 
     The withheld area is DISCLOSED, not dropped — the room carries
     `_ceiling_finish_assumptions` and lt_rules raises it as a WARN.
@@ -99,7 +99,7 @@ def test_single_garazas_bare_slab_gets_no_paint_at_all():
 
 def test_single_garazas_with_finish_evidence_is_painted():
     """The other half of the rule, kept adjacent so the two can't drift: the
-    moment the project says the garage walls are finished (Beržų g. 24), the
+    moment the project says the garage walls are finished (Objektas A), the
     room is painted — walls AND the betonas ceiling."""
     rooms = [{
         "nr": "1", "pavadinimas": "Garažas", "paskirtis": "garazas",

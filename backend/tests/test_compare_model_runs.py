@@ -64,12 +64,12 @@ def _run(project, model, actual_paint, pct_paint, tokens_in, cost_eur,
 
 @pytest.fixture()
 def synthetic_files(tmp_path):
-    a1 = _run("berzas", "claude-opus-4-8", 431.5, 2.76, 250_000, 1.85, 310.0,
+    a1 = _run("objektas_a", "claude-opus-4-8", 431.5, 2.76, 250_000, 1.85, 310.0,
               readers={"doors_elapsed_s": 21.0, "apdailos_elapsed_s": 33.5})
-    a2 = _run("ciurliu", "claude-opus-4-8", 300.0, -3.10, 180_000, 1.40, 250.0)
-    b1 = _run("berzas", "claude-fable-5", 424.0, 0.97, 260_000, 3.90, 780.0,
+    a2 = _run("objektas_c", "claude-opus-4-8", 300.0, -3.10, 180_000, 1.40, 250.0)
+    b1 = _run("objektas_a", "claude-fable-5", 424.0, 0.97, 260_000, 3.90, 780.0,
               readers={"doors_elapsed_s": 55.0, "apdailos_elapsed_s": 71.2})
-    b2 = _run("ciurliu", "claude-fable-5", 305.5, -1.32, 190_000, 3.05, 640.0)
+    b2 = _run("objektas_c", "claude-fable-5", 305.5, -1.32, 190_000, 3.05, 640.0)
     paths = {}
     for name, data in (("a1", a1), ("a2", a2), ("b1", b1), ("b2", b2)):
         p = tmp_path / f"{name}_results.json"
@@ -86,7 +86,7 @@ def test_report_contains_per_project_metric_rows(cmr, synthetic_files):
          json.loads(synthetic_files["b2"].read_text())],
     )
     assert "# Model comparison — claude-opus-4-8 vs claude-fable-5" in report
-    assert "## berzas" in report and "## ciurliu" in report
+    assert "## objektas_a" in report and "## objektas_c" in report
     # truth, A, B, pct A, pct B on one row
     assert ("| Sienų dažomas plotas | m² | 419.92 | 431.50 | 424.00 "
             "| +2.76% | +0.97% |") in report
@@ -99,9 +99,9 @@ def test_report_mae_and_totals(cmr, synthetic_files):
         [json.loads(synthetic_files["b1"].read_text()),
          json.loads(synthetic_files["b2"].read_text())],
     )
-    # per-project MAE: berzas A = mean(2.76, 5.44) = 4.10; B = mean(0.97, 5.44) = 3.21
+    # per-project MAE: objektas_a A = mean(2.76, 5.44) = 4.10; B = mean(0.97, 5.44) = 3.21
     # (the synthetic LED metric carries pct -5.44 on BOTH sides)
-    assert "| berzas | 4.10 | 3.21 |" in report
+    assert "| objektas_a | 4.10 | 3.21 |" in report
     # totals: tokens summed across projects
     assert "| input_tokens | 430,000 | 450,000 |" in report
     # € cost summed: 1.85+1.40 vs 3.90+3.05
@@ -191,7 +191,7 @@ def test_harness_model_flag_sets_override_before_pipeline(harness, monkeypatch):
                         Path(harness.EVAL_RUNS_ROOT).parent / "eval_runs_test_tmp")
     monkeypatch.delenv("MODEL_OVERRIDE", raising=False)
     monkeypatch.setattr(sys, "argv", [
-        "eval_harness.py", "--project", "berzas", "--vision",
+        "eval_harness.py", "--project", "objektas_a", "--vision",
         "--model", "claude-fable-5"])
     import shutil
     try:

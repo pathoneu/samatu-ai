@@ -1,11 +1,11 @@
 """Exhaustive formula explorer — RESEARCH ONLY (no implementation).
 
 Sweeps a small grid of (door_deduction × wall_factor_default × waste_factor)
-combinations on Beržų gt_dimensions and reports the top combos by combined
+combinations on Objektas A gt_dimensions and reports the top combos by combined
 distance to truth. Designed to let a human inspect whether ANY combination
 is principled (cites a citable LT standard) — versus being a curve fit.
 
-Honest engineering: any combo that happens to hit ≤0.1% on Beržų is
+Honest engineering: any combo that happens to hit ≤0.1% on Objektas A is
 overwhelmingly likely an overfit because (a) we have N=1 truth file and
 (b) the grid has enough degrees of freedom to fit any single target.
 Surface the data; do not commit.
@@ -82,7 +82,7 @@ def run_combo(rooms: list[dict], door_deduction: float, waste_paint: float) -> C
     ceiling_total = sum(float(r.get("plotas_m2") or 0) * waste_paint
                         for r in rooms
                         if (r.get("lubu_tipas") or "gkp").lower() in ("gkp", "tempiamos"))
-    # Angokraščiai per Rule #1 (Beržų-confirmed)
+    # Angokraščiai per Rule #1 (Objektas A-confirmed)
     ang = 0.0
     for r in rooms:
         for el in r.get("elementai") or []:
@@ -121,7 +121,7 @@ def _paskirtis_factor(p: str) -> float:
 
 
 def main() -> int:
-    truth_path = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+    truth_path = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
     truth = json.loads(truth_path.read_text(encoding="utf-8"))
     rooms = []
     for r in truth["gt_dimensions"]:
@@ -137,7 +137,7 @@ def main() -> int:
         combos.append(run_combo(rooms, dd, wf))
 
     combos.sort(key=lambda c: c.distance)
-    print(f"\nExhaustive formula search on Beržų — RESEARCH OUTPUT ONLY")
+    print(f"\nExhaustive formula search on Objektas A — RESEARCH OUTPUT ONLY")
     print(f"  {len(combos)} combos tested (door_deduction × waste_paint).")
     print(f"  Distance = Σ |Δ|/truth per metric, capped at 1.0 per metric.\n")
     print(f"  {'door_ded':>8} {'waste':>6} {'walls':>8} {'ceiling':>8} "
@@ -162,7 +162,7 @@ def main() -> int:
     print("  IMPORTANT — RESEARCH ONLY: do NOT implement any combo unless a")
     print("  specific STR / NRM2 / contractor convention citation justifies it.")
     print("  With 49 grid points and 4 weighted targets, the best combo is almost")
-    print("  certainly an overfit on Beržų's N=1 truth, not a generalisable rule.")
+    print("  certainly an overfit on Objektas A's N=1 truth, not a generalisable rule.")
     return 0
 
 

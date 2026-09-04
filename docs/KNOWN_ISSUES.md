@@ -114,7 +114,7 @@ A multi-round investigation (perimeter priors, niche-prompt tuning, coverage gat
 area priors, scale calibration, ceiling overage, **two live Vision spikes**) established
 that BOTH are Vision **measurement ceilings**, not code bugs — do not re-litigate:
 
-- **Čiurlių paint −10.5%** — the bundled `project_pdf` (planning + lighting sheets)
+- **Objektas C paint −10.5%** — the bundled `project_pdf` (planning + lighting sheets)
   has **no wall-dimension chains, only furniture dimensions**, so Vision sizes rooms
   from furniture + assumed 1:50 scale → uniform ~10% under-read. Empirical proof
   (live `claude-opus-4-7` calls, 2026-06-06):
@@ -127,29 +127,29 @@ that BOTH are Vision **measurement ceilings**, not code bugs — do not re-litig
   derive. AI floor (95.5) is only **−2.6%** vs the real floor (98.0); the headline
   −10.5% is mostly the unmodellable ceiling-soffit gap.
 - **Objektas B LED −18%** — Vision *recall* gap (niche prompt already recall-hardened;
-  multi-page locator already runs pgs 5/6/7). The inference fallback over-bills Čiurlių
+  multi-page locator already runs pgs 5/6/7). The inference fallback over-bills Objektas C
   (+12.5%) while under-recovering Objektas B; **no global ratio change is safe**
   (verified: dropping san/vonia/wc → Objektas B −29.6%).
 
-**Root cause is DATA/input-completeness, same pattern as lazunu** — the dimensioned
+**Root cause is DATA/input-completeness, same pattern as objektas_d** — the dimensioned
 architectural plan lives on a separate sheet not in the bundle.
 
 **Answers (no further extraction cleverness warranted):**
 1. **`/calibrate`** — contractor enters the exact floor/ceiling/LED value per project
    ($0, exact, never mutates the global calculator; `led_nisos_m` + `dazymo_plotas_m2`
    already registered as calibration metrics).
-2. Bundle the **dimensioned architectural plan** into Čiurlių's `project_pdf`.
+2. Bundle the **dimensioned architectural plan** into Objektas C's `project_pdf`.
 3. Expand the **no-eksplikacija ground-truth set** (currently N=1–2) before any further
    "global" no-schedule fix — that's the only thing that unblocks this regime.
 
-**Update 2026-06-06 — lazunu unblocked (benchmark 3 → 4 scored projects):**
-Bundled lazunu's split single-page Layout4 sheets (Apmatavimai + Naujai-pertvaru floor
-plan + Pakabinamu-lubu ceiling + Sviestuvu lighting → `lazunu_TP_bundled.pdf`) and
+**Update 2026-06-06 — objektas_d unblocked (benchmark 3 → 4 scored projects):**
+Bundled objektas_d's split single-page Layout4 sheets (Apmatavimai + Naujai-pertvaru floor
+plan + Pakabinamu-lubu ceiling + Sviestuvu lighting → `objektas_d_TP_bundled.pdf`) and
 re-extracted ($0.49 Vision). Areas now read correctly from the **eksplikacija** (4 rooms,
 `plotas_saltinis=eksplikacija`; perimeter floor correctly did NOT fire). Overall MAE
 **5.78% (3 proj) → 6.66% (4 proj)** — *added coverage*, not a regression
-(berzas/objektas_b/ciurliu byte-identical). lazunu paint is still **−14.2%**, but for a
-**distinct** reason from ciurliu: **multi-level suspended ceilings with bulkhead faces
+(objektas_a/objektas_b/objektas_c byte-identical). objektas_d paint is still **−14.2%**, but for a
+**distinct** reason from objektas_c: **multi-level suspended ceilings with bulkhead faces
 (kaktos at 2.39/2.51/2.66/2.26 m)**. Vision detects the heights (prose warning) but NOT the
 bulkhead boundary lengths, and `calc_room_quantities` has no bulkhead-face-paint term → not
 cleanly code-fixable from the current extract. **The no-schedule regime is hard for ≥2
@@ -160,7 +160,7 @@ distinct reasons** (no readable dimensions; multi-level ceilings). sernu remains
 
 ## 🚫 Untested scenarios (cannot resolve without sample data)
 
-We have **6** ground-truth projects (`ground_truth/`: berzas, ciurliu, lazunu, objektas_b, romainiai, sernu — was 5 when this was written), all private residential new-builds. The pipeline has NEVER been validated on:
+We have **6** ground-truth projects (`ground_truth/`: objektas_a, objektas_c, objektas_d, objektas_b, romainiai, sernu — was 5 when this was written), all private residential new-builds. The pipeline has NEVER been validated on:
 
 | Scenario | Risk | Mitigation if encountered |
 |----------|------|---------------------------|

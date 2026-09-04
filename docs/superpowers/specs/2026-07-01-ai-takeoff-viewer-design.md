@@ -113,7 +113,7 @@ Per-surface assignment; auto-deduct openings with `tikslus`/`praktinis` toggle; 
 
 ## 10. Testing strategy
 
-- **Ground-truth fixture:** the contractor-validated Beržų g. 24 project (known 419.92 paint, 42.3 LED, 165.61 ceiling) — the viewer's displayed/confirmed quantities must match, and confidence must correctly flag the synthesized ones.
+- **Ground-truth fixture:** the contractor-validated Objektas A project (known 419.92 paint, 42.3 LED, 165.61 ceiling) — the viewer's displayed/confirmed quantities must match, and confidence must correctly flag the synthesized ones.
 - **Confidence correctness:** provenance→color mapping unit-tested; low-confidence items appear in the worklist + on the plan.
 - **Counter:** on a known sheet, matcher over-returns modestly (not 100×); prune-to-truth reachable in a few actions; eksplikacija cross-check fires.
 - **Coordinate bridge:** polygon_pct→screen round-trips + aligns to the rendered page (numeric + visual).

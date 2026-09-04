@@ -30,7 +30,7 @@ TRUTH_ATKOSAI_M = 89.39
 
 
 def main() -> int:
-    truth = json.loads((REPO_ROOT / "ground_truth/berzas/truth.json").read_text())
+    truth = json.loads((REPO_ROOT / "ground_truth/objektas_a/truth.json").read_text())
     rooms = truth["gt_dimensions"]
 
     print("\n═══ Phase 1.1 — Ceiling height audit ═══\n")

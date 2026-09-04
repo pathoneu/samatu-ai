@@ -626,7 +626,7 @@ def test_pagescales_durable_survives_roundtrip(tmp_path, monkeypatch):
 
 ## Task 2.2: Surface durable scale in `PlanViewer` + room areas
 
-Make `PlanViewer` and the room-area display read the durable scale (via `getPageScaleDurable(project, pageNr)`) when present, falling back to legacy `pixels_per_meter`. Room polygon areas recompute from `polygon_pdf` × durable scale — fixing the "areas wrong after cache-clear" gap. Browser-verify against the contractor fixture (Beržų g. 24: known 419.92 m² paint etc.).
+Make `PlanViewer` and the room-area display read the durable scale (via `getPageScaleDurable(project, pageNr)`) when present, falling back to legacy `pixels_per_meter`. Room polygon areas recompute from `polygon_pdf` × durable scale — fixing the "areas wrong after cache-clear" gap. Browser-verify against the contractor fixture (Objektas A: known 419.92 m² paint etc.).
 
 ---
 

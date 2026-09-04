@@ -16,7 +16,7 @@
 | Angokraščiai | m | 94.02 | 89.44 | 183.10 | -4.87% | +94.75% |
 | **MAE** | % | | | | **51.53** | **64.20** |
 
-## berzas
+## objektas_a
 
 | Metric | Unit | Truth | claude-opus-4-8 | claude-fable-5 | %err claude-opus-4-8 | %err claude-fable-5 |
 |---|---|---:|---:|---:|---:|---:|
@@ -38,7 +38,7 @@
 | Šiukšlių išvežimas | m³ | 12.00 | — | — | — | — |
 | **MAE** | % | | | | **15.66** | **12.55** |
 
-## ciurliu
+## objektas_c
 
 | Metric | Unit | Truth | claude-opus-4-8 | claude-fable-5 | %err claude-opus-4-8 | %err claude-fable-5 |
 |---|---|---:|---:|---:|---:|---:|
@@ -50,7 +50,7 @@
 | Angokraščiai | m | 34.53 | 45.25 | 35.10 | +31.05% | +1.65% |
 | **MAE** | % | | | | **35.09** | **28.23** |
 
-## lazunu
+## objektas_d
 
 | Metric | Unit | Truth | claude-opus-4-8 | claude-fable-5 | %err claude-opus-4-8 | %err claude-fable-5 |
 |---|---|---:|---:|---:|---:|---:|
@@ -67,9 +67,9 @@
 | Project | claude-opus-4-8 | claude-fable-5 |
 |---|---:|---:|
 | objektas_b | 51.53 | 64.20 |
-| berzas | 15.66 | 12.55 |
-| ciurliu | 35.09 | 28.23 |
-| lazunu | 19.31 | 10.71 |
+| objektas_a | 15.66 | 12.55 |
+| objektas_c | 35.09 | 28.23 |
+| objektas_d | 19.31 | 10.71 |
 | **mean** | **30.40** | **28.92** |
 
 ## Totals (tokens / cost / time)

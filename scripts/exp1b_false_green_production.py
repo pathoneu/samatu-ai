@@ -79,7 +79,7 @@ def main():
         return round(float(calc_room_quantities(r).get(field) or 0), 2) if r else None
 
     # (name, app_value, truth, room_sensitive: does it depend on flagged geometry?)
-    if slug == "berzas":
+    if slug == "objektas_a":
         Q = [
             ("floor_total", floor, 165.64, False),
             ("combined_paint", round(iki + virs, 2), 584.81, True),

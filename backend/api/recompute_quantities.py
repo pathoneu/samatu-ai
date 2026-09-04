@@ -60,7 +60,7 @@ _ASSUMPTION_FIELDS = {
     "plyteliu_aukstis", "kampu_skaicius",
     "lubu_auksciai", "glaistimo_lygis", "sienos_storis_m",
     "custom_windows", "custom_doors",
-    # 2026-07-05: per-room finishing override (Beržų garage: contractors finish
+    # 2026-07-05: per-room finishing override (Objektas A garage: contractors finish
     # some garages/tambūrai — painted walls — that default to raw. Keyed by
     # patalpa.nr → 0.0 (raw) / 1.0 (painted). Flips walls_paint in the room's
     # rules and recomputes the paint fields, same live path as ceiling height.
@@ -319,7 +319,7 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
         # (vision_call §4.2). This endpoint used to run its own formula off a
         # different constant set (paint_coverage + first_coat_factor vs the
         # class profiles), so an unchanged project came back with different
-        # litres after any Prielaidos edit — measured on the Beržų fixture,
+        # litres after any Prielaidos edit — measured on the Objektas A fixture,
         # 83.83 l of wall paint became 67.59 l on a NO-OP ceiling edit.
         #
         # That was invisible while the litres only ever fed `medziagos_kiekis`;

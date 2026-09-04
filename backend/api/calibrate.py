@@ -42,7 +42,7 @@ CALIB_ROOT = _storage.data_path(
 CALIB_ROOT.mkdir(parents=True, exist_ok=True)
 
 FIXTURES = {
-    "berzas": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/app-output-to-the-dot.json",
+    "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
 
 # Map of override-key → accessor returning the AI value from a parsed

@@ -3,7 +3,7 @@
 Why this lane exists. `assign_markers_to_rooms` (polygon containment) needs
 room OUTLINES, and it refuses to run unless the room numbers print inside
 their own outlines on the marker page (`frame_agreement`). That refusal is
-correct — but on Beržų g. 24 only 1 of 11 rooms carries any geometry at all,
+correct — but on Objektas A only 1 of 11 rooms carries any geometry at all,
 so the gate scores 1/1 and the whole lane bails with `frame_mismatch`. The
 richest marker sheet in the corpus (14 altitudes, 11 rooms) produced nothing.
 
@@ -12,7 +12,7 @@ sheet. That pairing needs no polygons and no cross-page frame assumption:
 the two tokens are millimetres apart in the same coordinate system. This
 lane reads that, under two guards, and is allowed only to RAISE a height.
 
-Measured on Beržų page 6 (see the integration test at the bottom):
+Measured on Objektas A page 6 (see the integration test at the bottom):
   * room 101 Tambūras — two `+3400`, Vision said 2.8 → lane says 3.4
   * room 104 — a stray `+3400` sits 68 pt from its label vs 81 pt from 101's,
     i.e. NEARER the wrong room. The ambiguity margin drops it.
@@ -32,11 +32,11 @@ from extractor.height_markers import (
     scan_positioned_page_tokens,
 )
 
-# Beržų g. 24 page 6 is 1191 × 842 pt; the fixtures are untracked (client
+# Objektas A page 6 is 1191 × 842 pt; the fixtures are untracked (client
 # names + pricing), so every PDF-backed test skips when it is absent.
 _W, _H = 1191.0, 842.0
 _PDF = (pathlib.Path(__file__).resolve().parents[2]
-        / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf")
+        / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf")
 
 
 def _room(nr: str, name: str | None = None) -> dict:
@@ -44,7 +44,7 @@ def _room(nr: str, name: str | None = None) -> dict:
 
 
 def _marker(value_m: float, x_pt: float, y_pt: float, page: int = 1) -> dict:
-    """A marker positioned in Beržų-page points, converted to the pct space
+    """A marker positioned in Objektas A-page points, converted to the pct space
     the scanner emits."""
     return {"page": page, "raw": f"+{int(round(value_m * 1000))}",
             "value_m": value_m, "x_pct": x_pt / _W, "y_pct": y_pt / _H,
@@ -126,7 +126,7 @@ def test_distance_cap_boundary_is_the_page_diagonal_fraction():
 # ── guard 2: the ambiguity margin (kills the cross-wall steal) ────────────
 
 def test_ambiguous_marker_between_two_labels_is_dropped():
-    """Beržų's real trap: the +3400 at (540,202) is INSIDE room 101 but its
+    """Objektas A's real trap: the +3400 at (540,202) is INSIDE room 101 but its
     nearest label is 104's (68 pt) with 101's only 12 pt behind (81 pt).
     Nearest-label alone would hand a 3.4 to a 2.8 room. Refuse instead."""
     rooms = [_room("101"), _room("104")]
@@ -182,7 +182,7 @@ def test_label_tokens_that_are_not_known_room_numbers_are_ignored():
 
 
 def test_eksplikacija_table_labels_do_not_capture_plan_markers():
-    """Every room number is printed twice on Beržų p6 — once on the plan and
+    """Every room number is printed twice on Objektas A p6 — once on the plan and
     once in the room-list table at x≈60. The table copy must never win."""
     rooms = [_room("101"), _room("110")]
     out = assign_markers_by_label_proximity(
@@ -226,7 +226,7 @@ def test_missing_page_dims_fall_back_to_square_page_without_crashing():
 # ── integration: the real sheet ───────────────────────────────────────────
 
 @pytest.mark.skipif(not _PDF.exists(), reason="fixture PDF is untracked")
-def test_berzu_page6_reads_room_101_as_3_4_and_rejects_the_legend():
+def test_objektas_a_page6_reads_room_101_as_3_4_and_rejects_the_legend():
     """The whole point, end to end, on the real bytes."""
     tokens = scan_positioned_page_tokens(_PDF.read_bytes(), (6,))
     rooms = [_room(str(n)) for n in range(101, 112)]

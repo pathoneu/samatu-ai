@@ -21,19 +21,19 @@ def client():
     return TestClient(app)
 
 
-def test_fixture_berzas_returns_11_rooms(client):
-    r = client.get("/api/projects/anything/room-graph?fixture=berzas")
+def test_fixture_objektas_a_returns_11_rooms(client):
+    r = client.get("/api/projects/anything/room-graph?fixture=objektas_a")
     assert r.status_code == 200
     body = r.json()
     assert body["_source"] == "fixture"
     assert len(body["rooms"]) == 11
     assert body["total_floor_area_m2"] > 0
-    # at least one room has a polygon (room 102 has bbox_pct on Beržų extract)
+    # at least one room has a polygon (room 102 has bbox_pct on Objektas A extract)
     assert body["rooms_with_polygons"] >= 1
 
 
-def test_fixture_berzas_room_shape(client):
-    r = client.get("/api/projects/anything/room-graph?fixture=berzas")
+def test_fixture_objektas_a_room_shape(client):
+    r = client.get("/api/projects/anything/room-graph?fixture=objektas_a")
     body = r.json()
     room_102 = next(r for r in body["rooms"] if r["nr"] == "102")
     assert room_102["name"] == "Svetainė/virtuvė"
@@ -53,9 +53,9 @@ def test_rooms_without_polygons_carry_metadata(client):
     """Rooms that lack polygon_pct still appear in the list with their
     name + perimeter + area so the Annotator can show them in the side
     panel even though the overlay can't draw them."""
-    r = client.get("/api/projects/anything/room-graph?fixture=berzas")
+    r = client.get("/api/projects/anything/room-graph?fixture=objektas_a")
     body = r.json()
-    # Tambūras (101) has bbox_pct=None in the Beržų extract
+    # Tambūras (101) has bbox_pct=None in the Objektas A extract
     tamb = next(r for r in body["rooms"] if r["nr"] == "101")
     assert tamb["polygon_pct"] is None
     assert tamb["area_m2"] > 0

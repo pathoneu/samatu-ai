@@ -95,4 +95,7 @@ frontend/test-results/
 # Runtime CV capture (siblings corrections/legends/predictions already ignored)
 data/symbol_training/
 ground_truth/*/results_rescored*.json
+
+# Confidentiality denylist for backend/tests/test_no_confidential_terms_in_repo.py.
+# Local only — the terms it holds are exactly what must never be committed.
 backend/.confidential-terms

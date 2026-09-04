@@ -43,7 +43,7 @@ def test_build_user_text_lists_wet_rooms():
 
 
 # ── bidė as a first-class fixture (2026-07-29) ───────────────────────────────
-# The contractor bills "Bide dušiukų potinkinės/virštinkinės dalies" on berzas
+# The contractor bills "Bide dušiukų potinkinės/virštinkinės dalies" on objektas_a
 # AND objektas_b (3+3 each). No reader produced the count, so the emit layer
 # could only raise a kiekis=null checklist row.
 
@@ -62,7 +62,7 @@ def test_bide_count_reaches_the_symbol_summary():
 
 def test_no_bide_read_stays_zero_not_invented():
     """Absent bidė must land as 0 — the emit layer turns that into a visible
-    checklist TODO. It must never be defaulted from the klozetas count: berzas
+    checklist TODO. It must never be defaulted from the klozetas count: objektas_a
     is billed 3 bidė against 2 klozetai."""
     out = reconcile_fixture_counts({"praustuves": 3, "klozetai": 2},
                                    {"praustuves": 3, "klozetai": 2, "bide": 0})
@@ -113,7 +113,7 @@ def test_no_reader_run_publishes_no_tub_key_at_all():
 
 # ── praustuvė ≠ plautuvė: the kitchen sink gets its own key (2026-07-29) ─────
 # The prompt used to ask for "praustuvės/kriauklės", and "kriauklė" covers a
-# KITCHEN sink. A live 3/3-agreeing probe on berzas enumerated 4 praustuvės, of
+# KITCHEN sink. A live 3/3-agreeing probe on objektas_a enumerated 4 praustuvės, of
 # which two were the virtuvės and skalbyklos PLAUTUVĖS. The emit layer bills
 # "Plautuvės montavimas" off a separate count, so on any project with a room
 # classified `virtuve` that one sink was billed twice.
@@ -133,7 +133,7 @@ def test_prompt_no_longer_calls_a_kitchen_sink_a_praustuve():
 
 
 def test_kitchen_and_laundry_sinks_reach_their_own_symbol_key():
-    """berzas as the reader now reads it: 2 praustuvės + 2 plautuvės, not 4
+    """objektas_a as the reader now reads it: 2 praustuvės + 2 plautuvės, not 4
     praustuvės. Both counts survive to detected_symbols_summary."""
     out = reconcile_fixture_counts({"praustuves": 0},
                                    {"praustuves": 2, "plautuves": 2})
@@ -222,7 +222,7 @@ def test_a_page_classified_as_another_role_can_never_be_the_plumbing_sheet(fake_
 
 
 def test_no_plumbing_evidence_reads_nothing(fake_pdf):
-    """ciurliu/lazunu have no plumbing sheet — skipping is the correct answer,
+    """objektas_c/objektas_d have no plumbing sheet — skipping is the correct answer,
     not reading a floor plan and counting fixtures off it."""
     fake_pdf(["Baldų planas", "Elektros planas", "Apšvietimo planas"])
     assert _find_sanitary_pages(b"", None) == []

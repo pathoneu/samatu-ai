@@ -5,7 +5,7 @@ wrong whenever the model emits a thinking block first — `.text` does not
 exist on it, so the reader raised
 `'ThinkingBlock' object has no attribute 'text'` and died.
 
-Observed on berzas: the apdailos (išklotinių) reader crashed mid-run, every
+Observed on objektas_a: the apdailos (išklotinių) reader crashed mid-run, every
 room fell back to paskirtis defaults, the garažas walls (31.45 m² of real
 paint) vanished from the total and `Sienų dažomas plotas` came in 31% low.
 It is intermittent — the previous run of the same PDF was fine — so nothing

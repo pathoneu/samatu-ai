@@ -1,4 +1,4 @@
-"""Two 2026-07-29 evidence gates, both measured on Beržų g. 24.
+"""Two 2026-07-29 evidence gates, both measured on Objektas A.
 
 GAP 1 — WALL TILE OVER-READ (Skalbykla, 20.58 m²).
 The apdailos reader traces colour-coded wall lines off the išklotinių žymėjimo
@@ -24,7 +24,7 @@ the D125 fallback for another 30 m of ducts, 21 m of insulation and 20 hangers.
 
 A count is only billable when the drawing DEFINES the symbol. Legend entries
 are nominative noun phrases; prose references are oblique — which separates
-berzas (not defined) from objektas_b / lazunu (defined) with no model call.
+objektas_a (not defined) from objektas_b / objektas_d (defined) with no model call.
 """
 import pytest
 
@@ -56,7 +56,7 @@ def test_measured_walls_with_no_tile_zone_is_absence():
 
 
 def test_unmeasurable_wall_proves_nothing():
-    """Kitchen wall a6-a1 on Beržų: a backsplash tile zone is drawn but the
+    """Kitchen wall a6-a1 on Objektas A: a backsplash tile zone is drawn but the
     elevation carries no wall_total_width_mm, so its area sums to 0. That is
     NOT an absence — falling through to the weaker sources is correct."""
     room = {"_tile_elevation_evidence": {
@@ -84,7 +84,7 @@ def test_no_evidence_key_is_not_absence():
 # ══════════════════════════════════════════════════════════════════════════
 
 def _skalbykla(**kw):
-    """Beržų room 106: 6.84 m², 10.5 m perimeter, 2.8 m ceiling. The apdailos
+    """Objektas A room 106: 6.84 m², 10.5 m perimeter, 2.8 m ceiling. The apdailos
     reader claims 70% tile at a 2.8 m band; the išklotinė says none."""
     r = {"nr": "106", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla",
          "plotas_m2": 6.84, "perimetras_m": 10.5, "lubu_aukstis_m": 2.8,
@@ -209,7 +209,7 @@ def test_no_elevations_leaves_rooms_untouched():
 
 @pytest.mark.parametrize("text", [
     "Priglaistomas padavimo difuzorius",           # objektas_b legend
-    "Priglaistomi apvalūs difuzoriai gipso kartono lubose",   # lazunu legend
+    "Priglaistomi apvalūs difuzoriai gipso kartono lubose",   # objektas_d legend
     "Priglaistomas ištraukimo DIFUZORIUS",
     "priglaistomi difūzoriai",
 ])
@@ -218,7 +218,7 @@ def test_legend_labels_are_anchors(text):
 
 
 @pytest.mark.parametrize("text", [
-    # berzas p7/p8 note 3 — the ONLY mention in that 17-page project
+    # objektas_a p7/p8 note 3 — the ONLY mention in that 17-page project
     "derinti kartu su interjero projektuotojais, dėl difuzorių vietos ir "
     "formos parinkimo, kolonėlių dydžio ir vietos bei estetinio vaizdo.",
     "Priglaistomo plyšinio difūzoriaus apdirbimas",

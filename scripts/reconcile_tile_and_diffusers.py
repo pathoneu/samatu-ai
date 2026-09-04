@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile WALL-TILE m² and DIFŪZORIŲ vnt against the contractor's own lines.
 
-WHY (2026-07-29). Two quantities on Beržų g. 24 were flagged as gaps, and the
+WHY (2026-07-29). Two quantities on Objektas A were flagged as gaps, and the
 honest answer differs for each — so both need a number, not a claim:
 
   · WALL TILE. The contractor splits tiling by tile FORMAT (120×60 / 120×120 /
@@ -26,7 +26,7 @@ Zero API spend: replays the saved extract through the same deterministic tail
 toggled OFF and ON, so before/after is measured on one code tree.
 
 Usage:
-    ./venv/bin/python scripts/reconcile_tile_and_diffusers.py            # berzas
+    ./venv/bin/python scripts/reconcile_tile_and_diffusers.py            # objektas_a
     ./venv/bin/python scripts/reconcile_tile_and_diffusers.py --all
 """
 from __future__ import annotations
@@ -48,10 +48,10 @@ DIFFUSER_RX = re.compile(r"difūzor|difuzor", re.I)
 VENT_SKYRIUS = "Ventiliacijos darbai"
 
 # Per-room wall tile the contractor documented verbatim
-# (docs/superpowers/fixtures/2026-05-26-berzu-g-24/contractor-notes-verbatim.md
+# (docs/superpowers/fixtures/2026-05-26-objektas-a/contractor-notes-verbatim.md
 # §Plytelės). Only these two rooms are documented — the rest of his wall-tile
 # universe sits inside mixed-format lines.
-BERZAS_DOCUMENTED_WALL_TILE = {"107": 32.73, "111": 28.80}
+OBJEKTAS_A_DOCUMENTED_WALL_TILE = {"107": 32.73, "111": 28.80}
 
 
 def _norm(s) -> str:
@@ -129,19 +129,19 @@ def report(slug: str) -> None:
         tot_a, tot_b = tot_a + a, tot_b + b
         if a == 0 and b == 0:
             continue
-        truth = BERZAS_DOCUMENTED_WALL_TILE.get(nr) if slug == "berzas" else None
+        truth = OBJEKTAS_A_DOCUMENTED_WALL_TILE.get(nr) if slug == "objektas_a" else None
         print(f"  {str(nr):>4}  {_norm(r.get('pavadinimas'))[:22]:<22} "
               f"{b:>8.2f} {a:>8.2f}  {str(r.get('_tile_read_source')):<16} "
               f"{('%.2f' % truth) if truth else '—'}")
     print(f"  {'':>4}  {'VISO':<22} {tot_b:>8.2f} {tot_a:>8.2f}")
 
-    if slug == "berzas":
-        doc = sum(BERZAS_DOCUMENTED_WALL_TILE.values())
+    if slug == "objektas_a":
+        doc = sum(OBJEKTAS_A_DOCUMENTED_WALL_TILE.values())
         ours_doc_b = sum(float((b_rooms.get(k) or {}).get("plyteles_sienos_m2") or 0)
-                         for k in BERZAS_DOCUMENTED_WALL_TILE)
+                         for k in OBJEKTAS_A_DOCUMENTED_WALL_TILE)
         ours_doc_a = sum(float(r.get("plyteles_sienos_m2") or 0)
                          for r in after["patalpos"]
-                         if r.get("nr") in BERZAS_DOCUMENTED_WALL_TILE)
+                         if r.get("nr") in OBJEKTAS_A_DOCUMENTED_WALL_TILE)
         print(f"\n  Dokumentuotos patalpos (107+111) — rangovas {doc:.2f} m²:")
         print(f"    prieš {ours_doc_b:>7.2f} m²  ({(ours_doc_b - doc) / doc * 100:+.1f}%)")
         print(f"    po    {ours_doc_a:>7.2f} m²  ({(ours_doc_a - doc) / doc * 100:+.1f}%)")
@@ -189,7 +189,7 @@ def main() -> int:
         slugs = [p["slug"] for p in reg["projects"]
                  if (REPO / "ground_truth" / p["slug"] / "ai_extract.json").exists()]
     else:
-        slugs = args or ["berzas"]
+        slugs = args or ["objektas_a"]
     for s in slugs:
         report(s)
     return 0

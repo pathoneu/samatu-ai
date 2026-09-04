@@ -2,7 +2,7 @@
 
 Reads each pasiūlymas/sąmata PDF (zero Vision spend), maps the line
 items to standard metric keys, writes ``ground_truth/<slug>/truth.json``
-mirroring the Beržų schema. gt_dimensions = [] (per-room data not yet
+mirroring the Objektas A schema. gt_dimensions = [] (per-room data not yet
 collected; would require Vision).
 
 Mapping is hardcoded per-project because:
@@ -12,7 +12,7 @@ Mapping is hardcoded per-project because:
   • the cost of writing this once is small and the artefact is traceable
 
 All five sąmatos are from Rangovas A — same contractor
-as Beržų. This is a single-contractor cross-project benchmark, NOT a
+as Objektas A. This is a single-contractor cross-project benchmark, NOT a
 cross-contractor benchmark.
 """
 
@@ -61,7 +61,7 @@ OBJEKTAS_B = {
         "angokrasciu_m": _val(94.02, "pasiūlymas item 14 'Angokraščių apdirbimas GKP'"),
         "rotband_lyginimas_m2": _val(138.69, "pasiūlymas item 15"),
         "dazymo_walls_plus_ceilings_combined_m2": _val(
-            493.03, "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Beržų convention"),
+            493.03, "pasiūlymas items 16+17 sum (424.75 + 68.28) — matches Objektas A convention"),
         "dazymo_iki_3m_m2": _val(424.75, "pasiūlymas item 16 'Sienų/ lubų glaistymas/dažymas'"),
         "dazymo_lubu_virs_3m_m2": _val(68.28, "pasiūlymas item 17"),
         "sienu_molio_tinkas_m2": _val(160.0, "pasiūlymas item 18 'Sienų dekoravimas molio tinku'",
@@ -80,12 +80,12 @@ OBJEKTAS_B = {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 2 — Čiurlių g. 10, Bajorai (2-page pasiūlymas, 3-page A3 planai)
+# Nr. 2 — Objektas C (2-page pasiūlymas, 3-page A3 planai)
 # ─────────────────────────────────────────────────────────────────────
-CIURLIU = {
+OBJEKTAS_C = {
     "$schema_version": 1,
-    "project_id": "ciurliu",
-    "name": "Čiurlių g. 10, Bajorai",
+    "project_id": "objektas_c",
+    "name": "Objektas C",
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf",
@@ -114,12 +114,12 @@ CIURLIU = {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 3 — Romainiai (Objektas C), 1-page pasiūlymas, 45-page interior
+# Nr. 3 — Objektas E, 1-page pasiūlymas, 45-page interior
 # ─────────────────────────────────────────────────────────────────────
 ROMAINIAI = {
     "$schema_version": 1,
     "project_id": "romainiai",
-    "name": "Romainiai (Objektas C)",
+    "name": "Objektas E",
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Objektas C INTERJERAS 4.1-5.1 punktas.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf",
@@ -161,13 +161,13 @@ ROMAINIAI = {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 4 — Šernų g. 18B, Kaunas (2-page sąmata, electrical+tile plans only)
+# Nr. 4 — Objektas F (2-page sąmata, electrical+tile plans only)
 # ─────────────────────────────────────────────────────────────────────
 SERNU = {
     "$schema_version": 1,
     "project_id": "sernu",
-    "name": "Šernų g. 18B, Kaunas",
-    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf",
+    "name": "Objektas F",
+    "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_objektas_f_plyteles_2025 04 02.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf",
         "contractor": "Rangovas A",
@@ -198,12 +198,12 @@ SERNU = {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Nr. 5 — Lazūnų g. 6 (Butas, oldest 2024 project)
+# Nr. 5 — Objektas D (Butas, oldest 2024 project)
 # ─────────────────────────────────────────────────────────────────────
-LAZUNU = {
+OBJEKTAS_D = {
     "$schema_version": 1,
-    "project_id": "lazunu",
-    "name": "Lazūnų g. 6 (Butas)",
+    "project_id": "objektas_d",
+    "name": "Objektas D (Butas)",
     "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Apmatavimai-Layout4.pdf",
     "source": {
         "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf",
@@ -237,7 +237,7 @@ LAZUNU = {
 }
 
 
-PROJECTS = [OBJEKTAS_B, CIURLIU, ROMAINIAI, SERNU, LAZUNU]
+PROJECTS = [OBJEKTAS_B, OBJEKTAS_C, ROMAINIAI, SERNU, OBJEKTAS_D]
 
 
 def main() -> int:

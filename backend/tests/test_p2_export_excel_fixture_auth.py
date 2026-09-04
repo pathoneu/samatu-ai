@@ -2,7 +2,7 @@
 
 2026-07-04 pentest, pass 3, finding P2. `api/export_excel._load_project` returned
 from the ``?fixture=`` branch BEFORE `require_user` ran, so
-`POST /api/projects/{Bid}/export-excel?fixture=berzas` needed no auth and the
+`POST /api/projects/{Bid}/export-excel?fixture=objektas_a` needed no auth and the
 endpoint then called `_load_calibration({Bid})` → read
 `data/calibrations/{Bid}.json` keyed by the attacker-supplied URL project_id. The
 "Patikslinta Sąmata" sheet echoed B's secret calibration ``user_value`` totals
@@ -78,7 +78,7 @@ def _xlsx_contains(content: bytes, needle: float) -> bool:
 
 def test_p2_anon_with_fixture_rejected(env):
     """Anon POST with ?fixture= (the original PoC) → 401, no XLSX, no leak."""
-    r = TestClient(app).post("/api/projects/proj-B/export-excel?fixture=berzas")
+    r = TestClient(app).post("/api/projects/proj-B/export-excel?fixture=objektas_a")
     assert r.status_code == 401, r.text
     # No spreadsheet body at all.
     assert "spreadsheetml" not in r.headers.get("content-type", "")
@@ -88,7 +88,7 @@ def test_p2_anon_with_fixture_rejected(env):
 def test_p2_cross_tenant_export_with_fixture_blocked(env):
     """A logged in, targets B's project WITH ?fixture= → 404, no XLSX, no leak."""
     att = _login("attacker@x.lt")
-    r = att.post("/api/projects/proj-B/export-excel?fixture=berzas")
+    r = att.post("/api/projects/proj-B/export-excel?fixture=objektas_a")
     assert r.status_code == 404, r.text
     assert "spreadsheetml" not in r.headers.get("content-type", "")
     assert str(int(_SECRET_USER_VALUE)) not in r.text
@@ -97,7 +97,7 @@ def test_p2_cross_tenant_export_with_fixture_blocked(env):
 def test_p2_owner_export_still_works_and_carries_own_calibration(env):
     """The owner → 200 XLSX; the Patikslinta sheet legitimately shows B's total."""
     owner = _login("owner@x.lt")
-    r = owner.post("/api/projects/proj-B/export-excel?fixture=berzas")
+    r = owner.post("/api/projects/proj-B/export-excel?fixture=objektas_a")
     assert r.status_code == 200, r.text
     assert "spreadsheetml" in r.headers["content-type"]
     wb = load_workbook(io.BytesIO(r.content), data_only=True)

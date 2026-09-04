@@ -3,7 +3,7 @@
 **Method:** 5 advisors → anonymized peer review (3) → chairman synthesis. Companion to the 2026-06-11 council + experiments.
 
 ## Question
-After a session of backend accuracy work, systematic debugging established: deterministic math is verified sound (byte-identical before/after; geometry −0.7%/−2.8% vs contractor truth where Vision reads cleanly); the benchmark MAE rose 6.66%→9.48% from **honest regeneration** of 2 extracts (not a code regression); remaining gaps (ciurliu −21%, lazunu −11%) are **Vision recall** on hard plans, not math bugs; 3 recall classes were declined as N=2 fitting traps; per-pozicija confidence (🟢🟡🔴 + Lithuanian reasons) is built but **invisible in the React UI**. Is there more high-value backend/accuracy work, or move to the frontend?
+After a session of backend accuracy work, systematic debugging established: deterministic math is verified sound (byte-identical before/after; geometry −0.7%/−2.8% vs contractor truth where Vision reads cleanly); the benchmark MAE rose 6.66%→9.48% from **honest regeneration** of 2 extracts (not a code regression); remaining gaps (objektas_c −21%, objektas_d −11%) are **Vision recall** on hard plans, not math bugs; 3 recall classes were declined as N=2 fitting traps; per-pozicija confidence (🟢🟡🔴 + Lithuanian reasons) is built but **invisible in the React UI**. Is there more high-value backend/accuracy work, or move to the frontend?
 
 ## Chairman's Verdict
 
@@ -18,7 +18,7 @@ After a session of backend accuracy work, systematic debugging established: dete
 
 ### Blind spots the council caught (peer-review round)
 1. **The confidence labels have never been validated against human truth** — and can't be on ~6 AI-seeded fixtures. "The colors and the validation are the same prerequisite."
-2. **Silent failure has no completeness check.** (Chairman note: *verified* — lazunu's 4 rooms MATCH its eksplikacija, so it's complete; the omission hypothesis didn't hold on our anchors, but the gate is still sound defense-in-depth for projects where it would.)
+2. **Silent failure has no completeness check.** (Chairman note: *verified* — objektas_d's 4 rooms MATCH its eksplikacija, so it's complete; the omission hypothesis didn't hold on our anchors, but the gate is still sound defense-in-depth for projects where it would.)
 3. **localStorage-only storage is a live P0 trust-killer** — one cleared cache loses a contractor's bid. Only the Outsider flagged it, and under-weighted it.
 4. **Nobody verified the one customer actually uses it, on what.** A 20-minute call could moot all five roadmaps; with ~1 customer, that's the cheapest highest-value "research" there is.
 
@@ -32,4 +32,4 @@ After a session of backend accuracy work, systematic debugging established: dete
 ### The one thing to do first
 **Get human-confirmed ground truth on a handful of projects** (talk to the customer / build it). It's the keystone: it validates the confidence signal, re-baselines the benchmark honestly, and unblocks an *honest* frontend. Everything else is premature until the measurement is trustworthy.
 
-*House rule: council output is hypothesis until verified. The room-omission premise was already partially refuted by checking lazunu's eksplikacija — apply the same skepticism to the rest.*
+*House rule: council output is hypothesis until verified. The room-omission premise was already partially refuted by checking objektas_d's eksplikacija — apply the same skepticism to the rest.*

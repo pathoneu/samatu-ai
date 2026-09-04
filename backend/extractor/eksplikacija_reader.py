@@ -334,9 +334,9 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
             #     REFUSED, not guessed (pdfplumber_eksplikacija._try_parse_row).
             # Anything short of that returns empty and Vision runs as before.
             #
-            # Measured on the six fixture PDFs after the widening: berzas,
-            # ciurliu and sernu still MISS; objektas_b (15 rooms) and romainiai
-            # (11) were already hits and return byte-identical numbers; lazunu
+            # Measured on the six fixture PDFs after the widening: objektas_a,
+            # objektas_c and sernu still MISS; objektas_b (15 rooms) and romainiai
+            # (11) were already hits and return byte-identical numbers; objektas_d
             # flipped MISS -> HIT (4 rooms) and its four areas match the cached
             # Vision read exactly. No fixture's numbers changed.
             meta = pdf_attempt.get("_meta") or {}

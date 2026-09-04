@@ -37,7 +37,7 @@ One real `claude-fable-5` call through OUR client path: verifies org data-retent
 
 ## Task W1.4 — Benchmark runs + verdict (CONTROLLER ONLY, costs real €)
 
-- Fresh `--vision` runs on the 4 primary projects (berzas, objektas_b, ciurliu, lazunu) × both models. Sequential, watch for refusals/timeouts.
+- Fresh `--vision` runs on the 4 primary projects (objektas_a, objektas_b, objektas_c, objektas_d) × both models. Sequential, watch for refusals/timeouts.
 - `compare_model_runs.py` → benchmark log at `docs/superpowers/research/2026-07-03-fable5-benchmark.md` (the founder's Task 1.6 deliverable).
 - **GATE: founder sees the table and decides the flip** (global / mixed per-reader / stay). Only then W1.5.
 

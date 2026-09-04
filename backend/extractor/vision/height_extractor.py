@@ -3,7 +3,7 @@
 Per the 2026-06-01 user spec: the production pipeline often defaults
 ceiling height to 2.82 m when the eksplikacija doesn't carry it. This
 under-extracts walls_paintable when the real height differs (e.g.,
-ciurliu where actual height appears to be ~3.0 m).
+objektas_c where actual height appears to be ~3.0 m).
 
 This module reads the title block / section / general notes / eksplikacija
 of a project PDF and returns the canonical ceiling height(s).

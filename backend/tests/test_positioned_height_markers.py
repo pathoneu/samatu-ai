@@ -3,7 +3,7 @@
 The bug this closes: both the deterministic scanner (`best_ceiling_candidate`
 = "largest value on the sheet") and Vision ("+2800 visos kitos patalpos")
 reduce a lubų planas to ONE number and throw away the pairing the drawing
-states explicitly — each altitude is printed INSIDE a room. On Beržų g. 24
+states explicitly — each altitude is printed INSIDE a room. On Objektas A
 room 101 (Tambūras) is bracketed by two `+3400`; three production Vision runs
 read it 2.8 / 2.8 / 3.4, a coin flip on 42.5 m² of high wall.
 
@@ -58,7 +58,7 @@ def _agreeing_labels(rooms: list[dict]) -> list[dict]:
 # ── value parsing ─────────────────────────────────────────────────────────
 
 def test_parses_mm_marker():
-    # LT lubų planai print altitudes in mm — the legend on Beržų p6 says so.
+    # LT lubų planai print altitudes in mm — the legend on Objektas A p6 says so.
     assert _marker_value_m("+3400") == 3.4
     assert _marker_value_m("+2800") == 2.8
 
@@ -89,7 +89,7 @@ def test_marker_inside_a_room_assigns_to_that_room():
 
 
 def test_two_markers_bracketing_a_room_assign_to_it():
-    """The Beržų 101 shape: one marker above the room label, one below,
+    """The Objektas A 101 shape: one marker above the room label, one below,
     both inside the outline."""
     rooms = [_room("101", 0.4, 0.18, 0.11, 0.22),
              _room("104", 0.55, 0.05, 0.11, 0.19),
@@ -101,7 +101,7 @@ def test_two_markers_bracketing_a_room_assign_to_it():
 
 
 def test_dominant_value_wins_when_a_room_holds_several_markers():
-    """Beržų 101 exactly: two +3400 plus one +2800 clipping the outline
+    """Objektas A 101 exactly: two +3400 plus one +2800 clipping the outline
     edge. The drawing says 3.4 — the dominant reading must win."""
     # Padded to MIN_AGREEING_ROOMS so the frame gate has enough to check.
     rooms = [_room("101", 0.4, 0.18, 0.11, 0.22),
@@ -149,7 +149,7 @@ def test_room_without_a_marker_falls_back_and_is_disclosed():
 
 
 def test_marker_outside_every_room_is_unassigned_not_guessed():
-    """The Beržų legend prints `+2800 +3100 Lubų apačios altitudė …` in the
+    """The Objektas A legend prints `+2800 +3100 Lubų apačios altitudė …` in the
     sheet margin. Nearest-room would hand it to a real room; containment
     drops it."""
     rooms = [_room("101", 0.0, 0.0, 0.3, 0.3),
@@ -303,7 +303,7 @@ def test_user_override_beats_a_positioned_marker_height():
 
 
 def test_duplicate_room_names_do_not_collapse_marker_heights():
-    """`_apply_per_room_heights` keys by NAME, and Beržų alone has two rooms
+    """`_apply_per_room_heights` keys by NAME, and Objektas A alone has two rooms
     called "Berniuko kambarys". A marker belongs to a room NUMBER — the
     pipeline must re-assert it per nr after the name-keyed merge, or one
     room silently inherits the other's ceiling."""

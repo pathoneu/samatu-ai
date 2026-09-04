@@ -2,7 +2,7 @@
 page but no architectural floor plan.
 
 Per the 2026-06-01 spec section 5: when the input bundle lacks an
-architectural floor plan (lazunu), but a wall-measurement table exists
+architectural floor plan (objektas_d), but a wall-measurement table exists
 (Apmatavimai), we can produce APPROXIMATE per-room dimensions instead
 of zero rooms. The output is clearly tagged as ``estimated`` so any
 downstream UI / KŽ marks the values as "Įvertinta".
@@ -44,7 +44,7 @@ def estimate_rooms_from_wall_list(
     """Estimate per-room data given any subset of {wall_lengths, total_area,
     room_count}. Returns a list of room dicts compatible with the
     universal_rules.calc_room_quantities input schema, each tagged
-    ``plotas_saltinis="estimated_lazunu"``."""
+    ``plotas_saltinis="estimated_objektas_d"``."""
     total_wall_mm = float(sum(wall_lengths_mm or []))
 
     # Resolve room_count
@@ -79,7 +79,7 @@ def estimate_rooms_from_wall_list(
             "lubu_aukstis_m": default_height_m,
             "lubu_tipas": "gkp",
             "elementai": [],
-            "_source": "estimated_lazunu",
+            "_source": "estimated_objektas_d",
             "_confidence": "low",
         })
 
@@ -96,14 +96,14 @@ def estimate_rooms_from_wall_list(
     return rooms
 
 
-def apply_lazunu_estimate_to_extract(
+def apply_objektas_d_estimate_to_extract(
     ai: dict[str, Any],
     wall_lengths_mm: list[float] | None = None,
     total_floor_area_m2: float | None = None,
     room_count: int | None = None,
 ) -> dict[str, Any]:
     """Replace the AI extract's patalpos with estimated rooms when the
-    extract is clearly incomplete (the lazunu case)."""
+    extract is clearly incomplete (the objektas_d case)."""
     estimated = estimate_rooms_from_wall_list(
         wall_lengths_mm or [], total_floor_area_m2, room_count,
         default_height_m=float((ai.get("patalpos") or [{}])[0].get("lubu_aukstis_m") or 2.70),
@@ -111,10 +111,10 @@ def apply_lazunu_estimate_to_extract(
     if not estimated:
         return ai
     ai["patalpos"] = estimated
-    ai.setdefault("_meta", {})["estimation_source"] = "lazunu_estimator"
+    ai.setdefault("_meta", {})["estimation_source"] = "objektas_d_estimator"
     ai["warnings"] = (ai.get("warnings") or []) + [{
         "level": "WARN",
-        "source": "lazunu_estimator",
+        "source": "objektas_d_estimator",
         "message": (
             f"Architectural floor plan not in input PDF — "
             f"{len(estimated)} rooms ESTIMATED from measurements page. "

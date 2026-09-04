@@ -1,6 +1,6 @@
 # Contractor vs App reconciliation + fix plan (2026-06-17)
 
-Rangovas A/Beržų g.24 contractor samata (53 lines, 50,328.67 € su PVM) vs app extraction (project 1fc49edf, 66 poz., Opus 4.8). Careful per-line categorization (4-agent workflow + chairman). Full detail: workflow wl52wmj1d.
+Rangovas A/Objektas A g.24 contractor samata (53 lines, 50,328.67 € su PVM) vs app extraction (project 1fc49edf, 66 poz., Opus 4.8). Careful per-line categorization (4-agent workflow + chairman). Full detail: workflow wl52wmj1d.
 
 ## Headline counts (of 53 contractor lines)
 - ✅ **16 MATCH** (≤10%) — trustworthy

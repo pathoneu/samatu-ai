@@ -88,7 +88,7 @@ Output:
   ...
 }
 
-# Example 2 — medium_house (P2 Čiurlių)
+# Example 2 — medium_house (P2 Objektas C)
 Input: ~224 m² standartinis namas be arkų, 2 vonios, 2 kondicionieriai.
 Output:
 {
@@ -97,7 +97,7 @@ Output:
   ...
 }
 
-# Example 3 — premium (P3 Romainiai)
+# Example 3 — premium (P3 Objektas E)
 Input: Namas ~170 m², specifikacijoje "Benjamin Moore" + "Supreme Ultimate" + 
 "stiklo audinys ant lubų" + moldingai + paslėptos durys.
 Output:
@@ -107,7 +107,7 @@ Output:
   ...
 }
 
-# Example 4 — small_apartment (P5 Lazūnų)
+# Example 4 — small_apartment (P5 Objektas D)
 Input: 41.28 m² butas, 4 patalpos.
 Output:
 {

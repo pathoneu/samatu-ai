@@ -86,7 +86,7 @@ export default function PageOverlayHost({
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
   // the legacy react-pdf viewer, which plots the very same pct RAW over a
   // rotation-applied render and aligns perfectly (room 102 centroid 0.31,0.32
-  // = the top-left open-plan room on the LANDSCAPE Beržų sheet). The content
+  // = the top-left open-plan room on the LANDSCAPE Objektas A sheet). The content
   // wrapper below rotates the base render into that same rotation-applied
   // display, so zones consume the pct unchanged — any per-page rotation of the
   // room geometry here would double-rotate them off their rooms.

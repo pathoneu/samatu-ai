@@ -1,6 +1,6 @@
 """Angokraščiai rule explorer — brute-force candidate formulas.
 
-Loads Beržų gt_dimensions, enumerates every opening (doors + windows),
+Loads Objektas A gt_dimensions, enumerates every opening (doors + windows),
 then tries every combination of:
   • per-opening length formula (W+2H, W+H, 2(W+H), …)
   • which-openings-count filter (all, interior-only, doors only, …)
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TRUTH_PATH = REPO_ROOT / "ground_truth" / "berzas" / "truth.json"
+TRUTH_PATH = REPO_ROOT / "ground_truth" / "objektas_a" / "truth.json"
 TRUTH_TOTAL = 89.39   # contractor samata items 13/14 "Atkosai"
 
 DOOR_TIPAS = {"duris", "pasleptos_duris"}
@@ -171,7 +171,7 @@ def main() -> int:
     n_doors = sum(1 for o in openings if o.is_door)
     n_windows = sum(1 for o in openings if o.is_window)
     n_exterior = sum(1 for o in openings if o.is_exterior)
-    print(f"Beržų openings loaded: {len(openings)}  ({n_doors} doors, "
+    print(f"Objektas A openings loaded: {len(openings)}  ({n_doors} doors, "
           f"{n_windows} windows; {n_exterior} flagged exterior)")
     print(f"Contractor truth (atkosai item 13/14): {TRUTH_TOTAL} m")
     print()

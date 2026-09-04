@@ -25,7 +25,7 @@ const H_MAX_M = 6.0;
  * legacy `patalpos`.
  *
  * This panel used to read `patalpos` unconditionally. The two arrays DO diverge
- * — on the Beržų g. 24 demo, patalpos totals 607.11 m² of dažomas plotas while
+ * — on the Objektas A demo, patalpos totals 607.11 m² of dažomas plotas while
  * v8_rooms totals 561.54 (3 of 23 dev projects diverge) — so the panel showed
  * one set of numbers while the Kiekiai table and the export showed another.
  * Worse, it SEEDED /api/recompute-quantities from the stale array, so a single

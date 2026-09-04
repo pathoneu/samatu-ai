@@ -25,7 +25,7 @@ def test_room_count_match():
 
 
 def test_room_count_missing():
-    """The lazunu case: floor plan 3 rooms, eksplikacija 6 → FAIL."""
+    """The objektas_d case: floor plan 3 rooms, eksplikacija 6 → FAIL."""
     parsed = {
         "patalpos": [{"nr": "1"}, {"nr": "2"}, {"nr": "3"}],
         "_eksplikacija": {"patalpos": [{"number": str(i)} for i in range(1, 7)]},

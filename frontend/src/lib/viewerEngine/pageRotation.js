@@ -1,7 +1,7 @@
 /**
  * pageRotation — mediabox-space ⇄ display-space transforms for /Rotate pages.
  *
- * COORDINATE SPACES (verified 2026-07-11 on the Beržų /Rotate-270 sheets):
+ * COORDINATE SPACES (verified 2026-07-11 on the Objektas A /Rotate-270 sheets):
  * - Room polygon_pct / bbox_pct from the extractor are DISPLAY-space: pdf2image
  *   (poppler) APPLIES /Rotate when rastering, so the extraction raster is the
  *   rotation-applied readable sheet. (An earlier note here claimed pdf2image

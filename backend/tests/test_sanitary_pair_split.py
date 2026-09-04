@@ -3,7 +3,7 @@
 A concealed (potinkinis) mixer is two jobs at two different times: the in-wall
 body during rough-in, the visible trim after tiling. LT contractors bill the
 pair; we billed one bundled line and under-quoted the installer by a visit.
-Measured on Beržų g. 24: 5 vnt emitted against the contractor's 22.
+Measured on Objektas A: 5 vnt emitted against the contractor's 22.
 
 Tests assert BEHAVIOUR — pair-ness, count identity between the halves, which
 items stay single, and that a guessed concealment is DISCLOSED — not magic
@@ -48,7 +48,7 @@ def _qty(out, label_fragment):
             if label_fragment.lower() in p["aprasymas"].lower()]
 
 
-# ── the reference shape: berzas/objektas_b as the contractor bills it ────────
+# ── the reference shape: objektas_a/objektas_b as the contractor bills it ────────
 def test_concealed_project_emits_pairs_singles_and_matching_counts():
     """3 praustuvė mixers + 2 shower mixers + 3 bidė + 2 klozetai."""
     out = _build(symbols={"praustuves": 3, "bide": 3})
@@ -92,7 +92,7 @@ def test_bathtub_mixer_pair_follows_the_readers_tub_only_count():
 
 
 def test_shower_tray_read_as_a_tub_does_not_bill_a_bathtub_mixer():
-    """lazunu: the contractor bills only "Dušo maišytuvo sistemos montavimas
+    """objektas_d: the contractor bills only "Dušo maišytuvo sistemos montavimas
     (ne potinkinės)" — no bathtub anywhere — yet the conflated symbol reads 1.
     Reader says 0 tubs → the bathtub line must not appear at all."""
     out = _build(symbols={"praustuves": 1, "vonios": 1, "vonios_kubilai": 0,
@@ -121,7 +121,7 @@ def test_no_single_line_survives_alongside_its_pair():
     assert "Dušo maišytuvo sistemos montavimas" not in labels, labels
 
 
-# ── surface-mounted (lazunu: "Dušo maišytuvo sistemos montavimas ( ne
+# ── surface-mounted (objektas_d: "Dušo maišytuvo sistemos montavimas ( ne
 #    potinkinės)") — one job, one line, and the legacy label preserved ────────
 def test_surface_mounted_project_emits_no_potinkine_lines():
     out = _build(symbols={"praustuves": 2, "vonios": 1},
@@ -196,7 +196,7 @@ def test_read_bide_count_becomes_a_real_pair_not_a_checklist():
 
 
 def test_bide_count_is_never_derived_from_the_klozetas_count():
-    """berzas is billed 3 bidė against 2 klozetai — a 1-per-WC default would be
+    """objektas_a is billed 3 bidė against 2 klozetai — a 1-per-WC default would be
     wrong by construction. No bidė read ⇒ no bidė number, only the TODO."""
     out = _build(symbols={"praustuves": 3, "klozetai": 2})
     bide = [p for p in _san(out) if "bidė dušiuko" in p["aprasymas"].lower()]
@@ -229,10 +229,10 @@ def test_bide_without_a_count_is_a_checklist_todo_not_a_silent_zero():
 
 # ── praustuvė ≠ plautuvė: one sink, one line (2026-07-29) ───────────────────
 # The sanitary reader was asked for "praustuvės/kriauklės" — and a kriauklė is
-# also a KITCHEN sink, so a live berzas probe put the virtuvės and skalbyklos
+# also a KITCHEN sink, so a live objektas_a probe put the virtuvės and skalbyklos
 # plautuvės inside praustuves_count. "Plautuvės montavimas" is billed off its
 # own count, so on any project with a room classified `virtuve` that one sink
-# was billed twice. The contractor bills them as separate lines (lazunu nr 32
+# was billed twice. The contractor bills them as separate lines (objektas_d nr 32
 # "Plautuvės montavimas" alongside nr 33 "Praustuvės montavimas").
 
 def _kitchen(nr="102"):
@@ -271,7 +271,7 @@ def test_read_plautuve_count_raises_the_room_type_default():
 
 
 def test_read_plautuves_bill_even_when_no_room_is_classified_virtuve():
-    """berzas: room 102 "Svetainė/virtuvė" is classified `valgomasis` and the
+    """objektas_a: room 102 "Svetainė/virtuvė" is classified `valgomasis` and the
     skalbykla is its own paskirtis, so the room-type default is 0 — yet the
     plumbing sheet shows two sinks. Evidence has to be able to bill them."""
     out = _build(symbols={"praustuves": 2, "plautuves": 2},

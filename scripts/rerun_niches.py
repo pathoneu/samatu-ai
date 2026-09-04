@@ -111,7 +111,7 @@ def process(slug: str, entry: dict) -> dict:
     # CONDITIONAL BACKFILL (2026-06-05): primary page is canonical.
     # Run secondary pages ONLY if primary's LED coverage is sparse
     # (< COVERAGE_GATE rooms with non-zero LED). On projects where
-    # the ceiling_plan already covers most rooms (berzas pg6: 10
+    # the ceiling_plan already covers most rooms (objektas_a pg6: 10
     # rooms), additional pages just re-detect the same LEDs as new
     # niches → false positives.
     COVERAGE_GATE = 5

@@ -3,7 +3,7 @@
 5 advisors → 3 peer reviews. Companion to the door/fixture council + the standards research (kampai/45°/rotband, running).
 
 ## Question
-After fixing doors/paint/heights, current Beržų accuracy: paint −3.9%, doors −8.9%, angokraščiai −8.4%, silikonavimas −7.3% (all good). Remaining: **kampai (corner-bead) −22% AND unstable run-to-run (333/386/420 vs 493)**; skylių −18%; 45° tile +15%; rotband −14%. No human ground truth — the contractor oracle is itself **AI-parsed** (directional only).
+After fixing doors/paint/heights, current Objektas A accuracy: paint −3.9%, doors −8.9%, angokraščiai −8.4%, silikonavimas −7.3% (all good). Remaining: **kampai (corner-bead) −22% AND unstable run-to-run (333/386/420 vs 493)**; skylių −18%; 45° tile +15%; rotband −14%. No human ground truth — the contractor oracle is itself **AI-parsed** (directional only).
 
 ## Chairman's Verdict
 

@@ -50,7 +50,7 @@ separate design-research arc, doc: `docs/superpowers/research/2026-09-02-calc-tr
   see docs/DEVELOPING.md; do not misattribute them.
 - `cd frontend && npm test -- --run` → baseline 429 passing (+ new).
 - Eval (only tasks marked [EVAL]): `venv/bin/python eval_harness.py --totals-only
-  --recompute` — corpus mean MAE must stay ≤ 7.82%; per-project berzas ≤ 3.10
+  --recompute` — corpus mean MAE must stay ≤ 7.82%; per-project objektas_a ≤ 3.10
   unless the ceiling anchor moves it DOWN. NEVER quote a number without --recompute.
 - Reason strings on any new/changed row must pass
   `backend/tests/test_confidence_reasons_are_for_the_user.py` (guide, don't
@@ -140,8 +140,8 @@ quantity shrinks.
   Σ(stretch rooms' plotas) − Σ(rooms already excluded from ceiling finishing)`.
   Garažas stays IN (it paints ceiling only, existing rule ~1648).
 - The virš/iki-3m tier split must keep working: the split DISTRIBUTES the
-  anchored base; study lines 1566–1690 first and preserve the berzas
-  calibration (its truth 165.61 == the Beržų table total, so expect neutral or
+  anchored base; study lines 1566–1690 first and preserve the objektas_a
+  calibration (its truth 165.61 == the Objektas A table total, so expect neutral or
   better). [EVAL] gate is hard here.
 - Row provenance (user-visible, Lithuanian, guide-not-confess): e.g.
   `Iš eksplikacijos lentelės „Iš viso": 165,61 − 24,30 (įtempiamos lubos) = 141,31 m²`.
@@ -167,7 +167,7 @@ quantity shrinks.
 **Tests:** total-row capture (incl. multi-total pick + insane-total rejection);
 anchored quantity math with/without stretch rooms; migration fixture (old blob →
 split sections, prices kept); export section ordering; eval per-project deltas
-reported in the task summary (berzas/objektas_b/ciurliu/lazunu before vs after).
+reported in the task summary (objektas_a/objektas_b/objektas_c/objektas_d before vs after).
 
 ## Task 4 — Medžiagos section (F2) [backend + UI] [EVAL: neutral expected]
 

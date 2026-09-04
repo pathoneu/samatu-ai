@@ -3,8 +3,8 @@ update each room's tile area (plyteles_sienos_m2) from the mm-precision
 tile_zones.
 
 Per the 2026-06-01 multi-project sprint: paint-above-tile is the
-remaining dominant cause of combined-paint under-extraction (ciurliu
--20%, berzas -8.5%). The wall_elevation extractor exists in
+remaining dominant cause of combined-paint under-extraction (objektas_c
+-20%, objektas_a -8.5%). The wall_elevation extractor exists in
 production code but is opt-in via WALL_ELEVATION_EXTRACT=1 env var,
 which was never set during the initial sprint.
 
@@ -13,7 +13,7 @@ wall_elevation pages and merges the result into the existing
 ai_extract.json — no full re-extraction.
 
 Usage:
-  python scripts/apply_wall_elevations.py --only berzas
+  python scripts/apply_wall_elevations.py --only objektas_a
   python scripts/apply_wall_elevations.py --max-cost 6.0
 """
 
@@ -35,8 +35,8 @@ OPUS_OUTPUT_PER_M = 75.0
 
 
 def _resolve_pdf(slug: str, entry: dict) -> Path:
-    if slug == "berzas":
-        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    if slug == "objektas_a":
+        return REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     return REPO_ROOT / entry["project_pdf"]
 
 

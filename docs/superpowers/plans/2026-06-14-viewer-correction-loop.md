@@ -576,7 +576,7 @@ Expected: FAIL — module not found.
 ```js
 // frontend/src/lib/correctionModel.js
 // Pure helpers for the per-pozicija correction loop. Risk is deliberately NOT
-// confidence alone (it caught only 5/13 errors on the Beržų fixture).
+// confidence alone (it caught only 5/13 errors on the Objektas A fixture).
 
 const CONF_RANK = { raudona: 2, low: 2, geltona: 1, medium: 1, zalia: 0, high: 0 };
 
@@ -719,7 +719,7 @@ git commit -m "feat(viewer): per-pozicija correction card + risk-sorted triage; 
 
 ---
 
-## Acceptance (the whole PR, on the Beržų fixture, in a real browser)
+## Acceptance (the whole PR, on the Objektas A fixture, in a real browser)
 
 1. Clicking a room lands the halo on the **correct** room every time (zoom/pan/page-switch stable). ✅ no wrong-room flash.
 2. Correcting garažas tiles / frameless doors / silikonavimas writes the **first human-confirmed `corrections.jsonl` rows** the project has ever had.

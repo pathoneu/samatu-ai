@@ -6,10 +6,10 @@
 This audit replicates that work across P2-P5 to test whether the "missing universals" thesis holds beyond a single contract, and to find any items P1 missed.
 
 PDFs read (pdfplumber, full text):
-- P2 = `Naujos statybos namas Čiurlių g. 10 Bajorai Kauno r.` (2026-02-12) — 24,252 € be PVM
+- P2 = `Naujos statybos namas Objektas C` (2026-02-12) — 24,252 € be PVM
 - P3 = `Naujos statybos namas Romainiuose / Objektas C` (2026-01-15) — 18,602 € be PVM
-- P4 = `Naujos statybos namas Šernų g. 18B Kaunas` (2025-07-16) — 25,021 € be PVM
-- P5 = `Butas naujos statybos name Lazūnų g. 6` (2024-06-26) — 20,638 € be PVM
+- P4 = `Naujos statybos namas Objektas F` (2025-07-16) — 25,021 € be PVM
+- P5 = `Butas naujos statybos name Objektas D` (2024-06-26) — 20,638 € be PVM
 
 ---
 

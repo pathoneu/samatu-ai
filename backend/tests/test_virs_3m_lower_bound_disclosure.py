@@ -1,6 +1,6 @@
-"""Beržų room 110 — the virš-3m / off-perimeter surface the readers never see.
+"""Objektas A room 110 — the virš-3m / off-perimeter surface the readers never see.
 
-Root cause pinned here (2026-07-29). On the `berzas` fixture the cached extract
+Root cause pinned here (2026-07-29). On the `objektas_a` fixture the cached extract
 computes room 110 "Miegamasis" at 53.75 m² of paintable wall while truth.json's
 gt_dimensions produce 107.43 m². The 53.68 m² gap is NOT a formula defect — the
 engine consumes the primitives correctly (see the exact arithmetic pinned
@@ -30,7 +30,7 @@ from extractor.universal_rules import calc_room_quantities, default_paint_prefs
 from extractor.vision_call import _recompute_per_room_via_python
 
 
-# Beržų room 110 exactly as truth.json/gt_dimensions carries it.
+# Objektas A room 110 exactly as truth.json/gt_dimensions carries it.
 ROOM_110_GT = {
     "nr": "110",
     "pavadinimas": "Miegamasis",
@@ -157,7 +157,7 @@ def _has(warnings: list[dict], level: str, needle: str) -> bool:
     return any(w["level"] == level and needle in w["message"] for w in warnings)
 
 
-BERZAS_102 = {
+OBJEKTAS_A_102 = {
     "nr": "102", "pavadinimas": "Svetainė/virtuvė", "paskirtis": "valgomasis",
     "plotas_m2": 50.54, "perimetras_m": 31.0, "lubu_aukstis_m": 3.4,
     "lubu_tipas": "gkp", "elementai": [],
@@ -165,10 +165,10 @@ BERZAS_102 = {
 
 
 def test_project_warns_that_virs_3m_is_a_lower_bound():
-    """Beržų as Vision reads it: one >3 m room, no partial zones anywhere →
+    """Objektas A as Vision reads it: one >3 m room, no partial zones anywhere →
     the virš-3m tier must be declared a lower bound, and the ≤3 m rooms that
     need checking must be named."""
-    warnings = _sanity([BERZAS_102, _without_extras(ROOM_110_GT)])
+    warnings = _sanity([OBJEKTAS_A_102, _without_extras(ROOM_110_GT)])
     assert _has(warnings, "WARN", "APATINĖ RIBA")
     lb = [w for w in warnings if "APATINĖ RIBA" in w["message"]][0]
     assert lb["patalpa_nr"] is None            # project-level, not room-level
@@ -179,7 +179,7 @@ def test_project_warns_that_virs_3m_is_a_lower_bound():
 def test_warning_is_suppressed_once_a_partial_zone_is_known():
     """With the zone supplied (truth file or a human correction), the engine is
     no longer guessing — the lower-bound warning must not nag."""
-    warnings = _sanity([BERZAS_102, ROOM_110_GT])
+    warnings = _sanity([OBJEKTAS_A_102, ROOM_110_GT])
     assert not _has(warnings, "WARN", "APATINĖ RIBA")
 
 
@@ -191,8 +191,8 @@ def test_no_warning_when_the_project_has_no_high_tier():
 
 def test_off_perimeter_partitions_are_disclosed():
     """Room 110's 6.24 m² headboard partition class: perim × H cannot see it."""
-    warnings = _sanity([BERZAS_102, _without_extras(ROOM_110_GT)])
+    warnings = _sanity([OBJEKTAS_A_102, _without_extras(ROOM_110_GT)])
     assert _has(warnings, "INFO", "nesiliečiančios su kambario perimetru")
     # ...and the note goes away once such a surface is actually accounted for.
-    assert not _has(_sanity([BERZAS_102, ROOM_110_GT]),
+    assert not _has(_sanity([OBJEKTAS_A_102, ROOM_110_GT]),
                     "INFO", "nesiliečiančios su kambario perimetru")

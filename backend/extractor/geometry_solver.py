@@ -336,7 +336,7 @@ def _segments_overlap_collinear(
     """True iff segments a and b lie on the same axis-aligned line within
     ``tol_mm`` AND share a non-zero overlap along that line.
 
-    Beržų's walls are all axis-aligned (snapped by the solver). We require
+    Objektas A's walls are all axis-aligned (snapped by the solver). We require
     one of:
         - both horizontal (Δy < tol) and overlapping in x
         - both vertical   (Δx < tol) and overlapping in y

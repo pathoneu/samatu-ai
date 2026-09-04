@@ -8,19 +8,19 @@ Strategy (zero classifier change):
   4. For each matching page, render to base64 + call niche_locator
   5. Merge new niches into the project's ai_extract.json
 
-Budget: ~$0.10 per ceiling page × ~3 projects (lazunu has no ceiling
+Budget: ~$0.10 per ceiling page × ~3 projects (objektas_d has no ceiling
 plan in its bundle; sernu blocked) = ≤ $0.50.
 
 Per-project quirks:
   • objektas_b: 65-page TP — ceiling plan should exist somewhere
-  • ciurliu:      3-page A3 — single floor plan, likely no separate
+  • objektas_c:      3-page A3 — single floor plan, likely no separate
                   ceiling plan; AI already found 4 niches totaling
                   12m on the floor plan
-  • lazunu:       Apmatavimai-Layout4.pdf is just measurements; the
+  • objektas_d:       Apmatavimai-Layout4.pdf is just measurements; the
                   Pakabinamu lubu planas is a SEPARATE PDF not in the
                   registry's project_pdf — skip with a note
   • romainiai:    excluded (scope_mismatch); skip
-  • berzas:       already at -5.44% LED — within range; skip
+  • objektas_a:       already at -5.44% LED — within range; skip
 """
 
 from __future__ import annotations
@@ -49,9 +49,9 @@ CEILING_KEYWORDS = [
 # Projects where the LED fix is most impactful (from analyze_systematic_errors)
 TARGETS = {
     "objektas_b",  # -78.17%, biggest gap
-    "ciurliu",       # -28.74%, second
-    # "lazunu" omitted: lubų plan is in a different PDF not in registry
-    # "berzas" omitted: already at -5.44%, within range
+    "objektas_c",       # -28.74%, second
+    # "objektas_d" omitted: lubų plan is in a different PDF not in registry
+    # "objektas_a" omitted: already at -5.44%, within range
     # "romainiai" excluded for scope_mismatch
 }
 
@@ -91,9 +91,9 @@ def process_project(slug: str, dry_run: bool = False) -> dict:
     if not entry:
         return {"slug": slug, "status": "unknown_slug"}
 
-    if slug == "berzas":
-        pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
-        ai_path = REPO_ROOT / "ground_truth/berzas/ai_extract.json"
+    if slug == "objektas_a":
+        pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
+        ai_path = REPO_ROOT / "ground_truth/objektas_a/ai_extract.json"
     else:
         pdf_path = REPO_ROOT / entry["project_pdf"]
         ai_path = REPO_ROOT / "ground_truth" / slug / "ai_extract.json"

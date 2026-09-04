@@ -94,7 +94,7 @@ def test_adjacency_count_can_override_fallback():
 
 
 def test_envelope_rule_does_not_override_existing_exterior_door():
-    """Beržų Tambūras has 1 exterior + 2 interior doors all at 900×2100.
+    """Objektas A Tambūras has 1 exterior + 2 interior doors all at 900×2100.
     The envelope rule MUST NOT over-flag the 2 interior ones — that would
     shrink angokraščiai by hiding interior reveals (eval fitting). The
     safeguard: rule only fires when room has NO already-flagged exterior

@@ -510,6 +510,10 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 
 // ── Projects CRUD (sync API, async backend write-through) ─────────────────────
 
+// Kept in sync with DEMO_PROJECT.id in `@/demoData` (imported lazily there to
+// keep the sample blob out of the main bundle, hence the literal here).
+export const DEMO_PROJECT_ID = 'demo-objektas-a';
+
 export function getProjects() {
   // Reads the in-memory snapshot when a debounced save is pending, so a caller
   // that mutates twice in a row (updateRoomPolygon → updateProject, or two
@@ -517,19 +521,27 @@ export function getProjects() {
   const raw = _readProjectsRaw();
   // P7 migration: legacy skyrius mojibake → modern LT names. Pure-function
   // pass — doesn't write back, so old saves stay untouched until next save.
-  return Array.isArray(raw) ? raw.map(_migrateProject) : [];
+  if (!Array.isArray(raw)) return [];
+  // The sample project was re-issued under a new id. A browser that seeded the
+  // previous one still holds it — drop it here so the dashboard never lists two
+  // samples, and so the next save persists the removal. `is_demo` is set only
+  // by DEMO_PROJECT, and the sample is local-only, so nothing is sent to the
+  // backend and no real project can match.
+  return raw
+    .filter(p => !(p?.is_demo && p?.id !== DEMO_PROJECT_ID))
+    .map(_migrateProject);
 }
 
 export function getProject(id) {
   return getProjects().find(p => p.id === id) || null;
 }
 
-// Seed the read-only sample project (real Beržų g. 24 extraction + demo prices)
+// Seed the read-only sample project (real Objektas A extraction + demo prices)
 // so a prospect can explore a complete, priced sąmata without uploading a PDF.
 // Stable id (no duplicate on re-click); local-only — NOT synced to the backend.
 export async function seedDemoProject() {
   const projects = getProjects();
-  const existing = projects.find(p => p.id === 'demo-berzu-24');
+  const existing = projects.find(p => p.id === DEMO_PROJECT_ID);
   if (existing) return existing;
   const { DEMO_PROJECT } = await import('@/demoData');
   const demo = { ...DEMO_PROJECT, updated_at: new Date().toISOString() };

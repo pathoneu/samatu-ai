@@ -3,7 +3,7 @@
 Same class as the 2026-07-05 audit bug 4 (paint iki/virš-3m split): a room whose
 NOMINAL height is <3 m can still carry explicit above-3m surfaces — a feature
 wall (extra_walls_virs_3m_m2) or a raised ceiling coffer (high_ceiling_area_m2,
-e.g. Beržų room 110: 47.44 m² wall + 12.28 m² ceiling above 3 m over a 2.8 m
+e.g. Objektas A room 110: 47.44 m² wall + 12.28 m² ceiling above 3 m over a 2.8 m
 room). Those surfaces are billed on the virš-3m paint line and need scaffolding,
 so they must contribute to the pastoliai d.d. estimate too — not only rooms
 whose nominal lubu_aukstis_m is ≥3 m.
@@ -31,7 +31,7 @@ def _pastoliai(out: dict) -> list[dict]:
 
 
 ROOM_110_LIKE = {
-    # Beržų room 110 shape: 2.8 m nominal room with a 3.4 m coffer zone and
+    # Objektas A room 110 shape: 2.8 m nominal room with a 3.4 m coffer zone and
     # above-3m soffit/feature walls.
     "nr": "110", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
     "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8,

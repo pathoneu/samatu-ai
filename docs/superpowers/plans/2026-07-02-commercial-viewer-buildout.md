@@ -49,7 +49,7 @@ The founder's overlap complaint, fixed at the architecture level: **canvas is a 
 
 **Files:** Modify `frontend/src/lib/viewerEngine/pageRotation.js` (+ its test), `frontend/src/components/viewer/TakeoffViewer.jsx`
 
-Live bug: on a `/Rotate`-rotated page (Beržų p2 = 270), `handlePagePoint` computes `clickXPct = x/pageWidth` in the ROTATED display space and posts it to `/api/click-to-fill`, whose raster is UNROTATED (pdf2image ignores /Rotate). The flood-fill seed lands rotated ~90° away from where the user clicked. Zones render correctly only because PageOverlayHost applies the forward transform — clicks need the INVERSE.
+Live bug: on a `/Rotate`-rotated page (Objektas A p2 = 270), `handlePagePoint` computes `clickXPct = x/pageWidth` in the ROTATED display space and posts it to `/api/click-to-fill`, whose raster is UNROTATED (pdf2image ignores /Rotate). The flood-fill seed lands rotated ~90° away from where the user clicked. Zones render correctly only because PageOverlayHost applies the forward transform — clicks need the INVERSE.
 
 - [ ] Add to pageRotation.js: `export function inverseRotatePctPoint(x, y, rot) { return rotatePctPoint(x, y, (360 - normalizeRotation(rot)) % 360); }` — the exact inverse of `rotatePctPoint` (inverse of 90 is 270 and vice versa; 180 is self-inverse).
 - [ ] Unit tests: round-trip `inverseRotatePctPoint(...rotatePctPoint(x,y,r), r) === [x,y]` for r ∈ {0,90,180,270}, plus a concrete case: display click (0.66, 0.30) on a page whose DISPLAY rotation is 90 (i.e. reported /Rotate 270 after the complement swap) must map back to mediabox (0.30, 0.34)-ish — mirror of the verified room-102 forward mapping.
@@ -175,8 +175,8 @@ Live bug: on a `/Rotate`-rotated page (Beržų p2 = 270), `handlePagePoint` comp
 
 ## Verification protocol (controller, after each phase)
 
-Bring up stack (`SAMATU_AUTH_DISABLED=1` backend :8000 + vite :5173), open Beržų project `2e7a5a36-…` → Brėžinys, Playwright:
+Bring up stack (`SAMATU_AUTH_DISABLED=1` backend :8000 + vite :5173), open Objektas A project `2e7a5a36-…` → Brėžinys, Playwright:
 - P1: zones render fill-only; hover → chip + brighten; panel eye hides zone; Ctrl+click isolates; `Rodyti visas` restores; no chips at rest; no console errors.
 - P2: rail thumbnails render + click navigates + current-page ring; `+`/`-`/`0`/`1`/`[`/`]`/`T`/Esc all work; status bar shows psl/zoom/mm.
-- P3: draw distance + area on calibrated page → sane numbers vs known room dims (Beržų 102 ≈ 50.5 m²); Esc/Enter/Backspace/Shift grammar; scale persists reload; measurements persist reload.
-- P4: search on a text PDF finds hits (Beržų has text layer — verify with a room name), 0-result hint on raster; print dialog opens; download saves; build green.
+- P3: draw distance + area on calibrated page → sane numbers vs known room dims (Objektas A 102 ≈ 50.5 m²); Esc/Enter/Backspace/Shift grammar; scale persists reload; measurements persist reload.
+- P4: search on a text PDF finds hits (Objektas A has text layer — verify with a room name), 0-result hint on raster; print dialog opens; download saves; build green.

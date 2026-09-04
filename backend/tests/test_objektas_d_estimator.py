@@ -1,4 +1,4 @@
-"""Tests for the lazunu_estimator."""
+"""Tests for the objektas_d_estimator."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from extractor.lazunu_estimator import (
+from extractor.objektas_d_estimator import (
     estimate_rooms_from_wall_list,
-    apply_lazunu_estimate_to_extract,
+    apply_objektas_d_estimate_to_extract,
     LT_COMPACTNESS_RATIO,
 )
 
@@ -26,7 +26,7 @@ def test_wall_list_only_infers_room_count():
     # Total = 44000mm; 44/15 = 2.93 → 2 rooms (int)
     assert len(rooms) >= 1
     assert all(r["plotas_m2"] > 0 for r in rooms)
-    assert all(r["_source"] == "estimated_lazunu" for r in rooms)
+    assert all(r["_source"] == "estimated_objektas_d" for r in rooms)
 
 
 def test_area_only_estimates_rooms():
@@ -45,7 +45,7 @@ def test_rooms_compactness_within_lt_norm():
 
 def test_apply_to_extract_replaces_rooms_and_emits_warning():
     ai = {"patalpos": [{"lubu_aukstis_m": 2.82}], "warnings": []}
-    out = apply_lazunu_estimate_to_extract(
+    out = apply_objektas_d_estimate_to_extract(
         ai, wall_lengths_mm=None, total_floor_area_m2=70.0, room_count=6,
     )
     assert len(out["patalpos"]) == 6

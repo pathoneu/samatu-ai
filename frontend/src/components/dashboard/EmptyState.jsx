@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FileUp, Zap, Clock, CheckCircle2, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { seedDemoProject } from '@/lib/projectStore';
+import { seedDemoProject, DEMO_PROJECT_ID } from '@/lib/projectStore';
 
 export default function EmptyState() {
   const { t } = useTranslation();
@@ -14,7 +14,7 @@ export default function EmptyState() {
     setLoadingDemo(true);
     try {
       await seedDemoProject();
-      navigate('/project/demo-berzu-24');
+      navigate(`/project/${DEMO_PROJECT_ID}`);
     } finally {
       setLoadingDemo(false);
     }

@@ -1,7 +1,7 @@
 """Accurate room-polygon detection: seed locator + auto_room_polygon.
 
 The pure helpers are unit-tested; the flood-fill quality is an integration test
-against the contractor-validated Beržų fixture (skipped if absent). The
+against the contractor-validated Objektas A fixture (skipped if absent). The
 integration test is the real guard: it asserts the area-prior auto-solves the
 easy majority AND honestly rejects the known-leaky rooms (106/107/110) to manual
 rather than shipping a wrong polygon.
@@ -13,7 +13,7 @@ import pytest
 from extractor.cv_polygon import seed_grid, auto_room_polygon
 from extractor.room_seeds import locate_room_seeds, calibrate_page_scale
 
-FIXTURE = Path(__file__).resolve().parents[2] / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+FIXTURE = Path(__file__).resolve().parents[2] / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
 
 
 def test_seed_grid_is_local_and_nearest_first():
@@ -35,7 +35,7 @@ def test_calibrate_page_scale_none_when_empty():
     assert calibrate_page_scale([(0, 0), (None, 5)]) is None
 
 
-@pytest.mark.skipif(not FIXTURE.exists(), reason="Beržų fixture PDF not present")
+@pytest.mark.skipif(not FIXTURE.exists(), reason="Objektas A fixture PDF not present")
 def test_auto_polygon_solves_majority_and_rejects_leaks():
     import page_raster_cache as cache
     import cv2, numpy as np

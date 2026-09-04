@@ -86,7 +86,7 @@
 <li><b>Resequence:</b> substrate incl. false-green protocol → <b>correction UI now</b> (with persistence/auth/consent scoped in) → human ground-truth labeling flow → scale layer → <b>detector deferred</b> until a human-verified corpus exists.</li>
 <li><b>Add:</b> false-green rate as the tracked existential metric; blind-audit protocol; provenance/correction logging schema from day one; voting cost tracking.</li>
 </ul>
-<div class="first-thing"><b>The one thing to do first:</b> measure the false-green rate today — list every item the voted Beržų extraction would flag 🟢 and count how many are actually wrong vs contractor truth. One day, zero new infra, and it tests the assumption the entire trust model stands on. <i>(House rule: council output is hypothesis until verified on real PDFs — this step is that verification.)</i></div>
+<div class="first-thing"><b>The one thing to do first:</b> measure the false-green rate today — list every item the voted Objektas A extraction would flag 🟢 and count how many are actually wrong vs contractor truth. One day, zero new infra, and it tests the assumption the entire trust model stands on. <i>(House rule: council output is hypothesis until verified on real PDFs — this step is that verification.)</i></div>
 </div>
 
 <h2>Advisor alignment</h2>
@@ -114,7 +114,7 @@ Missing lever: corrections-as-labels flywheel. Steelman: &gt;90% autonomous requ
 
 The biggest missing lever follows directly: the correction UI isn't a fallback, it's your data engine. Every human fix is a labeled datapoint — the only ground truth you'll ever afford, the calibration signal, and the YOLO training set. Your own benchmark is AI-seeded and overstates production ~7.5×; bootstrapping the detector from Grounding DINO auto-labels is AI grading AI, the same circularity again. Humans must enter the loop as labelers, not just reviewers.
 
-Sequencing: substrate-first is right, but ship the correction UI before the detector — it manufactures the detector's training data. Scaffold-over-model is correct because of the flywheel; fine-tunes are downstream of owning labels. Competitors narrow because ground truth is per-domain, not because scaffolds aren't universal. Your thesis holds only at the speed you acquire validated fixtures per type — currently one (Beržų).
+Sequencing: substrate-first is right, but ship the correction UI before the detector — it manufactures the detector's training data. Scaffold-over-model is correct because of the flywheel; fine-tunes are downstream of owning labels. Competitors narrow because ground truth is per-domain, not because scaffolds aren't universal. Your thesis holds only at the speed you acquire validated fixtures per type — currently one (Objektas A).
 
 Steelman: &gt;90% autonomous doesn't require zero errors — it requires near-perfect recall on "I might be wrong." That's achievable; omniscient extraction isn't. Build the company that knows when it's guessing.</div></details>
 

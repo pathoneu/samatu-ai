@@ -8,7 +8,7 @@ the pipeline steers every reader without re-imports.
 Exact model IDs (authoritative — never append date suffixes):
   - ``claude-opus-5``    — production default for every role since
       2026-07-28, chosen by paid bake-off on the ground-truth fixtures:
-      Beržų headline MAE 6.12% vs 7.03% (opus-4-8), category 10.49% vs
+      Objektas A headline MAE 6.12% vs 7.03% (opus-4-8), category 10.49% vs
       13.41%; objektas_b headline 39.34% vs 51.23%, category ~tied.
       Same $5/$25 pricing and SAME TOKENIZER as opus-4-8 (cost baselines
       carry over). API facts: thinking ON BY DEFAULT (never send an
@@ -23,10 +23,10 @@ Exact model IDs (authoritative — never append date suffixes):
       lost both times on headline MAE at 2× the price. Not used.
   - ``claude-fable-5-1`` — evaluated 2026-09-02 (same-day fresh A/B vs opus-5,
       docs/superpowers/research/2026-09-02-fable51-benchmark.md): mean MAE
-      tie (29.14 vs 29.38), Beržų (contractor truth) 10.66 vs 5.23 — worse,
+      tie (29.14 vs 29.38), Objektas A (contractor truth) 10.66 vs 5.23 — worse,
       2.4× the cost, +22% wall time, doors reader 3× slower. Not used.
   - ``claude-sonnet-5``  — evaluated 2026-07-28: 24.3%/46.1% MAE on
-      Beržų, unusable for LT drawings. Never route vision roles here.
+      Objektas A, unusable for LT drawings. Never route vision roles here.
 
 NO-TEMPERATURE RULE: never add ``temperature``, ``top_p``, or ``top_k`` to
 any Anthropic call anywhere in this codebase — all three return 400 on both

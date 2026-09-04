@@ -113,7 +113,7 @@ Design note — **`mountOverlay(render: t => ReactNode)`** is the one non-obviou
 
 **Question:** does EmbedPDF keep real `polygon_pct` room zones + one draggable measure handle pixel-glued through deep zoom/pan on a real large LT raster sheet, sharp, with a correct inverse?
 
-**Fixture:** the contractor-validated **Beržų g. 24 PDF** (`docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf`) — a real flattened-raster sheet, not a synthetic ebook.
+**Fixture:** the contractor-validated **Objektas A PDF** (`docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf`) — a real flattened-raster sheet, not a synthetic ebook.
 
 **Build (~½ day):** a scratch route wiring `EmbedPDF → Viewport → Scroller`; install `@embedpdf/{core,engines,plugin-viewport,plugin-scroll,plugin-render,plugin-zoom,plugin-interaction-manager}` (+ `plugin-tiling` on standby). A `RoomZoneSpikeLayer` mounted via `renderPage` that **reuses the real `getPolygonPctPoints`** with `renderedWidth/Height` from `PageLayout`, drawing 2–3 real zones + a confidence dot + one draggable vertex; a click probe via `PagePointerProvider`.
 
@@ -127,7 +127,7 @@ Design note — **`mountOverlay(render: t => ReactNode)`** is the one non-obviou
 | P4 inverse | a clicked point round-trips to within **≤1% of page dimension** of true `polygon_pct` |
 | P5 rotation | rotate 90° — overlays + inverse still hold (LT sheets are sometimes landscape) |
 
-**Fallback trigger (hard):** if **P2 or P3 fails and `plugin-tiling` doesn't fix it within a further ½ day** → pivot to the OSD spike (`vips dzsave` one Beržų page → DZI → OSD `svgOverlay()` → same `polygon_pct` → re-run P1–P5; P3 is free with DZI). **P1/P4/P5 failures are almost certainly our transform-wiring bugs, not core defects** — fix in place, don't pivot on those alone.
+**Fallback trigger (hard):** if **P2 or P3 fails and `plugin-tiling` doesn't fix it within a further ½ day** → pivot to the OSD spike (`vips dzsave` one Objektas A page → DZI → OSD `svgOverlay()` → same `polygon_pct` → re-run P1–P5; P3 is free with DZI). **P1/P4/P5 failures are almost certainly our transform-wiring bugs, not core defects** — fix in place, don't pivot on those alone.
 
 ## 7. Migration map
 
@@ -170,10 +170,10 @@ Design note — **`mountOverlay(render: t => ReactNode)`** is the one non-obviou
 
 ## 11. Testing strategy
 
-- **Spike gates the engine choice** (P1–P5 on the real Beржų sheet).
+- **Spike gates the engine choice** (P1–P5 on the real Objektas A sheet).
 - **Coordinate parity unit-checkable** where pure (the `ViewportTransform` math can have node tests; pct→screen round-trips).
 - **Real-app verification (mandatory)** — every phase verified in the actual `InteriorWorkspace` route with a real logged-in project, driving the live DOM, exactly as Phase 1 was verified (bring up the stack, open a real project, assert overlays land pixel-accurate, zoom/pan/rotate hold). Not a standalone harness.
-- **No regressions:** existing lib unit suite (`npm run test:units`) stays green; overlays behave identically post-migration (same zones/measurements on the Beржų fixture).
+- **No regressions:** existing lib unit suite (`npm run test:units`) stays green; overlays behave identically post-migration (same zones/measurements on the Objektas A fixture).
 
 ## 12. Phasing (each independently shippable + verified)
 

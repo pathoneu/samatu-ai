@@ -10,7 +10,7 @@ projektais (visi Rangovas A / Rangovas A). 3 projektai turi pilną
 
 | Kategorija | Mediana Δ% | Tikslumas | Pastaba |
 |---|---:|:---:|---|
-| Combined paint (sienos + lubos) | **−4.75%** | **±10%** | berzas −4.75, objektas_b −0.80, ciurliu −20 |
+| Combined paint (sienos + lubos) | **−4.75%** | **±10%** | objektas_a −4.75, objektas_b −0.80, objektas_c −20 |
 | Lubų dažomas plotas | +0.02% | ±2% | exact match across 3 projects |
 | Dažymo kampai | +3.17% | ±5% | within 3-project gate |
 | Angokraščiai | +1.65% | ±5% | from 0 systematic candidates to 0 after fix |
@@ -23,11 +23,11 @@ projektais (visi Rangovas A / Rangovas A). 3 projektai turi pilną
 | Projektas | Combined paint Δ | MAE (headline) | Status |
 |---|---:|---:|---|
 | `objektas_b` | **−0.80%** | 27.77% | combined paint within 1% ✓ |
-| `berzas` | **−4.75%** | 2.88% | within 5% gate ✓ |
-| `ciurliu` | −20.33% | 24.54% | input PDF lacks height annotation |
+| `objektas_a` | **−4.75%** | 2.88% | within 5% gate ✓ |
+| `objektas_c` | −20.33% | 24.54% | input PDF lacks height annotation |
 | `romainiai` | — | — | excluded (scope mismatch) |
 | `sernu` | — | — | excluded (missing PDF) |
-| `lazunu` | — | — | excluded (missing architectural PDF) |
+| `objektas_d` | — | — | excluded (missing architectural PDF) |
 
 ## Sutaupomas laikas
 
@@ -52,7 +52,7 @@ gali rankiniu būdu užpildyti / pakoreguoti per Kalibruoti UI.
 
 Trijų projektų neįtraukimas į MAE yra dokumentuotas:
 
-- **lazunu**: bundle'is turi tik Apmatavimai lapą, ne architektūrinį
+- **objektas_d**: bundle'is turi tik Apmatavimai lapą, ne architektūrinį
   planą. AI randa 3 kambarius, tikrovė rodo ≥6.
 - **sernu**: bundle'yje nėra architektūrinio plano (tik specialybės
   brėžiniai).

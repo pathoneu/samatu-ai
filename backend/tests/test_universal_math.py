@@ -309,7 +309,7 @@ def test_gkp_sheets_zero_area_zero_sheets():
 # ─────────────────────────────────────────────────────────────────────
 # Perimeter floor for SYNTHETIC (non-eksplikacija) geometry — 2026-06-05
 #
-# Root cause (diagnosed across berzas/objektas_b/ciurliu/lazunu): on plans
+# Root cause (diagnosed across objektas_a/objektas_b/objektas_c/objektas_d): on plans
 # with no eksplikacija table Vision emits a minimum-SQUARE perimeter
 # (perim ≈ 4·√area), under-reading wall paint. The floor lifts ONLY the
 # wall-path perimeter, gated on plotas_saltinis so trusted-table rooms are

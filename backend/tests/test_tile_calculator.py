@@ -202,7 +202,7 @@ def test_diagnose_tile_coverage_warns_on_non_wet_room():
 
 
 def test_diagnose_tile_coverage_silent_on_wet_room_full_tile():
-    """Beržų-style bathroom: 95% tile coverage in a 'vonia'/'san' room is the
+    """Objektas A-style bathroom: 95% tile coverage in a 'vonia'/'san' room is the
     correct reading and must NOT raise a warning (or the diagnostic noise
     would drown out real signals)."""
     from extractor.tile_calculator import diagnose_tile_coverage

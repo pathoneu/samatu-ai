@@ -75,7 +75,7 @@ def test_run_pass1_voted_all_fail(monkeypatch):
 
 def test_resolve_floor_b64_picks_room_page_not_page0():
     # The kampai-killer bug: adjacency ran on pages[0] (a title sheet) instead of
-    # the floor page (page 2 on berzas), so n_partition_walls never got set.
+    # the floor page (page 2 on objektas_a), so n_partition_walls never got set.
     from extractor.vision_call import _resolve_floor_b64
     pages = [{"page_index": 1, "image_b64": "TITLE"},
              {"page_index": 2, "image_b64": "FLOOR"}]

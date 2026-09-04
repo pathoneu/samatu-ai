@@ -1,6 +1,6 @@
 """Sub-reader page locators must not go blind on a rasterised PDF.
 
-2026-08-23 flattened-scan ablation (Beržų at 150 DPI, no text layer): the
+2026-08-23 flattened-scan ablation (Objektas A at 150 DPI, no text layer): the
 apdailos and door-type locators search the text layer, found nothing, and the
 readers silently returned `skipped` — every room fell to paskirtis defaults and
 wall paint came out −31.6%. Pass-1 had classified the same pages correctly

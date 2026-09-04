@@ -39,10 +39,10 @@ from fastapi.testclient import TestClient
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-FIXTURE = (REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24"
+FIXTURE = (REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a"
            / "app-output-to-the-dot.json")
 
-# Beržų g. 24 room 110 "Miegamasis" — 23.97 m², perim 20.0 m, H 2.8 m,
+# Objektas A room 110 "Miegamasis" — 23.97 m², perim 20.0 m, H 2.8 m,
 # 2 doors + 2 windows. Same room/geometry as the live reproduction.
 ROOM = "110"
 H_EXTRACTED = 2.8

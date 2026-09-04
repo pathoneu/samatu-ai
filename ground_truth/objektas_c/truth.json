@@ -1,7 +1,7 @@
 {
   "$schema_version": 1,
-  "project_id": "ciurliu",
-  "name": "Čiurlių g. 10, Bajorai",
+  "project_id": "objektas_c",
+  "name": "Objektas C",
   "pdf_path": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf",
   "source": {
     "samata_pdf": "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf",
@@ -67,7 +67,7 @@
       "value": 276.17,
       "confidence": "derived",
       "source": "derived: dazymo_walls_plus_ceilings_combined 388.01 − billed GKP ceilings 111.84 (item 1)",
-      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Beržų; single-tier ceiling project)."
+      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Objektas A; single-tier ceiling project)."
     },
     "ceiling_paint_total_m2": {
       "value": 111.84,

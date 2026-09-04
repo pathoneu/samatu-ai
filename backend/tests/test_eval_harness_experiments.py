@@ -92,14 +92,14 @@ def test_experiment_run_dir_tagging(harness, monkeypatch, tmp_path):
     """run_one namespaces experiment output as <model-or-config>__<tag>/."""
     monkeypatch.setattr(harness, "EVAL_RUNS_ROOT", tmp_path)
     # stub the pipeline: reuse the GT-inputs driver so no Vision is called
-    truth = harness._load_truth("berzas")
+    truth = harness._load_truth("objektas_a")
     monkeypatch.setattr(harness, "run_pipeline_vision",
                         lambda pdf_path: harness.run_pipeline_use_gt_inputs(truth))
-    harness.run_one("berzas", "vision", experiment="native-pdf",
+    harness.run_one("objektas_a", "vision", experiment="native-pdf",
                     model="claude-opus-4-8")
-    tagged = list(tmp_path.glob("claude-opus-4-8__native-pdf/*_berzas_vision"))
+    tagged = list(tmp_path.glob("claude-opus-4-8__native-pdf/*_objektas_a_vision"))
     assert len(tagged) == 1
     assert (tagged[0] / "results.json").exists()
 
-    harness.run_one("berzas", "vision", experiment="agentic-zoom", model=None)
-    assert list(tmp_path.glob("default-config__agentic-zoom/*_berzas_vision"))
+    harness.run_one("objektas_a", "vision", experiment="agentic-zoom", model=None)
+    assert list(tmp_path.glob("default-config__agentic-zoom/*_objektas_a_vision"))

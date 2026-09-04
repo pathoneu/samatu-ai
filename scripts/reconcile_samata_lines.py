@@ -23,7 +23,7 @@ A concept with `app=None` is an ADMITTED gap: we know the work exists and we
 know we do not produce it.
 
 Usage:
-    ./venv/bin/python scripts/reconcile_samata_lines.py            # berzas
+    ./venv/bin/python scripts/reconcile_samata_lines.py            # objektas_a
     ./venv/bin/python scripts/reconcile_samata_lines.py --all
     ./venv/bin/python scripts/reconcile_samata_lines.py --unmapped # show ours
 """
@@ -82,8 +82,8 @@ CONCEPTS: list[Concept] = [
     Concept("pertvaru_storinimas", _rx(r"pertvar\w*\s+storinimas"),
             _rx(r"Pertvarų storinimas"), "checklist"),
     # He calls the SAME work three ways across projects: "pertvaros
-    # sutvirtinimas" (berzas), "dėžutčių iš GKP … tualetų mechanizmams"
-    # (ciurliu/lazunu), "dėžutės iš GKP … WC mechanizmams" (objektas_b).
+    # sutvirtinimas" (objektas_a), "dėžutčių iš GKP … tualetų mechanizmams"
+    # (objektas_c/objektas_d), "dėžutės iš GKP … WC mechanizmams" (objektas_b).
     Concept("pertvaros_sutvirtinimas",
             _rx(r"pertvar\w*\s+sutvirtinimas|dėžu\w*\W+iš gkp.*(wc|tualet)"),
             _rx(r"Pertvaros sutvirtinimas WC mechanizmams"),
@@ -347,7 +347,7 @@ def main() -> int:
         slugs = sorted(p.parent.name for p in
                        (REPO / "ground_truth").glob("*/contractor_samata_parsed.json"))
     else:
-        slugs = args or ["berzas"]
+        slugs = args or ["objektas_a"]
     if "--delta" in sys.argv:  # before/after on the SAME extract + concept table
         print(f"{'project':<14}{'priced':>7}{'before':>8}{'after':>7}{'Δ':>5}"
               f"{'checklist':>11}")

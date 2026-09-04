@@ -430,7 +430,7 @@ export default function NewProject() {
     }, 1000);
 
     try {
-      // Extraction time scales with project size — a real Beržų-class drawing
+      // Extraction time scales with project size — a real Objektas A-class drawing
       // runs ~19 min, well past the old fixed 600 s cap that made contractors
       // watch the browser abort a HEALTHY extraction (pre-prod QA 2026-07-15).
       // The streaming path emits progress events throughout, so abort only when
@@ -1020,7 +1020,7 @@ export default function NewProject() {
             <Rocket className="w-5 h-5 mr-2" />
             {t('newProject.startAnalysis')}
           </Button>
-          {/* Time expectation. Extraction is minutes, not seconds (a Beržų-class
+          {/* Time expectation. Extraction is minutes, not seconds (an Objektas A-class
               drawing runs ~19 min — see IDLE_ABORT_MS above). A bare "Pradėti
               analizę" + rocket reads as instant, so contractors closed the tab.
               (2026-07-28 explainability pass.)

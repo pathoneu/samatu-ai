@@ -3,7 +3,7 @@
 ROOT CAUSE of the intermittent degradation: `MAX_TOKENS = 4096` was too snug.
 Opus 5 runs extended thinking BY DEFAULT and thinking counts against the same
 cap, so a ~2 400-token answer plus a variable-length thinking block was a coin
-flip. Four paid runs of the byte-identical berzas PDF:
+flip. Four paid runs of the byte-identical objektas_a PDF:
 
     10:11  0/11 rooms  ThinkingBlock crash (fixed in 0c258e9)
     10:38 11/11 rooms  output_tokens = 2 776 of 4 096  ← thinking was short

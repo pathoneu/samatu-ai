@@ -276,7 +276,7 @@ def test_per_room_above_narrated_cap_still_rejected():
 
 
 def test_per_room_key_with_nr_prefix_matches():
-    """Real berzas Vision output keys per_room as '101 Tambūras',
+    """Real objektas_a Vision output keys per_room as '101 Tambūras',
     '102 Svetainė/virtuvė' — eksplikacija nr + name concatenated. Both
     the nr part and the name part must match."""
     rooms = [

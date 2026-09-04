@@ -1,6 +1,6 @@
 """Pozicijos accuracy fixes — Phase 1 (deterministic, no Vision change).
 
-From the Beržų line-by-line audit (docs/berzas_audit_notes.md):
+From the Objektas A line-by-line audit (docs/objektas_a_audit_notes.md):
   RC3 — angokraščiai use the calibrated angokrasciu_gkp_m field, not the inline
         Σ(2H+W) recompute (which over-quoted +54.8% by counting exterior reveals).
   RC1 — basin count from detected_symbols.praustuves, not the toilet count.
@@ -63,7 +63,7 @@ def test_basin_count_uses_praustuves_symbol():
 # ── RC4 ────────────────────────────────────────────────────────────────
 def test_rotband_share_calibrated_to_contractor_30pct():
     # Rotband (gypsum leveling) is applied ONLY to bare block/concrete walls,
-    # not GKP partitions. The Beržų contractor samata: 138.69 m² Rotband on
+    # not GKP partitions. The Objektas A contractor samata: 138.69 m² Rotband on
     # 460.71 m² total wall area = 30.1% (NOT 50%). The old 0.50 default was
     # calibrated against a since-corrected buggy walls_paint (277.33). Assert
     # the share is ~0.30 of walls_paintable, behaviourally.

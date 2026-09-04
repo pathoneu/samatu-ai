@@ -1,4 +1,4 @@
-# Gap analysis — Beržų g. 24 (Berzas)
+# Gap analysis — Objektas A (Objektas A)
 Date: 2026-05-27
 Truth: `samata-truth.pdf` (Rangovas A / Rangovas A) + `contractor-notes-verbatim.md`
 App output: `app-output-baseline.json` (run on 2026-05-26 baseline, before any fixes)
@@ -156,7 +156,7 @@ Contractor's pozicijos structure that we should match (per ankstesni user notes)
 
 ## Saved artifacts for this fixture
 
-- `project.pdf` — original Beržų g. 24 PDF (17 pages, 5,5 MB)
+- `project.pdf` — original Objektas A PDF (17 pages, 5,5 MB)
 - `samata-truth.pdf` — Rangovas's contractor-validated samata (53 line items)
 - `app-output-baseline.json` — app output before any fixes (2026-05-26 baseline)
 - `contractor-notes-verbatim.md` — Rangovas's hand-typed per-room calculation notes

@@ -13,11 +13,11 @@
 
 schema_version: 1
 projects:
-  - slug: berzas
-    name: "Beržų g. 24"
-    truth_path: ground_truth/berzas/truth.json
-    project_pdf: docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf
-    samata_pdf: docs/superpowers/fixtures/2026-05-26-berzu-g-24/samata-truth.pdf
+  - slug: objektas_a
+    name: "Objektas A"
+    truth_path: ground_truth/objektas_a/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf
+    samata_pdf: docs/superpowers/fixtures/2026-05-26-objektas-a/samata-truth.pdf
     contractor: "Rangovas A"
     has_gt_dimensions: true
     has_cached_extract: true
@@ -33,9 +33,9 @@ projects:
     has_cached_extract: false
     notes: "65-page TP; largest project in the batch."
 
-  - slug: ciurliu
-    name: "Čiurlių g. 10, Bajorai"
-    truth_path: ground_truth/ciurliu/truth.json
+  - slug: objektas_c
+    name: "Objektas C"
+    truth_path: ground_truth/objektas_c/truth.json
     project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Techninio projekto planai_20250501 (a3)_2.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 2/Pasiūlymas apdailos darbams galutinis 2026.pdf"
     contractor: "Rangovas A"
@@ -44,7 +44,7 @@ projects:
     notes: "3-page A3 plans; smallest project — fastest Vision ingestion."
 
   - slug: romainiai
-    name: "Romainiai (Objektas C)"
+    name: "Objektas E"
     truth_path: ground_truth/romainiai/truth.json
     project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Objektas C INTERJERAS 4.1-5.1 punktas.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 3/Pasiūlymas apdailos darbams atnaujintas.pdf"
@@ -86,9 +86,9 @@ projects:
     notes: "Interior-only scope (no plytelės). Contractor samata is a single-section preliminary quote; see scope_mismatch_reason."
 
   - slug: sernu
-    name: "Šernų g. 18B, Kaunas"
+    name: "Objektas F"
     truth_path: ground_truth/sernu/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_Šernu_plyteles_2025 04 02.pdf"
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/I109_objektas_f_plyteles_2025 04 02.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 4/Sąmata.pdf"
     contractor: "Rangovas A"
     has_gt_dimensions: false
@@ -96,56 +96,56 @@ projects:
     blocked_for_vision_extraction: true
     blocked_reason: "No architectural floor plan in bundle — only specialty (elektra, plytelės) drawings. Ask user for missing architectural PDF before any Vision spend."
 
-  - slug: lazunu
-    name: "Lazūnų g. 6 (Butas)"
-    truth_path: ground_truth/lazunu/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/lazunu_TP_bundled.pdf"
+  - slug: objektas_d
+    name: "Objektas D (Butas)"
+    truth_path: ground_truth/objektas_d/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/objektas_d_TP_bundled.pdf"
     samata_pdf: "docs/superpowers/fixtures/2026-06-01-batch-5/Nr. 5/Galutinė sąmata.pdf"
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
-    notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into lazunu_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
+    notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into objektas_d_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
 
-  # ── Beržų ABLATIONS (2026-08-22) — synthetic "foreign projects" with KNOWN truth.
+  # ── Objektas A ABLATIONS (2026-08-22) — synthetic "foreign projects" with KNOWN truth.
   # We have no out-of-sample interior PDF, so these manufacture the ways a
-  # foreign project differs from Beržų while keeping its contractor-verified
-  # truth. Built by scripts/build_berzas_ablations.py; PDFs untracked like all
+  # foreign project differs from Objektas A while keeping its contractor-verified
+  # truth. Built by scripts/build_objektas_a_ablations.py; PDFs untracked like all
   # fixtures. `ablation_of` EXCLUDES them from the corpus average (they would
-  # quadruple Beržų's weight) — score each one individually:
-  #   venv/bin/python eval_harness.py --project berzas_bundle --vision
-  - slug: berzas_bundle
-    name: "Beržų g. 24 — buried in a 54-page bundle (SA-02 + interior)"
-    truth_path: ground_truth/berzas/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_bundle.pdf"
+  # quadruple Objektas A's weight) — score each one individually:
+  #   venv/bin/python eval_harness.py --project objektas_a_bundle --vision
+  - slug: objektas_a_bundle
+    name: "Objektas A — buried in a 54-page bundle (SA-02 + interior)"
+    truth_path: ground_truth/objektas_a/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-objektas-a-ablations/objektas_a_bundle.pdf"
     contractor: "Rangovas A"
-    ablation_of: berzas
+    ablation_of: objektas_a
     has_gt_dimensions: true
     has_cached_extract: false
     notes: "37 pages of the SA-02 architectural part FIRST, then the 17 interior pages — the shape a contractor actually uploads. Tests page selection, the 20-page soft cap and runtime."
-  - slug: berzas_no_eksplikacija
-    name: "Beržų g. 24 — no eksplikacija table"
-    truth_path: ground_truth/berzas/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_no_eksplikacija.pdf"
+  - slug: objektas_a_no_eksplikacija
+    name: "Objektas A — no eksplikacija table"
+    truth_path: ground_truth/objektas_a/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-objektas-a-ablations/objektas_a_no_eksplikacija.pdf"
     contractor: "Rangovas A"
-    ablation_of: berzas
+    ablation_of: objektas_a
     has_gt_dimensions: true
     has_cached_extract: false
-    notes: "p2 rasterised with the PATALPŲ EKSPLIKACIJA table whited out of the image AND the text layer (all other p2 words kept as an invisible layer). Forces the no-table path (the Čiurlių failure mode) on a project we can score."
-  - slug: berzas_no_isklotines
-    name: "Beržų g. 24 — no wall elevations"
-    truth_path: ground_truth/berzas/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_no_isklotines.pdf"
+    notes: "p2 rasterised with the PATALPŲ EKSPLIKACIJA table whited out of the image AND the text layer (all other p2 words kept as an invisible layer). Forces the no-table path (the Objektas C failure mode) on a project we can score."
+  - slug: objektas_a_no_isklotines
+    name: "Objektas A — no wall elevations"
+    truth_path: ground_truth/objektas_a/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-objektas-a-ablations/objektas_a_no_isklotines.pdf"
     contractor: "Rangovas A"
-    ablation_of: berzas
+    ablation_of: objektas_a
     has_gt_dimensions: true
     has_cached_extract: false
     notes: "Pages 11–16 (išklotinės) removed → 11 pages. Tile must fall back to the apdailos plan / paskirtis defaults; rows should go geltona/raudona, not confidently wrong."
-  - slug: berzas_flat150
-    name: "Beržų g. 24 — flattened 150 DPI raster, no text layer"
-    truth_path: ground_truth/berzas/truth.json
-    project_pdf: "docs/superpowers/fixtures/2026-08-22-berzas-ablations/berzas_flat150.pdf"
+  - slug: objektas_a_flat150
+    name: "Objektas A — flattened 150 DPI raster, no text layer"
+    truth_path: ground_truth/objektas_a/truth.json
+    project_pdf: "docs/superpowers/fixtures/2026-08-22-objektas-a-ablations/objektas_a_flat150.pdf"
     contractor: "Rangovas A"
-    ablation_of: berzas
+    ablation_of: objektas_a
     has_gt_dimensions: true
     has_cached_extract: false
     notes: "Every page rasterised at 150 DPI — a scanned / iLovePDF-style re-export. Every deterministic text lane goes dark; Vision carries everything."

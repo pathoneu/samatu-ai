@@ -21,7 +21,7 @@ def _clean_env(monkeypatch):
 
 
 def test_default_is_opus_5_for_every_role():
-    """claude-opus-5 is the champion since the 2026-07-28 bake-off (Beržų
+    """claude-opus-5 is the champion since the 2026-07-28 bake-off (Objektas A
     6.12%/10.49% vs opus-4-8's 7.03%/13.41%; objektas_b 39.34% vs 51.23%).
     If this fails because someone flipped the default: any model change must
     be re-gated on the paid eval fixtures first (CLAUDE.md accuracy rule)."""

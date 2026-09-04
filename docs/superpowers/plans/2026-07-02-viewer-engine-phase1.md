@@ -404,7 +404,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Files:** none (verification; small fixes if needed).
 
-Verify in the REAL `InteriorWorkspace`, exactly as Phase 1 of the AI Takeoff Viewer was verified (bring up the stack, real project, drive the live DOM). The known-good local flow: register a throwaway user, open the Beржų project (`2e7a5a36…`), inject the fixture PDF into IndexedDB (`samatu_pdfs`/`pdfs`), append `?viewer=embed` to the URL.
+Verify in the REAL `InteriorWorkspace`, exactly as Phase 1 of the AI Takeoff Viewer was verified (bring up the stack, real project, drive the live DOM). The known-good local flow: register a throwaway user, open the Objektas A project (`2e7a5a36…`), inject the fixture PDF into IndexedDB (`samatu_pdfs`/`pdfs`), append `?viewer=embed` to the URL.
 
 - [ ] **Step 1: Bring up stack + open the project with `?viewer=embed`.**
 - [ ] **Step 2: Assert (Playwright evaluate):**

@@ -57,7 +57,7 @@ def main() -> int:
     from extractor.vision.dimension_extractor import extract_dimensions
     from extractor.vision.majority_voter import vote_dimensions
 
-    pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-berzu-g-24/project.pdf"
+    pdf_path = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
     pdf_bytes = pdf_path.read_bytes()
     pages = pdf_to_b64_images(pdf_bytes, max_pages=args.page)
     img = pages[args.page - 1]["image_b64"]
