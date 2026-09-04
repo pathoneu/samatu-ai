@@ -275,6 +275,33 @@ def test_darbu_sarasas_spelling_is_read_as_well_as_pozicijos():
     assert sc.rows[0].bucket == "within_10"
 
 
+def test_the_same_dict_object_twice_is_two_rows_not_one():
+    """Rows are addressed by position, never by `id()`. A caller can legitimately
+    pass the same dict twice (two identical checklist lines); identity keying
+    would collapse them into one verdict and silently shrink the denominator."""
+    shared = _c("1", "Widget install", "m2", 100.0)
+    sc = _score([shared, shared], [_a("Widget install", "m2", 100.0)])
+    assert sc.n_rows == 2 and sc.n_scored == 2
+    assert sum(sc.buckets.values()) == 2
+    # Two of his rows, one of ours → one pairing, one granularity miss.
+    assert sc.buckets["within_10"] == 1
+    assert sc.granularity_rows == 1
+
+
+def test_two_identical_unmapped_dict_objects_both_count():
+    shared = _c("1", "Doohickey", "vnt", 1.0)
+    sc = _score([shared, shared], [])
+    assert sc.buckets["unmapped"] == 2
+    assert sc.unmapped_families == ["Doohickey"]
+
+
+def test_the_same_app_dict_object_twice_is_two_app_rows():
+    shared = _a("Gizmo mount", "vnt", 2.0)
+    sc = _score([_c("1", "Gizmo mount", "vnt", 4.0)], [shared, shared])
+    assert sc.rows[0].app_quantity == pytest.approx(4.0)   # summed, not deduped
+    assert sc.rows[0].bucket == "within_10"
+
+
 def test_scoring_does_not_mutate_its_inputs():
     contractor = [_c("1", "Widget install", "m2", 100.0)]
     app = [_a("Widget install", "m2", 95.0)]

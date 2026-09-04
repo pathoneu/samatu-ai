@@ -311,26 +311,28 @@ def score_rows(contractor_items: Sequence[dict],
     # too also stops one app row being counted inside two concepts (e.g.
     # "LED nišų glaistymas/dažymas" matches both `nisos_led_dazymas` and the
     # generic `dazymas`), which would double-count its quantity.
-    c_rows: dict[str, list[dict]] = {}
-    unmapped: list[dict] = []
-    for it in items:
+    # Rows are addressed by POSITION, never by `id()`: a caller may legitimately
+    # hand us the same dict object twice (two identical checklist rows), and two
+    # rows sharing an id would silently collapse into one verdict.
+    concept_of_row: list[str | None] = []
+    c_rows: dict[str, list[int]] = {}
+    unmapped: list[int] = []
+    for i, it in enumerate(items):
         name = _norm(it.get("name"))
-        for c in table:
-            if c.contractor.search(name):
-                c_rows.setdefault(c.key, []).append(it)
-                break
-        else:
-            unmapped.append(it)
+        key = next((c.key for c in table if c.contractor.search(name)), None)
+        concept_of_row.append(key)
+        (c_rows.setdefault(key, []).append(i) if key is not None
+         else unmapped.append(i))
 
-    a_rows: dict[str, list[dict]] = {}
-    a_concept_of: dict[int, str] = {}
+    a_rows: dict[str, list[int]] = {}
+    a_concept_of: list[str | None] = []
     for p in app_rows:
         name = _app_name(p)
-        for c in table:
-            if c.app is not None and c.app.search(name):
-                a_rows.setdefault(c.key, []).append(p)
-                a_concept_of[id(p)] = c.key
-                break
+        key = next((c.key for c in table
+                    if c.app is not None and c.app.search(name)), None)
+        a_concept_of.append(key)
+        if key is not None:
+            a_rows.setdefault(key, []).append(len(a_concept_of) - 1)
 
     # ── Score each concept once, Σ-vs-Σ. ─────────────────────────────────────
     concept_verdicts: list[ConceptVerdict] = []
@@ -340,11 +342,11 @@ def score_rows(contractor_items: Sequence[dict],
         if not crows:
             continue
         arows = a_rows.get(c.key, [])
-        scorable = [it for it in crows if _truth_qty(it) is not None]
-        his = sum(_truth_qty(it) or 0.0 for it in scorable)
+        scorable = [i for i in crows if _truth_qty(items[i]) is not None]
+        his = sum(_truth_qty(items[i]) or 0.0 for i in scorable)
         his_units: set[str] = set()
-        for it in scorable:
-            his_units |= normalize_unit(it.get("unit"))
+        for i in scorable:
+            his_units |= normalize_unit(items[i].get("unit"))
 
         reason: str | None = None
         ours: float | None = None
@@ -355,13 +357,13 @@ def score_rows(contractor_items: Sequence[dict],
             bucket = "missing"
             reason = f"admitted gap — {c.note or 'no app family emits this'}"
         else:
-            usable = [p for p in arows
-                      if _app_qty(p) is not None
-                      and (normalize_unit(_app_unit(p)) & his_units)]
+            usable = [j for j in arows
+                      if _app_qty(app_rows[j]) is not None
+                      and (normalize_unit(_app_unit(app_rows[j])) & his_units)]
             if not arows:
                 bucket, reason = "missing", "no app row matched this family"
             elif not usable:
-                no_qty = [p for p in arows if _app_qty(p) is None]
+                no_qty = [j for j in arows if _app_qty(app_rows[j]) is None]
                 bucket = "missing"
                 reason = ("app row has no quantity (checklist — „suveskite patys“)"
                           if len(no_qty) == len(arows)
@@ -369,7 +371,7 @@ def score_rows(contractor_items: Sequence[dict],
             elif not his:
                 bucket, reason = "missing", "contractor quantity is zero"
             else:
-                ours = sum(_app_qty(p) or 0.0 for p in usable)
+                ours = sum(_app_qty(app_rows[j]) or 0.0 for j in usable)
                 pct = round((ours - his) / his * 100, 3)
                 bucket = _bucket_for(pct)
         v = ConceptVerdict(
@@ -391,86 +393,83 @@ def score_rows(contractor_items: Sequence[dict],
             continue
         v = by_key[c.key]
         arows = a_rows.get(c.key, [])
-        scorable = [it for it in crows if _truth_qty(it) is not None]
-        for it in crows:
-            if _truth_qty(it) is None:
-                row_result[id(it)] = ("no_truth_qty",
-                                      "contractor row carries no quantity",
-                                      None, None, ())
+        labels_all = tuple(sorted(_app_name(app_rows[j]) for j in arows))
+        scorable = [i for i in crows if _truth_qty(items[i]) is not None]
+        for i in crows:
+            if _truth_qty(items[i]) is None:
+                row_result[i] = ("no_truth_qty",
+                                 "contractor row carries no quantity",
+                                 None, None, ())
         if not scorable:
             continue
         if v.bucket == "missing" and v.app_quantity is None:
             # The whole family failed for one shared reason (admitted gap, no
             # app row, checklist-only, incomparable unit) — every row inherits it.
-            for it in scorable:
-                row_result[id(it)] = ("missing", v.reason, None, None, ())
+            for i in scorable:
+                row_result[i] = ("missing", v.reason, None, None, ())
             continue
 
         if len(scorable) == 1:
             # One row of his against the whole family of ours: he can add our
             # sienų + lubų lines together, so the sum is a fair counterpart.
-            it = scorable[0]
-            row_result[id(it)] = (v.bucket, v.reason, v.app_quantity,
-                                  v.pct_error,
-                                  tuple(sorted(_app_name(p) for p in arows)))
+            row_result[scorable[0]] = (v.bucket, v.reason, v.app_quantity,
+                                       v.pct_error, labels_all)
             continue
 
         # He splits this family finer than we emit it. Pair greedily on the
         # smallest relative error, unit-compatible, each app row used once;
-        # ties break on (his nr, our label) so the result never depends on
-        # dict or list ordering.
+        # ties break on (his nr, our label, positions) so the result never
+        # depends on dict ordering or on object identity.
         pairs: list[tuple[float, str, str, int, int]] = []
-        for it in scorable:
-            his_q = _truth_qty(it) or 0.0
+        for i in scorable:
+            his_q = _truth_qty(items[i]) or 0.0
             if not his_q:
                 continue
-            u = normalize_unit(it.get("unit"))
-            for p in arows:
-                q = _app_qty(p)
-                if q is None or not (normalize_unit(_app_unit(p)) & u):
+            u = normalize_unit(items[i].get("unit"))
+            for j in arows:
+                q = _app_qty(app_rows[j])
+                if q is None or not (normalize_unit(_app_unit(app_rows[j])) & u):
                     continue
                 pairs.append((abs((q - his_q) / his_q * 100),
-                              str(it.get("nr") or ""), _app_name(p),
-                              id(it), id(p)))
+                              str(items[i].get("nr") or ""),
+                              _app_name(app_rows[j]), i, j))
         pairs.sort()
         used_c: set[int] = set()
         used_a: set[int] = set()
-        by_id = {id(p): p for p in arows}
-        c_by_id = {id(it): it for it in scorable}
-        for abs_pct, _, label, cid, aid in pairs:
-            if cid in used_c or aid in used_a:
+        for _abs_pct, _nr, label, i, j in pairs:
+            if i in used_c or j in used_a:
                 continue
-            used_c.add(cid)
-            used_a.add(aid)
-            his_q = _truth_qty(c_by_id[cid]) or 0.0
-            our_q = _app_qty(by_id[aid]) or 0.0
+            used_c.add(i)
+            used_a.add(j)
+            his_q = _truth_qty(items[i]) or 0.0
+            our_q = _app_qty(app_rows[j]) or 0.0
             pct = round((our_q - his_q) / his_q * 100, 3)
-            row_result[cid] = (_bucket_for(pct), None, round(our_q, 3), pct,
-                               (label,))
-        for it in scorable:
-            if id(it) in used_c:
+            row_result[i] = (_bucket_for(pct), None, round(our_q, 3), pct,
+                             (label,))
+        for i in scorable:
+            if i in used_c:
                 continue
             granularity_rows += 1
-            row_result[id(it)] = (
+            row_result[i] = (
                 "missing",
                 f"granularity — he bills this family on {len(scorable)} rows, "
                 f"we emit {len(arows)}",
-                None, None, tuple(sorted(_app_name(p) for p in arows)))
+                None, None, labels_all)
 
     verdicts: list[RowVerdict] = []
     buckets = {b: 0 for b in BUCKETS}
-    for it in items:
-        name = _norm(it.get("name"))
-        key = next((c.key for c in table if c.contractor.search(name)), None)
+    for i, it in enumerate(items):
+        key = concept_of_row[i]
         if key is None:
             bucket, reason, ours_q, pct, labels = (
                 "unmapped", "no concept covers this family", None, None, ())
         else:
-            bucket, reason, ours_q, pct, labels = row_result[id(it)]
+            bucket, reason, ours_q, pct, labels = row_result[i]
         buckets[bucket] += 1
         verdicts.append(RowVerdict(
-            nr=it.get("nr"), name=name, section=it.get("section"),
-            unit=it.get("unit"), quantity=_truth_qty(it), concept=key,
+            nr=it.get("nr"), name=_norm(it.get("name")),
+            section=it.get("section"), unit=it.get("unit"),
+            quantity=_truth_qty(it), concept=key,
             bucket=bucket, app_quantity=ours_q, pct_error=pct, reason=reason,
             split_family=bool(key and by_key[key].n_contractor_rows > 1),
             app_labels=labels,
@@ -478,8 +477,8 @@ def score_rows(contractor_items: Sequence[dict],
 
     # ── Our rows nobody bills: unmatched, or matched to an absent family. ────
     extra: list[dict] = []
-    for p in app_rows:
-        key = a_concept_of.get(id(p))
+    for j, p in enumerate(app_rows):
+        key = a_concept_of[j]
         if key is not None and c_rows.get(key):
             continue
         extra.append({
@@ -497,7 +496,7 @@ def score_rows(contractor_items: Sequence[dict],
         # De-duplicated, first-seen order: he bills the same family on several
         # lines (three tile formats, two GKP heights) and the coverage gap is a
         # gap per FAMILY, not per line.
-        unmapped_families=list(dict.fromkeys(_norm(it.get("name"))
-                                             for it in unmapped)),
+        unmapped_families=list(dict.fromkeys(_norm(items[i].get("name"))
+                                             for i in unmapped)),
         granularity_rows=granularity_rows,
     )
