@@ -99,3 +99,6 @@ ground_truth/*/results_rescored*.json
 # Confidentiality denylist for backend/tests/test_no_confidential_terms_in_repo.py.
 # Local only — the terms it holds are exactly what must never be committed.
 backend/.confidential-terms
+
+# contractor unit prices are commercially confidential — never tracked
+ground_truth/*/contractor_samata_priced.json
