@@ -697,7 +697,7 @@ export default function PlanViewer({
               title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėkite patalpos viduje`}
             >
               <Wand2 className="w-4 h-4 inline mr-1.5" />
-              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Taisyti zoną'}
+              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Taisyti kontūrą'}
             </button>
           )}
           {fillLoading && (
@@ -781,7 +781,7 @@ export default function PlanViewer({
                   : 'border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] hover:bg-[hsl(var(--viewer-chrome-hover))]'
               }`}
               disabled={symbolLoading || !pdfFile}
-              title="Paspauskite ant simbolio brėžinyje, tada AI ieškos panašių"
+              title="Paspauskite ant ženklo brėžinyje — ieškosime tokių pačių"
             >
               <Target className="w-3.5 h-3.5 inline mr-1.5" />
               {symbolPickMode ? 'Paspauskite simbolį brėžinyje' : 'Skaičiuoti pagal paspaudimą'}
@@ -791,10 +791,10 @@ export default function PlanViewer({
               onClick={runPageSymbolDetect}
               className="h-8 px-3 rounded-md border border-blue-500/50 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
               disabled={symbolLoading || !pdfFile}
-              title="Vienu AI kvietimu rasti visus tikėtinus simbolius šiame puslapyje"
+              title="Vienu kartu rasti visus tikėtinus ženklus šiame puslapyje"
             >
               <Crosshair className="w-3.5 h-3.5 inline mr-1.5" />
-              AI nuskaityti puslapį
+              Perskaityti puslapio ženklus
             </button>
             {/* Fill flow moved to the main toolbar (core manual-correction feature). */}
             <div className="h-6 w-px bg-[hsl(var(--viewer-chrome-border))]" />
@@ -816,7 +816,7 @@ export default function PlanViewer({
             {symbolLoading && (
               <span className="inline-flex items-center gap-1.5 text-xs text-[hsl(var(--viewer-chrome-foreground)/0.65)]">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                AI ieško ženklų...
+                Ieškome ženklų…
               </span>
             )}
             {symbolResult && !symbolLoading && (
@@ -846,7 +846,7 @@ export default function PlanViewer({
                   type="button"
                   onClick={() => setSymbolResult(null)}
                   className="h-8 px-2.5 rounded-md border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-xs font-medium hover:bg-[hsl(var(--viewer-chrome-hover))]"
-                  title="Išvalyti dabartinį AI žymėjimą"
+                  title="Išvalyti dabartinį žymėjimą"
                 >
                   <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
                   Išvalyti

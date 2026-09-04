@@ -157,7 +157,7 @@ export default function ExportFilterModal({
         <div className="overflow-y-auto px-3 py-2 flex-1">
           {sections.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              Šiame projekte nėra eksportuotinų pozicijų.
+              Šiame projekte nėra eilučių, kurias būtų galima eksportuoti.
             </p>
           ) : (
             <ul className="space-y-0.5">

@@ -301,9 +301,13 @@ export default function SanityWarningsBanner({
                       <button
                         onClick={() => dismiss(w)}
                         title={t('project.sanity.hideOneTitle')}
-                        className="opacity-0 group-hover:opacity-60 hover:opacity-100 shrink-0"
+                        /* Was hover-only: the only way to dismiss a warning
+                           was to find it with the mouse. (Design §5.) */
+                        aria-label={t('project.sanity.hideOneTitle')}
+                        className="shrink-0 inline-flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+                        style={{ width: 28, height: 28 }}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </li>
                   );

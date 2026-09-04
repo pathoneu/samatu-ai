@@ -218,7 +218,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
   if (editing) {
     return (
       <tr className="bg-muted/30">
-        <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
+        <td className="px-3 py-2 text-sm text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
         <td className="px-3 py-2">
           <input type="text" value={draft.aprasymas}
             onChange={e => setDraft({...draft, aprasymas: e.target.value})}
@@ -227,7 +227,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
             title={t('project.mainView.descAria')}
             className="w-full px-2 py-1 border border-border bg-background rounded text-sm" />
         </td>
-        <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
+        <td className="px-3 py-2 text-sm text-muted-foreground">{item.mato_vnt || ''}</td>
         {/* type="text" + inputMode: a LT decimal comma makes type="number"
             report an EMPTY value, so "12,5" was read as 0. The placeholder now
             says the comma is welcome — it was the only unwritten rule in the
@@ -277,8 +277,8 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
 
   return (
     <tr className="hover:bg-muted/30 group transition-colors">
-      <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
-      <td className="px-3 py-2 text-sm text-foreground">
+      <td className="px-3 py-2 text-sm text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
+      <td className="px-3 py-2 text-foreground">
         <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
           {/* The description is the row's handle: clicking it opens „Kaip
@@ -332,8 +332,8 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
           </div>
         )}
       </td>
-      <td className="px-3 py-2 text-xs text-muted-foreground">{item.mato_vnt || ''}</td>
-      <td className="px-3 py-2 text-sm text-foreground text-right tabular-nums">
+      <td className="px-3 py-2 text-sm text-muted-foreground">{item.mato_vnt || ''}</td>
+      <td className="px-3 py-2 text-foreground text-right tabular-nums">
         {editingQty ? (
           <input
             autoFocus
@@ -455,7 +455,7 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
           </span>
         )}
       </td>
-      <td className="px-3 py-2 text-sm font-semibold text-right tabular-nums">
+      <td className="px-3 py-2 font-semibold text-right tabular-nums">
         {item.kaina ? fmtEur(itemSuma) : '—'}
       </td>
       {/* Always visible, never hover-only: a control a 52-year-old contractor
@@ -893,8 +893,11 @@ export default function ProjectMainView({
             the materials became their own section, entering an all-in rate on a
             work row AND letting the kainynas price the materials bills the same
             purchase twice — so say what these prices are. (2026-09-02) */}
-        <div className="px-4 py-2 border-b border-border bg-muted/10 text-xs text-muted-foreground">
+        <div className="px-4 py-2 border-b border-border bg-muted/10 text-muted-foreground" style={{ fontSize: 14 }}>
           {t('project.mainView.worksAreLabourOnly')}
+          {/* The keyboard shortcut, spelled out where it is used instead of
+              hidden in a hover tooltip. (Design §5 — „net „Enter" paaiškinta".) */}
+          <span className="block mt-0.5">{t('project.mainView.keyboardHint')}</span>
         </div>
 
         {darbai.length === 0 ? (
@@ -907,7 +910,10 @@ export default function ProjectMainView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* 16 px body text — design §5 („35–60 metų akims"). The column
+                headings stay small: they are labels read once, not numbers
+                read all evening. */}
+            <table className="w-full" style={{ fontSize: 16 }}>
               <thead className="text-xs uppercase text-muted-foreground border-b border-border bg-muted/20">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium w-12">{t('project.mainView.colNr')}</th>
@@ -939,9 +945,13 @@ export default function ProjectMainView({
                               onClick={() => handleAddRowInSection(cat)}
                               title={t('project.mainView.addRowToSectionTitle', { section: cat })}
                               aria-label={t('project.mainView.addRowToSectionTitle', { section: cat })}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium normal-case tracking-normal text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                              /* A primary action per design §E4 („Pridėti
+                                 eilutę — bet kuriame skyriuje, iškart"), so it
+                                 gets a real target instead of a 20 px link. */
+                              className="inline-flex items-center gap-1.5 rounded font-medium normal-case tracking-normal text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                              style={{ minHeight: 44, padding: '0 10px', fontSize: 14 }}
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-4 h-4" />
                               {t('project.mainView.addRow')}
                             </button>
                           </span>
@@ -1113,11 +1123,11 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     return (
       <Button
         variant="outline"
-        size="sm"
         disabled
         title={t('project.mainView.priceListNotLoaded')}
+        style={{ minHeight: 44, fontSize: 15 }}
       >
-        <Sliders className="w-3.5 h-3.5 mr-1.5" />
+        <Sliders className="w-4 h-4 mr-2" />
         {t('project.mainView.applyPriceList')}
       </Button>
     );
@@ -1127,13 +1137,13 @@ function ApplyPriceListButton({ project, onProjectChange }) {
     <div className="relative" ref={ref}>
       <Button
         variant="outline"
-        size="sm"
         onClick={() => setOpen(v => !v)}
         title={t('project.mainView.applyPriceListTitle')}
+        style={{ minHeight: 44, fontSize: 15 }}
       >
-        <Sliders className="w-3.5 h-3.5 mr-1.5" />
+        <Sliders className="w-4 h-4 mr-2" />
         {t('project.mainView.applyPriceList')}
-        <ChevronDown className="w-3 h-3 ml-1" />
+        <ChevronDown className="w-4 h-4 ml-1.5" />
       </Button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[260px] bg-popover border border-border rounded-md shadow-lg py-1">

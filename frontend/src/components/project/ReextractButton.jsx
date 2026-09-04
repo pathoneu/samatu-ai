@@ -1,5 +1,5 @@
 /**
- * ReextractButton — re-runs AI extraction on the saved PDF (Limitation 10 fix).
+ * ReextractButton — reads the saved PDF again from scratch (Limitation 10 fix).
  *
  * Use cases:
  * - Prompt was improved since original extraction (admin updates → user wants fresh result)
@@ -11,6 +11,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
@@ -18,6 +19,9 @@ import { getProject, updateProject } from '@/lib/projectStore';
 import { API_BASE as API } from '@/lib/apiBase';
 
 export default function ReextractButton({ project, onComplete }) {
+  // This component carried a complete set of i18n keys that nothing used: the
+  // strings were hard-coded LT, so no vocabulary pass could reach them.
+  const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [progress, setProgress] = useState('');
@@ -26,15 +30,15 @@ export default function ReextractButton({ project, onComplete }) {
   const handleReextract = async () => {
     setError(null);
     setExtracting(true);
-    setProgress('Įkeliamas PDF iš atminties...');
+    setProgress(t('project.reextract.loadingPdf'));
 
     try {
       const blob = await getPdfBlob(project.id);
       if (!blob) {
-        throw new Error('PDF nerastas. Negalima pakartoti analizės. Sukurkite naują projektą su PDF.');
+        throw new Error(t('project.reextract.pdfNotFound'));
       }
 
-      setProgress('AI analizuoja brėžinį (palaukite 3–8 min)...');
+      setProgress(t('project.reextract.analyzing'));
       const fd = new FormData();
       fd.append('files', blob, project.name + '.pdf');
       // Forward existing rules_override so user's prefs aren't lost. Read them
@@ -54,9 +58,9 @@ export default function ReextractButton({ project, onComplete }) {
       try {
         ti = setInterval(() => {
           const sec = Math.floor((Date.now() - t0) / 1000);
-          if (sec < 60) setProgress(`Pass 1: AI matuoja patalpas... (${sec}s)`);
-          else if (sec < 200) setProgress(`Pass 2: AI prizoom'ina kambarius... (${sec}s)`);
-          else setProgress(`Sudėtingas projektas (${sec}s)... gali užtrukti iki 8 min.`);
+          if (sec < 60) setProgress(t('project.reextract.pass1', { sec }));
+          else if (sec < 200) setProgress(t('project.reextract.pass2', { sec }));
+          else setProgress(t('project.reextract.complex', { sec }));
         }, 1000);
 
         const res = await fetch(`${API}/extract-interior`, {
@@ -76,14 +80,14 @@ export default function ReextractButton({ project, onComplete }) {
           throw new Error(result._error || 'Pipeline klaida');
         }
         if (!result.patalpos) {
-          throw new Error('AI grąžino netinkamą formatą');
+          throw new Error(t('project.reextract.badFormat'));
         }
 
         // Replace project data — preserve user-edited fields (kainos, name, etc.)
         //
         // 2026-07-28 audit: the base of this spread used to be the `project`
         // PROP — a render-time snapshot taken up to 10 minutes before the
-        // extraction returned. Everything the user changed while the AI worked
+        // extraction returned. Everything the user changed while it ran
         // (prices, measurements, polygons, per-room overrides, the name) was
         // silently rolled back to that snapshot. Re-read the CURRENT stored
         // project first; same idiom as InteriorWorkspace.jsx (`const fresh =
@@ -98,7 +102,7 @@ export default function ReextractButton({ project, onComplete }) {
           _reextracted_at: new Date().toISOString(),
         };
         updateProject(project.id, merged);
-        setProgress('✓ Atnaujinta!');
+        setProgress(t('project.reextract.updated'));
         setTimeout(() => {
           onComplete?.(merged);
           setExtracting(false);
@@ -109,7 +113,7 @@ export default function ReextractButton({ project, onComplete }) {
       }
     } catch (e) {
       console.error('Re-extract failed:', e);
-      setError(e.message || 'Klaida');
+      setError(e.message || t('project.reextract.error'));
       setExtracting(false);
     }
   };
@@ -119,7 +123,7 @@ export default function ReextractButton({ project, onComplete }) {
       <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 flex items-center gap-3 min-w-[280px]">
         <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">Pakartojama analizė...</p>
+          <p className="text-sm font-medium">{t('project.reextract.inProgress')}</p>
           <p className="text-xs text-muted-foreground truncate">{progress}</p>
         </div>
       </div>
@@ -132,10 +136,10 @@ export default function ReextractButton({ project, onComplete }) {
         variant="outline"
         size="sm"
         onClick={() => setConfirming(true)}
-        title="Pakartoti AI analizę su išsaugotu PDF"
+        title={t('project.reextract.buttonTitle')}
       >
         <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-        Pakartoti AI analizę
+        {t('project.reextract.button')}
       </Button>
     );
   }
@@ -146,16 +150,16 @@ export default function ReextractButton({ project, onComplete }) {
         <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            Pakartoti AI analizę?
+            {t('project.reextract.confirmTitle')}
           </p>
           <ul className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 mb-3 space-y-0.5 list-disc pl-4">
-            <li>Užtruks 3-8 min, kainuos ~$1-2</li>
-            <li>Senieji AI rezultatai bus pakeisti naujais</li>
-            <li>Kainos gali nesutapti su naujomis pozicijomis</li>
-            <li>Prielaidos ({Object.keys(project._overrides || {}).length} laukų) išsaugomos</li>
+            <li>{t('project.reextract.bullet1')}</li>
+            <li>{t('project.reextract.bullet2')}</li>
+            <li>{t('project.reextract.bullet3')}</li>
+            <li>{t('project.reextract.bullet4', { count: Object.keys(project._overrides || {}).length })}</li>
           </ul>
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleReextract}>Taip, pakartoti</Button>
+            <Button size="sm" onClick={handleReextract}>{t('project.reextract.yesRepeat')}</Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
               <X className="w-3.5 h-3.5" />
             </Button>

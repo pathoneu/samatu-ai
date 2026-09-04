@@ -235,7 +235,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               onClick={() => onStartFill(focusedRoomNr)}
             >
               <SquarePen className="w-3.5 h-3.5" />
-              <span>Taisyti zoną</span>
+              <span>Taisyti kontūrą</span>
             </button>
           ) : (
             /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
@@ -246,7 +246,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
                 onClick={onCancelFill}
               >
                 <SquarePen className="w-3.5 h-3.5" />
-                <span>Taisyti zoną</span>
+                <span>Taisyti kontūrą</span>
               </button>
               <button
                 className="p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
@@ -272,7 +272,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         <button className={btn} title="Spausdinti brėžinį (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
         {/* Honest title: this hands back the ORIGINAL uploaded PDF — the
             measurements and zones are not burned into it. (2026-07-28.) */}
-        <button className={btn} title="Atsisiųsti originalų PDF (be matavimų ir zonų)" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
+        <button className={btn} title="Atsisiųsti originalų PDF (be matavimų ir kontūrų)" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -316,7 +316,7 @@ function scaleStatusTitle(pageScale) {
     return 'Mastelis dar nenustatytas — matavimai bus be metrų. Spustelėkite ir pažymėkite atkarpą, kurios tikrą ilgį žinote.';
   }
   if (pageScale.source === 'auto') {
-    return 'Mastelį AI apskaičiavo pagal patalpų plotus eksplikacijoje — todėl apytikslis (~). Norėdami tikslesnio, spustelėkite ir kalibruokite pagal žinomą atstumą.';
+    return 'Mastelis apskaičiuotas iš patalpų plotų eksplikacijoje — todėl apytikslis (~). Norėdami tikslesnio, spustelėkite ir nustatykite mastelį pagal žinomą atstumą.';
   }
   return 'Mastelis kalibruotas rankiniu būdu pagal jūsų nurodytą atstumą. Spustelėkite, jei norite kalibruoti iš naujo.';
 }
@@ -549,7 +549,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
 function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
-  // `fillFor` = the room nr currently armed for "Taisyti zoną" click-to-fill.
+  // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
   const [fillFor, setFillFor] = useState(null);
   // Round-trip in flight (backend flood-fill takes ~3-6 s) — drives the status
   // hint so the user sees progress instead of a silent stall (audit P0).
@@ -641,7 +641,7 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
     });
   };
   const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); setFillFor(nr); };
-  // External fill arming (review-queue pencil → "Taisyti zoną" armed here).
+  // External fill arming (review-queue pencil → "Taisyti kontūrą" armed here).
   // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
   useEffect(() => {
     if (fillRequest?.nr != null) startFill(fillRequest.nr);

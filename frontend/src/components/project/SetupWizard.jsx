@@ -263,7 +263,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                       Dažyti sienas virš plytelių
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Standartas: dažoma iki lubų virš plytelių zonos
+                      Standartas: dažoma iki lubų virš plytelių
                     </div>
                   </div>
                 </label>

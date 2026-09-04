@@ -334,9 +334,13 @@ export default function PriceLists() {
                     ? 'Nebenaudoti šio kainyno automatiškai'
                     : 'Naudoti šį kainyną automatiškai naujuose projektuose'}
                   aria-pressed={!!pl.is_default}
+                  /* Was hover-only: on a touch screen, and for anyone who does
+                     not sweep the pointer down the list, the star and the bin
+                     did not exist. (Design §5 — jokių veiksmų tik užvedus
+                     pelę.) */
                   className={pl.is_default
                     ? 'text-primary'
-                    : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary'}
+                    : 'text-muted-foreground/70 hover:text-primary'}
                 >
                   <Star className={`w-4 h-4 ${pl.is_default ? 'fill-current' : ''}`} />
                 </Button>
@@ -345,7 +349,7 @@ export default function PriceLists() {
                   size="icon"
                   onClick={() => handleDelete(pl.id)}
                   title="Ištrinti kainyną"
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground/70 hover:text-destructive"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

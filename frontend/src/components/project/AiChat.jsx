@@ -94,7 +94,7 @@ export default function AiChat({ project, inline = false }) {
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-foreground text-background rounded-lg shadow-md hover:shadow-lg transition-shadow"
-        title="Klauskite AI apie projektą"
+        title="Klauskite apie projektą"
       >
         <MessageCircle className="w-4 h-4" />
         <span className="text-sm font-medium">AI</span>

@@ -144,7 +144,7 @@ function WallDetail({ wall }) {
       {(wall.tile_zones || []).length > 0 && (
         <div>
           <div className="text-muted-foreground uppercase tracking-wide font-medium" style={{ fontSize: 9 }}>
-            Plytelių zonos
+            Plytelių plotai
           </div>
           {wall.tile_zones.map((tz, i) => (
             <div key={i} className="flex items-center gap-2 pl-2">

@@ -417,8 +417,8 @@ export default function WorkspacePanel({
           <Search className="absolute left-2 top-2 w-3 h-3 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Filtruoti pozicijas, patalpas…"
-            aria-label="Filtruoti pozicijas ir patalpas"
+            placeholder="Ieškoti eilutės ar patalpos…"
+            aria-label="Ieškoti eilutės ar patalpos"
             title="Įrašykite dalį pavadinimo — sąrašas bus sutrumpintas"
             value={filter}
             onChange={e => setFilter(e.target.value)}
@@ -431,8 +431,8 @@ export default function WorkspacePanel({
           /* "šaltinio taškai" meant nothing outside the team — name what the
              dots actually tell you. (2026-07-28 explainability pass.) */
           title={showProvenance
-            ? 'Slėpti spalvotus ženkliukus, rodančius, iš kur paimtas kiekvienas skaičius'
-            : 'Rodyti spalvotus ženkliukus, iš kur paimtas kiekvienas skaičius (eksplikacija, formulė, prielaida)'}
+            ? 'Slėpti ženkliukus, rodančius, iš kur paimtas kiekvienas skaičius'
+            : 'Rodyti ženkliukus, iš kur paimtas kiekvienas skaičius (iš lentelės, apskaičiuota, numatyta)'}
           aria-pressed={showProvenance}
           className="rounded border flex items-center justify-center transition-colors"
           style={{
@@ -609,7 +609,7 @@ export default function WorkspacePanel({
                   }}
                   className="flex items-center justify-center justify-self-end text-muted-foreground hover:text-foreground transition-colors"
                   style={{ width: 16, height: 16 }}
-                  title="Rodyti/slėpti zoną plane · Ctrl+spustelėjimas — rodyti tik šią"
+                  title="Rodyti/slėpti kontūrą plane · Ctrl+spustelėjimas — rodyti tik šį"
                 >
                   {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -1020,7 +1020,9 @@ const PositionRow = memo(function PositionRow({
   // normalize, or engine-flagged rows render as confident green (P0 2026-08-03).
   const confTier = normalizeConfidence(row.confidence);
   const confClass = CONFIDENCE_DOT_CLASS[confTier];
-  const confTitle = `Pasitikėjimas: ${confidenceLabel(confTier)}${row._confidence_reason ? ` — ${cleanUserText(row._confidence_reason)}` : ''}`;
+  // „Pasitikėjimas" is banned on screen (design §1) — the tier label already
+  // says what to do („Skaityta tiesiogiai" / „Patikrinti" / „Būtina patikrinti").
+  const confTitle = `${confidenceLabel(confTier)}${row._confidence_reason ? ` — ${cleanUserText(row._confidence_reason)}` : ''}`;
   const sum = (row.kiekis || 0) * (row.kaina || 0);
   const isManualQty = row.manual_override === true || row.quantity_source === 'manual_override';
   const isCountUnit = String(row.mato_vnt || '').toLowerCase().includes('vnt');
@@ -1122,7 +1124,7 @@ const PositionRow = memo(function PositionRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onQuantityAdjust(-1); }}
-              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-red-400 hover:text-red-400 transition-all"
+              className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-red-400 hover:text-red-400 transition-colors"
               title="Atimti 1"
             >
               −
@@ -1147,7 +1149,7 @@ const PositionRow = memo(function PositionRow({
                   color: 'hsl(var(--source-table))',
                   background: 'hsl(var(--source-table) / 0.08)',
                 }}
-                title="Kiekį įrašėte rankiniu būdu — AI reikšmė pakeista"
+                title="Kiekį įrašėte ranka — ankstesnis skaičius pakeistas"
               >
                 rank.
               </span>
@@ -1157,7 +1159,7 @@ const PositionRow = memo(function PositionRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onQuantityAdjust(1); }}
-              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded border border-border hover:border-emerald-400 hover:text-emerald-400 transition-all"
+              className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-emerald-400 hover:text-emerald-400 transition-colors"
               title="Pridėti 1"
             >
               +
@@ -1297,7 +1299,7 @@ const PositionRow = memo(function PositionRow({
             fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
           }}
         >
-          AI kiekis buvo <span className="mono tabular">{fmt(row.ai_kiekis_original)}</span>
+          iš brėžinio buvo <span className="mono tabular">{fmt(row.ai_kiekis_original)}</span>
           {row.mato_vnt && <span className="ml-1">{row.mato_vnt}</span>}
         </div>
       )}
