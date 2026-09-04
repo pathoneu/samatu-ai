@@ -1002,6 +1002,50 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
     return parsed
 
 
+def _stamp_eksplikacija_evidence(room: dict, eks_row: dict, eks: dict) -> None:
+    """Carry the table row's own provenance onto the room it was joined to.
+
+    Row index + bbox + page dims are pdfplumber-only (the Vision eksplikacija
+    reader computes no geometry), and they are what lets the room check sheet
+    crop the actual row instead of describing it.
+
+    `eksplikacija_source_page` travels WITH the bbox on purpose. The
+    project-level `eksplikacija_source_page` is Vision's separate guess and can
+    disagree with the deterministic reader that produced this bbox — measured
+    on one corpus project, model 1 vs reader 2. A crop keyed on the top-level
+    number would frame the wrong sheet with a rectangle that still looked
+    plausible, which is the failure mode the 2026-05 browser-side highlight had
+    and the reason the crop moved server-side at all.
+
+    Lifted out of `extract_interior` 2026-09-04 so this is unit-testable
+    without a paid Vision run. Statement-for-statement the same work.
+    """
+    room["eksplikacija_row_idx"] = eks_row.get("row_idx")
+    for key in ("eksplikacija_row_bbox", "eksplikacija_page_width_pdf",
+                "eksplikacija_page_height_pdf"):
+        if eks_row.get(key):
+            room[key] = eks_row[key]
+    page = eks_row.get("page") or (eks or {}).get("eksplikacija_source_page")
+    if page:
+        room["eksplikacija_source_page"] = page
+
+
+def _apply_schedule_match(elem: dict, matched: dict) -> None:
+    """Overwrite an opening's dimensions with the žiniaraštis row that matched.
+
+    The page rides along (2026-09-04): the check sheet says „matmenys — iš
+    žiniaraščio, psl. N", and `_schedule_id` alone would force a second lookup
+    into `_eksplikacija.schedule_tables` that a saved blob may no longer be
+    able to answer.
+    """
+    elem["plotis_mm"] = matched["plotis_mm"]
+    elem["aukstis_mm"] = matched["aukstis_mm"]
+    elem["_schedule_anchored"] = True
+    elem["_schedule_id"] = matched.get("id")
+    if matched.get("page"):
+        elem["_schedule_page"] = matched["page"]
+
+
 def _elementai_to_counts(elementai: list) -> dict:
     """Translate Vision-emitted elementai[] into the n_doors/n_windows/area
     fields that calc_room_quantities expects.
@@ -1369,6 +1413,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "eksplikacija_row_bbox",
             "eksplikacija_page_width_pdf",
             "eksplikacija_page_height_pdf",
+            "eksplikacija_source_page",
             "_zoom", "_zoom_changes",
             # Per-room calculator overrides (Phase-3 calculator scope fixes,
             # 2026-05-31). These are sourced from contractor truth files or
@@ -4836,16 +4881,7 @@ def extract_interior(
                     room["plotas_saltinis"] = "eksplikacija"
                 if eks_row.get("perimetras_m"):
                     room["perimetras_m"] = eks_row["perimetras_m"]
-                room["eksplikacija_row_idx"] = eks_row.get("row_idx")
-                # Per-row bbox + page dims (pdfplumber only; Vision pre-pass
-                # doesn't compute these). Frontend uses them to overlay a
-                # highlight on the eksplikacija page when this room is focused.
-                if eks_row.get("eksplikacija_row_bbox"):
-                    room["eksplikacija_row_bbox"] = eks_row["eksplikacija_row_bbox"]
-                if eks_row.get("eksplikacija_page_width_pdf"):
-                    room["eksplikacija_page_width_pdf"] = eks_row["eksplikacija_page_width_pdf"]
-                if eks_row.get("eksplikacija_page_height_pdf"):
-                    room["eksplikacija_page_height_pdf"] = eks_row["eksplikacija_page_height_pdf"]
+                _stamp_eksplikacija_evidence(room, eks_row, eks)
                 merged_count += 1
         parsed.setdefault("_meta", {})["eksplikacija_merged_rooms"] = merged_count
         parsed["_meta"]["eksplikacija_total_rows"] = len(eks.get("patalpos", []))
@@ -4922,19 +4958,13 @@ def extract_interior(
                     room_langai_total += count
                     matched = _match(ew, eh, sched_langai)
                     if matched:
-                        elem["plotis_mm"] = matched["plotis_mm"]
-                        elem["aukstis_mm"] = matched["aukstis_mm"]
-                        elem["_schedule_anchored"] = True
-                        elem["_schedule_id"] = matched.get("id")
+                        _apply_schedule_match(elem, matched)
                         anchored_count += 1
                 elif tipas in ("duris", "pasleptos_duris"):
                     room_durys_total += count
                     matched = _match(ew, eh, sched_durys)
                     if matched:
-                        elem["plotis_mm"] = matched["plotis_mm"]
-                        elem["aukstis_mm"] = matched["aukstis_mm"]
-                        elem["_schedule_anchored"] = True
-                        elem["_schedule_id"] = matched.get("id")
+                        _apply_schedule_match(elem, matched)
                         anchored_count += 1
 
         sched_langai_total = sum((s.get("kiekis") or 1) for s in sched_langai)

@@ -452,6 +452,17 @@ def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
         room["sienu_apdailos_breakdown"] = {dazymas_share, plyteles_share, ...}
         room["plyteliu_aukstis_m"] = number | None  (only if not already set)
         room["_apdailos_pastabos"] = str
+        room["_apdailos_page"]  = int | None   — the sheet this room's finish
+        room["_apdailos_pages"] = list[int]      was read from
+
+    The two page fields exist for the room check sheet (2026-09-04): the
+    contractor is shown the finish next to a crop of the drawing it came from,
+    and until now the only record of WHICH drawing was project-level
+    (`_meta.apdailos_page`). A multi-sheet read therefore could not say which
+    of its pages answered a given room. It still cannot — the reader returns
+    one flat room list for the whole call — so both are recorded: `page` is
+    the first sheet sent, `pages` is every sheet in that call, and a renderer
+    that wants to be honest offers the first and lists the rest.
     """
     # "partial" = the body was truncated and only some rooms survived. Merging
     # them is right — the rooms that did NOT arrive simply keep no breakdown,
@@ -460,11 +471,17 @@ def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
     if apdailos_result.get("status") not in ("ok", "partial"):
         return 0
     by_nr = {str(p.get("nr")): p for p in (apdailos_result.get("patalpos") or [])}
+    src_page = apdailos_result.get("page")
+    src_pages = [p for p in (apdailos_result.get("pages") or []) if p]
     n = 0
     for room in rooms:
         p = by_nr.get(str(room.get("nr")))
         if not p:
             continue
+        if src_page:
+            room["_apdailos_page"] = src_page
+        if src_pages:
+            room["_apdailos_pages"] = list(src_pages)
         breakdown = p.get("sienu_apdaila")
         if breakdown:
             room["sienu_apdailos_breakdown"] = breakdown
