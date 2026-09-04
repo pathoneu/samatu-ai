@@ -255,6 +255,29 @@ export function findRowForQuantity(rows, quantity) {
   return (rows || []).find((r) => r && (r.id || r._id) === id) || null;
 }
 
+/**
+ * The id `lib/quantityOverride.js` matches on — which is NOT the ledger id.
+ * That module predates stable row ids and still keys on `_id` else
+ * `eil_nr-aprasymas`; real blobs carry `id` and no `_id`, so handing it a
+ * `row_id` matches nothing and returns the rows unchanged — a silent no-op
+ * that looks exactly like a saved edit. Translate deliberately instead.
+ */
+export function legacyRowKey(row) {
+  if (!row) return null;
+  return row._id || `${row.eil_nr}-${row.aprasymas}`;
+}
+
+/**
+ * `updatePositionQuantity` rewrites EVERY row whose legacy key matches, so an
+ * override is only safe when the key picks out one row. Two rows sharing an
+ * eilės nr and a label would both be overwritten from one click.
+ */
+export function legacyKeyIsUnique(rows, row) {
+  const key = legacyRowKey(row);
+  if (key == null) return false;
+  return (rows || []).filter((r) => legacyRowKey(r) === key).length === 1;
+}
+
 // ── The ripple ──────────────────────────────────────────────────────────────
 
 function qtyOf(value) {

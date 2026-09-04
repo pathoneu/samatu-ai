@@ -6,7 +6,8 @@ import {
   FACT_ORDER, canOverrideWholeRow, cornersFromPolygon, estimateMinutes,
   factNeedsInput, factTone, findRowForQuantity, hasCornerTerms, isRoomVerified,
   isWholeSheet, orderFacts, prefillValue, progressSummary, rippleText,
-  roomIndex, roomTitle, roomsInDrawingOrder, summarizeRipple, termRows,
+  legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
+  summarizeRipple, termRows,
 } from './roomSheet.js';
 
 const SAMPLE = JSON.parse(
@@ -246,6 +247,27 @@ test('an unknown row id is not overridable', () => {
   assert.equal(canOverrideWholeRow({}, ROWS, '202'), false);
   assert.equal(findRowForQuantity(ROWS, { row_id: 'bbbb33334444' }).id, 'bbbb33334444');
   assert.equal(findRowForQuantity(ROWS, {}), null);
+});
+
+// The ledger id and the id quantityOverride.js matches on are NOT the same.
+// Real blobs carry `id` and no `_id`, so handing it a row_id updates nothing
+// and looks identical to a saved edit.
+test('the legacy override key is eil_nr-aprasymas, not the ledger id', () => {
+  assert.equal(legacyRowKey({ id: 'abc123', eil_nr: 4, aprasymas: 'Dažymo kampų montavimas' }),
+    '4-Dažymo kampų montavimas');
+  assert.equal(legacyRowKey({ _id: 'rnk-9', eil_nr: 4, aprasymas: 'X' }), 'rnk-9');
+  assert.equal(legacyRowKey(null), null);
+});
+
+test('an override is refused when the legacy key would hit two rows', () => {
+  const twins = [
+    { id: 'a', eil_nr: 7, aprasymas: 'Glaistymas' },
+    { id: 'b', eil_nr: 7, aprasymas: 'Glaistymas' },
+    { id: 'c', eil_nr: 8, aprasymas: 'Dažymas' },
+  ];
+  assert.equal(legacyKeyIsUnique(twins, twins[0]), false);
+  assert.equal(legacyKeyIsUnique(twins, twins[2]), true);
+  assert.equal(legacyKeyIsUnique(twins, null), false);
 });
 
 // ── The ripple ──────────────────────────────────────────────────────────────
