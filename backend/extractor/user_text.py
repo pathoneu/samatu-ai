@@ -97,6 +97,11 @@ PROSE_KEYS = frozenset({
     # reader/check notes that older engines wrote in dev-speak ("Low confidence",
     # "Re-extract'ink … Vision prompt'as", "Sprint 4 Block B")
     "hint", "_apdailos_pastabos", "_pastabos",
+    # The room check sheet (2026-09-04): the six per-fact source sentences and
+    # the per-quantity formula line. Generated fresh on every request, so this
+    # is belt-and-braces — but they are the most-read prose in the product and
+    # the guard must own them too.
+    "sentence", "formula",
 })
 # NOT prose: `pavadinimas`, `pastabos` (project notes), page titles, file names —
 # those are the user's OWN document content (their drawing's title block may
