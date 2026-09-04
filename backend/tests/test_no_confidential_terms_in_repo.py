@@ -18,16 +18,25 @@ checkout that has no list to check against; it is not a pass. Run it on a
 machine that has the file (every dev machine does) before trusting a clean tree.
 
 Matching is deliberately generous, because the leaks that survive a naive
-`git grep` are the ones spelled differently:
+`git grep` are the ones spelled differently. Using a stand-in term to show the
+three shapes (never a real one — that is the whole point):
 
-  * case-insensitive               — `BERZAS`, `Berzas`, `berzas`
-  * diacritics-insensitive         — a term written without Lithuanian
-                                     diacritics still catches the diacritic
-                                     spelling (`berz` finds `berž`)
-  * homoglyph/transliteration-safe — 16 occurrences of the project name were
-                                     found spelled with Cyrillic р and ж inside
-                                     otherwise-Latin words, which every plain
-                                     grep for the name walked straight past.
+  * case-insensitive               — `ĄŽUOLAS`, `Ąžuolas`, `ąžuolas` all match
+                                     the one entry. `grep -i` does NOT do this
+                                     for multi-byte Lithuanian letters, which
+                                     is how an uppercase spelling survived the
+                                     mechanical cleanup that preceded this test.
+  * diacritics-insensitive         — an entry written in plain ascii still
+                                     catches the diacritic spelling
+                                     (`azuol` finds `ąžuol`)
+  * homoglyph/transliteration-safe — 16 occurrences of one project name were
+                                     found spelled with Cyrillic letters inside
+                                     otherwise-Latin words: visually identical,
+                                     and invisible to every plain grep anyone
+                                     had run for that name.
+
+Scope is `git ls-files`, so a file is checked only once it is TRACKED. A new
+file you have not staged yet is invisible to this test — stage it, then re-run.
 """
 
 from __future__ import annotations
