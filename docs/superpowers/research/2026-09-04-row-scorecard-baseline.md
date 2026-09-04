@@ -204,3 +204,17 @@ within ±10 %) must be claimed on `sernu`, not on the mean.
 - **`missing: app row has no quantity (checklist — „suveskite patys")`** is the
   other big block: rows we do emit, under his family, with no number. Those are
   exactly the rows the plan wants editable in place.
+
+## Addendum — € weighting (2026-09-04, director)
+
+All six sąmatas carry four price columns; the priced parse is generated locally into the gitignored `ground_truth/<slug>/contractor_samata_priced.json` and the harness prefers it when present. **Live engine**, share of the contractor's row totals (€) reproduced within ±10 %, next to the row-count share:
+
+| project | rows ±10 % | € ±10 % |
+|---|---:|---:|
+| objektas_a | 37.7 % | 32.4 % |
+| objektas_b | 9.9 % | 21.0 % |
+| objektas_c | 22.2 % | 49.1 % |
+| objektas_d | 36.0 % | 54.7 % |
+| **corpus mean** | **26.5 %** | **39.3 %** |
+
+Frozen extracts: 19.4 % of rows / 13.4 % of €. Reading: on the live engine the expensive families (paint, GKP, tiles) land closer than the cheap, numerous ones, so by money we reproduce ~40 % of his sąmata today; the missing/way-off tail is many small rows plus a few large misses per project. The € column is the founder's number from here on; the row count stays as the coverage signal.
