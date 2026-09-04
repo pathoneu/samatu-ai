@@ -184,6 +184,30 @@ def _app_qty(row: dict) -> float | None:
         return None
 
 
+def row_eur(item: dict) -> float | None:
+    """The contractor's row total in € — `prices.darbu_viso + medziagu_viso`
+    from the (gitignored, never tracked) priced parse; falls back to
+    quantity × (darbu_vnt + medziagu_vnt). None when the row carries no prices,
+    so a count-weighted scorecard stays possible on the tracked, price-free
+    files."""
+    pr = item.get("prices") if isinstance(item, dict) else None
+    if not isinstance(pr, dict):
+        return None
+    def _f(v):
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+    viso = [x for x in (_f(pr.get("darbu_viso")), _f(pr.get("medziagu_viso"))) if x is not None]
+    if viso:
+        return round(sum(viso), 2)
+    q = _truth_qty(item)
+    vnt = [x for x in (_f(pr.get("darbu_vnt")), _f(pr.get("medziagu_vnt"))) if x is not None]
+    if q is not None and vnt:
+        return round(q * sum(vnt), 2)
+    return None
+
+
 def _truth_qty(item: dict) -> float | None:
     q = item.get("quantity")
     if q is None or isinstance(q, bool):
@@ -210,6 +234,7 @@ class RowVerdict:
     reason: str | None              # why it is `missing` / `no_truth_qty`
     split_family: bool              # he bills this family on several rows
     app_labels: tuple[str, ...]     # the app row(s) behind app_quantity
+    eur: float | None = None        # HIS row total € (darbai + medžiagos) when the priced parse is used
 
 
 @dataclass(frozen=True)
@@ -257,6 +282,22 @@ class Scorecard:
         return n / self.n_scored * 100
 
     @property
+    def eur_scored_total(self) -> float | None:
+        """Σ of his row totals (€) over scorable rows that carry prices."""
+        vals = [r.eur for r in self.rows if r.bucket in SCORED_BUCKETS and r.eur is not None]
+        return round(sum(vals), 2) if vals else None
+
+    @property
+    def eur_within_10_share(self) -> float | None:
+        """Share of his MONEY (row totals) we reproduce within ±10 % — the
+        founder's number. None when the price-free parse was used."""
+        total = self.eur_scored_total
+        if not total:
+            return None
+        hit = sum(r.eur for r in self.rows if r.bucket == "within_10" and r.eur is not None)
+        return hit / total * 100
+
+    @property
     def families_scored(self) -> int:
         return sum(1 for c in self.concepts
                    if c.bucket in ("within_10", "within_25", "way_off"))
@@ -275,6 +316,9 @@ class Scorecard:
             "within_25_share": (None if self.within_25_share is None
                                 else round(self.within_25_share, 2)),
             "granularity_rows": self.granularity_rows,
+            "eur_scored_total": self.eur_scored_total,
+            "eur_within_10_share": (None if self.eur_within_10_share is None
+                                    else round(self.eur_within_10_share, 2)),
             "families_scored": self.families_scored,
             "families_within_10": self.families_within_10,
             "n_app_extra": len(self.app_extra),
@@ -473,6 +517,7 @@ def score_rows(contractor_items: Sequence[dict],
             bucket=bucket, app_quantity=ours_q, pct_error=pct, reason=reason,
             split_family=bool(key and by_key[key].n_contractor_rows > 1),
             app_labels=labels,
+            eur=row_eur(it),
         ))
 
     # ── Our rows nobody bills: unmatched, or matched to an absent family. ────

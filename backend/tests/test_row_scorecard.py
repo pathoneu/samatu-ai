@@ -341,3 +341,29 @@ def test_the_frozen_concept_table_loads_and_is_frozen():
         "mapping change and re-baseline before updating this number")
     assert len({c.key for c in concepts}) == len(concepts), "duplicate key"
     assert load_concepts() is concepts, "load_concepts must cache"
+
+
+# ── € weighting (2026-09-04): his money, not his row count ───────────────────
+def test_row_eur_reads_row_totals_then_unit_prices():
+    from extractor.row_scorecard import row_eur
+    assert row_eur({"prices": {"darbu_viso": 100.0, "medziagu_viso": 50.5}}) == 150.5
+    assert row_eur({"quantity": 10, "prices": {"darbu_vnt": 2.0, "medziagu_vnt": 1.0}}) == 30.0
+    assert row_eur({"quantity": 10}) is None
+    assert row_eur({"quantity": 10, "prices": {"darbu_vnt": "x"}}) is None
+
+
+def test_eur_share_weights_by_money_and_is_none_without_prices():
+    from extractor.row_scorecard import RowVerdict, Scorecard
+    def v(bucket, eur):
+        return RowVerdict(nr=None, name="x", section=None, unit="m2", quantity=1.0, concept="k",
+                          bucket=bucket, app_quantity=1.0, pct_error=0.0, reason=None,
+                          split_family=False, app_labels=(), eur=eur)
+    rows = [v("within_10", 1000.0), v("way_off", 50.0), v("within_25", 25.0)]
+    sc = Scorecard(n_rows=3, n_scored=3, buckets={"within_10": 1, "within_25": 1, "way_off": 1, "missing": 0, "unmapped": 0},
+                   rows=rows, concepts=[], app_extra=[], unmapped_families=[])
+    assert sc.eur_scored_total == 1075.0
+    assert abs(sc.eur_within_10_share - 1000 / 1075 * 100) < 1e-9   # by count it would be 33 %
+    assert sc.as_dict()["eur_within_10_share"] == round(1000 / 1075 * 100, 2)
+    bare = Scorecard(n_rows=3, n_scored=3, buckets=sc.buckets,
+                     rows=[v(r.bucket, None) for r in rows], concepts=[], app_extra=[], unmapped_families=[])
+    assert bare.eur_within_10_share is None and bare.eur_scored_total is None

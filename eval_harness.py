@@ -1717,7 +1717,12 @@ ROW_SCORECARD_HOLDOUT = "sernu"
 
 
 def _contractor_samata(slug: str) -> list[dict] | None:
-    path = GROUND_TRUTH_ROOT / slug / "contractor_samata_parsed.json"
+    # The PRICED parse (gitignored — his unit prices never enter the repo) wins
+    # when present: same rows, plus `prices`, which turns the count-weighted
+    # scorecard into a €-weighted one. The tracked price-free file is the
+    # fallback, so the metric always exists.
+    priced = GROUND_TRUTH_ROOT / slug / "contractor_samata_priced.json"
+    path = priced if priced.exists() else GROUND_TRUTH_ROOT / slug / "contractor_samata_parsed.json"
     if not path.exists():
         return None
     return (json.loads(path.read_text(encoding="utf-8")).get("line_items")
@@ -1758,8 +1763,10 @@ def _rows_for_slug(slug: str, *, recompute: bool):
 
 def _rows_row(slug: str, sc, note: str = "") -> str:
     b = sc.buckets
+    eur = sc.eur_within_10_share
+    eur_s = f"{eur:>7.1f}%" if eur is not None else f"{'—':>8}"
     return (f"  {slug:<14} {sc.n_scored:>5} "
-            f"{sc.within_10_share:>8.1f}% {b['within_25']:>8} {b['way_off']:>8} "
+            f"{sc.within_10_share:>8.1f}% {eur_s} {b['within_25']:>8} {b['way_off']:>8} "
             f"{b['missing']:>8} {b['unmapped']:>9}  {note}")
 
 
@@ -1775,22 +1782,25 @@ def _print_rows_block(scored: list[tuple[str, Any]],
         return
     print(f"\n  Rangovo eilutės — kiek JO eilučių atkartojame "
           f"({'live' if recomputed else 'FROZEN'} engine)")
-    print(f"  {'Project':<14} {'rows':>5} {'within10':>9} {'within25':>8} "
+    print(f"  {'Project':<14} {'rows':>5} {'within10':>9} {'€±10':>8} {'within25':>8} "
           f"{'way_off':>8} {'missing':>8} {'unmapped':>9}")
-    print("  " + "─" * 71)
+    print("  " + "─" * 80)
     for slug, sc in scored:
         print(_rows_row(slug, sc))
     for slug, sc, note in extra:
         if sc is None:
-            print(f"  {slug:<14} {'—':>5} {'—':>9} {'—':>8} {'—':>8} "
+            print(f"  {slug:<14} {'—':>5} {'—':>9} {'—':>8} {'—':>8} {'—':>8} "
                   f"{'—':>8} {'—':>9}  {note}")
         else:
             print(_rows_row(slug, sc, note))
-    print("  " + "─" * 71)
+    print("  " + "─" * 80)
     if scored:
         mean = sum(sc.within_10_share for _, sc in scored) / len(scored)
-        print(f"  {'Corpus mean':<14} {'':>5} {mean:>8.1f}%   "
-              f"(n={len(scored)} projects; {ROW_SCORECARD_HOLDOUT} held out)")
+        eurs = [sc.eur_within_10_share for _, sc in scored if sc.eur_within_10_share is not None]
+        eur_mean = f"{sum(eurs) / len(eurs):>7.1f}%" if len(eurs) == len(scored) else f"{'—':>8}"
+        print(f"  {'Corpus mean':<14} {'':>5} {mean:>8.1f}% {eur_mean}   "
+              f"(n={len(scored)} projects; {ROW_SCORECARD_HOLDOUT} held out; "
+              f"€ column needs the priced parse — gitignored, present on {len(eurs)}/{len(scored)})")
     gran = sum(sc.granularity_rows for _, sc in scored)
     if gran:
         print(f"\n  · {gran} row(s) are `missing` only because he bills the "
