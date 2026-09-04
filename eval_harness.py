@@ -1406,6 +1406,11 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
 
     per_project_summary: list[dict] = []
     all_pct_errors: list[float] = []
+    # Row scorecard, collected alongside the headline metrics off the SAME
+    # `parsed` dicts (read-only) so both numbers describe one engine and the
+    # recompute is not paid for twice.
+    rows_scored: list[tuple[str, Any]] = []
+    rows_excluded: list[tuple[str, Any, str]] = []
 
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only"
@@ -1531,6 +1536,36 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         for r in scored:
             all_pct_errors.append(abs(r.pct_error))
 
+        # Read-only second instrument on the same `parsed`. It cannot move the
+        # headline numbers above (already computed) and it never rebuilds rows.
+        sc = _score_rows_of(parsed, slug)
+        if sc is not None:
+            per_project_summary[-1]["row_scorecard"] = sc.as_dict()
+            if slug != ROW_SCORECARD_HOLDOUT:
+                rows_scored.append((slug, sc))
+            else:
+                rows_excluded.append((slug, sc, "HOLDOUT"))
+
+    # Projects the headline table skipped: named with their reason (outside the
+    # mean) so a registry exclusion never silently hides a whole sąmata.
+    # Not re-scored here — `--rows` does that; this block must not add a second
+    # recompute pass to the default run.
+    _EXCL_NOTE = {
+        "excluded_scope_mismatch": "registry: scope mismatch — see --rows",
+        "excluded_blocked": "registry: blocked",
+        "excluded_partial_input": "registry: partial input",
+        "excluded_ablation": "ablation",
+        "missing_truth": "no truth",
+        "no_ai_side": "no extract",
+    }
+    for s in per_project_summary:
+        if s.get("status") == "ok" or _contractor_samata(s["slug"]) is None:
+            continue
+        note = _EXCL_NOTE.get(s["status"], s["status"])
+        if s["slug"] == ROW_SCORECARD_HOLDOUT:
+            note = f"HOLDOUT — {note}"
+        rows_excluded.append((s["slug"], None, note))
+
     overall_mae = (sum(all_pct_errors) / len(all_pct_errors)
                    if all_pct_errors else None)
     baseline = {
@@ -1538,6 +1573,11 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         "registry": str(registry_path.relative_to(REPO_ROOT)),
         "overall_mae_pct": round(overall_mae, 3) if overall_mae is not None else None,
         "n_metric_observations": len(all_pct_errors),
+        # The contractor-facing number, alongside (never instead of) the MAE.
+        "rows_within_10_share_mean": (
+            round(sum(sc.within_10_share for _, sc in rows_scored)
+                  / len(rows_scored), 2) if rows_scored else None),
+        "rows_holdout": ROW_SCORECARD_HOLDOUT,
         "projects": per_project_summary,
     }
     out_json = run_dir / "baseline_multi.json"
@@ -1557,10 +1597,12 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
               f"(n={len(all_pct_errors)} metric observations)")
         _print_collapsed_footnote(per_project_summary)
+        _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
         print(f"  Saved → {out_json}")
     else:
         _print_summary_table(per_project_summary, overall_mae)
         _print_collapsed_footnote(per_project_summary)
+        _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
         print(f"  Saved → {out_json}")
 
     # Exit 1 only if at least one OK project broke the 2.0% per-project cap.
@@ -1662,6 +1704,169 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     parsed = vc._recompute_santrauka(parsed)
     parsed = vc._build_pozicijos_from_rooms(parsed)
     return parsed
+
+
+# ── Row-level scorecard (2026-09-04) ──────────────────────────────────────────
+# The headline table above scores ~22 aggregated metrics. The contractor judges
+# every billed row in HIS vocabulary. `backend/extractor/row_scorecard.py` is
+# that second instrument; everything here is presentation + which projects count.
+#
+# `sernu` is the HOLDOUT: its sąmata is parsed but never averaged in, so the
+# four-week target can be claimed on a project the work was not tuned against.
+ROW_SCORECARD_HOLDOUT = "sernu"
+
+
+def _contractor_samata(slug: str) -> list[dict] | None:
+    path = GROUND_TRUTH_ROOT / slug / "contractor_samata_parsed.json"
+    if not path.exists():
+        return None
+    return (json.loads(path.read_text(encoding="utf-8")).get("line_items")
+            or [])
+
+
+def _score_rows_of(parsed: dict, slug: str):
+    """Score one already-built extract. READ-ONLY over `parsed` — it must never
+    rebuild pozicijos, or the headline metrics scored from the same dict could
+    move. Returns a `Scorecard`, or None when either side is unavailable."""
+    items = _contractor_samata(slug)
+    if not items:
+        return None
+    app_rows = parsed.get("pozicijos") or parsed.get("darbu_sarasas") or []
+    if not app_rows:
+        return None
+    from extractor.row_scorecard import score_rows
+    return score_rows(items, app_rows)
+
+
+def _rows_for_slug(slug: str, *, recompute: bool):
+    """Load `ground_truth/<slug>/ai_extract.json` and score it through the SAME
+    recompute path the headline table uses, so both numbers describe one engine.
+
+    Returns (scorecard, status) where status is None on success or a short
+    reason string ('no extract', 'no sąmata', 'no rows')."""
+    if _contractor_samata(slug) is None:
+        return None, "no sąmata"
+    extract = GROUND_TRUTH_ROOT / slug / "ai_extract.json"
+    if not extract.exists():
+        return None, "no extract"
+    parsed = run_pipeline_replay(extract)
+    if recompute:
+        parsed = _rerun_deterministic_tail(parsed, slug)
+    sc = _score_rows_of(parsed, slug)
+    return (sc, None) if sc is not None else (None, "no rows")
+
+
+def _rows_row(slug: str, sc, note: str = "") -> str:
+    b = sc.buckets
+    return (f"  {slug:<14} {sc.n_scored:>5} "
+            f"{sc.within_10_share:>8.1f}% {b['within_25']:>8} {b['way_off']:>8} "
+            f"{b['missing']:>8} {b['unmapped']:>9}  {note}")
+
+
+def _print_rows_block(scored: list[tuple[str, Any]],
+                      extra: list[tuple[str, Any, str]],
+                      *, recomputed: bool) -> None:
+    """Compact per-project row scorecard + the corpus mean of the ±10 % share.
+
+    `scored` — (slug, Scorecard) pairs that COUNT toward the mean.
+    `extra`  — (slug, Scorecard|None, note) reported but never averaged.
+    """
+    if not scored and not extra:
+        return
+    print(f"\n  Rangovo eilutės — kiek JO eilučių atkartojame "
+          f"({'live' if recomputed else 'FROZEN'} engine)")
+    print(f"  {'Project':<14} {'rows':>5} {'within10':>9} {'within25':>8} "
+          f"{'way_off':>8} {'missing':>8} {'unmapped':>9}")
+    print("  " + "─" * 71)
+    for slug, sc in scored:
+        print(_rows_row(slug, sc))
+    for slug, sc, note in extra:
+        if sc is None:
+            print(f"  {slug:<14} {'—':>5} {'—':>9} {'—':>8} {'—':>8} "
+                  f"{'—':>8} {'—':>9}  {note}")
+        else:
+            print(_rows_row(slug, sc, note))
+    print("  " + "─" * 71)
+    if scored:
+        mean = sum(sc.within_10_share for _, sc in scored) / len(scored)
+        print(f"  {'Corpus mean':<14} {'':>5} {mean:>8.1f}%   "
+              f"(n={len(scored)} projects; {ROW_SCORECARD_HOLDOUT} held out)")
+    gran = sum(sc.granularity_rows for _, sc in scored)
+    if gran:
+        print(f"\n  · {gran} row(s) are `missing` only because he bills the "
+              f"family on more rows than we emit —\n    the family total is "
+              f"scored separately (see --rows for the per-family view).")
+
+
+def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
+                       detailed: bool = False) -> int:
+    """`--rows`: score every cached extract against the contractor's own sąmata,
+    row by row, through the frozen concept table. Zero API spend.
+
+    This is the contractor-facing accuracy number. The headline MAE says how
+    close ~22 aggregated totals are; this says how many of the rows he actually
+    bills he could find in our list with a number he can accept.
+    """
+    import yaml
+
+    reg = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    scored: list[tuple[str, Any]] = []
+    extra: list[tuple[str, Any, str]] = []
+    details: list[tuple[str, Any]] = []
+    for entry in reg.get("projects") or []:
+        slug = entry["slug"]
+        if _contractor_samata(slug) is None:
+            continue
+        if recompute and (GROUND_TRUTH_ROOT / slug / "ai_extract.json").exists():
+            print(f"  ↻ {slug}: recomputing deterministic tail")
+        sc, status = _rows_for_slug(slug, recompute=recompute)
+        if sc is None:
+            extra.append((slug, None, status or "no rows"))
+            continue
+        details.append((slug, sc))
+        note = ""
+        if slug == ROW_SCORECARD_HOLDOUT:
+            note = "HOLDOUT — never in the mean"
+        elif entry.get("scope_mismatch"):
+            note = "registry: scope mismatch — not in the mean"
+        elif entry.get("blocked_for_vision_extraction") or entry.get(
+                "blocked_partial_input") or entry.get("ablation_of"):
+            note = "registry-excluded — not in the mean"
+        (extra.append((slug, sc, note)) if note else scored.append((slug, sc)))
+
+    _print_rows_block(scored, extra, recomputed=recompute)
+
+    # The coverage gap: his families no concept covers. This list — not a
+    # better reader — is the input for the family-template work.
+    unmapped: dict[str, list[str]] = {}
+    for slug, sc in details:
+        for name in sc.unmapped_families:
+            unmapped.setdefault(name, []).append(slug)
+    if unmapped:
+        print(f"\n  UNMAPPED — jo eilutės, kurių koncepto lentelė nepažįsta "
+              f"({len(unmapped)} šeimos):")
+        for name in sorted(unmapped, key=lambda n: (-len(unmapped[n]), n)):
+            print(f"      {name[:66]:<66} {', '.join(sorted(unmapped[name]))}")
+
+    if detailed:
+        for slug, sc in details:
+            print(f"\n  {'=' * 92}\n  {slug} — {sc.n_rows} eilutės "
+                  f"({sc.n_scored} vertinamos)\n  {'=' * 92}")
+            print(f"  {'nr':>4}  {'rangovo eilutė':<44} {'vnt':<7} "
+                  f"{'jo':>9} {'mūsų':>9} {'Δ':>9}  bucket / kodėl")
+            for r in sc.rows:
+                pct = "—" if r.pct_error is None else f"{r.pct_error:+.1f}%"
+                ours = "—" if r.app_quantity is None else f"{r.app_quantity:g}"
+                why = r.bucket if r.pct_error is not None else (
+                    f"{r.bucket}: {r.reason or ''}")
+                print(f"  {str(r.nr or ''):>4}  {r.name[:44]:<44} "
+                      f"{str(r.unit or ''):<7} "
+                      f"{('—' if r.quantity is None else f'{r.quantity:g}'):>9} "
+                      f"{ours:>9} {pct:>9}  {why[:46]}")
+            print(f"    · šeimų sutapimas (Σ vs Σ, granuliaciją ignoruojant): "
+                  f"{sc.families_within_10}/{sc.families_scored} ±10 %")
+            print(f"    · mūsų eilutės be jo atitikmens: {len(sc.app_extra)}")
+    return 0
 
 
 def _print_registry_exclusion_banner(slug: str | None) -> None:
@@ -1804,6 +2009,13 @@ def main() -> int:
                      help="multi-project mode: iterate ground_truth/registry.yaml, "
                           "diff AI totals (cached or use-gt-inputs) against each "
                           "project's gt_totals; emit baseline_multi.json")
+    grp.add_argument("--rows", action="store_true",
+                     help="row-level scorecard: score every cached extract "
+                          "against the contractor's own parsed sąmata through "
+                          "the FROZEN concept table — how many of HIS billed "
+                          "rows we reproduce within ±10 %%. Zero API spend. "
+                          "Combine with --recompute for the live engine and "
+                          "--detailed for the per-row table.")
     grp.add_argument("--rescore", metavar="RUN_DIR_OR_PARSED_JSON",
                      help="offline re-score a saved run's parsed.json against "
                           "the CURRENT truth mappings — zero API calls. Writes "
@@ -1912,6 +2124,13 @@ def main() -> int:
 
     if args.debug_project:
         return run_debug_project(args.debug_project)
+
+    if args.rows:
+        return run_rows_scorecard(
+            GROUND_TRUTH_ROOT / "registry.yaml",
+            recompute=args.recompute,
+            detailed=args.detailed,
+        )
 
     if args.rescore:
         return run_rescore(args.rescore, args.project, recompute=args.recompute)
