@@ -116,9 +116,14 @@ G's two former „hits" were lucky pairings and now read honestly (+200 % /
 +100 % — the phantom bathroom). In-sample unchanged. Full report:
 `research/2026-09-04-row-scorecard-baseline.md`, mapping-change addendum.
 
-Fallout found on the way (engine, next): Rotband is derived from the PAINTED
-wall, so item 1 pulled it down (H −34 % → −44 %) — levelling goes under tile
-too; the tile-skirting rule counts a fraction of the tiled rooms (G −69 %;
+Fallout found on the way (engine, next): Rotband is 30 % of the PAINTED wall
+(a constant calibrated on objektas_a's sąmata in June — the kind of number the
+founder's rule now forbids). Tried and reverted the same day: basing it on all
+finished walls incl. tiled zones (a −8 %, b +15 %, d +5 %, H −34 %, c +124 %)
+— gypsum levelling belongs under paint, not under wet-room tile, and H's gap
+is the SHARE (a brick house with few GKP partitions levels ~46 % of its
+walls, not 30 %): readable from the pertvarų planas (which walls are new
+GKP), so it goes to item 3, and as a choice to item 4; the tile-skirting rule counts a fraction of the tiled rooms (G −69 %;
 the architect's sheet says 24,97 m); hole drilling over-generates (G +84 %);
 hidroizoliacija is emitted in vnt, his row is m².
 
