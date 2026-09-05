@@ -13,13 +13,14 @@ Bug map:
   2. calc_room_quantities drops door_area_m2 (and window_area_m2) from its
      output → the Vision-measured per-opening area is lost on recompute and
      re-defaults to 1.85 / 1.80 m².
-  3. legacy (no-apdailos) path deducts tile area from paint before the paint
-     factor — over-subtracts vs the glaistymas-under-tile contractor convention
+  3. legacy (no-apdailos) path and the tiled band — REVERSED 2026-09-05: the
+     band now leaves the paint base in every branch (see test_bug3_*)
      used by the apdailos path and the reference calculator.
   4. iki/virš-3m paint split is done by ROOM height only, so a <3m room's
      explicitly-above-3m surfaces (extra_walls_virs_3m_m2, high_ceiling_area_m2)
      land in the iki-3m line instead of virš-3m.
 """
+import pytest
 from extractor.universal_rules import calc_room_quantities
 from extractor.vision_call import _build_pozicijos_from_rooms
 
@@ -129,26 +130,34 @@ def test_bug1_high_tile_share_unknown_height_does_not_zero_paint():
     )
 
 
-# ── Bug 3: legacy path must NOT deduct tile area from the paint base ──────────
+# ── Bug 3 (REVERSED 2026-09-05): the tiled band leaves the paint base ────────
 
-def test_bug3_legacy_path_does_not_subtract_tile_from_paint():
+def test_bug3_legacy_path_deducts_the_tiled_band_from_paint():
     """A room with NO apdailos breakdown and NO elevation tile area falls into
-    the legacy path. Per the glaistymas-under-tile contractor convention (and
-    the reference calculator), the glaistymas/dažymas base is gross − door
-    deduction; the tiled band is NOT subtracted (it still gets glaistytas
-    underneath). The tile area is billed separately as plyteles_sienos_m2."""
+    the legacy path. The 2026-07-05 version of this test pinned the OPPOSITE
+    („glaistymas under tile", tile band NOT subtracted) — the first blind
+    out-of-sample runs (Objektas G/H, 2026-09-05) showed that convention to
+    be the largest single wall-paint error: the same bathroom wall was billed
+    as tile AND as paint. The išklotinių branch never did that. Now every
+    branch agrees: paint = gross − openings − tiled zone, where the part of
+    the openings that lies inside the band is not subtracted twice."""
     room = {
         "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
         "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0,
         # no sienu_apdailos_breakdown, no _tile_area_from_elevation_m2 → legacy
     }
     out = calc_room_quantities(room)
-    # gross 27.0 − door 1.85 = 25.15 ; tile band (10 × 2.0 = 20 m²) NOT deducted
-    assert out["walls_paintable_m2"] == 25.15
-    # the over-subtracted value (27 − 1.85 − 20 = 5.15) must NOT appear
-    assert out["walls_paintable_m2"] != 5.15
-    # tile is still tracked as its own line item
+    gross, door, band_h = 27.0, 1.85, 2.0          # default vonia band = 2,0 m
+    zone = 10.0 * band_h                            # 20 m² of tile, billed once
+    door_in_band = door * 1.0 * (band_h / 2.1)      # the door sits in the band
+    expected = gross - door - (zone - door_in_band)
+    assert out["walls_paintable_m2"] == pytest.approx(expected, abs=0.02)
+    # …which is the strip above the band, less the sliver of door above it
+    assert out["walls_paintable_m2"] == pytest.approx(10.0 * 0.7 - door * (1 - band_h / 2.1), abs=0.02)
+    assert out["walls_paintable_m2"] < 25.15        # the old double-billed figure
+    # tile is still tracked as its own line item — once
     assert out["plyteles_sienos_m2"] == 20.0
+    assert out["_tile_zone_deducted_m2"] == pytest.approx(zone - door_in_band, abs=0.02)
 
 
 # ── Bug 4: iki/virš-3m paint split must honour per-room above-3m surfaces ─────

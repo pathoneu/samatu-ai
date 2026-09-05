@@ -61,6 +61,7 @@ def _reference_walls_paintable_m2(room: dict) -> float:
     apdaila = room.get("sienu_apdailos_breakdown") or {}
     # Full-tile rooms have walls_paintable = 0
     is_full_tile = False
+    tile_share, tile_h_eff = 0.0, 0.0
     if apdaila:
         tile_share = float(apdaila.get("plyteles_share") or 0)
         tile_h = float(room.get("plyteles_sienos_aukstis_m") or 0)
@@ -86,7 +87,16 @@ def _reference_walls_paintable_m2(room: dict) -> float:
             walls_paint_factor = _paskirtis_walls_paint_factor(
                 (room.get("paskirtis") or "").lower()
             )
-        walls_paintable_base = max(0, walls_gross - doors_deduction) * walls_paint_factor
+        # 2026-09-05: the tiled band leaves the paint base (production:
+        # universal_rules._tile_zone_in_paint_base); the door already taken
+        # out of the base is added back for the part of it inside the band.
+        tile_zone = 0.0
+        if apdaila and tile_share > 0:
+            perim = walls_gross / H if H else 0.0
+            zone = tile_share * perim * tile_h_eff
+            in_band = doors_deduction * min(1.0, tile_share) * min(1.0, tile_h_eff / 2.1)
+            tile_zone = max(0.0, zone - in_band)
+        walls_paintable_base = max(0, walls_gross - doors_deduction - tile_zone) * walls_paint_factor
 
     extra_walls = float(room.get("extra_walls_m2") or 0)
     extra_walls_virs_3m = float(room.get("extra_walls_virs_3m_m2") or 0)

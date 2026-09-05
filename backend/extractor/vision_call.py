@@ -2262,7 +2262,9 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             if surf == "Sienų":
                 full = round(float(r.get("walls_paintable_m2") or 0), 2)
                 virs_r = round(min(vw, full), 2)
-                why = ("Dažoma sienų dalis — likusi dengiama plytelėmis"
+                zone = float(r.get("_tile_zone_deducted_m2") or 0)
+                why = ("Dažoma sienų dalis virš plytelių juostos" if zone > 0
+                       else "Dažoma sienų dalis — likusi dengiama plytelėmis"
                        if 0 < float(r.get("_walls_paint_factor") or 1) < 1
                        else "Sienos dažomos")
                 why_not = _WALLS_OUT_LT.get(

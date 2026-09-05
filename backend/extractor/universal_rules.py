@@ -961,6 +961,44 @@ def elevation_says_no_tile(room: dict) -> bool:
             and int(ev.get("tile_zones_seen") or 0) == 0)
 
 
+# A door is 2,1 m high (0,9 × 2,1 standard, see the door-deduction note in
+# calc_room_quantities). A tile band that reaches this height contains the
+# doors of a tiled wall; a lower band contains the part of them below its top.
+TILE_BAND_DOOR_H_M = 2.1
+
+
+def _tile_zone_in_paint_base(tile_zone_m2: float, band_h_m: float,
+                             tile_share: float, openings_deducted_m2: float) -> float:
+    """How much TILED wall to take out of the glaistymas/dažymas base.
+
+    2026-09-05. Nothing is skimmed or painted behind ceramic tile — the
+    under-tile levelling is its own row (Rotband / tinkas / GKP), so a wall
+    tiled to 2,4 m of a 2,82 m room is painted on the 0,42 m strip above the
+    band, not on its full height. Until now only the išklotinių branch of
+    `calc_room_quantities` knew this (paint = wall − doors − tile); the apdailos
+    and legacy branches kept the band in the paint base under a „glaistymas
+    under tile" convention and billed the same wall twice, as tile AND as
+    paint. Measured out of sample: Objektas G's išklotinės draw „Dažoma sienos
+    dalis" ABOVE the tile band and the contractor's walls-only paint row
+    (239,4 m²) is what we get WITHOUT the tiled zones (≈243 m²); with them we
+    said 309. Objektas H: ≈49 m² of the same double count.
+
+    The paint base has already lost its openings. An opening on a tiled wall
+    lies inside the band (fully, once the band reaches door height; partly
+    below that), so that part is added back here — otherwise the door would be
+    subtracted twice, once as an opening and once inside the tiled zone.
+    `tile_share` is the fraction of the perimeter that is tiled, i.e. the
+    chance the opening sits on a tiled wall.
+    """
+    if tile_zone_m2 <= 0:
+        return 0.0
+    share = max(0.0, min(1.0, float(tile_share or 0)))
+    height_part = (max(0.0, min(1.0, float(band_h_m) / TILE_BAND_DOOR_H_M))
+                   if band_h_m and band_h_m > 0 else 0.0)
+    in_band = max(0.0, float(openings_deducted_m2 or 0)) * share * height_part
+    return max(0.0, float(tile_zone_m2) - in_band)
+
+
 def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
                            wall_area_available_m2: float = 0.0) -> dict:
     """SINGLE SOURCE OF TRUTH for "how much of this room's wall is tiled".
@@ -1252,6 +1290,7 @@ def calc_room_quantities(room: dict,
 
     apdailos = room.get("sienu_apdailos_breakdown") or {}
     molio_tinko_m2 = 0.0  # set in the apdailos branch when molio/kita_danga share > 0
+    tile_zone_deducted = 0.0  # tiled wall taken out of the paint base (2026-09-05)
 
     # ── Wall finish resolution (2026-07-28) ──────────────────────────────
     # Resolve the tile read ONCE, from whatever evidence this room carries,
@@ -1315,6 +1354,7 @@ def calc_room_quantities(room: dict,
         walls_paintable = walls_paintable_gross * walls_paint_factor
         walls_net = walls_paintable
         tile_walls_area = elevation_tile_area
+        tile_zone_deducted = float(elevation_tile_area)
     elif apdailos:
         # `tile_share` / `tile_h_eff` now come from the shared resolver
         # (source = "apdailos"), which applies the same 2026-07-05 audit fix:
@@ -1331,10 +1371,15 @@ def calc_room_quantities(room: dict,
             walls_paintable = 0.0
             walls_paint_factor = 0.0
         else:
-            # Glaistytinos sienos = gross − standardized door deduction.
-            # No window deduct (reveals cancel), no under-tile/tapetai/plokšte
-            # deduct (those still get glaistymas underneath).
-            walls_paintable_gross = wall_area_available
+            # Glaistytinos sienos = gross − standardized door deduction − the
+            # TILED zone. No window deduct (reveals cancel); tapetai / plokštė
+            # shares stay in (they are skimmed underneath). Tile does not —
+            # see `_tile_zone_in_paint_base` (2026-09-05): until then this
+            # branch kept the band in the base and the išklotinių branch above
+            # did not, so the same bathroom wall was billed as tile AND paint.
+            tile_zone_deducted = _tile_zone_in_paint_base(
+                tile_walls_area, tile_h_eff, tile_share, doors_deduction)
+            walls_paintable_gross = max(0.0, wall_area_available - tile_zone_deducted)
             # When an apdailos breakdown is present, the room's walls receive
             # an interior finish (paint OR plokštė OR tapetai OR partial tile),
             # ALL of which require glaistymas underneath per LT convention.
@@ -1429,14 +1474,30 @@ def calc_room_quantities(room: dict,
                     f"prielaida paskirčiai '{paskirtis}'; projekto apdailos "
                     f"duomenų nerasta. Jei sienos dažomos, pažymėkite "
                     f"Prielaidų skydelyje.")
-        # 2026-07-05 audit fix (bug 3): do NOT subtract tile_walls_area from the
-        # glaistymas/dažymas base. Walls under a partial tile band still get
-        # glaistytas underneath (LT contractor convention), so the base is
-        # gross − openings, matching the apdailos branch and the reference
-        # calculator. The tiled band is billed separately (plyteles_sienos_m2).
-        # Prior code over-subtracted the tile zone from paint.
-        walls_net = max(0, walls_gross - doors_total - windows_total)
+        # The glaistymas/dažymas base is gross − openings − the TILED zone
+        # (2026-09-05, `_tile_zone_in_paint_base`). The 2026-07-05 „bug 3" fix
+        # had put the band back INTO the base („glaistymas under tile"); the
+        # blind runs on Objektas G/H showed that to be the largest single wall
+        # error, and the išklotinių branch never worked that way. The band is
+        # still billed separately as plyteles_sienos_m2 — once, not twice.
+        # A full-tile room is zeroed by the factor above; its provenance is the
+        # `full_tile` predicate, not a strip deduction.
+        tile_zone_deducted = 0.0 if is_full_tile else _tile_zone_in_paint_base(
+            tile_walls_area, tile_read["height_m"], tile_read["share"],
+            doors_total + windows_total)
+        walls_net = max(0, walls_gross - doors_total - windows_total - tile_zone_deducted)
         walls_paintable = walls_net * walls_paint_factor
+
+    if tile_zone_deducted > 0 and not is_full_tile and tile_read["missing"]:
+        # Said where it is decided, in the contractor's words (design „Rimo
+        # kelionė"): an ASSUMED band leaves the painted area — he must see it.
+        # A band read off the drawing is not an assumption; the ledger's
+        # per-room line („Dažoma sienų dalis virš plytelių juostos") explains
+        # that case without flagging a read as a guess.
+        wall_finish_notes.append(
+            f"Plytelių juosta (iki {float(tile_read['height_m'] or 0):.2f} m, "
+            f"{tile_zone_deducted:.2f} m²) į dažomą sienų plotą neįtraukta – "
+            f"po plytelėmis neglaistoma ir nedažoma.")
 
     # Add per-room "extra walls" (LED feature partitions, soffit step walls,
     # other paintable surfaces not captured by perim × H). These are sourced
@@ -1832,6 +1893,9 @@ def calc_room_quantities(room: dict,
         "_tile_read_missing": bool(tile_read["missing"]),
         "_walls_full_tile": bool(is_full_tile),
         "_walls_paint_factor": round(float(walls_paint_factor), 4),
+        # Tiled wall taken OUT of the glaistymas/dažymas base (2026-09-05) —
+        # 0 for an untiled or fully tiled room.
+        "_tile_zone_deducted_m2": round(float(tile_zone_deducted), 2),
         "_wall_finish_assumptions": list(wall_finish_notes),
         # ── Virš-3m provenance (2026-07-29) ──────────────────────────────
         # "explicit_zone" = a partial high zone was supplied for this room;

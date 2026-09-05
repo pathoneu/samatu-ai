@@ -15,6 +15,51 @@
 > iš karto, nes du žmonės (architektas ir rangovas) tą patį brėžinį skaičiuoja
 > 9–16 % skirtingai.
 
+## Founder decisions (2026-09-05, after reading the plan)
+
+- **No € in this work** — the metric is quantities only: share of his rows within ±10 %. Prices are his business. The € columns below stay as history; targets are restated in rows.
+- **No more projects for now, no paid runs for a few days** — everything is measured on the cached extracts (`--recompute`) and offline PDF reads.
+- **Never teach the engine from the sąmata** — the AI computes from the drawing; the sąmata is only used afterwards to CHECK. No calibration factors from his numbers (Move 5 is dropped), no rule tuned until it matches him. A rule changes only when the DRAWING shows it is wrong; his name→our name pairing (for the check and the template) carries no quantities.
+- **Scope is a free-form choice of what to calculate** (works × rooms, on/off, remembered), not yes/no questions like „ar lubos jūsų?".
+- Truth = his **quote** (his takeoff from the drawing); the act's contract-quantity column is the same number; acted quantities are a second column.
+
+Approved order of €0 work: (1) tile band + paint, (2) his wording → ours, names only, (3) room areas from the PDF text when there is no table, (4) what-to-calculate choices at upload.
+
+### Item 1 — DONE 2026-09-05: a wall is tiled or painted, never both
+
+`universal_rules.calc_room_quantities`: the apdailos and legacy branches now
+take the tiled zone out of the glaistymas/dažymas base, exactly as the
+išklotinių branch always did (`_tile_zone_in_paint_base`; the part of the
+openings inside the band is not deducted twice). Provenance
+`_tile_zone_deducted_m2` on every room; ledger line „Dažoma sienų dalis virš
+plytelių juostos"; an assumed band adds the LT note. Tests: 7 new
+(`test_tile_band_paint.py`), 4 rewritten with the reason.
+
+| project | walls before → after | combined paint before → after | headline MAE |
+|---|---:|---:|---:|
+| **G** (OOS, his row is walls only) | +29,3 % → **+5,1 %** | +70,7 % → +46,4 % (ceilings are out of his scope — item 4) | 50,0 → 25,7 |
+| **H** (OOS) | +34,3 % → +14,7 % | +24,2 % → +11,2 % | 14,2 → 7,7 |
+| a | −7,3 % → −8,3 % | −7,2 % → −8,0 % | 3,1 → 3,5 |
+| b | unchanged (bathrooms are full tile) | | 19,6 |
+| c | −0,1 % → **−21,5 %** | −4,9 % → −20,2 % | 7,5 → 16,6 |
+| d | +3,8 % → **−21,0 %** | +2,8 % → −15,3 % | 2,3 → 9,7 |
+| in-sample mean | | | 7,82 → 11,83 |
+| out-of-sample pooled | | | 24,4 → 12,8 |
+
+The exam improved and two in-sample projects got worse. Checked against the
+DRAWINGS (not tuned to the sąmata): **c** — its fixture PDF says „Atskiras
+brėžinys" for both bathrooms; their sheets are not in the bundle, the two
+bathroom rooms are `default_fallback` guesses (4,5 and 23,25 m²) with a guessed
+2,5 m band, and his tile row (55 m²) fits two ordinary fully tiled bathrooms,
+not our 92. The old rule made a phantom bathroom's paint cancel a real
+under-count. **d** — the lubų planas drops the bathroom ceiling to 2 390 mm;
+the extract read that as the tile height while the room height stayed 2,82,
+so the bathroom is in fact tiled to ITS ceiling; his paint line implies
+≈ 23 m² we do not read anywhere (soffit faces at 2 390/2 510 mm, niche walls).
+Both are now visible instead of cancelled. **The in-sample gate is therefore
+restated: 11,83 % is the honest baseline; 7,82 % contained a compensating
+error.** Registry notes carry both diagnoses.
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects
@@ -171,9 +216,9 @@ never says what a contractor will bill).
 
 ## 3. What „90 %" should mean
 
-**Proposed definition:** on projects the engine was never tuned on, the share
-of the contractor's sąmata **euros** whose rows we reproduce within ±10 %
-(`eval_harness.py --rows`, €-weighted, `out_of_sample` block only), measured
+**Definition (founder, 2026-09-05: quantities, no €):** on projects the engine was never tuned on, the share
+of the contractor's sąmata **rows** whose quantities we reproduce within ±10 %
+(`eval_harness.py --rows`, `out_of_sample` block only), measured
 **after his ≤5-minute check** — his three upload answers and room
 confirmations count; quantities he had to type do not.
 
@@ -269,10 +314,9 @@ asked, then remembered per contractor:
   from our output — the council's hill-climbing warning stands. Re-run the
   template hold-out after every 2 new sąmatas.
 
-### Move 5 — Calibration, gated
-Switch on per-family factors only where ≥3 blind-scored projects agree in
-direction and the row's taxonomy class is F or C — never over an R-class
-misread (a factor over a misread bakes the misread in).
+### Move 5 — Calibration: DROPPED (founder rule 2026-09-05)
+Factors derived from his quantities would be teaching the engine the answers.
+The engine computes from the drawing; the sąmata checks.
 
 ### Move 6 — Cadence and budget
 Per project: blind run → score → taxonomy → fix on train → gates → promote.

@@ -41,6 +41,7 @@ projects:
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
+    fixture_gap_2026_09_05: "The fixture PDF (3 A3 sheets) says 'Atskiras brėžinys' for BOTH bathrooms — their sheets are not in the bundle. The two bathroom rooms in the cached extract are default_fallback guesses (4.5 and 23.25 m², low confidence) with a guessed 2.5 m tile band. Until 2026-09-05 the double-billed paint on those guesses happened to match his combined paint line; the corrected tile-band rule exposes it (walls −21 %) — a fixture gap, not a rule regression. His tile row (55.27 m² walls+floors) fits two ordinary fully tiled bathrooms, not our 92 m²."
     notes: "3-page A3 plans; smallest project — fastest Vision ingestion."
 
   - slug: romainiai
@@ -104,6 +105,7 @@ projects:
     contractor: "Rangovas A"
     has_gt_dimensions: false
     has_cached_extract: false
+    height_note_2026_09_05: "The lubų planas drops the san. mazgas ceiling to 2390 mm ('Kaktos pab. h - 2390'); the cached extract carries 2.39 as plyteles_sienos_aukstis_m while the room height stays the 2.82 default — so the bathroom is in fact tiled to ITS ceiling (full tile), which his tile row (32.97 m² walls+floors) fits. After the 2026-09-05 tile-band rule the combined paint reads −15 %: the old +3 % was the bathroom's phantom paint compensating an under-count elsewhere (soffit 'kaktos' faces at 2390/2510 mm and niche walls are not read)."
     notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into objektas_d_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
 
   # ── SECOND BATCH (2026-09-05) — OUT-OF-SAMPLE. Same contractor, two NEW

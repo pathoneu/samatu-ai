@@ -122,7 +122,13 @@ def test_without_the_absence_evidence_apdailos_still_wins():
 
 def test_room_quantities_bill_zero_wall_tile_and_keep_the_paint():
     """The billed consequence: 20.58 m² of tile disappears, and the wall does
-    NOT silently become unpainted (the drawing colour-codes it as painted)."""
+    NOT silently become unpainted (the drawing colour-codes it as painted).
+
+    2026-09-05: a wall is either tiled or painted. With the phantom tile gone
+    the whole wall is painted; with the phantom tile IN, only the part above
+    the (phantom) band was — so killing the phantom tile now GIVES the paint
+    back (the pre-2026-09-05 rule billed the tiled zone as paint as well, and
+    this assertion used to demand that the two figures stay equal)."""
     with_evidence = calc_room_quantities(_skalbykla())
     room_no_ev = _skalbykla()
     room_no_ev.pop("_tile_elevation_evidence")
@@ -130,9 +136,11 @@ def test_room_quantities_bill_zero_wall_tile_and_keep_the_paint():
 
     assert without["plyteles_sienos_m2"] == pytest.approx(20.58, abs=0.01)
     assert with_evidence["plyteles_sienos_m2"] == pytest.approx(0.0, abs=0.01)
+    assert with_evidence["_tile_zone_deducted_m2"] == 0.0
+    assert with_evidence["walls_paintable_m2"] > without["walls_paintable_m2"], (
+        "with no tile on the wall the whole wall is painted")
     assert with_evidence["walls_paintable_m2"] == pytest.approx(
-        without["walls_paintable_m2"], abs=0.01), (
-        "killing phantom tile must not move the paint area")
+        without["walls_paintable_m2"] + without["_tile_zone_deducted_m2"], abs=0.01)
 
 
 # ══════════════════════════════════════════════════════════════════════════

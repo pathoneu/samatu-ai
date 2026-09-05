@@ -90,14 +90,18 @@ def test_optional_vision_field_cannot_flip_the_double_billing_rule():
     assert without_read["dazymo_plotas_m2"] < 10.0
 
 
-def test_partial_tile_band_still_gets_paint_and_glaistymas():
-    """A 2.0 m band under a 2.8 m ceiling is NOT full tile: the wall above it
-    is painted, and the wall under it still gets glaistymas (LT contractor
-    convention — the tile is billed separately, not deducted from paint)."""
+def test_partial_tile_band_still_gets_paint_above_it():
+    """A 2.0 m band under a 2.8 m ceiling is NOT full tile: the strip above it
+    is painted. 2026-09-05: the wall UNDER the band is tile, billed once as
+    tile — it no longer also counts as glaistymas/dažymas (the first blind
+    out-of-sample runs showed that double count to be the largest wall-paint
+    error; see test_tile_band_paint.py)."""
     q = calc_room_quantities(_room(plyteles_sienos_aukstis_m=2.0))
     assert q["_walls_full_tile"] is False
-    assert q["walls_paintable_m2"] > 25
+    assert 0 < q["walls_paintable_m2"] < 25
     assert q["plyteles_sienos_m2"] == pytest.approx(12.4 * 2.0, abs=0.01)
+    assert q["_tile_zone_deducted_m2"] > 0
+    assert q["plyteles_sienos_m2"] + q["walls_paintable_m2"] <= q["walls_gross_m2"] + 0.01
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -122,10 +126,14 @@ def test_missing_tile_read_is_disclosed_not_silent():
 
 
 def test_read_tile_height_is_not_flagged_as_an_assumption():
+    """A band read off the drawing is a read: no assumption text. The band
+    still leaves the paint base (2026-09-05) — that is explained by the
+    ledger's per-room line, not by an „assumption" the room never made."""
     q = calc_room_quantities(_room(plyteles_sienos_aukstis_m=2.4))
     assert q["_tile_read_source"] == "vision_height"
     assert q["_tile_read_missing"] is False
     assert q["_wall_finish_assumptions"] == []
+    assert q["_tile_zone_deducted_m2"] > 0
 
 
 # ══════════════════════════════════════════════════════════════════════════
