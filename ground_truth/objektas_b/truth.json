@@ -134,16 +134,16 @@
       "notes": "Key name follows the engine bucket pvc_grindys_m2_total = non-tile finished floor covering (PVC/parketas/laminatas). This project's covering is parquet; garage rubber mat (item 108, 10.8 m², Papildomi darbai) is out of scope for this bucket."
     },
     "walls_paint_total_m2": {
-      "value": 349.84,
+      "value": 313.03,
       "confidence": "derived",
-      "source": "derived: dazymo_walls_plus_ceilings_combined 493.03 − billed GKP ceilings (74.91 + 68.28 = 143.19)",
-      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity holds exactly on Objektas A: GKP 102.78+62.82 = 165.60 = contractor ceiling paint; and here item 17 dažymo virš 3m = 68.28 = GKP virš 3m exactly). Clay-plastered walls (item 18, 160 m²) are billed separately and are NOT in this paint figure."
+      "source": "derived: combined 493,03 - eksplikacijos \"Is viso\" 180,0",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately. Previous derivation (- billed GKP 143,19 = 349,84) is superseded."
     },
     "ceiling_paint_total_m2": {
-      "value": 143.19,
+      "value": 180.0,
       "confidence": "derived",
-      "source": "derived: billed GKP ceilings 74.91 + 68.28 (items 1+2); item 17 (lubų dažymas virš 3m) = 68.28 confirms the convention",
-      "notes": "See walls_paint_total_m2 derivation note."
+      "source": "eksplikacijos \"Is viso\" = 180,0 (Vision-read bendras_plotas_m2; rooms incl. garazas sum to 224 - the table total excludes the garage, so its ceiling is not painted)",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately."
     }
   }
 }

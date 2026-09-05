@@ -83,6 +83,17 @@ def _merge_registry_yaml() -> None:
 _merge_registry_yaml()
 
 
+# Metrics that are printed but never pooled into an MAE (2026-09-05, founder
+# rule: „daryk atskirai lubas ir sienas"). The contractor's combined
+# „Sienų, lubų glaistymas/dažymas" line is the SUM of two quantities we score
+# separately; averaging it in let a walls error and a ceilings error cancel
+# — which is exactly how a double-billed bathroom wall stayed invisible on
+# objektas_c/d until the first out-of-sample runs. It stays in the table
+# (it is his row) and in the row scorecard (which pairs his one row with our
+# two), but the headline number is walls and ceilings on their own.
+INFORMATIONAL_METRICS = frozenset({"dazymo_walls_plus_ceilings_combined_m2"})
+
+
 # ── Metric mapping: contractor truth field → extractor output field/extractor ──
 # Each entry: truth_key → (label, accessor(parsed_extractor_output) → float)
 #
@@ -704,7 +715,9 @@ def _summarize(results: list[MetricResult]) -> dict:
               and r.status != "no_truth"]
 
     def _pct_values(tier: str) -> list[float]:
-        return [abs(r.pct_error) for r in scored if r.tier == tier]
+        # INFORMATIONAL_METRICS are printed but never averaged (2026-09-05).
+        return [abs(r.pct_error) for r in scored
+                if r.tier == tier and r.truth_key not in INFORMATIONAL_METRICS]
 
     head_pcts = _pct_values("headline")
     cat_pcts = _pct_values("category")
@@ -1296,7 +1309,7 @@ def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
     def _fmt(v):
         return "—" if v is None else f"{v:+.2f}%"
 
-    print(f"\n  {'Project':<14} {'Combined Paint':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}  {'engine':<9}")
+    print(f"\n  {'Project':<14} {'Combined(info)':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}  {'engine':<9}")
     print("  " + "─" * 71)
     for s in per_project_summary:
         if s.get("status") != "ok":
@@ -1534,16 +1547,18 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
 
         results = evaluate(parsed, truth)
         scored, not_emitted, collapsed = _partition_headline_metrics(results, ai_mode)
-        mae = (sum(abs(r.pct_error) for r in scored) / len(scored)
-               if scored else None)
-        worst = max((abs(r.pct_error) for r in scored), default=None)
+        # Printed, not pooled — see INFORMATIONAL_METRICS.
+        pooled = [r for r in scored if r.truth_key not in INFORMATIONAL_METRICS]
+        mae = (sum(abs(r.pct_error) for r in pooled) / len(pooled)
+               if pooled else None)
+        worst = max((abs(r.pct_error) for r in pooled), default=None)
         per_project_summary.append({
             "slug": slug,
             "name": entry.get("name", slug),
             "status": "ok",
             "ai_mode": ai_mode,
             "recomputed": recomputed,
-            "metrics_scored": len(scored),
+            "metrics_scored": len(pooled),
             "metrics_not_emitted": not_emitted,
             "metrics_collapsed": collapsed,
             "mae_pct": round(mae, 3) if mae is not None else None,
@@ -1559,10 +1574,10 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
             per_project_summary[-1]["out_of_sample"] = True
             per_project_summary[-1]["excluded_from_mae"] = True
             oos_slugs.append(slug)
-            for r in scored:
+            for r in pooled:
                 oos_pct_errors.append(abs(r.pct_error))
         else:
-            for r in scored:
+            for r in pooled:
                 all_pct_errors.append(abs(r.pct_error))
 
         # Read-only second instrument on the same `parsed`. It cannot move the

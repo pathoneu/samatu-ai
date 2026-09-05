@@ -40,15 +40,16 @@
       "source": "pasiūlymas item 13 'Sienų, lubų glaistymas/dažymas'"
     },
     "walls_paint_total_m2": {
-      "value": 275.17,
+      "value": 269.61,
       "confidence": "derived",
-      "source": "derived: 412,88 − billed GKP ceilings 137,71 (item 1)",
-      "notes": "Same identity as objektas_d. Designer's sienų dažymo planas states 320 m² of wall paint — 16 % above this derivation; the two humans disagree."
+      "source": "derived: combined 412,88 - eksplikacijos \"BENDRAS PLOTAS\" 143,27",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately. Designer sienu dazymo planas states 320 m2; the two humans differ by 19 %. Previous derivation (- GKP 137,71 = 275,17) is superseded."
     },
     "ceiling_paint_total_m2": {
-      "value": 137.71,
+      "value": 143.27,
       "confidence": "derived",
-      "source": "derived: billed GKP lubos 137,71 (item 1)"
+      "source": "eksplikacijos \"BENDRAS PLOTAS\" 143,27 (drawing p1)",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately. Billed GKP lubos are 137,71 - the 5,56 m2 difference is GKP scope, not painted ceiling."
     },
     "kampu_metrai_m": {
       "value": 412.94,

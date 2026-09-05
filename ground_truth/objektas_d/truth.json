@@ -86,14 +86,14 @@
     "walls_paint_total_m2": {
       "value": 109.29,
       "confidence": "derived",
-      "source": "derived: dazymo_walls_plus_ceilings_combined 150.57 − billed GKP ceilings 41.28 (item 1)",
-      "notes": "Assumes painted-ceiling area = billed GKP ceiling area (identity exact on Objektas A)."
+      "source": "derived: combined 150,57 - eksplikacijos \"Bendras plotas\" 41,28",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately."
     },
     "ceiling_paint_total_m2": {
       "value": 41.28,
       "confidence": "derived",
-      "source": "derived: billed GKP lubos 41.28 (item 1)",
-      "notes": "See walls_paint_total_m2 derivation note."
+      "source": "eksplikacijos \"Bendras plotas\" 41,28 (equals billed GKP lubos 41,28)",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total (Is viso), always; walls = his combined glaistymas/dazymas line minus that total. Ceilings and walls are checked separately."
     },
     "grindjuostes_total_m": {
       "value": 23.07,

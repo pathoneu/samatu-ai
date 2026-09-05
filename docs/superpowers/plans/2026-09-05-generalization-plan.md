@@ -60,6 +60,40 @@ Both are now visible instead of cancelled. **The in-sample gate is therefore
 restated: 11,83 % is the honest baseline; 7,82 % contained a compensating
 error.** Registry notes carry both diagnoses.
 
+### Item 1b — DONE 2026-09-05: ceilings from the table, walls on their own
+
+Founder: „lubos dažomos visada taip, kaip iš eksplikacijos — negali būti
+paklaidos; daryk atskirai lubas ir sienas." Applied in three places:
+
+- **Engine.** The ceiling quantity was already anchored to the table's printed
+  „Iš viso" (2026-09-02); now a table WITHOUT a printed total anchors to the
+  sum of its rows (`vision_call`, same guard and tolerance), so a room Vision
+  invents or drops cannot move the ceiling quantity. Walls and ceilings were
+  already separate rows.
+- **Truth.** Where a table exists, `ceiling_paint_total_m2` = the table's total
+  and `walls_paint_total_m2` = his combined line − that total (b, d, H
+  rewritten; the old „− billed GKP" derivation is superseded and noted). c and G
+  have no table and say so.
+- **Eval.** The combined line is printed but never pooled
+  (`INFORMATIONAL_METRICS`): a walls error and a ceilings error can no longer
+  cancel. The headline MAE is walls, ceilings, LED and floor total, each on
+  its own.
+
+| project | walls | ceilings | headline MAE |
+|---|---:|---:|---:|
+| a | −8,3 % | +0,02 % | 2,3 % |
+| b | +29,5 % (vs 493,03 − 180) | 0,00 % | 15,9 % |
+| c (no table, bathroom sheets missing) | −21,5 % | −16,8 % | 15,4 % |
+| d | −21,0 % | 0,00 % | 7,8 % |
+| **G** (OOS, walls-only scope) | **+5,1 %** | — | 5,1 % |
+| **H** (OOS) | +17,1 % (designer's own figure would put us at −1,3 %) | 0,00 % | 6,4 % |
+| in-sample mean | | | 9,76 % |
+| out-of-sample | | | 6,13 % |
+
+Read the walls column as the real open work: b (largest TP, known height
+issues), c (phantom rooms), d (soffit faces not read), H (full-height windows
++ 2,82 m default height). Ceilings are closed wherever a table exists.
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects

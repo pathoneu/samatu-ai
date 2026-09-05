@@ -4908,12 +4908,30 @@ def extract_interior(
                           .get("eksplikacija_guard") or {})
         _final_verdict = (_guard_verdict.get("retry") or {}).get(
             "verdict", _guard_verdict.get("verdict"))
-        if _eks_meta.get("total_area_m2") and _final_verdict == "accept":
-            parsed["_ceiling_anchor"] = {
-                "total_area_m2": _eks_meta["total_area_m2"],
-                "label": _eks_meta.get("total_row_label") or "Iš viso",
-                "page": _eks_meta.get("total_row_page"),
-            }
+        if _final_verdict == "accept":
+            if _eks_meta.get("total_area_m2"):
+                parsed["_ceiling_anchor"] = {
+                    "total_area_m2": _eks_meta["total_area_m2"],
+                    "label": _eks_meta.get("total_row_label") or "Iš viso",
+                    "page": _eks_meta.get("total_row_page"),
+                }
+            else:
+                # 2026-09-05 (founder rule: „lubos visada kaip iš
+                # eksplikacijos"). A table without a printed total row is
+                # still THE table — its rows' sum is the ceiling base, so a
+                # room Vision invented or dropped cannot move the ceiling
+                # quantity. Same guard, same tolerance check downstream.
+                _rows_sum = round(sum(
+                    float(p.get("plotas_m2") or 0)
+                    for p in (eks.get("patalpos") or [])
+                    if isinstance(p, dict)), 2)
+                if _rows_sum > 0:
+                    parsed["_ceiling_anchor"] = {
+                        "total_area_m2": _rows_sum,
+                        "label": "patalpų plotų suma",
+                        "page": _eks_meta.get("source_page")
+                                or eks.get("eksplikacija_source_page"),
+                    }
         _emit({
             "event": "eksplikacija_merged",
             "merged_rooms": merged_count,
