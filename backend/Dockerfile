@@ -25,6 +25,13 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ backend/
 # prompts/ lives at repo root and is read via relative paths from backend/.
 COPY prompts/ prompts/
+# The FROZEN contractor-family → app-family concept table. It lives in scripts/
+# because the harness owns it, but `extractor/row_scorecard` and
+# `extractor/samata_template` load it by path, and the second of those runs
+# behind /api/samata-templates. Without this the endpoint would degrade to
+# blank cells in production only — the worst kind of difference from dev.
+# (Railway's nixpacks build copies the whole repo, so it already had it.)
+COPY scripts/reconcile_samata_lines.py scripts/reconcile_samata_lines.py
 
 WORKDIR /app/backend
 

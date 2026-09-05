@@ -72,7 +72,8 @@ from typing import Any, Iterable, Sequence
 __all__ = [
     "RowVerdict", "ConceptVerdict", "Scorecard",
     "BUCKETS", "SCORED_BUCKETS",
-    "load_concepts", "normalize_unit", "priced_rows", "score_rows",
+    "app_concept_of", "load_concepts", "normalize_unit", "priced_rows",
+    "score_rows",
 ]
 
 # Ordered worst-last so a table can print them in a stable, meaningful order.
@@ -161,6 +162,43 @@ def priced_rows(line_items: Iterable[dict]) -> list[dict]:
     """Drop the „Viso už skyrių“ subtotal rows — they are sums of rows we
     already score, so counting them would double-weight whole sections."""
     return [it for it in line_items if not _SUBTOTAL.match(_norm(it.get("name")))]
+
+
+def app_concept_of(app_rows: Sequence[dict],
+                   table: Sequence) -> list[str | None]:
+    """Concept key of each app row, by POSITION — first match wins, in the
+    concept table's own order.
+
+    Extracted so `samata_template.render_samata` decides which app row belongs
+    to which family by exactly the rule the scorecard grades by. Two copies of
+    this loop would let the template fill a cell the scorecard then calls
+    `missing`, which is the one divergence that would make week 2's number
+    unreadable.
+
+    The table's order is honoured on the app side as well as his, which is what
+    stops one app row being counted inside two concepts (e.g. "LED nišų
+    glaistymas/dažymas" matches both `nisos_led_dazymas` and the generic
+    `dazymas`) and double-counting its quantity.
+
+    A row that already KNOWS its concept says so in `_concept`, and that wins
+    over the regex — a sheet rendered through the contractor's template carries
+    HIS wording, which the `app` patterns are not written against, so scoring it
+    by label would read every row as unmapped. The key is still checked against
+    the table, so a stray value can name a concept but never invent one.
+    `pozicijos[]` and `darbu_sarasas[]` never carry the field, so the corpus
+    numbers are untouched.
+    """
+    keys = {c.key for c in table}
+    out: list[str | None] = []
+    for p in app_rows:
+        declared = p.get("_concept")
+        if isinstance(declared, str) and declared in keys:
+            out.append(declared)
+            continue
+        out.append(next((c.key for c in table
+                         if c.app is not None and c.app.search(_app_name(p))),
+                        None))
+    return out
 
 
 # ── App-row accessors ─────────────────────────────────────────────────────────
@@ -369,14 +407,10 @@ def score_rows(contractor_items: Sequence[dict],
          else unmapped.append(i))
 
     a_rows: dict[str, list[int]] = {}
-    a_concept_of: list[str | None] = []
-    for p in app_rows:
-        name = _app_name(p)
-        key = next((c.key for c in table
-                    if c.app is not None and c.app.search(name)), None)
-        a_concept_of.append(key)
+    a_concept_of = app_concept_of(app_rows, table)
+    for j, key in enumerate(a_concept_of):
         if key is not None:
-            a_rows.setdefault(key, []).append(len(a_concept_of) - 1)
+            a_rows.setdefault(key, []).append(j)
 
     # ── Score each concept once, Σ-vs-Σ. ─────────────────────────────────────
     concept_verdicts: list[ConceptVerdict] = []

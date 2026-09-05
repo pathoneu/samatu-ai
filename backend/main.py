@@ -394,6 +394,9 @@ from api.export_excel import router as export_excel_router
 from api.project_stats import router as project_stats_router
 # Kainynai — xlsx import + durable per-user price-list storage (2026-09-02).
 from api.price_lists import router as price_lists_router
+# Sąmatų šablonai (2026-09-04): the contractor's own sections + labels as the
+# skeleton of our output, and a project rendered through them.
+from api.samata_templates import router as samata_templates_router
 # The room check sheet (2026-09-04): six read facts per room + the quantities
 # that room contributes, and the PNG crop of the drawing behind each fact.
 from api.room_facts import router as room_facts_router
@@ -715,6 +718,7 @@ app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
 app.include_router(project_stats_router)
 app.include_router(price_lists_router)
+app.include_router(samata_templates_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
 
@@ -4772,8 +4776,16 @@ _EXPORT_SKYRIUS_RANK: dict[str, int] = {
 }
 
 
-def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
+def _sequential_export_nr(eilutes: list[dict],
+                          keep_layout: bool = False) -> list[dict]:
     """Return EXPORT COPIES of `eilutes` whose Nr. column runs 1..N with no gaps.
+
+    `keep_layout=True` renumbers and NOTHING else — no section migration, no
+    re-sort into our canonical order. That is what the contractor-template
+    layout needs (`/export/excel?layout=template`): the sheet is in HIS section
+    order under HIS headings, and rewriting „Sienų lubų glaistymas dažymas" into
+    our two split sections, or re-ranking his „Statybvietės išlaidos" against
+    our order, would hand him back our layout wearing his labels.
 
     E2 (pre-prod walkthrough 2026-07-27): the app drops placeholder rows
     ("suveskite kiekį" — no quantity) from the deliverable, which is right, but
@@ -4791,6 +4803,11 @@ def _sequential_export_nr(eilutes: list[dict]) -> list[dict]:
     renumbering those would break the reference, so they pass through verbatim.
     """
     rows = [dict(e) for e in eilutes]
+    if keep_layout:
+        for i, e in enumerate(rows, 1):
+            e["nr"] = str(i)
+        return rows
+
     # 2026-09-02: canonicalise the section name on the export COPY, per row.
     # The paint block split into "Sienų glaistymas dažymas" + "Lubų glaistymas
     # dažymas", and only a row's aprašymas says which half it is — so a project
@@ -4868,10 +4885,23 @@ def generate_excel(request: Request, data: dict):
 
     projektas    = data.get("projektas", "Projektas")
     imone        = (data.get("imone") or data.get("company_name") or "").strip()
+    # ?layout=template — the contractor's OWN layout (week 2, 2026-09-04). The
+    # rows arrive already rendered through his family template by
+    # `/api/projects/{id}/samata-render`, WITH whatever he has since typed into
+    # the blank cells, so the export prints what he is looking at rather than
+    # re-deriving it and discarding his typing. All this branch changes is that
+    # his sections and their order survive, and an empty cell stays empty.
+    #
+    # A greyed `_siulomas_kiekis` is deliberately NOT exported. On screen it is
+    # visibly a suggestion; in a workbook that reaches his client there is no
+    # such affordance, and an unverified number in his own row is the one thing
+    # the council ruled out.
+    _his_layout  = (request.query_params.get("layout") or "").strip().lower() == "template"
     # E2: renumber the exported rows 1..N so dropped placeholder rows don't leave
     # a visible gap in the client's Nr. column. Copies — the stored project keeps
     # its own numbering (see _sequential_export_nr).
-    eilutes      = _sequential_export_nr(data.get("eilutes", []))
+    eilutes      = _sequential_export_nr(data.get("eilutes", []),
+                                         keep_layout=_his_layout)
     prielaidos   = data.get("prielaidos") or {}
     patalpos     = data.get("patalpos") or []
     perspejimani = data.get("perspejimani") or []
@@ -5049,7 +5079,13 @@ def generate_excel(request: Request, data: dict):
                     # rounded sumas), so the same project's Excel and PDF show the
                     # identical Suma be PVM / VISO. (2026-06-19 hunt.)
                     fc = ws.cell(row=r, column=6)
-                    fc.value        = f"=ROUND(D{r}*E{r},2)"
+                    # …except on a template row he has not filled in yet: a
+                    # formula over an empty Kiekis prints „0,00 €", which reads
+                    # as „this work costs nothing" rather than „įrašykite".
+                    # Blank in, blank out. SUBTOTAL(9,…) skips empty cells, so
+                    # the section and grand totals are unaffected.
+                    fc.value        = (None if (_his_layout and kiekis in (None, ""))
+                                       else f"=ROUND(D{r}*E{r},2)")
                     fc.fill         = fill
                     fc.border       = border
                     fc.alignment    = Alignment(horizontal="right", vertical="center")
@@ -5130,9 +5166,10 @@ def generate_excel(request: Request, data: dict):
     # 2026-09-02: `migrate_skyrius_row` (not the bare name map) — the paint
     # section split in two and only the row's aprašymas says which half it is.
     from extractor.vision_call import migrate_skyrius_row as _SKYRIUS_MIG
-    for e in eilutes:
-        _sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        e["skyrius"] = _SKYRIUS_MIG(_sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
+    if not _his_layout:
+        for e in eilutes:
+            _sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
+            e["skyrius"] = _SKYRIUS_MIG(_sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
 
     ws_main = wb.active
     ws_main.title = "Sąmata"
@@ -5151,7 +5188,11 @@ def generate_excel(request: Request, data: dict):
     sections: dict[str, list] = OrderedDict()
     for e in eilutes:
         sec_raw = (e.get("skyrius") or "KITI DARBAI").strip()
-        sec = _SKYRIUS_MIG(sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
+        # His layout keeps HIS heading verbatim — the migration exists to
+        # collapse OUR legacy section names, and applying it to his would
+        # rename „Sienų lubų glaistymas dažymas" into our split pair.
+        sec = sec_raw if _his_layout else _SKYRIUS_MIG(
+            sec_raw, e.get("aprasymas") or e.get("pavadinimas"))
         # Mutate the row's skyrius to canonical so the section header in
         # _write_rows shows the normalized name too.
         e["skyrius"] = sec
@@ -7354,13 +7395,22 @@ async def chat_project(request: Request, payload: dict = Body(...)):
         return {"status": "error", "error": "AI laikinai nepasiekiamas. Bandykite dar kartą."}
 
 
+# Aliases for /generate-excel and /generate-pdf. Plain `def`, and NO `await`:
+# both handlers were converted to synchronous functions (openpyxl / reportlab
+# are pure CPU with zero awaits — see the notes on each) and these two aliases
+# were left awaiting their return value, so every call raised
+# `'StreamingResponse' object can't be awaited` → HTTP 500. It went unnoticed
+# because the frontend posts to /generate-excel and /generate-pdf directly;
+# `?layout=template` is the first thing to use the alias. As plain `def` routes
+# FastAPI runs them in the threadpool, which is what the CPU work wants anyway.
 @app.post("/export/excel")
-async def export_excel_alias(request: Request, data: dict):
-    return await generate_excel(request, data)
+def export_excel_alias(request: Request, data: dict):
+    return generate_excel(request, data)
+
 
 @app.post("/export/pdf")
-async def export_pdf_alias(request: Request, data: dict):
-    return await generate_pdf(request, data)
+def export_pdf_alias(request: Request, data: dict):
+    return generate_pdf(request, data)
 
 
 

@@ -109,6 +109,12 @@ This list is the input for the family-template work (week 2). These are rows he
 bills that our vocabulary has no name for at all; they are not read failures and
 no better reader fixes them.
 
+> **Outcome (2026-09-04, `2026-09-04-template-holdout.md`):** the template built
+> from his own sąmatas offers **73,2 %** of his billed rows, leave-one-out, at
+> zero cost to the ±10 % share — which stays at exactly the 26,5 % below. The
+> families still missed are the ones seen in a single project; that residual
+> shrinks with HIS sąmata count, not with our reader.
+
 | his family | seen in |
 |---|---|
 | Priglaistomų led ptofilių apdirbimas | objektas_d, romainiai |
