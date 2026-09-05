@@ -2409,7 +2409,105 @@
     "grindjuosciu_pre_cap_m": 151.27,
     "grindjuosciu_post_cap_m": 145.6,
     "grindjuosciu_cap_ratio_m_per_m2": 0.65,
-    "elapsed_s": 468.3
+    "elapsed_s": 468.3,
+    "eksplikacija_guard": {
+      "verdict": "accept",
+      "matched": 15,
+      "agreed": 15,
+      "rate": 1.0,
+      "pairs": [
+        {
+          "nr": "01",
+          "room": "Tambūras",
+          "table": "Tambūras",
+          "agree": true
+        },
+        {
+          "nr": "02",
+          "room": "Svetainė/valgomasis/virtuvė",
+          "table": "Svetainė/valgomasis/virtuvė",
+          "agree": true
+        },
+        {
+          "nr": "03",
+          "room": "Koridorius",
+          "table": "Koridorius",
+          "agree": true
+        },
+        {
+          "nr": "04",
+          "room": "Kambarys",
+          "table": "Kambarys",
+          "agree": true
+        },
+        {
+          "nr": "05",
+          "room": "Kambario drabužinė",
+          "table": "Kambario drabužinė",
+          "agree": true
+        },
+        {
+          "nr": "06",
+          "room": "Kambarys 2",
+          "table": "Kambarys 2",
+          "agree": true
+        },
+        {
+          "nr": "07",
+          "room": "Kambario 2 drabužinė",
+          "table": "Kambario 2 drabužinė",
+          "agree": true
+        },
+        {
+          "nr": "08",
+          "room": "Vaikų vonia",
+          "table": "Vaikų vonia",
+          "agree": true
+        },
+        {
+          "nr": "09",
+          "room": "Miegamasis",
+          "table": "Miegamasis",
+          "agree": true
+        },
+        {
+          "nr": "10",
+          "room": "Miegamojo vonia",
+          "table": "Miegamojo vonia",
+          "agree": true
+        },
+        {
+          "nr": "11",
+          "room": "Miegamojo drabužinė",
+          "table": "Miegamojo drabužinė",
+          "agree": true
+        },
+        {
+          "nr": "12",
+          "room": "Svečių wc",
+          "table": "Svečių wc",
+          "agree": true
+        },
+        {
+          "nr": "13",
+          "room": "Tech. patalpa/skalbykla",
+          "table": "Tech. patalpa/skalbykla",
+          "agree": true
+        },
+        {
+          "nr": "14",
+          "room": "Pagrindinė namo drabužinė",
+          "table": "Pagrindinė namo drabužinė",
+          "agree": true
+        },
+        {
+          "nr": "15",
+          "room": "Garažas",
+          "table": "Garažas",
+          "agree": true
+        }
+      ]
+    }
   },
   "paint_class": 2,
   "paint_class_source": "user_default",
@@ -6487,5 +6585,13 @@
     "n_fail": 0,
     "n_warn": 1,
     "overall_status": "REVIEW_NEEDED"
+  },
+  "_ceiling_anchor": {
+    "total_area_m2": 224.0,
+    "label": "Bendras namo plotas (su garažu)",
+    "page": 2
+  },
+  "_backfill": {
+    "ceiling_anchor": "2026-09-05: added from the fixture PDF's room table (pdfplumber, deterministic) — the pipeline publishes this on a fresh run; the frozen extract predates it"
   }
 }

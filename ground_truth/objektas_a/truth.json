@@ -624,9 +624,10 @@
       "source": "notes:sienos žemos 278.67 + aukštos 150.59 + garažas 31.45"
     },
     "ceiling_paint_total_m2": {
-      "value": 165.6,
+      "value": 165.61,
       "confidence": "green",
-      "source": "notes:lubos žemos 92.73 + aukštos 62.82 + garažas 10.05"
+      "source": "eksplikacijos 'Is viso' 165,61 (same figure as floor_total_m2 'samata bendras_plotas')",
+      "notes": "Founder rule 2026-09-05: painted ceilings = the eksplikacija total. His three ceiling lines (zemos 92,73 + aukstos 62,82 + garazas 10,05) sum to 165,60 - rounding of the parts; the table's total is the reference."
     },
     "led_nisos_m": {
       "value": 42.3,

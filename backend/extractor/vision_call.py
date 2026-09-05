@@ -4918,14 +4918,30 @@ def extract_interior(
             else:
                 # 2026-09-05 (founder rule: „lubos visada kaip iš
                 # eksplikacijos"). A table without a printed total row is
-                # still THE table — its rows' sum is the ceiling base, so a
-                # room Vision invented or dropped cannot move the ceiling
-                # quantity. Same guard, same tolerance check downstream.
+                # still THE table. Prefer the total Vision read off the same
+                # table („Iš viso" / „Bendras plotas" → `bendras_plotas_m2`)
+                # when it agrees with the rows within 1 % — that is the
+                # designer's own rounding, and the printed figure is the one
+                # the contractor quotes from (objektas_a: rows 165,64, table
+                # 165,61). Otherwise the rows' sum. Either way a room Vision
+                # invented or dropped cannot move the ceiling quantity. Same
+                # guard, same tolerance check downstream.
                 _rows_sum = round(sum(
                     float(p.get("plotas_m2") or 0)
                     for p in (eks.get("patalpos") or [])
                     if isinstance(p, dict)), 2)
-                if _rows_sum > 0:
+                try:
+                    _read_total = float(parsed.get("bendras_plotas_m2") or 0)
+                except (TypeError, ValueError):
+                    _read_total = 0.0
+                if (_read_total > 0 and _rows_sum > 0
+                        and abs(_read_total - _rows_sum) <= 0.01 * _rows_sum):
+                    parsed["_ceiling_anchor"] = {
+                        "total_area_m2": _read_total,
+                        "label": "Iš viso (nuskaityta)",
+                        "page": eks.get("eksplikacija_source_page"),
+                    }
+                elif _rows_sum > 0:
                     parsed["_ceiling_anchor"] = {
                         "total_area_m2": _rows_sum,
                         "label": "patalpų plotų suma",

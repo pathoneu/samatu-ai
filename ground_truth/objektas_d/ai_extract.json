@@ -729,6 +729,38 @@
       "voting_on": true,
       "voting_n": 3,
       "note": "fresh live production output; NO offline apply_adjacency / hand corrections. Replaces enriched cached extract."
+    },
+    "eksplikacija_guard": {
+      "verdict": "accept",
+      "matched": 4,
+      "agreed": 4,
+      "rate": 1.0,
+      "pairs": [
+        {
+          "nr": "01",
+          "room": "Įėjimo koridorius",
+          "table": "Įėjimo koridorius",
+          "agree": true
+        },
+        {
+          "nr": "02",
+          "room": "San. mazgas",
+          "table": "San. mazgas",
+          "agree": true
+        },
+        {
+          "nr": "03",
+          "room": "Miegamasis",
+          "table": "Miegamasis",
+          "agree": true
+        },
+        {
+          "nr": "04",
+          "room": "Virtuvė/svetainė",
+          "table": "Virtuvė/svetainė",
+          "agree": true
+        }
+      ]
     }
   },
   "_voting": {
@@ -3287,5 +3319,13 @@
     "error": null
   },
   "_elapsed_s": 212.4,
-  "status": "ok"
+  "status": "ok",
+  "_ceiling_anchor": {
+    "total_area_m2": 41.28,
+    "label": "Iš viso (nuskaityta)",
+    "page": 2
+  },
+  "_backfill": {
+    "ceiling_anchor": "2026-09-05: added from the fixture PDF's room table (pdfplumber, deterministic) — the pipeline publishes this on a fresh run; the frozen extract predates it"
+  }
 }

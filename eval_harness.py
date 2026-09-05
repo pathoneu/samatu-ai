@@ -187,7 +187,15 @@ METRICS: dict[str, dict[str, Any]] = {
     },
     "ceiling_paint_total_m2": {
         "label": "Lubų dažomas plotas",
-        "accessor": lambda p: round(_sum_room_field(p, "ceiling_paintable_m2"), 2),
+        # 2026-09-05: measure what is BILLED. The Lubų rows are anchored to
+        # the eksplikacija total (founder rule „lubos visada kaip iš
+        # eksplikacijos"), while Σ room fields carries the table's own
+        # rounding (objektas_a: rows 165,64 vs printed 165,61). Falls back to
+        # the per-room sum on an extract that emits no Lubų row.
+        "accessor": lambda p: (
+            _pozicijos_sum(p, "lubų glaistymas/dažymas")   # substr is matched lower-cased
+            if _pozicijos_sum(p, "lubų glaistymas/dažymas") is not None
+            else round(_sum_room_field(p, "ceiling_paintable_m2"), 2)),
         "unit": "m²",
         "tier": "headline",
     },

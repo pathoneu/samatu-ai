@@ -90,6 +90,15 @@ paklaidos; daryk atskirai lubas ir sienas." Applied in three places:
 | in-sample mean | | | 9,76 % |
 | out-of-sample | | | 6,13 % |
 
+**Anchor backfill (same day, founder: „taip ir padaryk").** Old cached
+extracts predate the anchor. `scripts/backfill_ceiling_anchor.py` adds it
+from the fixture PDF's text-layer table (b: „Bendras namo plotas (su garažu)"
+224 → billed 180 after the unpainted garage, as his sąmata bills), or — on a
+raster PDF — from the Vision pre-pass total when it agrees with the rows within
+1 % (a: 165,61; d: 41,28), under the same guard. The pipeline does the same on
+a fresh run. The ceiling metric now reads the BILLED Lubų rows, so a is
++0,00 %. Ceilings: a/b/d/H 0,00 %; c −16,8 % (no table, sheets missing).
+
 Read the walls column as the real open work: b (largest TP, known height
 issues), c (phantom rooms), d (soffit faces not read), H (full-height windows
 + 2,82 m default height). Ceilings are closed wherever a table exists.

@@ -1340,6 +1340,80 @@
       "input_tokens_total": 42504,
       "output_tokens_total": 4097,
       "cache_read_tokens_total": 0
+    },
+    "eksplikacija_guard": {
+      "verdict": "accept",
+      "matched": 11,
+      "agreed": 11,
+      "rate": 1.0,
+      "pairs": [
+        {
+          "nr": "101",
+          "room": "Tambūras",
+          "table": "Tambūras",
+          "agree": true
+        },
+        {
+          "nr": "102",
+          "room": "Svetainė/virtuvė",
+          "table": "Svetainė/virtuvė",
+          "agree": true
+        },
+        {
+          "nr": "103",
+          "room": "Koridorius",
+          "table": "Koridorius",
+          "agree": true
+        },
+        {
+          "nr": "104",
+          "room": "Darbo kambarys",
+          "table": "Darbo kambarys",
+          "agree": true
+        },
+        {
+          "nr": "105",
+          "room": "Garažas",
+          "table": "Garažas",
+          "agree": true
+        },
+        {
+          "nr": "106",
+          "room": "Skalbykla",
+          "table": "Skalbykla",
+          "agree": true
+        },
+        {
+          "nr": "107",
+          "room": "Vaikų san.mazgas",
+          "table": "Vaikų san.mazgas",
+          "agree": true
+        },
+        {
+          "nr": "108",
+          "room": "Berniuko kambarys",
+          "table": "Berniuko kambarys",
+          "agree": true
+        },
+        {
+          "nr": "109",
+          "room": "Berniuko kambarys",
+          "table": "Berniuko kambarys",
+          "agree": true
+        },
+        {
+          "nr": "110",
+          "room": "Miegamasis",
+          "table": "Miegamasis",
+          "agree": true
+        },
+        {
+          "nr": "111",
+          "room": "Tėvų vonia",
+          "table": "Tėvų vonia",
+          "agree": true
+        }
+      ]
     }
   },
   "paint_class": 2,
@@ -5329,5 +5403,13 @@
     "n_fail": 0,
     "n_warn": 0,
     "overall_status": "OK"
+  },
+  "_ceiling_anchor": {
+    "total_area_m2": 165.61,
+    "label": "Iš viso (nuskaityta)",
+    "page": 2
+  },
+  "_backfill": {
+    "ceiling_anchor": "2026-09-05: added from the fixture PDF's room table (pdfplumber, deterministic) — the pipeline publishes this on a fresh run; the frozen extract predates it"
   }
 }
