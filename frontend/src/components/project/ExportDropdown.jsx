@@ -12,6 +12,8 @@ import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
 import { useConfirm } from '@/components/ui/confirm-provider';
+import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
+import { exportRows as templateExportRows } from '@/lib/samataTemplate';
 
 // "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
 // warning doesn't read like machine output.
@@ -117,7 +119,9 @@ function buildPayload(project, allowedSkyriai = null) {
   };
 }
 
-async function downloadFile(endpoint, project, filename, allowedSkyriai, extra = {}) {
+// `payloadOverride` (2026-09-05): the template-layout export sends rows already
+// rendered in the contractor's own sections instead of buildPayload's list.
+async function downloadFile(endpoint, project, filename, allowedSkyriai, extra = {}, payloadOverride = null) {
   // Sprint §AUDIT (2026-04-29): credentials: 'include' required after backend
   // export endpoints became auth-gated.
   // 2026-06-19: send the full branding block (logo + legal details) from global
@@ -139,7 +143,7 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     objektas:     extra.objektas || project.objektas || '',
     pasiulymo_nr: extra.pasiulymo_nr || project.pasiulymo_nr || '',
   };
-  const payload = { ...buildPayload(project, allowedSkyriai), ...branding };
+  const payload = { ...(payloadOverride || buildPayload(project, allowedSkyriai)), ...branding };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
     credentials: 'include',
@@ -154,9 +158,21 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
 export default function ExportDropdown({ project }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(null);
-  const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | null
+  const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | 'excel-template' | null
   const ref = useRef(null);
   const confirm = useConfirm();
+  // His own layout (2026-09-05): offered only when the account has a template.
+  // The rows are rendered ONCE when the menu item is chosen and reused for the
+  // section list and the file, so the modal and the workbook agree.
+  const [hasTemplate, setHasTemplate] = useState(false);
+  const [templateRows, setTemplateRows] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetchSamataTemplates()
+      .then((list) => { if (alive) setHasTemplate(list.length > 0); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     const onClick = (e) => {
@@ -166,8 +182,23 @@ export default function ExportDropdown({ project }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  const handle = (action) => {
+  const handle = async (action) => {
     setOpen(false);
+    if (action === 'excel-template') {
+      setLoading('excel-template');
+      try {
+        const body = await renderSamata(project.id, {
+          rows: project.darbu_sarasas || [], rooms: roomsForRender(project),
+        });
+        setTemplateRows(body.eilutes || []);
+        setFilterFor(action);
+      } catch (e) {
+        toast.error(`Nepavyko sudaryti sąmatos jūsų išdėstymu: ${e.message}`);
+      } finally {
+        setLoading(null);
+      }
+      return;
+    }
     setFilterFor(action);
   };
 
@@ -193,8 +224,11 @@ export default function ExportDropdown({ project }) {
     // when EVERY line is unpriced, so a sąmata where 3 of 40 positions still sat
     // at 0,00 € went to the client silently. Count on the payload actually being
     // exported (skyriai filter applied, kiekis = 0 placeholder rows are dropped
-    // by buildPayload, so they can't inflate the warning).
-    const exportedRows = (buildPayload(project, skyriai).eilutes || [])
+    // by buildPayload, so they can't inflate the warning). In his own layout the
+    // rows are the rendered ones; blank cells are by design and are not counted.
+    const exportedRows = (format === 'excel-template'
+      ? templateExportRows(templateRows || [], skyriai)
+      : (buildPayload(project, skyriai).eilutes || []))
       .filter((r) => (r.kiekis || 0) > 0);
     const unpricedRows = exportedRows.filter((r) => !(Number(r.kaina) > 0));
     if (unpricedRows.length > 0 && unpricedRows.length < exportedRows.length) {
@@ -212,6 +246,23 @@ export default function ExportDropdown({ project }) {
       const extra = { uzsakovas, objektas, pasiulymo_nr };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
+      } else if (format === 'excel-template') {
+        // His sections, his order, his labels; a blank cell prints EMPTY (the
+        // backend's `layout=template` branch), never „0,00 €".
+        const floorCount = getFloorCount(project);
+        const eilutes = templateExportRows(templateRows || [], skyriai).map((r) => (
+          r.kiekis == null ? r : { ...r, kiekis: r.kiekis * floorCount, suma: r.kiekis * floorCount * (r.kaina || 0) }
+        ));
+        const payload = {
+          projektas: floorCount > 1 ? `${project.name} (× ${floorCount} aukštai)` : project.name,
+          eilutes,
+          patalpos: project.v8_rooms || project.patalpos || [],
+          tipas: project.tipas || project.type || 'kz',
+          perspejimani: collectWarnings(project),
+          archetipas: project.archetipas || '',
+          aukstu_skaicius: floorCount,
+        };
+        await downloadFile('generate-excel?layout=template', project, `${safeName}.xlsx`, skyriai, extra, payload);
       } else if (format === 'pdf') {
         await downloadFile('generate-pdf', project, `${safeName}.pdf`, skyriai, extra);
       }
@@ -257,6 +308,19 @@ export default function ExportDropdown({ project }) {
               <div className="text-[11px] text-muted-foreground">Sąmata su skyriais ir kainomis</div>
             </div>
           </button>
+          {hasTemplate && (
+            <button
+              onClick={() => handle('excel-template')}
+              title="Jūsų skyriai ir eilučių pavadinimai kaip jūsų sąmatose; tušti langeliai lieka tušti"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted text-left text-sm border-t border-border transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+              <div className="flex-1">
+                <div className="font-medium text-foreground">Excel — kaip mano sąmatose</div>
+                <div className="text-[11px] text-muted-foreground">Jūsų skyriai ir pavadinimai, tušti langeliai tušti</div>
+              </div>
+            </button>
+          )}
           <button
             onClick={() => handle('pdf')}
             title="Spausdintinas pasiūlymas su jūsų įmonės duomenimis ir logotipu iš Nustatymų"
@@ -278,6 +342,7 @@ export default function ExportDropdown({ project }) {
         <ExportFilterModal
           project={project}
           format={filterFor}
+          rows={filterFor === 'excel-template' ? templateRows : null}
           loading={loading === filterFor}
           onCancel={() => { if (loading == null) setFilterFor(null); }}
           onConfirm={handleConfirm}

@@ -44,6 +44,10 @@ router = APIRouter(tags=["samata-templates"])
 # more than his six sąmatas produce together.
 MAX_BODY_BYTES = 2 * 1024 * 1024
 MAX_TEMPLATES_PER_USER = 50
+# A render body carries the client's darbu_sarasas WITH ledgers; a 150-row
+# interior project is ~1 MB of that. Bounded rows keep the render CPU bounded.
+RENDER_BODY_BYTES = 8 * 1024 * 1024
+MAX_RENDER_ROWS = 5000
 
 
 def _rate_limit_user(user: dict, endpoint: str) -> None:
@@ -72,6 +76,25 @@ async def _read_json_body(request: Request, cap: int = MAX_BODY_BYTES) -> Any:
     raw = await _read_body_capped(request, cap)
     if not raw:
         raise HTTPException(status_code=400, detail="Tuščias užklausos turinys")
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400,
+                            detail="Netinkamas užklausos turinys") from exc
+
+
+async def _read_optional_json_body(request: Request, cap: int) -> Any:
+    """Like `_read_json_body`, but an EMPTY body is `None`, not a 400 — the
+    render is legal without one (it then reads the saved blob)."""
+    try:
+        from main import _read_body_capped
+    except Exception as exc:  # noqa: BLE001
+        log.error("body reader unavailable: %r", exc)
+        raise HTTPException(status_code=500,
+                            detail="Serverio klaida — bandykite vėliau") from exc
+    raw = await _read_body_capped(request, cap)
+    if not raw or not raw.strip():
+        return None
     try:
         return json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
@@ -243,11 +266,20 @@ def render_summary(rows: list[dict]) -> dict[str, int]:
 
 
 @router.post("/api/projects/{project_id}/samata-render")
-def api_render_project(request: Request, project_id: str) -> dict[str, Any]:
+async def api_render_project(request: Request, project_id: str) -> dict[str, Any]:
     """Render one project in the contractor's layout. NO persistence.
 
     `?template_id=` picks the template; omitted, the caller's default (or their
     only) one is used. `?include_optional=0` drops the „kartais" families.
+
+    The body is OPTIONAL. `{darbu_sarasas: [...], patalpos: [...]}` renders the
+    rows the CLIENT is holding — what the contractor is looking at while his
+    last edit is still on its way to the store (the frontend cache is
+    write-through, so the saved blob lags a keystroke by a network round trip;
+    rendering the blob made his typed number appear one edit late,
+    2026-09-05). Without a body the saved blob is rendered. Either way nothing
+    is written, and a body never widens access: ownership is checked first and
+    the template is still the caller's own.
     """
     # Auth + ownership FIRST, before anything reads a {URL_id}-keyed store.
     user = _auth.require_owned_project(request, project_id)
@@ -257,25 +289,47 @@ def api_render_project(request: Request, project_id: str) -> dict[str, Any]:
     template = resolve_template(user, request.query_params.get("template_id"))
     include_optional = request.query_params.get("include_optional") != "0"
 
-    user_filter = None if user.get("is_admin") else user["id"]
-    project = _db.get_project(project_id, user_id=user_filter)
-    if project is None:                       # raced with a delete
-        raise HTTPException(status_code=404, detail="Projektas nerastas")
-    if project.get("_data_corrupt"):
-        raise HTTPException(
-            status_code=409,
-            detail="Projekto duomenys sugadinti — susisiekite su mumis.")
+    body = await _read_optional_json_body(request, RENDER_BODY_BYTES)
+    rows_in: list | None = None
+    rooms: list | None = None
+    if body is not None:
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="Netinkamas užklausos turinys")
+        if body.get("darbu_sarasas") is not None:
+            if not isinstance(body["darbu_sarasas"], list):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Laukas „darbu_sarasas“ turi būti sąrašas")
+            if len(body["darbu_sarasas"]) > MAX_RENDER_ROWS:
+                raise HTTPException(status_code=413, detail="Per daug eilučių")
+            rows_in = [r for r in body["darbu_sarasas"] if isinstance(r, dict)]
+        if body.get("patalpos") is not None:
+            if not isinstance(body["patalpos"], list):
+                raise HTTPException(
+                    status_code=400, detail="Laukas „patalpos“ turi būti sąrašas")
+            rooms = [r for r in body["patalpos"] if isinstance(r, dict)]
 
-    rows_in = project.get("darbu_sarasas") or project.get("pozicijos") or []
-    if not isinstance(rows_in, list):
-        rows_in = []
-    rooms = project.get("patalpos") or []
-    if not isinstance(rooms, list):
-        rooms = []
+    if rows_in is None or rooms is None:
+        user_filter = None if user.get("is_admin") else user["id"]
+        project = await run_in_threadpool(
+            _db.get_project, project_id, user_id=user_filter)
+        if project is None:                       # raced with a delete
+            raise HTTPException(status_code=404, detail="Projektas nerastas")
+        if project.get("_data_corrupt"):
+            raise HTTPException(
+                status_code=409,
+                detail="Projekto duomenys sugadinti — susisiekite su mumis.")
+        if rows_in is None:
+            saved_rows = project.get("darbu_sarasas") or project.get("pozicijos") or []
+            rows_in = saved_rows if isinstance(saved_rows, list) else []
+        if rooms is None:
+            saved_rooms = project.get("patalpos") or []
+            rooms = saved_rooms if isinstance(saved_rooms, list) else []
 
     try:
-        rows = render_samata(template, rows_in, rooms,
-                             include_optional=include_optional)
+        rows = await run_in_threadpool(
+            render_samata, template, rows_in, rooms,
+            include_optional=include_optional)
     except Exception as exc:  # noqa: BLE001
         log.error("samata render failed project=%s template=%s: %r",
                   project_id, template.get("id"), exc)

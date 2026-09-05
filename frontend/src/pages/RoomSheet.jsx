@@ -53,6 +53,7 @@ import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import FactRow from '@/components/roomsheet/FactRow';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
+import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
@@ -319,6 +320,14 @@ export default function RoomSheet() {
         <div className="mx-auto w-full max-w-[900px] flex-1 p-4">
           <div className="rounded-[2px] border border-border bg-card">
             <GeneralFactsPanel project={project} busy={busy} onSaveSymbol={saveSymbol} />
+          </div>
+          {/* „Jūsų eilutės" — the rows of HIS template the drawing cannot answer.
+              Renders nothing when the account has no template. */}
+          <div className="mt-4 rounded-[2px] border border-border bg-card">
+            <YourRowsPanel
+              project={project}
+              onProjectChange={(next) => { setProject(next); updateProject(project.id, next); }}
+            />
           </div>
           {ripple && (
             <p className="mt-3 rounded-[2px] bg-[hsl(var(--surface-2))] px-3 py-2 text-[14px]">

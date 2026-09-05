@@ -77,6 +77,52 @@ Four contract rules a renderer must not blur:
 | contribution ledger on `darbu_sarasas` | 2026-09-02 | `ledger_available: false` |
 | opening coordinates | — | **never** — `elementai` has no geometry; the crop is the room |
 
+## Sąmatos šablonas — the contractor's OWN layout (2026-09-04/05)
+
+His five section headings are stable across all his sąmatas while his row
+wording is not, so the artefact we derive from his sąmatas is a **family
+skeleton in his sections and his labels** (`backend/extractor/samata_template.py`,
+measured in `docs/superpowers/research/2026-09-04-template-holdout.md`: offers
+73,2 % of his rows at zero precision cost). Contract:
+
+- **Storage:** `samata_templates` table, owner-scoped like price lists
+  (`api/samata_templates.py`: `GET/POST/DELETE /api/samata-templates`; `POST
+  {samatas:[<parsed sąmata>…]}` derives one server-side, `{id, samatas}` merges
+  — idempotent on the sąmata's source name).
+- **Render:** `POST /api/projects/{id}/samata-render[?template_id&include_optional=0]`
+  → `{eilutes, santrauka, sablonas}`. **Pure — writes nothing.** The body is
+  optional: `{darbu_sarasas:[…], patalpos:[…]}` renders the rows the CLIENT is
+  holding (the store is write-through and lags a keystroke; rendering the blob
+  showed a typed number one edit late). Without a body the saved blob is used.
+- **Row shape** = the export row shape (`skyrius`, `aprasymas`, `mato_vnt`,
+  `kiekis`, `kaina`, `id`) plus flags: `_sablonas` (his row vs „Kita (iš
+  brėžinio)"), `_sablono_eile` (family key), `_pildymas` ∈ `uzpildyta |
+  pasiulymas | tuscia`, `_siulomas_kiekis` (greyed suggestion, never the value,
+  never exported), `_saltinio_id` (the darbu_sarasas ids that fed the cell),
+  `_pastaba`, `_daznumas` („įprasta"/„kartais"), `_patikslinimas`.
+- **The three rules:** a cell fills only from a VERIFIED or LEDGERED row
+  (`is_fillable`); nothing computed is lost (unconsumed rows land in „Kita (iš
+  brėžinio)"); no new fuzzy matching (families come from the frozen concept
+  table in `scripts/reconcile_samata_lines.py`, the one the scorecard is pinned
+  to). A family he has billed on more than one line is *itemised*: one row per
+  app row, his label plus our qualifier.
+- **Declared family:** an app row carrying `_sablono_eile` is consumed by THAT
+  family regardless of what the concept regex makes of its wording, and is
+  never taken by a neighbour's concept. This is how a number typed into one of
+  his blank cells comes back into his cell: the frontend writes a hand-added
+  `rnk-` row with his label, his unit, `manual_override: true` and the family
+  key (`frontend/src/lib/samataTemplate.typeQuantity`). „Teisinga ✓" on a
+  suggested cell stamps `user_verified_at` on the source rows — the same stamp
+  Patikra writes, so it counts for the scorecard and `build_ground_truth.py`.
+- **Frontend:** the Sąmata step has a layout switch („Pathon" | „Kaip mano
+  sąmatose", `ProjectMainView.jsx` → `SamataTemplateView.jsx`), shown only when
+  the account has a template; the room sheet's last page lists his blank rows
+  („Jūsų eilutės", `components/roomsheet/YourRowsPanel.jsx`); the export menu
+  offers „Excel — kaip mano sąmatose" → `POST /generate-excel?layout=template`
+  (his sections and order kept, a blank cell prints EMPTY — never „0,00 €" to
+  his client). All three read `lib/samataTemplateApi.js`; the pure helpers and
+  their tests are `lib/samataTemplate.js`.
+
 ## Export flow
 
 `ExportModal` builds `{projektas, eilutes, prielaidos, patalpos}` (maps `darbu_sarasas → eilutes`) → `POST /export/excel` | `/export/pdf` → `generate_excel` / `generate_pdf` (`main.py`). Excel uses **live formulas** (`=SUBTOTAL`, `=ROUND(...*0.21)`) so the contractor can edit quantities/prices in Excel and totals recompute.

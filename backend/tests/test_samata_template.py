@@ -306,6 +306,45 @@ def test_with_no_rooms_read_the_blank_note_says_so():
                if r["_pildymas"] == FILL_EMPTY)
 
 
+def test_a_row_that_names_its_family_fills_that_cell_and_is_not_duplicated():
+    """Typed into HIS blank cell: the frontend writes a hand-added row carrying
+    the family key. His wording matches no `app` pattern, so without the
+    declared key the number would sit in „Kita" while his cell stayed blank."""
+    t = build_template(FIVE)
+    typed = _app("Gadget nuoma", "d.d.", 3.0, id="rnk-1", manual_override=True,
+                 _sablono_eile="c:gadget_gap")
+    rows = render_samata(t, [typed], rooms=[{"nr": "1"}])
+    gadget = next(r for r in rows if r["_sablono_eile"] == "c:gadget_gap")
+    assert gadget["_pildymas"] == FILL_DONE
+    assert gadget["kiekis"] == 3.0
+    assert gadget["_saltinio_id"] == ["rnk-1"]
+    assert not [r for r in rows if r["skyrius"] == EXTRA_SECTION], \
+        "the typed row is HIS row now — it must not also appear under ours"
+
+
+def test_a_row_that_names_one_family_is_never_taken_by_another_concept():
+    """Our regex reads „Widget" in the label, but the row declares the gadget
+    family — the declaration wins, and the widget cell is left alone."""
+    t = build_template(FIVE)
+    typed = _app("Widget assembly for the gadget", "vnt", 2.0, id="rnk-2",
+                 manual_override=True, _sablono_eile="c:gadget_gap")
+    rows = render_samata(t, [typed], rooms=[{"nr": "1"}])
+    gadget = next(r for r in rows if r["_sablono_eile"] == "c:gadget_gap")
+    widget = next(r for r in rows if r["_sablono_eile"] == "c:widget")
+    assert gadget["_pildymas"] == FILL_DONE and gadget["kiekis"] == 2.0
+    assert widget["_pildymas"] == FILL_EMPTY and widget["kiekis"] is None
+
+
+def test_a_declared_family_the_template_does_not_offer_still_reaches_kita():
+    t = build_template(FIVE)
+    typed = _app("Kažkas iš seno šablono", "vnt", 1.0, id="rnk-3",
+                 manual_override=True, _sablono_eile="n:nebera|vnt")
+    rows = render_samata(t, [typed], rooms=[{"nr": "1"}])
+    kita = [r for r in rows if r["skyrius"] == EXTRA_SECTION]
+    assert [r["id"] for r in kita] == ["rnk-3"]
+    assert kita[0]["_pildymas"] == FILL_DONE
+
+
 def test_a_unit_mismatch_does_not_fill_the_cell():
     """His `vnt` row must never take our `m2` number, concept or no concept."""
     t = build_template(FIVE)

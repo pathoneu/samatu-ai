@@ -85,6 +85,14 @@ Ground truth = the contractor's real sąmatos:
 
 **Provenance is an accuracy invariant too (2026-09-02).** Any change to the builder must keep `backend/tests/test_contribution_ledger.py` green — it replays every row's `roll_up` over its `contributions` on all corpus fixtures and fails if the ledger stops reproducing `kiekis`. If you wire a new family into the ledger, add it there (and to the LT-string vocabulary guard). To eyeball Patikra locally: start `backend-dev` + `frontend-dev` from `.claude/launch.json` (restart the backend after backend edits — no `--reload`), open a local project, toggle anything in Prielaidos (the rebuilt list carries ids + ledger), then click a row → tree, and use the right-hand PATIKRA rail (card → „Pataisyti" → Prielaidos focus → recompute → „Perskaičiuota: N eilučių" → „Įsiminta"). The shipped demo snapshot carries no ledger on disk until it is recomputed.
 
+**To eyeball the contractor's own layout (2026-09-05):** the switch („Pathon" | „Kaip mano sąmatose") appears on the Sąmata step only when the dev account has a template. Seed one from the gitignored parsed sąmatas — never from anything that could carry a client name into a tracked file:
+
+```bash
+venv/bin/python -c "import json;print(json.dumps({'name':'Mano sąmatos šablonas','is_default':True,'samatas':[{'slug':s,'line_items':json.load(open(f'ground_truth/{s}/contractor_samata_parsed.json'))['line_items']} for s in ['objektas_a','objektas_b','objektas_c','objektas_d']]},ensure_ascii=False))" > /tmp/seed_template.json && curl -s -X POST http://localhost:8000/api/samata-templates -H 'Content-Type: application/json' --data-binary @/tmp/seed_template.json | head -c 200
+```
+
+Then: Sąmata → switch → type into a blank cell (becomes an `rnk-` row in `darbu_sarasas`), „Teisinga" on a greyed suggestion (stamps the source rows), Eksportuoti → „Excel — kaip mano sąmatose"; Patikra → last page → „Jūsų eilutės". `DELETE /api/samata-templates/{id}` removes the seed. The render is a view — `POST …/samata-render` never writes.
+
 ## Deploy / billing (dev-relevant bits — full launch steps in `RUNBOOK.md`)
 
 - `BILLING_ENABLED` defaults `'0'` (dormant). Don't flip without the pre-flight: Stripe secret + webhook secret + price IDs present, webhook signature verified live, and `usage_events` logging confirmed (a silent-fail there could let a user drain the API budget uncharged).

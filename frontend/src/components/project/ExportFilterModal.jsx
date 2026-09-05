@@ -7,6 +7,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { ltCount } from '@/lib/ltPlural';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import {
   exportSelectionKey,
@@ -37,15 +38,22 @@ function saveExcluded(projectId, excluded) {
 
 export default function ExportFilterModal({
   project,
-  format, // 'excel' | 'pdf'
+  format, // 'excel' | 'pdf' | 'excel-template'
   loading,
   onCancel,
   onConfirm,
+  // 'excel-template' (2026-09-05): the rows already rendered in the
+  // contractor's own layout. His sections replace ours in the list, and a
+  // section whose rows are all still blank stays listed — blank is a state of
+  // his sheet, not a reason to drop the section.
+  rows = null,
 }) {
   // Build unique-skyrius list with row count + total kiekis per skyrius.
   const sections = useMemo(() => {
     const map = new Map();
-    const items = (project.darbu_sarasas || []).filter(it => (it.kiekis || 0) > 0);
+    const items = rows
+      ? rows
+      : (project.darbu_sarasas || []).filter(it => (it.kiekis || 0) > 0);
     for (const it of items) {
       const s = it.skyrius || it.kategorija || 'Kiti darbai';
       const cur = map.get(s) || { count: 0 };
@@ -55,7 +63,7 @@ export default function ExportFilterModal({
     return [...map.entries()]
       .map(([name, info]) => ({ name, ...info }))
       .sort((a, b) => a.name.localeCompare(b.name, 'lt'));
-  }, [project.darbu_sarasas]);
+  }, [project.darbu_sarasas, rows]);
 
   // State = what the user explicitly UNCHECKED. The checked set is derived from
   // the sections that exist right now, so no reconciliation effect is needed and
@@ -102,11 +110,11 @@ export default function ExportFilterModal({
       <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            {format === 'excel'
+            {format !== 'pdf'
               ? <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
               : <FileText className="w-4 h-4 text-muted-foreground" />}
             <h2 className="text-sm font-semibold text-foreground">
-              Eksportuoti {format === 'excel' ? 'Excel' : 'PDF'} — pasirinkti skyriai
+              Eksportuoti {format !== 'pdf' ? 'Excel' : 'PDF'} — pasirinkti skyriai
             </h2>
           </div>
           <button onClick={onCancel} disabled={loading}
@@ -174,7 +182,7 @@ export default function ExportFilterModal({
                       />
                       <span className="flex-1 text-sm text-foreground">{s.name}</span>
                       <span className="text-[11px] text-muted-foreground tabular-nums">
-                        {s.count} {s.count === 1 ? 'pozicija' : 'pozicijos'}
+                        {ltCount(s.count, 'eilutė', 'eilutės', 'eilučių')}
                       </span>
                     </label>
                   </li>
@@ -198,12 +206,12 @@ export default function ExportFilterModal({
             disabled={loading || noneChecked}
             title={noneChecked
               ? 'Pažymėkite bent vieną skyrių'
-              : `Sugeneruoti ir atsisiųsti ${format === 'excel' ? 'Excel' : 'PDF'} failą su pažymėtais skyriais`}
+              : `Sugeneruoti ir atsisiųsti ${format !== 'pdf' ? 'Excel' : 'PDF'} failą su pažymėtais skyriais`}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-foreground text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             {loading
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              : (format === 'excel'
+              : (format !== 'pdf'
                   ? <FileSpreadsheet className="w-3.5 h-3.5" />
                   : <FileText className="w-3.5 h-3.5" />)}
             Eksportuoti

@@ -751,6 +751,21 @@ def render_samata(template: dict,
         if key is not None:
             rows_by_concept.setdefault(key, []).append(i)
 
+    # A row that NAMES its family — `_sablono_eile` — was typed into one of HIS
+    # blank cells (the frontend writes a hand-added `rnk-` row carrying the
+    # family key, his label and his unit). It belongs to that family whatever
+    # the concept regex makes of his wording: without this the typed row would
+    # not match (his labels are not what the `app` patterns are written
+    # against), land in „Kita (iš brėžinio)", and his cell would stay blank —
+    # the same number shown twice, once as his row and once as ours.
+    rows_by_family: dict[str, list[int]] = {}
+    declared_family: dict[int, str] = {}
+    for i, r in enumerate(rows):
+        fam_key = r.get("_sablono_eile")
+        if isinstance(fam_key, str) and fam_key:
+            rows_by_family.setdefault(fam_key, []).append(i)
+            declared_family[i] = fam_key
+
     consumed: set[int] = set()
     out: list[dict] = []
     blank_note = NOTE_BLANK if (rooms or []) else NOTE_NO_ROOMS
@@ -783,10 +798,18 @@ def render_samata(template: dict,
             # An unknown concept key (a stored template built against an older
             # table, or a table that would not load) is treated as unmapped —
             # a blank cell, never a guess about which rows it meant.
-            candidates = (rows_by_concept.get(concept, [])
-                          if concept and concept in by_key else [])
+            # Declared rows first (their unit IS the family's, by construction),
+            # then concept matches — minus any row that declared ANOTHER family,
+            # which must never be swallowed by a neighbour's concept.
+            declared = [i for i in rows_by_family.get(fam.get("key") or "", [])
+                        if i not in consumed]
+            candidates = list(declared) + [
+                i for i in (rows_by_concept.get(concept, [])
+                            if concept and concept in by_key else [])
+                if i not in declared_family and i not in consumed]
             usable = [i for i in candidates
-                      if _app_qty(rows[i]) is not None and _unit_ok(f_unit, rows[i])]
+                      if _app_qty(rows[i]) is not None
+                      and (i in declared_family or _unit_ok(f_unit, rows[i]))]
 
             # A family HE itemises gets one row per app row instead of one
             # summed row — see ITEMISED_MIN_ROWS. `usable` is a subset of

@@ -46,6 +46,9 @@ import ExportDropdown from './ExportDropdown';
 import ReextractButton from './ReextractButton';
 import RowDetailPanel from './RowDetailPanel';
 import SanityWarningsBanner from './SanityWarningsBanner';
+import SamataTemplateView from './SamataTemplateView';
+import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
+import { LAYOUT_PATHON, LAYOUT_TEMPLATE, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
 import { createSession } from '@/lib/telemetry';
 import {
   adjustPositionQuantity,
@@ -504,6 +507,22 @@ export default function ProjectMainView({
 }) {
   const { t } = useTranslation();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
+  // The contractor's OWN layout (2026-09-05, week 2 of the contractor-trust
+  // plan): his sections and row labels, rendered by the backend from a template
+  // derived from his sąmatas. Offered only when the account has a template — an
+  // account without one never sees the switch. The choice sticks per browser.
+  const [templates, setTemplates] = useState([]);
+  const [layout, setLayout] = useState(loadLayoutChoice);
+  useEffect(() => {
+    let alive = true;
+    fetchSamataTemplates()
+      .then((list) => { if (alive) setTemplates(list); })
+      .catch(() => { /* no switch, nothing else changes */ });
+    return () => { alive = false; };
+  }, []);
+  const hisLayout = layout === LAYOUT_TEMPLATE && templates.length > 0;
+  const defaultTemplateId = (templates.find((tp) => tp.is_default) || templates[0])?.id;
+  const chooseLayout = (next) => { setLayout(next); saveLayoutChoice(next); };
 
   // P0 (2026-07-27): "Pritaikyti kainyną" / re-extract push a NEW darbu_sarasas
   // up through onProjectChange, but this local mirror stayed frozen on the
@@ -864,6 +883,35 @@ export default function ProjectMainView({
             </Badge>
           </h2>
           <div className="flex items-center gap-2">
+            {templates.length > 0 && (
+              <div
+                role="radiogroup"
+                aria-label={t('project.samataTemplate.layoutLabel')}
+                className="inline-flex rounded-md border border-border overflow-hidden"
+              >
+                {[
+                  [LAYOUT_PATHON, t('project.samataTemplate.layoutPathon'), t('project.samataTemplate.layoutPathonTitle')],
+                  [LAYOUT_TEMPLATE, t('project.samataTemplate.layoutMine'), t('project.samataTemplate.layoutMineTitle')],
+                ].map(([value, label, title]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={(hisLayout ? LAYOUT_TEMPLATE : LAYOUT_PATHON) === value}
+                    title={title}
+                    onClick={() => chooseLayout(value)}
+                    className={`px-3 font-medium transition-colors ${
+                      (hisLayout ? LAYOUT_TEMPLATE : LAYOUT_PATHON) === value
+                        ? 'bg-foreground text-background'
+                        : 'bg-card text-foreground/80 hover:bg-muted/60'
+                    }`}
+                    style={{ minHeight: 44, fontSize: 15 }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
@@ -900,7 +948,18 @@ export default function ProjectMainView({
           <span className="block mt-0.5">{t('project.mainView.keyboardHint')}</span>
         </div>
 
-        {darbai.length === 0 ? (
+        {hisLayout ? (
+          <SamataTemplateView
+            project={projectWithDarbai}
+            darbai={darbai}
+            templateId={defaultTemplateId}
+            onDarbaiChange={(updated) => {
+              setDarbai(updated);
+              onProjectChange?.({ ...project, darbu_sarasas: updated });
+            }}
+            onOpenLedger={setDetailRow}
+          />
+        ) : darbai.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground text-sm">
             {t('project.mainView.emptyList')}
           </div>

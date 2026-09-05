@@ -256,6 +256,53 @@ def test_render_writes_nothing(as_user):
     assert before == after
 
 
+def test_render_takes_the_rows_the_client_is_holding_and_still_writes_nothing(as_user):
+    """The frontend cache is write-through: the saved blob lags the screen by a
+    round trip. Rendering the rows in the request shows his typed number NOW,
+    and the store is untouched."""
+    client = as_user(USER_A)
+    client.post("/api/samata-templates",
+                json={"samatas": [SAMATA_1], "is_default": True})
+    _save_project([{"id": "r1", "aprasymas": "Šiukšlių išvežimas",
+                    "mato_vnt": "m3", "kiekis": 5.0}])
+    before = json.dumps(_db.get_project(PROJECT_A, user_id=USER_A["id"]),
+                        sort_keys=True, default=str)
+    typed = {"id": "rnk-1", "aprasymas": "Išgalvotas vienkartinis darbas",
+             "mato_vnt": "vnt", "kiekis": 2.0, "manual_override": True,
+             "_sablono_eile": None}
+    # Name the family the way the frontend does: from a previous render.
+    first = client.post(f"/api/projects/{PROJECT_A}/samata-render").json()
+    fam = next(r for r in first["eilutes"]
+               if r["aprasymas"] == "Išgalvotas vienkartinis darbas")
+    typed["_sablono_eile"] = fam["_sablono_eile"]
+
+    out = client.post(f"/api/projects/{PROJECT_A}/samata-render",
+                      json={"darbu_sarasas": [typed], "patalpos": []}).json()
+    rows = {r["aprasymas"]: r for r in out["eilutes"]}
+    assert rows["Išgalvotas vienkartinis darbas"]["kiekis"] == 2.0
+    assert rows["Išgalvotas vienkartinis darbas"]["_saltinio_id"] == ["rnk-1"]
+    # The saved r1 is NOT in this render — the body replaced the rows…
+    assert rows["Šiukšlių išvežimas"]["kiekis"] is None
+    # …and the blank note says no rooms were sent.
+    assert rows["Šiukšlių išvežimas"]["_pastaba"] == "Brėžinyje patalpų nerasta — įrašykite"
+    after = json.dumps(_db.get_project(PROJECT_A, user_id=USER_A["id"]),
+                       sort_keys=True, default=str)
+    assert before == after
+
+
+def test_render_body_shape_is_checked(as_user):
+    client = as_user(USER_A)
+    client.post("/api/samata-templates",
+                json={"samatas": [SAMATA_1], "is_default": True})
+    _save_project([])
+    assert client.post(f"/api/projects/{PROJECT_A}/samata-render",
+                       json={"darbu_sarasas": "ne sąrašas"}).status_code == 400
+    assert client.post(f"/api/projects/{PROJECT_A}/samata-render",
+                       json=[1, 2, 3]).status_code == 400
+    # An empty body is still the saved-blob render.
+    assert client.post(f"/api/projects/{PROJECT_A}/samata-render").status_code == 200
+
+
 def test_render_falls_back_to_the_only_template_when_none_is_named(as_user):
     client = as_user(USER_A)
     client.post("/api/samata-templates", json={"samatas": [SAMATA_1]})
