@@ -224,3 +224,50 @@ All six sąmatas carry four price columns; the priced parse is generated locally
 | **corpus mean** | **26.5 %** | **39.3 %** |
 
 Frozen extracts: 19.4 % of rows / 13.4 % of €. Reading: on the live engine the expensive families (paint, GKP, tiles) land closer than the cheap, numerous ones, so by money we reproduce ~40 % of his sąmata today; the missing/way-off tail is many small rows plus a few large misses per project. The € column is the founder's number from here on; the row count stays as the coverage signal.
+
+## Addendum — mapping change 2026-09-05: the table grows from his G/H rows (60 → 81)
+
+Founder rule the same day: the engine is never taught from a sąmata; a sąmata
+only CHECKS. Growing the concept table is a check-side change — names only, no
+quantity enters the engine — and it is reported here because the frozen-table
+test (`test_row_scorecard.py`) pins the count for exactly that reason.
+
+What was added, all from the contractor's own wording on objektas_g/h:
+- **Families we emit, under wording the table did not know:** tiles by format
+  („Plytelės – grindys (60×120 cm)"), „Siūlių glaistas + silikonas" (= fugavimas),
+  „Skylių pjovimas plytelėse", „Plytelių pjovimas 45º kampu", „Plytelės –
+  grindjuostės", „Glaistymo kampų statymas", „GKP sienutė WC …" (= pertvaros
+  sutvirtinimas), magnetinis profilis (= TRACK), potinkinė / virštinkinė dalis
+  of praustuvas, dušas, vonia.
+- **Angokraščiai split in three**, as he bills them: sandarinimas (we emit
+  nothing), glaistymas/dažymas, apdirbimas GKP (= our struktūra row only). His
+  one „Angokraščių apdirbimas GKP" row on objektas_h read +121 % because our
+  two operations on the same 70 m were summed against it; it is +11 % now.
+- **Parents with `parts`** (scorer change, `row_scorecard.score_rows`): his ONE
+  row for work we emit as several — „praustuvo sistemos įrengimas" = potinkinė
+  + virštinkinė, „šviestuvų bei difūzorių apdirbimas" = our two apdirbimas
+  rows, „vonios ir dušo potinkinės" = two families. The parent pools the
+  parts' app rows only when he did not bill the part himself, so objektas_a
+  (bills the parts) scores exactly as before.
+- **Eleven admitted gaps** (app = None): trapas, betonavimas, šildymo remontas,
+  vonios apsiuvimas, bidė rėmas, LED bortelis, smulkūs darbai, langų rėmų
+  sandarinimas, grindų betonavimas prie langų, mozaika, aliuminio užbaigimai,
+  drėgmės surinkėjas. They become template families and stop being „unmapped".
+- `pjovimas_45` tightened: a duct elbow „45° Ø160mm" and „parketlentės 45°
+  eglutė" (objektas_b) are not tile cuts.
+
+| project | rows ±10 % | unmapped before → after | note |
+|---|---:|---:|---|
+| objektas_a | 37,7 % (same) | 0 → 0 | angokraščiai now paired op-for-op |
+| objektas_b | 9,9 % (same) | 19 → 19 | its unmapped rows are MEP/carpentry, not in G/H either |
+| objektas_c | 19,4 % (same) | 8 → 6 | |
+| objektas_d | 32,0 % (same) | 8 → 8 | |
+| **objektas_g** (OOS) | 10,0 % → 0,0 % | **12 → 0** | the two „within ±10 %" rows were lucky pairings (a bidet frame against a bidet shower; a GKP box against the wrong family); now paired honestly they read +200 % / +100 % — one phantom bathroom |
+| **objektas_h** (OOS) | 22,2 % → **29,2 %** | **11 → 0** | praustuvo potinkinė 2 ↔ 2 ✓, angokraščiai +11 %, doors row paired (−56 %) |
+
+Limitation kept on purpose: tiles stay ONE family (`plyteles`). He bills by
+format, we emit by room, so row-level pairing inside the family is numeric
+luck either way; the family Σ (G: 67,56 vs 80,98, +20 %) is the honest figure.
+Template hold-out after the change: offers 71,1 % (was 73,2 % — a few rows that
+used to share a label signature across projects are now distinct concept
+families), ±10 % with suggestions 24,8 % = plain list, unchanged.

@@ -207,7 +207,9 @@ def test_render_returns_his_sections_and_leaves_unverified_cells_blank(as_user):
                       json={"samatas": [SAMATA_1, SAMATA_2],
                             "is_default": True}).json()
     _save_project([
-        {"id": "r1", "aprasymas": "Angokraščių glaistymas", "mato_vnt": "m",
+        # 2026-09-05: his „Angokraščių apdirbimas GKP" is its own family now
+        # (= our GKP struktūra row); the glaistymas/dažymas row is another.
+        {"id": "r1", "aprasymas": "Angokraščių apdirbimas GKP (struktūra)", "mato_vnt": "m",
          "kiekis": 38.0},
         {"id": "r2", "aprasymas": "Šiukšlių išvežimas", "mato_vnt": "m3",
          "kiekis": 5.0, "roll_up": [{"op": "sum", "label": "Σ", "value": 5.0}]},

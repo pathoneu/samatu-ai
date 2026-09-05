@@ -335,8 +335,14 @@ def test_the_frozen_concept_table_loads_and_is_frozen():
     and re-baseline the scorecard doc.
     """
     concepts = load_concepts()
-    assert len(concepts) == 60, (
-        f"the frozen concept table now has {len(concepts)} entries, not 60 — "
+    # 60 → 81 on 2026-09-05: HIS families from the first two out-of-sample
+    # sąmatas (objektas_g/h) — tile rows by format, potinkinė/virštinkinė
+    # dalis, angokraščių sandarinimas/dažymas/GKP, magnetinis profilis, ten
+    # families we do not emit (admitted gaps, app=None) — plus `parts` parents.
+    # Names only; no quantity from any sąmata enters the engine. Reported in
+    # docs/superpowers/research/2026-09-04-row-scorecard-baseline.md.
+    assert len(concepts) == 81, (
+        f"the frozen concept table now has {len(concepts)} entries, not 81 — "
         "adding a concept changes what the scorecard measures; report it as a "
         "mapping change and re-baseline before updating this number")
     assert len({c.key for c in concepts}) == len(concepts), "duplicate key"
@@ -367,3 +373,53 @@ def test_eur_share_weights_by_money_and_is_none_without_prices():
     bare = Scorecard(n_rows=3, n_scored=3, buckets=sc.buckets,
                      rows=[v(r.bucket, None) for r in rows], concepts=[], app_extra=[], unmapped_families=[])
     assert bare.eur_within_10_share is None and bare.eur_scored_total is None
+
+
+# ── Parents and parts (2026-09-05): his one row, our several ─────────────────
+@dataclass
+class PartConcept(FakeConcept):
+    parts: tuple = ()
+
+
+PARTS_TABLE = [
+    PartConcept("sys_parent", _rx(r"sistemos įrengimas"), None,
+                "his one row = our two parts", parts=("part_a", "part_b")),
+    PartConcept("part_a", _rx(r"potinkinės dalies"), _rx(r"potinkinės dalies")),
+    PartConcept("part_b", _rx(r"virštinkinės dalies"), _rx(r"virštinkinės dalies")),
+]
+
+
+def _score_parts(c, a):
+    return score_rows(c, a, concepts=PARTS_TABLE)
+
+
+def test_parent_pools_the_parts_app_rows_when_he_bills_the_parent_only():
+    sc = _score_parts(
+        [_c("1", "Praustuvo sistemos įrengimas", "vnt", 2.0)],
+        [_a("Potinkinės dalies montavimas", "vnt", 2.0),
+         _a("Virštinkinės dalies montavimas", "vnt", 2.0)])
+    v = sc.rows[0]
+    assert v.concept == "sys_parent"
+    assert v.app_quantity == 4.0, v          # 2 + 2 against his 2: the sum IS the counterpart
+    assert sc.app_extra == [], "rows lent to the parent are not ours-nobody-bills"
+
+
+def test_a_part_he_bills_himself_keeps_its_rows_and_the_parent_gets_the_rest():
+    sc = _score_parts(
+        [_c("1", "Praustuvo sistemos įrengimas", "vnt", 2.0),
+         _c("2", "Praustuvo virštinkinės dalies montavimas", "vnt", 2.0)],
+        [_a("Potinkinės dalies montavimas", "vnt", 2.0),
+         _a("Virštinkinės dalies montavimas", "vnt", 2.0)])
+    by = {v.concept: v for v in sc.rows}
+    assert by["part_b"].bucket == "within_10" and by["part_b"].app_quantity == 2.0
+    assert by["sys_parent"].app_quantity == 2.0, "only the un-billed part is pooled"
+    assert by["sys_parent"].bucket == "within_10"
+
+
+def test_without_a_billed_parent_nothing_is_pooled():
+    sc = _score_parts(
+        [_c("1", "Praustuvo potinkinės dalies montavimas", "vnt", 2.0)],
+        [_a("Potinkinės dalies montavimas", "vnt", 2.0),
+         _a("Virštinkinės dalies montavimas", "vnt", 2.0)])
+    assert sc.rows[0].concept == "part_a" and sc.rows[0].bucket == "within_10"
+    assert [e["aprasymas"] for e in sc.app_extra] == ["Virštinkinės dalies montavimas"]

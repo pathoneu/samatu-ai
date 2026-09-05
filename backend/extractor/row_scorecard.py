@@ -412,6 +412,23 @@ def score_rows(contractor_items: Sequence[dict],
         if key is not None:
             a_rows.setdefault(key, []).append(j)
 
+    # ── Parents (2026-09-05): HIS one row for work WE emit as several. ──────
+    # A concept that names `parts` pools the parts' app rows when he billed
+    # the parent and not that part — „Praustuvo potinkinės sistemos įrengimas"
+    # against our potinkinė + virštinkinė rows. Where he bills a part on its
+    # own row, that row keeps its app rows and the parent does not get them.
+    # Rows lent to a parent are not „ours nobody bills" below.
+    lent: set[int] = set()
+    for c in table:
+        parts = tuple(getattr(c, "parts", ()) or ())
+        if not parts or not c_rows.get(c.key) or a_rows.get(c.key):
+            continue
+        pooled = [j for part in parts if not c_rows.get(part)
+                  for j in a_rows.get(part, [])]
+        if pooled:
+            a_rows[c.key] = pooled
+            lent.update(pooled)
+
     # ── Score each concept once, Σ-vs-Σ. ─────────────────────────────────────
     concept_verdicts: list[ConceptVerdict] = []
     by_key: dict[str, ConceptVerdict] = {}
@@ -431,7 +448,8 @@ def score_rows(contractor_items: Sequence[dict],
         pct: float | None = None
         if not scorable:
             bucket, reason = "no_truth_qty", "contractor row carries no quantity"
-        elif c.app is None:
+        elif c.app is None and not arows:
+            # No app pattern and nothing pooled from `parts` — an admitted gap.
             bucket = "missing"
             reason = f"admitted gap — {c.note or 'no app family emits this'}"
         else:
@@ -558,7 +576,7 @@ def score_rows(contractor_items: Sequence[dict],
     extra: list[dict] = []
     for j, p in enumerate(app_rows):
         key = a_concept_of[j]
-        if key is not None and c_rows.get(key):
+        if (key is not None and c_rows.get(key)) or j in lent:
             continue
         extra.append({
             "aprasymas": _app_name(p), "vnt": _app_unit(p),

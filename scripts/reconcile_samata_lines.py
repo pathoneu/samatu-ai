@@ -52,6 +52,14 @@ class Concept:
     # Contractor lines matched / app lines matched — filled in at report time.
     c_rows: list = field(default_factory=list)
     a_rows: list = field(default_factory=list)
+    # 2026-09-05 — HIS one row for work WE emit as several rows („Praustuvo
+    # potinkinės sistemos įrengimas" = our potinkinė + virštinkinė dalis;
+    # „šviestuvų bei difūzorių apdirbimas" = our two apdirbimas rows). A parent
+    # concept names its parts; the scorer pools the parts' app rows under the
+    # parent when he billed the parent and not the parts. App patterns stay
+    # first-match on the parts, so a project where he bills the parts
+    # separately (objektas_a) scores exactly as before.
+    parts: tuple = ()
 
 
 # ORDER MATTERS: the first concept whose `contractor` pattern hits wins, so the
@@ -85,32 +93,47 @@ CONCEPTS: list[Concept] = [
     # sutvirtinimas" (objektas_a), "dėžutčių iš GKP … tualetų mechanizmams"
     # (objektas_c/objektas_d), "dėžutės iš GKP … WC mechanizmams" (objektas_b).
     Concept("pertvaros_sutvirtinimas",
-            _rx(r"pertvar\w*\s+sutvirtinimas|dėžu\w*\W+iš gkp.*(wc|tualet)"),
+            _rx(r"pertvar\w*\s+sutvirtinimas|dėžu\w*\W+iš gkp.*(wc|tualet)|gkp sienut\w*.*(wc|bid)"),
             _rx(r"Pertvaros sutvirtinimas WC mechanizmams"),
             "perpavadinta 2026-07-29 į rangovo formuluotę"),
     Concept("revizines_dureles", _rx(r"revizini\w*\s+durel"),
             _rx(r"Reviziniai dureliai")),
-    Concept("pasleptu_duru_staktos", _rx(r"paslėptų durų stakt"),
-            _rx(r"Durų angų paruošimas beapvadinėms durims")),
+    Concept("pasleptu_duru_staktos", _rx(r"paslėptų durų stakt"), None,
+            "jo staktų eilutė = mūsų vienintelė durų angų eilutė (parts, 2026-09-05)",
+            parts=("duru_angos",)),
     Concept("gk_klijavimas", _rx(r"gipso ?kartono klijavimas"),
             _rx(r"Gipso kartono klijavimas sienai išlyginti"), "checklist"),
     Concept("gkp_pertvaros", _rx(r"pertvar\w*\s+(montavimas|įrengimas)|GKP pertvar"),
             None, "GKP PERTVARŲ m² neskaičiuojam — modelyje tik lubų GKP"),
     Concept("difuzoriai_mont", _rx(r"difūzori\w*\s+montavimas"),
             _rx(r"Difūzorių montavimas")),
+    Concept("sviestuvu_difuzoriu_apd",
+            _rx(r"šviestuv\w*,?\s*bei\s+difūzori\w*\s+apdirbimas|šviestuv\w*\s+ir\s+difūzori\w*\s+apdirbimas"),
+            None, "jo viena eilutė = mūsų šviestuvų + difūzorių apdirbimas (2026-09-05)",
+            parts=("sviestuvai_apd", "difuzoriai_apd")),
     Concept("difuzoriai_apd", _rx(r"difūzori\w*\s+apdirbimas"),
             _rx(r"Difūzorių (apdirbimas|montavimas ir apdirbimas)")),
     Concept("sviestuvai_mont", _rx(r"šviestuv\w*\s+montavimas"),
             _rx(r"šviestuvų montavimas")),
     Concept("sviestuvai_apd", _rx(r"šviestuv\w*\s+apdirbimas"),
             _rx(r"Šviestuvų apdirbimas")),
-    Concept("track_mont", _rx(r"TRACK.*montavimas"),
+    Concept("track_mont", _rx(r"TRACK.*montavimas|karkas\w*\s+paruošimas magnetin|magnetin\w*\s+profil\w*\s+tvirtinim"),
             _rx(r"TRACK apšvietimo sistemos montavimas"), "checklist"),
-    Concept("track_apd", _rx(r"TRACK.*apdirbimas"),
+    Concept("track_apd", _rx(r"TRACK.*apdirbimas|magnetin\w*\s+p\w*ofil\w*\s+apdirbimas"),
             _rx(r"TRACK apšvietimo sistemos apdirbimas"), "checklist"),
+    # 2026-09-05 (objektas_h blind run): his ONE „Angokraščių apdirbimas GKP"
+    # row was scored against our struktūra + glaistymas-dažymas rows SUMMED —
+    # the same 70 m twice, read as +121 %. Three families now, in his words:
+    # sandarinimas (putos/juosta — we emit nothing), glaistymas/dažymas, and
+    # apdirbimas GKP (= our GKP struktūra row only).
+    Concept("angokrasciu_sandarinimas",
+            _rx(r"angokrašč\w*\s+sandarin|langų rėmų sandarin"), None,
+            "sandarinimas / langų rėmų sandarinimas perimetru — neemit'inam"),
+    Concept("angokrasciai_dazymas", _rx(r"angokrašč\w*\s+(glaistymas|dažymas)"),
+            _rx(r"Angokraščių glaistymas-dažymas")),
     Concept("angokrasciai", _rx(r"angokrašč"),
-            _rx(r"Angokraščių (glaistymas|apdirbimas)"),
-            "jis skiria sandarinimą nuo apdirbimo — mes glaistymą nuo GKP struktūros"),
+            _rx(r"Angokraščių apdirbimas GKP"),
+            "jo 'apdirbimas GKP' = mūsų GKP struktūra; dažymas — atskiras konceptas"),
 
     # ── Sienų lubų glaistymas dažymas ───────────────────────────────────────
     Concept("rotband", _rx(r"lyginimas sausu|rotband"), _rx(r"Rotband")),
@@ -119,25 +142,31 @@ CONCEPTS: list[Concept] = [
             "iki/virš 3 m eilutės atitinka 1:1"),
     # `beapva\w*din` — objektas_b nr 19 is typed "beapvasdinėms".
     Concept("duru_angos", _rx(r"beapva\w*din"), _rx(r"beapvadinėms durims")),
-    Concept("dazymo_kampai", _rx(r"dažymo kampų"), _rx(r"Dažymo kampų montavimas")),
+    Concept("dazymo_kampai", _rx(r"dažymo kampų|glaistymo kampų statym"),
+            _rx(r"Dažymo kampų montavimas"),
+            "objektas_g: Glaistymo kampų statymas (2026-09-05)"),
     Concept("molio_tinkas", _rx(r"molio tink"), _rx(r"molio tinku")),
 
     # ── Plytelių klijavimas ─────────────────────────────────────────────────
-    Concept("plyteles", _rx(r"plytel\w*\s+klijavimas"),
+    Concept("plyteles", _rx(r"plytel\w*\s+klijavimas|plytelės\s*-\s*(grindys|sienos)"),
             _rx(r"plytelių klijavimas"),
             "jis skirsto pagal formatą (120×60/120×120/90×90), mes pagal vietą"),
     Concept("lentyneles", _rx(r"lentynėl"), _rx(r"Lentynėlių iš plytelių")),
     Concept("nuolydis", _rx(r"nuolydžio formavimas"), _rx(r"Nuolydžio formavimas")),
     Concept("hidroizoliacija", _rx(r"hidroizoliacij"), _rx(r"Hidroizoliacijos įrengimas")),
-    Concept("skyliu_grezimas", _rx(r"skyl\w*\s+gręžimas"), _rx(r"Skylių gręžimas")),
+    Concept("skyliu_grezimas", _rx(r"skyl\w*\s+(gręžimas|pjovimas)\s+plytel|skyl\w*\s+gręžimas"),
+            _rx(r"Skylių gręžimas")),
     Concept("latakai", _rx(r"latak"), _rx(r"latako montavimas")),
     Concept("silikonavimas", _rx(r"silikonavimas"), _rx(r"silikonavimas")),
-    Concept("plyteliu_grindjuostes", _rx(r"grindjuosč\w*\s+supjovimas"),
+    Concept("plyteliu_grindjuostes",
+            _rx(r"grindjuosč\w*\s+supjovimas|plytelės\s*-\s*grindjuost|plytelių grindjuost"),
             _rx(r"Plytelių grindjuosčių supjovimas"),
             "nauja 2026-07-29 — plytelėtų grindų patalpų grindjuostės"),
-    Concept("pjovimas_45", _rx(r"45\s*[⁰°]|supjovimas 45|45\s*laipsn"),
+    # Tightened 2026-09-05: „45° Ø160mm" (a duct elbow) and „45° eglutė"
+    # (parquet) are not tile cuts; his tile rows all say „… 45⁰/º kampu".
+    Concept("pjovimas_45", _rx(r"plytel\w*\s+(su)?pjovimas\s+45|45\s*[⁰°º]\s*kampu|45\s*laipsn\w*\s*kampu"),
             _rx(r"45° pjovimas")),
-    Concept("fugavimas", _rx(r"fugav|glaistymas epoksid"), _rx(r"plytelių fugavimas")),
+    Concept("fugavimas", _rx(r"fugav|glaistymas epoksid|siūlių glaist"), _rx(r"plytelių fugavimas")),
 
     # ── Grindys ─────────────────────────────────────────────────────────────
     Concept("isliginamasis", _rx(r"išlyginam\w*\s+(sluoksni|pylimas)|išlyginamojo"),
@@ -151,11 +180,35 @@ CONCEPTS: list[Concept] = [
     # ── Santechnikos darbai ─────────────────────────────────────────────────
     Concept("lauko_ciaupas", _rx(r"lauko laistymo|lauko čiaup|vandens taš\w* laistymui"),
             None, "LAUKO įranga — interjero modulis skaito tik vidaus planus"),
-    Concept("vonios_maisytuvas", _rx(r"vonios (maišytuv|sistem)"),
-            _rx(r"vonios maišytuvo")),
-    Concept("praustuvo_maisytuvas", _rx(r"praustuv\w*\s+(maišytuv|sistem)"),
-            _rx(r"praustuvės maišytuvo")),
-    Concept("duso_maisytuvas", _rx(r"dušo (maišytuv|sistem)"), _rx(r"dušo maišytuvo")),
+    # 2026-09-05: he bills the potinkinė and virštinkinė dalis as two rows on
+    # some projects (a, b), one „sistemos įrengimas" row on others (c), and on
+    # objektas_h ONE row for „vonios ir dušo potinkinės sistemos potinkinės
+    # dalies". Parts first (first-match on both sides), parents pool them.
+    Concept("vonios_duso_potinkine", _rx(r"vonios ir dušo.*potinkin"), None,
+            "jo viena eilutė = mūsų vonios + dušo potinkinės dalys",
+            parts=("vonios_potinkine", "duso_potinkine")),
+    Concept("vonios_potinkine", _rx(r"vonios.*potinkin\w*\s+dalies"),
+            _rx(r"vonios maišytuvo potinkinės dalies")),
+    Concept("vonios_virstinkine", _rx(r"vonios.*virštinkin"),
+            _rx(r"vonios maišytuvo virštinkinės dalies")),
+    Concept("vonios_maisytuvas", _rx(r"vonios (maišytuv|sistem)"), None,
+            "sistema / maišytuvo montavimas = abi dalys",
+            parts=("vonios_potinkine", "vonios_virstinkine")),
+    Concept("praustuvo_potinkine", _rx(r"praustuv\w*.*potinkin\w*\s+dalies"),
+            _rx(r"praustuvės maišytuvo potinkinės dalies")),
+    Concept("praustuvo_virstinkine", _rx(r"praustuv\w*.*virštinkin"),
+            _rx(r"praustuvės maišytuvo virštinkinės dalies")),
+    Concept("praustuvo_maisytuvas", _rx(r"praustuv\w*\s+(maišytuv|sistem)"), None,
+            "sistema = abi dalys", parts=("praustuvo_potinkine", "praustuvo_virstinkine")),
+    Concept("duso_potinkine", _rx(r"dušo.*potinkin\w*\s+dalies"),
+            _rx(r"dušo maišytuvo potinkinės dalies")),
+    Concept("duso_virstinkine", _rx(r"dušo.*virštinkin"),
+            _rx(r"dušo maišytuvo virštinkinės dalies")),
+    Concept("duso_maisytuvas", _rx(r"dušo (maišytuv|sistem)"), None,
+            "sistema = abi dalys", parts=("duso_potinkine", "duso_virstinkine")),
+    # objektas_g: a bidet FRAME („Potinkinio bidė rėmo montavimas") is not the
+    # bidet shower we emit — before 2026-09-05 it paired with „Bidė dušiuko".
+    Concept("bide_remas", _rx(r"bidė rėmo"), None, "potinkinis bidė rėmas — neemit'inam"),
     Concept("bide", _rx(r"bide\w*\s+dušiuk|bidė"), _rx(r"Bidė dušiuko"), "checklist"),
     Concept("wc_remas", _rx(r"WC rėmo"), _rx(r"WC rėmo montavimas")),
     Concept("klozetas", _rx(r"klozeto montavimas"), _rx(r"Klozeto montavimas")),
@@ -191,6 +244,30 @@ CONCEPTS: list[Concept] = [
     # ── Statybvietės išlaidos ───────────────────────────────────────────────
     Concept("siuksles", _rx(r"šiukšl"), _rx(r"Šiukšlių išvežimas")),
     Concept("pastoliai", _rx(r"pastoli"), _rx(r"Pastolių nuoma")),
+
+    # ── His families we do not emit (objektas_g / objektas_h, 2026-09-05) ─────
+    # Names only — no quantity from any sąmata enters the engine. Each becomes
+    # a template family and an ADMITTED gap in the scorecard instead of an
+    # „unmapped" row; the note says what would compute it.
+    Concept("trapas", _rx(r"trap\w*\s+montavimas"), None,
+            "santechnikos plane 'Trapas' etiketes — suskaiciuojama is teksto"),
+    Concept("betonavimas_grindu", _rx(r"betonavimas,?\s*grindų lyginim"), None,
+            "kompl. — vonios grindų paruošimas"),
+    Concept("sildymo_remontas", _rx(r"šildymo vamzd\w*\s+remont"), None,
+            "apžiūros eilutė"),
+    Concept("vonios_apsiuvimas", _rx(r"vonios\W+apsiuvimas"), None,
+            "vonios apsiuvimas plytelėmis — kompl."),
+    Concept("led_bortelis", _rx(r"bortel\w*\s+formavim"), None,
+            "bortelis LED nišoje — ilgis lubų plane"),
+    Concept("smulkus_darbai", _rx(r"smulk\w*\s+papildom\w*\s+darb"), None,
+            "vienkartinė eilutė"),
+    Concept("grindu_betonavimas_prie_langu", _rx(r"grindų betonavimas prie langų"), None,
+            "langų iki grindų pločių suma — kai langai nuskaitomi"),
+    Concept("mozaika", _rx(r"mozaik"), None, "mozaikos plotas iš išklotinių"),
+    Concept("aliuminio_uzbaigimai",
+            _rx(r"aliumini\w*\s+plytelių užbaigim|aliuminio apdailinio kampo"), None,
+            "plytelių užbaigimo profiliai — kampų ilgis"),
+    Concept("dregmes_surinkejas", _rx(r"drėgmės surinkėj"), None, "nuoma"),
 ]
 
 _SUBTOTAL = _rx(r"^viso\b")

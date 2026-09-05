@@ -103,6 +103,25 @@ Read the walls column as the real open work: b (largest TP, known height
 issues), c (phantom rooms), d (soffit faces not read), H (full-height windows
 + 2,82 m default height). Ceilings are closed wherever a table exists.
 
+### Item 2 — DONE 2026-09-05: his words → ours, names only
+
+The frozen concept table grew 60 → 81 from the G/H rows (his wording only; no
+quantity enters the engine): tiles by format, potinkinė/virštinkinė dalis,
+angokraščiai split in three (his one „apdirbimas GKP" row was scored against
+our two operations summed → +121 %, now +11 %), magnetinis profilis = TRACK,
+eleven admitted gaps named. The scorer learned „parents with parts" (his one
+row for work we emit as several) without changing how objektas_a scores.
+Result: unmapped rows G 12 → 0, H 11 → 0; H rows within ±10 % 22 % → 29 %;
+G's two former „hits" were lucky pairings and now read honestly (+200 % /
++100 % — the phantom bathroom). In-sample unchanged. Full report:
+`research/2026-09-04-row-scorecard-baseline.md`, mapping-change addendum.
+
+Fallout found on the way (engine, next): Rotband is derived from the PAINTED
+wall, so item 1 pulled it down (H −34 % → −44 %) — levelling goes under tile
+too; the tile-skirting rule counts a fraction of the tiled rooms (G −69 %;
+the architect's sheet says 24,97 m); hole drilling over-generates (G +84 %);
+hidroizoliacija is emitted in vnt, his row is m².
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects
