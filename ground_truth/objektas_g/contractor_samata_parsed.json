@@ -1,0 +1,213 @@
+{
+  "slug": "objektas_g",
+  "source": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_g/samata-aktas.pdf",
+  "n_line_items": 20,
+  "sections": [
+    "Gipso kartono montavimo darbai",
+    "Vonios kambario paruošimas",
+    "Plytelių klijavimas",
+    "Dažymo darbai"
+  ],
+  "line_items": [
+    {
+      "page": 1,
+      "nr": "1",
+      "section": "Gipso kartono montavimo darbai",
+      "name": "GKP sienutė WC ir bidė rėmų ir komunikacijų apsiuvimui",
+      "unit": "kompl",
+      "quantity": 1.0,
+      "raw_qty": "1",
+      "raw_unit": "kompl."
+    },
+    {
+      "page": 1,
+      "nr": "2",
+      "section": "Gipso kartono montavimo darbai",
+      "name": "GKP sienutė WC rėmo ir komunikacijų apsiuvimui ( iki lubų)",
+      "unit": "kompl",
+      "quantity": 1.0,
+      "raw_qty": "1",
+      "raw_unit": "kompl."
+    },
+    {
+      "page": 1,
+      "nr": "3",
+      "section": "Vonios kambario paruošimas",
+      "name": "Betonavimas, grindų lyginimas",
+      "unit": "kompl",
+      "quantity": 2.0,
+      "raw_qty": "2",
+      "raw_unit": "kompl."
+    },
+    {
+      "page": 1,
+      "nr": "4",
+      "section": "Vonios kambario paruošimas",
+      "name": "Dušo latako montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "5",
+      "section": "Vonios kambario paruošimas",
+      "name": "Trapo montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "6",
+      "section": "Vonios kambario paruošimas",
+      "name": "Dušo nuolydžio formavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "7",
+      "section": "Vonios kambario paruošimas",
+      "name": "Potinkinio bidė rėmo montavimas ir tvirtinimas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "8",
+      "section": "Vonios kambario paruošimas",
+      "name": "Potinkinio WC rėmo montavimas ir tvirtinimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "9",
+      "section": "Vonios kambario paruošimas",
+      "name": "Grindinio šildymo vamzdelių remontas",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "10",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelės - grindys (60*120 cm)",
+      "unit": "m2",
+      "quantity": 10.91,
+      "raw_qty": "10,91",
+      "raw_unit": "kv. m."
+    },
+    {
+      "page": 1,
+      "nr": "11",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelės - sienos san mazguose (60*120 cm)",
+      "unit": "m2",
+      "quantity": 46.06,
+      "raw_qty": "46,06",
+      "raw_unit": "kv. m."
+    },
+    {
+      "page": 1,
+      "nr": "12",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelės - grindys (60*60 cm)",
+      "unit": "m2",
+      "quantity": 10.59,
+      "raw_qty": "10,59",
+      "raw_unit": "kv. m."
+    },
+    {
+      "page": 1,
+      "nr": "13",
+      "section": "Plytelių klijavimas",
+      "name": "Skylių pjovimas plytelėse",
+      "unit": "vnt",
+      "quantity": 32.0,
+      "raw_qty": "32",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "14",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelių pjovimas 45º kampu",
+      "unit": "m",
+      "quantity": 12.08,
+      "raw_qty": "12,08",
+      "raw_unit": "m."
+    },
+    {
+      "page": 1,
+      "nr": "15",
+      "section": "Plytelių klijavimas",
+      "name": "Vonios \"apsiuvimas\" plytelėmis",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1",
+      "raw_unit": "vnt."
+    },
+    {
+      "page": 1,
+      "nr": "16",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelės - grindjuostės",
+      "unit": "m",
+      "quantity": 26.87,
+      "raw_qty": "26,87",
+      "raw_unit": "m."
+    },
+    {
+      "page": 1,
+      "nr": "17",
+      "section": "Plytelių klijavimas",
+      "name": "Siūlių glaistas + silikonas",
+      "unit": "m2",
+      "quantity": 67.56,
+      "raw_qty": "67,56",
+      "raw_unit": "kv.m."
+    },
+    {
+      "page": 1,
+      "nr": "18",
+      "section": "Plytelių klijavimas",
+      "name": "Hidroizoliacija",
+      "unit": "m2",
+      "quantity": 39.5,
+      "raw_qty": "39,5",
+      "raw_unit": "kv. m."
+    },
+    {
+      "page": 1,
+      "nr": "19",
+      "section": "Dažymo darbai",
+      "name": "Sienų glaistymas/ dažymas (su dažų kaina)",
+      "unit": "m2",
+      "quantity": 239.4,
+      "raw_qty": "239,4",
+      "raw_unit": "kv. m."
+    },
+    {
+      "page": 1,
+      "nr": "20",
+      "section": "Dažymo darbai",
+      "name": "Glaistymo kampų statymas",
+      "unit": "m",
+      "quantity": 134.72,
+      "raw_qty": "134,72",
+      "raw_unit": "m."
+    }
+  ]
+}

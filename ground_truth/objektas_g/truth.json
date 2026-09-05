@@ -1,0 +1,65 @@
+{
+  "$schema_version": 1,
+  "project_id": "objektas_g",
+  "name": "Objektas G (Butas, naujas namas)",
+  "pdf_path": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_g/project.pdf",
+  "source": {
+    "samata_pdf": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_g/samata-aktas.pdf",
+    "contractor": "Rangovas A",
+    "date_collected": "2026-09-05",
+    "document_kind": "atliktu_darbu_aktas (contract quantities column = his takeoff; acted-2026-08-24 column noted where it differs)"
+  },
+  "notes_for_evaluator": "OUT-OF-SAMPLE (second batch, 2026-09-05): never used to tune a rule, prompt, concept or calibration. Interior project of a flat in a new-build (16 pages: baldų/pertvarų/sienų apdailos planai, grindų, lubų, elektros, durų/grindjuosčių lapai, vonios išklotinės, vizualizacijos). NO patalpų eksplikacija table — dimensions are on the pertvarų planas; the sienų apdailos planas legend states painted walls 202 + 18 = 220 m² and stone tiles 60x120. Contractor scope is bathroom prep + tiles + WALL paint only: his paint row is 'Sienų glaistymas/dažymas' (walls), no GKP ceilings and no ceiling paint are billed, no skirting except tile skirting, no floors. A whole-flat walls+ceilings paint figure is therefore NOT comparable to his 239,4 — see the ceiling key. gt_dimensions empty.",
+  "floor_total_sanity_check_m2": null,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 239.4,
+      "confidence": "green",
+      "source": "aktas row 19 'Sienų glaistymas/ dažymas (su dažų kaina)' — WALLS ONLY in this scope",
+      "notes": "Acted 2026-08-24: 179,54 done, 59,86 left. Architect's apdailos legend: 202 + 18 = 220 m² painted walls. His figure is 8,8 % above the architect's."
+    },
+    "walls_paint_total_m2": {
+      "value": 239.4,
+      "confidence": "derived",
+      "source": "derived: = row 19 (no ceiling paint billed in this scope)"
+    },
+    "ceiling_paint_total_m2": {
+      "value": null,
+      "confidence": "absent",
+      "source": "not billed — ceilings outside this contractor's scope on this flat (unknown who finishes them)",
+      "notes": "Left None on purpose: scoring 0 would punish the app for a scope decision the drawing does not state. The blind run's ceiling figure is recorded in the run notes instead."
+    },
+    "kampu_metrai_m": {
+      "value": 134.72,
+      "confidence": "green",
+      "source": "aktas row 20 'Glaistymo kampų statymas'"
+    },
+    "plyteles_grindys_total_m2": {
+      "value": 21.5,
+      "confidence": "green",
+      "source": "aktas rows 10 + 12: 10,91 (60x120) + 10,59 (60x60)"
+    },
+    "plyteles_sienos_total_m2": {
+      "value": 46.06,
+      "confidence": "green",
+      "source": "aktas row 11 'Plytelės - sienos san mazguose (60*120 cm)'"
+    },
+    "plyteles_sienos_grindys_combined_m2": {
+      "value": 67.56,
+      "confidence": "green",
+      "source": "rows 10+11+12 = 67,56; equals row 17 'Siūlių glaistas + silikonas' 67,56 m² (his own tile total)"
+    },
+    "hidroizoliacija_m2": {
+      "value": 39.5,
+      "confidence": "green",
+      "source": "aktas row 18 'Hidroizoliacija' (not a harness metric yet — row scorecard only)"
+    },
+    "plyteliu_grindjuostes_m": {
+      "value": 26.87,
+      "confidence": "green",
+      "source": "aktas row 16 'Plytelės - grindjuostės' (tile skirting in wet rooms; NOT whole-flat skirting — do not map to grindjuostes_total_m)"
+    }
+  }
+}

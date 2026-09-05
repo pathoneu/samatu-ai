@@ -218,6 +218,11 @@ def main() -> int:
     results: list[dict] = []
     for entry in reg.get("projects", []):
         slug = entry["slug"]
+        # A sąmata parsed by hand (an act's group-column layout, an xlsx) must
+        # not be overwritten by this table parser — the registry says so.
+        if entry.get("samata_parsed_by_hand"):
+            print(f"  {slug}: samata_parsed_by_hand in registry — skip (do not overwrite)")
+            continue
         samata_path = entry.get("samata_pdf")
         if not samata_path:
             print(f"  {slug}: no samata_pdf in registry — skip")

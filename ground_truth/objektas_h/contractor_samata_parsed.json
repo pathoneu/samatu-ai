@@ -1,0 +1,329 @@
+{
+  "slug": "objektas_h",
+  "source": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/samata.xlsx",
+  "n_line_items": 35,
+  "sections": [
+    "Gipso kartono montavimas",
+    "Sienų lubų glaistymas dažymas",
+    "Plytelių klijavimas",
+    "Santechnikos darbai",
+    "Statybvietės išlaidos"
+  ],
+  "line_items": [
+    {
+      "page": 1,
+      "nr": "1",
+      "section": "Gipso kartono montavimas",
+      "name": "GKP monatavimas ant lubų, įrengiant dvigubą karkasą",
+      "unit": "m2",
+      "quantity": 137.71,
+      "raw_qty": "137,71"
+    },
+    {
+      "page": 1,
+      "nr": "2",
+      "section": "Gipso kartono montavimas",
+      "name": "Karkaso paruošimas magnetinio profilio tvirtinimui",
+      "unit": "m",
+      "quantity": 31.26,
+      "raw_qty": "31,26"
+    },
+    {
+      "page": 1,
+      "nr": "3",
+      "section": "Gipso kartono montavimas",
+      "name": "GKP pertvaru įrengimas, montuojant keturis sluoksnius gipso kartono ir apšiltinant vata",
+      "unit": "m2",
+      "quantity": 19.35,
+      "raw_qty": "19,35"
+    },
+    {
+      "page": 1,
+      "nr": "4",
+      "section": "Gipso kartono montavimas",
+      "name": "Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)",
+      "unit": "m",
+      "quantity": 33.19,
+      "raw_qty": "33,19"
+    },
+    {
+      "page": 1,
+      "nr": "5",
+      "section": "Gipso kartono montavimas",
+      "name": "Bortelio formavimas svetainės led nišoje",
+      "unit": "m",
+      "quantity": 11.8,
+      "raw_qty": "11,8"
+    },
+    {
+      "page": 1,
+      "nr": "6",
+      "section": "Gipso kartono montavimas",
+      "name": "Dėžutčių iš GKP formavimas tualetų mechanizmams paslėpti",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "7",
+      "section": "Gipso kartono montavimas",
+      "name": "Nišų pertvarose įrengimas",
+      "unit": "m",
+      "quantity": 13.68,
+      "raw_qty": "13,68"
+    },
+    {
+      "page": 1,
+      "nr": "8",
+      "section": "Gipso kartono montavimas",
+      "name": "Priglaistomų gipsinių difūzorių montavimas",
+      "unit": "vnt",
+      "quantity": 7.0,
+      "raw_qty": "7"
+    },
+    {
+      "page": 1,
+      "nr": "9",
+      "section": "Gipso kartono montavimas",
+      "name": "Priglaistomų plyšinių difūzorių montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "10",
+      "section": "Gipso kartono montavimas",
+      "name": "Lubinių priglaistomų šviestuvų  montavimas",
+      "unit": "vnt",
+      "quantity": 20.0,
+      "raw_qty": "20"
+    },
+    {
+      "page": 1,
+      "nr": "11",
+      "section": "Gipso kartono montavimas",
+      "name": "Smulkūs papildomi darbai",
+      "unit": "vnt",
+      "quantity": 1.0,
+      "raw_qty": "1"
+    },
+    {
+      "page": 1,
+      "nr": "12",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų lyginimas sausu gipsiniu tinku \"Rotband\"",
+      "unit": "m2",
+      "quantity": 168.83,
+      "raw_qty": "168,83"
+    },
+    {
+      "page": 1,
+      "nr": "13",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Sienų, lubų glaistymas/dažymas",
+      "unit": "m2",
+      "quantity": 412.88,
+      "raw_qty": "412,88"
+    },
+    {
+      "page": 1,
+      "nr": "14",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Angų beapvadinėms durims glaistymas dažymas",
+      "unit": "m",
+      "quantity": 40.94,
+      "raw_qty": "40,94"
+    },
+    {
+      "page": 1,
+      "nr": "15",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Dažymo kampų montavimas",
+      "unit": "m",
+      "quantity": 412.94,
+      "raw_qty": "412,94"
+    },
+    {
+      "page": 1,
+      "nr": "16",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų magnetinių ptofilių apdirbimas",
+      "unit": "m",
+      "quantity": 31.26,
+      "raw_qty": "31,26"
+    },
+    {
+      "page": 1,
+      "nr": "17",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Priglaistomų gipsinių šviestuvų, bei difūzorių apdirbimas",
+      "unit": "vnt",
+      "quantity": 27.0,
+      "raw_qty": "27"
+    },
+    {
+      "page": 1,
+      "nr": "18",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Angokraščių apdirbimas GKP",
+      "unit": "m",
+      "quantity": 63.23,
+      "raw_qty": "63,23"
+    },
+    {
+      "page": 1,
+      "nr": "19",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Langų rėmų sandarinimas perimetru",
+      "unit": "m",
+      "quantity": 74.95,
+      "raw_qty": "74,95"
+    },
+    {
+      "page": 1,
+      "nr": "20",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Grindų betonavimas prie langų rėmų",
+      "unit": "m",
+      "quantity": 11.72,
+      "raw_qty": "11,72"
+    },
+    {
+      "page": 1,
+      "nr": "21",
+      "section": "Sienų lubų glaistymas dažymas",
+      "name": "Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas",
+      "unit": "m",
+      "quantity": 33.19,
+      "raw_qty": "33,19"
+    },
+    {
+      "page": 1,
+      "nr": "22",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelių klijavimas ant sienų ir grindų 1200x600 *",
+      "unit": "m2",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "23",
+      "section": "Plytelių klijavimas",
+      "name": "Mozaikos klijavimas (kaina nuo)",
+      "unit": "m2",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "24",
+      "section": "Plytelių klijavimas",
+      "name": "Nuolydžio formavimas dušo kabinoje",
+      "unit": "vnt",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "25",
+      "section": "Plytelių klijavimas",
+      "name": "Hidroizoliacijos įrengimas",
+      "unit": "vnt",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "26",
+      "section": "Plytelių klijavimas",
+      "name": "Skylių gręžimas plytelėse",
+      "unit": "vnt",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "27",
+      "section": "Plytelių klijavimas",
+      "name": "Kampų silikonavimas",
+      "unit": "m",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "28",
+      "section": "Plytelių klijavimas",
+      "name": "Aliuminių plytelių užbaigimų montavimas",
+      "unit": "m",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "29",
+      "section": "Plytelių klijavimas",
+      "name": "Plytelių supjovimas 45⁰ kampu",
+      "unit": "m",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "30",
+      "section": "Santechnikos darbai",
+      "name": "Wc rėmo montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "31",
+      "section": "Santechnikos darbai",
+      "name": "Praustuvo potinkinės sistemos potinkinės dalies montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "32",
+      "section": "Santechnikos darbai",
+      "name": "Vonios ir dušo potinkinės sistemos potinkinės dalies montavimas",
+      "unit": "vnt",
+      "quantity": 2.0,
+      "raw_qty": "2"
+    },
+    {
+      "page": 1,
+      "nr": "33",
+      "section": "Statybvietės išlaidos",
+      "name": "Šiukšlių išvežimas",
+      "unit": "m3",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "34",
+      "section": "Statybvietės išlaidos",
+      "name": "Pastolių nuoma (aukštesnių nei 3m)",
+      "unit": "d.d.",
+      "quantity": null,
+      "raw_qty": null
+    },
+    {
+      "page": 1,
+      "nr": "35",
+      "section": "Statybvietės išlaidos",
+      "name": "Drėgmės surinkėjo nuoma",
+      "unit": "d.d.",
+      "quantity": null,
+      "raw_qty": null
+    }
+  ]
+}

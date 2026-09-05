@@ -74,7 +74,7 @@ def _merge_registry_yaml() -> None:
         # registry-excluded score got hand-averaged into a "corpus MAE".
         for flag in ("scope_mismatch", "scope_mismatch_reason",
                      "blocked_for_vision_extraction", "blocked_partial_input",
-                     "blocked_reason", "ablation_of"):
+                     "blocked_reason", "ablation_of", "out_of_sample"):
             if entry.get(flag):
                 merged[flag] = entry[flag]
         REGISTRY[slug] = merged
@@ -1311,12 +1311,26 @@ def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
         # shouted, because a frozen row can neither show a fix nor catch a
         # regression (see run_totals_only_multi's docstring).
         engine = "live" if s.get("recomputed") else "FROZEN"
+        # Out-of-sample rows are scored like the rest but wear a tag and stay
+        # out of the Average below (see run_totals_only_multi).
+        if s.get("out_of_sample"):
+            engine += " OOS"
         print(f"  {s['slug']:<14} {_fmt(combined):>15} {_fmt(walls):>9} "
               f"{_fmt(ceiling):>10} "
               f"{('—' if mae is None else f'{mae:.2f}%'):>8}  {engine:<9}")
     print("  " + "─" * 71)
     avg_line = "—" if overall_mae is None else f"{overall_mae:.2f}%"
-    print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}")
+    print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}  (in-sample; OOS rows excluded)")
+    # The generalisation number, from the same metric observations, never
+    # blended with the line above.
+    oos = [(s["mae_pct"], s.get("metrics_scored") or 0) for s in per_project_summary
+           if s.get("out_of_sample") and s.get("status") == "ok" and s.get("mae_pct") is not None]
+    n_oos = sum(n for _, n in oos)
+    if n_oos:
+        slugs = ", ".join(s["slug"] for s in per_project_summary if s.get("out_of_sample"))
+        pooled = sum(m * n for m, n in oos) / n_oos      # same pooling as the corpus MAE
+        print(f"  {'Out-of-sample':<14} {'':>15} {'':>9} {'':>10} {pooled:>7.2f}%  "
+              f"(n={n_oos} obs. on {slugs}; never tuned on)")
     if any(s.get("status") == "ok" and not s.get("recomputed")
            for s in per_project_summary):
         print("\n  ⚠ FROZEN rows score the numbers saved in ai_extract.json, not "
@@ -1416,6 +1430,14 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
     run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only"
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # OUT-OF-SAMPLE (2026-09-05): projects the engine was never tuned on. They
+    # are scored exactly like the others but their errors never enter the
+    # corpus mean — that mean is the in-sample number a rule change is gated
+    # on, and folding a fresh project into it would let one bad new PDF look
+    # like a regression of the fix and one lucky one hide a real regression.
+    # Their own mean is printed as a separate line: the generalisation number.
+    oos_pct_errors: list[float] = []
+    oos_slugs: list[str] = []
     for entry in projects:
         slug = entry["slug"]
         # Per-registry exclusions: scope_mismatch, blocked_for_vision_extraction,
@@ -1533,15 +1555,24 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
                 for r in scored
             ],
         })
-        for r in scored:
-            all_pct_errors.append(abs(r.pct_error))
+        if entry.get("out_of_sample"):
+            per_project_summary[-1]["out_of_sample"] = True
+            per_project_summary[-1]["excluded_from_mae"] = True
+            oos_slugs.append(slug)
+            for r in scored:
+                oos_pct_errors.append(abs(r.pct_error))
+        else:
+            for r in scored:
+                all_pct_errors.append(abs(r.pct_error))
 
         # Read-only second instrument on the same `parsed`. It cannot move the
         # headline numbers above (already computed) and it never rebuilds rows.
         sc = _score_rows_of(parsed, slug)
         if sc is not None:
             per_project_summary[-1]["row_scorecard"] = sc.as_dict()
-            if slug != ROW_SCORECARD_HOLDOUT:
+            if entry.get("out_of_sample"):
+                rows_excluded.append((slug, sc, "OUT-OF-SAMPLE — not in the mean"))
+            elif slug != ROW_SCORECARD_HOLDOUT:
                 rows_scored.append((slug, sc))
             else:
                 rows_excluded.append((slug, sc, "HOLDOUT"))
@@ -1568,11 +1599,17 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
 
     overall_mae = (sum(all_pct_errors) / len(all_pct_errors)
                    if all_pct_errors else None)
+    oos_mae = (sum(oos_pct_errors) / len(oos_pct_errors)
+               if oos_pct_errors else None)
     baseline = {
         "ts": ts,
         "registry": str(registry_path.relative_to(REPO_ROOT)),
         "overall_mae_pct": round(overall_mae, 3) if overall_mae is not None else None,
         "n_metric_observations": len(all_pct_errors),
+        # The generalisation number — never blended with the line above.
+        "out_of_sample_mae_pct": round(oos_mae, 3) if oos_mae is not None else None,
+        "out_of_sample_projects": oos_slugs,
+        "n_out_of_sample_observations": len(oos_pct_errors),
         # The contractor-facing number, alongside (never instead of) the MAE.
         "rows_within_10_share_mean": (
             round(sum(sc.within_10_share for _, sc in rows_scored)
@@ -1596,6 +1633,10 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
                   f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
         print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
               f"(n={len(all_pct_errors)} metric observations)")
+        if oos_slugs:
+            print(f"  OUT-OF-SAMPLE MAE: {oos_mae if oos_mae is None else f'{oos_mae:.3f}%'}  "
+                  f"(n={len(oos_pct_errors)} observations on {', '.join(oos_slugs)} — "
+                  f"never in the corpus mean)")
         _print_collapsed_footnote(per_project_summary)
         _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
         print(f"  Saved → {out_json}")
@@ -1837,6 +1878,8 @@ def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
         note = ""
         if slug == ROW_SCORECARD_HOLDOUT:
             note = "HOLDOUT — never in the mean"
+        elif entry.get("out_of_sample"):
+            note = "OUT-OF-SAMPLE — not in the mean"
         elif entry.get("scope_mismatch"):
             note = "registry: scope mismatch — not in the mean"
         elif entry.get("blocked_for_vision_extraction") or entry.get(

@@ -102,3 +102,4 @@ backend/.confidential-terms
 
 # contractor unit prices are commercially confidential — never tracked
 ground_truth/*/contractor_samata_priced.json
+docs/superpowers/fixtures/**/*.xlsx

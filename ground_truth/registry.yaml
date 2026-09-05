@@ -106,6 +106,37 @@ projects:
     has_cached_extract: false
     notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into objektas_d_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
 
+  # ── SECOND BATCH (2026-09-05) — OUT-OF-SAMPLE. Same contractor, two NEW
+  # architects/designers. Rule: never tune a rule, prompt, concept mapping or
+  # calibration factor while looking at these; measure first, diagnose second,
+  # fix on the in-sample corpus, re-measure here. `out_of_sample: true` keeps
+  # them out of the in-sample corpus mean (reported in their own block).
+  - slug: objektas_g
+    name: "Objektas G (Butas, naujas namas)"
+    truth_path: ground_truth/objektas_g/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-09-05-batch-2/objektas_g/project.pdf
+    samata_pdf: docs/superpowers/fixtures/2026-09-05-batch-2/objektas_g/samata-aktas.pdf
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: true
+    samata_parsed_by_hand: true
+    out_of_sample: true
+    blind_result: "Blind 2026-09-05 (runner est. $12.91, 25 min): headline MAE 49.98 %, 2.5 % of his € within ±10 %; 9 rooms read (one phantom bathroom); paint +71 % (ceilings out of scope + tiled walls also painted), corners +122 %; 12/20 rows unmapped by wording (tiles by format)."
+    notes: "16-page interior of a flat in a new-build, vector PDF with text layer. NO eksplikacija table (dimensions on the pertvarų planas; apdailos legend gives 220 m² of painted walls). Truth is an atliktų darbų aktas: bathroom prep + tiles + WALL paint only — ceilings, floors and wooden skirting are outside his scope here. Parsed by hand from the act (parse_all_samatas.py does not read its group-column layout)."
+
+  - slug: objektas_h
+    name: "Objektas H (Namas)"
+    truth_path: ground_truth/objektas_h/truth.json
+    project_pdf: docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.pdf
+    samata_xlsx: docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/samata.xlsx
+    contractor: "Rangovas A"
+    has_gt_dimensions: false
+    has_cached_extract: true
+    samata_parsed_by_hand: true
+    out_of_sample: true
+    blind_result: "Blind 2026-09-05 (runner est. $8.10, 12 min): headline MAE 14.19 %, 31.8 % of his € within ±10 %; 11/11 rooms exact from the table; GKP ceilings −1 %, corners +6 %; paint +24 % (tiled bathroom walls also painted, default window sizes, 2.82 m default height); Rotband −34 %."
+    notes: "8 A4 pages by a designer studio: išdėstymo planas WITH eksplikacija (11 rooms, 143,27 m²), rozečių, apšvietimo, vandens, lubų, sienų dažymo (designer: 320 m²), grindų dangų, pertvarų planai; no išklotinės, no door/window schedule. Truth is an xlsx pasiūlymas (GKP, glaistymas/dažymas, santechnika quantified; tiles + site costs priced without quantities) — parsed by hand (xlsx, not PDF)."
+
   # ── Objektas A ABLATIONS (2026-08-22) — synthetic "foreign projects" with KNOWN truth.
   # We have no out-of-sample interior PDF, so these manufacture the ways a
   # foreign project differs from Objektas A while keeping its contractor-verified

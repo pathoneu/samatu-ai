@@ -1,0 +1,89 @@
+{
+  "$schema_version": 1,
+  "project_id": "objektas_h",
+  "name": "Objektas H (Namas)",
+  "pdf_path": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.pdf",
+  "source": {
+    "samata_xlsx": "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/samata.xlsx",
+    "contractor": "Rangovas A",
+    "date_collected": "2026-09-05",
+    "document_kind": "pasiūlymas 2026-09-03 (xlsx); tiles + statybvietės rows carry unit prices but NO quantities"
+  },
+  "notes_for_evaluator": "OUT-OF-SAMPLE (second batch, 2026-09-05): never used to tune a rule, prompt, concept or calibration. Single-storey house interior by a designer studio, 8 A4 pages: išdėstymo planas WITH patalpų eksplikacija (11 rooms, bendras plotas 143,27 m²), rozečių, apšvietimo, vandens įvadų, lubų, sienų dažymo (designer's own figure: 'Sienų dažai 320 m²'), grindų dangų, pertvarų planai. No išklotinės, no durų/langų žiniaraštis. Contractor quote covers GKP, glaistymas/dažymas, santechnika; tiles and site costs are priced per unit without quantities. gt_dimensions empty.",
+  "floor_total_sanity_check_m2": 143.27,
+  "gt_dimensions": [],
+  "gt_per_room": {},
+  "gt_totals": {
+    "floor_total_m2": {
+      "value": 143.27,
+      "confidence": "green",
+      "source": "drawing p1 PATALPŲ EKSPLIKACIJA 'BENDRAS PLOTAS 143,27' (from the drawing, not the quote)"
+    },
+    "gkp_lubu_iki_3m_m2": {
+      "value": 137.71,
+      "confidence": "green",
+      "source": "pasiūlymas item 1 'GKP monatavimas ant lubų, įrengiant dvigubą karkasą' (one line, no height split)"
+    },
+    "led_nisos_m": {
+      "value": 33.19,
+      "confidence": "green",
+      "source": "pasiūlymas item 4 'Nišų formavimas iš GKP (paslėptam apšvietimui, užuolaidų karnizams ir kt.)'"
+    },
+    "rotband_lyginimas_m2": {
+      "value": 168.83,
+      "confidence": "green",
+      "source": "pasiūlymas item 12 'Sienų lyginimas sausu gipsiniu tinku Rotband'"
+    },
+    "dazymo_walls_plus_ceilings_combined_m2": {
+      "value": 412.88,
+      "confidence": "green",
+      "source": "pasiūlymas item 13 'Sienų, lubų glaistymas/dažymas'"
+    },
+    "walls_paint_total_m2": {
+      "value": 275.17,
+      "confidence": "derived",
+      "source": "derived: 412,88 − billed GKP ceilings 137,71 (item 1)",
+      "notes": "Same identity as objektas_d. Designer's sienų dažymo planas states 320 m² of wall paint — 16 % above this derivation; the two humans disagree."
+    },
+    "ceiling_paint_total_m2": {
+      "value": 137.71,
+      "confidence": "derived",
+      "source": "derived: billed GKP lubos 137,71 (item 1)"
+    },
+    "kampu_metrai_m": {
+      "value": 412.94,
+      "confidence": "green",
+      "source": "pasiūlymas item 15 'Dažymo kampų montavimas'"
+    },
+    "angokrasciu_m": {
+      "value": 63.23,
+      "confidence": "green",
+      "source": "pasiūlymas item 18 'Angokraščių apdirbimas GKP'"
+    },
+    "doors_atkosai_m": {
+      "value": 40.94,
+      "confidence": "green",
+      "source": "pasiūlymas item 14 'Angų beapvadinėms durims glaistymas dažymas' (not a harness metric — row scorecard only)"
+    },
+    "langu_remu_sandarinimas_m": {
+      "value": 74.95,
+      "confidence": "green",
+      "source": "pasiūlymas item 19 'Langų rėmų sandarinimas perimetru' (row scorecard only)"
+    },
+    "sviestuvai_priglaistomi_count": {
+      "value": 20,
+      "confidence": "green",
+      "source": "pasiūlymas item 10"
+    },
+    "difuzoriai_count": {
+      "value": 9,
+      "confidence": "green",
+      "source": "pasiūlymas items 8 + 9 (7 gipsiniai + 2 plyšiniai)"
+    },
+    "gkp_pertvaros_4_sluoksniai_m2": {
+      "value": 19.35,
+      "confidence": "green",
+      "source": "pasiūlymas item 3"
+    }
+  }
+}

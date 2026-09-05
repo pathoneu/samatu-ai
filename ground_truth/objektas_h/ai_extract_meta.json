@@ -1,0 +1,446 @@
+{
+  "slug": "objektas_h",
+  "pdf_path": "/Users/ignasgaldikas/samatu-ai/docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.pdf",
+  "pdf_size_bytes": 1434071,
+  "status": "pending",
+  "error": null,
+  "input_tokens": 109429,
+  "output_tokens": 86058,
+  "cost_usd": 8.0958,
+  "seconds": 735.6731309890747,
+  "n_rooms": 11,
+  "n_pages": null,
+  "metas": [
+    {
+      "event": "rendering_pdf"
+    },
+    {
+      "event": "started",
+      "page_count": 8,
+      "vendor_pages_skipped": [],
+      "page_selection": {
+        "pages_considered": 8,
+        "pages_sent": 8,
+        "pages_skipped": [],
+        "skipped_by_reason": {},
+        "soft_page_cap": 20,
+        "over_soft_cap": false
+      }
+    },
+    {
+      "event": "eksplikacija_started"
+    },
+    {
+      "event": "eksplikacija_completed",
+      "rooms_in_table": 11,
+      "doors_in_table": 0,
+      "windows_in_table": 0
+    },
+    {
+      "event": "pass1_started",
+      "page_count": 8,
+      "voting": true
+    },
+    {
+      "event": "native_pdf_prepared",
+      "input": "document",
+      "fallback_reason": null,
+      "pdf_pages": 8,
+      "pdf_b64_bytes": 1919688,
+      "text_median_chars_page": 1275.5
+    },
+    {
+      "event": "voting_round_started",
+      "round": 1,
+      "of": 3,
+      "model": null
+    },
+    {
+      "event": "voting_round_started",
+      "round": 2,
+      "of": 3,
+      "model": null
+    },
+    {
+      "event": "voting_round_started",
+      "round": 3,
+      "of": 3,
+      "model": null
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 1,
+      "rooms": 11
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 2,
+      "rooms": 11
+    },
+    {
+      "event": "voting_round_completed",
+      "round": 3,
+      "rooms": 11
+    },
+    {
+      "event": "adjacency_applied",
+      "page": 1,
+      "rooms_matched": 33
+    },
+    {
+      "event": "pass1_completed",
+      "rooms_count": 11,
+      "patalpos": [
+        {
+          "nr": "01",
+          "pavadinimas": "Tambūras",
+          "paskirtis": "tamburas",
+          "plotas_m2": 4.48,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "02",
+          "pavadinimas": "Katilinė",
+          "paskirtis": "katiline",
+          "plotas_m2": 6.9,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "03",
+          "pavadinimas": "Koridorius",
+          "paskirtis": "koridorius",
+          "plotas_m2": 10.12,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "04",
+          "pavadinimas": "Virtuvė/valgomasis",
+          "paskirtis": "virtuve",
+          "plotas_m2": 26.31,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "05",
+          "pavadinimas": "Svetainė",
+          "paskirtis": "gyvenamoji",
+          "plotas_m2": 35.5,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "06",
+          "pavadinimas": "Vaiko kambarys",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 15.29,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "07",
+          "pavadinimas": "Vonios kambarys 1",
+          "paskirtis": "san",
+          "plotas_m2": 4.9,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "08",
+          "pavadinimas": "Vonios kambarys 2",
+          "paskirtis": "san",
+          "plotas_m2": 4.32,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "09",
+          "pavadinimas": "Miegamasis kambarys",
+          "paskirtis": "miegamoji",
+          "plotas_m2": 16.84,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "10",
+          "pavadinimas": "Drabužinė",
+          "paskirtis": "drabuzine",
+          "plotas_m2": 2.72,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        },
+        {
+          "nr": "11",
+          "pavadinimas": "Darbo/svečių kambarys",
+          "paskirtis": "kabinetas",
+          "plotas_m2": 15.89,
+          "puslapio_nr": 1,
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "event": "eksplikacija_merged",
+      "merged_rooms": 11,
+      "total_rows": 11
+    },
+    {
+      "event": "schedule_anchored",
+      "anchored_elements": 0,
+      "langai_match": "8/0",
+      "durys_match": "13/0"
+    },
+    {
+      "event": "polygon_prepass_applied",
+      "rooms_with_adjacency": 0
+    },
+    {
+      "event": "no_height_markers",
+      "reason": "text_layer_empty_or_flattened_or_no_markers",
+      "scan_pages_count": 8
+    },
+    {
+      "event": "positioned_marker_lane_skipped",
+      "reason": "no_positioned_markers",
+      "pages": [
+        5
+      ],
+      "polygon_reason": "no_positioned_markers",
+      "n_markers": 0
+    },
+    {
+      "event": "lubu_auksciai_salvaged_from_warnings",
+      "salvaged_count": 2,
+      "rooms": [
+        "Vonios kambarys 1",
+        "Vonios kambarys 2"
+      ]
+    },
+    {
+      "event": "per_room_ceiling_applied",
+      "rooms_with_per_room": 2,
+      "source_count_by_nr": 0,
+      "source_count_by_name": 2
+    },
+    {
+      "event": "zoom_started",
+      "total": 9,
+      "skipped_via_eksplikacija": 2,
+      "agentic": false
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 1,
+      "total": 9,
+      "room_nr": "01",
+      "pavadinimas": "Tambūras"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 1,
+      "total": 9,
+      "room_nr": "01",
+      "applied": false,
+      "plotas_m2": 4.48
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 2,
+      "total": 9,
+      "room_nr": "02",
+      "pavadinimas": "Katilinė"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 2,
+      "total": 9,
+      "room_nr": "02",
+      "applied": false,
+      "plotas_m2": 6.9
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 3,
+      "total": 9,
+      "room_nr": "03",
+      "pavadinimas": "Koridorius"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 3,
+      "total": 9,
+      "room_nr": "03",
+      "applied": false,
+      "plotas_m2": 10.12
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 4,
+      "total": 9,
+      "room_nr": "04",
+      "pavadinimas": "Virtuvė/valgomasis"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 4,
+      "total": 9,
+      "room_nr": "04",
+      "applied": false,
+      "plotas_m2": 26.31
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 5,
+      "total": 9,
+      "room_nr": "05",
+      "pavadinimas": "Svetainė"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 5,
+      "total": 9,
+      "room_nr": "05",
+      "applied": false,
+      "plotas_m2": 35.5
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 6,
+      "total": 9,
+      "room_nr": "06",
+      "pavadinimas": "Vaiko kambarys"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 6,
+      "total": 9,
+      "room_nr": "06",
+      "applied": false,
+      "plotas_m2": 15.29
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 7,
+      "total": 9,
+      "room_nr": "09",
+      "pavadinimas": "Miegamasis kambarys"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 7,
+      "total": 9,
+      "room_nr": "09",
+      "applied": false,
+      "plotas_m2": 16.84
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 8,
+      "total": 9,
+      "room_nr": "10",
+      "pavadinimas": "Drabužinė"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 8,
+      "total": 9,
+      "room_nr": "10",
+      "applied": false,
+      "plotas_m2": 2.72
+    },
+    {
+      "event": "zoom_room_started",
+      "idx": 9,
+      "total": 9,
+      "room_nr": "11",
+      "pavadinimas": "Darbo/svečių kambarys"
+    },
+    {
+      "event": "zoom_room_completed",
+      "idx": 9,
+      "total": 9,
+      "room_nr": "11",
+      "applied": false,
+      "plotas_m2": 15.89
+    },
+    {
+      "event": "zoom_completed",
+      "attempted": 9,
+      "applied": 0,
+      "skipped_via_eksplikacija": 2,
+      "elapsed_s": 86.7
+    },
+    {
+      "event": "apdailos_started"
+    },
+    {
+      "event": "apdailos_skipped",
+      "reason": "no apdailos page found"
+    },
+    {
+      "event": "doors_started"
+    },
+    {
+      "event": "doors_completed",
+      "page": 1,
+      "total": 13,
+      "interior": 11,
+      "exterior": 2
+    },
+    {
+      "event": "door_types_started"
+    },
+    {
+      "event": "door_types_completed",
+      "frameless": 3,
+      "confidence": "zalia",
+      "reader": 0,
+      "tagged": 3
+    },
+    {
+      "event": "fixtures_started"
+    },
+    {
+      "event": "fixtures_completed",
+      "raised": [
+        "dusai"
+      ],
+      "counts": {
+        "praustuves": 2,
+        "plautuves": 1,
+        "klozetai": 2,
+        "vonios": 1,
+        "dusai": 2,
+        "wc_remai": 2,
+        "bide": 0
+      }
+    },
+    {
+      "event": "niche_locator_started",
+      "pages": [
+        5,
+        3
+      ]
+    },
+    {
+      "event": "niche_locator_completed",
+      "primary_page": 5,
+      "primary_rooms_covered": 1,
+      "total_niches_kept": 10,
+      "backfill_ran": true
+    },
+    {
+      "event": "niche_inference_completed",
+      "rooms_inferred": 1
+    },
+    {
+      "event": "post_processing"
+    },
+    {
+      "event": "python_math_completed",
+      "rooms_computed": 11
+    }
+  ]
+}
