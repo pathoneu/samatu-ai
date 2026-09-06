@@ -11,6 +11,7 @@ import {
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
+  authorFigureRows, bboxToRectPct,
 } from './roomSheet.js';
 
 const SAMPLE = JSON.parse(
@@ -525,4 +526,77 @@ test('rows moved but no measurable delta still reports the row count', () => {
   }, stubT));
   assert.equal(out.key, 'project.roomSheet.rippleRows');
   assert.equal(out.rowsWord, 'eilučių');
+});
+
+
+test('authorFigureRows pairs the designer\'s figure with OUR rows of the same family, summed, in the same unit', () => {
+  const project = {
+    _autoriaus_kiekiai: [
+      { page: 3, label: 'Glaistoma dažoma (baltai)', value: 202, unit: 'm2', family: 'sienu_dazymas',
+        bbox: [100, 200, 300, 212], page_width: 1000, page_height: 800 },
+      { page: 8, label: 'Sienų plytelės - 60X120 cm', value: 38, unit: 'vnt', family: 'plyteles',
+        bbox: [1, 2, 3, 4], page_width: 1000, page_height: 800 },
+    ],
+    darbu_sarasas: [
+      { aprasymas: 'Sienų glaistymas/dažymas (iki 3m aukščio)', kiekis: 150.5, mato_vnt: 'm²' },
+      { aprasymas: 'Sienų glaistymas/dažymas (virš 3m aukščio)', kiekis: 49.5, mato_vnt: 'm²' },
+      { aprasymas: 'Lubų glaistymas/dažymas', kiekis: 94.03, mato_vnt: 'm²' },
+      { aprasymas: 'Vonios sienų plytelių klijavimas', kiekis: 51.96, mato_vnt: 'm²' },
+    ],
+  };
+  const rows = authorFigureRows(project);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].ours.value, 200);
+  assert.equal(rows[0].ours.unit, 'm2');
+  assert.equal(rows[0].group, null, 'one figure in the family → no group footer');
+  assert.deepEqual(rows[0].rect, [0.08, 0.23, 0.32, 0.285]);
+  assert.equal(rows[1].ours, null, 'a tile COUNT has no counterpart — we do not count tiles');
+  assert.equal(rows[1].unit, 'vnt');
+});
+
+test('authorFigureRows: a family the designer split into parts is compared as a SUM, once', () => {
+  const project = {
+    _autoriaus_kiekiai: [
+      { page: 3, label: 'Glaistoma dažoma (akcentinė)', value: 18, unit: 'm2', family: 'sienu_dazymas' },
+      { page: 7, label: 'Plytelių klojimo', value: 3.95, unit: 'm2', family: 'plyteles' },
+      { page: 3, label: 'Glaistoma dažoma (baltai)', value: 202, unit: 'm2', family: 'sienu_dazymas' },
+      { page: 8, label: 'Sienų plytelės 60X120', value: 46, unit: 'm2', family: 'plyteles' },
+    ],
+    darbu_sarasas: [
+      { aprasymas: 'Sienų glaistymas/dažymas', kiekis: 248.12, mato_vnt: 'm²' },
+      { aprasymas: 'Vonios sienų plytelių klijavimas', kiekis: 51.96, mato_vnt: 'm²' },
+      { aprasymas: 'Vonios grindų plytelių klijavimas', kiekis: 16.41, mato_vnt: 'm²' },
+    ],
+  };
+  const rows = authorFigureRows(project);
+  assert.deepEqual(rows.map((r) => r.value), [18, 202, 46, 3.95], 'paired families first, parts kept together');
+  assert.deepEqual(rows[0].group, { size: 2, designerTotal: 220 });
+  assert.equal(rows[1].group.designerTotal, 220);
+  assert.equal(rows[0].ours.value, 248.12);
+  assert.equal(rows[2].ours.value, 51.96, 'a tile label naming WALLS pairs with the wall tile rows only');
+  assert.equal(rows[3].ours, null, 'a bare tile zone pairs with nothing');
+});
+
+test('authorFigureRows is empty when the backend read nothing, and never throws on junk', () => {
+  assert.deepEqual(authorFigureRows({}), []);
+  assert.deepEqual(authorFigureRows({ _autoriaus_kiekiai: [{ value: 'x' }, null] }), []);
+  assert.equal(bboxToRectPct([1, 2, 3], 10, 10), null);
+});
+
+
+test('authorFigureRows: tile skirting pairs with the tile-skirting row, wooden skirting with the wooden one', () => {
+  const project = {
+    _autoriaus_kiekiai: [
+      { page: 7, label: 'Grindjuostės (derinamos prie durų), h-8cm', value: 53.69, unit: 'm', family: 'grindjuostes' },
+      { page: 7, label: 'Grindjuostės (iš plytelių), h-8cm', value: 24.97, unit: 'm', family: 'grindjuostes' },
+    ],
+    darbu_sarasas: [
+      { aprasymas: 'Grindjuosčių sumontavimas', kiekis: 64.36, mato_vnt: 'm' },
+      { aprasymas: 'Plytelių grindjuosčių supjovimas ir suklijavimas', kiekis: 8.42, mato_vnt: 'm' },
+    ],
+  };
+  const rows = authorFigureRows(project);
+  assert.equal(rows[0].ours.value, 64.36);
+  assert.equal(rows[1].ours.value, 8.42);
+  assert.equal(rows[0].group, null, 'two different skirtings are not one family total');
 });

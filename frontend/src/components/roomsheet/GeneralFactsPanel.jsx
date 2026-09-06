@@ -11,6 +11,10 @@
  *    correct it. The corrected count rides `detected_symbols_summary` into the
  *    recompute context — the same channel the builder already reads it from —
  *    so this is a real edit, not a display-only number.
+ *  • the designer's own figures (2026-09-06) — legend totals such as
+ *    „Glaistoma dažoma 202 m²", read from the PDF text — each with OUR number
+ *    for the same family beside it. A second reading of the same drawing to
+ *    compare against; never a value we take.
  */
 
 import { useState } from 'react';
@@ -18,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
-import { symbolRows } from '@/lib/roomSheet';
+import { authorFigureRows, symbolRows } from '@/lib/roomSheet';
 import EvidenceCrop from './EvidenceCrop';
 
 function SymbolRow({ row, projectId, busy, onSave }) {
@@ -74,15 +78,69 @@ function SymbolRow({ row, projectId, busy, onSave }) {
   );
 }
 
+const unitText = (u) => (u === 'm2' ? 'm²' : u === 'vnt' ? 'vnt.' : u);
+
+function AuthorFigureRow({ row, projectId, lastOfGroup }) {
+  const { t } = useTranslation();
+  const unitLabel = unitText(row.unit);
+  const rect = row.rect || [0, 0, 1, 1];
+  const fact = row.page == null ? null : {
+    crop_url: `/api/projects/${encodeURIComponent(projectId)}`
+      + `/evidence?page=${row.page}&rect=${rect.map((v) => v.toFixed(4)).join(',')}&dpi=110`,
+    source: { page: row.page, rect_pct: row.rect },
+  };
+  // one figure alone carries our number on its own line; a split family
+  // carries it once, under its last part, against the parts' sum
+  const showOursHere = row.ours && !row.group;
+  const showGroupFooter = row.ours && row.group && lastOfGroup;
+  return (
+    <li className="grid grid-cols-[104px_minmax(0,1fr)] items-start gap-3 border-t border-border px-4 py-3">
+      {fact
+        ? <EvidenceCrop fact={fact} alt={row.label} imgClassName="h-[68px] object-cover object-left-top" />
+        : <span />}
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold">{row.label}</p>
+        <p className="font-mono text-[16px]">
+          {ltNumber(row.value, 2)} {unitLabel}
+          {showOursHere && (
+            <span className="ml-3 text-[hsl(var(--ink-2))]">
+              {' · '}{t('project.roomSheet.generalAuthorOurs', { value: ltNumber(row.ours.value, 2), unit: unitLabel })}
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+          {row.ours
+            ? t('project.roomSheet.generalAuthorWhy', { page: row.page })
+            : t('project.roomSheet.generalAuthorNoOurs', { page: row.page })}
+        </p>
+        {showGroupFooter && (
+          <p className="mt-1.5 font-mono text-[15px]">
+            {t('project.roomSheet.generalAuthorGroupTotal', {
+              count: row.group.size, total: ltNumber(row.group.designerTotal, 2), unit: unitLabel,
+            })}
+            <span className="ml-3 text-[hsl(var(--ink-2))]">
+              {' · '}{t('project.roomSheet.generalAuthorOurs', { value: ltNumber(row.ours.value, 2), unit: unitLabel })}
+            </span>
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol }) {
   const { t } = useTranslation();
   const rows = symbolRows(project);
+  const authorRows = authorFigureRows(project);
   const anchor = project?._ceiling_anchor;
-  const anchorValue = Number(anchor?.value ?? anchor?.plotas_m2 ?? anchor?.viso_m2);
+  // `total_area_m2` is what every backend writer sets (eksplikacija total,
+  // rows' sum, plan labels' sum); the older aliases are kept for saved blobs.
+  const anchorValue = Number(anchor?.total_area_m2 ?? anchor?.value ?? anchor?.plotas_m2 ?? anchor?.viso_m2);
   const anchorPage = anchor?.page ?? anchor?.puslapio_nr
     ?? project?._eksplikacija?.eksplikacija_source_page;
+  const anchorIsPlanLabels = String(anchor?.label || '').startsWith('plano užrašų');
 
-  if (!rows.length && !Number.isFinite(anchorValue)) {
+  if (!rows.length && !authorRows.length && !Number.isFinite(anchorValue)) {
     return (
       <p className="px-4 py-6 text-[15px] text-muted-foreground">
         {t('project.roomSheet.generalNone')}
@@ -116,11 +174,15 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol 
           ) : <span />}
           <div className="min-w-0">
             <p className="text-[15px] font-semibold">
-              {t('project.roomSheet.generalCeilingTitle')}
+              {t(anchorIsPlanLabels
+                ? 'project.roomSheet.generalCeilingPlanTitle'
+                : 'project.roomSheet.generalCeilingTitle')}
             </p>
             <p className="font-mono text-[16px]">{ltNumber(anchorValue, 2)} m²</p>
             <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-              {t('project.roomSheet.generalCeilingWhy')}
+              {t(anchorIsPlanLabels
+                ? 'project.roomSheet.generalCeilingPlanWhy'
+                : 'project.roomSheet.generalCeilingWhy')}
             </p>
           </div>
           <Check className="mt-1 h-5 w-5 text-[hsl(var(--accent-2))]" aria-hidden="true" />
@@ -138,6 +200,22 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol 
           />
         ))}
       </ul>
+
+      {authorRows.length > 0 && (
+        <div>
+          <div className="border-t border-border px-4 pt-4 pb-2">
+            <h3 className="text-[15px] font-semibold">{t('project.roomSheet.generalAuthorTitle')}</h3>
+            <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.generalAuthorIntro')}</p>
+          </div>
+          <ul className="list-none p-0">
+            {authorRows.map((row, i) => {
+              const next = authorRows[i + 1];
+              const lastOfGroup = !next || next.pairKey !== row.pairKey || next.unit !== row.unit;
+              return <AuthorFigureRow key={row.key} row={row} projectId={project.id} lastOfGroup={lastOfGroup} />;
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

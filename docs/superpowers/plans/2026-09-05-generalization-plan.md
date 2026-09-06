@@ -135,32 +135,52 @@ room) — exact, deterministic, free to read. Vision had read 7 of the 8 correct
 mis-read two (3,11 for 3,52; 7,01 for 7,25) and invented a ninth room (a third
 bathroom, 5,64 m², with its own tiles, paint and one of every fixture).
 
-**The lane** (`backend/extractor/plan_area_annotations.py`, pure pdfplumber, no
-model call): a „N.NN m²" that stands alone, or beside a ROOM NAME, is a room
-label; beside a material / total / count word (danga, laminat, vnt, sienų dažai,
-bendras plotas…) it is not. Digits are re-joined from characters because CAD
-exports split „7.25" into four one-character words. Sheets are taken richest-
-first and a sheet whose values repeat ≥ 60 % of the accepted ones is the same
-rooms drawn again (a and b label every room on 4–5 sheets — summing them would
-double the ceiling anchor). Reconcile against Vision's rooms: within ±3 % →
-confirmed; one unclaimed label within ±20 % → the label's value is adopted (the
-Vision figure is kept for the sheet); otherwise `_area_unconfirmed` — the room
-stays, never deleted (evidence-first: he decides), with a high-severity
-`room_area_unconfirmed` warning and the sheet sentence „ploto užrašo plane
-neradau… patikrinkite, ar patalpa yra ir ar ji nesidubliuoja". Σ labels becomes
-`_ceiling_anchor` („plano užrašų suma") so an invented room cannot move the
-ceilings. Runs in Step 2.44 only when `eksplikacija_merged_rooms == 0`;
-`scripts/backfill_plan_areas.py` applies it to cached extracts (idempotent).
-Check sheet: `plotas_saltinis = plano_uzrasas` crops the label itself (bbox in
-pdfplumber's top-origin frame, like the eksplikacija row); provenance chip
-„užrašyta plane"; RoomCard confidence high.
+**The lane** (`backend/extractor/plan_area_annotations.py`, text layer only, no
+model call). Engine: **pypdfium2** (already a dependency, Apache/BSD) — pdfplumber
+needed 58–75 s for three pages of the 22 MB drawing because pdfminer parses the
+object streams the renders live in; PDFium reads the same pages in 0.1 s, the
+whole sheet set in 0.6 s. Character boxes are converted into the display frame
+the crops use (/Rotate applied); every text DIRECTION on a sheet is analysed in
+its own frame (a plan's vertical dimension strings neither outvote nor pollute
+its horizontal labels; a's grindų planas is a landscape drawing turned 90° on
+a portrait page with no /Rotate — its legend reads at π/2 and is read there).
+A „N.NN m²" that stands alone, or beside a ROOM NAME, is a room label; beside a
+material / total / count word (danga, laminat, vnt, sienų dažai, bendras
+plotas…) it is not. Digits are re-joined from characters (CAD exports split
+„7.25"). Sheets are taken richest-first and a sheet whose values repeat ≥ 60 %
+of the accepted ones is the same rooms drawn again.
 
-**Result (€0, cached extracts).** G: 8 labels, 6 rooms confirmed, 2 corrected, 1
-flagged; walls +5,1 % → +3,6 %; OOS pooled 6,13 % → 5,85 %; in-sample 9,75 %
-unchanged (a/b/d/H have tables — the lane never runs; c has no labels at all —
-„insufficient", the old no-table notice stays). The flagged room still counts
-in the totals until he switches it off (item 4 gives him the switch) — that is
-the remaining +30 m² of G's walls.
+**Reconcile — WHERE the label stands first, its VALUE second.** The floor plan
+the rooms were outlined on and the lubų planas share one frame on G (every
+label falls inside a room outline of the pertvarų planas). When ≥ 60 % of the
+labels fall inside some outline: a label inside exactly one room IS that room's
+area (confirmed within ±3 %, otherwise adopted — the Vision figure is kept for
+the sheet); a label inside SEVERAL outlines means the outlines overlap — the
+closer room takes it and the other is the same room drawn twice
+(`_area_unconfirmed_reason = duplicate_of:NN`), kept, never deleted; a label
+inside NO outline is a room the model never returned. Without a shared frame,
+value only: ±3 % confirm, one unclaimed label within ±20 % adopt, else
+`_area_unconfirmed` (`no_label`). Σ labels becomes `_ceiling_anchor` („plano
+užrašų suma") so an invented room cannot move the ceilings. Warnings
+(`lane_warnings`, shared by pipeline and backfill): duplicate → high, no label
+→ high, unclaimed label with a shared frame → medium („greičiausiai trūksta
+patalpos; pridėkite ją, jei ji jūsų"). Runs in Step 2.44 only when
+`eksplikacija_merged_rooms == 0`; `scripts/backfill_plan_areas.py`
+(`--refresh-lane`, `--refresh-author`) applies it to cached extracts.
+Check sheet: `plotas_saltinis = plano_uzrasas` crops the label itself; the
+duplicate room says „persidengia su patalpa 06 … greičiausiai ta pati patalpa
+antrą kartą"; provenance chip „užrašyta plane"; RoomCard confidence high.
+
+**What G actually is (read, not guessed).** Ten room labels on the lubų planas
+(pdfplumber had found eight): 8 fall inside one Vision outline each, „7.25"
+inside TWO (06 „Vonios kambarys" 7,01 and 07 „Vonios kambarys" 5,64 — the
+bathroom returned twice; 06 takes it, 07 is flagged a duplicate), and two
+labels — 6,90 and 3,60 m², bottom of the plan — inside no outline: two rooms
+the model never returned (a hallway and a small room by the look of the plan).
+Σ 104,53 m² = the ceiling anchor. Walls +5,1 % → +3,6 % (unchanged by the
+final geometry pass: the duplicate still counts until he switches it off —
+item 4 gives him the switch); OOS pooled 5,85 %; in-sample 9,75 % unchanged
+(a/b/d/H have tables — the lane never runs; c has no labels at all).
 
 **By-product — the scorecard's paint family, names only.** The frozen table had
 ONE „glaistymas/dažymas" concept and paired his rows greedily with our single
@@ -177,6 +197,40 @@ gaps, previously hidden); G rows ±10 % 0 → 5 % (1 of 20). Table 81 → 89.
 „laminuota grindų danga 76,65 m²") shown beside ours on the general facts
 panel, never as the value; the Rotband share from the pertvarų planas (masonry
 vs GKP) instead of the 30 % constant.
+
+### Item 3c — DONE 2026-09-06: the designer's own figures beside ours
+
+**What the drawing offers.** Designers total their own drawing in legends:
+G „Glaistoma dažoma (baltai) 202 m²" + „(akcentinė spalva) 18 m²", „laminuota
+grindų danga 76,65 m²", „Grindjuostės … 53,69 m", „Sienų plytelės 60×120 –
+38 vnt."; H „Sienų dažai 320 m²"; a „Parketlentės 135 m²", „Grindjuostės h=60
+mm 56 m". A second reading of the same drawing — worth showing, never worth
+copying (his 239 m² of walls vs the designer's 220 m² is the 9–16 % two
+humans disagree by).
+
+**The reader** (`read_author_figures`, same module, pure text layer): a number
++ unit (m², m, vnt, kompl) whose own line — or the label-like text lines just
+above it — names a material family (paint, floor covering, skirting, tiles,
+wallpaper, cornice, LED, GKP). Lines are rebuilt from characters; rotated
+dimension fragments („0.610", „5 0 0") interleaved with the legend are skipped
+when looking for the label and scrubbed from it; heights („h 1,20 m", „H 0.3m")
+are refused; the ROOM-AREA labels the room lane owns are excluded; a note
+paragraph („*PASTABA: …") never adopts the number below it (objektas_b labels
+its rooms under such notes — the first version misread ten of them as paint);
+a second statement on one rebuilt line starts after the first quantity, while
+„Plytelių klojimo 13vnt. 3.95 m²" stays one statement. Read in the same single
+PDFium pass as the room labels (`scan_text_layer`, `_meta.text_layer_scan_s`).
+Stored as `_autoriaus_kiekiai` on every extraction (tables or not). Yield on
+the fixtures: G 12 (paint 202 + 18, skirting 53,69 + tile skirting 24,97,
+laminate 76,65, tile zones and counts), a 5 (the turned legend: parketlentės
+135, grindjuostės 56, three tile counts), d 1, H 1, b/c 0.
+
+**On the sheet.** General facts panel, „Projektuotojo užrašyti kiekiai": each
+figure with its crop, and OUR number for the same family beside it (walls iki +
+virš summed, all tile rooms summed; `lib/roomSheet.authorFigureRows`), paired
+ones first; when we emit nothing comparable the sentence says so and offers
+the typed row. The ceiling row of the panel now also names its source when the
+anchor is the plan labels' sum. No value is taken from any figure.
 
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 

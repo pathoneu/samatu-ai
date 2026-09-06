@@ -3327,5 +3327,22 @@
   },
   "_backfill": {
     "ceiling_anchor": "2026-09-05: added from the fixture PDF's room table (pdfplumber, deterministic) — the pipeline publishes this on a fresh run; the frozen extract predates it"
-  }
+  },
+  "_autoriaus_kiekiai": [
+    {
+      "page": 4,
+      "label": "transformatorius spinteleje virš WC LED juosta",
+      "value": 2.2,
+      "unit": "m",
+      "family": "led",
+      "bbox": [
+        195.36,
+        374.04,
+        987.62,
+        396.27
+      ],
+      "page_width": 1191.0,
+      "page_height": 842.0
+    }
+  ]
 }

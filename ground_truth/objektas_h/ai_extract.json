@@ -11324,5 +11324,22 @@
   },
   "_elapsed_s": 735.4,
   "status": "ok",
-  "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)"
+  "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)",
+  "_autoriaus_kiekiai": [
+    {
+      "page": 6,
+      "label": "Sienų dažai",
+      "value": 320.0,
+      "unit": "m2",
+      "family": "sienu_dazymas",
+      "bbox": [
+        107.04,
+        562.16,
+        150.04,
+        567.1
+      ],
+      "page_width": 595.0,
+      "page_height": 842.0
+    }
+  ]
 }

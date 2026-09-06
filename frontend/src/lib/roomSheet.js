@@ -469,6 +469,128 @@ export function symbolRows(project) {
     }));
 }
 
+// ── The author's own figures (2026-09-06) ───────────────────────────────────
+// Designers total their own drawing in a legend („Glaistoma dažoma 202 m²",
+// „Sienų dažai 320 m²", „Parketlentės 135 m²"). The backend reads them from the
+// PDF text (`_autoriaus_kiekiai`); the sheet shows each one with OUR number for
+// the same family beside it. A reference to compare against — never a value we
+// take: the engine computes from the drawing, other people's numbers only check.
+
+const AUTHOR_FAMILY_OURS = {
+  grindu_danga: { unit: 'm2', match: /parketo \/ laminato klojimas|grindų dangos klojimas/i },
+  grindjuostes: { unit: 'm', match: /^grindjuosčių sumontavimas/i },
+  // „Grindjuostės (iš plytelių)" is the tile skirting — our cut-and-glue row, not the wooden one
+  grindjuostes_plyteliu: { unit: 'm', match: /plytelių grindjuosčių/i },
+  sienu_dazymas: { unit: 'm2', match: /^sienų glaistymas\/dažymas/i },
+  lubu_dazymas: { unit: 'm2', match: /^lubų glaistymas\/dažymas/i },
+  // tiles only when the label says which surface — a bare tile zone („Plytelių
+  // klojimo 3,95 m²") against every tiled wall and floor of the flat would mislead
+  plyteles_sienos: { unit: 'm2', match: /sienų plytelių klijavimas|atatvaro plytelių klijavimas/i },
+  plyteles_grindys: { unit: 'm2', match: /grindų plytelių klijavimas/i },
+  karnizai: { unit: 'm', match: /^lubų karnizo sumontavimas/i },
+  gkp: { unit: 'm2', match: /^gkp lubų montavimas/i },
+};
+
+/** The pairing key of a figure: its family, refined by the surface its label names. */
+function pairingFamily(f) {
+  const l = String(f.label || '').toLowerCase();
+  if (f.family === 'grindjuostes') return /plytel/.test(l) ? 'grindjuostes_plyteliu' : 'grindjuostes';
+  if (f.family !== 'plyteles') return f.family;
+  if (/sien/.test(l)) return 'plyteles_sienos';
+  if (/grind/.test(l)) return 'plyteles_grindys';
+  return null;
+}
+
+const UNIT_ALIASES = { 'm²': 'm2', m2: 'm2', m: 'm', 'vnt.': 'vnt', vnt: 'vnt', kompl: 'kompl', 'kompl.': 'kompl' };
+
+function sameUnit(a, b) {
+  const na = UNIT_ALIASES[String(a || '').trim().toLowerCase()] || String(a || '').trim().toLowerCase();
+  const nb = UNIT_ALIASES[String(b || '').trim().toLowerCase()] || String(b || '').trim().toLowerCase();
+  return na !== '' && na === nb;
+}
+
+/** Page-percent rectangle of a text-layer bbox (PDF points from the page top). */
+export function bboxToRectPct(bbox, pageWidth, pageHeight, margin = 0.02) {
+  if (!Array.isArray(bbox) || bbox.length !== 4) return null;
+  const W = Number(pageWidth); const H = Number(pageHeight);
+  if (!(W > 0) || !(H > 0)) return null;
+  const [x0, top, x1, bottom] = bbox.map(Number);
+  if ([x0, top, x1, bottom].some((v) => !Number.isFinite(v))) return null;
+  const clamp = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e4) / 1e4;
+  return [clamp(x0 / W - margin), clamp(top / H - margin), clamp(x1 / W + margin), clamp(bottom / H + margin)];
+}
+
+/**
+ * The designer's figures with our counterpart beside each:
+ *   { key, label, value, unit, family, page, rect,
+ *     ours: { value, unit, rows } | null,          — our family total, same unit
+ *     group: { size, designerTotal } | null }      — when the designer split the
+ *                                                     family over several figures
+ * A designer often states one family in parts („Glaistoma dažoma (baltai)
+ * 202 m²" + „(akcentinė spalva) 18 m²"): each part is listed, and OUR number is
+ * compared with the parts' SUM, once, on the group — a part against our whole
+ * would read as a wrong number. `ours` sums every row of the family in the
+ * same unit (walls iki + virš 3 m); null when we emit nothing comparable — the
+ * sheet then says so rather than inventing a pairing.
+ */
+export function authorFigureRows(project) {
+  const figs = Array.isArray(project?._autoriaus_kiekiai) ? project._autoriaus_kiekiai : [];
+  const rows = Array.isArray(project?.darbu_sarasas) ? project.darbu_sarasas : [];
+  const clean = figs.filter((f) => f && Number.isFinite(Number(f.value)) && Number(f.value) > 0);
+  const oursFor = (pairKey, unit) => {
+    const fam = AUTHOR_FAMILY_OURS[pairKey];
+    if (!fam || !sameUnit(unit, fam.unit)) return null;
+    const hits = rows.filter((r) => fam.match.test(String(r?.aprasymas || ''))
+      && sameUnit(r?.mato_vnt, fam.unit) && Number.isFinite(Number(r?.kiekis)));
+    if (!hits.length) return null;
+    return {
+      value: Math.round(hits.reduce((n, r) => n + Number(r.kiekis), 0) * 100) / 100,
+      unit: fam.unit,
+      rows: hits.map((r) => r.aprasymas),
+    };
+  };
+  // group the designer's parts: same pairing family + unit
+  const groups = new Map();
+  clean.forEach((f) => {
+    const pk = pairingFamily(f);
+    const unit = UNIT_ALIASES[String(f.unit || '').toLowerCase()] || String(f.unit || '');
+    const gk = pk ? `${pk}|${unit}` : null;
+    if (gk) {
+      const g = groups.get(gk) || { size: 0, designerTotal: 0 };
+      g.size += 1; g.designerTotal = Math.round((g.designerTotal + Number(f.value)) * 100) / 100;
+      groups.set(gk, g);
+    }
+  });
+  const out = clean.map((f, i) => {
+    const pk = pairingFamily(f);
+    const unit = UNIT_ALIASES[String(f.unit || '').toLowerCase()] || String(f.unit || '');
+    const ours = pk ? oursFor(pk, unit) : null;
+    const g = pk ? groups.get(`${pk}|${unit}`) : null;
+    return {
+      key: `${f.page}-${i}`,
+      label: String(f.label || '').trim(),
+      value: Number(f.value),
+      unit,
+      family: f.family || null,
+      pairKey: pk,
+      page: f.page ?? null,
+      rect: bboxToRectPct(f.bbox, f.page_width, f.page_height),
+      ours,
+      group: g && g.size > 1 ? { size: g.size, designerTotal: g.designerTotal } : null,
+    };
+  });
+  // paired families first, their parts kept together; page order otherwise
+  const firstIndex = new Map();
+  out.forEach((r, i) => { const k = r.pairKey ? `${r.pairKey}|${r.unit}` : `solo-${i}`; if (!firstIndex.has(k)) firstIndex.set(k, i); });
+  return out.map((r, i) => [r, i]).sort((a, b) => {
+    const pa = Number(!!a[0].ours); const pb = Number(!!b[0].ours);
+    if (pa !== pb) return pb - pa;
+    const ka = a[0].pairKey ? `${a[0].pairKey}|${a[0].unit}` : `solo-${a[1]}`;
+    const kb = b[0].pairKey ? `${b[0].pairKey}|${b[0].unit}` : `solo-${b[1]}`;
+    return (firstIndex.get(ka) - firstIndex.get(kb)) || (a[1] - b[1]);
+  }).map(([r]) => r);
+}
+
 /** `detected_symbols_summary` with one family's count changed, clamped at 0. */
 export function setSymbolCount(summary, key, value) {
   const n = Math.max(0, Math.round(Number(value) || 0));

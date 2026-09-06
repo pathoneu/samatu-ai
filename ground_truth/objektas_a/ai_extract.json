@@ -5411,5 +5411,82 @@
   },
   "_backfill": {
     "ceiling_anchor": "2026-09-05: added from the fixture PDF's room table (pdfplumber, deterministic) — the pipeline publishes this on a fresh run; the frozen extract predates it"
-  }
+  },
+  "_autoriaus_kiekiai": [
+    {
+      "page": 9,
+      "label": "Parketlentės",
+      "value": 135.0,
+      "unit": "m2",
+      "family": "grindu_danga",
+      "bbox": [
+        497.0,
+        992.05,
+        583.62,
+        999.9
+      ],
+      "page_width": 842.0,
+      "page_height": 1191.0
+    },
+    {
+      "page": 9,
+      "label": "TV Plytelės Living ceramics Vonn Light 120x120cm",
+      "value": 14.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        290.48,
+        1006.48,
+        699.42,
+        1014.78
+      ],
+      "page_width": 842.0,
+      "page_height": 1191.0
+    },
+    {
+      "page": 9,
+      "label": "PATALPŲ EKSPLIKACIJA Plytelės Stoneplay cliff bianco 100x100cm",
+      "value": 20.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        -226.96,
+        1021.1,
+        798.66,
+        1029.18
+      ],
+      "page_width": 842.0,
+      "page_height": 1191.0
+    },
+    {
+      "page": 9,
+      "label": "Plytelės kronosceramiche Lux falda 120x120cm",
+      "value": 5.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        236.12,
+        1035.73,
+        694.82,
+        1043.58
+      ],
+      "page_width": 842.0,
+      "page_height": 1191.0
+    },
+    {
+      "page": 9,
+      "label": "Grindjuostės, h=60 mm",
+      "value": 56.0,
+      "unit": "m",
+      "family": "grindjuostes",
+      "bbox": [
+        -294.4,
+        1049.89,
+        614.78,
+        1057.86
+      ],
+      "page_width": 842.0,
+      "page_height": 1191.0
+    }
+  ]
 }

@@ -4964,37 +4964,26 @@ def extract_interior(
     # label supports (objektas_g's invented third bathroom), and anchoring the
     # ceiling quantity to their sum. See extractor/plan_area_annotations.py.
     try:
+        from .plan_area_annotations import (
+            lane_warnings, most_common_page, plan_pages_from_classification,
+            reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
+        # ONE pass over the text layer (pypdfium2; renders skipped): the room-area
+        # labels for the lane below and — 3c — the designer's own legend totals
+        # („Glaistoma dažoma 202 m²"), shown beside ours on the check sheet, never
+        # used as a value.
+        _t0 = time.time()
+        _text_pages = text_pages_from_classification(parsed.get("puslapiai") or [])
+        _scan = scan_text_layer(pdf_bytes, pages=_text_pages or None)
+        parsed["_autoriaus_kiekiai"] = _scan["figures"]
+        parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
         _merged_rooms = int((parsed.get("_meta") or {}).get("eksplikacija_merged_rooms") or 0)
         if _merged_rooms == 0 and parsed.get("patalpos"):
-            from .plan_area_annotations import (
-                most_common_page, plan_pages_from_classification,
-                read_area_annotations, reconcile_rooms_with_annotations)
-            _plan_pages = plan_pages_from_classification(parsed.get("puslapiai") or [])
-            _ann = read_area_annotations(pdf_bytes, pages=_plan_pages or None)
+            _plan_pages = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
+            _ann = [a for a in _scan["annotations"] if not _plan_pages or a["page"] in _plan_pages]
             _lane = reconcile_rooms_with_annotations(parsed["patalpos"], _ann)
             parsed.setdefault("_meta", {})["plan_area_lane"] = _lane
             if _lane.get("status") == "applied":
-                _rooms_by_nr = {str(r.get("nr")): r for r in parsed["patalpos"] if isinstance(r, dict)}
-                _warns = parsed.setdefault("warnings", [])
-                for _nr in _lane.get("unconfirmed") or []:
-                    _r = _rooms_by_nr.get(str(_nr)) or {}
-                    _warns.append({
-                        "level": "WARN", "code": "room_area_unconfirmed",
-                        "room": _nr, "severity": "high",
-                        "message": (
-                            f"Patalpos „{_r.get('pavadinimas') or _nr}\" "
-                            f"({_lt_num(_r.get('plotas_m2') or 0)} m²) ploto užrašo plane "
-                            "neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia "
-                            "patalpa yra ir ar ji nesidubliuoja."),
-                    })
-                for _u in _lane.get("unclaimed") or []:
-                    _warns.append({
-                        "level": "INFO", "code": "plan_area_unclaimed", "severity": "low",
-                        "message": (
-                            f"Plane (psl. {_u.get('page')}) užrašytas plotas "
-                            f"{_lt_num(_u.get('value_m2') or 0)} m², kurio nepriskyriau "
-                            "jokiai patalpai – galbūt trūksta patalpos."),
-                    })
+                parsed.setdefault("warnings", []).extend(lane_warnings(_lane, parsed["patalpos"]))
                 if not parsed.get("_ceiling_anchor") and float(_lane.get("sum_m2") or 0) > 0:
                     parsed["_ceiling_anchor"] = {
                         "total_area_m2": float(_lane["sum_m2"]),
@@ -5002,7 +4991,7 @@ def extract_interior(
                         "page": most_common_page(_ann),
                     }
             _emit({"event": "plan_area_lane", "status": _lane.get("status"),
-                   "candidates": _lane.get("candidates"),
+                   "geometry": _lane.get("geometry"), "candidates": _lane.get("candidates"),
                    "confirmed": len(_lane.get("confirmed") or []),
                    "adopted": len(_lane.get("adopted") or []),
                    "unconfirmed": len(_lane.get("unconfirmed") or [])})

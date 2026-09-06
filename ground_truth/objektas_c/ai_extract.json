@@ -1042,11 +1042,13 @@
     },
     "plan_area_lane": {
       "status": "insufficient",
+      "geometry": "value_only",
       "candidates": 0,
       "sum_m2": 0,
       "confirmed": [],
       "adopted": [],
       "unconfirmed": [],
+      "duplicates": [],
       "unclaimed": [],
       "pages": [],
       "duplicate_view_pages": []
@@ -3643,5 +3645,6 @@
   "status": "ok",
   "_backfill": {
     "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44"
-  }
+  },
+  "_autoriaus_kiekiai": []
 }

@@ -350,7 +350,7 @@
         "value_m2": 37.86,
         "bbox": [
           186.43,
-          468.39,
+          467.27,
           225.11,
           478.11
         ],
@@ -574,7 +574,7 @@
         "value_m2": 14.26,
         "bbox": [
           404.07,
-          206.94,
+          205.82,
           442.76,
           216.66
         ],
@@ -785,7 +785,7 @@
         "value_m2": 3.52,
         "bbox": [
           443.15,
-          368.0,
+          366.87,
           476.43,
           377.72
         ],
@@ -1013,7 +1013,7 @@
         "value_m2": 10.05,
         "bbox": [
           404.57,
-          565.46,
+          564.34,
           443.25,
           575.18
         ],
@@ -1219,7 +1219,7 @@
         "value_m2": 3.76,
         "bbox": [
           146.88,
-          622.69,
+          621.56,
           180.16,
           632.41
         ],
@@ -1435,7 +1435,7 @@
         "value_m2": 7.25,
         "bbox": [
           218.95,
-          814.75,
+          813.62,
           252.23,
           824.47
         ],
@@ -1646,7 +1646,8 @@
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
       "plotas_source": "vision",
-      "_area_unconfirmed": true
+      "_area_unconfirmed": true,
+      "_area_unconfirmed_reason": "duplicate_of:06"
     },
     {
       "nr": "08",
@@ -1865,7 +1866,7 @@
         "value_m2": 10.55,
         "bbox": [
           390.93,
-          795.2,
+          794.07,
           429.61,
           804.92
         ],
@@ -2057,7 +2058,7 @@
         "value_m2": 6.78,
         "bbox": [
           417.92,
-          1012.94,
+          1011.82,
           451.2,
           1022.66
         ],
@@ -2264,8 +2265,21 @@
     {
       "level": "WARN",
       "code": "room_area_unconfirmed",
-      "patalpa_nr": "07",
-      "message": "Patalpos „Vonios kambarys\" (5,64 m²) ploto užrašo plane neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia patalpa yra ir ar ji nesidubliuoja."
+      "severity": "high",
+      "room": "07",
+      "message": "Patalpa „Vonios kambarys\" (5,64 m²) plane persidengia su patalpa „Vonios kambarys\" ir savo ploto užrašo neturi – greičiausiai ta pati patalpa įskaičiuota du kartus. Patikrinkite ir nereikalingą išjunkite."
+    },
+    {
+      "level": "WARN",
+      "code": "plan_area_unclaimed",
+      "severity": "med",
+      "message": "Plane (psl. 4) užrašytas plotas 3,60 m² nepatenka į jokią patalpą – greičiausiai trūksta patalpos; pridėkite ją, jei ji jūsų."
+    },
+    {
+      "level": "WARN",
+      "code": "plan_area_unclaimed",
+      "severity": "med",
+      "message": "Plane (psl. 4) užrašytas plotas 6,90 m² nepatenka į jokią patalpą – greičiausiai trūksta patalpos; pridėkite ją, jei ji jūsų."
     }
   ],
   "_meta": {
@@ -2547,11 +2561,12 @@
     "elapsed_s": 1510.6,
     "plan_area_lane": {
       "status": "applied",
-      "candidates": 8,
-      "sum_m2": 94.03,
+      "geometry": "shared_frame",
+      "candidates": 10,
+      "sum_m2": 104.53,
       "confirmed": [
-        "01",
         "02",
+        "01",
         "04",
         "05",
         "08",
@@ -2564,7 +2579,22 @@
       "unconfirmed": [
         "07"
       ],
-      "unclaimed": [],
+      "duplicates": [
+        {
+          "nr": "07",
+          "of": "06"
+        }
+      ],
+      "unclaimed": [
+        {
+          "page": 4,
+          "value_m2": 3.6
+        },
+        {
+          "page": 4,
+          "value_m2": 6.9
+        }
+      ],
       "pages": [
         4
       ],
@@ -9626,12 +9656,194 @@
   "_elapsed_s": 1510.6,
   "status": "ok",
   "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)",
-  "_ceiling_anchor": {
-    "total_area_m2": 94.03,
-    "label": "plano užrašų suma",
-    "page": 4
-  },
   "_backfill": {
     "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44"
+  },
+  "_autoriaus_kiekiai": [
+    {
+      "page": 3,
+      "label": "Glaistoma dažoma (akcentine spalva-S310-G80Y)",
+      "value": 18.0,
+      "unit": "m2",
+      "family": "sienu_dazymas",
+      "bbox": [
+        642.01,
+        353.3,
+        770.57,
+        375.28
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 3,
+      "label": "Glaistoma dažoma (baltai s0601G)",
+      "value": 202.0,
+      "unit": "m2",
+      "family": "sienu_dazymas",
+      "bbox": [
+        642.01,
+        364.43,
+        758.14,
+        401.22
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "Grindjuostės (derinamos prie durų arba grindų dangos), h-8cm",
+      "value": 53.69,
+      "unit": "m",
+      "family": "grindjuostes",
+      "bbox": [
+        290.5,
+        189.29,
+        788.48,
+        212.12
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "Grindjuostės (iš plytelių), h-8cm",
+      "value": 24.97,
+      "unit": "m",
+      "family": "grindjuostes",
+      "bbox": [
+        619.4,
+        201.28,
+        758.21,
+        247.65
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "laminuota grindų danga",
+      "value": 76.65,
+      "unit": "m2",
+      "family": "grindu_danga",
+      "bbox": [
+        226.26,
+        440.84,
+        283.0,
+        471.53
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "CORSO IVORY 60X60cm Plytelių klojimo",
+      "value": 13.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        134.27,
+        611.83,
+        653.88,
+        636.38
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "60X60cm Plytelių klojimo 13vnt",
+      "value": 3.95,
+      "unit": "m2",
+      "family": "plyteles",
+      "bbox": [
+        146.22,
+        619.76,
+        655.84,
+        648.62
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "CORSO IVORY Plytelių klojimo 60X120cm",
+      "value": 11.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        286.51,
+        690.0,
+        516.15,
+        714.55
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "CORSO IVORY plytelės 60X60cm CORSO IVORY",
+      "value": 22.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        220.18,
+        974.16,
+        469.07,
+        998.71
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 7,
+      "label": "plytelės 60X60cm CORSO IVORY 22vnt. 60X60cm",
+      "value": 7.24,
+      "unit": "m2",
+      "family": "plyteles",
+      "bbox": [
+        220.18,
+        981.87,
+        456.98,
+        1006.65
+      ],
+      "page_width": 841.89,
+      "page_height": 1190.55
+    },
+    {
+      "page": 8,
+      "label": "Sienų plytelės CORSO IVORY 60X120 cm",
+      "value": 38.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        677.66,
+        551.52,
+        955.01,
+        564.35
+      ],
+      "page_width": 1190.55,
+      "page_height": 841.89
+    },
+    {
+      "page": 9,
+      "label": "Sienų plytelės CORSO IVORY 60X120 cm",
+      "value": 37.0,
+      "unit": "vnt",
+      "family": "plyteles",
+      "bbox": [
+        654.96,
+        531.67,
+        932.31,
+        544.51
+      ],
+      "page_width": 1190.55,
+      "page_height": 841.89
+    }
+  ],
+  "_ceiling_anchor": {
+    "total_area_m2": 104.53,
+    "label": "plano užrašų suma",
+    "page": 4
   }
 }

@@ -345,12 +345,21 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
 
     if room.get("_area_unconfirmed"):
         # Other rooms on this drawing have their area written next to them;
-        # this one has none — the contractor decides whether it exists.
+        # this one has none — the contractor decides whether it exists. When
+        # its outline lies over another room that DOES own the label, say so:
+        # it is most likely the same room returned twice.
+        reason = str(room.get("_area_unconfirmed_reason") or "")
+        if reason.startswith("duplicate_of:"):
+            of = reason.split(":", 1)[1]
+            sentence = (f"Ši patalpa plane persidengia su patalpa {of}, o ploto užrašas ten "
+                        f"vienas — greičiausiai ta pati patalpa antrą kartą. Kol kas skaičiuoju su "
+                        f"{lt_num(value)} m²; jei ji nereikalinga, išjunkite.")
+        else:
+            sentence = (f"Plane prie šios patalpos ploto užrašo neradau, nors kitos "
+                        f"patalpos jį turi — skaičiuoju su {lt_num(value)} m². "
+                        "Patikrinkite, ar patalpa yra ir ar ji nesidubliuoja.")
         return _fact("plotas", round(value, 2), "m²", "assumed", "prielaida",
-                     room.get("puslapio_nr"), region,
-                     f"Plane prie šios patalpos ploto užrašo neradau, nors kitos "
-                     f"patalpos jį turi — skaičiuoju su {lt_num(value)} m². "
-                     "Patikrinkite, ar patalpa yra ir ar ji nesidubliuoja.",
+                     room.get("puslapio_nr"), region, sentence,
                      {"field": "plotas_m2", "kind": "number"})
 
     if saltinis == "inline_label":

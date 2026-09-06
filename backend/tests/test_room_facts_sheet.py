@@ -639,3 +639,15 @@ def test_a_room_no_plan_label_supports_is_assumed_and_says_so():
     assert f["status"] == "assumed" and f["value"] == 5.64
     assert "užrašo neradau" in f["sentence"] and "5,64" in f["sentence"]
     assert "nesidubliuoja" in f["sentence"]
+
+
+def test_a_room_drawn_over_another_rooms_label_is_called_a_likely_duplicate():
+    project = {"patalpos": [
+        {"nr": "06", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2, "plotas_m2": 7.25,
+         "plotas_saltinis": "plano_uzrasas"},
+        {"nr": "07", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2, "plotas_m2": 5.64,
+         "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True,
+         "_area_unconfirmed_reason": "duplicate_of:06"}]}
+    f = _fact(build_room_facts(project, "07"), "plotas")
+    assert f["status"] == "assumed"
+    assert "persidengia su patalpa 06" in f["sentence"] and "antrą kartą" in f["sentence"]
