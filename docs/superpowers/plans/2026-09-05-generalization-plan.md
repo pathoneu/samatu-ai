@@ -270,14 +270,32 @@ plotas next to the families; after three projects with the same choice the
 screen pre-selects it and says „Kaip jūsų 3 paskutiniuose projektuose"
 (`lib/scopeMemory.js`, browser storage).
 
+**Second slice (same day).** Per-room × family: one room can drop apdaila,
+grindys or plytelės (`patalpu_sritys_ne`) — the room-driven families; its
+fields for that family are zeroed by `FAMILY_ROOM_FIELDS`, the predicate
+fields say „Neįtraukta jūsų pasirinkimu" in the ledger, and the tile piece
+counts (nuolydis, lentynėlės, skylės, silikonas, hidroizoliacija) skip a room
+whose tiles are off. Plumbing and electrics are symbol counts per project, so
+they stay project-level (the note says so). **Rotband is a choice, not a
+constant**: nėra / dalis % / visos dažomos sienos (`rotband`, `rotband_dalis`),
+default a stated 30 % assumption whose row note tells him to set his share —
+the adjacency count of GKP partitions was measured too coarse to stand in for
+wall types (a +15 %, b −69 %, H −43 % against his rows), so no reading-based
+share is claimed. **A missed room becomes one click**: the labels no room
+claimed are listed on the general page with their crop and „Pridėti kaip
+patalpą" — the new room carries the label as its area (`plano_uzrasas`), sits
+where the label stands, and leaves purpose and perimeter to him
+(`lib/planLabels.js`).
+
 **Measured:** in-sample and out-of-sample numbers unchanged (no scope on the
-fixtures); `tests/test_scope.py` (16) covers the helpers, both endpoints, the
-wall-finish branch and a room switched back on; the ledger invariant holds on
-scoped rows. A scope change drops the rows the builder left out instead of
-carrying them as orphans (`mergeDarbuSarasasEdits` `scopeChange`), keeping his
-own rows and typed quantities. **Not in this slice:** per-room ×
-family chips (needs family-aware room quantities in the builder), windows to
-the floor (a reading question, not a scope), the Rotband share as a choice.
+fixtures); `tests/test_scope.py` (20) covers the helpers, both endpoints, the
+wall-finish branch, a room switched back on, per-room families and Rotband;
+the ledger invariant holds on scoped rows. A scope change drops the rows the
+builder left out instead of carrying them as orphans (`mergeDarbuSarasasEdits`
+`scopeChange`), keeping his own rows and typed quantities. **Still not done:**
+windows to the floor (a reading question, not a scope); Rotband from a real
+wall-type read (needs the pertvarų planas legend read by geometry — a paid
+Vision pass, parked with the €0 rule).
 
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 

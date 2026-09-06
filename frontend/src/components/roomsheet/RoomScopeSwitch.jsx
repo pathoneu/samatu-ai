@@ -1,15 +1,19 @@
 /**
- * RoomScopeSwitch — „Ši patalpa: skaičiuoju / neskaičiuoju".
+ * RoomScopeSwitch — „Ši patalpa: skaičiuoju / neskaičiuoju" + which work areas
+ * are counted in THIS room.
  *
  * The one control that answers the sheet's own warnings („greičiausiai ta pati
  * patalpa antrą kartą", „ne jūsų patalpa"): switched off, the room stays on the
- * sheet and leaves every row server-side (extractor/scope.py). Two big
- * buttons, one sentence saying what the current state means.
+ * sheet and leaves every row server-side (extractor/scope.py). Below it, three
+ * chips — apdaila / grindys / plytelės — for the families a single room can
+ * drop; plumbing and electrics are counted per project, so they live on the
+ * general page. Two big buttons, one sentence saying what the state means.
  */
 
 import { useTranslation } from 'react-i18next';
+import { ROOM_FAMILIES } from '@/lib/scope';
 
-export default function RoomScopeSwitch({ included, busy = false, onChange }) {
+export default function RoomScopeSwitch({ included, familiesOff = [], busy = false, onChange, onFamily }) {
   const { t } = useTranslation();
   const btn = (on, label, active) => (
     <button
@@ -27,6 +31,7 @@ export default function RoomScopeSwitch({ included, busy = false, onChange }) {
       {label}
     </button>
   );
+  const off = new Set(familiesOff);
   return (
     <div className="border-b border-border px-4 pb-3 pt-3" data-testid="room-scope-switch">
       <div className="flex flex-wrap items-center gap-3">
@@ -39,6 +44,36 @@ export default function RoomScopeSwitch({ included, busy = false, onChange }) {
       <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">
         {included ? t('project.roomSheet.scopeRoomOnNote') : t('project.roomSheet.scopeRoomOffNote')}
       </p>
+      {included && onFamily && (
+        <div className="mt-3" data-testid="room-scope-families">
+          <p className="text-[14px] font-semibold">{t('project.roomSheet.scopeRoomFamiliesLabel')}</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {ROOM_FAMILIES.map((fam) => {
+              const on = !off.has(fam);
+              return (
+                <button
+                  key={fam}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={busy}
+                  onClick={() => onFamily(fam, !on)}
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-[2px] border px-3 text-[14px] ${
+                    on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))]/10 font-semibold' : 'border-border bg-card text-muted-foreground'
+                  }`}
+                >
+                  <span aria-hidden className={`inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm border text-[11px] ${
+                    on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white' : 'border-border'}`}>
+                    {on ? '✓' : ''}
+                  </span>
+                  {t(`newProject.q.family.${fam}`)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{t('project.roomSheet.scopeRoomFamiliesNote')}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -2588,11 +2588,27 @@
       "unclaimed": [
         {
           "page": 4,
-          "value_m2": 3.6
+          "value_m2": 3.6,
+          "bbox": [
+            117.11,
+            981.84,
+            150.38,
+            992.68
+          ],
+          "page_width": 841.89,
+          "page_height": 1190.55
         },
         {
           "page": 4,
-          "value_m2": 6.9
+          "value_m2": 6.9,
+          "bbox": [
+            237.68,
+            1011.82,
+            270.96,
+            1022.66
+          ],
+          "page_width": 841.89,
+          "page_height": 1190.55
         }
       ],
       "pages": [

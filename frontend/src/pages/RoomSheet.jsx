@@ -53,7 +53,7 @@ import FactRow from '@/components/roomsheet/FactRow';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
 import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
-import { isRoomIncluded, withRoomIncluded } from '@/lib/scope';
+import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } from '@/lib/scope';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 
@@ -213,6 +213,15 @@ export default function RoomSheet() {
     toast.success(t('project.roomSheet.scopeSaved'));
   }), [run, project, land, t]);
 
+  // A room the plan labels but the model never returned: added with the label
+  // as its area; purpose and perimeter stay his to set on the new room's sheet.
+  const addRoom = useCallback((room) => run(async () => {
+    const next = [...roomsOf(project), room];
+    const result = await saveRoomEdit(project, next);
+    await land(result, { fromInterior: true });
+    toast.success(t('project.roomSheet.roomAdded', { nr: room.nr }));
+  }), [run, project, land, t]);
+
   const saveChoice = useCallback((field, value) => run(async () => {
     if (field === 'walls_paint_override') {
       const next = {
@@ -331,7 +340,7 @@ export default function RoomSheet() {
         />
         <div className="mx-auto w-full max-w-[900px] flex-1 p-4">
           <div className="rounded-[2px] border border-border bg-card">
-            <GeneralFactsPanel project={project} busy={busy} onSaveSymbol={saveSymbol} onSaveScope={saveScope} />
+            <GeneralFactsPanel project={project} busy={busy} onSaveSymbol={saveSymbol} onSaveScope={saveScope} onAddRoom={addRoom} />
           </div>
           {/* „Jūsų eilutės" — the rows of HIS template the drawing cannot answer.
               Renders nothing when the account has no template. */}
@@ -429,8 +438,10 @@ export default function RoomSheet() {
             <>
               <RoomScopeSwitch
                 included={isRoomIncluded(project?._apimtis, roomNr)}
+                familiesOff={roomFamiliesOff(project?._apimtis, roomNr)}
                 busy={busy}
                 onChange={(on) => saveScope(withRoomIncluded(project?._apimtis, roomNr, on))}
+                onFamily={(fam, on) => saveScope(withRoomFamily(project?._apimtis, roomNr, fam, on))}
               />
               <h2 className="flex items-baseline justify-between px-4 pb-2 pt-3 text-[17px] font-semibold">
                 {t('project.roomSheet.factsTitle')}

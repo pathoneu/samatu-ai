@@ -1800,6 +1800,7 @@ _WALLS_OUT_LT = {
     "pasirinkimas": "Neįtraukta jūsų pasirinkimu",
 }
 _GRIND_OUT_LT = {
+    "pasirinkimas": "Neįtraukta jūsų pasirinkimu",
     "plyteles": "Grindys klojamos plytelėmis — grindjuosčių nėra",
     "betonas": "Betoninės grindys be apdailos — grindjuosčių nėra",
     "sienos": "Sienos neapdailinamos, todėl grindjuosčių nėra",
@@ -2726,6 +2727,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # Wet rooms (vonia/wc/san) — voniose dažymas tik virš plytelių zonos
     WET = {"vonia", "wc", "san"}
+    # Apimtis: a room whose TILES he does not do keeps its paint but leaves the
+    # tile piece counts (nuolydis, lentynėlės, skylės, silikonas, hidroizoliacija).
+    rooms_pl = [r for r in rooms if "plyteles" not in (r.get("_neskaiciuoti_sritys") or [])]
 
     SK_GD = "Sienų lubų glaistymas dažymas"
     SK_GKP = "GKP montavimas"
@@ -2759,21 +2763,30 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # walls_paint=277,33 (nuo to laiko ištaisyta į ~448 m² — GT walls_paint
         # 460,71, −2,8%). Rotband užvalg. TIK ant pliko bloko/betono (ne ant GKP
         # pertvarų), o tai ~30% vidaus sienų ploto LT naujos statybos name.
-        # User gali override per `rotband_share` (0.0-1.0).
-        rotband_share = (parsed.get("_overrides") or {}).get("rotband_share", 0.30)
-        try:
-            rotband_share = max(0.0, min(1.0, float(rotband_share)))
-        except (ValueError, TypeError):
-            rotband_share = 0.30
+        # Apimtis (2026-09-06): the share is HIS choice („Ką skaičiuoti" —
+        # nėra / dalis % / visos dažomos sienos) or, until he chooses, a stated
+        # assumption. Never a number from anyone's sąmata: the drawing does not
+        # tell us which walls are masonry, and the adjacency count of GKP
+        # partitions was measured too coarse to stand in for it.
+        rotband_share, rotband_src = _scope.rotband_share(parsed.get("_apimtis"), parsed.get("_overrides"))
         rotband_m2 = round(walls_paint * rotband_share, 2)
-        pozicijos.append({
-            "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
-            "vnt": "m2", "kiekis": rotband_m2, "saltinis": SAL,
-            "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
-            "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
-            "medziagos_vnt": "kg",
-            "_assumption": f"{int(rotband_share*100)}% sienų ploto (mūro/betono sienos, ne GKP pertvaros). Užvalg. tik prieš glaistant ant pliko bloko/betono.",
-        })
+        if rotband_m2 > 0:
+            pozicijos.append({
+                "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
+                "vnt": "m2", "kiekis": rotband_m2, "saltinis": SAL,
+                "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
+                "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
+                "medziagos_vnt": "kg",
+                "_rotband_share": rotband_share,
+                "_rotband_source": rotband_src,
+                "_assumption": (
+                    f"Jūsų pasirinkimas: {int(round(rotband_share * 100))} % dažomų sienų ploto "
+                    "(mūro / betono sienos be GKP pertvarų)."
+                    if rotband_src == "pasirinkimas" else
+                    f"Prielaida: {int(round(rotband_share * 100))} % dažomų sienų ploto lyginama "
+                    "(mūro / betono sienos, ne GKP pertvaros). Brėžinys sienų tipų nenurodo — "
+                    "nustatykite savo dalį skiltyje „Ką skaičiuoti\"."),
+            })
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
              "vnt": "m2", "kiekis": walls_paint, "saltinis": SAL,
@@ -3165,7 +3178,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         ])
 
     # Reviziniai dureliai voniose (1 vnt per drėgnam patalpą)
-    rev_dureliai = sum(1 for r in rooms
+    rev_dureliai = sum(1 for r in rooms_pl
                        if _pask(r) in WET)
     if rev_dureliai > 0:
         # The hatches themselves — one count, one purchase. When there is a GKP
@@ -3279,7 +3292,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # when available, fallback to opening-count heuristic.
     # NOTE: pl_total is already assigned above (moved up to fix NameError bug).
     if pl_total > 0:
-        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms_pl
                               if _pask(r) in WET), 2)
         # 2026-06-11: silikonavimas seals ALL tiled zones, not only paskirtis-wet
         # rooms — skalbyklos, and any room the apdailos reader marks substantially
@@ -3297,9 +3310,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         if wet_perim > 0:
             # Plytelių 45° pjovimas — outer corners × tile_height (vonia
             # default 2 outer corners). Floor: wet_perim × 0.4.
-            avg_tile_h = sum(float(r.get("plyteles_sienos_aukstis_m") or 0) for r in rooms
+            avg_tile_h = sum(float(r.get("plyteles_sienos_aukstis_m") or 0) for r in rooms_pl
                              if _pask(r) in WET)
-            n_wet = sum(1 for r in rooms if _pask(r) in WET)
+            n_wet = sum(1 for r in rooms_pl if _pask(r) in WET)
             tile_h = (avg_tile_h / n_wet) if n_wet > 0 else 2.0
             pjovimas_45 = max(round(wet_perim * 0.4, 2), round(2 * n_wet * tile_h, 2))
             pozicijos.append({
@@ -3376,7 +3389,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         else:
             # Fallback: opening-count heuristic when no symbols detected
             n_holes = sum(int(el.get("kiekis") or 1)
-                          for r in rooms if _pask(r) in WET
+                          for r in rooms_pl if _pask(r) in WET
                           for el in (r.get("elementai") or [])
                           if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris", "langas"))
             if n_holes > 0:
@@ -3487,10 +3500,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # kampuose į vieną darbą. m² + juostelės m saugojami kaip _detail_*
     # frontend'ui, kad galėtų išskleisti detales jei reikia.
     hidro_m2 = _sum("hidroizoliacija_m2")
-    n_wet_zones = sum(1 for r in rooms
+    n_wet_zones = sum(1 for r in rooms_pl
                       if _pask(r) in WET)
     if hidro_m2 > 0 and n_wet_zones > 0:
-        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms
+        wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms_pl
                               if _pask(r) in WET), 2)
         # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
         membrana_kg = round(hidro_m2 * 3.0, 2)  # 2 sluoksniai

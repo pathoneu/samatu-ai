@@ -12,8 +12,13 @@ WHAT A SCOPE IS (`_apimtis` on the project, sent as `rules_override.apimtis`):
     {"patalpos_ne": ["07"],                 # rooms he does not do — kept on the
                                             #   sheet, marked, out of every row
      "darbai_ne": ["plyteles"],             # work families he does not do
+     "patalpu_sritys_ne": {"03": ["grindys"]},   # families off in ONE room
+                                            #   (apdaila / grindys / plyteles —
+                                            #   the room-driven ones)
      "lubos": "dazomos"|"ne_musu"|"itempiamos",   # project default for ceilings
-     "sienos_angos": "atimti"|"neatimti"}   # wall area with or without openings
+     "sienos_angos": "atimti"|"neatimti",   # wall area with or without openings
+     "rotband": "dalis"|"nera"|"visos",     # wall levelling: a share, none, all
+     "rotband_dalis": 30}                   #   the share in %, when "dalis"
 
 Everything absent means „as the drawing says". A per-room choice already made
 elsewhere (Prielaidos: a room's own ceiling flag) wins over the project default.
@@ -40,15 +45,25 @@ from __future__ import annotations
 from typing import Any, Iterable, Sequence
 
 __all__ = [
-    "FAMILIES", "LUBOS_CHOICES", "SIENOS_ANGOS_CHOICES", "EXCLUDED_BECAUSE",
-    "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS", "normalize_apimtis", "section_family",
-    "is_room_excluded", "mark_rooms", "rooms_in_scope", "filter_rows_by_families",
-    "apply_ceiling_choice",
+    "FAMILIES", "ROOM_FAMILIES", "LUBOS_CHOICES", "SIENOS_ANGOS_CHOICES", "ROTBAND_CHOICES",
+    "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
+    "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
+    "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
+    "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
 FAMILIES = ("apdaila", "grindys", "plyteles", "santechnika", "elektra")
+# The families a single room can switch off: the ones the builder derives from
+# the room's own quantities. Santechnika and elektra are counted per project
+# (symbol counts), so they are project-level choices only.
+ROOM_FAMILIES = ("apdaila", "grindys", "plyteles")
 LUBOS_CHOICES = ("dazomos", "ne_musu", "itempiamos")
 SIENOS_ANGOS_CHOICES = ("atimti", "neatimti")
+ROTBAND_CHOICES = ("dalis", "nera", "visos")
+# Levelling plaster goes on masonry, not on GKP partitions. Without a wall-type
+# read the engine can only ASSUME a share; the number below is a stated
+# assumption the contractor is told to replace, not a fact of any drawing.
+ROTBAND_DEFAULT_SHARE = 0.30
 
 EXCLUDED_BECAUSE = "Neįtraukta jūsų pasirinkimu"
 CEILING_NOT_OURS = "Lubos ne jūsų darbas — neįtrauktos jūsų pasirinkimu"
@@ -64,18 +79,23 @@ _SECTION_PATTERNS: dict[str, tuple[str, ...]] = {
     "elektra": ("elektr",),
 }
 
-# Per-room quantities the builder consumes. Zeroed on an excluded room so no
-# consumer (frontend sums, validators) sees a stale number; a recompute that
-# includes the room again recalculates every one of them from the geometry.
-COMPUTED_ROOM_FIELDS = (
-    "walls_paintable_m2", "ceiling_paintable_m2", "dazymo_plotas_m2", "dazai_l",
-    "kampu_metrai", "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_opening_reveals_m",
-    "kampai_inner_m", "angokrasciu_gkp_m", "nisu_metrai", "lubu_karnizo_m", "molio_tinko_m2",
-    "glaistas_kg", "gruntas_l", "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2",
-    "grindjuosciu_m", "_grindjuosciu_baze_m", "_grindjuosciu_duru_m",
-    "plyteles_sienos_m2", "plyteles_grindys_m2", "pvc_grindys_m2", "isliginamasis_m2",
-    "hidroizoliacija_m2",
-)
+# Per-room quantities the builder consumes, by the family they feed. Zeroed on
+# an excluded room (all of them) or for a family switched off in one room, so
+# no consumer (builder, frontend sums, validators) sees a stale number; a
+# recompute that includes the room again recalculates every one of them from
+# the geometry.
+FAMILY_ROOM_FIELDS: dict[str, tuple[str, ...]] = {
+    "apdaila": (
+        "walls_paintable_m2", "ceiling_paintable_m2", "dazymo_plotas_m2", "dazai_l",
+        "kampu_metrai", "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_opening_reveals_m",
+        "kampai_inner_m", "angokrasciu_gkp_m", "nisu_metrai", "lubu_karnizo_m", "molio_tinko_m2",
+        "glaistas_kg", "gruntas_l", "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2",
+    ),
+    "grindys": ("grindjuosciu_m", "_grindjuosciu_baze_m", "_grindjuosciu_duru_m",
+                "pvc_grindys_m2", "isliginamasis_m2"),
+    "plyteles": ("plyteles_sienos_m2", "plyteles_grindys_m2", "hidroizoliacija_m2"),
+}
+COMPUTED_ROOM_FIELDS = tuple(f for fam in ROOM_FAMILIES for f in FAMILY_ROOM_FIELDS[fam])
 
 
 def _nr(v: Any) -> str:
@@ -99,39 +119,116 @@ def normalize_apimtis(raw: Any) -> dict | None:
         return None
     rooms = raw.get("patalpos_ne")
     darbai = raw.get("darbai_ne")
+    per_room_raw = raw.get("patalpu_sritys_ne")
+    per_room: dict[str, list[str]] = {}
+    if isinstance(per_room_raw, dict):
+        for nr, fams in per_room_raw.items():
+            if not _nr(nr) or not isinstance(fams, (list, tuple, set)):
+                continue
+            kept = [f for f in ROOM_FAMILIES if f in fams]
+            if kept:
+                per_room[_nr(nr)] = kept
+    share = None
+    try:
+        if raw.get("rotband_dalis") is not None:
+            share = max(0.0, min(100.0, float(raw.get("rotband_dalis"))))
+    except (TypeError, ValueError):
+        share = None
     out: dict[str, Any] = {
         "patalpos_ne": sorted({_nr(x) for x in rooms if _nr(x)}) if isinstance(rooms, (list, tuple, set)) else [],
         "darbai_ne": [f for f in FAMILIES if isinstance(darbai, (list, tuple, set)) and f in darbai],
+        "patalpu_sritys_ne": dict(sorted(per_room.items())),
         "lubos": raw.get("lubos") if raw.get("lubos") in LUBOS_CHOICES else None,
         "sienos_angos": raw.get("sienos_angos") if raw.get("sienos_angos") in SIENOS_ANGOS_CHOICES else None,
+        "rotband": raw.get("rotband") if raw.get("rotband") in ROTBAND_CHOICES else None,
+        "rotband_dalis": share,
     }
-    if not out["patalpos_ne"] and not out["darbai_ne"] and out["lubos"] in (None, "dazomos") \
-            and out["sienos_angos"] in (None, "atimti"):
+    if (not out["patalpos_ne"] and not out["darbai_ne"] and not out["patalpu_sritys_ne"]
+            and out["lubos"] in (None, "dazomos") and out["sienos_angos"] in (None, "atimti")
+            and out["rotband"] in (None,) and out["rotband_dalis"] is None):
         return None
     return out
+
+
+def room_families_off(apimtis: dict | None, nr: Any) -> list[str]:
+    """The room-driven families switched off in this one room (plus every
+    family that is off for the whole project)."""
+    if not apimtis:
+        return []
+    off = set(f for f in (apimtis.get("darbai_ne") or []) if f in ROOM_FAMILIES)
+    off |= set((apimtis.get("patalpu_sritys_ne") or {}).get(_nr(nr)) or [])
+    return [f for f in ROOM_FAMILIES if f in off]
+
+
+def family_on_in_room(apimtis: dict | None, nr: Any, family: str) -> bool:
+    return family not in room_families_off(apimtis, nr)
+
+
+def rotband_share(apimtis: dict | None, overrides: dict | None = None) -> tuple[float, str]:
+    """(share of the painted walls that gets levelling plaster, source).
+
+    source: "pasirinkimas" — his choice (apimtis); "prielaida" — nothing
+    chosen, the stated default. The older `rules_override.rotband_share`
+    number (Prielaidos) counts as his choice too."""
+    a = apimtis or {}
+    if a.get("rotband") == "nera":
+        return 0.0, "pasirinkimas"
+    if a.get("rotband") == "visos":
+        return 1.0, "pasirinkimas"
+    if a.get("rotband") == "dalis" or a.get("rotband_dalis") is not None:
+        pct = a.get("rotband_dalis")
+        if pct is not None:
+            return max(0.0, min(1.0, float(pct) / 100.0)), "pasirinkimas"
+    legacy = (overrides or {}).get("rotband_share")
+    if legacy is not None:
+        try:
+            return max(0.0, min(1.0, float(legacy))), "pasirinkimas"
+        except (TypeError, ValueError):
+            pass
+    return ROTBAND_DEFAULT_SHARE, "prielaida"
 
 
 def is_room_excluded(apimtis: dict | None, nr: Any) -> bool:
     return bool(apimtis) and _nr(nr) in set(apimtis.get("patalpos_ne") or [])
 
 
+def _zero(r: dict, fields: Iterable[str]) -> None:
+    for f in fields:
+        if f in r:
+            r[f] = 0.0
+
+
 def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
-    """Mark the rooms the contractor does not do; clear the mark on the rest.
-    Returns the numbers actually marked. Mutates the room dicts."""
+    """Mark the rooms the contractor does not do and the families he does not
+    do in a room; clear the marks on the rest. Returns the numbers of the rooms
+    fully marked. Mutates the room dicts: an excluded room loses every computed
+    quantity; a room with a family off loses that family's quantities and says
+    why in the predicate fields the ledger reads (`_walls_unpainted_reason`,
+    `_ceiling_paint_source`, `_grindjuosciu_praleista`)."""
     marked: list[str] = []
     for r in rooms:
         if not isinstance(r, dict):
             continue
+        r.pop("_neskaiciuoti", None)
+        r.pop("_neskaiciuoti_kodel", None)
+        r.pop("_neskaiciuoti_sritys", None)
         if is_room_excluded(apimtis, r.get("nr")):
             r["_neskaiciuoti"] = True
             r["_neskaiciuoti_kodel"] = "pasirinkimas"
-            for f in COMPUTED_ROOM_FIELDS:
-                if f in r:
-                    r[f] = 0.0
+            _zero(r, COMPUTED_ROOM_FIELDS)
             marked.append(_nr(r.get("nr")))
-        else:
-            r.pop("_neskaiciuoti", None)
-            r.pop("_neskaiciuoti_kodel", None)
+            continue
+        off = room_families_off(apimtis, r.get("nr"))
+        if not off:
+            continue
+        r["_neskaiciuoti_sritys"] = off
+        for fam in off:
+            _zero(r, FAMILY_ROOM_FIELDS[fam])
+        if "apdaila" in off:
+            r["_walls_unpainted_reason"] = "pasirinkimas"
+            r["_ceiling_paint_source"] = "pasirinkimas"
+        if "grindys" in off:
+            r["_grindjuosciu_praleista"] = "pasirinkimas"
     return marked
 
 

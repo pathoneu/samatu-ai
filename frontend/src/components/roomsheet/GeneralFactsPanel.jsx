@@ -22,11 +22,12 @@ import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
-import { authorFigureRows, symbolRows } from '@/lib/roomSheet';
+import { authorFigureRows, bboxToRectPct, symbolRows } from '@/lib/roomSheet';
 import {
-  LUBOS_CHOICES, SIENOS_ANGOS_CHOICES, WORK_FAMILIES, isFamilyOn, normalizeScope,
-  withFamily, withLubos, withSienosAngos,
+  LUBOS_CHOICES, ROTBAND_CHOICES, ROTBAND_DEFAULT_PCT, SIENOS_ANGOS_CHOICES, WORK_FAMILIES,
+  isFamilyOn, normalizeScope, withFamily, withLubos, withRotband, withSienosAngos,
 } from '@/lib/scope';
+import { unclaimedPlanLabels, roomFromPlanLabel } from '@/lib/planLabels';
 import EvidenceCrop from './EvidenceCrop';
 
 function SymbolRow({ row, projectId, busy, onSave }) {
@@ -163,6 +164,88 @@ function Choice({ label, options, value, notes, busy, onPick, labelOf }) {
   );
 }
 
+/** The share of the painted walls that gets levelling plaster — his number. */
+function RotbandShare({ scope, busy, onSaveScope }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(scope.rotband_dalis == null ? '' : String(scope.rotband_dalis));
+  const apply = () => {
+    const raw = draft.trim();
+    if (raw === '') { onSaveScope?.(withRotband(scope, 'dalis', null)); return; }
+    const num = parseLtNumber(raw);
+    if (!Number.isFinite(num) || num < 0 || num > 100) return;
+    onSaveScope?.(withRotband(scope, 'dalis', num));
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
+      <label className="flex items-center gap-2 text-[14px] text-[hsl(var(--ink-2))]">
+        {t('project.roomSheet.scopeRotbandPct')}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          placeholder={String(ROTBAND_DEFAULT_PCT)}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply(); } }}
+          className="h-11 w-20 rounded-[2px] border border-border bg-card px-2 text-right font-mono text-[16px]"
+        />
+        <span>%</span>
+      </label>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={apply}
+        className="inline-flex min-h-[44px] items-center rounded-[2px] border border-border bg-card px-3 text-[14px] font-semibold hover:bg-muted disabled:opacity-50"
+      >
+        {t('project.roomSheet.scopeRotbandApply')}
+      </button>
+    </div>
+  );
+}
+
+/** Plan labels no room claimed — each one becomes a room with one click. */
+function UnclaimedLabels({ project, busy, onAddRoom }) {
+  const { t } = useTranslation();
+  const labels = unclaimedPlanLabels(project);
+  if (!labels.length || !onAddRoom) return null;
+  return (
+    <div>
+      <div className="border-t border-border px-4 pt-4 pb-1">
+        <h3 className="text-[15px] font-semibold">{t('project.roomSheet.unclaimedTitle')}</h3>
+        <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.unclaimedIntro')}</p>
+      </div>
+      <ul className="list-none p-0">
+        {labels.map((u) => {
+          const rect = bboxToRectPct(u.bbox, u.page_width, u.page_height, 0.05);
+          const fact = u.page == null ? null : {
+            crop_url: `/api/projects/${encodeURIComponent(project.id)}`
+              + `/evidence?page=${u.page}&rect=${(rect || [0, 0, 1, 1]).map((v) => v.toFixed(4)).join(',')}&dpi=110`,
+            source: { page: u.page, rect_pct: rect },
+          };
+          return (
+            <li key={`${u.page}-${u.value_m2}`} className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-start gap-3 border-t border-border px-4 py-3">
+              {fact ? <EvidenceCrop fact={fact} alt={`${ltNumber(u.value_m2, 2)} m²`} imgClassName="h-[68px] object-cover object-center" /> : <span />}
+              <div className="min-w-0">
+                <p className="font-mono text-[16px]">{ltNumber(u.value_m2, 2)} m²</p>
+                <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+                  {t('project.roomSheet.unclaimedWhy', { page: u.page })}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onAddRoom(roomFromPlanLabel(project, u))}
+                className="inline-flex min-h-[44px] items-center rounded-[2px] border border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] px-3 text-[14px] font-semibold text-white disabled:opacity-50"
+              >
+                {t('project.roomSheet.unclaimedAdd')}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /** „Ką skaičiuoti" for the whole job — ceilings, wall area, work areas. */
 function ScopeSection({ project, busy, onSaveScope }) {
   const { t } = useTranslation();
@@ -191,6 +274,18 @@ function ScopeSection({ project, busy, onSaveScope }) {
         notes={(v) => t(`project.roomSheet.scopeSienosNote.${v}`)}
         onPick={(o) => onSaveScope?.(withSienosAngos(scope, o))}
       />
+      <Choice
+        label={t('project.roomSheet.scopeRotbandLabel')}
+        options={ROTBAND_CHOICES}
+        value={scope.rotband}
+        busy={busy}
+        labelOf={(o) => t(`project.roomSheet.scopeRotband.${o}`)}
+        notes={(v) => t(`project.roomSheet.scopeRotbandNote.${v}`)}
+        onPick={(o) => onSaveScope?.(withRotband(scope, o))}
+      />
+      {scope.rotband === 'dalis' && (
+        <RotbandShare scope={scope} busy={busy} onSaveScope={onSaveScope} />
+      )}
       <div className="border-t border-border px-4 py-3">
         <p className="text-[15px] font-semibold">{t('project.roomSheet.scopeFamiliesLabel')}</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -223,7 +318,7 @@ function ScopeSection({ project, busy, onSaveScope }) {
   );
 }
 
-export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol, onSaveScope }) {
+export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol, onSaveScope, onAddRoom }) {
   const { t } = useTranslation();
   const rows = symbolRows(project);
   const authorRows = authorFigureRows(project);
@@ -298,6 +393,8 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
           />
         ))}
       </ul>
+
+      <UnclaimedLabels project={project} busy={busy} onAddRoom={onAddRoom} />
 
       {onSaveScope && <ScopeSection project={project} busy={busy} onSaveScope={onSaveScope} />}
 

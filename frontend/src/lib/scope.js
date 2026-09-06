@@ -16,19 +16,36 @@
  */
 
 export const WORK_FAMILIES = ['apdaila', 'grindys', 'plyteles', 'santechnika', 'elektra'];
+/** The families ONE room can switch off — the room-driven ones. Plumbing and
+ *  electrics are counted per project (symbol counts), so they stay project-level. */
+export const ROOM_FAMILIES = ['apdaila', 'grindys', 'plyteles'];
 export const LUBOS_CHOICES = ['dazomos', 'ne_musu', 'itempiamos'];
 export const SIENOS_ANGOS_CHOICES = ['atimti', 'neatimti'];
+export const ROTBAND_CHOICES = ['dalis', 'nera', 'visos'];
+export const ROTBAND_DEFAULT_PCT = 30;
 
 const nr = (v) => String(v ?? '').trim();
 
 /** A complete scope object from whatever the project carries. */
 export function normalizeScope(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
+  const perRoom = {};
+  if (r.patalpu_sritys_ne && typeof r.patalpu_sritys_ne === 'object') {
+    for (const [k, fams] of Object.entries(r.patalpu_sritys_ne)) {
+      const kept = ROOM_FAMILIES.filter((f) => Array.isArray(fams) && fams.includes(f));
+      if (nr(k) && kept.length) perRoom[nr(k)] = kept;
+    }
+  }
+  const pct = Number(r.rotband_dalis);
   return {
     patalpos_ne: Array.isArray(r.patalpos_ne) ? [...new Set(r.patalpos_ne.map(nr).filter(Boolean))].sort() : [],
     darbai_ne: WORK_FAMILIES.filter((f) => Array.isArray(r.darbai_ne) && r.darbai_ne.includes(f)),
+    patalpu_sritys_ne: perRoom,
     lubos: LUBOS_CHOICES.includes(r.lubos) ? r.lubos : 'dazomos',
     sienos_angos: SIENOS_ANGOS_CHOICES.includes(r.sienos_angos) ? r.sienos_angos : 'atimti',
+    rotband: ROTBAND_CHOICES.includes(r.rotband) ? r.rotband : 'dalis',
+    rotband_dalis: Number.isFinite(pct) && r.rotband_dalis !== null && r.rotband_dalis !== undefined && r.rotband_dalis !== ''
+      ? Math.min(100, Math.max(0, pct)) : null,
   };
 }
 
@@ -36,7 +53,42 @@ export function normalizeScope(raw) {
 export function isDefaultScope(raw) {
   const s = normalizeScope(raw);
   return s.patalpos_ne.length === 0 && s.darbai_ne.length === 0
-    && s.lubos === 'dazomos' && s.sienos_angos === 'atimti';
+    && Object.keys(s.patalpu_sritys_ne).length === 0
+    && s.lubos === 'dazomos' && s.sienos_angos === 'atimti'
+    && s.rotband === 'dalis' && s.rotband_dalis === null;
+}
+
+/** The families switched off in this room (its own plus the project-wide ones). */
+export function roomFamiliesOff(raw, roomNr) {
+  const s = normalizeScope(raw);
+  const off = new Set(s.darbai_ne.filter((f) => ROOM_FAMILIES.includes(f)));
+  for (const f of s.patalpu_sritys_ne[nr(roomNr)] || []) off.add(f);
+  return ROOM_FAMILIES.filter((f) => off.has(f));
+}
+
+export function isRoomFamilyOn(raw, roomNr, family) {
+  return !roomFamiliesOff(raw, roomNr).includes(family);
+}
+
+export function withRoomFamily(raw, roomNr, family, on) {
+  const s = normalizeScope(raw);
+  if (!ROOM_FAMILIES.includes(family) || !nr(roomNr)) return s;
+  const cur = new Set(s.patalpu_sritys_ne[nr(roomNr)] || []);
+  if (on) cur.delete(family); else cur.add(family);
+  const next = { ...s.patalpu_sritys_ne };
+  if (cur.size) next[nr(roomNr)] = ROOM_FAMILIES.filter((f) => cur.has(f)); else delete next[nr(roomNr)];
+  return { ...s, patalpu_sritys_ne: next };
+}
+
+export function withRotband(raw, choice, pct) {
+  const s = normalizeScope(raw);
+  const rotband = ROTBAND_CHOICES.includes(choice) ? choice : s.rotband;
+  let rotband_dalis = s.rotband_dalis;
+  if (pct !== undefined) {
+    const n = Number(pct);
+    rotband_dalis = Number.isFinite(n) && pct !== null && pct !== '' ? Math.min(100, Math.max(0, n)) : null;
+  }
+  return { ...s, rotband, rotband_dalis };
 }
 
 /** What goes into `rules_override.apimtis` — null when there is nothing to say. */
@@ -91,7 +143,7 @@ export function rulesWithScope(overrides, scopeRaw) {
 // history list so nothing is inferred from a single project.
 
 export const REMEMBER_AFTER = 3;
-const PROJECT_LEVEL_KEYS = ['lubos', 'sienos_angos', 'darbai_ne'];
+const PROJECT_LEVEL_KEYS = ['lubos', 'sienos_angos', 'darbai_ne', 'rotband', 'rotband_dalis'];
 
 function sameValue(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);

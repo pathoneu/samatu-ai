@@ -6580,6 +6580,10 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
         merged = {**room, **recalc, **preserved}
         out_rooms.append(merged)
+    # The per-room calc above rewrote every computed field, so a family switched
+    # off in ONE room (its quantities zeroed by the first `mark_rooms`) has to be
+    # marked again on the recomputed rooms; fully excluded rooms skipped the calc.
+    _scope.mark_rooms(out_rooms, apimtis)
     if apimtis:
         _scope.apply_ceiling_choice(out_rooms, apimtis)
 

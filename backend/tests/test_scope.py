@@ -71,8 +71,13 @@ def test_normalize_keeps_only_real_choices():
     assert normalize_apimtis({}) is None
     assert normalize_apimtis({"lubos": "dazomos", "sienos_angos": "atimti", "patalpos_ne": [], "darbai_ne": []}) is None
     a = normalize_apimtis({"patalpos_ne": [7, " 07", "07"], "darbai_ne": ["plyteles", "nesamone"],
-                           "lubos": "ne_musu", "sienos_angos": "kazkas"})
-    assert a == {"patalpos_ne": ["07", "7"], "darbai_ne": ["plyteles"], "lubos": "ne_musu", "sienos_angos": None}
+                           "lubos": "ne_musu", "sienos_angos": "kazkas",
+                           "patalpu_sritys_ne": {"03": ["grindys", "elektra", "x"], " ": ["apdaila"], "05": []},
+                           "rotband": "dalis", "rotband_dalis": "45"})
+    assert a == {"patalpos_ne": ["07", "7"], "darbai_ne": ["plyteles"],
+                 "patalpu_sritys_ne": {"03": ["grindys"]},
+                 "lubos": "ne_musu", "sienos_angos": None, "rotband": "dalis", "rotband_dalis": 45.0}
+    assert normalize_apimtis({"rotband": "nera"})["rotband"] == "nera"
 
 
 def test_section_family_mirrors_the_upload_screen():
@@ -132,7 +137,8 @@ def test_an_excluded_room_leaves_every_row_but_stays_on_the_sheet():
         _qty(base, "Sienų glaistymas/dažymas") - float(
             next(r for r in base["patalpos"] if r["nr"] == "02")["walls_paintable_m2"]), abs=0.02)
     assert out["bendras_plotas_m2"] == pytest.approx(36.0)
-    assert out.get("_apimtis") == {"patalpos_ne": ["02"], "darbai_ne": [], "lubos": None, "sienos_angos": None}
+    assert out.get("_apimtis") == {"patalpos_ne": ["02"], "darbai_ne": [], "patalpu_sritys_ne": {},
+                                   "lubos": None, "sienos_angos": None, "rotband": None, "rotband_dalis": None}
     walls = _row(out, "Sienų glaistymas/dažymas")
     assert any(e.get("room_nr") == "02" and e.get("excluded_because") == EXCLUDED_BECAUSE
                for e in walls.get("excluded") or []), "the ledger says why the room is out"
@@ -266,3 +272,57 @@ def test_a_room_switched_back_on_comes_back():
     assert not r02.get("_neskaiciuoti") and float(r02["walls_paintable_m2"]) > 0
     assert _qty(back, "Sienų glaistymas/dažymas") == pytest.approx(_qty(_recompute(), "Sienų glaistymas/dažymas"), abs=0.02)
     assert _qty(back, "Lubų glaistymas/dažymas") == pytest.approx(50.0, abs=0.02)
+
+
+# ── one room, one family off ─────────────────────────────────────────────────
+
+def test_a_family_switched_off_in_one_room_leaves_that_rooms_share_only():
+    base = _recompute()
+    out = _recompute({"patalpu_sritys_ne": {"01": ["grindys"]}})
+    r01b = next(r for r in base["patalpos"] if r["nr"] == "01")
+    r01 = next(r for r in out["patalpos"] if r["nr"] == "01")
+    assert r01.get("_neskaiciuoti_sritys") == ["grindys"] and not r01.get("_neskaiciuoti")
+    assert float(r01["walls_paintable_m2"]) == pytest.approx(float(r01b["walls_paintable_m2"]), abs=0.01), "walls untouched"
+    assert float(r01.get("pvc_grindys_m2") or 0) == 0 and float(r01.get("grindjuosciu_m") or 0) == 0
+    assert _qty(out, "Parketo / laminato klojimas") == pytest.approx(
+        _qty(base, "Parketo / laminato klojimas") - float(r01b.get("pvc_grindys_m2") or 0), abs=0.02)
+    assert _qty(out, "Grindjuosčių sumontavimas") < _qty(base, "Grindjuosčių sumontavimas")
+    assert _qty(out, "Sienų glaistymas/dažymas") == pytest.approx(_qty(base, "Sienų glaistymas/dažymas"), abs=0.02)
+
+
+def test_apdaila_off_in_one_room_names_the_choice_in_the_ledger():
+    out = _recompute({"patalpu_sritys_ne": {"02": ["apdaila"]}})
+    walls = _row(out, "Sienų glaistymas/dažymas")
+    assert any(e.get("room_nr") == "02" and e.get("excluded_because") == EXCLUDED_BECAUSE
+               for e in walls.get("excluded") or []), walls.get("excluded")
+    assert all(c.get("room_nr") != "02" for c in walls.get("contributions") or [])
+    lubos = _row(out, "Lubų glaistymas/dažymas")
+    assert _qty(out, "Lubų glaistymas/dažymas") == pytest.approx(36.0, abs=0.02), "anchor minus the room's ceiling"
+
+
+def test_tiles_off_in_the_bathroom_drops_its_tile_rows_and_piece_counts():
+    base = _recompute()
+    out = _recompute({"patalpu_sritys_ne": {"03": ["plyteles"]}})
+    assert _qty(base, "Vonios sienų plytelių klijavimas") > 0
+    assert _qty(out, "Vonios sienų plytelių klijavimas") == 0
+    assert _qty(out, "Nuolydžio formavimas dušo zonoje") < _qty(base, "Nuolydžio formavimas dušo zonoje") or \
+        _qty(base, "Nuolydžio formavimas dušo zonoje") == 0
+    assert _qty(out, "Sienų glaistymas/dažymas") > 0
+
+
+# ── Rotband: a share he chooses, never a number from anyone's sąmata ─────────
+
+def test_rotband_is_a_stated_assumption_until_he_chooses():
+    base = _recompute()
+    row = _row(base, "Sienų lyginimas Knauf Rotband")
+    assert row is not None and "Prielaida" in str(row.get("_assumption") or "")
+    assert float(row["kiekis"]) == pytest.approx(0.30 * _qty(base, "Sienų glaistymas/dažymas"), abs=0.05)
+    none = _recompute({"rotband": "nera"})
+    assert _row(none, "Sienų lyginimas Knauf Rotband") is None
+    all_walls = _recompute({"rotband": "visos"})
+    assert float(_row(all_walls, "Sienų lyginimas Knauf Rotband")["kiekis"]) == pytest.approx(
+        _qty(base, "Sienų glaistymas/dažymas"), abs=0.05)
+    half = _recompute({"rotband": "dalis", "rotband_dalis": 50})
+    r = _row(half, "Sienų lyginimas Knauf Rotband")
+    assert float(r["kiekis"]) == pytest.approx(0.5 * _qty(base, "Sienų glaistymas/dažymas"), abs=0.05)
+    assert "pasirinkimas" in str(r.get("_assumption") or "").lower()

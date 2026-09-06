@@ -592,7 +592,11 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
         else:
             _flag(r, "no_label")
 
-    summary["unclaimed"] = [{"page": cands[i].get("page"), "value_m2": cands[i]["value_m2"]}
+    # An unclaimed label carries its position too, so the sheet can offer
+    # „pridėti kaip patalpą" with the crop and the room lands on the right spot.
+    summary["unclaimed"] = [{"page": cands[i].get("page"), "value_m2": cands[i]["value_m2"],
+                             "bbox": cands[i].get("bbox"), "page_width": cands[i].get("page_width"),
+                             "page_height": cands[i].get("page_height")}
                             for i in range(len(cands)) if i not in claimed]
     summary["status"] = "applied"
     return summary

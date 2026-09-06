@@ -103,7 +103,8 @@ def test_confirm_adopt_and_flag():
     assert res["confirmed"] == ["01", "02", "09"]
     assert res["adopted"] == ["03"]                     # 3,11 → the label's 3,52
     assert res["unconfirmed"] == ["07"]                 # no label within 20 %
-    assert res["unclaimed"] == [{"page": 4, "value_m2": 7.25}]
+    assert [(u["page"], u["value_m2"]) for u in res["unclaimed"]] == [(4, 7.25)]
+    assert res["unclaimed"][0]["bbox"] == [1, 2, 3, 4] and res["unclaimed"][0]["page_width"] == 842
     assert res["sum_m2"] == pytest.approx(37.86 + 14.26 + 3.52 + 7.25 + 6.78)
     r3 = rooms[2]
     assert r3["plotas_m2"] == 3.52 and r3["_plotas_pries_uzrasa_m2"] == 3.11
