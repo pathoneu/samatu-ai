@@ -6480,6 +6480,13 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     )
 
     rules = translate_user_prefs_to_room_rules(payload.rules_override) or {}
+    # Apimtis (2026-09-06): rooms / families / ceilings / openings he does not
+    # do — enforced here so the sheet, the exports and the template agree.
+    from extractor import scope as _scope
+    apimtis = _scope.normalize_apimtis((payload.rules_override or {}).get("apimtis"))
+    # ALWAYS: with no scope this clears a stale `_neskaiciuoti` mark, so a room
+    # switched back on comes back (the mark rides on the stored room dicts).
+    _scope.mark_rooms(payload.patalpos, apimtis)
 
     # Per-room overrides (e.g. force koridorius floor=tile)
     per_room = payload.per_room_overrides or {}
@@ -6514,6 +6521,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
                 # report the room as failed. (audit 2026-07-27)
                 room[_k] = 0.0
                 _room_failed = True
+        if room.get("_neskaiciuoti"):
+            # a room he does not do: kept for the sheet, its quantities zeroed
+            # by `mark_rooms`, nothing recomputed
+            out_rooms.append(room)
+            continue
         # Preserve Vision-emitted fields we don't recompute
         preserved = {
             "nr": room.get("nr"),
@@ -6568,6 +6580,8 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
         merged = {**room, **recalc, **preserved}
         out_rooms.append(merged)
+    if apimtis:
+        _scope.apply_ceiling_choice(out_rooms, apimtis)
 
     # Recompute santrauka + emit V8-compat + lt_sanity mirror
     parsed = {
@@ -6585,11 +6599,14 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             else 0
             for r in out_rooms
             if normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
+            and not r.get("_neskaiciuoti")
         ),
         "patalpos": out_rooms,
         "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
     }
+    if apimtis:
+        parsed["_apimtis"] = apimtis
     # The anchor must be in `parsed` BEFORE _build_pozicijos_from_rooms runs —
     # that is where `_ceiling_paint_base` looks for it. An explicit field wins
     # over whatever a stale `context` copy carries.
@@ -6614,6 +6631,8 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     _pozicijos_failed = False
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
+        if apimtis:
+            parsed["pozicijos"] = _scope.filter_rows_by_families(parsed.get("pozicijos"), apimtis)
     except Exception as exc:
         log.warning("[recompute-interior] pozicijos build failed: %s", exc)
         parsed["pozicijos"] = parsed.get("pozicijos") or []

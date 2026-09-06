@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { recompute } from '../../lib/recomputeApi';
 import { parseLtNumber } from '@/lib/parseLtNumber';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
+import { rulesWithScope } from '@/lib/scope';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
@@ -315,7 +316,8 @@ export default function AssumptionsPanel({
           // (P0 2026-07-28.)
           darbu_sarasas: darbuSarasas || rawData?.darbu_sarasas || [],
           edits: [{ field, new_value: newValue }],
-          current_assumptions: assumptions || {},
+          // the contractor's scope choices ride on every recompute (extractor/scope.py)
+          current_assumptions: rulesWithScope(assumptions, rawData?._apimtis),
           // Reader/extraction context so a ceiling-height edit rebuilds the
           // canonical pozicijos (paint iki/virš split, kampai…) without losing
           // the door/fixture/symbol lines. (2026-06-17 recompute fix.)

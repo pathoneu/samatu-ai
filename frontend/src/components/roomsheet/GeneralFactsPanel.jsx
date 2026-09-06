@@ -23,6 +23,10 @@ import { Check } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { authorFigureRows, symbolRows } from '@/lib/roomSheet';
+import {
+  LUBOS_CHOICES, SIENOS_ANGOS_CHOICES, WORK_FAMILIES, isFamilyOn, normalizeScope,
+  withFamily, withLubos, withSienosAngos,
+} from '@/lib/scope';
 import EvidenceCrop from './EvidenceCrop';
 
 function SymbolRow({ row, projectId, busy, onSave }) {
@@ -128,7 +132,98 @@ function AuthorFigureRow({ row, projectId, lastOfGroup }) {
   );
 }
 
-export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol }) {
+function Choice({ label, options, value, notes, busy, onPick, labelOf }) {
+  return (
+    <div className="border-t border-border px-4 py-3">
+      <p className="text-[15px] font-semibold">{label}</p>
+      <div role="radiogroup" aria-label={label} className="mt-2 flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const active = opt === value;
+          return (
+            <button
+              key={opt}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={busy || active}
+              onClick={() => onPick(opt)}
+              className={`inline-flex min-h-[44px] items-center rounded-[2px] border px-4 text-[15px] font-semibold ${
+                active
+                  ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+                  : 'border-border bg-card hover:bg-muted disabled:opacity-60'
+              }`}
+            >
+              {labelOf(opt)}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{notes(value)}</p>
+    </div>
+  );
+}
+
+/** „Ką skaičiuoti" for the whole job — ceilings, wall area, work areas. */
+function ScopeSection({ project, busy, onSaveScope }) {
+  const { t } = useTranslation();
+  const scope = normalizeScope(project?._apimtis);
+  return (
+    <div>
+      <div className="border-t border-border px-4 pt-4 pb-1">
+        <h3 className="text-[15px] font-semibold">{t('project.roomSheet.scopeTitle')}</h3>
+        <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.scopeIntro')}</p>
+      </div>
+      <Choice
+        label={t('project.roomSheet.scopeLubosLabel')}
+        options={LUBOS_CHOICES}
+        value={scope.lubos}
+        busy={busy}
+        labelOf={(o) => t(`project.roomSheet.scopeLubos.${o}`)}
+        notes={(v) => t(`project.roomSheet.scopeLubosNote.${v}`)}
+        onPick={(o) => onSaveScope?.(withLubos(scope, o))}
+      />
+      <Choice
+        label={t('project.roomSheet.scopeSienosLabel')}
+        options={SIENOS_ANGOS_CHOICES}
+        value={scope.sienos_angos}
+        busy={busy}
+        labelOf={(o) => t(`project.roomSheet.scopeSienos.${o}`)}
+        notes={(v) => t(`project.roomSheet.scopeSienosNote.${v}`)}
+        onPick={(o) => onSaveScope?.(withSienosAngos(scope, o))}
+      />
+      <div className="border-t border-border px-4 py-3">
+        <p className="text-[15px] font-semibold">{t('project.roomSheet.scopeFamiliesLabel')}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {WORK_FAMILIES.map((fam) => {
+            const on = isFamilyOn(scope, fam);
+            return (
+              <button
+                key={fam}
+                type="button"
+                role="checkbox"
+                aria-checked={on}
+                disabled={busy}
+                onClick={() => onSaveScope?.(withFamily(scope, fam, !on))}
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-[2px] border px-3 text-[15px] ${
+                  on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))]/10 font-semibold' : 'border-border bg-card text-muted-foreground'
+                }`}
+              >
+                <span aria-hidden className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border text-[12px] ${
+                  on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white' : 'border-border'}`}>
+                  {on ? '✓' : ''}
+                </span>
+                {t(`newProject.q.family.${fam}`)}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{t('project.roomSheet.scopeFamiliesNote')}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol, onSaveScope }) {
   const { t } = useTranslation();
   const rows = symbolRows(project);
   const authorRows = authorFigureRows(project);
@@ -142,9 +237,12 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol 
 
   if (!rows.length && !authorRows.length && !Number.isFinite(anchorValue)) {
     return (
-      <p className="px-4 py-6 text-[15px] text-muted-foreground">
-        {t('project.roomSheet.generalNone')}
-      </p>
+      <section aria-labelledby="general-facts">
+        <p className="px-4 py-6 text-[15px] text-muted-foreground">
+          {t('project.roomSheet.generalNone')}
+        </p>
+        {onSaveScope && <ScopeSection project={project} busy={busy} onSaveScope={onSaveScope} />}
+      </section>
     );
   }
 
@@ -200,6 +298,8 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol 
           />
         ))}
       </ul>
+
+      {onSaveScope && <ScopeSection project={project} busy={busy} onSaveScope={onSaveScope} />}
 
       {authorRows.length > 0 && (
         <div>

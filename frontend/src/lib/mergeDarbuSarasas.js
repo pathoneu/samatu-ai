@@ -245,7 +245,17 @@ export function hasUserEditBeyondKainynas(p) {
  *                          actually present, so a bogus note can't eat money.
  * @returns {Array} merged rows
  */
-export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.scopeChange] — this rebuild followed a „ką skaičiuoti"
+ *   choice (lib/scope.js). A prior row the builder no longer emits was removed
+ *   ON PURPOSE (ceilings not his, a family off, a room switched off), so it is
+ *   dropped rather than carried as an orphan — except the contractor's own
+ *   rows (`rnk-`) and rows whose QUANTITY he typed (`manual_override`), which
+ *   are never taken away by a recompute.
+ */
+export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled, opts = {}) {
+  const scopeChange = !!(opts && opts.scopeChange);
   if (!Array.isArray(notes)) notes = [];
   if (!Array.isArray(rebuilt)) return old || [];
   const oldList = old || [];
@@ -406,6 +416,12 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
       notes.push({ reason: 'manual_row_kept', aprasymas: o.aprasymas });
       continue;
     }
+    if (scopeChange && o.manual_override !== true && o.quantity_source !== 'manual_override') {
+      // The builder left this row out because of what he just chose — that is
+      // the point of the choice, not a loss to paper over.
+      notes.push({ reason: 'dropped_by_scope', id: o.id, aprasymas: o.aprasymas, kiekis: o.kiekis, kaina: o.kaina });
+      continue;
+    }
     merged.push({ ...o, _orphaned_after_rebuild: true });
     notes.push({
       reason: 'orphan_carried',
@@ -417,6 +433,11 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled) {
     });
   }
   return reassignDuplicateIds(materialsLast(merged));
+}
+
+/** Rows a „ką skaičiuoti" choice took out of the sąmata. */
+export function droppedByScope(notes) {
+  return (notes || []).filter((n) => n && n.reason === 'dropped_by_scope');
 }
 
 /** Rows the rebuild could not reproduce — the ones the user must be told about. */

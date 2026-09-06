@@ -412,6 +412,11 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
 
     rules = {k: dict(v) for k, v in ROOM_TYPE_RULES.items()}
 
+    # Apimtis (2026-09-06): walls measured without deducting the openings.
+    if (prefs.get("apimtis") or {}).get("sienos_angos") == "neatimti":
+        for rt in rules:
+            rules[rt]["deduct_openings"] = False
+
     bath_h = prefs.get("bathroom_tile_height_m")
     if bath_h is not None:
         for room_type in ("vonia", "wc", "san"):
@@ -1225,6 +1230,12 @@ def calc_room_quantities(room: dict,
 
     doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
+    # Apimtis (2026-09-06): „sienų plotas be angų" — the contractor measures
+    # straight through the openings (cut-outs are waste and cutting labour), so
+    # nothing is deducted from the wall area in any branch below.
+    if not rt_rules.get("deduct_openings", True):
+        doors_total = 0.0
+        windows_total = 0.0
 
     # Plytelinės sienos (vonia / virtuvė backsplash).
     # 2026-07-28: the tile HEIGHT/SHARE priority chain moved into
@@ -1299,6 +1310,8 @@ def calc_room_quantities(room: dict,
     # the double-billing rule (a fully tiled wet room billed as tile AND as
     # paint). See resolve_wall_tile_read() for the priority order.
     doors_deduction = n_doors * DOOR_NET_DEDUCTION
+    if not rt_rules.get("deduct_openings", True):
+        doors_deduction = 0.0          # apimtis: „sienų plotas be angų" — see the openings block above
     wall_area_available = max(0.0, walls_gross - doors_deduction)
     tile_read = resolve_wall_tile_read(room, rt_rules, H, wall_area_available)
     is_full_tile = tile_read["is_full_tile"]

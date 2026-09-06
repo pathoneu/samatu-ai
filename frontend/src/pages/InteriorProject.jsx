@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { rulesWithScope } from '@/lib/scope';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -934,7 +935,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patalpos: newRooms,
-          rules_override: project._overrides || {},
+          rules_override: rulesWithScope(project._overrides, project._apimtis),
           per_room_overrides: project._per_room_overrides || {},
           archetipas: project.archetipas,
           bendras_plotas_m2: newRooms.reduce(

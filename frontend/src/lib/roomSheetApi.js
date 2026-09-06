@@ -24,6 +24,7 @@
  */
 
 import { API_BASE } from './apiBase.js';
+import { rulesWithScope } from './scope.js';
 import { recompute } from './recomputeApi.js';
 import { buildRecomputeContext } from './recomputeContext.js';
 import { updatePositionQuantity } from './quantityOverride.js';
@@ -31,7 +32,7 @@ import {
   canOverrideWholeRow, findRowForQuantity, legacyKeyIsUnique, legacyRowKey,
 } from './roomSheet.js';
 
-function roomsOf(project) {
+export function roomsOf(project) {
   return project?.v8_rooms?.length ? project.v8_rooms : (project?.patalpos || []);
 }
 
@@ -73,7 +74,7 @@ export function saveAssumptionEdit(project, field, nextDict) {
     // merge cannot tell a priced row from a throwaway one.
     darbu_sarasas: project?.darbu_sarasas || [],
     edits: [{ field, new_value: nextDict }],
-    current_assumptions: project?._overrides || {},
+    current_assumptions: rulesWithScope(project?._overrides, project?._apimtis),
     context: buildRecomputeContext(project),
   });
 }
@@ -89,7 +90,9 @@ export async function saveRoomEdit(project, nextRooms) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       patalpos: nextRooms,
-      rules_override: project?._overrides || {},
+      // the contractor's „ką skaičiuoti" rides along on every recompute and is
+      // enforced server-side (extractor/scope.py)
+      rules_override: rulesWithScope(project?._overrides, project?._apimtis),
       per_room_overrides: project?._per_room_overrides || {},
       archetipas: project?.archetipas,
       bendras_plotas_m2: nextRooms.reduce((s, r) => s + (Number(r?.plotas_m2) || 0), 0),
@@ -113,7 +116,7 @@ export function recomputeUntouched(project) {
     pozicijos: project?.pozicijos || [],
     darbu_sarasas: project?.darbu_sarasas || [],
     edits: [],
-    current_assumptions: project?._overrides || {},
+    current_assumptions: rulesWithScope(project?._overrides, project?._apimtis),
     context: buildRecomputeContext(project),
   });
 }

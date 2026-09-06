@@ -1102,7 +1102,18 @@ def recompute(
                 "patalpos": rooms,
                 "_overrides": overrides,
             }
+            # Apimtis (2026-09-06): the contractor's „ką skaičiuoti" rides in
+            # `_overrides.apimtis`; enforced exactly as in /recompute-interior
+            # (extractor/scope.py) so a Prielaidos edit cannot undo it.
+            from extractor import scope as _scope
+            _apimtis = _scope.normalize_apimtis(overrides.get("apimtis"))
+            _scope.mark_rooms(rooms, _apimtis)       # also CLEARS a stale mark when no scope
+            if _apimtis:
+                _scope.apply_ceiling_choice(rooms, _apimtis)
+                parsed["_apimtis"] = _apimtis
             rebuilt = _build_pozicijos_from_rooms(parsed)
+            if _apimtis:
+                rebuilt["pozicijos"] = _scope.filter_rows_by_families(rebuilt.get("pozicijos"), _apimtis)
             if rebuilt.get("pozicijos"):
                 # Carry the user's manual edits (prices, corrected counts,
                 # locks) forward so the rebuild doesn't silently revert them.

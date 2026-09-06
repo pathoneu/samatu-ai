@@ -11,6 +11,8 @@ import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
 import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
 import { WORK_FAMILIES, filterRowsByFamilies } from '@/lib/workFamilies';
+import { LUBOS_CHOICES, SIENOS_ANGOS_CHOICES, scopeForBackend } from '@/lib/scope';
+import { rememberProjectScope, remembered } from '@/lib/scopeMemory';
 import { parseLtNumber } from '@/lib/parseLtNumber';
 import {
   createProject, updateProject, getPriceLists, pullPriceListsFromBackend,
@@ -83,37 +85,9 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
   const fd = new FormData();
   if (projType === 'interior') {
     fd.append('files', file);
-    // V8: užkrauti vartotojo nustatymus (rules_override)
+    // V8: užkrauti vartotojo nustatymus (rules_override) + „ką skaičiuoti"
     fd.append('interior_subtype', interiorSubtype);
-    try {
-      const prefs = loadPrefs();
-      if (prefs && prefs.setup_completed) {
-        fd.append('rules_override', JSON.stringify({
-          bathroom_tile_height_m: prefs.bathroom_tile_height_m,
-          bathroom_walls_painted_above_tiles: prefs.bathroom_walls_painted_above_tiles,
-          kitchen_backsplash_height_m: prefs.kitchen_backsplash_height_m,
-          drabuzine_painted: prefs.drabuzine_painted,
-          rubine_painted: prefs.rubine_painted,
-          sandeliukas_painted: prefs.sandeliukas_painted,
-          katiline_painted: prefs.katiline_painted,
-          garazas_painted: prefs.garazas_painted,
-          tamburas_painted: prefs.tamburas_painted,
-          openings_threshold_m2: prefs.openings_threshold_m2,
-          default_door_area_m2: prefs.default_door_area_m2,
-          default_window_area_m2: prefs.default_window_area_m2,
-          count_inner_corners: prefs.count_inner_corners,
-          count_outer_corners: prefs.count_outer_corners,
-          glaistas_q_lygis: prefs.glaistas_q_lygis,
-          glaistas_storis_mm: prefs.glaistas_storis_mm,
-          tile_method: prefs.tile_method,
-          tile_waste_pct: prefs.tile_waste_pct,
-          paint_waste_pct: prefs.paint_waste_pct,
-          high_ceiling_threshold_m: prefs.high_ceiling_threshold_m,
-        }));
-      }
-    } catch (e) {
-      console.warn('Could not load user prefs', e);
-    }
+    appendRulesOverride(fd, opts?.scope);
   } else {
     fd.append('file', file);
   }
@@ -123,17 +97,18 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
   return { json, res, projType };
 }
 
-// SM01: streaming variant for interior projects. Wires SSE events to onProgress
-// and resolves with the same {json, projType} shape the non-streaming path
-// returned, so downstream code can keep its branching.
-async function streamInteriorExtract(file, signal, opts, onProgress) {
-  const fd = new FormData();
-  fd.append('files', file);
-  fd.append('interior_subtype', opts.interiorSubtype || 'naujas');
+/**
+ * The `rules_override` field of the upload: the Setup Wizard preferences (when
+ * the wizard was completed) plus the „ką skaičiuoti" choices made on this
+ * screen (`apimtis`, enforced server-side — extractor/scope.py). Appended only
+ * when there is something to say.
+ */
+function appendRulesOverride(fd, scope) {
+  const overrides = {};
   try {
     const prefs = loadPrefs();
     if (prefs && prefs.setup_completed) {
-      fd.append('rules_override', JSON.stringify({
+      Object.assign(overrides, {
         bathroom_tile_height_m: prefs.bathroom_tile_height_m,
         bathroom_walls_painted_above_tiles: prefs.bathroom_walls_painted_above_tiles,
         kitchen_backsplash_height_m: prefs.kitchen_backsplash_height_m,
@@ -154,11 +129,24 @@ async function streamInteriorExtract(file, signal, opts, onProgress) {
         tile_waste_pct: prefs.tile_waste_pct,
         paint_waste_pct: prefs.paint_waste_pct,
         high_ceiling_threshold_m: prefs.high_ceiling_threshold_m,
-      }));
+      });
     }
   } catch (e) {
     console.warn('Could not load user prefs', e);
   }
+  const apimtis = scopeForBackend(scope);
+  if (apimtis) overrides.apimtis = apimtis;
+  if (Object.keys(overrides).length) fd.append('rules_override', JSON.stringify(overrides));
+}
+
+// SM01: streaming variant for interior projects. Wires SSE events to onProgress
+// and resolves with the same {json, projType} shape the non-streaming path
+// returned, so downstream code can keep its branching.
+async function streamInteriorExtract(file, signal, opts, onProgress) {
+  const fd = new FormData();
+  fd.append('files', file);
+  fd.append('interior_subtype', opts.interiorSubtype || 'naujas');
+  appendRulesOverride(fd, opts.scope);
 
   let finalResult = null;
   await postSse(`${API}/extract-interior-stream`, fd, {
@@ -316,6 +304,23 @@ export default function NewProject() {
   const [objektas, setObjektas]         = useState('butas');
   const [ceilingHeight, setCeilingHeight] = useState('');
   const [families, setFamilies]         = useState(() => new Set(WORK_FAMILIES));
+  // „Ką skaičiuoti" beyond the families: ceilings and the wall area convention.
+  // Pre-selected from his last three projects when they agree (lib/scopeMemory);
+  // the note under the control says so, and one click changes it.
+  const [rememberedKeys] = useState(() => new Set(Object.keys(remembered())));
+  const [lubosChoice, setLubosChoice]   = useState(() => remembered().lubos || 'dazomos');
+  const [sienosAngos, setSienosAngos]   = useState(() => remembered().sienos_angos || 'atimti');
+  const scopeChoice = () => ({
+    darbai_ne: WORK_FAMILIES.filter((f) => !families.has(f)),
+    lubos: lubosChoice,
+    sienos_angos: sienosAngos,
+  });
+  useEffect(() => {
+    const learned = remembered();
+    if (Array.isArray(learned.darbai_ne) && learned.darbai_ne.length) {
+      setFamilies(new Set(WORK_FAMILIES.filter((f) => !learned.darbai_ne.includes(f))));
+    }
+  }, []);
   // Default interior subtype, no setter — UI selector removed 2026-05-13.
   const [interiorSubtype] = useState('naujas');
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
@@ -493,7 +498,7 @@ export default function NewProject() {
           bumpIdle();  // arm the stall detector before the first event arrives
           ({ json, projType } = await streamInteriorExtract(
             file, controller.signal,
-            { interiorSubtype },
+            { interiorSubtype, scope: scopeChoice() },
             (ev) => {
               bumpIdle();  // every progress event resets the stall timer
               // First event of every stream: the id the server will save under
@@ -546,7 +551,7 @@ export default function NewProject() {
           ({ json, res, projType } = await detectAndExtract(
             file, projTypeChoice, controller.signal,
             { interiorSubtype },
-          ));
+          ), { scope: scopeChoice() });
         }
         setStatus(t('newProject.statusSaving'));
       } finally {
@@ -630,6 +635,7 @@ export default function NewProject() {
           tipas:           'interjeras',
           objektas_tipas:  objektas,
           skaiciuoti_families: [...families],
+          _apimtis:        scopeForBackend(scopeChoice()),
           ...(Number.isFinite(ceilingDefault) && ceilingDefault > 0
             ? { lubu_aukstis_default_m: ceilingDefault } : {}),
           rows:            [],
@@ -644,6 +650,7 @@ export default function NewProject() {
           } : {}),
         }, t));
         if (zeroRooms) toast.warning(t('newProject.errNoRooms'), { duration: 12000 });
+        rememberProjectScope(scopeChoice());
       } else {
         if (!json.eilutes) throw new Error(t('newProject.errUnexpectedFormat'));
         const rows = json.eilutes.map(row => ({
@@ -1138,6 +1145,47 @@ export default function NewProject() {
                   : t('newProject.q.familiesSomeOffNote')}
               </p>
             </fieldset>
+
+            {/* 4 · Lubos / 5 · Sienų plotas — the two conventions that decide the
+                biggest rows; each option says what it does to the sąmata. */}
+            {[
+              { key: 'lubos', label: t('newProject.q.lubosLabel'), options: LUBOS_CHOICES,
+                value: lubosChoice, set: setLubosChoice,
+                text: (o) => t(`newProject.q.lubos.${o}`), note: (v) => t(`newProject.q.lubosNote.${v}`) },
+              { key: 'sienos_angos', label: t('newProject.q.sienosLabel'), options: SIENOS_ANGOS_CHOICES,
+                value: sienosAngos, set: setSienosAngos,
+                text: (o) => t(`newProject.q.sienos.${o}`), note: (v) => t(`newProject.q.sienosNote.${v}`) },
+            ].map((q) => (
+              <fieldset key={q.key}>
+                <legend className="text-foreground font-medium" style={{ fontSize: 16 }}>{q.label}</legend>
+                <div role="radiogroup" aria-label={q.label} className="mt-2 flex flex-wrap gap-2">
+                  {q.options.map((o) => {
+                    const on = q.value === o;
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => q.set(o)}
+                        className={`inline-flex items-center rounded border transition-colors ${
+                          on
+                            ? 'border-primary bg-primary/10 text-foreground font-medium'
+                            : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
+                        }`}
+                        style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
+                      >
+                        {q.text(o)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-muted-foreground mt-1.5" style={{ fontSize: 14 }}>
+                  {q.note(q.value)}
+                  {rememberedKeys.has(q.key) && ` ${t('newProject.q.rememberedNote')}`}
+                </p>
+              </fieldset>
+            ))}
           </div>
         )}
 

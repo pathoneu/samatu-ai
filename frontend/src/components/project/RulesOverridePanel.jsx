@@ -12,6 +12,7 @@
  */
 
 import { useState, useMemo, useRef } from 'react';
+import { rulesWithScope } from '@/lib/scope';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ export default function RulesOverridePanel({ project, onProjectUpdate }) {
       try {
         const payload = {
           patalpos,
-          rules_override: newOverrides,
+          rules_override: rulesWithScope(newOverrides, project?._apimtis),
           per_room_overrides: newPerRoom,
           archetipas: project.archetipas,
           bendras_plotas_m2: project.bendras_plotas_m2,

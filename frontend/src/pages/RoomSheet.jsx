@@ -45,14 +45,15 @@ import {
   setSymbolCount, stampVerified,
 } from '@/lib/roomSheet';
 import {
-  fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched,
-  saveAssumptionEdit, saveRoomEdit,
+  fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
 } from '@/lib/roomSheetApi';
 import RoomSheetStrip from '@/components/roomsheet/RoomSheetStrip';
 import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import FactRow from '@/components/roomsheet/FactRow';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
+import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
+import { isRoomIncluded, withRoomIncluded } from '@/lib/scope';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 
@@ -143,7 +144,7 @@ export default function RoomSheet() {
    * `patalpos` and `v8_rooms`. Writing one and not the other would leave this
    * walk (which reads `v8_rooms` first) showing the pre-edit room forever.
    */
-  const land = useCallback((result, { fromInterior = false } = {}) => {
+  const land = useCallback((result, { fromInterior = false, scopeChange = false } = {}) => {
     const prior = project?.darbu_sarasas || [];
     const notes = [];
     const rebuilt = result.rooms || result.v8_rooms || result.patalpos;
@@ -154,7 +155,8 @@ export default function RoomSheet() {
         name: project.name,
         company_name: project.company_name,
         vat_rate: project.vat_rate,
-        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, prior, notes),
+        // a scope choice removes rows on purpose — do not carry them back as orphans
+        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, prior, notes, undefined, { scopeChange }),
       }
       : {
         ...project,
@@ -200,6 +202,16 @@ export default function RoomSheet() {
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, { [field]: value })),
       { fromInterior: true });
   }), [run, project, roomNr, land]);
+
+  // „Ką skaičiuoti" (apimtis): the whole project object changes, then every
+  // row is rebuilt server-side with the new scope — same path as a room edit.
+  const saveScope = useCallback((nextScope) => run(async () => {
+    const withScope = { ...project, _apimtis: nextScope };
+    setProject(withScope);
+    const result = await saveRoomEdit(withScope, roomsOf(withScope));
+    await land({ ...result, _apimtis: nextScope }, { fromInterior: true, scopeChange: true });
+    toast.success(t('project.roomSheet.scopeSaved'));
+  }), [run, project, land, t]);
 
   const saveChoice = useCallback((field, value) => run(async () => {
     if (field === 'walls_paint_override') {
@@ -319,7 +331,7 @@ export default function RoomSheet() {
         />
         <div className="mx-auto w-full max-w-[900px] flex-1 p-4">
           <div className="rounded-[2px] border border-border bg-card">
-            <GeneralFactsPanel project={project} busy={busy} onSaveSymbol={saveSymbol} />
+            <GeneralFactsPanel project={project} busy={busy} onSaveSymbol={saveSymbol} onSaveScope={saveScope} />
           </div>
           {/* „Jūsų eilutės" — the rows of HIS template the drawing cannot answer.
               Renders nothing when the account has no template. */}
@@ -415,6 +427,11 @@ export default function RoomSheet() {
 
           {!loading && !loadError && (
             <>
+              <RoomScopeSwitch
+                included={isRoomIncluded(project?._apimtis, roomNr)}
+                busy={busy}
+                onChange={(on) => saveScope(withRoomIncluded(project?._apimtis, roomNr, on))}
+              />
               <h2 className="flex items-baseline justify-between px-4 pb-2 pt-3 text-[17px] font-semibold">
                 {t('project.roomSheet.factsTitle')}
                 <span className="font-mono text-[13px] font-medium text-muted-foreground">

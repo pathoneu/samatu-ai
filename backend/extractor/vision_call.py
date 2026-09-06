@@ -26,6 +26,7 @@ from .prompt import (
 )
 from models_config import model_for
 from . import ledger as _ledger
+from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
 
@@ -1716,14 +1717,24 @@ def _stretch_ceiling_nrs(parsed: dict) -> set[str]:
     """Room numbers the user marked as įtempiamos lubos, as a set of strings."""
     raw = (parsed.get("_overrides") or {}).get("stretch_ceiling_override")
     if not isinstance(raw, dict):
-        return set()
+        raw = {}
     out: set[str] = set()
+    explicit_off: set[str] = set()
     for nr, val in raw.items():
         try:
             if float(val) >= 0.5:
                 out.add(str(nr).strip())
+            else:
+                explicit_off.add(str(nr).strip())
         except (TypeError, ValueError):
             continue  # a malformed flag must never break the whole build
+    # Apimtis (2026-09-06): „lubos įtempiamos" for the whole project — every
+    # room, unless the room's own flag says otherwise.
+    if (parsed.get("_apimtis") or {}).get("lubos") == "itempiamos":
+        for r in parsed.get("patalpos") or []:
+            nr = str((r or {}).get("nr") or "").strip()
+            if nr and nr not in explicit_off:
+                out.add(nr)
     out.discard("")
     return out
 
@@ -1786,6 +1797,7 @@ _WALLS_OUT_LT = {
     "paskirtis": ("Pagal patalpos paskirtį sienos neapdailinamos — jei "
                   "dažomos, pažymėkite Prielaidų skydelyje"),
     "geometrija": "Nepavyko nustatyti sienų ploto — patikrinkite matmenis",
+    "pasirinkimas": "Neįtraukta jūsų pasirinkimu",
 }
 _GRIND_OUT_LT = {
     "plyteles": "Grindys klojamos plytelėmis — grindjuosčių nėra",
@@ -1801,6 +1813,7 @@ _CEILING_OUT_LT = {
     "unfinished_room_standard": ("Pagal patalpos paskirtį lubos "
                                  "neapdailinamos — jei dažomos, pažymėkite "
                                  "Prielaidų skydelyje"),
+    "pasirinkimas": "Lubos ne jūsų darbas — neįtrauktos jūsų pasirinkimu",
 }
 
 
@@ -1868,6 +1881,15 @@ def _ceiling_base_meta(parsed: dict, rooms: list[dict], stretch_nrs: set[str],
     if total <= 0:
         return _per_room(per_room_sum)
 
+    # Rooms the contractor does not do (apimtis) are not in `rooms`; the table
+    # total still counts them, so take them off the anchor first.
+    excluded_m2 = round(sum(float(r.get("plotas_m2") or 0)
+                            for r in (parsed.get("patalpos") or [])
+                            if isinstance(r, dict) and r.get("_neskaiciuoti")), 2)
+    total_all = total
+    total = round(total - excluded_m2, 2)
+    if total <= 0:
+        return _per_room(per_room_sum)
     rooms_sum = round(sum(float(r.get("plotas_m2") or 0) for r in rooms), 2)
     if rooms_sum <= 0 or abs(total - rooms_sum) > _ANCHOR_TOLERANCE * rooms_sum:
         # The table's sum and the rooms we costed describe different things
@@ -1901,17 +1923,19 @@ def _ceiling_base_meta(parsed: dict, rooms: list[dict], stretch_nrs: set[str],
         return _per_room(per_room_sum)
 
     label = anchor.get("label") or "Iš viso"
-    parts = [f"Iš eksplikacijos lentelės „{label}\": {_lt_num(total)}"]
+    parts = [f"Iš eksplikacijos lentelės „{label}\": {_lt_num(total_all)}"]
+    if excluded_m2 > 0:
+        parts.append(f" − {_lt_num(excluded_m2)} (neįtrauktos patalpos)")
     if stretch_m2 > 0:
         parts.append(f" − {_lt_num(stretch_m2)} (įtempiamos lubos)")
     if unpainted_m2 > 0:
         parts.append(f" − {_lt_num(unpainted_m2)} (lubos nedažomos)")
-    if stretch_m2 > 0 or unpainted_m2 > 0:
+    if stretch_m2 > 0 or unpainted_m2 > 0 or excluded_m2 > 0:
         parts.append(f" = {_lt_num(base)}")
     parts.append(" m²")
     return {"base": base, "provenance": "".join(parts), "source": "anchor",
-            "total": total, "label": label, "stretch_m2": stretch_m2,
-            "unpainted_m2": unpainted_m2}
+            "total": total_all, "label": label, "stretch_m2": stretch_m2,
+            "unpainted_m2": unpainted_m2, "excluded_m2": excluded_m2}
 
 
 # ── Sienų / lubų skyrių atskyrimas (2026-09-02 contractor ask F3) ────────────
@@ -2146,7 +2170,8 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     if not _consolidate_paint_enabled():
         return
     pozicijos = parsed.get("pozicijos") or []
-    rooms = parsed.get("patalpos") or []
+    rooms = [r for r in (parsed.get("patalpos") or [])
+             if isinstance(r, dict) and not r.get("_neskaiciuoti")]   # apimtis: rooms he does not do
     SK_GD = SK_GD_MERGED
     SAL = "skaiciuota_is_brezinio"
 
@@ -2294,6 +2319,9 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
                 # be noise on every room of every ordinary project.
                 continue
             contribs.append(_ledger.contribution(r, value, "m2", why))
+        for r in (parsed.get("patalpos") or []):
+            if isinstance(r, dict) and r.get("_neskaiciuoti"):
+                skipped.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
         return contribs, skipped
 
     def _paint_roll_up(surf: str, tier: str, kiekis: float,
@@ -2316,7 +2344,8 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             "Patalpų kiekiai — iš brėžinio, o bendras kiekis imamas iš "
             "patalpų eksplikacijos lentelės, todėl patalpų suma jam nelygi")]
         running = float(_lubos_meta["total"])
-        for amount, name in ((_lubos_meta["stretch_m2"], "įtempiamos lubos"),
+        for amount, name in ((_lubos_meta.get("excluded_m2") or 0.0, "neįtrauktos patalpos"),
+                             (_lubos_meta["stretch_m2"], "įtempiamos lubos"),
                              (_lubos_meta["unpainted_m2"], "nedažomos lubos")):
             if amount > 0:
                 running = round(running - float(amount), 2)
@@ -2652,7 +2681,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     first build decide what the second one sees (2026-09-02 review finding 2).
     Hand it a fresh `json.loads` per build.
     """
-    rooms = parsed.get("patalpos") or []
+    # Apimtis (2026-09-06): a room the contractor does not do stays in
+    # `patalpos` (marked `_neskaiciuoti`) but is out of every row, total and
+    # anchor — see extractor/scope.py.
+    _all_rooms = parsed.get("patalpos") or []
+    rooms = [r for r in _all_rooms if isinstance(r, dict) and not r.get("_neskaiciuoti")]
+    _excluded_rooms = [r for r in _all_rooms if isinstance(r, dict) and r.get("_neskaiciuoti")]
     if not rooms:
         parsed["pozicijos"] = []
         return parsed
@@ -4052,7 +4086,8 @@ def _recompute_santrauka(parsed: dict) -> dict:
     """
     from .universal_rules import calc_totals
 
-    rooms = parsed.get("patalpos", [])
+    rooms = [r for r in (parsed.get("patalpos") or [])
+             if isinstance(r, dict) and not r.get("_neskaiciuoti")]   # apimtis: rooms he does not do
     if not rooms:
         return parsed
 
@@ -5888,8 +5923,17 @@ def extract_interior(
     # deduction standard (Sprint §2A.1). Re-set definitively at Step 6 below.
     if rules_override is not None:
         parsed["_overrides"] = rules_override
+    # Apimtis chosen at upload (families, ceilings, walls with/without openings;
+    # rooms are not known yet) — see extractor/scope.py.
+    _apimtis = _scope.normalize_apimtis((rules_override or {}).get("apimtis"))
+    _scope.mark_rooms(parsed.get("patalpos") or [], _apimtis)
+    if _apimtis:
+        parsed["_apimtis"] = _apimtis
+        _scope.apply_ceiling_choice(parsed.get("patalpos") or [], _apimtis)
     try:
         parsed = _build_pozicijos_from_rooms(parsed)
+        if _apimtis:
+            parsed["pozicijos"] = _scope.filter_rows_by_families(parsed.get("pozicijos"), _apimtis)
     except Exception as exc:
         import traceback
         tb = traceback.format_exc()

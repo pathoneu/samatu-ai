@@ -232,6 +232,53 @@ ones first; when we emit nothing comparable the sentence says so and offers
 the typed row. The ceiling row of the panel now also names its source when the
 anchor is the plan labels' sum. No value is taken from any figure.
 
+### Item 4 — first slice DONE 2026-09-06: „ką skaičiuoti" as the contractor wants it
+
+**Founder's ask.** „Reikia padaryti kažkokių daug pasirinkimų ką skaičiuoti ko
+ne, kad būtų freeform kaip ką nori rangovas" — choices, not odd yes/no
+questions; scope questions at upload; the choice remembered after three uses.
+
+**The object** (`_apimtis` on the project; `rules_override.apimtis` on every
+compute — `frontend/src/lib/scope.js`, `backend/extractor/scope.py`):
+`patalpos_ne` (rooms he does not do), `darbai_ne` (work families he does not
+do), `lubos` (dažomos / ne mūsų / įtempiamos, project default), `sienos_angos`
+(atimti / neatimti). Absent = as the drawing says; a room's own Prielaidos flag
+wins over the project default. Stateless: derived on every compute, nothing is
+written into the rooms for keeps — switch back and the drawing's numbers return.
+
+**Enforced server-side** (so the sheet, the exports and the template agree):
+an excluded room stays in `patalpos` marked `_neskaiciuoti`, its computed
+quantities zeroed, and the builder, the totals, the paint consolidation and the
+ceiling anchor skip it (the anchor subtracts its area as a named step
+„− neįtrauktos patalpos"; the ledger lists it „Neįtraukta jūsų pasirinkimu");
+a family that is off drops its rows and their materials after the build
+(server twin of `workFamilies.js`, unknown sections always stay); „lubos ne
+mūsų" empties every painted ceiling without an explicit room flag
+(`_ceiling_paint_source = pasirinkimas`); „įtempiamos" marks every room stretch
+unless its own flag says no; „sienos be angų" turns the openings deduction off
+through the room rules (`deduct_openings`). Wired into `/recompute-interior`,
+`/api/recompute-quantities` (a Prielaidos edit cannot undo the scope) and the
+extraction end (upload-time choices). Every frontend sender folds the scope
+into its overrides (`rulesWithScope`): room sheet, assumptions panel, rules
+panel, interior page, upload.
+
+**On the screen.** Room sheet: „Ši patalpa: Skaičiuoju / Neskaičiuoju" above
+the facts — the one control the duplicate-room warning asks for. General facts
+page: „Ką skaičiuoti" — lubos, sienų plotas, darbų sritys, each option saying
+what it does to the sąmata; changes recompute at once. Upload: lubos and sienų
+plotas next to the families; after three projects with the same choice the
+screen pre-selects it and says „Kaip jūsų 3 paskutiniuose projektuose"
+(`lib/scopeMemory.js`, browser storage).
+
+**Measured:** in-sample and out-of-sample numbers unchanged (no scope on the
+fixtures); `tests/test_scope.py` (16) covers the helpers, both endpoints, the
+wall-finish branch and a room switched back on; the ledger invariant holds on
+scoped rows. A scope change drops the rows the builder left out instead of
+carrying them as orphans (`mergeDarbuSarasasEdits` `scopeChange`), keeping his
+own rows and typed quantities. **Not in this slice:** per-room ×
+family chips (needs family-aware room quantities in the builder), windows to
+the floor (a reading question, not a scope), the Rotband share as a choice.
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects

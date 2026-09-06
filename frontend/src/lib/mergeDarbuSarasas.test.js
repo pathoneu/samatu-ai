@@ -573,3 +573,29 @@ test('a hand-added rnk- row is carried without the „pasenusi" flag', () => {
   assert.ok(notes.some(n => n.reason === 'manual_row_kept'));
   assert.ok(!notes.some(n => n.reason === 'orphan_carried'));
 });
+
+import { droppedByScope } from './mergeDarbuSarasas.js';
+
+
+test('a scope change drops the rows the builder left out — except his own rows and typed quantities', () => {
+  const prior = [
+    { id: 'p1', aprasymas: 'Sienų glaistymas/dažymas', kiekis: 250, mato_vnt: 'm²', kaina: 8 },
+    { id: 'p2', aprasymas: 'Lubų glaistymas/dažymas', kiekis: 100, mato_vnt: 'm²', kaina: 7 },
+    { id: 'p3', aprasymas: 'Dažai luboms (2 sluoksniai)', kiekis: 20, mato_vnt: 'l' },
+    { id: 'rnk-1', aprasymas: 'Šiukšlių išvežimas', kiekis: 2, mato_vnt: 'vnt' },
+    { id: 'p4', aprasymas: 'Grindjuosčių sumontavimas', kiekis: 61, mato_vnt: 'm', manual_override: true, quantity_source: 'manual_override' },
+  ];
+  const rebuilt = [
+    { id: 'p1', aprasymas: 'Sienų glaistymas/dažymas', kiekis: 243, mato_vnt: 'm²' },
+  ];
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, prior, notes, undefined, { scopeChange: true });
+  const labels = out.map((r) => r.aprasymas);
+  assert.deepEqual(labels.sort(), ['Grindjuosčių sumontavimas', 'Sienų glaistymas/dažymas', 'Šiukšlių išvežimas'].sort());
+  assert.equal(out.find((r) => r.id === 'p1').kaina, 8, 'the price rides on the kept row');
+  assert.deepEqual(droppedByScope(notes).map((n) => n.aprasymas).sort(), ['Dažai luboms (2 sluoksniai)', 'Lubų glaistymas/dažymas']);
+  // without the flag the same rows are carried as orphans, as before
+  const notes2 = [];
+  const out2 = mergeDarbuSarasasEdits(rebuilt, prior, notes2);
+  assert.ok(out2.some((r) => r.aprasymas === 'Lubų glaistymas/dažymas' && r._orphaned_after_rebuild));
+});
