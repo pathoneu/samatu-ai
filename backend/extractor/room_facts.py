@@ -325,6 +325,34 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
                      page, rect or region_on_page(room, page, region), sentence,
                      {"field": "plotas_m2", "kind": "number"})
 
+    if saltinis == "plano_uzrasas":
+        # 2026-09-06: the designer's own area label, read from the text layer
+        # (extractor/plan_area_annotations.py). The crop is the label itself.
+        uz = room.get("_plotas_uzrasas") or {}
+        page = uz.get("page") or room.get("puslapio_nr")
+        label_rect = _bbox_pdf_to_pct(uz.get("bbox"), uz.get("page_width"), uz.get("page_height"))
+        if label_rect:
+            m = MARKER_MARGIN_PCT
+            label_rect = [max(0.0, label_rect[0] - m), max(0.0, label_rect[1] - m),
+                          min(1.0, label_rect[2] + m), min(1.0, label_rect[3] + m)]
+        prior = _f(room.get("_plotas_pries_uzrasa_m2"))
+        sentence = "Plotas — užrašytas prie patalpos plane."
+        if prior:
+            sentence += f" Skaitant planą buvo {lt_num(prior)} m² — imu užrašytą."
+        return _fact("plotas", round(value, 2), "m²", "read", "planas",
+                     page, label_rect or region_on_page(room, page, region), sentence,
+                     {"field": "plotas_m2", "kind": "number"})
+
+    if room.get("_area_unconfirmed"):
+        # Other rooms on this drawing have their area written next to them;
+        # this one has none — the contractor decides whether it exists.
+        return _fact("plotas", round(value, 2), "m²", "assumed", "prielaida",
+                     room.get("puslapio_nr"), region,
+                     f"Plane prie šios patalpos ploto užrašo neradau, nors kitos "
+                     f"patalpos jį turi — skaičiuoju su {lt_num(value)} m². "
+                     "Patikrinkite, ar patalpa yra ir ar ji nesidubliuoja.",
+                     {"field": "plotas_m2", "kind": "number"})
+
     if saltinis == "inline_label":
         return _fact("plotas", round(value, 2), "m²", "read", "planas",
                      room.get("puslapio_nr"), region,

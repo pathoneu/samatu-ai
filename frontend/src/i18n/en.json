@@ -677,6 +677,8 @@
       "manualTitle": "The number is from your traced polygon.",
       "visionLabel": "read from the drawing",
       "visionTitle": "Read from the drawing itself rather than from a table. Worth a look.",
+      "planoUzrasasLabel": "labelled on plan",
+      "planoUzrasasTitle": "The area is written on the drawing next to the room itself and was read from the PDF text. Click → see the label.",
       "dimensionLabel": "from dimension",
       "dimensionTitle": "The number is from a drawing dimension."
     },

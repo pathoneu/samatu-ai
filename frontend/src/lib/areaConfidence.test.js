@@ -107,3 +107,13 @@ test('AREA_AGREEMENT_TOLERANCE_PCT is 5%', () => {
   // when sources are within ±2% AND drops to "low" when >5% — between, it stays "medium".
   assert.ok(AREA_AGREEMENT_TOLERANCE_PCT > 0 && AREA_AGREEMENT_TOLERANCE_PCT <= 0.05);
 });
+
+
+test('plano_uzrasas: the designer\'s area label read from the PDF text is a deterministic single source → high, own chip type (2026-09-06)', () => {
+  const room = { plotas_m2: 37.86, plotas_saltinis: 'plano_uzrasas', plotas_source: 'vision' };
+  const r = computeAreaConfidence(room);
+  assert.equal(r.confidence, 'high');
+  assert.equal(r.primarySource, 'plano_uzrasas');
+  assert.deepEqual(r.sources.map((s) => s.type), ['plano_uzrasas']);
+  assert.equal(inferPlotasSource(room), 'plano_uzrasas');
+});

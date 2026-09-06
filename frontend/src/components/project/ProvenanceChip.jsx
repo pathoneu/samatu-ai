@@ -39,6 +39,13 @@ const SOURCE_META = {
     cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     titleKey: 'project.provenance.visionTitle',
   },
+  // 2026-09-06: the designer's own room area written on the plan („37.86 m²"
+  // inside the room), read from the PDF text layer — deterministic, exact.
+  plano_uzrasas: {
+    labelKey: 'project.provenance.planoUzrasasLabel',
+    cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    titleKey: 'project.provenance.planoUzrasasTitle',
+  },
   dimension: {
     labelKey: 'project.provenance.dimensionLabel',
     cls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',

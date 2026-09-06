@@ -683,6 +683,8 @@
       "manualTitle": "Skaičius iš jūsų apvesto kontūro.",
       "visionLabel": "perskaityta iš brėžinio",
       "visionTitle": "Skaičius perskaitytas iš brėžinio piešinio, ne iš lentelės. Vertėtų peržiūrėti.",
+      "planoUzrasasLabel": "užrašyta plane",
+      "planoUzrasasTitle": "Plotas užrašytas brėžinyje prie pačios patalpos ir perskaitytas iš PDF teksto. Spauskite → matysite užrašą.",
       "dimensionLabel": "iš dimensijos",
       "dimensionTitle": "Skaičius iš brėžinio dimensijos."
     },

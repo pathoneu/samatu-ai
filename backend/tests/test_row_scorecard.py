@@ -341,8 +341,13 @@ def test_the_frozen_concept_table_loads_and_is_frozen():
     # families we do not emit (admitted gaps, app=None) — plus `parts` parents.
     # Names only; no quantity from any sąmata enters the engine. Reported in
     # docs/superpowers/research/2026-09-04-row-scorecard-baseline.md.
-    assert len(concepts) == 81, (
-        f"the frozen concept table now has {len(concepts)} entries, not 81 — "
+    # 81 → 89 on 2026-09-06: the paint family is four leaves (Sienų/Lubų ×
+    # iki/virš 3 m — the rows we emit) + five parents in his aggregations
+    # (walls only — objektas_g; ceilings only; combined per height band —
+    # objektas_a; everything in one row — objektas_b/h). Greedy single-row
+    # pairing had scored his walls-only row against walls + ceilings.
+    assert len(concepts) == 89, (
+        f"the frozen concept table now has {len(concepts)} entries, not 89 — "
         "adding a concept changes what the scorecard measures; report it as a "
         "mapping change and re-baseline before updating this number")
     assert len({c.key for c in concepts}) == len(concepts), "duplicate key"

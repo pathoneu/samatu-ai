@@ -63,7 +63,7 @@ function getFieldConfidence(room, field) {
   // Priority 2: source tag — eksplikacija/section_pjuvis = high; default_fallback = low
   if (field === 'plotas_m2' && room?.plotas_saltinis) {
     const src = room.plotas_saltinis;
-    if (src === 'eksplikacija' || src === 'inline_label') return 'high';
+    if (src === 'eksplikacija' || src === 'inline_label' || src === 'plano_uzrasas') return 'high';
     if (src === 'wall_dim_calc') return backendConf || 'medium';
     if (src === 'default_fallback') return 'low';
   }

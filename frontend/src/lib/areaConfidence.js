@@ -28,6 +28,7 @@ export const AREA_AGREEMENT_TOLERANCE_PCT = 0.05;
 
 const SOURCE_LABEL_LT = {
   eksplikacija: 'iš eksplikacijos',
+  plano_uzrasas: 'užrašyta plane',
   manual_polygon: 'rankinis',
   vision: 'iš AI',
   dimension: 'iš dimensijos',
@@ -74,7 +75,8 @@ export function computeAreaConfidence(room) {
     let singleConfidence;
     if (userVerified) singleConfidence = 'high';
     else if (primarySource === 'vision') singleConfidence = 'low';
-    else if (primarySource === 'eksplikacija' || primarySource === 'manual_polygon') singleConfidence = 'high';
+    else if (primarySource === 'eksplikacija' || primarySource === 'manual_polygon'
+      || primarySource === 'plano_uzrasas') singleConfidence = 'high';
     else singleConfidence = 'medium';
     return {
       confidence: singleConfidence,
@@ -126,6 +128,9 @@ export function inferPlotasSource(room) {
   // reader and never lies.
   const saltinis = (room.plotas_saltinis || '').trim();
   if (saltinis === 'eksplikacija') return 'eksplikacija';
+  // 2026-09-06: the designer's area label read from the PDF text (no table on
+  // the drawing) — deterministic like the eksplikacija, shown as its own chip.
+  if (saltinis === 'plano_uzrasas') return 'plano_uzrasas';
   if (room.plotas_source) return room.plotas_source;
   if (
     Array.isArray(room.polygon_pdf) &&
@@ -146,8 +151,13 @@ function collectSources(room) {
   // cached-project 🔴 neaišku bug visible in user screenshot.
   const saltinisIsEksplikacija =
     (room.plotas_saltinis || '').trim() === 'eksplikacija';
+  const saltinisIsPlanLabel =
+    (room.plotas_saltinis || '').trim() === 'plano_uzrasas';
   if ((room.plotas_source === 'eksplikacija' || saltinisIsEksplikacija) && room.plotas_m2 != null) {
     out.push({ type: 'eksplikacija', value: room.plotas_m2, label: SOURCE_LABEL_LT.eksplikacija });
+  }
+  if (saltinisIsPlanLabel && room.plotas_m2 != null) {
+    out.push({ type: 'plano_uzrasas', value: room.plotas_m2, label: SOURCE_LABEL_LT.plano_uzrasas });
   }
   // A room counts as having a manual_polygon source if EITHER
   //   (a) it has polygon_pdf + polygon_source==='manual' (Phase C-1 trace),
@@ -163,7 +173,8 @@ function collectSources(room) {
   }
   // Vision source — only when plotas_saltinis ALSO does not say eksplikacija
   // (saltinis is the deterministic truth; legacy plotas_source may lie).
-  if (room.plotas_source === 'vision' && room.plotas_m2 != null && !saltinisIsEksplikacija) {
+  if (room.plotas_source === 'vision' && room.plotas_m2 != null && !saltinisIsEksplikacija
+    && !saltinisIsPlanLabel) {
     out.push({ type: 'vision', value: room.plotas_m2, label: SOURCE_LABEL_LT.vision });
   }
   // Phase C-2 backfill: projects extracted before the plotas_source audit

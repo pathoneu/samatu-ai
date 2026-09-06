@@ -149,7 +149,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 37.86,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 27.5,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -344,7 +344,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 37.86,
+        "bbox": [
+          186.43,
+          468.39,
+          225.11,
+          478.11
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "02",
@@ -377,7 +389,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 14.26,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 15.27,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -556,7 +568,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 14.26,
+        "bbox": [
+          404.07,
+          206.94,
+          442.76,
+          216.66
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "03",
@@ -588,8 +612,8 @@
         ]
       ],
       "eksplikacija_row_idx": null,
-      "plotas_m2": 3.11,
-      "plotas_saltinis": "wall_dim_calc",
+      "plotas_m2": 3.52,
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 7.08,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -754,7 +778,20 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_pries_uzrasa_m2": 3.11,
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 3.52,
+        "bbox": [
+          443.15,
+          368.0,
+          476.43,
+          377.72
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "04",
@@ -787,7 +824,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.05,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 12.68,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -970,7 +1007,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 10.05,
+        "bbox": [
+          404.57,
+          565.46,
+          443.25,
+          575.18
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "05",
@@ -1003,7 +1052,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 3.76,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 8.5,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -1164,7 +1213,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 3.76,
+        "bbox": [
+          146.88,
+          622.69,
+          180.16,
+          632.41
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "06",
@@ -1196,8 +1257,8 @@
         ]
       ],
       "eksplikacija_row_idx": null,
-      "plotas_m2": 7.01,
-      "plotas_saltinis": "inline_label",
+      "plotas_m2": 7.25,
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 9.63,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -1367,7 +1428,20 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_pries_uzrasa_m2": 7.01,
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 7.25,
+        "bbox": [
+          218.95,
+          814.75,
+          252.23,
+          824.47
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "07",
@@ -1571,7 +1645,8 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_area_unconfirmed": true
     },
     {
       "nr": "08",
@@ -1604,7 +1679,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.55,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 11.47,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -1784,7 +1859,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 10.55,
+        "bbox": [
+          390.93,
+          795.2,
+          429.61,
+          804.92
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     },
     {
       "nr": "09",
@@ -1817,7 +1904,7 @@
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 6.78,
-      "plotas_saltinis": "inline_label",
+      "plotas_saltinis": "plano_uzrasas",
       "perimetras_m": 10.5,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
@@ -1964,7 +2051,19 @@
       "_grindjuosciu_capped": true,
       "_paint_virs_3m_sienos_m2": 0.0,
       "_paint_virs_3m_lubu_m2": 0.0,
-      "plotas_source": "vision"
+      "plotas_source": "vision",
+      "_plotas_uzrasas": {
+        "page": 4,
+        "value_m2": 6.78,
+        "bbox": [
+          417.92,
+          1012.94,
+          451.2,
+          1022.66
+        ],
+        "page_width": 841.89,
+        "page_height": 1190.55
+      }
     }
   ],
   "durys_total": [
@@ -2161,6 +2260,12 @@
     {
       "level": "INFO",
       "message": "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų (±10–20% kambarių skaičiui, daugiau plytelių zonoms). Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
+    },
+    {
+      "level": "WARN",
+      "code": "room_area_unconfirmed",
+      "patalpa_nr": "07",
+      "message": "Patalpos „Vonios kambarys\" (5,64 m²) ploto užrašo plane neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia patalpa yra ir ar ji nesidubliuoja."
     }
   ],
   "_meta": {
@@ -2439,7 +2544,32 @@
     "grindjuosciu_pre_cap_m": 76.75,
     "grindjuosciu_post_cap_m": 64.36,
     "grindjuosciu_cap_ratio_m_per_m2": 0.65,
-    "elapsed_s": 1510.6
+    "elapsed_s": 1510.6,
+    "plan_area_lane": {
+      "status": "applied",
+      "candidates": 8,
+      "sum_m2": 94.03,
+      "confirmed": [
+        "01",
+        "02",
+        "04",
+        "05",
+        "08",
+        "09"
+      ],
+      "adopted": [
+        "03",
+        "06"
+      ],
+      "unconfirmed": [
+        "07"
+      ],
+      "unclaimed": [],
+      "pages": [
+        4
+      ],
+      "duplicate_view_pages": []
+    }
   },
   "_voting": {
     "n_runs": 3,
@@ -9495,5 +9625,13 @@
   },
   "_elapsed_s": 1510.6,
   "status": "ok",
-  "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)"
+  "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)",
+  "_ceiling_anchor": {
+    "total_area_m2": 94.03,
+    "label": "plano užrašų suma",
+    "page": 4
+  },
+  "_backfill": {
+    "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44"
+  }
 }

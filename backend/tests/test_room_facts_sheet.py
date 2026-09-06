@@ -596,3 +596,46 @@ def test_every_crop_url_on_a_sheet_actually_returns_a_png(tmp_path, monkeypatch)
         assert r.headers["content-type"] == "image/png"
         img = Image.open(io.BytesIO(r.content))
         assert img.width > 20 and img.height > 20, f["key"]
+
+
+# ── the area fact from the designer's own plan label (2026-09-06) ───────────
+
+def test_an_area_taken_from_the_plan_label_crops_the_label_itself():
+    """No room table on the drawing, but the designer wrote „7.25 m²" inside
+    the room on the lubų planas. The fact is READ, the crop is that label
+    (on ITS page, not the room's page), and the sheet says what Vision had
+    read before the label corrected it."""
+    project = {"patalpos": [{
+        "nr": "06", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2,
+        "plotas_m2": 7.25, "plotas_saltinis": "plano_uzrasas",
+        "_plotas_pries_uzrasa_m2": 7.01,
+        "_plotas_uzrasas": {"page": 4, "value_m2": 7.25, "bbox": [219.0, 814.7, 252.2, 824.4],
+                             "page_width": 1191.0, "page_height": 842.0}}]}
+    f = _fact(build_room_facts(project, "06"), "plotas")
+    assert f["status"] == "read" and f["value"] == 7.25
+    assert f["source"]["kind"] == "planas" and f["source"]["page"] == 4
+    x0, y0, x1, y1 = f["source"]["rect_pct"]
+    assert 0.12 < x0 < 0.19 and 0.90 < y0 < 0.97 and x1 > x0 and y1 > y0
+    assert "užrašytas" in f["sentence"] and "7,01" in f["sentence"]
+
+
+def test_an_area_confirmed_by_the_plan_label_does_not_mention_a_correction():
+    project = {"patalpos": [{
+        "nr": "01", "puslapio_nr": 2, "plotas_m2": 37.86, "plotas_saltinis": "plano_uzrasas",
+        "_plotas_uzrasas": {"page": 4, "value_m2": 37.86, "bbox": [186.4, 468.4, 225.1, 478.0],
+                             "page_width": 1191.0, "page_height": 842.0}}]}
+    f = _fact(build_room_facts(project, "01"), "plotas")
+    assert f["status"] == "read" and "buvo" not in f["sentence"]
+
+
+def test_a_room_no_plan_label_supports_is_assumed_and_says_so():
+    """Vision's ninth room on a drawing whose other eight rooms all carry a
+    label: kept, never deleted, but the sheet says the label is missing and
+    asks whether the room exists."""
+    project = {"patalpos": [{
+        "nr": "07", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2,
+        "plotas_m2": 5.64, "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True}]}
+    f = _fact(build_room_facts(project, "07"), "plotas")
+    assert f["status"] == "assumed" and f["value"] == 5.64
+    assert "užrašo neradau" in f["sentence"] and "5,64" in f["sentence"]
+    assert "nesidubliuoja" in f["sentence"]

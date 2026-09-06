@@ -1039,6 +1039,17 @@
       "voting_on": true,
       "voting_n": 3,
       "note": "fresh live production output; NO offline apply_adjacency / hand corrections. Replaces enriched cached extract."
+    },
+    "plan_area_lane": {
+      "status": "insufficient",
+      "candidates": 0,
+      "sum_m2": 0,
+      "confirmed": [],
+      "adopted": [],
+      "unconfirmed": [],
+      "unclaimed": [],
+      "pages": [],
+      "duplicate_view_pages": []
     }
   },
   "_voting": {
@@ -3629,5 +3640,8 @@
     "error": null
   },
   "_elapsed_s": 308.7,
-  "status": "ok"
+  "status": "ok",
+  "_backfill": {
+    "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44"
+  }
 }

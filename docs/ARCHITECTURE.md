@@ -65,6 +65,8 @@ Four contract rules a renderer must not blur:
 
 ⚠️ **Never key an eksplikacija crop on the top-level `eksplikacija_source_page`.** That field is Vision's own guess; the deterministic reader that produced the bbox records its page separately. Measured on one corpus project they disagree (model 1, reader 2). Order: room `eksplikacija_source_page` → `_eksplikacija.eksplikacija_source_page` / the row's own `page` → top-level.
 
+**Room areas without a table (2026-09-06).** When no eksplikacija merged, `extractor/plan_area_annotations.py` reads the designer's own room-area labels („37.86 m²" standing in the room, or beside the room name) from the PDF text layer, confirms / corrects Vision's rooms against them, flags a room no label supports (`_area_unconfirmed`, kept — never deleted) and anchors the ceilings to their sum. A room then carries `plotas_saltinis = "plano_uzrasas"` and `_plotas_uzrasas {page, value_m2, bbox, page_width, page_height}` — the bbox is in the same top-origin pdfplumber frame as the eksplikacija row, so the check sheet crops the label with the same plain division.
+
 **Which evidence exists on which blob generation** — the endpoint degrades, it does not lie:
 
 | Evidence | Since | Older blobs |

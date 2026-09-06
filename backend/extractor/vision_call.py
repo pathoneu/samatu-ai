@@ -4956,6 +4956,59 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] eksplikacija merge failed: {exc}")
 
+    # Step 2.44: plan-area annotations lane (2026-09-06, item 3 of the €0
+    # generalisation work). Only when NO room table merged: the designer's own
+    # room areas written on the lubų/grindų planas („37.86 m²" standing alone
+    # in each room) are read from the text layer and become the table —
+    # confirming Vision's rooms, correcting a near miss, FLAGGING a room no
+    # label supports (objektas_g's invented third bathroom), and anchoring the
+    # ceiling quantity to their sum. See extractor/plan_area_annotations.py.
+    try:
+        _merged_rooms = int((parsed.get("_meta") or {}).get("eksplikacija_merged_rooms") or 0)
+        if _merged_rooms == 0 and parsed.get("patalpos"):
+            from .plan_area_annotations import (
+                most_common_page, plan_pages_from_classification,
+                read_area_annotations, reconcile_rooms_with_annotations)
+            _plan_pages = plan_pages_from_classification(parsed.get("puslapiai") or [])
+            _ann = read_area_annotations(pdf_bytes, pages=_plan_pages or None)
+            _lane = reconcile_rooms_with_annotations(parsed["patalpos"], _ann)
+            parsed.setdefault("_meta", {})["plan_area_lane"] = _lane
+            if _lane.get("status") == "applied":
+                _rooms_by_nr = {str(r.get("nr")): r for r in parsed["patalpos"] if isinstance(r, dict)}
+                _warns = parsed.setdefault("warnings", [])
+                for _nr in _lane.get("unconfirmed") or []:
+                    _r = _rooms_by_nr.get(str(_nr)) or {}
+                    _warns.append({
+                        "level": "WARN", "code": "room_area_unconfirmed",
+                        "room": _nr, "severity": "high",
+                        "message": (
+                            f"Patalpos „{_r.get('pavadinimas') or _nr}\" "
+                            f"({_lt_num(_r.get('plotas_m2') or 0)} m²) ploto užrašo plane "
+                            "neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia "
+                            "patalpa yra ir ar ji nesidubliuoja."),
+                    })
+                for _u in _lane.get("unclaimed") or []:
+                    _warns.append({
+                        "level": "INFO", "code": "plan_area_unclaimed", "severity": "low",
+                        "message": (
+                            f"Plane (psl. {_u.get('page')}) užrašytas plotas "
+                            f"{_lt_num(_u.get('value_m2') or 0)} m², kurio nepriskyriau "
+                            "jokiai patalpai – galbūt trūksta patalpos."),
+                    })
+                if not parsed.get("_ceiling_anchor") and float(_lane.get("sum_m2") or 0) > 0:
+                    parsed["_ceiling_anchor"] = {
+                        "total_area_m2": float(_lane["sum_m2"]),
+                        "label": "plano užrašų suma",
+                        "page": most_common_page(_ann),
+                    }
+            _emit({"event": "plan_area_lane", "status": _lane.get("status"),
+                   "candidates": _lane.get("candidates"),
+                   "confirmed": len(_lane.get("confirmed") or []),
+                   "adopted": len(_lane.get("adopted") or []),
+                   "unconfirmed": len(_lane.get("unconfirmed") or [])})
+    except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
+        print(f"[extractor] plan-area lane failed: {exc}")
+
     # Step 2.45: Schedule-table anchoring for window/door dimensions (Sprint 2).
     # Each room.elementai item with tipas in (langas, stoglangis, duris, pasleptos_duris)
     # is matched against schedule_tables.langai/durys by dimension proximity (±50mm).
@@ -6056,15 +6109,30 @@ def extract_interior(
     eksplikacija_page = parsed.get("eksplikacija_source_page")
     if not eksplikacija_page:
         existing = parsed.get("warnings") or []
-        existing.append({
-            "level": "INFO",
-            "message": (
-                "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai "
-                "išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų "
-                "(±10–20% kambarių skaičiui, daugiau plytelių zonoms). "
-                "Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
-            ),
-        })
+        _lane = (parsed.get("_meta") or {}).get("plan_area_lane") or {}
+        if _lane.get("status") == "applied":
+            # 2026-09-06: no table, but the designer's own room areas were
+            # read from the plan text (extractor/plan_area_annotations.py) —
+            # the areas are exact; only a room without a label is in doubt.
+            _pg = ", ".join(str(p) for p in (_lane.get("pages") or []))
+            existing.append({
+                "level": "INFO", "code": "room_table_from_plan_labels", "severity": "low",
+                "message": (
+                    f"Patalpų eksplikacijos lentelės nėra – patalpų plotai paimti iš "
+                    f"brėžinyje prie patalpų užrašytų plotų ({_lane.get('candidates')} "
+                    f"užrašai, psl. {_pg})."
+                ),
+            })
+        else:
+            existing.append({
+                "level": "INFO", "code": "room_table_missing",
+                "message": (
+                    "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai "
+                    "išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų "
+                    "(±10–20% kambarių skaičiui, daugiau plytelių zonoms). "
+                    "Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
+                ),
+            })
         parsed["warnings"] = existing
 
     # Phase C-2 (2026-05-02): if a patalpa has plotas_m2 but no plotas_source,

@@ -137,9 +137,47 @@ CONCEPTS: list[Concept] = [
 
     # ── Sienų lubų glaistymas dažymas ───────────────────────────────────────
     Concept("rotband", _rx(r"lyginimas sausu|rotband"), _rx(r"Rotband")),
-    Concept("dazymas", _rx(r"glaistymas ?/ ?dažymas|glaistymas/dažymas"),
-            _rx(r"glaistymas/dažymas"),
-            "iki/virš 3 m eilutės atitinka 1:1"),
+    # 2026-09-06 — the paint family in HIS words. We always emit four rows:
+    # Sienų / Lubų × (iki 3 m | virš 3 m) (the height suffix is absent when a
+    # project has no virš-3 m surfaces). He bills any aggregation of them:
+    # objektas_g walls only („Sienų glaistymas/ dažymas" — ceilings are not
+    # his), objektas_a „Sienų, lubų …" per height band, objektas_b everything
+    # in one row plus „Lubų … (virš 3m)" on its own, objektas_h one combined
+    # row. Before this the whole family was ONE concept and his rows were
+    # paired greedily with our single best row: his 239 m² of walls read as
+    # +43 % against walls + ceilings, and his 425 m² „everything" row against
+    # our 257 m² walls-iki row alone. Now: four LEAVES (surface × height,
+    # first-match on our rows) and five PARENTS that pool the leaves he did
+    # not bill separately — the scorer's existing `parts` rule. Names only;
+    # no quantity of his enters anything.
+    Concept("dazymas_sienos_virs",
+            _rx(r"^(?!.*\blub)(?=.*\bsien)(?=.*(virš|aukščiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"Sienų glaistymas/dažymas \(virš")),
+    Concept("dazymas_sienos_iki",
+            _rx(r"^(?!.*\blub)(?=.*\bsien)(?=.*(\biki\b|žemiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"Sienų glaistymas/dažymas(?! \(virš)")),
+    Concept("dazymas_lubos_virs",
+            _rx(r"^(?!.*\bsien)(?=.*\blub)(?=.*(virš|aukščiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"Lubų glaistymas/dažymas \(virš")),
+    Concept("dazymas_lubos_iki",
+            _rx(r"^(?!.*\bsien)(?=.*\blub)(?=.*(\biki\b|žemiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"Lubų glaistymas/dažymas(?! \(virš)")),
+    Concept("dazymas_sienos", _rx(r"^(?!.*\blub)(?=.*\bsien).*glaistymas ?/ ?dažymas"), None,
+            "jo eilutė tik sienoms, be aukščio (objektas_g)",
+            parts=("dazymas_sienos_iki", "dazymas_sienos_virs")),
+    Concept("dazymas_lubos", _rx(r"^(?!.*\bsien)(?=.*\blub).*glaistymas ?/ ?dažymas"), None,
+            "jo eilutė tik luboms, be aukščio",
+            parts=("dazymas_lubos_iki", "dazymas_lubos_virs")),
+    Concept("dazymas_virs", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(virš|aukščiau)).*glaistymas ?/ ?dažymas"), None,
+            "sienos + lubos virš 3 m (objektas_a)",
+            parts=("dazymas_sienos_virs", "dazymas_lubos_virs")),
+    Concept("dazymas_iki", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(\biki\b|žemiau)).*glaistymas ?/ ?dažymas"), None,
+            "sienos + lubos iki 3 m (objektas_a)",
+            parts=("dazymas_sienos_iki", "dazymas_lubos_iki")),
+    Concept("dazymas", _rx(r"glaistymas ?/ ?dažymas|glaistymas/dažymas"), None,
+            "viskas vienoje eilutėje (objektas_b, objektas_h): sudedamos visos keturios mūsų eilutės, "
+            "kurių jis neišskyrė atskirai",
+            parts=("dazymas_sienos_iki", "dazymas_sienos_virs", "dazymas_lubos_iki", "dazymas_lubos_virs")),
     # `beapva\w*din` — objektas_b nr 19 is typed "beapvasdinėms".
     Concept("duru_angos", _rx(r"beapva\w*din"), _rx(r"beapvadinėms durims")),
     Concept("dazymo_kampai", _rx(r"dažymo kampų|glaistymo kampų statym"),

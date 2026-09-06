@@ -127,6 +127,57 @@ GKP), so it goes to item 3, and as a choice to item 4; the tile-skirting rule co
 the architect's sheet says 24,97 m); hole drilling over-generates (G +84 %);
 hidroizoliacija is emitted in vnt, his row is m².
 
+### Item 3a/3b — DONE 2026-09-06: room areas from the plan text when there is no table; a room no label supports is flagged
+
+**What the drawing offers.** Objektas G prints no patalpų eksplikacija, but the
+lubų planas carries every room's area as TEXT („37.86 m²" standing inside the
+room) — exact, deterministic, free to read. Vision had read 7 of the 8 correctly,
+mis-read two (3,11 for 3,52; 7,01 for 7,25) and invented a ninth room (a third
+bathroom, 5,64 m², with its own tiles, paint and one of every fixture).
+
+**The lane** (`backend/extractor/plan_area_annotations.py`, pure pdfplumber, no
+model call): a „N.NN m²" that stands alone, or beside a ROOM NAME, is a room
+label; beside a material / total / count word (danga, laminat, vnt, sienų dažai,
+bendras plotas…) it is not. Digits are re-joined from characters because CAD
+exports split „7.25" into four one-character words. Sheets are taken richest-
+first and a sheet whose values repeat ≥ 60 % of the accepted ones is the same
+rooms drawn again (a and b label every room on 4–5 sheets — summing them would
+double the ceiling anchor). Reconcile against Vision's rooms: within ±3 % →
+confirmed; one unclaimed label within ±20 % → the label's value is adopted (the
+Vision figure is kept for the sheet); otherwise `_area_unconfirmed` — the room
+stays, never deleted (evidence-first: he decides), with a high-severity
+`room_area_unconfirmed` warning and the sheet sentence „ploto užrašo plane
+neradau… patikrinkite, ar patalpa yra ir ar ji nesidubliuoja". Σ labels becomes
+`_ceiling_anchor` („plano užrašų suma") so an invented room cannot move the
+ceilings. Runs in Step 2.44 only when `eksplikacija_merged_rooms == 0`;
+`scripts/backfill_plan_areas.py` applies it to cached extracts (idempotent).
+Check sheet: `plotas_saltinis = plano_uzrasas` crops the label itself (bbox in
+pdfplumber's top-origin frame, like the eksplikacija row); provenance chip
+„užrašyta plane"; RoomCard confidence high.
+
+**Result (€0, cached extracts).** G: 8 labels, 6 rooms confirmed, 2 corrected, 1
+flagged; walls +5,1 % → +3,6 %; OOS pooled 6,13 % → 5,85 %; in-sample 9,75 %
+unchanged (a/b/d/H have tables — the lane never runs; c has no labels at all —
+„insufficient", the old no-table notice stays). The flagged room still counts
+in the totals until he switches it off (item 4 gives him the switch) — that is
+the remaining +30 m² of G's walls.
+
+**By-product — the scorecard's paint family, names only.** The frozen table had
+ONE „glaistymas/dažymas" concept and paired his rows greedily with our single
+best row: G's walls-only row was scored against our walls + ceilings (+43 %,
+while the walls row alone is +3,6 %), and a's „iki 3 m" / „virš 3 m" rows were
+crossed with the wrong height band. Now four leaves (Sienų / Lubų × iki / virš —
+the rows we emit) + five parents in his aggregations (walls only — G; ceilings
+only; combined per height band — a; everything in one row — b, H), pooled by the
+scorer's existing `parts` rule. Within-10 % counts of a–d unchanged; a's and b's
+paint rows now compare like with like (a −10,9 % / +20,6 %, b +23,1 % — real
+gaps, previously hidden); G rows ±10 % 0 → 5 % (1 of 20). Table 81 → 89.
+
+**Still inside item 3:** 3c — the author's own figures (legend totals such as
+„laminuota grindų danga 76,65 m²") shown beside ours on the general facts
+panel, never as the value; the Rotband share from the pertvarų planas (masonry
+vs GKP) instead of the 30 % constant.
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects
