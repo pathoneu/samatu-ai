@@ -1437,59 +1437,74 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             if k not in PRIMITIVE_KEYS:
                 room[k] = v
 
-        # 4. Hidroizoliacija (not in calc_room_quantities; CLAUDE.md §1.12)
-        perim = float(room.get("perimetras_m") or 0)
-        room["hidroizoliacija_m2"] = _calc_hidroizoliacija_m2(room, perim)
-
-        # 4.1 Glaistas (kg) per Q-level (rules_override.glaistas_q_lygis if set)
-        q_lygis = (rules_override or {}).get("glaistas_q_lygis", "Q2")
-        dazymo = float(room.get("dazymo_plotas_m2") or 0)
-        room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
-
-        # 4.2 Dažai (litrai) — paint class drives coats × coverage (Sprint §2A.5).
-        paint_class = _resolve_paint_class_from_prefs(rules_override)
-        room["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=paint_class)
-        room["_paint_class"] = paint_class  # surface to UI / debug
-
-        # 4.3 Gruntas (litrai) — 1 coat at lower coverage (~7 m²/l)
-        room["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
-
-        # 4.4 Lubų karnizas (cornice) — perim + 5%, no door deduct,
-        # only for living-quality rooms (not vonia/garažas/utility)
-        room["lubu_karnizo_m"] = _calc_lubu_karnizas_m(
-            perim, room.get("paskirtis", ""))
-
-        # 4.5 LED nišų metrai
-        room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
-
-        # 5. Audit field
-        room["_computed_by"] = "python_deterministic"
-        # …and the two counts every opening deduction rides on (2026-09-02).
-        # They were DERIVED from `elementai` on every call and never stored, so
-        # a row could not say "3 durys × 1,125 m²".
-        #
-        # Stored UNDER-PREFIXED on purpose. `calc_room_quantities` reads a bare
-        # `n_doors` off the room it is handed, and `main.py:6498`
-        # (/recompute-interior) hands it the RAW room — so a bare key would
-        # silently change that endpoint's geometry from its 1-door/1-window
-        # default to the real counts. That default IS a defect (it is the one
-        # `api/recompute_quantities._calc_input` exists to prevent), but fixing
-        # it moves billed quantities and belongs in its own measured change,
-        # not in a persistence pass that must stay additive.
-        room["_n_doors"] = counts["n_doors"]
-        room["_n_windows"] = counts["n_windows"]
-        # 6. Calculation trace (human-readable for RoomCard)
-        H = float(room.get("lubu_aukstis_m") or 2.82)
-        perim = float(room.get("perimetras_m") or 0)
-        n_doors = counts["n_doors"]
-        n_windows = counts["n_windows"]
-        room["calculation_trace"] = (
-            f"perim({perim:.2f}) × H({H:.2f}) = {perim * H:.2f} m² "
-            f"− {n_windows} lang./{n_doors} dur. atimimai → "
-            f"dažymas {room.get('dazymo_plotas_m2', 0):.2f} m². "
-            f"Skaičiavo Python (deterministinis)."
-        )
+        # 4–6. Everything the calculator does NOT return but every row builder
+        # reads — shared with /recompute-interior (2026-09-07).
+        derive_room_extras(room, counts, rules_override)
     return parsed
+
+
+def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) -> None:
+    """Steps 4–6 of the per-room engine, applied IN PLACE after
+    `calc_room_quantities`: hidroizoliacija, glaistas (kg), dažai (l), gruntas
+    (l), lubų karnizas, LED nišų metrai, the audit fields and the readable trace.
+
+    One function for both the extraction pipeline and `/recompute-interior`
+    (2026-09-07). Until then the room-sheet recompute refreshed the areas but
+    left the materials from the first run on the room: the wall and ceiling
+    paint stayed a FROZEN total (81,71 l on the objektas_g demo whatever the
+    choices were) that was merely re-split between the two surfaces, and the
+    putty and primer litres did the same — a sąmata whose areas moved while its
+    materials did not. Guarded in tests/test_recompute_interior_parity.py.
+    """
+    perim = float(room.get("perimetras_m") or 0)
+    # 4. Hidroizoliacija (not in calc_room_quantities; CLAUDE.md §1.12)
+    room["hidroizoliacija_m2"] = _calc_hidroizoliacija_m2(room, perim)
+
+    # 4.1 Glaistas (kg) per Q-level (rules_override.glaistas_q_lygis if set)
+    q_lygis = (rules_override or {}).get("glaistas_q_lygis", "Q2")
+    dazymo = float(room.get("dazymo_plotas_m2") or 0)
+    room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
+
+    # 4.2 Dažai (litrai) — paint class drives coats × coverage (Sprint §2A.5).
+    # ONE figure per room, walls + ceiling. A Prielaidos edit decomposes it into
+    # `dazai_l` + `dazai_luboms_l` (api/recompute_quantities); a room coming
+    # back through here gets the canonical total again, so the ceiling part
+    # must not survive as a second copy that `_room_dazai_l` would add on top.
+    paint_class = _resolve_paint_class_from_prefs(rules_override)
+    room["dazai_l"] = _calc_dazai_liters(dazymo, paint_class=paint_class)
+    room.pop("dazai_luboms_l", None)
+    room["_paint_class"] = paint_class  # surface to UI / debug
+
+    # 4.3 Gruntas (litrai) — 1 coat at lower coverage (~7 m²/l)
+    room["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
+
+    # 4.4 Lubų karnizas (cornice) — perim + 5%, no door deduct,
+    # only for living-quality rooms (not vonia/garažas/utility)
+    room["lubu_karnizo_m"] = _calc_lubu_karnizas_m(
+        perim, room.get("paskirtis", ""))
+
+    # 4.5 LED nišų metrai
+    room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
+
+    # 5. Audit field
+    room["_computed_by"] = "python_deterministic"
+    # …and the two counts every opening deduction rides on (2026-09-02).
+    # They are DERIVED from `elementai` on every call (api.recompute_quantities
+    # ._calc_input is the shared contract) and stored under-prefixed so a row
+    # can say "3 durys × 1,125 m²" without the calculator ever reading them
+    # off a stored room.
+    room["_n_doors"] = counts["n_doors"]
+    room["_n_windows"] = counts["n_windows"]
+    # 6. Calculation trace (human-readable for RoomCard)
+    H = float(room.get("lubu_aukstis_m") or 2.82)
+    n_doors = counts["n_doors"]
+    n_windows = counts["n_windows"]
+    room["calculation_trace"] = (
+        f"perim({perim:.2f}) × H({H:.2f}) = {perim * H:.2f} m² "
+        f"− {n_windows} lang./{n_doors} dur. atimimai → "
+        f"dažymas {room.get('dazymo_plotas_m2', 0):.2f} m². "
+        f"Skaičiavo Python (deterministinis)."
+    )
 
 
 def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:

@@ -6569,7 +6569,17 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             # and 500'd the whole recompute — every other room lost with it.
             if "walls_paint" in room_override:
                 rt_rules["walls_paint"] = float(room_override["walls_paint"])
-            recalc = calc_room_quantities(room, rules=single_rules)
+            # The calculator reads n_doors / n_windows / door_area_m2 /
+            # window_area_m2, which are DERIVED from `elementai` and never
+            # stored on the room. Passing the raw room made it fall back to its
+            # „1 door / 1 window" default on every room-sheet recompute — a
+            # phantom window in each bathroom (+4,2 m of kampuotė), a missing
+            # door elsewhere — while a fresh extraction and the Prielaidos
+            # recompute counted the drawing's openings. Same contract as
+            # api.recompute_quantities._calc_input (2026-09-07; parity test in
+            # tests/test_recompute_interior_parity.py).
+            from api.recompute_quantities import _calc_input
+            recalc = calc_room_quantities(_calc_input(room), rules=single_rules)
         except Exception as exc:  # noqa: BLE001
             log.warning("[recompute-interior] room %s calc failed: %s",
                         room.get('nr'), exc)
@@ -6579,6 +6589,16 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             _failed_rooms.append(str(room.get("nr") or ""))
 
         merged = {**room, **recalc, **preserved}
+        # Steps 4–6 of the engine (materials, hidroizoliacija, karnizas, LED,
+        # trace) — without this the room kept its first-run putty / paint /
+        # primer while its areas moved (2026-09-07, see derive_room_extras).
+        if recalc:
+            try:
+                from extractor.vision_call import _elementai_to_counts, derive_room_extras
+                derive_room_extras(merged, _elementai_to_counts(merged.get("elementai") or []),
+                                   payload.rules_override)
+            except Exception as exc:  # noqa: BLE001 — the areas are already right
+                log.warning("[recompute-interior] room %s extras failed: %s", room.get("nr"), exc)
         out_rooms.append(merged)
     # The per-room calc above rewrote every computed field, so a family switched
     # off in ONE room (its quantities zeroed by the first `mark_rooms`) has to be

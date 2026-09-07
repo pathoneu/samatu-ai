@@ -25,15 +25,28 @@ from main import app  # noqa: E402
 client = TestClient(app)
 
 
+def _door(n=1):
+    return {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100, "kiekis": n}
+
+
+def _window(n=1):
+    return {"tipas": "langas", "plotis_mm": 1200, "aukstis_mm": 1500, "kiekis": n}
+
+
 def _rooms():
+    # `elementai` is the primitive every recompute path derives the opening
+    # counts from (api.recompute_quantities._calc_input); bare n_doors /
+    # n_windows on a room are never read in production.
     return [
         {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-         "perimetras_m": 22.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 2, "puslapio_nr": 1},
+         "perimetras_m": 22.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "elementai": [_door(1), _window(2)]},
         {"nr": "02", "pavadinimas": "Miegamasis", "paskirtis": "miegamasis", "plotas_m2": 14.0,
-         "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 1, "puslapio_nr": 1},
+         "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "elementai": [_door(1), _window(1)]},
         {"nr": "03", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0, "puslapio_nr": 1,
-         "hidroizoliacija_m2": 9.5},
+         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "hidroizoliacija_m2": 9.5, "elementai": [_door(1)]},
     ]
 
 
