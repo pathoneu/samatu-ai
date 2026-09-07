@@ -28,7 +28,7 @@ import {
   WORK_FAMILIES, isFamilyOn, normalizeScope, withFamily, withKampai, withLubos, withRotband,
   withSienosAngos,
 } from '@/lib/scope';
-import { unclaimedPlanLabels, roomFromPlanLabel } from '@/lib/planLabels';
+import { planLabelsUnionRect, roomFromPlanLabel, unclaimedPlanLabels } from '@/lib/planLabels';
 import EvidenceCrop from './EvidenceCrop';
 
 function SymbolRow({ row, projectId, busy, onSave }) {
@@ -366,12 +366,20 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
         <div className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-start gap-3 border-t border-border px-4 py-3">
           {anchorPage != null ? (
             <EvidenceCrop
-              fact={{
-                crop_url: `/api/projects/${encodeURIComponent(project.id)}`
-                  + `/evidence?page=${anchorPage}&rect=0.0000,0.0000,1.0000,1.0000&dpi=90`,
-                source: { page: anchorPage, rect_pct: null },
-              }}
-              alt={t('project.roomSheet.generalCeilingTitle')}
+              fact={(() => {
+                // the plan itself when the labels say where it is — a whole
+                // sheet at thumbnail size shows nothing but white margins
+                const rect = anchorIsPlanLabels ? planLabelsUnionRect(project, anchorPage) : null;
+                const r = (rect || [0, 0, 1, 1]).map((v) => v.toFixed(4)).join(',');
+                return {
+                  crop_url: `/api/projects/${encodeURIComponent(project.id)}`
+                    + `/evidence?page=${anchorPage}&rect=${r}&dpi=${rect ? 110 : 90}`,
+                  source: { page: anchorPage, rect_pct: rect },
+                };
+              })()}
+              alt={t(anchorIsPlanLabels
+                ? 'project.roomSheet.generalCeilingPlanTitle'
+                : 'project.roomSheet.generalCeilingTitle')}
               imgClassName="h-[68px] object-cover object-top"
             />
           ) : <span />}

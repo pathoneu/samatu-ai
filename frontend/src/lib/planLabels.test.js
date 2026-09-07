@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextRoomNr, roomFromPlanLabel, unclaimedPlanLabels } from './planLabels.js';
+import { nextRoomNr, planLabelsUnionRect, roomFromPlanLabel, unclaimedPlanLabels } from './planLabels.js';
 
 const project = {
   id: 'p',
@@ -35,4 +35,17 @@ test('roomFromPlanLabel carries the label as the area and sits where it stands',
   assert.equal(room._prideta_is_plano, true);
   assert.ok(room.bbox_pct.x0 < 0.32 && room.bbox_pct.x1 > 0.32 && room.bbox_pct.y0 < 0.855 && room.bbox_pct.y1 > 0.855);
   assert.equal(room.paskirtis, null, 'the purpose is his to set, not a guess');
+});
+
+
+test('planLabelsUnionRect frames the labels on the page, or nothing below three', () => {
+  const p = { patalpos: [
+    { nr: '01', _plotas_uzrasas: { page: 4, bbox: [100, 200, 140, 210], page_width: 1000, page_height: 1000 } },
+    { nr: '02', _plotas_uzrasas: { page: 4, bbox: [500, 600, 540, 610], page_width: 1000, page_height: 1000 } },
+    { nr: '03', _plotas_uzrasas: { page: 4, bbox: [300, 900, 340, 910], page_width: 1000, page_height: 1000 } },
+    { nr: '04', _plotas_uzrasas: { page: 2, bbox: [0, 0, 10, 10], page_width: 1000, page_height: 1000 } },
+  ] };
+  assert.deepEqual(planLabelsUnionRect(p, 4), [0.06, 0.16, 0.58, 0.95]);
+  assert.equal(planLabelsUnionRect(p, 2), null);
+  assert.equal(planLabelsUnionRect({}, 4), null);
 });

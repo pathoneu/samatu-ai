@@ -62,3 +62,26 @@ export function roomFromPlanLabel(project, label) {
     elementai: [],
   };
 }
+
+
+/**
+ * The rectangle (page-percent) that holds every plan label the rooms carry on
+ * `page` — i.e. the drawn plan itself — with a margin, or null when fewer than
+ * three labels sit on that page. Used to crop the „plane užrašytų plotų suma"
+ * row to the plan instead of the whole sheet's white margins.
+ */
+export function planLabelsUnionRect(project, page, margin = 0.04) {
+  const boxes = (project?.patalpos || [])
+    .map((r) => r?._plotas_uzrasas)
+    .filter((u) => u && Number(u.page) === Number(page) && Array.isArray(u.bbox) && u.bbox.length === 4
+      && Number(u.page_width) > 0 && Number(u.page_height) > 0);
+  if (boxes.length < 3) return null;
+  const W = Number(boxes[0].page_width); const H = Number(boxes[0].page_height);
+  let x0 = 1; let y0 = 1; let x1 = 0; let y1 = 0;
+  for (const u of boxes) {
+    x0 = Math.min(x0, Number(u.bbox[0]) / W); y0 = Math.min(y0, Number(u.bbox[1]) / H);
+    x1 = Math.max(x1, Number(u.bbox[2]) / W); y1 = Math.max(y1, Number(u.bbox[3]) / H);
+  }
+  const c = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e4) / 1e4;
+  return [c(x0 - margin), c(y0 - margin), c(x1 + margin), c(y1 + margin)];
+}

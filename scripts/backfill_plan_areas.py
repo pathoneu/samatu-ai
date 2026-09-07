@@ -62,12 +62,48 @@ def _lt(v: float) -> str:
     return f"{float(v):.2f}".replace(".", ",")
 
 
+# Fields the text-layer lanes write onto `patalpos`. The extract also carries a
+# V8-compat copy of the rooms (`v8_rooms`, written at extraction time), and the
+# room sheet sends THAT list to the recompute when it exists — so a backfilled
+# extract must mirror the lane's evidence onto it, or the first recompute drops
+# the labels' crops and the „plane užrašytų plotų suma" framing (2026-09-07).
+_MIRRORED_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_uzrasas", "_plotas_pries_uzrasa_m2",
+                  "_area_unconfirmed", "_area_unconfirmed_reason",
+                  "lubu_aukstis_m", "lubu_aukstis_saltinis", "_lubu_aukstis_uzrasas")
+
+
+def sync_v8_rooms(parsed: dict) -> int:
+    """Copy the lane fields from `patalpos` onto the matching `v8_rooms` entry
+    (by nr). Returns how many entries changed."""
+    v8 = parsed.get("v8_rooms")
+    if not isinstance(v8, list) or not v8:
+        return 0
+    by_nr = {str(r.get("nr")): r for r in parsed.get("patalpos") or [] if isinstance(r, dict)}
+    changed = 0
+    for r in v8:
+        if not isinstance(r, dict):
+            continue
+        src = by_nr.get(str(r.get("nr")))
+        if not src:
+            continue
+        for k in _MIRRORED_KEYS:
+            if k in src and r.get(k) != src[k]:
+                r[k] = src[k]
+                changed += 1
+            elif k not in src and k in r and k.startswith("_"):
+                r.pop(k, None)
+                changed += 1
+    return changed
+
+
 def backfill(slug: str, entry: dict) -> str:
     path = REPO / "ground_truth" / slug / "ai_extract.json"
     if not path.exists():
         return "no cached extract"
     parsed = json.loads(path.read_text(encoding="utf-8"))
     meta = parsed.setdefault("_meta", {})
+    if sync_v8_rooms(parsed):
+        path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     pdf = REPO / (entry.get("project_pdf") or "")
     if not entry.get("project_pdf") or not pdf.exists():
         return "no project PDF on disk"
@@ -77,6 +113,7 @@ def backfill(slug: str, entry: dict) -> str:
     hs = apply_height_statements(parsed.get("patalpos") or [], scan.get("heights") or [])
     if hs.get("status") == "applied":
         notes.append(f"plan height {hs['value_m']} m on {len(hs['rooms'])} rooms")
+        sync_v8_rooms(parsed)
         path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if "_autoriaus_kiekiai" not in parsed or REFRESH_AUTHOR:
         # 3c — the designer's own legend totals, on every project (tables or not)
@@ -102,6 +139,7 @@ def backfill(slug: str, entry: dict) -> str:
     parsed.setdefault("_backfill", {})["plan_areas"] = (
         "2026-09-06: plan-area lane applied from the fixture PDF's text layer; "
         "a fresh run does the same in Step 2.44")
+    sync_v8_rooms(parsed)
     path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return "; ".join(notes + [
         f"{lane['status']} ({lane.get('geometry')}): {lane['candidates']} labels on pages {lane['pages']}, "
