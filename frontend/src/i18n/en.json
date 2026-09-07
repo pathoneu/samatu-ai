@@ -1541,6 +1541,10 @@
       "sym_kondicionieriai": "Air conditioners",
       "sym_radiatoriai": "Radiators",
       "sym_gyvatukai": "Towel radiators",
+      "sym_plautuves": "Kitchen sinks",
+      "sym_dusai": "Showers",
+      "sym_bide": "Bidet showers",
+      "sym_vonios_kubilai": "Bathtubs",
       "symCount": "{{count}} pcs.",
       "symNoPage": "I cannot name the sheet they were counted on.",
       "legendCornersCount": "corners from the outline ({{count}})"

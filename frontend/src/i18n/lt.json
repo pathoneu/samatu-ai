@@ -1555,6 +1555,10 @@
       "sym_kondicionieriai": "Kondicionieriai",
       "sym_radiatoriai": "Radiatoriai",
       "sym_gyvatukai": "Gyvatukai",
+      "sym_plautuves": "Plautuvės",
+      "sym_dusai": "Dušai",
+      "sym_bide": "Bidė dušiukai",
+      "sym_vonios_kubilai": "Vonios (kubilai)",
       "symCount": "{{count}} vnt.",
       "symNoPage": "Lapo, kuriame jie suskaičiuoti, nurodyti negaliu.",
       "legendCornersCount": "kampai iš kontūro ({{count}})"
