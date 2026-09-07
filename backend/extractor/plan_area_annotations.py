@@ -44,6 +44,7 @@ __all__ = [
     "read_area_annotations", "reconcile_rooms_with_annotations",
     "plan_pages_from_classification", "text_pages_from_classification",
     "most_common_page", "read_author_figures", "scan_text_layer", "lane_warnings",
+    "read_height_statements", "apply_height_statements", "HEIGHT_SOURCE",
 ]
 
 CONFIRM_TOL = 0.03      # a Vision area this close to a label IS that label
@@ -784,6 +785,7 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
     top-to-bottom, left-to-right."""
     annotations: list[dict] = []
     figs: list[dict] = []
+    heights: list[dict] = []
     seen: set[tuple] = set()
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
@@ -796,10 +798,14 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
             try:
                 figs.extend(_figures_on_page(pn, W, H, chars, room_labels, seen, to_display))
             except Exception:  # noqa: BLE001
-                continue
+                pass
+            try:
+                heights.extend(_height_statements_on_page(pn, W, H, chars, to_display))
+            except Exception:  # noqa: BLE001
+                pass
     annotations.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
     figs.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
-    return {"annotations": annotations, "figures": figs}
+    return {"annotations": annotations, "figures": figs, "heights": heights}
 
 
 def read_author_figures(pdf_bytes: bytes, pages: Iterable[int] | None = None) -> list[dict]:
@@ -874,3 +880,103 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
                            "nepriskirtas jokiai patalpai – galbūt trūksta patalpos.")),
         })
     return out
+
+
+# ── the plan's own ceiling height („H - 2820") ───────────────────────────────
+# Some designers state the storey height once on the plan. When the rooms
+# carry only OUR default (2,82 m, `section_average`), that statement is the
+# drawing's number for the same thing: the room keeps the value the statement
+# gives and the sheet says „užrašytas plane" instead of „prielaida". A soffit
+# or fixture height („Kaktos pab. h - 2390", „spintoje h - 2,20 m") is not a
+# storey height and is skipped by its words.
+
+HEIGHT_SOURCE = "plano_uzrasas"
+_HEIGHT_RE = re.compile(
+    r"(?<![\w.,])(?:H|h)\s*[-=:–]?\s*(\d{4}|\d[.,]\d{2})\s*(?:mm|m)?(?![\w])")
+_NOT_A_STOREY_WORDS = ("kakt", "niš", "nis", "spint", "sviest", "šviest", "bald", "lentyn",
+                       "rozet", "jungik", "dus", "duš", "galv", "montuo", "isvad", "išvad",
+                       "nuo", "iki", "pakab", "lub", "grind")
+
+
+def _height_value(token: str) -> float | None:
+    v = _f(token.replace(",", "."))
+    if v is None:
+        return None
+    if v > 100:            # millimetres
+        v = v / 1000.0
+    return round(v, 3) if 2.2 <= v <= 4.5 else None
+
+
+def _height_statements_on_page(pn: int, W: float, H: float, chars: list[dict], to_display=_identity) -> list[dict]:
+    out: list[dict] = []
+    for line in _lines(chars):
+        txt = _line_text(line)
+        if not txt or len(txt) > 60:
+            continue                      # a note paragraph, not a stamp
+        folded = _fold(txt)
+        if any(w in folded for w in _NOT_A_STOREY_WORDS):
+            continue
+        for m in _HEIGHT_RE.finditer(txt):
+            v = _height_value(m.group(1))
+            if v is None:
+                continue
+            # A storey height is a bare stamp („H - 2820", possibly repeated on
+            # the line); a height inside a sentence („ap. h - 2260 mm, kai …")
+            # describes a soffit, a niche or a fixture and must not be taken for
+            # the storey — the words around the stamps give it away.
+            rest = _HEIGHT_RE.sub(" ", txt)
+            if any(ch.isalpha() for ch in rest):
+                continue
+            out.append({
+                "page": pn, "value_m": v, "text": m.group(0).strip()[:40],
+                "bbox": [round(x, 2) for x in to_display(
+                    [min(float(c["x0"]) for c in line), min(float(c["top"]) for c in line),
+                     max(float(c["x1"]) for c in line), max(float(c["bottom"]) for c in line)])],
+                "page_width": round(W, 2), "page_height": round(H, 2),
+            })
+    return out
+
+
+def read_height_statements(pdf_bytes: bytes, pages: Iterable[int] | None = None) -> list[dict]:
+    """Storey-height statements on the given pages: [{page, value_m, text, bbox, …}]."""
+    out: list[dict] = []
+    for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
+        try:
+            out.extend(_height_statements_on_page(pn, W, H, chars, to_display))
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
+_DEFAULT_HEIGHT_SOURCES = ("section_average", "default_fallback", "height_gate_reattributed",
+                           "height_gate_clamped", "")
+
+
+def apply_height_statements(rooms: Sequence[dict], statements: Sequence[dict]) -> dict:
+    """Give the rooms that carry only our default height the plan's stated
+    height. Applies only when the statements agree on ONE value (a plan that
+    states two heights needs the per-room readers, not this). Returns a
+    summary {status, value_m, rooms}."""
+    vals = sorted({float(s["value_m"]) for s in statements if _f(s.get("value_m")) is not None})
+    if not vals:
+        return {"status": "none", "value_m": None, "rooms": []}
+    if len(vals) > 1 and (max(vals) - min(vals)) > 0.011:
+        return {"status": "ambiguous", "value_m": None, "values": vals, "rooms": []}
+    value = vals[0]
+    first = next(s for s in statements if _f(s.get("value_m")) == value)
+    touched: list[str] = []
+    for r in rooms:
+        if not isinstance(r, dict):
+            continue
+        src = str(r.get("lubu_aukstis_saltinis") or "").strip().lower()
+        if src not in _DEFAULT_HEIGHT_SOURCES:
+            continue                       # a reader or the user already said something
+        if r.get("_height_marker_evidence"):
+            continue
+        r["lubu_aukstis_m"] = value
+        r["lubu_aukstis_saltinis"] = HEIGHT_SOURCE
+        r["_lubu_aukstis_uzrasas"] = {"page": first.get("page"), "text": first.get("text"),
+                                       "bbox": first.get("bbox"), "page_width": first.get("page_width"),
+                                       "page_height": first.get("page_height")}
+        touched.append(str(r.get("nr")))
+    return {"status": "applied" if touched else "nothing_to_do", "value_m": value, "rooms": touched}

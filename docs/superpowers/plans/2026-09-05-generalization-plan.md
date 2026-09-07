@@ -297,6 +297,38 @@ windows to the floor (a reading question, not a scope); Rotband from a real
 wall-type read (needs the pertvarų planas legend read by geometry — a paid
 Vision pass, parked with the €0 rule).
 
+### Third €0 round — DONE 2026-09-06 (founder: „dar kažką galima nemokamai padaryt?")
+
+- **Corner bead is a choice.** The calculator counted every room's four
+  concave corners as bead (`inner_corners_m = 4 × H`, ~100 m on G) and the
+  Setup Wizard's „tik išorės kampai" checkbox was never read by it. Now
+  `apimtis.kampai` (su vidiniais — today's default — / tik angų ir pertvarų)
+  and the wizard checkbox both reach `calc_room_quantities`
+  (`count_inner_corners`). Default unchanged on purpose: G reads +122 % against
+  his row and H +6 % with inner corners in, so the convention is his, not a
+  standard we can pick for him — the founder decides the default.
+- **Waterproofing checked in m² without a second row.** His out-of-sample
+  sąmata bills hidroizoliacija in m² (G 39,5); the LT pro convention the
+  builder follows is ONE line per job (per wet zone, vnt), and a second m² row
+  would be a row he could price twice (`test_pozicijos_p6_hidroizoliacija_
+  collapsed_to_one_line` pins it). The line already carries its m²
+  (`_detail_m2` = floors + splash zone); the row scorecard now pairs a his-row
+  in m² with that detail when the units differ.
+- **The plan's stated storey height is read, not assumed.** `H - 2820` on a
+  floor plan (objektas_d, p1–p2) now gives rooms that carried only our default
+  the stated value with `lubu_aukstis_saltinis = plano_uzrasas` and the
+  statement's crop on the sheet („Aukštis — užrašytas plane: „H - 2820""). A
+  reader or the user always wins; two different statements → nothing applied.
+  Soffit/fixture heights („Kaktos pab. h - 2390", „spintoje h - 2,20 m") are
+  refused by their words, and so is a height inside a sentence („ap. h - 2260 mm,
+  kai …" — words around the stamp). G/H/b print no storey height; d's two
+  default-height rooms flip from „prielaida" to „perskaityta" at the same 2,82 m
+  (the other two already had per-room reads) — numbers unchanged.
+- Checked and NOT changed for free: hole count (a per-fixture convention),
+  tile skirting on G (which floors are tiled is a Vision read; the designer's
+  own 24,97 m now shows beside our 8,42 m), fixture counts on G (+50 % = the
+  duplicated bathroom; the room switch fixes it in one click).
+
 ## 0. What was handed over, and what we did with it (€0 + two paid blind runs)
 
 Two new projects, both from the reference contractor, drawn by two architects

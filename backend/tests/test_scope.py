@@ -32,7 +32,8 @@ def _rooms():
         {"nr": "02", "pavadinimas": "Miegamasis", "paskirtis": "miegamasis", "plotas_m2": 14.0,
          "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 1, "puslapio_nr": 1},
         {"nr": "03", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0, "puslapio_nr": 1},
+         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0, "puslapio_nr": 1,
+         "hidroizoliacija_m2": 9.5},
     ]
 
 
@@ -76,7 +77,8 @@ def test_normalize_keeps_only_real_choices():
                            "rotband": "dalis", "rotband_dalis": "45"})
     assert a == {"patalpos_ne": ["07", "7"], "darbai_ne": ["plyteles"],
                  "patalpu_sritys_ne": {"03": ["grindys"]},
-                 "lubos": "ne_musu", "sienos_angos": None, "rotband": "dalis", "rotband_dalis": 45.0}
+                 "lubos": "ne_musu", "sienos_angos": None, "rotband": "dalis", "rotband_dalis": 45.0,
+                 "kampai": None}
     assert normalize_apimtis({"rotband": "nera"})["rotband"] == "nera"
 
 
@@ -138,7 +140,8 @@ def test_an_excluded_room_leaves_every_row_but_stays_on_the_sheet():
             next(r for r in base["patalpos"] if r["nr"] == "02")["walls_paintable_m2"]), abs=0.02)
     assert out["bendras_plotas_m2"] == pytest.approx(36.0)
     assert out.get("_apimtis") == {"patalpos_ne": ["02"], "darbai_ne": [], "patalpu_sritys_ne": {},
-                                   "lubos": None, "sienos_angos": None, "rotband": None, "rotband_dalis": None}
+                                   "lubos": None, "sienos_angos": None, "rotband": None, "rotband_dalis": None,
+                                   "kampai": None}
     walls = _row(out, "Sienų glaistymas/dažymas")
     assert any(e.get("room_nr") == "02" and e.get("excluded_because") == EXCLUDED_BECAUSE
                for e in walls.get("excluded") or []), "the ledger says why the room is out"
@@ -326,3 +329,35 @@ def test_rotband_is_a_stated_assumption_until_he_chooses():
     r = _row(half, "Sienų lyginimas Knauf Rotband")
     assert float(r["kiekis"]) == pytest.approx(0.5 * _qty(base, "Sienų glaistymas/dažymas"), abs=0.05)
     assert "pasirinkimas" in str(r.get("_assumption") or "").lower()
+
+
+def test_waterproofing_stays_one_line_and_carries_its_square_metres():
+    """The LT pro convention is ONE hidroizoliacija line per job (billed per wet
+    zone); a contractor who bills it in m² is checked against the line's own m²
+    detail by the row scorecard, not by a second row he might price twice."""
+    out = _recompute()
+    rows = [r for r in out["darbu_sarasas"] if str(r.get("aprasymas") or "").startswith("Hidroizoliacijos įrengimas")]
+    assert len(rows) == 1
+    assert str(rows[0].get("mato_vnt") or "").lower() in ("vnt", "kompl")
+    # the m² live on the builder's own row (`pozicijos`); the compat emit keeps the sąmata row lean
+    poz = [r for r in out.get("pozicijos") or [] if str(r.get("aprasymas") or "").startswith("Hidroizoliacijos įrengimas")]
+    assert len(poz) == 1
+    assert float(poz[0].get("_detail_m2") or 0) > 6.0, "the bathroom floor alone is 6 m²; the splash zone adds to it"
+
+
+def test_corner_bead_on_the_rooms_own_corners_is_his_choice():
+    base = _recompute()
+    outer = _recompute({"kampai": "tik_isoriniai"})
+    r01b = next(r for r in base["patalpos"] if r["nr"] == "01")
+    r01 = next(r for r in outer["patalpos"] if r["nr"] == "01")
+    assert float(r01b["kampai_inner_m"]) == pytest.approx(4 * 2.7, abs=0.01), "today: four vertical room corners"
+    assert float(r01["kampai_inner_m"]) == 0.0
+    assert float(r01["kampu_metrai"]) == pytest.approx(float(r01b["kampu_metrai"]) - 4 * 2.7, abs=0.01)
+    assert _qty(outer, "Dažymo kampų montavimas") < _qty(base, "Dažymo kampų montavimas")
+    same = _recompute({"kampai": "su_vidiniais"})
+    assert _qty(same, "Dažymo kampų montavimas") == pytest.approx(_qty(base, "Dažymo kampų montavimas"), abs=0.02)
+    # the Setup Wizard checkbox now reaches the calculator too (the scope choice wins when set)
+    body = {"patalpos": _rooms(), "rules_override": {"count_inner_corners": False}}
+    res = client.post("/recompute-interior", json=body)
+    assert res.status_code == 200
+    assert _qty(res.json(), "Dažymo kampų montavimas") == pytest.approx(_qty(outer, "Dažymo kampų montavimas"), abs=0.02)

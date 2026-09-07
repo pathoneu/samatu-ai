@@ -11,8 +11,9 @@ import pytest
 from reportlab.pdfgen import canvas
 
 from extractor.plan_area_annotations import (
-    MIN_CANDIDATES, SOURCE_LABEL, lane_warnings, plan_pages_from_classification,
-    read_area_annotations, read_author_figures, reconcile_rooms_with_annotations,
+    MIN_CANDIDATES, SOURCE_LABEL, apply_height_statements, lane_warnings,
+    plan_pages_from_classification, read_area_annotations, read_author_figures,
+    read_height_statements, reconcile_rooms_with_annotations, scan_text_layer,
 )
 
 
@@ -369,3 +370,40 @@ def test_a_drawing_turned_on_the_page_is_read_in_its_own_direction():
     # drawn at (120, 300) up the turned sheet (translate 842 + rotate 90): the string
     # starts 120 pt above the page bottom and runs upward along x ≈ 842 − 300 = 542
     assert abs(x1 - 542) < 6 and abs((1191 - bottom) - 120) < 6, a["bbox"]
+
+
+# ── the plan's own storey height ─────────────────────────────────────────────
+
+def _height_page(c):
+    c.setFont("Helvetica", 9)
+    c.drawString(100, 1100, "H - 2820")                          # the storey height, stated once
+    c.drawString(100, 1060, "Kaktos pab. h - 2390")              # a soffit — not the storey
+    c.drawString(100, 1020, "spintoje h - 2,20 m")               # a fixture height
+    c.drawString(100, 980, "Isvadai TV, internetui h- 1,20m")    # below any storey
+    c.drawString(100, 940, "37.86 m2")                           # a room label, untouched
+    c.drawString(100, 900, "ap. h - 2260 mm, kai lubos zeminamos")   # a soffit inside a sentence — not the storey
+    c.drawString(400, 1100, "H - 2820")                          # the same stamp again on the sheet
+
+
+def test_the_plan_stated_height_is_read_and_fixture_heights_are_not():
+    hs = read_height_statements(_pdf(_height_page))
+    assert [(h["value_m"], h["text"]) for h in hs] == [(2.82, "H - 2820"), (2.82, "H - 2820")]
+    assert hs[0]["page"] == 1 and hs[0]["bbox"][0] < 110
+    assert apply_height_statements([_room("01", 20.0, lubu_aukstis_saltinis="section_average")], hs)["status"] == "applied"
+    assert scan_text_layer(_pdf(_height_page))["heights"] == hs
+
+
+def test_rooms_with_only_our_default_take_the_plan_height_readers_win():
+    rooms = [_room("01", 20.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="section_average"),
+             _room("02", 12.0, lubu_aukstis_m=3.1, lubu_aukstis_saltinis="section_pjuvis"),
+             _room("03", 8.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="user_override")]
+    res = apply_height_statements(rooms, [{"page": 1, "value_m": 2.6, "text": "H - 2600",
+                                           "bbox": [1, 2, 3, 4], "page_width": 842, "page_height": 1191}])
+    assert res["status"] == "applied" and res["rooms"] == ["01"]
+    assert rooms[0]["lubu_aukstis_m"] == 2.6 and rooms[0]["lubu_aukstis_saltinis"] == "plano_uzrasas"
+    assert rooms[0]["_lubu_aukstis_uzrasas"]["text"] == "H - 2600"
+    assert rooms[1]["lubu_aukstis_m"] == 3.1 and rooms[2]["lubu_aukstis_saltinis"] == "user_override"
+    assert apply_height_statements(rooms, [])["status"] == "none"
+    two = apply_height_statements([_room("04", 9.0, lubu_aukstis_saltinis="section_average")],
+                                  [{"value_m": 2.6}, {"value_m": 3.0}])
+    assert two["status"] == "ambiguous", "two stated heights need the per-room readers, not a guess"

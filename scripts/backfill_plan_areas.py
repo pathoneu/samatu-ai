@@ -26,8 +26,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "backend"))
 
 from extractor.plan_area_annotations import (  # noqa: E402
-    SOURCE_LABEL, lane_warnings, most_common_page, plan_pages_from_classification,
-    reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification,
+    SOURCE_LABEL, apply_height_statements, lane_warnings, most_common_page,
+    plan_pages_from_classification, reconcile_rooms_with_annotations, scan_text_layer,
+    text_pages_from_classification,
 )
 
 LANE_WARNING_CODES = ("room_area_unconfirmed", "plan_area_unclaimed")
@@ -73,6 +74,10 @@ def backfill(slug: str, entry: dict) -> str:
     notes: list[str] = []
     text_pages = text_pages_from_classification(parsed.get("puslapiai") or [])
     scan = scan_text_layer(pdf.read_bytes(), pages=text_pages or None)   # one pass, same as Step 2.44
+    hs = apply_height_statements(parsed.get("patalpos") or [], scan.get("heights") or [])
+    if hs.get("status") == "applied":
+        notes.append(f"plan height {hs['value_m']} m on {len(hs['rooms'])} rooms")
+        path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if "_autoriaus_kiekiai" not in parsed or REFRESH_AUTHOR:
         # 3c — the designer's own legend totals, on every project (tables or not)
         parsed["_autoriaus_kiekiai"] = scan["figures"]

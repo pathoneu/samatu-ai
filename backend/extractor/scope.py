@@ -18,7 +18,8 @@ WHAT A SCOPE IS (`_apimtis` on the project, sent as `rules_override.apimtis`):
      "lubos": "dazomos"|"ne_musu"|"itempiamos",   # project default for ceilings
      "sienos_angos": "atimti"|"neatimti",   # wall area with or without openings
      "rotband": "dalis"|"nera"|"visos",     # wall levelling: a share, none, all
-     "rotband_dalis": 30}                   #   the share in %, when "dalis"
+     "rotband_dalis": 30,                   #   the share in %, when "dalis"
+     "kampai": "su_vidiniais"|"tik_isoriniai"}   # bead on the room's own corners too, or only reveals + partition ends
 
 Everything absent means „as the drawing says". A per-room choice already made
 elsewhere (Prielaidos: a room's own ceiling flag) wins over the project default.
@@ -45,7 +46,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Sequence
 
 __all__ = [
-    "FAMILIES", "ROOM_FAMILIES", "LUBOS_CHOICES", "SIENOS_ANGOS_CHOICES", "ROTBAND_CHOICES",
+    "FAMILIES", "ROOM_FAMILIES", "LUBOS_CHOICES", "SIENOS_ANGOS_CHOICES", "ROTBAND_CHOICES", "KAMPAI_CHOICES",
     "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
@@ -60,6 +61,7 @@ ROOM_FAMILIES = ("apdaila", "grindys", "plyteles")
 LUBOS_CHOICES = ("dazomos", "ne_musu", "itempiamos")
 SIENOS_ANGOS_CHOICES = ("atimti", "neatimti")
 ROTBAND_CHOICES = ("dalis", "nera", "visos")
+KAMPAI_CHOICES = ("su_vidiniais", "tik_isoriniai")
 # Levelling plaster goes on masonry, not on GKP partitions. Without a wall-type
 # read the engine can only ASSUME a share; the number below is a stated
 # assumption the contractor is told to replace, not a fact of any drawing.
@@ -142,10 +144,11 @@ def normalize_apimtis(raw: Any) -> dict | None:
         "sienos_angos": raw.get("sienos_angos") if raw.get("sienos_angos") in SIENOS_ANGOS_CHOICES else None,
         "rotband": raw.get("rotband") if raw.get("rotband") in ROTBAND_CHOICES else None,
         "rotband_dalis": share,
+        "kampai": raw.get("kampai") if raw.get("kampai") in KAMPAI_CHOICES else None,
     }
     if (not out["patalpos_ne"] and not out["darbai_ne"] and not out["patalpu_sritys_ne"]
             and out["lubos"] in (None, "dazomos") and out["sienos_angos"] in (None, "atimti")
-            and out["rotband"] in (None,) and out["rotband_dalis"] is None):
+            and out["rotband"] in (None,) and out["rotband_dalis"] is None and out["kampai"] is None):
         return None
     return out
 

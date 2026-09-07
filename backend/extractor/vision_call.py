@@ -3523,7 +3523,6 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "_detail_m2": hidro_m2,
             "_detail_juostele_m": wet_perim,
         })
-
     # ════════════════════════════════════════════════════════════════════════
     # GRINDYS (~5-6 lines)
     # ════════════════════════════════════════════════════════════════════════
@@ -5013,7 +5012,7 @@ def extract_interior(
     # ceiling quantity to their sum. See extractor/plan_area_annotations.py.
     try:
         from .plan_area_annotations import (
-            lane_warnings, most_common_page, plan_pages_from_classification,
+            apply_height_statements, lane_warnings, most_common_page, plan_pages_from_classification,
             reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
         # ONE pass over the text layer (pypdfium2; renders skipped): the room-area
         # labels for the lane below and — 3c — the designer's own legend totals
@@ -5024,6 +5023,10 @@ def extract_interior(
         _scan = scan_text_layer(pdf_bytes, pages=_text_pages or None)
         parsed["_autoriaus_kiekiai"] = _scan["figures"]
         parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
+        # The plan's own storey height („H - 2820") for rooms that carry only our
+        # default — the same number read, not assumed; a room's own reader wins.
+        _hs = apply_height_statements(parsed.get("patalpos") or [], _scan.get("heights") or [])
+        parsed["_meta"]["plan_height_statement"] = {k: v for k, v in _hs.items() if k != "rooms"} | {"rooms": len(_hs.get("rooms") or [])}
         _merged_rooms = int((parsed.get("_meta") or {}).get("eksplikacija_merged_rooms") or 0)
         if _merged_rooms == 0 and parsed.get("patalpos"):
             _plan_pages = set(plan_pages_from_classification(parsed.get("puslapiai") or []))

@@ -24,8 +24,9 @@ import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { authorFigureRows, bboxToRectPct, symbolRows } from '@/lib/roomSheet';
 import {
-  LUBOS_CHOICES, ROTBAND_CHOICES, ROTBAND_DEFAULT_PCT, SIENOS_ANGOS_CHOICES, WORK_FAMILIES,
-  isFamilyOn, normalizeScope, withFamily, withLubos, withRotband, withSienosAngos,
+  KAMPAI_CHOICES, LUBOS_CHOICES, ROTBAND_CHOICES, ROTBAND_DEFAULT_PCT, SIENOS_ANGOS_CHOICES,
+  WORK_FAMILIES, isFamilyOn, normalizeScope, withFamily, withKampai, withLubos, withRotband,
+  withSienosAngos,
 } from '@/lib/scope';
 import { unclaimedPlanLabels, roomFromPlanLabel } from '@/lib/planLabels';
 import EvidenceCrop from './EvidenceCrop';
@@ -286,6 +287,15 @@ function ScopeSection({ project, busy, onSaveScope }) {
       {scope.rotband === 'dalis' && (
         <RotbandShare scope={scope} busy={busy} onSaveScope={onSaveScope} />
       )}
+      <Choice
+        label={t('project.roomSheet.scopeKampaiLabel')}
+        options={KAMPAI_CHOICES}
+        value={scope.kampai}
+        busy={busy}
+        labelOf={(o) => t(`project.roomSheet.scopeKampai.${o}`)}
+        notes={(v) => t(`project.roomSheet.scopeKampaiNote.${v}`)}
+        onPick={(o) => onSaveScope?.(withKampai(scope, o))}
+      />
       <div className="border-t border-border px-4 py-3">
         <p className="text-[15px] font-semibold">{t('project.roomSheet.scopeFamiliesLabel')}</p>
         <div className="mt-2 flex flex-wrap gap-2">

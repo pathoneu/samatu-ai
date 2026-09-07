@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {
   isDefaultScope, isFamilyOn, isRoomFamilyOn, isRoomIncluded, learnedDefaults, normalizeScope,
   rememberScope, roomFamiliesOff, rulesWithScope, scopeForBackend, withFamily, withLubos,
-  withRoomFamily, withRoomIncluded, withRotband, withSienosAngos,
+  withKampai, withRoomFamily, withRoomIncluded, withRotband, withSienosAngos,
 } from './scope.js';
 
 test('normalizeScope fills the defaults and drops junk', () => {
-  assert.deepEqual(normalizeScope(undefined), { patalpos_ne: [], darbai_ne: [], patalpu_sritys_ne: {}, lubos: 'dazomos', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: null });
+  assert.deepEqual(normalizeScope(undefined), { patalpos_ne: [], darbai_ne: [], patalpu_sritys_ne: {}, lubos: 'dazomos', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: null, kampai: 'su_vidiniais' });
   assert.deepEqual(normalizeScope({ patalpos_ne: [7, ' 07', '07'], darbai_ne: ['plyteles', 'x'], lubos: 'ne_musu', sienos_angos: 'nope',
     patalpu_sritys_ne: { '03': ['grindys', 'elektra'], '': ['apdaila'] }, rotband: 'dalis', rotband_dalis: '45' }),
-    { patalpos_ne: ['07', '7'], darbai_ne: ['plyteles'], patalpu_sritys_ne: { '03': ['grindys'] }, lubos: 'ne_musu', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: 45 });
+    { patalpos_ne: ['07', '7'], darbai_ne: ['plyteles'], patalpu_sritys_ne: { '03': ['grindys'] }, lubos: 'ne_musu', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: 45, kampai: 'su_vidiniais' });
 });
 
 test('a default scope sends nothing to the backend', () => {
@@ -18,7 +18,7 @@ test('a default scope sends nothing to the backend', () => {
   assert.equal(scopeForBackend({ lubos: 'dazomos' }), null);
   assert.deepEqual(rulesWithScope({ glaistas_q_lygis: 'Q2', apimtis: { lubos: 'ne_musu' } }, null), { glaistas_q_lygis: 'Q2' });
   assert.deepEqual(rulesWithScope({ glaistas_q_lygis: 'Q2' }, { patalpos_ne: ['07'] }),
-    { glaistas_q_lygis: 'Q2', apimtis: { patalpos_ne: ['07'], darbai_ne: [], patalpu_sritys_ne: {}, lubos: 'dazomos', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: null } });
+    { glaistas_q_lygis: 'Q2', apimtis: { patalpos_ne: ['07'], darbai_ne: [], patalpu_sritys_ne: {}, lubos: 'dazomos', sienos_angos: 'atimti', rotband: 'dalis', rotband_dalis: null, kampai: 'su_vidiniais' } });
 });
 
 test('room and family switches are idempotent and reversible', () => {
@@ -72,4 +72,12 @@ test('Rotband is a choice: none, a share, or every painted wall', () => {
   assert.equal(withRotband(null, 'visos').rotband, 'visos');
   assert.equal(withRotband(null, 'dalis', '').rotband_dalis, null);
   assert.equal(withRotband(null, 'dalis', 140).rotband_dalis, 100);
+});
+
+
+test('corner bead on the rooms\' own corners is a choice, default as today', () => {
+  assert.equal(isDefaultScope(withKampai(null, 'su_vidiniais')), true);
+  assert.equal(withKampai(null, 'tik_isoriniai').kampai, 'tik_isoriniai');
+  assert.equal(isDefaultScope(withKampai(null, 'tik_isoriniai')), false);
+  assert.equal(withKampai(null, 'x').kampai, 'su_vidiniais');
 });

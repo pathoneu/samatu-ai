@@ -73,6 +73,7 @@ function getFieldConfidence(room, field) {
     // Altitudė, atspausdinta PAČIOJE patalpoje lubų plane ir priskirta
     // deterministiškai (point-in-polygon) — skaityta tiesiai iš brėžinio.
     if (src === 'ceiling_plan_marker') return 'high';
+    if (src === 'plano_uzrasas') return 'high';   // the plan's own „H - 2820" statement, read from the PDF text
     if (src === 'ceiling_plan_annotation') return backendConf || 'medium';
     if (src === 'default_fallback') return 'low';
   }

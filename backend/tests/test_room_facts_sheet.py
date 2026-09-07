@@ -651,3 +651,15 @@ def test_a_room_drawn_over_another_rooms_label_is_called_a_likely_duplicate():
     f = _fact(build_room_facts(project, "07"), "plotas")
     assert f["status"] == "assumed"
     assert "persidengia su patalpa 06" in f["sentence"] and "antrą kartą" in f["sentence"]
+
+
+def test_a_height_stated_on_the_plan_is_read_and_cropped_where_it_is_written():
+    project = {"patalpos": [{
+        "nr": "01", "pavadinimas": "Svetainė", "puslapio_nr": 1, "plotas_m2": 20.0,
+        "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
+        "_lubu_aukstis_uzrasas": {"page": 2, "text": "H - 2820", "bbox": [100, 80, 160, 92],
+                                  "page_width": 1000, "page_height": 1000}}]}
+    f = _fact(build_room_facts(project, "01"), "aukstis")
+    assert f["status"] == "read" and f["value"] == 2.82
+    assert f["source"]["page"] == 2 and f["source"]["rect_pct"][0] < 0.1
+    assert "H - 2820" in f["sentence"] and "užrašytas plane" in f["sentence"]

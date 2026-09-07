@@ -23,6 +23,7 @@ export const LUBOS_CHOICES = ['dazomos', 'ne_musu', 'itempiamos'];
 export const SIENOS_ANGOS_CHOICES = ['atimti', 'neatimti'];
 export const ROTBAND_CHOICES = ['dalis', 'nera', 'visos'];
 export const ROTBAND_DEFAULT_PCT = 30;
+export const KAMPAI_CHOICES = ['su_vidiniais', 'tik_isoriniai'];
 
 const nr = (v) => String(v ?? '').trim();
 
@@ -46,6 +47,7 @@ export function normalizeScope(raw) {
     rotband: ROTBAND_CHOICES.includes(r.rotband) ? r.rotband : 'dalis',
     rotband_dalis: Number.isFinite(pct) && r.rotband_dalis !== null && r.rotband_dalis !== undefined && r.rotband_dalis !== ''
       ? Math.min(100, Math.max(0, pct)) : null,
+    kampai: KAMPAI_CHOICES.includes(r.kampai) ? r.kampai : 'su_vidiniais',
   };
 }
 
@@ -55,7 +57,12 @@ export function isDefaultScope(raw) {
   return s.patalpos_ne.length === 0 && s.darbai_ne.length === 0
     && Object.keys(s.patalpu_sritys_ne).length === 0
     && s.lubos === 'dazomos' && s.sienos_angos === 'atimti'
-    && s.rotband === 'dalis' && s.rotband_dalis === null;
+    && s.rotband === 'dalis' && s.rotband_dalis === null && s.kampai === 'su_vidiniais';
+}
+
+export function withKampai(raw, choice) {
+  const s = normalizeScope(raw);
+  return { ...s, kampai: KAMPAI_CHOICES.includes(choice) ? choice : s.kampai };
 }
 
 /** The families switched off in this room (its own plus the project-wide ones). */
@@ -143,7 +150,7 @@ export function rulesWithScope(overrides, scopeRaw) {
 // history list so nothing is inferred from a single project.
 
 export const REMEMBER_AFTER = 3;
-const PROJECT_LEVEL_KEYS = ['lubos', 'sienos_angos', 'darbai_ne', 'rotband', 'rotband_dalis'];
+const PROJECT_LEVEL_KEYS = ['lubos', 'sienos_angos', 'darbai_ne', 'rotband', 'rotband_dalis', 'kampai'];
 
 function sameValue(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);

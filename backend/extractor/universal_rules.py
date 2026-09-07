@@ -416,6 +416,16 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     if (prefs.get("apimtis") or {}).get("sienos_angos") == "neatimti":
         for rt in rules:
             rules[rt]["deduct_openings"] = False
+    # Corner bead on the room's own (concave) corners: the „Ką skaičiuoti"
+    # choice first; otherwise the Setup Wizard checkbox, which promised this
+    # for months and was never read by the calculator.
+    _kampai = (prefs.get("apimtis") or {}).get("kampai")
+    if _kampai in ("tik_isoriniai", "su_vidiniais"):
+        for rt in rules:
+            rules[rt]["count_inner_corners"] = _kampai == "su_vidiniais"
+    elif prefs.get("count_inner_corners") is not None:
+        for rt in rules:
+            rules[rt]["count_inner_corners"] = bool(prefs.get("count_inner_corners"))
 
     bath_h = prefs.get("bathroom_tile_height_m")
     if bath_h is not None:
@@ -1781,12 +1791,17 @@ def calc_room_quantities(room: dict,
     # adjacency pass found no neighbours), the contribution is zero so
     # Objektas A is unaffected by the default flip.
     count_partition_corners = bool(room.get("count_partition_corners", True))
+    # Apimtis (2026-09-06): the room's own vertical corners are CONCAVE — bead
+    # goes there only if the contractor works that way (Setup Wizard
+    # `count_inner_corners`, or „Ką skaičiuoti" → kampai). Default keeps the
+    # long-standing behaviour (counted); the choice is his, shown with terms.
+    count_inner_corners = bool(rt_rules.get("count_inner_corners", True))
 
     if walls_paint_factor > 0:
         # Interior corners: one per polygon vertex × ceiling height.
         # Default to 4 for a rectangle; L-shape rooms set n_walls_estimate=6,
         # T-shape 8, etc.
-        inner_corners_m = n_walls_estimate * H
+        inner_corners_m = n_walls_estimate * H if count_inner_corners else 0.0
         # Door/window reveal edges (vertical perimeters around openings).
         opening_reveals_m = (
             n_doors * (door_width + 2 * door_height)

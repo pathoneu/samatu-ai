@@ -438,6 +438,7 @@ _HEIGHT_SOURCES: dict[str, tuple[str, str, str]] = {
                                 "Aukštis — iš lubų plane užrašytos altitudės."),
     "section_pjuvis": ("read", "pjuvis", "Aukštis — iš pjūvio."),
     "per_room": ("read", "planas", "Aukštis užrašytas prie šios patalpos."),
+    "plano_uzrasas": ("read", "planas", "Aukštis — užrašytas plane (visam aukštui)."),
     "user_override": ("read", "prielaida", "Šį aukštį įrašėte patys."),
     "section_average": ("assumed", "pjuvis",
                         "Prie šios patalpos aukščio neradau — imu tokį pat "
@@ -475,6 +476,17 @@ def _fact_aukstis(project: dict, room: dict,
 
     status, kind, sentence = _HEIGHT_SOURCES.get(
         saltinis, ("assumed", "prielaida", ""))
+    uz = room.get("_lubu_aukstis_uzrasas")
+    if saltinis == "plano_uzrasas" and isinstance(uz, dict):
+        # the statement itself is the evidence — crop it on its own page
+        page = int(_f(uz.get("page")) or 0) or page
+        label_rect = _bbox_pdf_to_pct(uz.get("bbox"), uz.get("page_width"), uz.get("page_height"))
+        if label_rect:
+            m = MARKER_MARGIN_PCT
+            rect = [max(0.0, label_rect[0] - m), max(0.0, label_rect[1] - m),
+                    min(1.0, label_rect[2] + m), min(1.0, label_rect[3] + m)]
+        if uz.get("text"):
+            sentence = f"Aukštis — užrašytas plane: „{uz.get('text')}\"."
     if page is None:
         page = (first_page_of_type(project, "section")
                 if kind == "pjuvis"
