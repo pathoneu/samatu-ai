@@ -107,6 +107,12 @@ Then: Sąmata → switch → type into a blank cell (becomes an `rnk-` row in `d
 
 ## Housekeeping gotchas
 
+- **A response key that starts with `_sa` never reaches the browser.** FastAPI's
+  `jsonable_encoder` runs with `sqlalchemy_safe=True` and silently drops every dict
+  key beginning with `_sa` (meant for SQLAlchemy's `_sa_instance_state`). A row flag
+  named `_salyga` was on the row right up to `return` and absent in the JSON
+  (2026-09-08, an hour lost). Name private row keys anything else (`_only_while`).
+
 - Real listeners: `lsof -nP -iTCP -sTCP:LISTEN | grep -E "python|node"`.
 - The "N running tasks" panel can show **zombie agents** (40 h+ timers = finished-but-not-cleared). They cost nothing and clear on app/session restart.
 - Spun-off task-sessions live in `.claude/worktrees/*` on their own branches, sometimes based on an **older** commit than `viewer-rebuild` — merge their results forward deliberately, don't assume a clean fast-forward.

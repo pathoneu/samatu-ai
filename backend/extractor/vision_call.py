@@ -962,6 +962,13 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # suppress a „Σ" affordance that would contradict the headline.
             _ledger.SUM_FLAG_KEY: p.get(_ledger.SUM_FLAG_KEY),
             "_assumption": p.get("_assumption"),
+            # The condition a row exists under (see „Pastolių nuoma"): the
+            # merges read it off the STORED row to drop it when it no longer
+            # holds, so it has to survive the move onto darbu_sarasas. NOT named
+            # `_salyga`: FastAPI's jsonable_encoder silently drops every dict
+            # key that starts with `_sa` (SQLAlchemy state), so that spelling
+            # never reached the browser (2026-09-08, an hour of debugging).
+            "_only_while": p.get("_only_while"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 
@@ -2263,7 +2270,11 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     # leaves the sąmata must take its material with it, not hand it to the walls.
     _all = walls_paint + lubos_paint_all
     w_share = (walls_paint / _all) if _all > 0 else 0.5
-    l_share = ((1 - w_share) * (lubos_paint / lubos_paint_all)
+    # …and the ceiling's share follows the BILLED ceiling, not the per-room
+    # sum: when the eksplikacija / plan-label anchor moves the ceiling line to
+    # 104,53 m², its putty, primer and paint move with it. They were bought for
+    # the rooms' 99,67 m² while the line billed 104,53 (2026-09-08).
+    l_share = ((1 - w_share) * (lubos_billed / lubos_paint_all)
                if lubos_paint_all > 0 else 0.0)
 
     # 2026-09-02: the material names carry their SURFACE. They used to be bare
@@ -2713,6 +2724,39 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     def _sum_filtered(field: str, paskirtys: set) -> float:
         return round(sum(float(r.get(field) or 0) for r in rooms
                          if _pask(r) in paskirtys), 2)
+
+    def _choice_excluded(family: str, keep=None) -> list[dict]:
+        """Rooms a „ką skaičiuoti" choice keeps out of this family's lines —
+        named on the line's ledger so the room's check sheet can say so.
+        `keep(room)` narrows it to the rooms that would BELONG to the line
+        (a bathroom is not „left out by choice" of the kitchen-splashback
+        line — it was never in it), so an excluded room's sheet lists the
+        lines it lost, not every line of the family."""
+        out: list[dict] = []
+        for r in _all_rooms:
+            if not isinstance(r, dict):
+                continue
+            if keep is not None and not keep(r):
+                continue
+            if r.get("_neskaiciuoti") or family in (r.get("_neskaiciuoti_sritys") or []):
+                out.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
+        return out
+
+    def _floor_rule_is_tile(r: dict) -> bool:
+        """Whether this room's purpose rule lays tiles — read off the rule, not
+        the (possibly zeroed) quantity, so an excluded bathroom still counts
+        as a tiled one."""
+        from .universal_rules import ROOM_TYPE_RULES, normalize_paskirtis
+        if r.get("tile_floor_override") is not None:
+            return bool(r.get("tile_floor_override"))
+        rule = ROOM_TYPE_RULES.get(normalize_paskirtis(r.get("paskirtis") or "")) or {}
+        return bool(rule.get("tile_floor")) or rule.get("floor") == "tile"
+
+    def _family_ledger(row: dict, contribs: list[dict], excluded: list[dict]) -> dict:
+        """Attach a plain Σ ledger (fresh lists, so two rows never share one)."""
+        c = [dict(x) for x in contribs]
+        return _ledger.attach(row, c, [dict(x) for x in excluded],
+                              [_ledger.sum_step(c, _ledger.rooms_label(len(c)))])
 
     pozicijos: list[dict] = []
     SAL = "skaiciuota_is_brezinio"
@@ -3217,7 +3261,32 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pl_grindys_virtuve = _sum_filtered("plyteles_grindys_m2", {"virtuve"})
     pl_grindys_kita = round(_sum("plyteles_grindys_m2") - pl_grindys_vonia - pl_grindys_virtuve, 2)
 
-    def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str):
+    def _tile_ledger(field: str, pasks: set | None) -> tuple[list[dict], list[dict]]:
+        """Which rooms put their m² into this tile line, and which the choice
+        kept out — the ledger the paint lines carry, so a bathroom's check sheet
+        lists its tiles and not only its paint (2026-09-08)."""
+        contribs: list[dict] = []
+        why = ("Sienos dengiamos plytelėmis" if field == "plyteles_sienos_m2"
+               else "Grindys klojamos plytelėmis")
+
+        def in_group(r: dict) -> bool:
+            pk = _pask(r)
+            return (pk in pasks) if pasks is not None else (pk not in WET and pk != "virtuve")
+
+        for r in rooms:
+            if not in_group(r):
+                continue
+            v = round(float(r.get(field) or 0), 2)
+            if v > 0:
+                contribs.append(_ledger.contribution(r, v, "m2", why))
+        # a floor-tile line only ever held the rooms whose rule lays floor
+        # tiles; a wall-tile line, the rooms of its location
+        keep = (in_group if field == "plyteles_sienos_m2"
+                else (lambda r: in_group(r) and _floor_rule_is_tile(r)))
+        return contribs, _choice_excluded("plyteles", keep)
+
+    def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str,
+                        field: str | None = None, pasks: set | None = None):
         """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos.
 
         2026-09-02: the material names carry their LOCATION. Bare names were
@@ -3228,14 +3297,16 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         """
         if kiekis <= 0:
             return
-        pozicijos.append({
+        _t_contribs, _t_excluded = _tile_ledger(field, pasks) if field else ([], [])
+        _klij = {
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelių klijavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
             "medziagos_aprasymas": f"{vieta} plytelių klijai (~5 kg/m²)",
             "medziagos_kiekis": round(kiekis * 5.0, 2),
             "medziagos_vnt": "kg",
-        })
+        }
+        pozicijos.append(_family_ledger(_klij, _t_contribs, _t_excluded) if field else _klij)
         # The tiles themselves (already carrying the 8% waste). This row IS the
         # purchase — it used to clone itself into a second priceable line, and
         # one kainynas entry then filled BOTH: 137 m² of tiles quoted as 275.
@@ -3246,21 +3317,22 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "susijes_darbas": f"{vieta} plytelių klijavimas",
             _IS_MATERIAL_LINE: True,
         })
-        pozicijos.append({
+        _fug = {
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelių fugavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
             "medziagos_aprasymas": f"{vieta} plytelių fugavimo masė (~0.3 kg/m²)",
             "medziagos_kiekis": round(kiekis * 0.3, 2),
             "medziagos_vnt": "kg",
-        })
+        }
+        pozicijos.append(_family_ledger(_fug, _t_contribs, _t_excluded) if field else _fug)
 
-    _add_tile_lines(SK_PL, pl_sienos_vonia, "Vonios sienų")
-    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės atatvaro")
-    _add_tile_lines(SK_PL, pl_sienos_kita, "Kitų sienų")
-    _add_tile_lines(SK_PL, pl_grindys_vonia, "Vonios grindų")
-    _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų")
-    _add_tile_lines(SK_PL, pl_grindys_kita, "Kitų grindų")
+    _add_tile_lines(SK_PL, pl_sienos_vonia, "Vonios sienų", "plyteles_sienos_m2", WET)
+    _add_tile_lines(SK_PL, pl_sienos_virtuve, "Virtuvės atatvaro", "plyteles_sienos_m2", {"virtuve"})
+    _add_tile_lines(SK_PL, pl_sienos_kita, "Kitų sienų", "plyteles_sienos_m2", None)
+    _add_tile_lines(SK_PL, pl_grindys_vonia, "Vonios grindų", "plyteles_grindys_m2", WET)
+    _add_tile_lines(SK_PL, pl_grindys_virtuve, "Virtuvės grindų", "plyteles_grindys_m2", {"virtuve"})
+    _add_tile_lines(SK_PL, pl_grindys_kita, "Kitų grindų", "plyteles_grindys_m2", None)
 
     # Sprint §41 (2026-04-29): tile format split — per rangovas audit v2 #2 gap.
     # Didžiaformatės plytelės (>600×600) reikalauja papildomo darbo: extra
@@ -3522,7 +3594,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                               if _pask(r) in WET), 2)
         # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
         membrana_kg = round(hidro_m2 * 3.0, 2)  # 2 sluoksniai
-        pozicijos.append({
+        _h_contribs = [
+            _ledger.contribution(r, 1, "vnt", "Drėgna patalpa — hidroizoliacija po plytelėmis")
+            for r in rooms_pl if _pask(r) in WET]
+        pozicijos.append(_family_ledger({
             "skyrius": SK_HI,
             "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
             "vnt": "vnt", "kiekis": n_wet_zones, "saltinis": SAL,
@@ -3537,20 +3612,24 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # Detail fields — frontend can show on expand
             "_detail_m2": hidro_m2,
             "_detail_juostele_m": wet_perim,
-        })
+        }, _h_contribs, _choice_excluded("plyteles", lambda r: _pask(r) in WET)))
     # ════════════════════════════════════════════════════════════════════════
     # GRINDYS (~5-6 lines)
     # ════════════════════════════════════════════════════════════════════════
 
     isliginamasis = _sum("isliginamasis_m2")
     if isliginamasis > 0:
-        pozicijos.append({
+        _i_contribs = [
+            _ledger.contribution(r, round(float(r.get("isliginamasis_m2") or 0), 2), "m2",
+                                 "Išlyginamasis sluoksnis po grindų danga")
+            for r in rooms if float(r.get("isliginamasis_m2") or 0) > 0]
+        pozicijos.append(_family_ledger({
             "skyrius": SK_GR, "aprasymas": "Grindų išlyginamasis sluoksnis",
             "vnt": "m2", "kiekis": isliginamasis, "saltinis": SAL,
             "medziagos_aprasymas": "Savaime išsilyginantis mišinys (~2 kg/m²/mm)",
             "medziagos_kiekis": round(isliginamasis * 6.0, 2),  # ~3mm × 2 kg
             "medziagos_vnt": "kg",
-        })
+        }, _i_contribs, _choice_excluded("grindys")))
 
     pvc_grindys = _sum("pvc_grindys_m2")
     if pvc_grindys > 0:
@@ -3560,11 +3639,20 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
              "susijes_darbas": "Parketo / laminato klojimas",
              _IS_MATERIAL_LINE: True},
-            {"skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
-             "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
-             "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
-             "medziagos_kiekis": round(pvc_grindys * 1.10, 2),
-             "medziagos_vnt": "m2"},
+            _family_ledger({
+                "skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
+                "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
+                "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
+                "medziagos_kiekis": round(pvc_grindys * 1.10, 2),
+                "medziagos_vnt": "m2"},
+                [_ledger.contribution(r, round(float(r.get("pvc_grindys_m2") or 0), 2), "m2",
+                                      "Grindys — parketas arba laminatas")
+                 for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0],
+                [_ledger.excluded(r, "Grindys klojamos plytelėmis — dangos nėra")
+                 for r in rooms
+                 if float(r.get("pvc_grindys_m2") or 0) <= 0
+                 and float(r.get("plyteles_grindys_m2") or 0) > 0]
+                + _choice_excluded("grindys", lambda r: not _floor_rule_is_tile(r))),
         ])
 
     # Slenksniai — perėjimai tarp patalpų (per kambarį 1 vnt)
@@ -4021,6 +4109,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_PR, "aprasymas": "Pastolių nuoma (aukštesnių nei 3m)",
             "vnt": "d.d", "kiekis": pastoliu_dd, "saltinis": "lubu_aukstis>3m",
+            # Emitted only while some room is above 3 m. When the height goes
+            # back down the rebuild no longer produces it, and both merges DROP
+            # an unedited copy instead of carrying it as an orphan — scaffolding
+            # in a 2,82 m flat is not a row to protect (2026-09-08).
+            "_only_while": "lubu_aukstis>3m",
         })
 
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)

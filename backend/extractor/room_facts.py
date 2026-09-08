@@ -533,6 +533,19 @@ _TILE_SOURCE = {
 }
 
 
+def _kept_out_by_choice(room: dict, family: str) -> bool:
+    """The contractor's own choice keeps this room — or this family in it —
+    out of the sąmata. Its quantities are zeroed by `scope.mark_rooms`; its
+    READING is not, and the check sheet must keep showing the reading
+    („dažoma 20 %, plytelės 80 %"), not the zero („nedažomos")."""
+    if room.get("_neskaiciuoti"):
+        return True
+    return family in (room.get("_neskaiciuoti_sritys") or [])
+
+
+_KEPT_OUT_SENTENCE = "Į sąmatą neįtraukta jūsų pasirinkimu — rodau, ką perskaičiau."
+
+
 def _walls_description(room: dict) -> str:
     """What this room's walls get — and it MUST agree with the sąmata.
 
@@ -545,6 +558,9 @@ def _walls_description(room: dict) -> str:
         return "plytelės"
     paintable = _f(room.get("walls_paintable_m2"))
     factor = _f(room.get("_walls_paint_factor"))
+    if _kept_out_by_choice(room, "apdaila"):
+        # the zero is the choice, not the drawing
+        paintable = None
     unpainted = ((paintable is not None and paintable <= 0)
                  or (factor is not None and factor <= 0))
     breakdown = room.get("sienu_apdailos_breakdown")
@@ -571,7 +587,7 @@ def _ceiling_description(room: dict) -> str:
     if src in ("override_off", "unfinished_room_standard"):
         return "nedažomos"
     paint = _f(room.get("ceiling_paintable_m2"))
-    if paint is not None and paint <= 0:
+    if paint is not None and paint <= 0 and not _kept_out_by_choice(room, "apdaila"):
         return "nedažomos"
     return "dažomos"
 
@@ -606,6 +622,8 @@ def _fact_apdaila(project: dict, room: dict,
         sentence += " Lubos — patikrinkite lubų plane."
     else:
         sentence += " Patikrinkite išklotinėse arba apdailų lentelėje."
+    if _kept_out_by_choice(room, "apdaila"):
+        sentence += " " + _KEPT_OUT_SENTENCE
     # No per-room rectangle exists for a finish anywhere in the pipeline. When
     # the finish sheet happens to BE the room's own page the outline still
     # frames it usefully; otherwise the crop is the whole sheet and the
@@ -698,13 +716,35 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
 
 # ── grindys ─────────────────────────────────────────────────────────────────
 
+def _floor_by_rule(room: dict) -> str:
+    """The floor finish the calculator would give this room — read off the
+    same purpose rule, for a room whose floor quantities a choice zeroed."""
+    if room.get("tile_floor_override") is not None:
+        return "plytelės" if room.get("tile_floor_override") else "parketas arba laminatas"
+    if (_f(room.get("plyteles_grindys_m2_override")) or 0) > 0:
+        return "plytelės"
+    from .universal_rules import ROOM_TYPE_RULES, normalize_paskirtis
+    rule = ROOM_TYPE_RULES.get(normalize_paskirtis(room.get("paskirtis") or "")) or {}
+    if rule.get("tile_floor") or rule.get("floor") == "tile":
+        return "plytelės"
+    if rule.get("floor") == "concrete":
+        return "betonas, be dangos"
+    return "parketas arba laminatas"
+
+
 def _fact_grindys(project: dict, room: dict,
                   region: list[float] | None) -> dict:
     tile = _f(room.get("plyteles_grindys_m2")) or 0.0
     soft = _f(room.get("pvc_grindys_m2")) or 0.0
     override = (room.get("plyteles_grindys_m2_override") is not None
                 or room.get("tile_floor_override") is not None)
-    if tile > 0:
+    kept_out = (_kept_out_by_choice(room, "grindys")
+                or _kept_out_by_choice(room, "plyteles"))
+    if kept_out:
+        # the floor quantities are zeroed by the choice; the finish still
+        # follows the room's purpose (no lane reads a floor finish)
+        value = _floor_by_rule(room)
+    elif tile > 0:
         value = "plytelės"
     elif soft > 0:
         value = "parketas arba laminatas"
@@ -722,6 +762,8 @@ def _fact_grindys(project: dict, room: dict,
     sentence = ("Grindų danga parinkta pagal patalpos paskirtį"
                 + (f" („{paskirtis}“)." if paskirtis else ".")
                 + " Patikrinkite grindų plane.")
+    if kept_out:
+        sentence += " " + _KEPT_OUT_SENTENCE
     return _fact("grindys", value, None, "assumed", "prielaida", page, rect,
                  sentence, editable)
 

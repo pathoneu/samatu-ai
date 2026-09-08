@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { diffDarbuSarasas } from './takeoffWorkflow.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -599,4 +600,18 @@ test('authorFigureRows: tile skirting pairs with the tile-skirting row, wooden s
   assert.equal(rows[0].ours.value, 64.36);
   assert.equal(rows[1].ours.value, 8.42);
   assert.equal(rows[0].group, null, 'two different skirtings are not one family total');
+});
+
+
+test('rippleText names the moved quantity after a tier split, not the vanished label', () => {
+  const t = (key, vars = {}) => `${key} ${JSON.stringify(vars)}`;
+  const prior = [{ skyrius: 'S', aprasymas: 'Sienų glaistymas/dažymas', kiekis: 279.08, mato_vnt: 'm²' }];
+  const next = [
+    { skyrius: 'S', aprasymas: 'Sienų glaistymas/dažymas (iki 3m aukščio)', kiekis: 248.12, mato_vnt: 'm²' },
+    { skyrius: 'S', aprasymas: 'Sienų glaistymas/dažymas (virš 3m aukščio)', kiekis: 32.94, mato_vnt: 'm²' },
+  ];
+  const text = rippleText(diffDarbuSarasas(prior, next), t);
+  assert.ok(text.includes('"label":"Sienų glaistymas/dažymas"'), text);
+  assert.ok(text.includes('+1,98 m²'), text);
+  assert.ok(!text.includes('279,08'), text);
 });

@@ -1,4 +1,5 @@
 import { CONF_RAUDONA, confidenceNeedsReview, confidenceRank, normalizeConfidence } from './confidence.js';
+import { tierBaseLabel, tierKey } from './mergeDarbuSarasas.js';
 import {
   contributionsOf, isAreaRead, isHeightRead, sortedContributions, termShare,
 } from './ledger.js';
@@ -384,12 +385,54 @@ export function diffDarbuSarasas(prior = [], next = []) {
     });
   });
 
+  const folded = foldTierMoves(changed);
   return {
-    changed,
-    count: changed.length,
+    changed: folded,
+    count: folded.length,
     deltaEur: Math.round(deltaEur * 100) / 100,
     usePrices: hasAnyPrice(next) || hasAnyPrice(prior),
   };
+}
+
+/**
+ * A line that split into „… (iki 3m aukščio)" + „… (virš 3m aukščio)" — or
+ * merged back — is ONE quantity that moved a little, not a row that vanished
+ * and two that appeared. Reported raw, a 3,00 m ceiling on one room read
+ * „Sienų glaistymas/dažymas −279,08 m²" (2026-09-08). Entries sharing a
+ * section and a tier key, where at least one label carries a tier suffix and
+ * something was added or removed, fold into a single `changed` entry on the
+ * base label; a pure re-tiering that moved nothing is not a change at all.
+ */
+function foldTierMoves(changed) {
+  const groups = new Map();
+  changed.forEach((c) => {
+    const key = `${c.row?.skyrius || ''}\u0000${tierKey(c.row?.aprasymas)}`;
+    groups.set(key, (groups.get(key) || []).concat(c));
+  });
+  const out = [];
+  groups.forEach((entries) => {
+    const tiered = entries.some((c) => tierBaseLabel(c.row?.aprasymas) !== String(c.row?.aprasymas || '').trim());
+    const moved = entries.some((c) => c.kind === 'added' || c.kind === 'removed');
+    if (entries.length < 2 || !tiered || !moved) {
+      out.push(...entries);
+      return;
+    }
+    const before = entries.reduce((sum, c) => sum + (Number(c.before) || 0), 0);
+    const after = entries.reduce((sum, c) => sum + (Number(c.after) || 0), 0);
+    const eur = entries.reduce((sum, c) => sum + (Number(c.deltaEur) || 0), 0);
+    if (Math.abs(after - before) <= 0.005 && Math.abs(eur) <= 0.005) return;
+    const base = entries.find((c) => tierBaseLabel(c.row?.aprasymas) === String(c.row?.aprasymas || '').trim())?.row
+      || entries[0].row;
+    out.push({
+      kind: 'changed',
+      row: { ...base, aprasymas: tierBaseLabel(base.aprasymas) },
+      before: Math.round(before * 100) / 100,
+      after: Math.round(after * 100) / 100,
+      deltaEur: Math.round(eur * 100) / 100,
+      tiers: entries.map((c) => ({ kind: c.kind, aprasymas: c.row?.aprasymas, before: c.before, after: c.after })),
+    });
+  });
+  return out;
 }
 
 export function summarizeTakeoffWorkflow(project = {}, { hasPdf = false } = {}) {

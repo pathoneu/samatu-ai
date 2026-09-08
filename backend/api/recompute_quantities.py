@@ -1043,6 +1043,15 @@ def _merge_user_edits(rebuilt: list[dict], prior: list[dict],
             rebuilt.append(kept)
             notes.append({"aprasymas": p.get("aprasymas"), "reason": "manual_row_kept"})
             continue
+        if p.get("_only_while") and not edited:
+            # A row the builder emits only under a condition („Pastolių nuoma"
+            # while a room is above 3 m) and did not emit now: the condition
+            # is gone and so is the row. Carrying it flagged „pasenusi" showed
+            # scaffolding in a 2,82 m flat (2026-09-08). Mirrors the browser
+            # merge (lib/mergeDarbuSarasas.js).
+            notes.append({"aprasymas": p.get("aprasymas"), "reason": "dropped_by_condition",
+                          "only_while": p.get("_only_while")})
+            continue
         rebuilt.append({**p, "_orphaned_after_rebuild": True})
         notes.append({"aprasymas": p.get("aprasymas"), "reason": "orphan_carried",
                       "kiekis": p.get("kiekis"), "kaina": p.get("kaina"),

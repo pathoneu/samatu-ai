@@ -189,11 +189,20 @@ export function normLabel(s) {
  * from one the rebuild simply cannot produce.
  */
 export function tierKey(s) {
-  return _lc(s)
-    .replace(/\s*\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')           // (iki|virš 3m …)
-    .replace(/\s*\(standartinis aukštis\)/g, '')                   // GKP tier label
-    .replace(/\s*—\s*papildomas darbas dėl aukščio/g, '')          // height premium
-    .replace(/\s*q4\s*\([^)]*\)/g, '')                             // Q4 sanding suffix
+  return tierBaseLabel(_lc(s));
+}
+
+/**
+ * The label with its tier suffix stripped but its CASE kept — what a diff
+ * shows for a line that split into „… (iki 3m aukščio)" + „… (virš 3m
+ * aukščio)" or merged back. Same suffix vocabulary as `tierKey`.
+ */
+export function tierBaseLabel(s) {
+  return String(s || '')
+    .replace(/\s*\((?:iki|vir[sš])\s*3\s*m[^)]*\)/gi, '')          // (iki|virš 3m …)
+    .replace(/\s*\(standartinis aukštis\)/gi, '')                  // GKP tier label
+    .replace(/\s*—\s*papildomas darbas dėl aukščio/gi, '')         // height premium
+    .replace(/\s*q4\s*\([^)]*\)/gi, '')                            // Q4 sanding suffix
     .trim();
 }
 
@@ -414,6 +423,15 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled, opt
       const { _orphaned_after_rebuild: _drop, ...kept } = o;
       merged.push(kept);
       notes.push({ reason: 'manual_row_kept', aprasymas: o.aprasymas });
+      continue;
+    }
+    if (o._only_while && !edited) {
+      // A row the builder emits only under a condition („Pastolių nuoma" while
+      // a room is above 3 m) and did not emit now: the condition is gone and so
+      // is the row. Carried „pasenusi", it showed scaffolding in a 2,82 m flat
+      // after the height went back down (2026-09-08). Mirrors the backend carry
+      // in api/recompute_quantities.py.
+      notes.push({ reason: 'dropped_by_condition', id: o.id, aprasymas: o.aprasymas, kiekis: o.kiekis, only_while: o._only_while });
       continue;
     }
     if (scopeChange && o.manual_override !== true && o.quantity_source !== 'manual_override') {

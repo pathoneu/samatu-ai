@@ -519,3 +519,40 @@ test('summarizeSamataRows: _id carries the rnk- marker too (rows that came back 
   assert.equal(s.mine, 1);
   assert.equal(s.fromDrawing, 0);
 });
+
+
+// ── a tier split is one move, not a disappearance (2026-09-08) ──────────────
+
+test('diffDarbuSarasas folds an iki/virš 3 m split into one change', () => {
+  const prior = [{ id: 'a', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas', kiekis: 279.08, mato_vnt: 'm²' }];
+  const next = [
+    { id: 'a-iki', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas (iki 3m aukščio)', kiekis: 248.12, mato_vnt: 'm²' },
+    { id: 'a-virs', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas (virš 3m aukščio)', kiekis: 32.94, mato_vnt: 'm²' },
+  ];
+  const diff = diffDarbuSarasas(prior, next);
+  assert.equal(diff.count, 1);
+  const c = diff.changed[0];
+  assert.equal(c.kind, 'changed');
+  assert.equal(c.row.aprasymas, 'Sienų glaistymas/dažymas');
+  assert.equal(c.before, 279.08);
+  assert.equal(c.after, 281.06);
+  assert.equal(c.tiers.length, 3);
+});
+
+test('diffDarbuSarasas folds the merge back and drops a pure re-tiering', () => {
+  const prior = [
+    { skyrius: 'S', aprasymas: 'Lubų glaistymas/dažymas (iki 3m aukščio)', kiekis: 97.63, mato_vnt: 'm²' },
+    { skyrius: 'S', aprasymas: 'Lubų glaistymas/dažymas (virš 3m aukščio)', kiekis: 6.9, mato_vnt: 'm²' },
+  ];
+  const next = [{ skyrius: 'S', aprasymas: 'Lubų glaistymas/dažymas', kiekis: 104.53, mato_vnt: 'm²' }];
+  const diff = diffDarbuSarasas(prior, next);
+  assert.equal(diff.count, 0, 'same quantity under one label instead of two — nothing moved');
+});
+
+test('diffDarbuSarasas leaves unrelated added and removed rows alone', () => {
+  const prior = [{ skyrius: 'S', aprasymas: 'Pastolių nuoma (aukštesnių nei 3m)', kiekis: 1, mato_vnt: 'd.d' }];
+  const next = [{ skyrius: 'S', aprasymas: 'Ortakių D125 mm montavimas', kiekis: 24, mato_vnt: 'm' }];
+  const diff = diffDarbuSarasas(prior, next);
+  assert.equal(diff.count, 2);
+  assert.deepEqual(diff.changed.map((c) => c.kind).sort(), ['added', 'removed']);
+});

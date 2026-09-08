@@ -5,6 +5,7 @@ import {
   mergeDarbuSarasasEdits,
   carriedOrphans,
   tierKey,
+  tierBaseLabel,
   normLabel,
   hasUserEdit,
 } from './mergeDarbuSarasas.js';
@@ -598,4 +599,39 @@ test('a scope change drops the rows the builder left out — except his own rows
   const notes2 = [];
   const out2 = mergeDarbuSarasasEdits(rebuilt, prior, notes2);
   assert.ok(out2.some((r) => r.aprasymas === 'Lubų glaistymas/dažymas' && r._orphaned_after_rebuild));
+});
+
+
+// ── a spent condition (2026-09-08) ──────────────────────────────────────────
+
+test('a conditional row the rebuild no longer emits is dropped, not carried', () => {
+  // „Pastolių nuoma" exists only while a room is above 3 m; the height went
+  // back to 2,82 and the rebuild left it out — nothing of the user's is on it.
+  const old = [
+    { id: 'p1', aprasymas: 'Pastolių nuoma (aukštesnių nei 3m)', kiekis: 1, _only_while: 'lubu_aukstis>3m' },
+    { id: 'v1', aprasymas: 'Ortakių D125 mm montavimas', kiekis: 24 },
+  ];
+  const rebuilt = [{ id: 'w1', aprasymas: 'Sienų dažymas', kiekis: 100 }];
+  const notes = [];
+  const out = mergeDarbuSarasasEdits(rebuilt, old, notes);
+  const labels = out.map((r) => r.aprasymas);
+  assert.ok(!labels.includes('Pastolių nuoma (aukštesnių nei 3m)'));
+  assert.ok(labels.includes('Ortakių D125 mm montavimas'), 'an unconditional row is still carried (P0)');
+  assert.equal(notes.filter((n) => n.reason === 'dropped_by_condition').length, 1);
+});
+
+test('a conditional row the user priced or corrected is still carried', () => {
+  const old = [
+    { id: 'p1', aprasymas: 'Pastolių nuoma (aukštesnių nei 3m)', kiekis: 2, kaina: 120, kaina_source: 'user', _only_while: 'lubu_aukstis>3m' },
+    { id: 'p2', aprasymas: 'Pastolių nuoma (aukštesnių nei 3m) — antra', kiekis: 3, manual_override: true, _only_while: 'lubu_aukstis>3m' },
+  ];
+  const out = mergeDarbuSarasasEdits([{ id: 'w1', aprasymas: 'Sienų dažymas', kiekis: 100 }], old, []);
+  assert.equal(out.filter((r) => r._orphaned_after_rebuild).length, 2);
+});
+
+test('tierBaseLabel strips the tier suffix and keeps the case', () => {
+  assert.equal(tierBaseLabel('Sienų glaistymas/dažymas (iki 3m aukščio)'), 'Sienų glaistymas/dažymas');
+  assert.equal(tierBaseLabel('Lubų glaistymas/dažymas (virš 3m aukščio)'), 'Lubų glaistymas/dažymas');
+  assert.equal(tierBaseLabel('GKP lubų montavimas (standartinis aukštis)'), 'GKP lubų montavimas');
+  assert.equal(tierBaseLabel('Sienų glaistymas/dažymas'), 'Sienų glaistymas/dažymas');
 });
