@@ -5,7 +5,7 @@ import {
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
   pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
-  consumePriceFillPending,
+  consumePriceFillPending, refreshProjectFromBackend,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -479,4 +479,63 @@ test('an unmarked project is never treated as owing a fill', () => {
   installSessionStorage();
   assert.equal(peekPriceFillPending('p-never-marked'), false);
   assert.equal(peekPriceFillPending(null), false);
+});
+
+
+test('refreshProjectFromBackend: a newer server copy replaces the cached one and sets the base version', async () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p9', name: 'Sena', updated_at: '2026-09-10T09:00:00Z',
+                                      patalpos: [{ nr: '08', perimetras_m: 11.48 }] }]),
+  });
+  const fresh = { id: 'p9', name: 'Nauja', updated_at: '2026-09-10T09:50:10Z',
+                  patalpos: [{ nr: '08', perimetras_m: 13.13, perimetras_saltinis: 'plano_matmenys' }] };
+  const calls = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url, method: opts.method || 'GET' });
+    return { ok: true, status: 200, json: async () => fresh };
+  };
+  const got = await refreshProjectFromBackend('p9');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/api\/projects\/p9$/);
+  assert.equal(got.patalpos[0].perimetras_m, 13.13);
+  assert.equal(getProject('p9').patalpos[0].perimetras_saltinis, 'plano_matmenys');
+  assert.equal(_getServerVersion('p9'), '2026-09-10T09:50:10Z');
+});
+
+test('refreshProjectFromBackend: an older server copy leaves the cache alone; a missing one is added', async () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p9', name: 'Vietinė', updated_at: '2026-09-10T10:00:00Z' }]),
+  });
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'Serverio', updated_at: '2026-09-10T09:00:00Z' }) });
+  const got = await refreshProjectFromBackend('p9');
+  assert.equal(got.name, 'Vietinė');
+  assert.equal(_getServerVersion('p9'), '2026-09-10T09:00:00Z', 'the conflict base is recorded either way');
+
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p10', name: 'Tiesioginis adresas', updated_at: '2026-09-10T09:30:00Z' }) });
+  const added = await refreshProjectFromBackend('p10');
+  assert.equal(added.name, 'Tiesioginis adresas');
+  assert.equal(getProjects().length, 2);
+});
+
+test('refreshProjectFromBackend: an unsaved local edit is not swapped away, and a failed fetch is harmless', async () => {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p9', name: 'Sena', updated_at: '2026-09-10T09:00:00Z' }]),
+  });
+  installFetchRecorder();                       // the debounced PUT goes nowhere
+  updateProject('p9', { name: 'Redaguota' });   // pending, not yet flushed
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'Serverio', updated_at: '2026-09-10T12:00:00Z' }) });
+  const got = await refreshProjectFromBackend('p9');
+  assert.equal(got.name, 'Redaguota');
+  await flushProjectSaves();
+
+  globalThis.fetch = async () => { throw new Error('offline'); };
+  const same = await refreshProjectFromBackend('p9');
+  assert.equal(same.name, 'Redaguota');
+  assert.equal(await refreshProjectFromBackend(null), null);
 });

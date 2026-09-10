@@ -514,6 +514,43 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
 // keep the sample blob out of the main bundle, hence the literal here).
 export const DEMO_PROJECT_ID = 'demo-objektas-a';
 
+// ── One project, fresh from the server ────────────────────────────────────────
+// The cached copy can be OLDER than the server's blob — a backfill, a save from
+// another browser or device — while the room sheet's facts are computed
+// server-side from the current blob. So the sheet showed a perimeter the cached
+// rooms did not carry, and the first save after a page load, which has no base
+// version to check against, pushed the stale rooms over it (2026-09-10, a scope
+// toggle on a backfilled project). Pages that edit a project call this on
+// mount: the cached entry is replaced when the server's is newer and has no
+// unsaved local edit, and the server version is recorded for the conflict
+// check either way. Resolves to the project now in the cache (null when neither
+// side has it).
+export async function refreshProjectFromBackend(id) {
+  if (!id) return null;
+  let fresh;
+  try {
+    const r = await fetch(`${API}/api/projects/${id}`, { credentials: 'include' });
+    if (!r.ok) return getProject(id);
+    fresh = await r.json();
+  } catch {
+    return getProject(id);
+  }
+  if (!fresh || fresh.id !== id) return getProject(id);
+  if (fresh.updated_at) _serverVersions.set(id, fresh.updated_at);
+  if (_dirtyIds.has(id)) return getProject(id);      // an unsaved local edit is pushed first, then compared
+  const raw = _readProjectsRaw();
+  const projects = Array.isArray(raw) ? raw : [];
+  const cached = projects.find(p => p?.id === id) || null;
+  const newer = !cached || !cached.updated_at
+    || (!!fresh.updated_at && fresh.updated_at > cached.updated_at);
+  if (!newer) return getProject(id);
+  const next = cached ? projects.map(p => (p?.id === id ? fresh : p)) : [fresh, ...projects];
+  _memProjects = next;
+  // a refused localStorage write leaves the flag set, so the next flush retries it
+  _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(next));
+  return getProject(id);
+}
+
 export function getProjects() {
   // Reads the in-memory snapshot when a debounced save is pending, so a caller
   // that mutates twice in a row (updateRoomPolygon → updateProject, or two

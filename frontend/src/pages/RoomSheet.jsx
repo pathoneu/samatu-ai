@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import {
-  flushProjectSaves, getProject, markRoomVerified, pullProjectsFromBackend,
+  flushProjectSaves, getProject, markRoomVerified, refreshProjectFromBackend,
   updateProject,
 } from '@/lib/projectStore';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
@@ -88,12 +88,15 @@ export default function RoomSheet() {
   const idx = roomIndex(rooms, roomNr);
   const room = idx >= 0 ? rooms[idx] : null;
 
-  // Direct-URL access: the blob may not be in the local cache yet.
+  // A fresh copy on mount — not only when the blob is missing from the cache.
+  // The facts below are computed server-side from the current blob; the cached
+  // rooms can be older (a backfill, a save from another browser), and a scope
+  // toggle recomputes from and saves THOSE rooms (2026-09-10).
   useEffect(() => {
-    if (project || pulled || !id) return;
+    if (pulled || !id) return;
     setPulled(true);
-    pullProjectsFromBackend({ force: true }).then(() => setProject(getProject(id)));
-  }, [project, pulled, id]);
+    refreshProjectFromBackend(id).then((fresh) => { if (fresh) setProject(fresh); });
+  }, [pulled, id]);
 
   const loadFacts = useCallback(() => {
     if (!id || roomNr == null) return;

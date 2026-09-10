@@ -15,6 +15,7 @@ import InteriorProject from '@/pages/InteriorProject';
 import ConstructionProject from '@/pages/ConstructionProject';
 import {
   getProject, updateProject, deleteProject, pullProjectsFromBackend, flushProjectSaves,
+  refreshProjectFromBackend,
   getPriceLists, pullPriceListsFromBackend, consumePriceFillPending,
   peekPriceFillPending, markPriceFillPending,
 } from '@/lib/projectStore';
@@ -55,6 +56,20 @@ export default function ProjectDetail() {
       });
     }
   }, [isLoading, project, id, didFallback, queryClient]);
+
+  // A fresh copy on mount even when the cache has one: the cached blob can be
+  // older than the server's (a backfill, a save from another browser), and the
+  // first save after a page load carries no base version — an edit here would
+  // push the stale copy over the server's (2026-09-10). Re-runs the query when
+  // the server's is newer; a no-op otherwise.
+  useEffect(() => {
+    if (!id) return undefined;
+    let alive = true;
+    refreshProjectFromBackend(id).then(() => {
+      if (alive) queryClient.invalidateQueries({ queryKey: ['project', id] });
+    });
+    return () => { alive = false; };
+  }, [id, queryClient]);
 
   useEffect(() => {
     if (project?.rows) {
