@@ -201,3 +201,61 @@ def test_an_excluded_room_is_named_only_on_the_lines_it_belonged_to(client):
     assert not any(l.startswith("Parketo / laminato") for l in labels), labels
     assert not any(l.startswith("Kitų sienų plytelių") for l in labels), labels
     assert not any(l.startswith("Virtuvės") for l in labels), labels
+
+
+# ── every per-room line carries its rooms (2026-09-10) ──────────────────────
+
+def test_the_living_room_sheet_lists_its_cornice_reveals_and_gkp(client):
+    rooms = _rooms()
+    rooms[0]["elementai"].append({"tipas": "pasleptos_duris", "plotis_mm": 900, "aukstis_mm": 2400, "kiekis": 1})
+    rooms[0]["elementai"].append({"tipas": "nisa_LED", "ilgis_m": 3.5, "kiekis": 1})
+    out = _recompute(client, rooms)
+    q01, _ = room_facts.room_quantities(out, "01")
+    labels = {q["aprasymas"] for q in q01}
+    for want in ("Lubų karnizo sumontavimas", "Angokraščių glaistymas-dažymas",
+                 "GKP lubų montavimas", "GKP siūlių glaistymas", "Sienų lyginimas Knauf Rotband",
+                 "Durų angų paruošimas beapvadinėms durims", "LED nišų"):
+        assert any(l.startswith(want) for l in labels), (want, sorted(labels))
+
+
+def test_the_bathroom_sheet_lists_its_fixtures_and_tile_work(client):
+    out = _recompute(client)
+    q03, _ = room_facts.room_quantities(out, "03")
+    labels = {q["aprasymas"] for q in q03}
+    for want in ("WC rėmo montavimas", "Klozeto montavimas", "Praustuvės montavimas",
+                 "Gyvatuko montavimas", "Linijinio latako montavimas", "Nuolydžio formavimas",
+                 "Silikonavimas tarp plytelių zonos", "Plytelių vidinių kampų silikonavimas",
+                 "Plytelių 45° pjovimas", "Pertvaros sutvirtinimas WC"):
+        assert any(l.startswith(want) for l in labels), (want, sorted(labels))
+
+
+def test_every_ledgered_line_is_explained_by_its_rooms_or_an_anchor(client):
+    from extractor import ledger as _ledger
+    out = _recompute(client)
+    seen = 0
+    for row in out["darbu_sarasas"]:
+        if not row.get("roll_up"):
+            continue
+        seen += 1
+        assert _ledger.replay(row.get("contributions"), row.get("roll_up")) == pytest.approx(
+            float(row["kiekis"]), abs=_ledger.rounding_bound(float(row["kiekis"])) + 0.011), row["aprasymas"]
+    assert seen >= 25, seen
+
+
+def test_a_symbol_count_above_the_room_count_is_stated_as_an_anchor(client):
+    rooms = _rooms()
+    body = {"patalpos": rooms, "rules_override": {}, "context": {"detected_symbols_summary": {"praustuves": 3}}}
+    r = client.post("/recompute-interior", json=body)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    row = _row(out, "Praustuvės montavimas")
+    assert row is not None and float(row["kiekis"]) == 3
+    assert [c["room_nr"] for c in row["contributions"]] == ["03"]
+    assert any(s.get("op") == "anchor" for s in row["roll_up"])
+
+
+def test_the_project_area_follows_the_rooms_he_counts(client):
+    out = _recompute(client, apimtis={"patalpos_ne": ["03"]})
+    assert out["bendras_plotas_m2"] == pytest.approx(44.0)
+    back = _recompute(client)
+    assert back["bendras_plotas_m2"] == pytest.approx(50.0)

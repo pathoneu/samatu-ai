@@ -681,3 +681,32 @@ statymas" row:
 Side finding: the Setup Wizard sent `count_inner_corners: false` with every upload, so a
 new project was silently computed „tik išoriniai" while the UI pre-selected the other —
 flipped to `true`. objektas_g (+122 %) is its own problem (duplicate room 07 alone is 26 m).
+
+## €0 closure — 2026-09-10 („padaryk absoliučiai viską, kas nemokamai")
+
+Done: per-room ledgers on every per-room line (karnizas, angokraščiai, paslėptų durų
+angos, LED nišos, GKP lubos ir siūlės, Rotband, WC dėžutės, plytelių darbai, drėgnų
+patalpų santechnika) — a living room's check sheet now lists 19 quantities, a bathroom's
+29; `bendras_plotas_m2` follows the rooms he counts; kampai default measured (above);
+scorecard m² pairing; wizard default fixed.
+
+Looked at with existing reads, NO engine change (the numbers explain themselves):
+- **Hidroizoliacija G** — his 39,5 m², ours 57,69. Without the duplicate room 07 ours is
+  40,14 (+1,6 %). The formula (floor + 0,30 m splash band + shower zone × H) is fine;
+  the phantom bathroom is the whole gap.
+- **Grindjuostės G** — designer 53,69 m, ours 64,79 = 58,9 net + 10 % waste. The 5 m net
+  difference is most likely the kitchen run of the svetainė-virtuvė (no plinth behind
+  cabinets), which no lane reads.
+- **Plytelių grindjuostės G** — designer 24,97 m, ours 8,42 (skalbykla only; wet rooms
+  are treated as tiled to the floor). The two plan labels without a room (3,60 + 6,90 m²,
+  perimeters ≈ 7,6 + 10,5 m) plus the technical room would add up to his figure — the
+  gap is the missed rooms, which he adds with the button (his decision: „užrašas").
+- **Dažomos sienos G** — designer 220 m², ours 248 (235 without room 07).
+- **Window rows for H** („Langų rėmų sandarinimas perimetru" 74,95 m, „Grindų
+  betonavimas prie langų rėmų" 11,72 m) — computable from window sizes in principle,
+  but the read windows give 41,4 m / 0 m: the window reader is not reliable enough to
+  emit them. Needs reader work (paid runs), not formula work.
+- **„Trapo montavimas"** — he bills trapas AND latakas as two rows on G, so our latakas
+  line cannot double as the trapas; stays an admitted gap.
+- The 55 empty „Jūsų eilutės" are rows from OTHER objects (garage etc.), checklist rows
+  that need his input, or the admitted gaps above — no safe names-only mapping was left.

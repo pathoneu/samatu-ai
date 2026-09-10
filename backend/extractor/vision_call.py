@@ -2762,6 +2762,139 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         return _ledger.attach(row, c, [dict(x) for x in excluded],
                               [_ledger.sum_step(c, _ledger.rooms_label(len(c)))])
 
+    def _attach_room_ledgers(pozicijos: list[dict]) -> None:
+        """Rooms behind every line whose quantity is a per-room sum or count
+        (2026-09-10, „absoliučiai viskas, kas nemokama"): karnizas, angokraščiai,
+        LED nišos, GKP lubos ir siūlės, Rotband, paslėptų durų angos, WC dėžutės,
+        plytelių darbai, drėgnų patalpų santechnika. Applied by LABEL after the
+        rows exist, so the check sheet of any room lists what that room put into
+        the sąmata. A line is attached only when the rooms really add up to it
+        (rounding aside); a count the drawing's symbols raised above the room
+        count keeps the rooms and states the rest as an „anchor" step."""
+        WET_K = {"vonia", "wc", "san", "san_mazgas"}
+        SHOWER = {"vonia", "san"}
+
+        def _is_tiled_room(r: dict) -> bool:
+            if _pask(r) in WET:
+                return True
+            bd = r.get("sienu_apdailos_breakdown") or {}
+            return float(bd.get("plyteles_share") or 0) >= 0.6
+
+        def _hidden_door_reveal(r: dict) -> float:
+            m = 0.0
+            for el in (r.get("elementai") or []):
+                if (el.get("tipas") or "").lower() == "pasleptos_duris":
+                    W = (el.get("plotis_mm") or 0) / 1000
+                    H = (el.get("aukstis_mm") or 0) / 1000
+                    if W > 0 and H > 0:
+                        m += (2 * H + W) * int(el.get("kiekis") or 1)
+            return m
+
+        def _tile_plinth(r: dict) -> float:
+            if float(r.get("plyteles_grindys_m2") or 0) <= 0 or _pask(r) in WET:
+                return 0.0
+            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+                      if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+            return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10
+
+        def _pjovimas_45(r: dict) -> float:
+            # mirrors the line: max(Σ perim × 0,4 ; 2 × n × vidutinis plytelių aukštis)
+            wet = [x for x in rooms_pl if _pask(x) in WET]
+            if r not in wet:
+                return 0.0
+            perim_total = sum(float(x.get("perimetras_m") or 0) for x in wet)
+            h_total = sum(float(x.get("plyteles_sienos_aukstis_m") or 0) for x in wet)
+            if perim_total * 0.4 >= 2 * h_total:
+                return float(r.get("perimetras_m") or 0) * 0.4
+            return 2 * float(r.get("plyteles_sienos_aukstis_m") or 0)
+
+        # label prefix → (per-room value, unit, why, rooms considered)
+        def _field(name: str, scale: float = 1.0):
+            return lambda r: float(r.get(name) or 0) * scale
+
+        def _one_if(pasks: set):
+            return lambda r: 1.0 if _pask(r) in pasks else 0.0
+
+        rules: list[tuple[str, object, str, str, object]] = [
+            ("Sienų lyginimas Knauf Rotband", None, "m2", "Dalis dažomų sienų", lambda r: _pask(r) is not None),
+            ("Angokraščių glaistymas-dažymas", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink duris ir vidinius langus", None),
+            ("Angokraščių apdirbimas GKP (struktūra)", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink duris ir vidinius langus", None),
+            ("Durų angų paruošimas beapvadinėms durims", _hidden_door_reveal, "m", "Paslėptos (beapvadinės) durys", None),
+            ("Lubų karnizo sumontavimas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
+            ("Lubų karnizo dažymas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
+            ("Nišų formavimas GKP konstrukcijoje", _field("nisu_metrai"), "m", "LED nišos lubose", None),
+            ("LED nišų glaistymas", _field("nisu_metrai"), "m", "LED nišos lubose", None),
+            ("LED nišų dažymas", _field("nisu_metrai"), "m", "LED nišos lubose", None),
+            ("GKP lubų montavimas (standartinis aukštis)", _field("gkp_lubu_standart_m2"), "m2", "GKP lubos", None),
+            ("GKP lubų montavimas (virš 3 m aukščio)", _field("gkp_lubu_virs_3m_m2"), "m2", "GKP lubos virš 3 m", None),
+            ("GKP siūlių glaistymas + armavimo juostelė",
+             lambda r: (float(r.get("gkp_lubu_standart_m2") or 0) + float(r.get("gkp_lubu_virs_3m_m2") or 0)) * 1.5,
+             "m", "1,5 m siūlių kiekvienam GKP lubų m²", None),
+            ("Pertvaros sutvirtinimas WC mechanizmams montuoti", _one_if(WET_K), "vnt", "Drėgna patalpa su klozetu", lambda r: _pask(r) in WET_K),
+            ("Silikonavimas tarp plytelių zonos ir sanitarinės įrangos", lambda r: float(r.get("perimetras_m") or 0) * 1.31 if _is_tiled_room(r) else 0.0, "m", "Plytelėmis dengta patalpa — perimetras × 1,31", _is_tiled_room),
+            ("Plytelių vidinių kampų silikonavimas", lambda r: float(r.get("perimetras_m") or 0) * 0.99 if _is_tiled_room(r) else 0.0, "m", "Plytelėmis dengta patalpa — perimetras × 0,99", _is_tiled_room),
+            ("Plytelių 45° pjovimas (vidiniai kampai)", _pjovimas_45, "m", "Drėgna patalpa — plytelių kampai", lambda r: _pask(r) in WET),
+            ("Nuolydžio formavimas dušo zonoje", _one_if(SHOWER), "vnt", "Dušo zona", lambda r: _pask(r) in SHOWER),
+            ("Lentynėlių iš plytelių įrengimas dušo kabinoje", None, "vnt", "Dušo kabina", lambda r: _pask(r) in SHOWER),
+            ("Plytelių grindjuosčių supjovimas ir suklijavimas", _tile_plinth, "m", "Plytelių grindys prie dažomų sienų", lambda r: float(r.get("plyteles_grindys_m2") or 0) > 0 and _pask(r) not in WET),
+            ("WC rėmo montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa su klozetu", lambda r: _pask(r) in WET_K),
+            ("Klozeto montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa su klozetu", lambda r: _pask(r) in WET_K),
+            ("Praustuvės montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa", lambda r: _pask(r) in WET_K),
+            ("Potinkinio praustuvės maišytuvo", _one_if(WET_K), "vnt", "Drėgna patalpa", lambda r: _pask(r) in WET_K),
+            ("Potinkinio dušo maišytuvo", _one_if(SHOWER), "vnt", "Dušas", lambda r: _pask(r) in SHOWER),
+            ("Gyvatuko montavimas", _one_if(SHOWER), "vnt", "Vonios kambarys", lambda r: _pask(r) in SHOWER),
+            ("Linijinio latako montavimas", _one_if(SHOWER), "vnt", "Dušo zona", lambda r: _pask(r) in SHOWER),
+        ]
+
+        for p in pozicijos:
+            if not isinstance(p, dict) or p.get("roll_up") or p.get(_IS_MATERIAL_LINE):
+                continue
+            label = p.get("aprasymas") or ""
+            kiekis = p.get("kiekis")
+            if not isinstance(kiekis, (int, float)) or isinstance(kiekis, bool) or kiekis <= 0:
+                continue
+            rule = next((x for x in rules if label.startswith(x[0])), None)
+            if rule is None:
+                continue
+            prefix, per_room, unit, why, keep = rule
+            if prefix == "Sienų lyginimas Knauf Rotband":
+                share = float(p.get("_rotband_share") or 0)
+                per_room = _field("walls_paintable_m2", share)
+                why = f"{int(round(share * 100))} % dažomų sienų"
+            elif prefix == "Lentynėlių iš plytelių įrengimas dušo kabinoje":
+                n = sum(1 for r in rooms if _pask(r) in SHOWER)
+                each = (float(kiekis) / n) if n else 0.0
+                per_room = lambda r, each=each: each if _pask(r) in SHOWER else 0.0
+                why = "Dušo kabina"
+            contribs = []
+            for r in rooms:
+                v = round(float(per_room(r)), 2)
+                if v > 0:
+                    contribs.append(_ledger.contribution(r, v, unit, why))
+            if not contribs:
+                continue
+            total = round(sum(c["value"] for c in contribs), 2)
+            family = _scope.section_family(p.get("skyrius")) or "apdaila"
+            excluded = _choice_excluded(family, keep)
+            roll = [_ledger.sum_step(contribs, _ledger.rooms_label(len(contribs)))]
+            gap = round(float(kiekis) - total, 2)
+            if abs(gap) <= max(0.05, 0.01 * float(kiekis)):
+                # Per-room values are rounded to the cent, so nine of them can
+                # land a cent or two off the line. Put that residue on the
+                # largest room instead of a „round" step: the rooms then add up
+                # to exactly what is billed, which is what a reader checks.
+                if abs(gap) >= 0.005:
+                    k = max(range(len(contribs)), key=lambda i: contribs[i]["value"])
+                    contribs[k]["value"] = round(contribs[k]["value"] + gap, 2)
+                    roll = [_ledger.sum_step(contribs, _ledger.rooms_label(len(contribs)))]
+                _ledger.attach(p, contribs, excluded, roll)
+            elif unit == "vnt" and gap > 0:
+                # the drawing's symbols counted more than the rooms alone
+                roll.append(_ledger.step("anchor", "Suskaičiuota plane", float(kiekis),
+                                         f"{int(round(gap))} vnt. daugiau, nei patalpų šiai eilutei"))
+                _ledger.attach(p, contribs, excluded, roll)
+            # else: the rooms do not explain this number — leave it unledgered
+
     pozicijos: list[dict] = []
     SAL = "skaiciuota_is_brezinio"
 
@@ -4143,6 +4276,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # 2026-06-06: collapse the per-coat glaistymas/dažymas split into the
     # contractor's combined line(s) (flag ENABLE_CONSOLIDATE_PAINT_LINES, default on).
+    _attach_room_ledgers(pozicijos)
     parsed["pozicijos"] = pozicijos
     _consolidate_paint_pozicijos(parsed)
     _consolidate_led_niche_pozicijos(parsed)
@@ -4181,6 +4315,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     }
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
+    _attach_room_ledgers(pozicijos)
     parsed["pozicijos"] = pozicijos
 
     # 2026-06-11: per-pozicija confidence (class calibration + apdailos
