@@ -745,3 +745,34 @@ What the live path showed (and what was fixed the same day):
   `shared_frame`): Vision's room boxes did not frame ≥60 % of the labels. Run 2 read two
   rooms named „Miegamasis 3" (10,55 and 8,22) — the 10,55 label sat unclaimed until the
   post-zoom reclaim.
+
+## Openings — step 1 (measure) and step 2 (deterministic lanes), 2026-09-10
+
+**Where the reader actually fails.** objektas_a is the only object with per-room opening
+truth: the read matches it in 11/11 rooms (doors AND windows). On objektas_g the two fresh
+runs disagree because run 2 came back with ZERO doors in every room — not a per-room
+misread: the dedicated doors reader found 11 doors, but `merge_doors_into_rooms` first
+erased every pass-1 door and then could not place a single one of its own (`between`
+numbers did not match the run's room numbers), so all eleven were dropped silently while
+`doors_rooms_updated` still said 8. Convention worth knowing: doors are counted ONCE, on
+the corridor side (objektas_a: koridorius D6, bedrooms D0 — that is the truth, not a
+miss), so „every room has a door" is NOT a valid prior.
+
+**Fixed (€0):** the merge resolves `between` by number, by number without leading zeros,
+by unique name, or by a number inside the string; doors it cannot place are counted in
+`_meta.doors_unattributed` and said in a warning; when fewer than half can be placed the
+pass-1 doors are left alone. Tests in tests/test_doors_reader.py.
+
+**Deterministic lanes probed on the G drawing (vector PDF, 8 911 paths, text layer):**
+- Window/door TAGS are positioned text on the floor plan (L-01 ×2, L-02, L-03, D1, D2,
+  G01 ×2) and pages 2 and 4 share one frame, so page-4 area labels locate rooms on page 2.
+  Totals are therefore deterministic (4 windows, 2+2 exterior doors); per-room assignment
+  by nearest label is ambiguous for big rooms (L-03 sits as close to the bedroom's label
+  as to the living room's) — it needs room outlines, which Vision's boxes do not give
+  reliably (the plan-area lane fell to `value_only` on both fresh runs for the same reason).
+- Door swings: 3 bezier arcs of door radius on the whole plan, and no quarter-arc chains
+  among the 8 176 two-point segments — swings are not extractable cheaply from this PDF.
+
+**Next lever (paid, small):** a schedule/tag-driven check of the doors reader — when the
+plan carries tags, the reader's exterior-door count must equal the tag count; and a
+targeted re-read when the merged door total is far below `total_count`.

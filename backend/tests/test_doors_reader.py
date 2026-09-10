@@ -53,3 +53,60 @@ def test_find_floor_plan_page_prefers_classification():
 def test_build_user_text_has_schema_and_procedure():
     txt = build_user_text([{"nr": "101", "pavadinimas": "Tambūras", "plotas_m2": 5.0}])
     assert "total_count" in txt and "PROCEDŪRA" in txt and "Tambūras" in txt
+
+
+
+# ── the merge must never erase what it cannot place (2026-09-10) ─────────────
+def _rooms_01():
+    return [
+        {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
+         "elementai": [{"tipas": "duris", "kiekis": 2, "plotis_mm": 900, "aukstis_mm": 2100}, {"tipas": "langas", "kiekis": 1}]},
+        {"nr": "02", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
+         "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2100}]},
+        {"nr": "08", "pavadinimas": "Koridorius", "paskirtis": "koridorius", "elementai": []},
+    ]
+
+
+def _doors(*between):
+    return {"status": "ok", "total_count": len(between),
+            "doors": [{"between": list(b), "tipas": "standart", "plotis_mm": 900, "aukstis_mm": 2100} for b in between]}
+
+
+def _n_doors(room):
+    return sum(int(e.get("kiekis") or 1) for e in room.get("elementai") or []
+               if (e.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+
+
+def test_between_numbers_without_leading_zeros_still_place_the_doors():
+    from extractor.doors_reader import merge_doors_into_rooms
+    rooms = _rooms_01()
+    res = _doors(("8", "1"), ("8", "2"), (8, "exterior"))
+    assert merge_doors_into_rooms(rooms, res) == 1
+    assert [_n_doors(r) for r in rooms] == [0, 0, 3], "the corridor owns all three"
+    assert res["_unattributed"] == 0
+
+
+def test_between_room_names_place_the_doors_when_unique():
+    from extractor.doors_reader import merge_doors_into_rooms
+    rooms = _rooms_01()
+    res = _doors(("Koridorius", "Svetainė"), ("Miegamasis", "Koridorius"))
+    assert merge_doors_into_rooms(rooms, res) == 2
+    assert [_n_doors(r) for r in rooms] == [0, 1, 1]
+
+
+def test_an_unplaceable_enumeration_leaves_the_first_reads_doors_alone():
+    from extractor.doors_reader import merge_doors_into_rooms
+    rooms = _rooms_01()
+    res = _doors(("101", "103"), ("103", "108"), ("Holas", "exterior"))
+    assert merge_doors_into_rooms(rooms, res) == 0
+    assert [_n_doors(r) for r in rooms] == [2, 1, 0], "pass-1 doors survive"
+    assert res["_unattributed"] == 3 and res.get("_kept_pass1_doors") is True
+
+
+def test_a_mostly_placeable_enumeration_replaces_and_reports_the_rest():
+    from extractor.doors_reader import merge_doors_into_rooms
+    rooms = _rooms_01()
+    res = _doors(("08", "01"), ("08", "02"), ("99", "77"))
+    assert merge_doors_into_rooms(rooms, res) == 1
+    assert [_n_doors(r) for r in rooms] == [0, 0, 2]
+    assert res["_unattributed"] == 1 and not res.get("_kept_pass1_doors")

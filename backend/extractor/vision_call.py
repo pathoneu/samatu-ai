@@ -5893,6 +5893,15 @@ def extract_interior(
             parsed["_meta"]["doors_exterior_count"] = doors_result.get("exterior_count")
             parsed["_meta"]["doors_rooms_updated"] = n_updated
             parsed["_meta"]["doors_elapsed_s"] = doors_result.get("_elapsed_s")
+            _n_unplaced = int(doors_result.get("_unattributed") or 0)
+            parsed["_meta"]["doors_unattributed"] = _n_unplaced
+            if _n_unplaced:
+                parsed.setdefault("warnings", []).append({
+                    "level": "WARN", "code": "doors_unattributed", "severity": "med",
+                    "message": (f"{_n_unplaced} durų iš plano nepavyko priskirti patalpoms"
+                                + (" — palikti pirmo skaitymo durų skaičiai" if doors_result.get("_kept_pass1_doors") else "")
+                                + ". Patikrinkite durų skaičių patalpose."),
+                })
             _emit({
                 "event": "doors_completed",
                 "page": doors_result.get("page"),

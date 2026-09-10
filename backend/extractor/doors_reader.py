@@ -214,63 +214,110 @@ def read_doors_from_plan(
     }
 
 
+def _room_resolver(rooms: list[dict]):
+    """`between` entries → the room dict. The schema asks for room NUMBERS, but
+    a reader answer arrives as "1" for "01", as an int, or as the room's NAME —
+    on the second fresh objektas_g run (2026-09-10) none of the eleven doors
+    matched a room, so every one was dropped after the pass-1 doors had already
+    been erased. Numbers are matched exactly, then without leading zeros; a
+    name only when it is unique."""
+    by_nr: dict[str, dict] = {}
+    by_short: dict[str, list[dict]] = {}
+    by_name: dict[str, list[dict]] = {}
+    for r in rooms:
+        nr = str(r.get("nr") or "").strip()
+        if nr:
+            by_nr[nr] = r
+            by_short.setdefault(nr.lstrip("0") or "0", []).append(r)
+        nm = " ".join(str(r.get("pavadinimas") or "").lower().split())
+        if nm:
+            by_name.setdefault(nm, []).append(r)
+
+    def resolve(x) -> dict | None:
+        if x is None:
+            return None
+        key = str(x).strip()
+        if not key or key.lower() == "exterior":
+            return None
+        if key in by_nr:
+            return by_nr[key]
+        short = by_short.get(key.lstrip("0") or "0")
+        if short and len(short) == 1:
+            return short[0]
+        nm = " ".join(key.lower().split())
+        named = by_name.get(nm)
+        if named and len(named) == 1:
+            return named[0]
+        # "01 Svetainė" / "Svetainė (01)" — a number somewhere in the string
+        m = re.search(r"\b(\d{1,3})\b", key)
+        if m:
+            short = by_short.get(m.group(1).lstrip("0") or "0")
+            if short and len(short) == 1:
+                return short[0]
+        return None
+    return resolve
+
+
 def merge_doors_into_rooms(rooms: list[dict], doors_result: dict) -> int:
-    """Replace ALL per-room door elements with doors_reader output.
+    """Replace the per-room door elements with the doors_reader enumeration.
 
-    doors_reader is authoritative: when it returns status "ok" we TRUST its
-    enumeration entirely and drop pass-1 door attributions from every room
-    (otherwise the SAME physical door is counted in both rooms it connects).
-    Each door is attributed to the FIRST room in `between` (the "owner") so
-    that sum(per_room_doors) == doors_result.total_count.
+    doors_reader is authoritative when its doors can be PLACED: each door is
+    attributed to the FIRST room in `between` (the "owner") so that the rooms'
+    doors add up to `total_count` and a door is never counted in both rooms it
+    connects. Doors the resolver cannot place are counted in
+    `doors_result["_unattributed"]`; when fewer than half of the doors can be
+    placed the pass-1 doors are LEFT ALONE (an unplaceable enumeration must
+    not erase what the first read found — 2026-09-10).
 
-    Returns the count of rooms whose elementai got modified."""
+    Returns the count of rooms that gained a door."""
     if doors_result.get("status") != "ok":
         return 0
     doors = doors_result.get("doors") or []
     if not doors:
         return 0
-    by_nr = {str(r.get("nr") or ""): r for r in rooms}
+    resolve = _room_resolver(rooms)
     entrance_rooms = [r for r in rooms
                       if normalize_paskirtis(r.get("paskirtis") or "") in _ENTRANCE]
-    modified: set[str] = set()
 
-    # First pass — strip stale pass-1 doors from every room.
-    for room in rooms:
-        existing = room.get("elementai") or []
-        kept = [e for e in existing if (e.get("tipas") or "").lower() not in ("duris", "pasleptos_duris")]
-        if len(kept) != len(existing):
-            room["elementai"] = kept
-            modified.add(str(room.get("nr") or ""))
+    def _mm(v, dflt):
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return dflt
 
-    # Second pass — re-attribute each door to the FIRST room in `between`.
+    placed: list[tuple[dict, dict]] = []
+    unattributed = 0
     for d in doors:
         between = d.get("between") or []
+        if not isinstance(between, list):
+            between = [between]
         tipas = (d.get("tipas") or "standart").lower()
-        is_exterior = "exterior" in between or tipas == "garazo"
-        target_nr = None
-        if is_exterior:
-            target_nr = next((str(x) for x in between if x != "exterior" and str(x) in by_nr), None)
-            if target_nr is None and entrance_rooms:
-                target_nr = str(entrance_rooms[0].get("nr"))
-        else:
-            target_nr = next((str(x) for x in between if str(x) in by_nr), None)
-        if not target_nr or target_nr not in by_nr:
+        is_exterior = any(str(x).lower() == "exterior" for x in between) or tipas == "garazo"
+        target = next((r for r in (resolve(x) for x in between) if r is not None), None)
+        if target is None and is_exterior and entrance_rooms:
+            target = entrance_rooms[0]
+        if target is None:
+            unattributed += 1
             continue
-        # Coerce Vision-supplied dims defensively: a non-numeric value (e.g.
-        # "large", null) must fall back to the LT default, not ValueError-crash
-        # the whole merge and silently drop EVERY door. (audit 2026-07-05)
-        def _mm(v, dflt):
-            try:
-                return int(float(v))
-            except (TypeError, ValueError):
-                return dflt
-        new_door = {
+        placed.append((target, {
             "tipas": "pasleptos_duris" if tipas == "pasleptos" else "duris",
             "kiekis": 1,
             "plotis_mm": _mm(d.get("plotis_mm"), 900),
             "aukstis_mm": _mm(d.get("aukstis_mm"), 2100),
             "_exterior": is_exterior,
-        }
-        by_nr[target_nr].setdefault("elementai", []).append(new_door)
-        modified.add(target_nr)
-    return len(modified)
+        }))
+    doors_result["_unattributed"] = unattributed
+    if not placed or len(placed) * 2 < len(doors):
+        doors_result["_kept_pass1_doors"] = True
+        return 0
+
+    for room in rooms:
+        existing = room.get("elementai") or []
+        kept = [e for e in existing if (e.get("tipas") or "").lower() not in ("duris", "pasleptos_duris")]
+        if len(kept) != len(existing):
+            room["elementai"] = kept
+    gained: set[int] = set()
+    for target, new_door in placed:
+        target.setdefault("elementai", []).append(new_door)
+        gained.add(id(target))
+    return len(gained)
