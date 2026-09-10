@@ -12,6 +12,7 @@ Output is structured Warning dicts merged into vision_result["warnings"]
 alongside scale_validator's plain-string warnings (Sprint 0).
 """
 from __future__ import annotations
+import math
 from dataclasses import dataclass, asdict
 
 
@@ -152,6 +153,41 @@ def check_baseboard_perimeter(rooms):
     )
 
 
+def check_perimeter_geometric_minimum(rooms):
+    """A room of area A cannot have a perimeter under 4·√A — the square is
+    the tightest rectangle, every other shape is longer around. Vision's
+    read perimeters broke this on three of objektas_g's rooms (2026-09-10:
+    7,08 m around 3,52 m², 9,63 m around 7,25 m²) — a figure the estimator
+    would otherwise take for a measurement."""
+    bad = []
+    for r in rooms:
+        area = float(r.get("plotas_m2") or 0)
+        perim = float(r.get("perimetras_m") or 0)
+        if area <= 0 or perim <= 0:
+            continue
+        least = 4 * math.sqrt(area)
+        if perim < least * 0.99:
+            label = " ".join(str(v) for v in (r.get("nr"), r.get("pavadinimas")) if v).strip()
+            bad.append((label, perim, least))
+    if not bad:
+        return None
+    rows = "; ".join(f"{label}: {_lt(p, 2)} m, mažiausiai {_lt(least, 2)} m" for label, p, least in bad)
+    if len(bad) == 1:
+        message = f"1 patalpos perimetras trumpesnis, nei įmanoma pagal jos plotą ({rows})"
+    else:
+        message = f"{len(bad)} patalpų perimetras trumpesnis, nei įmanoma pagal jų plotą ({rows})"
+    return Warning(
+        code="perimeter_below_geometric_minimum",
+        message=message,
+        hint="Kvadrato perimetras (4 × √plotas) yra trumpiausias įmanomas — tokio "
+             "ploto patalpa negali turėti trumpesnio. Patikrinkite perimetrą arba "
+             "plotą patalpos lape.",
+        severity="med",
+        expected="≥ 4 × √plotas",
+        actual=rows,
+    )
+
+
 def check_paint_quantity(rooms):
     """§6 #4: paint ≈ 0.22 l/m² for 2 coats avg (±20%)."""
     paint_l = 0.0
@@ -270,6 +306,7 @@ _ALL_CHECKS = [
     check_paint_quantity,
     check_gk_sheets_math,
     check_window_reveals,
+    check_perimeter_geometric_minimum,
 ]
 
 

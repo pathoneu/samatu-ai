@@ -784,3 +784,64 @@ label, every room label-confirmed (8) or adopted (1), only the 3,60 m² label le
 Rows against run 1 / run 2: walls 261,62 / 269,44 / 262,54; kampai 305,11 / 302,87 / 218,30;
 angokraščiai 94,86 / 88,40 / 30,60. With the merge fixed, two independent reads agree
 within ~3 % on walls and corners — the run-2 collapse was the merge, not the model.
+
+## Perimeters from the plan's dimension strings (deterministic, €0), 2026-09-10
+
+Founder, after the room-02 screenshot: „nu tai taisom accuracy pradžiai" — read the numbers
+the drawing states and do the arithmetic; do not measure. Areas already came from the plan's
+labels (2026-09-06); this does the same for perimeters.
+
+**What was built.** `extractor/plan_dimensions.py`, Step 2.44b after the area lane. Every
+dimension string on the text pages („3.400", „530" mm), backed by the hairline dimension LINE
+under it from the vector layer (pypdfium2 page objects, ≤ 2,5 pt thick; the page's scale is
+the median value/length — G: 1:50 on the plan sheets, 1:25 on the išklotinės; B: 1:100 and
+1:50 sheets). Sheets of one storey that repeat the strings at the same spots are pooled. A
+room's pair is a width string whose LINE spans the room label's x and a height string whose
+line spans its y, the two lines closing a rectangle around the label (≤ 45 pt slack for an
+exterior chain), with plotis × ilgis = the label's area (+5 % over — an L-room's bounding
+box — and at most 2 % under). Then `perimetras_m = 2 × (plotis + ilgis)`,
+`perimetras_saltinis = "plano_matmenys"`, the read figure kept as `_perimetras_pries_matmenis`;
+the check sheet says „Perimetras — iš plane užrašytų matmenų (M 1:50): 2 × (2,805 + 3,760)
+= 13,13 m. Sandauga 10,55 m² sutampa su plotu 10,55 m². Skaitant planą buvo 11,48 m — imu
+užrašytus matmenis." and crops the rectangle the two lines close. Zoom (Step 2.5) and
+`/recompute-interior` keep a lane perimeter; table and user perimeters are never touched.
+
+**What the first version got wrong — and why the lines are load-bearing.** With ~250
+strings of a storey pooled, the exactness of a product is NOT a signal: „1.070 × 3.290 =
+3.52" (a plumbing-sheet mounting height and a neighbour's wall) beat the true WC pair to the
+cent; room 05 had two different pairs at the same error; the „corrections" of rooms 02, 03,
+05 and 06 were coincidences (checked on the sheet: 02 is an L whose width is written as a
+chain 0,765 + 1,760 + 0,765; 03's height is written in two parts). B's single correction
+(2,34 × 3,00 = 7,02 against a 7,36 label, 10,68 m — below the 4·√7,36 = 10,85 m any room of
+that area must have) placed the strings relative to the eksplikacija table cell, not the
+plan. A string without a hairline of the right length under it never pairs now, a pair whose
+product falls short of the label is refused, and a room no pair explains keeps the read
+figure and says so.
+
+**Result on G** (the fixture and all four local projects agree): 04 confirmed (3,05 × 3,29),
+09 confirmed (2,31 × 2,935), 08 corrected 11,47 → 13,13 (2,805 × 3,76; run 1 had read 13,56),
+07 corrected 12,0 → 10,6 on run 3 (the hall, 2,984 × 2,315); 01, 02, 03, 05, 06 unmatched.
+Each accepted rectangle was checked against the sheet by eye. Vision's read perimeters that
+are physically impossible (03: 7,08 < 4·√3,52 = 7,50; 06: 9,63 < 10,77; 08: 11,47 < 12,99) are
+now named in the banner by `sanity_checks.check_perimeter_geometric_minimum`. Rows of demo
+G and run 3 rebuilt (walls 248,12 → 252,77 and 261,62 → 262,48 m²).
+
+**Eval.** In-sample 9,75 % (unchanged); OOS 6,24 % (was 5,85 %) — room 08's 13,13 is what
+the sheet says, and the sąmata is the exam, not the textbook, so the figure stays. Rows
+±10 % unchanged (G 5 %, H 29 %, corpus 24,8 %).
+
+**Found on the way, fixed.** A scope toggle on the room sheet recomputed from the browser's
+CACHED project copy and saved it over the backend's blob: the sheet's facts are computed
+server-side from the current blob, so the sheet showed 13,13 while the toggle pushed the
+pre-lane rooms back (and the first save after a page load carries no base version, so the
+409 guard never saw it). `refreshProjectFromBackend(id)` (projectStore) now fetches the one
+project on RoomSheet / ProjectDetail mount, replaces the cached copy when the server's is
+newer and has no unsaved edit, and records the server version for the conflict check. Run
+3's room 08 lost a `user_override` height mark in that clobber (the value, 2,82, is the same).
+
+**Not done / next.** Rooms whose extent is written as a chain (room 02's 3,29) — summing
+collinear chain segments would pair 02 and, with a two-part height, 03; L-rooms need the
+outline; a raster sheet (no vector layer) backs nothing and the lane says so (`lines` in
+`_meta.plan_dimension_lane`). Every text-layer object in the corpus but G lacks plan
+dimensions (A's walls are in the elevations only), so G is the only perimeter-truth check.
+

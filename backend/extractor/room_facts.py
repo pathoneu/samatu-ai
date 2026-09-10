@@ -412,6 +412,23 @@ def _fact_perimetras(project: dict, room: dict,
                      f"Perimetro brėžinyje neradau — skaičiuoju iš ploto "
                      f"({lt_num(used)} m). Įrašykite tikrą.", editable)
 
+    if (room.get("perimetras_saltinis") == "plano_matmenys"
+            and isinstance(room.get("_perimetras_matmenys"), dict)):
+        m = room["_perimetras_matmenys"]
+        from .plan_dimensions import dimension_rect_pct
+        page = m.get("page") or room.get("puslapio_nr")
+        w, l = _f(m.get("plotis_m")), _f(m.get("ilgis_m"))
+        scale = f" (M 1:{int(m['mastelis'])})" if m.get("mastelis") else ""
+        sentence = (f"Perimetras — iš plane užrašytų matmenų{scale}: 2 × ({lt_num(w, 3)} + {lt_num(l, 3)}) "
+                    f"= {lt_num(measured)} m. Sandauga {lt_num(_f(m.get('sandauga_m2')))} m² "
+                    f"sutampa su plotu {lt_num(_f(m.get('plotas_m2')))} m².")
+        prev = _f(room.get("_perimetras_pries_matmenis"))
+        if prev is not None and abs(prev - measured) > 0.05:
+            sentence += f" Skaitant planą buvo {lt_num(prev)} m — imu užrašytus matmenis."
+        return _fact("perimetras", round(measured, 2), "m", "read", "planas", page,
+                     dimension_rect_pct(room) or region_on_page(room, page, region),
+                     sentence + tail, editable)
+
     if from_table:
         page = _row_page(project, room, row)
         rect = _bbox_pdf_to_pct(room.get("eksplikacija_row_bbox"),

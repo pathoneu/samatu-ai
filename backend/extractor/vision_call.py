@@ -556,7 +556,11 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     if zoom.get("perimetras_saltinis") == "from_zoom" and zoom.get("perimetras_m") is not None:
         old = room.get("perimetras_m")
         new = float(zoom["perimetras_m"])
-        if abs(new - (old or 0)) > 0.1:  # only update if meaningful diff
+        if room.get("perimetras_saltinis") in ("plano_matmenys", "eksplikacija"):
+            # the drawing STATES the walls (plan_dimensions) or the table does —
+            # a zoomed re-read is weaker evidence; kept beside it
+            room["_perimetras_zoom_m"] = new
+        elif abs(new - (old or 0)) > 0.1:  # only update if meaningful diff
             room["perimetras_m"] = new
             room.setdefault("_zoom_changes", []).append(f"perimetras: {old} → {new}")
             changed = True
@@ -1430,7 +1434,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         PRIMITIVE_KEYS = {
             "nr", "pavadinimas", "paskirtis", "puslapio_nr", "bbox_pct",
             "plotas_m2", "plotas_saltinis", "plotas_m2_raw",
-            "perimetras_m", "perimetras_m_raw",
+            "perimetras_m", "perimetras_m_raw", "perimetras_saltinis",
+            "_perimetras_matmenys", "_perimetras_pries_matmenis",
             "lubu_aukstis_m", "lubu_aukstis_saltinis", "lubu_aukstis_m_raw",
             "lubu_tipas", "elementai", "confidence", "pastabos",
             "eksplikacija_row_idx",
@@ -5189,6 +5194,8 @@ def extract_interior(
                     room["plotas_saltinis"] = "eksplikacija"
                 if eks_row.get("perimetras_m"):
                     room["perimetras_m"] = eks_row["perimetras_m"]
+                    # a table figure — the dimension lane must not touch it
+                    room["perimetras_saltinis"] = "eksplikacija"
                 _stamp_eksplikacija_evidence(room, eks_row, eks)
                 merged_count += 1
         parsed.setdefault("_meta", {})["eksplikacija_merged_rooms"] = merged_count
@@ -5305,6 +5312,31 @@ def extract_interior(
                    "confirmed": len(_lane.get("confirmed") or []),
                    "adopted": len(_lane.get("adopted") or []),
                    "unconfirmed": len(_lane.get("unconfirmed") or [])})
+        # Step 2.44b: perimeters from the plan's DIMENSION STRINGS (2026-09-10,
+        # founder: „perskaityti skaičius ir padaryti matematiką"). Runs for
+        # table projects too — their plans still state the walls; a table
+        # perimeter (none in the corpus) is marked `eksplikacija` and skipped.
+        try:
+            from .plan_dimensions import apply_dimension_strings
+            # Dimensions from EVERY text page: the page classifier can call
+            # the floor plan something else (run 2 of objektas_g: not one of
+            # its 8 rooms matched because the dimensioned sheet was filtered
+            # out). A string pairs only when its dimension LINE spans the
+            # room's label, so a far-off sheet cannot pair and the filter
+            # would only ever lose walls. Labels stay restricted to plan
+            # pages, as in the area lane.
+            _plan_pages_d = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
+            _dims = list(_scan.get("dimensions") or [])
+            _anns = [a for a in _scan["annotations"] if not _plan_pages_d or a["page"] in _plan_pages_d]
+            _dl = apply_dimension_strings(parsed.get("patalpos") or [], _dims, _anns)
+            parsed.setdefault("_meta", {})["plan_dimension_lane"] = _dl
+            _emit({"event": "plan_dimension_lane", "status": _dl.get("status"),
+                   "dimensions": _dl.get("dimensions"), "lines": _dl.get("lines"),
+                   "confirmed": len(_dl.get("confirmed") or []),
+                   "corrected": len(_dl.get("corrected") or []),
+                   "unmatched": len(_dl.get("unmatched") or [])})
+        except Exception as exc:  # noqa: BLE001
+            print(f"[extractor] plan-dimension lane failed: {exc}")
     except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
         print(f"[extractor] plan-area lane failed: {exc}")
 

@@ -6,6 +6,7 @@ from extractor.sanity_checks import (
     check_paint_quantity,
     check_gk_sheets_math,
     check_window_reveals,
+    check_perimeter_geometric_minimum,
     run_all_checks,
 )
 
@@ -165,3 +166,16 @@ def test_baseboard_check_counts_pipeline_doors_and_skips_tiled_floors():
     rooms[0]["grindjuosciu_m"] = 12.0
     w = check_baseboard_perimeter(rooms)
     assert w is not None and "2 durys" in w.message
+
+
+def test_a_perimeter_below_the_square_of_its_area_is_impossible():
+    # 4·√3,52 = 7,50 — Vision's 7,08 m around a 3,52 m² WC cannot exist
+    rooms = [{"nr": "03", "pavadinimas": "Vonia", "plotas_m2": 3.52, "perimetras_m": 7.08},
+             {"nr": "04", "pavadinimas": "Kambarys", "plotas_m2": 10.05, "perimetras_m": 12.68}]
+    w = check_perimeter_geometric_minimum(rooms)
+    assert w is not None and w.code == "perimeter_below_geometric_minimum"
+    assert "1 patalpos" in w.message and "03 Vonia" in w.message and "7,08 m" in w.actual and "7,50" in w.actual
+    assert "04" not in w.actual, "a square-ish room at exactly the minimum passes"
+    assert check_perimeter_geometric_minimum([{"plotas_m2": 10.05, "perimetras_m": 12.68}]) is None
+    codes = {x["code"] for x in run_all_checks({"patalpos": rooms})}
+    assert "perimeter_below_geometric_minimum" in codes

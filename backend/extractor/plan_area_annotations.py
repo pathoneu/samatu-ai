@@ -249,22 +249,36 @@ def _iter_pages_pdfium(pdf_bytes: bytes, wanted: set[int] | None):
             page = doc[idx]
             tp = None
             try:
-                W, H = (float(v) for v in page.get_size())
+                # Which frame do the character boxes live in? PDFium's `get_size`
+                # is the unrotated page for some files and the /Rotate-d one for
+                # others (objektas_a's /Rotate 270 sheets: size 1191×842, boxes
+                # up to y = 945 — so 842×1191 — and every label crop landed off
+                # the page, 2026-09-10). The boxes themselves settle it: the
+                # frame that contains them is theirs; `to_display` then turns
+                # them into the displayed frame Wd×Hd.
+                Ws, Hs = (float(v) for v in page.get_size())
                 rotation = int(page.get_rotation() or 0) % 360
-                Wd, Hd = (H, W) if rotation in (90, 270) else (W, H)
                 tp = page.get_textpage()
                 n = tp.count_chars()
-                raw: list[tuple[str, list[float], int]] = []
+                boxes: list[tuple[str, tuple[float, float, float, float], int]] = []
                 turns = [0, 0, 0, 0]
                 for i in range(n):
                     t = tp.get_text_range(i, 1)
                     if not t or t in ("\r", "\n") or (len(t) == 1 and ord(t) < 32):
                         continue                      # PDFium's synthetic line breaks
                     k = _quarter_turn(C.FPDFText_GetCharAngle(tp, i))
-                    l, b, r, tt = tp.get_charbox(i, loose=True)   # advance box: one top/bottom per line, like pdfplumber
-                    raw.append((t, [l, H - tt, r, H - b], k))
+                    boxes.append((t, tp.get_charbox(i, loose=True), k))   # advance box: one top/bottom per line, like pdfplumber
                     if not t.isspace():
                         turns[k] += 1
+                xmax = max((bx[2] for _, bx, _ in boxes), default=0.0)
+                ymax = max((bx[3] for _, bx, _ in boxes), default=0.0)
+                W, H = Ws, Hs
+                if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
+                    W, H = Hs, Ws
+                Wd, Hd = (H, W) if rotation in (90, 270) else (W, H)
+                raw: list[tuple[str, list[float], int]] = []
+                for t, (l, b, r, tt), k in boxes:
+                    raw.append((t, [l, H - tt, r, H - b], k))
                 # Every direction with real text is analysed in ITS OWN frame — a
                 # plan full of vertical dimension strings must not outvote its
                 # horizontal room labels, and a drawing turned 90° on the page must
@@ -777,7 +791,7 @@ def _figures_on_page(pn: int, W: float, H: float, chars: list[dict],
 
 def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
                     figures: bool = True) -> dict:
-    """ONE pass over the text layer: {"annotations": [...], "figures": [...]}.
+    """ONE pass over the text layer: {"annotations", "figures", "heights", "dimensions"}.
 
     `annotations` are the „N.NN m²" labels (see `read_area_annotations`);
     `figures` the designer's quantity statements (see `read_author_figures`) —
@@ -786,6 +800,7 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
     annotations: list[dict] = []
     figs: list[dict] = []
     heights: list[dict] = []
+    dimensions: list[dict] = []
     seen: set[tuple] = set()
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
@@ -793,6 +808,13 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
         except Exception:  # noqa: BLE001 — a broken page is not a lane failure
             continue
         annotations.extend(ann)
+        try:
+            # the wall lengths the plan states (plan_dimensions) — same pass,
+            # same frames, so a dimension and a label never disagree on where
+            from .plan_dimensions import _dimensions_on_page
+            dimensions.extend(_dimensions_on_page(pn, W, H, chars, to_display))
+        except Exception:  # noqa: BLE001
+            pass
         if figures:
             room_labels = {(a["page"], a["value_m2"]) for a in ann if a.get("standalone")}
             try:
@@ -803,9 +825,19 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
                 heights.extend(_height_statements_on_page(pn, W, H, chars, to_display))
             except Exception:  # noqa: BLE001
                 pass
+    if dimensions:
+        try:
+            # the hairline under each string — what makes a string a wall
+            # length rather than a mounting height (plan_dimensions module doc)
+            from .plan_dimensions import attach_dimension_lines
+            attach_dimension_lines(pdf_bytes, dimensions)
+        except Exception:  # noqa: BLE001
+            pass
     annotations.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
     figs.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
-    return {"annotations": annotations, "figures": figs, "heights": heights}
+    dimensions.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
+    return {"annotations": annotations, "figures": figs, "heights": heights,
+            "dimensions": dimensions}
 
 
 def read_author_figures(pdf_bytes: bytes, pages: Iterable[int] | None = None) -> list[dict]:

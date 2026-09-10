@@ -69,7 +69,9 @@ def _lt(v: float) -> str:
 # the labels' crops and the „plane užrašytų plotų suma" framing (2026-09-07).
 _MIRRORED_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_uzrasas", "_plotas_pries_uzrasa_m2",
                   "_area_unconfirmed", "_area_unconfirmed_reason",
-                  "lubu_aukstis_m", "lubu_aukstis_saltinis", "_lubu_aukstis_uzrasas")
+                  "lubu_aukstis_m", "lubu_aukstis_saltinis", "_lubu_aukstis_uzrasas",
+                  "perimetras_m", "perimetras_saltinis", "_perimetras_matmenys",
+                  "_perimetras_pries_matmenis")
 
 
 def sync_v8_rooms(parsed: dict) -> int:

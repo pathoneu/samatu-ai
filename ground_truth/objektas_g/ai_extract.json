@@ -1019,6 +1019,38 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
+      },
+      "_perimetras_pries_matmenis": 12.68,
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 3.05,
+        "ilgis_m": 3.29,
+        "sandauga_m2": 10.03,
+        "plotas_m2": 10.05,
+        "bboxes": [
+          [
+            411.7,
+            614.9,
+            436.02,
+            625.75
+          ],
+          [
+            465.78,
+            528.4,
+            476.67,
+            552.74
+          ]
+        ],
+        "rect": [
+          329.6,
+          453.7,
+          518.11,
+          627.45
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
       }
     },
     {
@@ -1681,7 +1713,7 @@
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.55,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 11.47,
+      "perimetras_m": 13.13,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -1872,6 +1904,38 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
+      },
+      "_perimetras_pries_matmenis": 11.47,
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 2.805,
+        "ilgis_m": 3.76,
+        "sandauga_m2": 10.55,
+        "plotas_m2": 10.55,
+        "bboxes": [
+          [
+            398.39,
+            893.99,
+            422.71,
+            904.83
+          ],
+          [
+            465.68,
+            823.33,
+            476.57,
+            847.67
+          ]
+        ],
+        "rect": [
+          302.97,
+          755.58,
+          518.12,
+          915.43
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
       }
     },
     {
@@ -1906,7 +1970,7 @@
       "eksplikacija_row_idx": null,
       "plotas_m2": 6.78,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 10.5,
+      "perimetras_m": 10.49,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "betonas",
@@ -2064,6 +2128,38 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
+      },
+      "_perimetras_pries_matmenis": 10.5,
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 2.31,
+        "ilgis_m": 2.935,
+        "sandauga_m2": 6.78,
+        "plotas_m2": 6.78,
+        "bboxes": [
+          [
+            421.93,
+            1041.8,
+            446.25,
+            1052.64
+          ],
+          [
+            465.62,
+            979.36,
+            476.51,
+            1003.7
+          ]
+        ],
+        "rect": [
+          349.91,
+          925.62,
+          518.27,
+          1057.44
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
       }
     }
   ],
@@ -2615,6 +2711,48 @@
         4
       ],
       "duplicate_view_pages": []
+    },
+    "plan_dimension_lane": {
+      "status": "applied",
+      "dimensions": 364,
+      "lines": 286,
+      "confirmed": [
+        "04",
+        "09"
+      ],
+      "corrected": [
+        "08"
+      ],
+      "unmatched": [
+        "01",
+        "02",
+        "03",
+        "05",
+        "06"
+      ],
+      "skipped": [],
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16
+      ],
+      "mastelis": {
+        "2": 50,
+        "4": 50,
+        "5": 50,
+        "6": 50,
+        "7": 50,
+        "8": 25,
+        "9": 25
+      }
     }
   },
   "_voting": {
@@ -8717,7 +8855,39 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 3.05,
+        "ilgis_m": 3.29,
+        "sandauga_m2": 10.03,
+        "plotas_m2": 10.05,
+        "bboxes": [
+          [
+            411.7,
+            614.9,
+            436.02,
+            625.75
+          ],
+          [
+            465.78,
+            528.4,
+            476.67,
+            552.74
+          ]
+        ],
+        "rect": [
+          329.6,
+          453.7,
+          518.11,
+          627.45
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
+      },
+      "_perimetras_pries_matmenis": 12.68
     },
     {
       "nr": "05",
@@ -9379,7 +9549,7 @@
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.55,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 11.47,
+      "perimetras_m": 13.13,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -9570,7 +9740,39 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 2.805,
+        "ilgis_m": 3.76,
+        "sandauga_m2": 10.55,
+        "plotas_m2": 10.55,
+        "bboxes": [
+          [
+            398.39,
+            893.99,
+            422.71,
+            904.83
+          ],
+          [
+            465.68,
+            823.33,
+            476.57,
+            847.67
+          ]
+        ],
+        "rect": [
+          302.97,
+          755.58,
+          518.12,
+          915.43
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
+      },
+      "_perimetras_pries_matmenis": 11.47
     },
     {
       "nr": "09",
@@ -9604,7 +9806,7 @@
       "eksplikacija_row_idx": null,
       "plotas_m2": 6.78,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 10.5,
+      "perimetras_m": 10.49,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "betonas",
@@ -9762,7 +9964,39 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "plano_matmenys",
+      "_perimetras_matmenys": {
+        "page": 2,
+        "plotis_m": 2.31,
+        "ilgis_m": 2.935,
+        "sandauga_m2": 6.78,
+        "plotas_m2": 6.78,
+        "bboxes": [
+          [
+            421.93,
+            1041.8,
+            446.25,
+            1052.64
+          ],
+          [
+            465.62,
+            979.36,
+            476.51,
+            1003.7
+          ]
+        ],
+        "rect": [
+          349.91,
+          925.62,
+          518.27,
+          1057.44
+        ],
+        "mastelis": 50,
+        "page_width": 841.8900146484375,
+        "page_height": 1190.550048828125
+      },
+      "_perimetras_pries_matmenis": 10.5
     }
   ],
   "_verify_pass": {
@@ -9773,7 +10007,8 @@
   "status": "ok",
   "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)",
   "_backfill": {
-    "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44"
+    "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44",
+    "plan_dimensions": "2026-09-10: perimeters from the plan's dimension strings backed by their dimension lines (plan_dimensions); a fresh run does the same in Step 2.44b"
   },
   "_autoriaus_kiekiai": [
     {
