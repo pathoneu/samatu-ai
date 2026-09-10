@@ -54,6 +54,7 @@ import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
 import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
 import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } from '@/lib/scope';
+import { ltPlural } from '@/lib/ltPlural';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 
@@ -78,6 +79,11 @@ export default function RoomSheet() {
   const [seen, setSeen] = useState(() => new Set());
   const [overridden, setOverridden] = useState(() => new Set());
   const [highlightCorners, setHighlightCorners] = useState(false);
+  // The estimate rows a room feeds are folded by default: opened on the
+  // first project, they read as „daug taisymų“ beside the six facts
+  // (founder, 2026-09-10). One line says what they are; the fold stays
+  // open from room to room once he opens it.
+  const [showQuantities, setShowQuantities] = useState(false);
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -474,6 +480,29 @@ export default function RoomSheet() {
                 </span>
               </h2>
 
+              {facts?.ledger_available !== false && quantities.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3">
+                  <p className="max-w-[46ch] text-[15px] leading-snug text-[hsl(var(--ink-2))]">
+                    {t('project.roomSheet.quantitiesSummary', {
+                      facts: `${factList.length} ${ltPlural(factList.length,
+                        t('project.roomSheet.factNounOne'), t('project.roomSheet.factNounFew'),
+                        t('project.roomSheet.factNounMany'))}`,
+                      rows: `${quantities.length} ${ltPlural(quantities.length,
+                        t('project.roomSheet.rowNounOne'), t('project.roomSheet.rowNounFew'),
+                        t('project.roomSheet.rowNounMany'))}`,
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    aria-expanded={showQuantities}
+                    onClick={() => setShowQuantities((v) => !v)}
+                    className="inline-flex min-h-[44px] items-center rounded-[2px] border border-border bg-card px-3 font-semibold hover:bg-muted"
+                  >
+                    {showQuantities ? t('project.roomSheet.quantitiesHide') : t('project.roomSheet.quantitiesShow')}
+                  </button>
+                </div>
+              )}
+
               {facts?.ledger_available === false ? (
                 <div className="px-4 pb-3">
                   <p className="text-[15px] leading-snug text-[hsl(var(--ink-2))]">
@@ -492,7 +521,7 @@ export default function RoomSheet() {
                 <p className="px-4 pb-3 text-[15px] text-muted-foreground">
                   {t('project.roomSheet.quantitiesEmpty')}
                 </p>
-              ) : quantities.map((q) => (
+              ) : !showQuantities ? null : quantities.map((q) => (
                 <QuantityLine
                   key={q.row_id}
                   quantity={q}
