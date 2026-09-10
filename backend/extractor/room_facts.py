@@ -398,8 +398,14 @@ def _fact_perimetras(project: dict, room: dict,
     # footnote.
     tail = ""
     if floored and used and measured and abs(used - measured) > 0.01:
-        tail = (f" Sienų plotui naudoju {lt_num(used)} m — patalpos kontūras "
-                "brėžinyje nepažymėtas, todėl imu stačiakampio perimetrą.")
+        if room.get("_perimetras_floor_reason") == "geometrinis_minimumas":
+            # the read figure is impossible for the area — say so, and what is billed
+            tail = (f" Tokio ploto patalpa negali turėti trumpesnio perimetro nei "
+                    f"{lt_num(used)} m (kvadratas) — sienų plotui imu {lt_num(used)} m. "
+                    "Patikrinkite perimetrą.")
+        else:
+            tail = (f" Sienų plotui naudoju {lt_num(used)} m — patalpos kontūras "
+                    "brėžinyje nepažymėtas, todėl imu stačiakampio perimetrą.")
 
     if measured is None:
         if used is None:

@@ -897,6 +897,15 @@ def _resolve_deduction_standard(rules: dict | None) -> str:
 # acting only on a positive synthetic signal bounds false positives (a missed
 # correction is safe; inflating a real-perimeter room is not).
 _SYNTHETIC_PERIM_RECT_COEFF = 4.69
+# Perimeters somebody STATED — the plan's dimension strings, the eksplikacija,
+# the user — are never floored: below 4·√A they say the AREA label is the odd
+# one out, not the perimeter.
+_STATED_PERIMETER_SOURCES = ("plano_matmenys", "eksplikacija", "user_override", "manual")
+# Areas somebody READ or stated — the plan's own label, the eksplikacija, the
+# user. Only against these is a perimeter below 4·√A provably the wrong one;
+# with the area itself a guess (or of unknown origin — legacy blobs, synthetic
+# test rooms) nothing says which of the two is off, and nothing is floored.
+_READ_AREA_SOURCES = ("plano_uzrasas", "eksplikacija", "user_override", "manual")
 _SYNTHETIC_AREA_SOURCES = ("wall_dim_calc", "default_fallback")
 
 # 2026-07-05 audit fix (bug 1): fallback wall-tile band height used ONLY on the
@@ -1206,13 +1215,30 @@ def calc_room_quantities(room: dict,
     # stays the MEASURED Vision value; only walls_gross uses the floored length.
     perim_walls = perim
     perimetras_floor_applied = False
+    perimetras_floor_reason = None
     if _perimeter_floor_enabled() and plotas > 0:
         area_src = (room.get("plotas_saltinis") or "").strip().lower()
+        perim_src = (room.get("perimetras_saltinis") or "").strip().lower()
         if area_src in _SYNTHETIC_AREA_SOURCES:
             floored = _SYNTHETIC_PERIM_RECT_COEFF * math.sqrt(plotas)
             if floored > perim_walls:
                 perim_walls = floored
                 perimetras_floor_applied = True
+                perimetras_floor_reason = "sintetinis_plotas"
+        elif area_src in _READ_AREA_SOURCES and perim_src not in _STATED_PERIMETER_SOURCES:
+            # A READ area with an IMPOSSIBLE perimeter: no room of area A goes
+            # around in less than 4·√A — the square — yet Vision's read
+            # perimeters did on three of objektas_g's rooms (2026-09-10: 7,08 m
+            # around 3,52 m², 9,63 m around 7,25 m²). The least possible length
+            # replaces it on the WALL path only; `perim` itself stays the read
+            # figure, the sheet says so and the sanity check names the room. A
+            # perimeter the plan's dimensions, the table or the user STATED is
+            # not Vision's guess and is left alone.
+            least = 4.0 * math.sqrt(plotas)
+            if 0 < perim_walls < least * 0.99:
+                perim_walls = least
+                perimetras_floor_applied = True
+                perimetras_floor_reason = "geometrinis_minimumas"
 
     # Sienos bruto plotas. Sprint §2A.3: stairwell uses
     # max_height − Σ(stair triangles), not flat perim × H.
@@ -1908,6 +1934,7 @@ def calc_room_quantities(room: dict,
         # not hidden, per CLAUDE.md. _walls_perimetras_m is the length actually
         # used for walls_gross; perimetras_m above stays the measured value.
         "_perimetras_floor_applied": perimetras_floor_applied,
+        "_perimetras_floor_reason": perimetras_floor_reason,
         "_walls_perimetras_m": round(perim_walls, 2),
         "lubu_aukstis_m": round(H, 2),
         "ceiling_type": ceiling_type,

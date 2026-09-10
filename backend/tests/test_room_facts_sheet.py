@@ -186,6 +186,18 @@ def test_a_floored_perimeter_names_the_number_the_walls_are_billed_on():
     assert "20,97" in f["sentence"]
 
 
+def test_an_impossible_perimeter_says_the_least_the_room_can_have():
+    project = {"patalpos": [{
+        "nr": "03", "puslapio_nr": 2, "plotas_m2": 3.52,
+        "perimetras_m": 7.08, "_walls_perimetras_m": 7.5,
+        "_perimetras_floor_applied": True, "_perimetras_floor_reason": "geometrinis_minimumas"}]}
+    f = _fact(build_room_facts(project, "03"), "perimetras")
+    assert f["value"] == 7.08
+    assert "negali turėti trumpesnio perimetro nei 7,50 m" in f["sentence"]
+    assert "sienų plotui imu 7,50 m" in f["sentence"]
+    assert "stačiakampio" not in f["sentence"]
+
+
 def test_a_perimeter_nobody_read_is_assumed_and_says_where_it_came_from():
     project = {"patalpos": [{"nr": "1", "puslapio_nr": 1, "plotas_m2": 20.0,
                              "_walls_perimetras_m": 18.7}]}

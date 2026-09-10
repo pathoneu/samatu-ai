@@ -845,3 +845,39 @@ outline; a raster sheet (no vector layer) backs nothing and the lane says so (`l
 `_meta.plan_dimension_lane`). Every text-layer object in the corpus but G lacks plan
 dimensions (A's walls are in the elevations only), so G is the only perimeter-truth check.
 
+## After the lane: chains checked, the impossible perimeter floored, the row list folded (2026-09-10, €0)
+
+**Chain sums — checked, NOT built.** Summing collinear adjacent dimension segments
+(0,765 + 1,760 + 0,765 = 3,29) was the lever named for rooms 02 and 03. On the G sheets it
+pairs nothing new: 02 is an L (3,29 × 3,4 = 11,19 against 14,26, and its full extent is a
+chain 3,400 + 2,435 nobody's area confirms), 03's height IS a chain — 0,850 + 1,075 = 1,925
+— but 1,76 × 1,925 = 3,39 is 3,7 % under its 3,52 label, 05 and 06 carry niches. The
+mechanism would add candidates (more coincidence risk) with no measurable gain on the only
+dimensioned drawing in the corpus, so it stays unbuilt until a drawing needs it.
+
+**Impossible perimeters floored on the wall path.** A read perimeter below 4·√plotas cannot
+exist (the square is the shortest way around an area), so `calc_room_quantities` now takes
+the least possible length for `_walls_perimetras_m` when the area is read but the perimeter
+is Vision's guess (`_perimetras_floor_reason = "geometrinis_minimumas"`); `perimetras_m`
+itself stays the read figure, the sheet says „Tokio ploto patalpa negali turėti trumpesnio
+perimetro nei 7,50 m (kvadratas) — sienų plotui imu 7,50 m. Patikrinkite perimetrą." and
+the banner names the room. A perimeter STATED by the plan's dimensions, the table or the
+user is never floored (below the minimum it is the area label that is off), and neither is a
+room whose AREA is a guess or of unknown origin — only a read area (plan label, table, user)
+can convict the perimeter. G: demo 03
+7,08 → 7,50, 06 9,63 → 10,77; run 1 room 02 13,67 → 15,10; run 3 03 7,37 → 7,50, 06 → 10,77.
+Rows of all four local G projects rebuilt (walls demo 252,77 → 257,18 m²; run 3 262,48 →
+265,91).
+
+**Eval after both.** In-sample 9,75 % (unchanged); OOS 6,61 % (6,24 % after the lane,
+5,85 % before it): G walls +7,43 % against his sąmata (was +5,58 %). Every move is a
+figure the sheet supports — 13,13 m written on the plan, floors replacing lengths that
+cannot exist — so the numbers stand; where his walls are lower than the drawing's is a
+question for the row-level check with him, not for the engine.
+
+**Row list folded.** The „Ką iš to paskaičiavau" list on the room sheet read as many
+fixes beside the six facts (founder: „taisymo pasirinkimų daug?"). It is folded by default
+behind one line — „Iš šių 6 faktų išeina 27 sąmatos eilutės. Jos persiskaičiuoja pačios,
+kai pataisote faktą." — with „Rodyti eilutes"; opened once, it stays open from room to
+room.
+

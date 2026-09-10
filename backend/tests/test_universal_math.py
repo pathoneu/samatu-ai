@@ -378,3 +378,39 @@ def test_perimeter_floor_does_not_touch_silikonavimas():
     out = calc_room_quantities(room)
     assert out["_perimetras_floor_applied"] is True
     assert out["silikonavimas_m"] == pytest.approx(8.0 * 2.3, abs=0.01)  # measured perim
+
+
+def test_an_impossible_read_perimeter_is_floored_at_the_square_for_the_walls():
+    """objektas_g room 03 (2026-09-10): a 3,52 m² WC read as 7,08 m around —
+    below the 4·√3,52 = 7,50 m any room of that area must have. The wall path
+    takes the least possible length; the read figure itself is kept."""
+    room = {"paskirtis": "vonia", "plotas_m2": 3.52, "perimetras_m": 7.08,
+            "plotas_saltinis": "plano_uzrasas", "lubu_aukstis_m": 2.82}
+    out = calc_room_quantities(room)
+    assert out["_perimetras_floor_applied"] is True
+    assert out["_perimetras_floor_reason"] == "geometrinis_minimumas"
+    assert out["_walls_perimetras_m"] == pytest.approx(7.50, abs=0.01)
+    assert out["perimetras_m"] == pytest.approx(7.08, abs=0.01)
+    assert out["walls_gross_m2"] == pytest.approx(7.50 * 2.82, abs=0.02)
+
+
+def test_a_possible_read_perimeter_and_a_stated_one_are_not_floored():
+    possible = {"paskirtis": "gyvenamoji", "plotas_m2": 10.05, "perimetras_m": 12.68,
+                "plotas_saltinis": "plano_uzrasas", "lubu_aukstis_m": 2.82}
+    out = calc_room_quantities(possible)
+    assert out["_perimetras_floor_applied"] is False and out["_perimetras_floor_reason"] is None
+    assert out["_walls_perimetras_m"] == pytest.approx(12.68, abs=0.01)
+    # 2 × (w + l) of a pair whose product is 2 % under the label dips below 4·√A —
+    # the dimensions were STATED on the plan, so the label is the odd one, not them
+    stated = {"paskirtis": "gyvenamoji", "plotas_m2": 4.0, "perimetras_m": 7.92,
+              "perimetras_saltinis": "plano_matmenys", "plotas_saltinis": "plano_uzrasas",
+              "lubu_aukstis_m": 2.82}
+    out = calc_room_quantities(stated)
+    assert out["_perimetras_floor_applied"] is False
+    assert out["_walls_perimetras_m"] == pytest.approx(7.92, abs=0.01)
+    # an area of unknown origin (legacy blob, synthetic room) cannot convict the perimeter
+    unknown = {"paskirtis": "vonia", "plotas_m2": 7.0, "perimetras_m": 9.63, "lubu_aukstis_m": 2.82}
+    out = calc_room_quantities(unknown)
+    assert out["_perimetras_floor_applied"] is False
+    assert out["_walls_perimetras_m"] == pytest.approx(9.63, abs=0.01)
+
