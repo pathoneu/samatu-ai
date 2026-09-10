@@ -710,3 +710,38 @@ Looked at with existing reads, NO engine change (the numbers explain themselves)
   line cannot double as the trapas; stays an admitted gap.
 - The 55 empty „Jūsų eilutės" are rows from OTHER objects (garage etc.), checklist rows
   that need his input, or the admitted gaps above — no safe names-only mapping was left.
+
+## First paid runs after the €0 work — 2026-09-10 (localhost, objektas_g × 2)
+
+Two fresh extractions of the same 16-page PDF (a client disconnect made the first request
+survive as an orphan-drain job, so the second launch ran alongside it): €3,17 + €2,35,
+25 and 28 min, both saved server-side (`stream_disconnect_recovery`).
+
+| | run 1 | run 2 | demo (old engine, backfilled) |
+|---|---:|---:|---:|
+| rooms | 9 | 8 | 9 |
+| plan-label lane | value_only, 7 confirmed | value_only, 6 confirmed | shared_frame |
+| Sienų glaistymas/dažymas | 276,11 | 268,48 | 248,12 |
+| Dažymo kampų montavimas | 302,88 | 218,31 | 299,78 |
+| Angokraščių glaistymas-dažymas | 88,40 | 30,60 | 94,85 |
+| Lubų glaistymas/dažymas (anchor) | 104,53 | 104,53 | 104,53 |
+| Vonios sienų plytelių | 39,20 | 35,37 | 51,96 |
+| Hidroizoliacija / WC rėmai | 2 / 2 | 2 / 2 | 3 / 3 |
+
+What the live path showed (and what was fixed the same day):
+- **Zoom overwrote a plan label** — Step 2.5 turned room 02's adopted 14,26 m² back into
+  11,68 m² „wall_dim_calc"; the lane summary and its warnings then described rooms that no
+  longer existed, and `bendras_plotas_m2` kept Vision's pre-zoom total (101,04 vs Σ 97,90).
+  Fixed: `_apply_zoom_refinements` never overwrites a `plano_uzrasas`/`eksplikacija` area
+  (keeps the zoom figure as `_plotas_zoom_m2`); after zoom the lane takes a confirm-only
+  second look at unconfirmed rooms (`reclaim_after_refinement`), warnings are regenerated
+  and the project area is re-summed.
+- **The phantom third bathroom did not come back** — both runs read 2 wet rooms (his
+  sąmata: 2), so hidroizoliacija and WC rėmai match without any switch.
+- **Run-to-run variance is the opening reader**: kampai 303 vs 218 m and angokraščiai
+  88 vs 31 m from the same drawing — the doors/windows per room differ between reads.
+  Areas (label-confirmed) and ceilings are stable. This is the paid-side lever now.
+- The lane fell to `value_only` on both fresh runs (the backfilled demo had
+  `shared_frame`): Vision's room boxes did not frame ≥60 % of the labels. Run 2 read two
+  rooms named „Miegamasis 3" (10,55 and 8,22) — the 10,55 label sat unclaimed until the
+  post-zoom reclaim.

@@ -564,7 +564,19 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     if zoom.get("plotas_saltinis") == "from_zoom" and zoom.get("plotas_m2") is not None:
         old = room.get("plotas_m2")
         new = float(zoom["plotas_m2"])
-        if abs(new - (old or 0)) > 0.1:
+        if room.get("plotas_saltinis") in ("plano_uzrasas", "eksplikacija"):
+            # The drawing STATES this room's area (a plan label adopted at Step
+            # 2.44, or the eksplikacija table). Wall-dimension arithmetic off a
+            # zoomed crop is weaker evidence and must not overwrite it — on the
+            # first fresh objektas_g run (2026-09-10) it turned an adopted
+            # 14,26 m² back into 11,68 m² „wall_dim_calc", and left the lane's
+            # summary and warnings describing rooms that no longer existed.
+            # Kept beside the label for the check sheet.
+            room["_plotas_zoom_m2"] = new
+            if abs(new - (old or 0)) > 0.1:
+                room.setdefault("_zoom_changes", []).append(
+                    f"plotas (zoom): {new} — paliktas užrašas {old}")
+        elif abs(new - (old or 0)) > 0.1:
             room["plotas_m2"] = new
             room["plotas_saltinis"] = "wall_dim_calc"  # zoom-derived
             room.setdefault("_zoom_changes", []).append(f"plotas: {old} → {new}")
@@ -5741,6 +5753,29 @@ def extract_interior(
             "plotas_m2": room.get("plotas_m2"),
         })
     zoom_elapsed = round(time.time() - t_zoom_start, 1)
+    # Zoom may have moved the areas of rooms the plan-label lane could not
+    # confirm; the lane's warnings named their OLD areas and the project's own
+    # total (Vision's figure) was never recomputed. Refresh both so what the
+    # contractor reads matches the rooms he sees (2026-09-10, first fresh run).
+    if zoom_count_applied:
+        try:
+            _lane_now = (parsed.get("_meta") or {}).get("plan_area_lane") or {}
+            if _lane_now.get("status") == "applied":
+                from .plan_area_annotations import (
+                    lane_warnings as _lane_warnings, reclaim_after_refinement as _reclaim)
+                _re = _reclaim(parsed.get("patalpos") or [], _lane_now)
+                if _re:
+                    print(f"[extractor] plan-area lane: {len(_re)} room(s) confirmed after zoom: {_re}")
+                _keep = [w for w in (parsed.get("warnings") or [])
+                         if not (isinstance(w, dict)
+                                 and w.get("code") in ("room_area_unconfirmed", "plan_area_unclaimed"))]
+                parsed["warnings"] = _keep + _lane_warnings(_lane_now, rooms)
+            _areas = [float(r.get("plotas_m2") or 0) for r in rooms
+                      if isinstance(r.get("plotas_m2"), (int, float))]
+            if _areas:
+                parsed["bendras_plotas_m2"] = round(sum(_areas), 2)
+        except Exception as exc:  # noqa: BLE001 — bookkeeping must not break the run
+            print(f"[extractor] post-zoom refresh skipped: {exc}")
     _emit({
         "event": "zoom_completed",
         "attempted": zoom_count_attempted,

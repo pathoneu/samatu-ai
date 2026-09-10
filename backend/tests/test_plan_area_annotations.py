@@ -407,3 +407,45 @@ def test_rooms_with_only_our_default_take_the_plan_height_readers_win():
     two = apply_height_statements([_room("04", 9.0, lubu_aukstis_saltinis="section_average")],
                                   [{"value_m": 2.6}, {"value_m": 3.0}])
     assert two["status"] == "ambiguous", "two stated heights need the per-room readers, not a guess"
+
+
+
+def test_zoom_arithmetic_never_overwrites_an_area_the_drawing_states():
+    """First fresh objektas_g run (2026-09-10): Step 2.5 zoom turned an adopted
+    plan label (14,26 m²) back into wall-dimension arithmetic (11,68 m²)."""
+    from extractor.vision_call import _apply_zoom_refinements
+    room = {"nr": "02", "plotas_m2": 14.26, "plotas_saltinis": "plano_uzrasas",
+            "_plotas_uzrasas": {"page": 4, "value_m2": 14.26}, "perimetras_m": 15.0}
+    zoom = {"confidence_zoom": "high", "plotas_saltinis": "from_zoom", "plotas_m2": 11.68,
+            "perimetras_saltinis": "from_zoom", "perimetras_m": 13.67}
+    changed = _apply_zoom_refinements(room, zoom)
+    assert room["plotas_m2"] == 14.26 and room["plotas_saltinis"] == "plano_uzrasas"
+    assert room["_plotas_zoom_m2"] == 11.68
+    assert changed is True and room["perimetras_m"] == 13.67, "the perimeter still takes the zoom"
+    # a room the drawing does not label still takes the zoomed area
+    other = {"nr": "07", "plotas_m2": 8.78, "plotas_saltinis": "inline_label"}
+    _apply_zoom_refinements(other, {"confidence_zoom": "high", "plotas_saltinis": "from_zoom", "plotas_m2": 8.22})
+    assert other["plotas_m2"] == 8.22 and other["plotas_saltinis"] == "wall_dim_calc"
+
+
+
+def test_a_zoomed_room_takes_the_label_it_now_matches_but_never_adopts_a_near_miss():
+    from extractor.plan_area_annotations import reclaim_after_refinement
+    lab = lambda v: {"page": 4, "value_m2": v, "bbox": [0, 0, 1, 1], "page_width": 100, "page_height": 100}
+    rooms = [
+        {"nr": "07", "pavadinimas": "Miegamasis 3", "plotas_m2": 10.55, "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True, "_area_unconfirmed_reason": "no_label"},
+        {"nr": "08", "pavadinimas": "Miegamasis 3", "plotas_m2": 8.22, "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True, "_area_unconfirmed_reason": "no_label"},
+        {"nr": "09", "pavadinimas": "Vonia", "plotas_m2": 5.6, "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True, "_area_unconfirmed_reason": "duplicate_of:06"},
+    ]
+    lane = {"status": "applied", "geometry": "value_only", "confirmed": ["01"], "adopted": [],
+            "unconfirmed": ["07", "08", "09"], "duplicates": [{"nr": "09", "of": "06"}],
+            "unclaimed": [lab(10.55), lab(3.6), lab(6.9)]}
+    assert reclaim_after_refinement(rooms, lane) == ["07"]
+    assert rooms[0]["plotas_saltinis"] == "plano_uzrasas" and rooms[0]["_plotas_uzrasas"]["value_m2"] == 10.55
+    assert "_area_unconfirmed" not in rooms[0]
+    # 8,22 is 19 % from the hall's 6,90 — a different room, left alone
+    assert rooms[1]["plotas_m2"] == 8.22 and rooms[1].get("_area_unconfirmed") is True
+    # a duplicate stays a duplicate whatever its area
+    assert rooms[2].get("_area_unconfirmed") is True
+    assert lane["unconfirmed"] == ["08", "09"] and lane["confirmed"] == ["01", "07"]
+    assert [u["value_m2"] for u in lane["unclaimed"]] == [3.6, 6.9]

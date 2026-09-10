@@ -845,6 +845,46 @@ def _lt_num(v: Any) -> str:
         return "0,00"
 
 
+def reclaim_after_refinement(rooms: Sequence[dict], lane: dict,
+                             confirm_tol: float = CONFIRM_TOL) -> list[str]:
+    """A second look at the rooms the lane left unconfirmed, after a LATER
+    step refined their areas (Step 2.5 zoom re-reads wall dimensions): a room
+    now within ±3 % of a label nobody claimed takes that label as CONFIRMED.
+
+    Confirm only — never adopt. The first pass may adopt within ±20 % because
+    Vision's first figure is coarse; a zoomed figure is precise, so a 19 %
+    miss there is a different room's label (on the second fresh objektas_g run
+    a bedroom read at 8,22 m² sat 19 % from the hall's 6,90 m² label).
+    Mutates the rooms and the lane summary; returns the room numbers claimed.
+    """
+    if not lane or lane.get("status") != "applied":
+        return []
+    unclaimed = list(lane.get("unclaimed") or [])
+    by_nr = {str(r.get("nr")): r for r in rooms if isinstance(r, dict)}
+    claimed: list[str] = []
+    for nr in list(lane.get("unconfirmed") or []):
+        r = by_nr.get(str(nr))
+        if not r or str(r.get("_area_unconfirmed_reason") or "").startswith("duplicate_of:"):
+            continue
+        v = float(r.get("plotas_m2") or 0)
+        if v <= 0 or not unclaimed:
+            continue
+        scored = sorted((abs(float(u["value_m2"]) - v) / float(u["value_m2"]), i)
+                        for i, u in enumerate(unclaimed) if float(u.get("value_m2") or 0) > 0)
+        if not scored or scored[0][0] > confirm_tol:
+            continue
+        u = unclaimed.pop(scored[0][1])
+        r["plotas_saltinis"] = SOURCE_LABEL
+        r["_plotas_uzrasas"] = {k: u.get(k) for k in ("page", "value_m2", "bbox", "page_width", "page_height")}
+        r.pop("_area_unconfirmed", None)
+        r.pop("_area_unconfirmed_reason", None)
+        lane["unconfirmed"] = [x for x in lane["unconfirmed"] if str(x) != str(nr)]
+        lane.setdefault("confirmed", []).append(nr)
+        claimed.append(str(nr))
+    lane["unclaimed"] = unclaimed
+    return claimed
+
+
 def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
     """The user-facing warnings one applied lane result produces — shared by
     the live pipeline and the cache backfill so the two never drift. Says what
