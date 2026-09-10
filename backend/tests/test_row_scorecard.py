@@ -428,3 +428,33 @@ def test_without_a_billed_parent_nothing_is_pooled():
          _a("Virštinkinės dalies montavimas", "vnt", 2.0)])
     assert sc.rows[0].concept == "part_a" and sc.rows[0].bucket == "within_10"
     assert [e["aprasymas"] for e in sc.app_extra] == ["Virštinkinės dalies montavimas"]
+
+
+# ── A zone-billed line checked in his unit (2026-09-10) ───────────────────────
+def test_his_square_metres_are_checked_against_the_detail_behind_our_zone_count():
+    table = [FakeConcept("hidro", _rx(r"hidroizoliacij"), _rx(r"Hidroizoliacijos įrengimas"))]
+    sc = score_rows([_c("1", "Hidroizoliacija", "m2", 12.5)],
+                    [_a("Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai)", "vnt", 3.0)
+                     | {"_detail_m2": 12.4}],
+                    concepts=table)
+    assert sc.rows[0].bucket == "within_10", sc.rows[0]
+    assert sc.rows[0].app_quantity == pytest.approx(12.4)
+
+
+def test_without_the_detail_a_zone_count_is_still_not_square_metres():
+    table = [FakeConcept("hidro", _rx(r"hidroizoliacij"), _rx(r"Hidroizoliacijos įrengimas"))]
+    sc = score_rows([_c("1", "Hidroizoliacija", "m2", 12.5)],
+                    [_a("Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai)", "vnt", 3.0)],
+                    concepts=table)
+    assert sc.rows[0].bucket == "missing"
+    assert "unit" in (sc.rows[0].reason or "")
+
+
+def test_the_detail_never_stands_in_for_metres():
+    # a detail in m² does not make a piece count comparable with his metres
+    table = [FakeConcept("hidro", _rx(r"hidroizoliacij"), _rx(r"Hidroizoliacijos įrengimas"))]
+    sc = score_rows([_c("1", "Hidroizoliacijos juosta", "m", 30.0)],
+                    [_a("Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai)", "vnt", 3.0)
+                     | {"_detail_m2": 12.4}],
+                    concepts=table)
+    assert sc.rows[0].bucket == "missing"

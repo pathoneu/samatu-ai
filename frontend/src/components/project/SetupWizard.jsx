@@ -56,7 +56,12 @@ export const DEFAULT_PREFS = {
   exterior_wall_thickness_m: 0.40,
 
   // Kampai
-  count_inner_corners: false,           // industries: tik išorės kampai
+  // 2026-09-10, measured on six contractor sąmatos: bead on the rooms' own
+  // corners too lands within a quarter on 4 of 6 (2 within a tenth); „tik
+  // išoriniai" on 2 (1). Sent with every upload, so `false` here silently
+  // computed every new project the way the UI did NOT show („Ką skaičiuoti"
+  // pre-selects „Su patalpų vidiniais kampais"). The choice stays per project.
+  count_inner_corners: true,
   count_outer_corners: true,
 
   // Glaistas

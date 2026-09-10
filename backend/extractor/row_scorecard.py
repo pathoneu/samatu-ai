@@ -222,6 +222,35 @@ def _app_qty(row: dict) -> float | None:
         return None
 
 
+# A line billed per ZONE („Hidroizoliacijos įrengimas … 3 vnt") carries the
+# square metres behind it as `_detail_m2` (vision_call P6). The contractor
+# bills the same work in m², so his row is checked against that detail — the
+# only unit fallback there is; metres are never read off a piece count.
+_DETAIL_BY_UNIT = {"m2": "_detail_m2"}
+
+
+def _app_qty_in(row: dict, his_units: frozenset[str] | set[str]) -> float | None:
+    """The app row's quantity IN one of his units, or None when incomparable.
+
+    The row's own unit first; failing that, a stored detail in his unit
+    (`_DETAIL_BY_UNIT`). Founder decision 2026-09-10: without this the
+    waterproofing line could never be checked against his sąmata."""
+    q = _app_qty(row)
+    if q is not None and (normalize_unit(_app_unit(row)) & set(his_units)):
+        return q
+    for unit, key in _DETAIL_BY_UNIT.items():
+        if unit not in his_units:
+            continue
+        d = row.get(key)
+        if d is None or isinstance(d, bool):
+            continue
+        try:
+            return float(d)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def row_eur(item: dict) -> float | None:
     """The contractor's row total in € — `prices.darbu_viso + medziagu_viso`
     from the (gitignored, never tracked) priced parse; falls back to
@@ -454,8 +483,7 @@ def score_rows(contractor_items: Sequence[dict],
             reason = f"admitted gap — {c.note or 'no app family emits this'}"
         else:
             usable = [j for j in arows
-                      if _app_qty(app_rows[j]) is not None
-                      and (normalize_unit(_app_unit(app_rows[j])) & his_units)]
+                      if _app_qty_in(app_rows[j], his_units) is not None]
             if not arows:
                 bucket, reason = "missing", "no app row matched this family"
             elif not usable:
@@ -467,7 +495,7 @@ def score_rows(contractor_items: Sequence[dict],
             elif not his:
                 bucket, reason = "missing", "contractor quantity is zero"
             else:
-                ours = sum(_app_qty(app_rows[j]) or 0.0 for j in usable)
+                ours = sum(_app_qty_in(app_rows[j], his_units) or 0.0 for j in usable)
                 pct = round((ours - his) / his * 100, 3)
                 bucket = _bucket_for(pct)
         v = ConceptVerdict(
@@ -523,8 +551,8 @@ def score_rows(contractor_items: Sequence[dict],
                 continue
             u = normalize_unit(items[i].get("unit"))
             for j in arows:
-                q = _app_qty(app_rows[j])
-                if q is None or not (normalize_unit(_app_unit(app_rows[j])) & u):
+                q = _app_qty_in(app_rows[j], u)
+                if q is None:
                     continue
                 pairs.append((abs((q - his_q) / his_q * 100),
                               str(items[i].get("nr") or ""),
@@ -538,7 +566,7 @@ def score_rows(contractor_items: Sequence[dict],
             used_c.add(i)
             used_a.add(j)
             his_q = _truth_qty(items[i]) or 0.0
-            our_q = _app_qty(app_rows[j]) or 0.0
+            our_q = _app_qty_in(app_rows[j], normalize_unit(items[i].get("unit"))) or 0.0
             pct = round((our_q - his_q) / his_q * 100, 3)
             row_result[i] = (_bucket_for(pct), None, round(our_q, 3), pct,
                              (label,))

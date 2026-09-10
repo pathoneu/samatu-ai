@@ -969,6 +969,10 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # key that starts with `_sa` (SQLAlchemy state), so that spelling
             # never reached the browser (2026-09-08, an hour of debugging).
             "_only_while": p.get("_only_while"),
+            # The m² (and tape metres) behind a line billed per zone — the row
+            # scorecard checks his m² row against `_detail_m2` (2026-09-10).
+            "_detail_m2": p.get("_detail_m2"),
+            "_detail_juostele_m": p.get("_detail_juostele_m"),
         })
     parsed["darbu_sarasas"] = darbu_sarasas
 

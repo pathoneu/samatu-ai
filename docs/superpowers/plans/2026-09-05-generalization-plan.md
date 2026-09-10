@@ -658,3 +658,26 @@ Budget: ~€3 per blind run + ~€3 per fix validation ≈ €30–60 / month at
   timed — gives the first „after his 5-minute check" number.
 - Decide calibration candidates only where ≥3 projects agree; write the
   8-project targets from the measured curve, not from hope.
+
+
+## Kampai default — measured 2026-09-10
+
+Founder: „skaičiuok su būdu, kuris tiktų visiems projektams, ir pažiūrėk, kuris labiau
+matchina pagal sąmatas". Both methods run on the six frozen extracts (deterministic tail
+only, €0) against the contractor's own „Dažymo kampų montavimas" / „Glaistymo kampų
+statymas" row:
+
+| objektas | his m | su vidiniais | tik išoriniai |
+|---|---:|---:|---:|
+| a | 493,35 | 437,70 (−11 %) | 333,70 (−32 %) |
+| b | 580,54 | 445,66 (−23 %) | 344,14 (−41 %) |
+| c | 201,86 | 266,89 (+32 %) | 199,21 (−1 %) |
+| d | 123,59 | 131,87 (+7 %) | 86,75 (−30 %) |
+| g | 134,72 | 299,78 (+122 %) | 198,26 (+47 %) |
+| h | 412,94 | 437,78 (+6 %) | 324,98 (−21 %) |
+
+„Su vidiniais": median |err| 17 %, 2/6 within ±10 %, 4/6 within ±25 %. „Tik išoriniai":
+31 %, 1/6, 2/6. **Default stays „su vidiniais"**; the per-project choice covers objektas_c.
+Side finding: the Setup Wizard sent `count_inner_corners: false` with every upload, so a
+new project was silently computed „tik išoriniai" while the UI pre-selected the other —
+flipped to `true`. objektas_g (+122 %) is its own problem (duplicate room 07 alone is 26 m).
