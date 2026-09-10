@@ -776,3 +776,11 @@ pass-1 doors are left alone. Tests in tests/test_doors_reader.py.
 **Next lever (paid, small):** a schedule/tag-driven check of the doors reader — when the
 plan carries tags, the reader's exterior-door count must equal the tag count; and a
 targeted re-read when the merged door total is far below `total_count`.
+
+
+**Run 3 (2026-09-10, after the doors-merge fix, €4,29, 28 min):** doors placed
+(13 read, 0 unattributed), the hall read as its own room and confirmed by the 6,90 m²
+label, every room label-confirmed (8) or adopted (1), only the 3,60 m² label left.
+Rows against run 1 / run 2: walls 261,62 / 269,44 / 262,54; kampai 305,11 / 302,87 / 218,30;
+angokraščiai 94,86 / 88,40 / 30,60. With the merge fixed, two independent reads agree
+within ~3 % on walls and corners — the run-2 collapse was the merge, not the model.

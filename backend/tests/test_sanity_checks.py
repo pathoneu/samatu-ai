@@ -146,3 +146,22 @@ def test_gk_sheets_math_skipped_when_no_gkp_area():
 def test_gk_sheets_math_skipped_when_no_pozicija():
     rooms = [{"gkp_lubu_standart_m2": 100}]
     assert check_gk_sheets_math(rooms, {"pozicijos": []}) is None
+
+
+
+def test_baseboard_check_counts_pipeline_doors_and_skips_tiled_floors():
+    """Live rooms carry `tipas: duris` (× kiekis), and a tiled bathroom has no
+    baseboard to expect — both were missed, so a fresh project read
+    „− 0 durys" and warned against every room's perimeter (2026-09-10)."""
+    from extractor.sanity_checks import check_baseboard_perimeter
+    rooms = [
+        {"nr": "01", "perimetras_m": 20.0, "grindjuosciu_m": 18.4,
+         "elementai": [{"tipas": "duris", "kiekis": 2}]},
+        {"nr": "03", "perimetras_m": 8.0, "grindjuosciu_m": 0.0, "plyteles_grindys_m2": 3.5,
+         "elementai": [{"tipas": "duris", "kiekis": 1}]},
+    ]
+    # 18,4 against 20 − 2 × 0,8 = 18,4 → no warning (the bathroom is not expected)
+    assert check_baseboard_perimeter(rooms) is None
+    rooms[0]["grindjuosciu_m"] = 12.0
+    w = check_baseboard_perimeter(rooms)
+    assert w is not None and "2 durys" in w.message

@@ -109,18 +109,28 @@ def check_baseboard_perimeter(rooms):
     We use approximation: total_grindjuostes / (total_perim − 0.8m × N_doors).
     """
     total_grind = 0.0
-    for r in rooms:
-        derived = r.get("derived") or r
-        total_grind += float(derived.get("grindjuostes_m") or derived.get("grindjuosciu_m") or 0)
-    total_perim = _sum_field(rooms, "perimetras_m")
-    if total_grind < 1 or total_perim < 1:
-        return None
-    # Estimate door subtraction from elementai if present
+    total_perim = 0.0
     door_count = 0
     for r in rooms:
+        derived = r.get("derived") or r
+        grind = float(derived.get("grindjuostes_m") or derived.get("grindjuosciu_m") or 0)
+        total_grind += grind
+        # A tiled floor has no baseboard, so its perimeter cannot be expected
+        # to carry one — comparing the total against EVERY room's perimeter
+        # flagged every project with bathrooms (2026-09-10, fresh objektas_g:
+        # „87,2 m, tikėtina ~114,5 m").
+        if grind <= 0 and float(derived.get("plyteles_grindys_m2") or 0) > 0:
+            continue
+        total_perim += float(r.get("perimetras_m") or 0)
         for e in (r.get("elementai") or []):
-            if (e.get("type") or "").lower() in ("durys", "doorway", "door"):
-                door_count += 1
+            # `tipas: duris | pasleptos_duris` is the pipeline's shape; the
+            # `type` spellings are the legacy test/derived shape — the old
+            # check read only those, so on a live project it counted 0 doors.
+            kind = (e.get("tipas") or e.get("type") or "").lower()
+            if kind in ("duris", "pasleptos_duris", "durys", "doorway", "door"):
+                door_count += int(e.get("kiekis") or 1)
+    if total_grind < 1 or total_perim < 1:
+        return None
     expected_subtract = door_count * 0.8
     expected_grind = total_perim - expected_subtract
     if expected_grind < 1:
