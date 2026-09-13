@@ -1091,3 +1091,20 @@ aukstis_mm`, `_dydis_user`, marked `_angos_user_at` so a re-read keeps it; the r
 „matmenys — jūsų"; schedule sizes are not editable — they are read). Above the facts, the room's own
 headline quantities (`roomTotals`: sienos, lubos, grindys by kind, sienų plytelės, grindjuostės) —
 what this room puts into the sąmata before any row is opened. Frontend 702; facts tests +1.
+
+## 2026-09-13 (night, last): pilot telemetry that can answer the pilot's questions
+
+Council verdict 5. The telemetry that existed logged one session per mount of the sąmata table
+(step 3 only), always with `gestures: []` and `exported: false` — it could say how long step 3 was
+open and nothing else. Now `lib/telemetry.js` keeps ONE session per project per page load
+(`pilotSession`), started when the project opens (drawing step) and shared with the check sheet and
+the table, flushed with `sendBeacon` on pagehide (a plain fetch is dropped when the tab closes) and
+when the project changes. Events, all free of prices and names (a fact key, a room number, a row
+label): `fact_accept`, `fact_number`, `fact_choice`, `opening_adjust`, `opening_size`,
+`room_verified`, `room_add`, `scope_change`, `row_edit`, `row_delete`, `row_add`, `kainynas_apply`,
+`export` (format; also sets `exported`), `reread` (how many rooms changed). The backend endpoint and
+JSONL store are unchanged. `scripts/pilot_report.py` prints, per project id: sessions, minutes open,
+minutes from first opening to first export, exports, facts accepted vs corrected, rooms with a
+correction, rooms verified, rows edited / deleted / added, re-reads — the pilot's „corrections per
+project 15 → <5", „minutes upload→sent", „export sent" in one table (`--json` for machines).
+Tests: telemetry.test.js +3, test_pilot_report.py +2. Frontend 705.

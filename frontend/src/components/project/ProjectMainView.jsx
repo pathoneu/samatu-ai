@@ -48,7 +48,7 @@ import SanityWarningsBanner from './SanityWarningsBanner';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
 import { LAYOUT_PATHON, LAYOUT_TEMPLATE, hasLayoutChoice, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
-import { createSession } from '@/lib/telemetry';
+import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import {
   adjustPositionQuantity,
   updatePositionQuantity,
@@ -554,19 +554,17 @@ export default function ProjectMainView({
     return () => cancelAnimationFrame(id);
   }, [focusSanityNonce]);
 
-  // Sprint 0 Fix 6: session telemetry — track time-on-task per project view
-  const sessionRef = useRef(null);
+  // Pilot telemetry (2026-09-13): ONE session per project per page load,
+  // shared with the check sheet and the drawing step (lib/telemetry.js) —
+  // the per-mount session this table used to open logged step 3 alone, with
+  // no events. Flushed on pagehide and when the project changes.
   useEffect(() => {
     const projectId = project?.id;
-    if (!projectId) return;
-    sessionRef.current = createSession({ projectId });
-    const onUnload = () => sessionRef.current?.finish({ exported: false });
-    window.addEventListener('beforeunload', onUnload);
-    return () => {
-      window.removeEventListener('beforeunload', onUnload);
-      sessionRef.current?.finish({ exported: false });
-    };
+    if (!projectId) return undefined;
+    pilotSession(projectId);
+    return () => { releasePilotSession(projectId); };
   }, [project?.id]);
+  const pilot = (type, target = {}) => recordPilot(project?.id, type, target);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
   // „Kaip suskaičiuota" (2026-09-02, Patikra): the row whose ledger is open.
   // Re-derived from the live array below so a recompute under an open panel
@@ -631,6 +629,7 @@ export default function ProjectMainView({
   useEffect(() => { latestRef.current = { project, darbai }; });
 
   const handleRowChange = (idx, newItem) => {
+    pilot('row_edit', { kind: 'row', id: String(newItem?.aprasymas || '') });
     const updated = [...darbai];
     updated[idx] = newItem;
     setDarbai(updated);
@@ -645,6 +644,7 @@ export default function ProjectMainView({
   const handleRowRemove = (idx) => {
     const removed = darbai[idx];
     if (!removed) return;
+    pilot('row_delete', { kind: 'row', id: String(removed.aprasymas || '') });
     const updated = darbai.filter((_, i) => i !== idx);
     setDarbai(updated);
     onProjectChange?.({ ...project, darbu_sarasas: updated });
@@ -666,6 +666,7 @@ export default function ProjectMainView({
   };
 
   const handleAddRow = () => {
+    pilot('row_add', { kind: 'row', id: '' });
     const next = {
       eil_nr: darbai.length + 1,
       id: manualRowId(),
@@ -683,6 +684,7 @@ export default function ProjectMainView({
   // Contractor ask (2026-09-02): a row must be addable into ANY section, not
   // only "Kiti darbai".
   const handleAddRowInSection = (cat) => {
+    pilot('row_add', { kind: 'row', id: String(cat || '') });
     const next = {
       eil_nr: nextEilNr(darbai),
       id: manualRowId(),
@@ -1149,6 +1151,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
   }, [open]);
 
   const handleApply = (priceList, opts = {}) => {
+    pilot('kainynas_apply', { kind: 'kainynas', id: '' });
     setOpen(false);
     // Price each list from its OWN rows and write back ONLY that list. The old
     // code priced `pozicijos || darbu_sarasas` and wrote the SAME result into

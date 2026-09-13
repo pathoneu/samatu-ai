@@ -8,6 +8,7 @@ import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucid
 import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
+import { markExported } from '@/lib/telemetry';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
@@ -269,6 +270,7 @@ export default function ExportDropdown({ project }) {
       // Sprint §FIX-9 (2026-04-29): F2/F3 forms removed per user feedback.
       // Code preserved in docs/superpowers/backup-2026-04-29-f2-f3-forms.py
       // for re-enable once contractors confirm what's needed.
+      markExported(project.id, format);
       toast.success('Failas atsisiųstas');
       setFilterFor(null);
     } catch (e) {

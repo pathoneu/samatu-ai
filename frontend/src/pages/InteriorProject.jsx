@@ -20,6 +20,7 @@ import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import ReextractButton from '@/components/project/ReextractButton';
+import { pilotSession, releasePilotSession } from '@/lib/telemetry';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 // Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
 // flow never shipped to production after 2026-04-26 rollback.
@@ -773,6 +774,13 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  // Pilot telemetry: the clock starts when the project opens, not on step 3.
+  useEffect(() => {
+    if (!project?.id) return undefined;
+    const pid = project.id;
+    pilotSession(pid);
+    return () => { releasePilotSession(pid); };
+  }, [project?.id]);
   // Bumped by the top-bar sanity pill. ProjectMainView watches it to scroll
   // the banner into view and force the loud groups open — otherwise the jump
   // lands on the Sąmata step somewhere above the warnings the user clicked.

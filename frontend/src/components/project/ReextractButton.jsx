@@ -25,6 +25,7 @@ import { API_BASE as API } from '@/lib/apiBase';
 import { mergeReextract } from '@/lib/mergeReextract';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { saveRoomEdit } from '@/lib/roomSheetApi';
+import { recordPilot } from '@/lib/telemetry';
 
 /**
  * The stored project after a fresh read: merged, then its rows rebuilt on the
@@ -133,6 +134,7 @@ export default function ReextractButton({ project, onComplete }) {
         setProgress(t('project.reextract.rebuilding'));
         const base = getProject(project.id) || project;
         const merged = await projectAfterReread(base, result);
+        recordPilot(project.id, 'reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
         updateProject(project.id, merged);
         setProgress(t('project.reextract.updated'));
         setTimeout(() => {

@@ -56,6 +56,7 @@ import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
 import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } from '@/lib/scope';
 import { ltPlural } from '@/lib/ltPlural';
 import { ltNumber } from '@/lib/ledger';
+import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
@@ -208,7 +209,15 @@ export default function RoomSheet() {
     }
   }, [busy, t]);
 
+  // Pilot telemetry (council verdict 5): what gets accepted, what gets fixed.
+  useEffect(() => {
+    pilotSession(id);
+    return () => { releasePilotSession(id); };
+  }, [id]);
+  const pilot = useCallback((type, target = {}) => recordPilot(id, type, { room: roomNr, ...target }), [id, roomNr]);
+
   const saveNumber = useCallback((field, value) => run(async () => {
+    pilot('fact_number', { kind: 'fact', id: field });
     if (field === 'lubu_auksciai') {
       const next = { ...((project?._overrides || {}).lubu_auksciai || {}), [String(roomNr)]: value };
       await land(await saveAssumptionEdit(project, 'lubu_auksciai', next));
@@ -218,28 +227,31 @@ export default function RoomSheet() {
     // marked as his, so the sheet says so and a re-read keeps them.
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(field, value))),
       { fromInterior: true });
-  }), [run, project, roomNr, land]);
+  }), [run, project, roomNr, land, pilot]);
 
   // „Ką skaičiuoti" (apimtis): the whole project object changes, then every
   // row is rebuilt server-side with the new scope — same path as a room edit.
   const saveScope = useCallback((nextScope) => run(async () => {
+    pilot('scope_change', { kind: 'scope', id: 'apimtis' });
     const withScope = { ...project, _apimtis: nextScope };
     setProject(withScope);
     const result = await saveRoomEdit(withScope, roomsOf(withScope));
     await land({ ...result, _apimtis: nextScope }, { fromInterior: true, scopeChange: true });
     toast.success(t('project.roomSheet.scopeSaved'));
-  }), [run, project, land, t]);
+  }), [run, project, land, t, pilot]);
 
   // A room the plan labels but the model never returned: added with the label
   // as its area; purpose and perimeter stay his to set on the new room's sheet.
   const addRoom = useCallback((room) => run(async () => {
+    pilot('room_add', { kind: 'room', id: String(room?.nr ?? '') });
     const next = [...roomsOf(project), room];
     const result = await saveRoomEdit(project, next);
     await land(result, { fromInterior: true });
     toast.success(t('project.roomSheet.roomAdded', { nr: room.nr }));
-  }), [run, project, land, t]);
+  }), [run, project, land, t, pilot]);
 
   const saveChoice = useCallback((field, value) => run(async () => {
+    pilot('fact_choice', { kind: 'fact', id: field });
     if (field === 'walls_paint_override') {
       const next = {
         ...((project?._overrides || {}).walls_paint_override || {}),
@@ -250,20 +262,22 @@ export default function RoomSheet() {
     }
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch('paskirtis', value))),
       { fromInterior: true });
-  }), [run, project, roomNr, land]);
+  }), [run, project, roomNr, land, pilot]);
 
   const adjustOpening = useCallback((detail, delta) => run(async () => {
+    pilot('opening_adjust', { kind: 'opening', id: String(detail?.tipas ?? '') });
     const elementai = adjustOpeningCount(room?.elementai, detail, delta);
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true });
-  }), [run, project, room, roomNr, land]);
+  }), [run, project, room, roomNr, land, pilot]);
 
   // The size he knows replaces the standard one the reader assumed.
   const saveOpeningSize = useCallback((detail, size) => run(async () => {
+    pilot('opening_size', { kind: 'opening', id: String(detail?.tipas ?? '') });
     const elementai = setOpeningSize(room?.elementai, detail, size);
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true });
-  }), [run, project, room, roomNr, land]);
+  }), [run, project, room, roomNr, land, pilot]);
 
   const totals = useMemo(() => roomTotals(room), [room]);
 
@@ -304,6 +318,7 @@ export default function RoomSheet() {
 
   const acceptRoom = useCallback(() => {
     if (busy || !room) return;
+    pilot('room_verified', { kind: 'room', id: String(room.nr) });
     markRoomVerified(id, room.nr);       // canonical write: patalpos + the event
     const fresh = getProject(id);
     if (!fresh) { advance(); return; }
@@ -319,7 +334,7 @@ export default function RoomSheet() {
       setProject(fresh);
     }
     advance();
-  }, [busy, room, id, advance]);
+  }, [busy, room, id, advance, pilot]);
 
   // Enter → next room. Guarded on the focused element as well as on the inputs'
   // own stopPropagation, so typing a height and pressing Enter saves the field
@@ -505,7 +520,10 @@ export default function RoomSheet() {
                     room={room}
                     busy={busy}
                     verified={seen.has(fact.key)}
-                    onAccept={() => setSeen((prev) => new Set(prev).add(fact.key))}
+                    onAccept={() => {
+                      pilot('fact_accept', { kind: 'fact', id: fact.key });
+                      setSeen((prev) => new Set(prev).add(fact.key));
+                    }}
                     onSaveNumber={saveNumber}
                     onSaveChoice={saveChoice}
                     onAdjustOpening={adjustOpening}
