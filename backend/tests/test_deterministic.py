@@ -321,17 +321,18 @@ def test_pozicijos_elektros_skyrius_uses_symbols_when_available():
     assert rozetes_line["kiekis"] == 17  # 12 + 5
 
 
-def test_grindjuostes_capped_at_065_per_m2():
-    """Per-room (perim − Σdurys) sums double-count interior walls. Rangovas
-    ratios 0.50-0.62 m/m². Cap = 0.65 m/m². When raw exceeds cap, capped
-    value is used + audit fields populated."""
-    # Three rooms with high perim (all share interior walls) → raw will
-    # exceed 0.65 × total_plotas
+def test_grindjuostes_are_the_rooms_own_metres_never_capped():
+    """Skirting runs on BOTH sides of a shared wall, so the per-room sum counts
+    nothing twice. The 0,65 m/m² cap this test used to pin was a factor read
+    off his sąmatas (founder's rule, 2026-09-05: never teach the engine from
+    the sąmata); on objektas_g it cut 87,4 m to 65,6 m against a drawing that
+    supports 87,4. Gone — the line is Σ(perimetras − durys) × 1,10, and older
+    blobs' cap marks and warning are dropped on rebuild."""
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
              "plotas_m2": 25.0, "perimetras_m": 25.0, "lubu_aukstis_m": 2.65,
-             "elementai": [], "confidence": "high"},
+             "elementai": [], "confidence": "high", "_grindjuosciu_capped": True},
             {"nr": "2", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
              "plotas_m2": 15.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.65,
              "elementai": [], "confidence": "high"},
@@ -339,18 +340,18 @@ def test_grindjuostes_capped_at_065_per_m2():
              "plotas_m2": 10.0, "perimetras_m": 16.0, "lubu_aukstis_m": 2.65,
              "elementai": [], "confidence": "high"},
         ],
+        "_meta": {"grindjuosciu_pre_cap_m": 64.9, "grindjuosciu_post_cap_m": 32.5},
+        "warnings": [{"code": "grindjuosciu_cap_fired", "message": "sena riba"}],
     }
     out = _run_full_pipeline(parsed)
     grindj_lines = [p for p in out["pozicijos"]
                     if "grindjuosčių sumontavimas" in p["aprasymas"].lower()]
     assert len(grindj_lines) == 1
-    total_plotas = 50.0
-    cap_m = total_plotas * 0.65  # 32.5
-    assert grindj_lines[0]["kiekis"] <= cap_m + 0.01, (
-        f"Grindjuostės {grindj_lines[0]['kiekis']} should be capped at {cap_m}")
-    # Audit fields should be set
-    assert out.get("_meta", {}).get("grindjuosciu_pre_cap_m") is not None
-    assert out["_meta"]["grindjuosciu_post_cap_m"] <= cap_m + 0.01
+    assert grindj_lines[0]["kiekis"] == pytest.approx((25.0 + 18.0 + 16.0) * 1.10, abs=0.05)
+    assert "grindjuosciu_pre_cap_m" not in (out.get("_meta") or {})
+    assert not any(r.get("_grindjuosciu_capped") for r in out["patalpos"])
+    assert not any(isinstance(w, dict) and w.get("code") == "grindjuosciu_cap_fired"
+                   for w in out.get("warnings") or [])
 
 
 def test_grindjuostes_not_capped_when_within_ratio():

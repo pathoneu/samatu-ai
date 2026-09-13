@@ -355,14 +355,14 @@ def test_a_row_without_terms_states_its_share_rather_than_inventing_one(objektas
     assert "Iš šios patalpos" in q["formula"] and "visa eilutė" in q["formula"]
 
 
-def test_a_capped_line_says_the_total_was_capped(objektas_a):
+def test_the_grindjuostes_line_is_the_rooms_own_addition_uncapped(objektas_a):
     q = next(q for q in build_room_facts(objektas_a, "104")["quantities"]
              if q["aprasymas"] == "Grindjuosčių sumontavimas")
-    # The room's own addition is perfectly explainable AND still not what the
-    # line bills — the cap clipped the Σ. Both halves have to reach him.
+    # The room's own addition IS what the line bills — the 0,65 m/m² cap that
+    # used to clip the Σ is gone (2026-09-13), so nothing says „apribota".
     assert q["terms"] is not None
     assert q["formula"].startswith("perimetras ")
-    assert "apribota" in q["formula"]
+    assert "apribota" not in q["formula"]
 
 
 def test_quantities_carry_the_row_id_the_sąmata_uses(objektas_a):

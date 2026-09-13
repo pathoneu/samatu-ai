@@ -2593,6 +2593,14 @@ _SAN_FAMILY_LT = {"praustuve": "praustuvės maišytuvas", "dusas": "dušo maišy
 _SAN_ASSUMPTION_FIELD = "santechnika_potinkinis"
 
 
+def _lt_join(items: list[str]) -> str:
+    """„a, b ir c" — a Lithuanian list for a sentence."""
+    items = [str(x) for x in items if x]
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return ", ".join(items[:-1]) + " ir " + items[-1]
+
+
 def _resolve_san_concealment(parsed: dict) -> tuple[dict[str, bool], dict[str, str]]:
     """Which mixer families are CONCEALED, and where did each answer come from?
 
@@ -3197,46 +3205,26 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 _door_line["_confidence_reason"] = _door_reason
         pozicijos.append(_door_line)
 
-    # Grindjuostės — cap-by-ratio fix (P1 audit measured +88% over rangovas).
-    # Per-room (perim − Σdurys) × 1.10 double-counts interior walls (each
-    # interior wall belongs to 2 rooms). rangovas ratios across P1+P5: 0.50-0.62
-    # m of grindjuostė per m² of floor. Cap at 0.65 m/m² to remove the
-    # phantom segments. Audit field marks when cap fires for transparency.
-    GRINDJUOSCIU_RATIO_CAP = 0.65  # m grindjuostės per m² floor (rangovas-empirical)
+    # Grindjuostės — the rooms' own metres, summed. The 0,65 m/m² cap that
+    # used to sit here (P1 audit, 2026-05) was a factor read off his sąmatas:
+    # skirting IS laid on both sides of a shared wall, so the per-room sum
+    # counts nothing twice — his lower totals come from kitchen runs, wardrobes
+    # and tiled rooms, which are his to take out on the sheet, not ours to
+    # guess away (founder's rule, 2026-09-05: compute from the drawing, never
+    # teach the engine from the sąmata). objektas_g, 3rd run, 2026-09-12: 87,4 m
+    # cut to 65,6 m against a drawing that supports 87,4. Older blobs carry
+    # the cap's marks and its warning — dropped on every rebuild.
     grindjuostes_raw = _sum("grindjuosciu_m")
-    bendras_plotas_for_cap = sum(float(r.get("plotas_m2") or 0) for r in rooms)
-    grindjuostes_capped = min(grindjuostes_raw, bendras_plotas_for_cap * GRINDJUOSCIU_RATIO_CAP)
-    if grindjuostes_raw > grindjuostes_capped + 0.01:
-        # Cap fired — record on each room for audit trail
-        for r in rooms:
-            r["_grindjuosciu_capped"] = True
-        parsed.setdefault("_meta", {})["grindjuosciu_pre_cap_m"] = round(grindjuostes_raw, 2)
-        parsed["_meta"]["grindjuosciu_post_cap_m"] = round(grindjuostes_capped, 2)
-        parsed["_meta"]["grindjuosciu_cap_ratio_m_per_m2"] = GRINDJUOSCIU_RATIO_CAP
-        # Surface to UI so user knows the empirical band-aid (not pure math)
-        # capped this number. Prepass should make the cap unnecessary; if it
-        # fires, polygon_pct/bbox_pct were missing or wall_adjacency bailed.
-        warnings_list = parsed.setdefault("warnings", [])
-        warnings_list.append({
-            "code": "grindjuosciu_cap_fired",
-            "severity": "low",
-            "message": (
-                f"Grindjuostės apriboti per empirinį 0.65 m/m² limitą: "
-                f"{grindjuostes_raw:.1f}m → {grindjuostes_capped:.1f}m. "
-                "Reiškia, kad polygon_pct/bbox_pct duomenų trūko ir "
-                "wall_adjacency negalėjo apskaičiuoti bendrų sienų."
-            ),
-            "hint": "Re-extract'ink projektą — naujas Vision prompt'as turėtų grąžinti polygon_pct visoms patalpoms.",
-            "expected": "≤0.65 m/m² (po wall_adjacency korekcijos ~0.55)",
-            "actual": f"{grindjuostes_raw / max(bendras_plotas_for_cap, 0.01):.3f} m/m² (pre-cap)",
-        })
-    grindjuostes_total = round(grindjuostes_capped, 2)
+    for r in rooms:
+        r.pop("_grindjuosciu_capped", None)
+    for _k in ("grindjuosciu_pre_cap_m", "grindjuosciu_post_cap_m", "grindjuosciu_cap_ratio_m_per_m2"):
+        (parsed.get("_meta") or {}).pop(_k, None)
+    if isinstance(parsed.get("warnings"), list):
+        parsed["warnings"] = [w for w in parsed["warnings"]
+                              if not (isinstance(w, dict) and w.get("code") == "grindjuosciu_cap_fired")]
+    grindjuostes_total = round(grindjuostes_raw, 2)
     if grindjuostes_total > 0:
-        # The ledger for a CAPPED line. Contributions stay the rooms' own raw
-        # metres and the cap is its own roll-up step, so the chain reads
-        # „Σ 11 patalpų 111,87 → riba 0,65 m/m² 107,67" — the alternative
-        # (pro-rating the rooms silently) hides the one number the contractor
-        # would want to argue with.
+        # The ledger: every room's own metres, then one sum step.
         _g_contribs, _g_excluded = [], []
         for r in rooms:
             _gm = round(float(r.get("grindjuosciu_m") or 0), 2)
@@ -3270,15 +3258,6 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
         _g_roll = [_ledger.sum_step(_g_contribs,
                                     _ledger.rooms_label(len(_g_contribs)))]
-        if grindjuostes_raw > grindjuostes_capped + 0.01:
-            _pct = (grindjuostes_capped / grindjuostes_raw * 100
-                    if grindjuostes_raw else 100)
-            _g_roll.append(_ledger.step(
-                "cap", f"Riba {_lt_num(GRINDJUOSCIU_RATIO_CAP)} m/m²",
-                grindjuostes_total,
-                f"Kiekvienos patalpos dalis sumažinta iki {_pct:.0f} %. "
-                "Bendros sienos priklauso dviem patalpoms, todėl "
-                "perimetrų suma jas suskaičiuoja dukart."))
         # Two lines, two ledgers. They must not SHARE the lists or the dicts
         # inside them: a consumer that edits one row's contribution (a merge
         # carrying a correction, a serializer normalising a value) would silently
@@ -3961,17 +3940,27 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # Disclose the concealment calls we had to GUESS — one note per family that
     # was actually emitted on the LT default rather than on evidence/an override.
-    _record_san_assumptions(parsed, [
-        (f"Santechnika: {_SAN_FAMILY_LT[f]} priimtas POTINKINIU "
-         f"(LT standartinė praktika) — brėžinyje tai nenurodyta. Todėl darbas "
-         f"padalintas į potinkinės ir virštinkinės dalies eilutes. Jei "
-         f"virštinkinis, pakeisk prielaidą „santechnika_potinkinis“."
-         if san_concealed[f] else
-         f"Santechnika: {_SAN_FAMILY_LT[f]} priimtas VIRŠTINKINIU "
-         f"— viena montavimo eilutė.")
-        for f in _SAN_MIXER_LINES
-        if f in san_emitted and san_source[f] == "assumption"
-    ])
+    # One note per ASSUMPTION, naming every fixture it covers — four identical
+    # lines („praustuvės…", „dušo…", „vonios…", „bidė…") buried the one warning
+    # that mattered on objektas_g's banner (2026-09-12).
+    _san_assumed = [f for f in _SAN_MIXER_LINES if f in san_emitted and san_source[f] == "assumption"]
+    _san_notes: list[str] = []
+    _hidden = [_SAN_FAMILY_LT[f] for f in _san_assumed if san_concealed[f]]
+    _shown = [_SAN_FAMILY_LT[f] for f in _san_assumed if not san_concealed[f]]
+    if _hidden:
+        _many = len(_hidden) > 1
+        _san_notes.append(
+            f"Santechnika: {_lt_join(_hidden)} {'priimti POTINKINIAIS' if _many else 'priimtas POTINKINIU'} "
+            f"(LT standartinė praktika) — brėžinyje tai nenurodyta, todėl "
+            f"{'darbai padalinti' if _many else 'darbas padalintas'} į potinkinės ir virštinkinės "
+            f"dalies eilutes. Jei {'virštinkiniai' if _many else 'virštinkinis'}, pakeiskite "
+            f"prielaidą „santechnika_potinkinis“.")
+    if _shown:
+        _many = len(_shown) > 1
+        _san_notes.append(
+            f"Santechnika: {_lt_join(_shown)} {'priimti VIRŠTINKINIAIS' if _many else 'priimtas VIRŠTINKINIU'} "
+            f"— {'po vieną montavimo eilutę' if _many else 'viena montavimo eilutė'}.")
+    _record_san_assumptions(parsed, _san_notes)
 
     # ════════════════════════════════════════════════════════════════════════
     # ELEKTROS INSTALIACIJOS DARBAI (placeholders — count po Vision symbol counter)

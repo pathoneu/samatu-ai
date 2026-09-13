@@ -235,20 +235,17 @@ def test_stale_sub_terms_are_dropped_rather_than_shown_wrong():
     assert terms_or_none(100.0, {"a": 60.0, "b": None}) is None
 
 
-def test_grindjuostes_state_the_cap_instead_of_hiding_it(blob):
+def test_grindjuostes_are_the_rooms_own_sum_with_no_cap_step(blob):
+    """The 0,65 m/m² cap step is gone (2026-09-13): skirting runs on both
+    sides of a shared wall, so the rooms' metres are the line — one sum, the
+    contributions add up to the headline, nothing clipped behind it."""
     row = next(r for r in _build(blob) if r["aprasymas"] == "Grindjuosčių sumontavimas")
     ops = [s["op"] for s in row["roll_up"]]
-    assert ops == ["sum", "cap"], ops
-    raw, capped = row["roll_up"][0]["value"], row["roll_up"][1]["value"]
-    assert capped < raw
-    assert capped == row["kiekis"]
-    assert "0,65" in row["roll_up"][1]["label"]
-    assert row["roll_up"][1].get("note")
-    # The contributions stay the rooms' RAW metres: the whole point of the cap
-    # step is that the contractor can see the number it clipped.
-    assert abs(sum(c["value"] for c in row["contributions"]) - raw) <= 0.01
-    # …which is exactly why a „Σ" beside the headline would contradict it.
-    assert row["contributions_sum_to_total"] is False
+    assert ops == ["sum"], ops
+    assert row["roll_up"][0]["value"] == row["kiekis"]
+    assert abs(sum(c["value"] for c in row["contributions"]) - row["kiekis"]) <= 0.01
+    assert row["contributions_sum_to_total"] is True
+    assert not any("0,65" in (s.get("label") or "") for s in row["roll_up"])
 
 
 def test_the_two_grindjuostes_lines_do_not_share_one_evidence_list(blob):

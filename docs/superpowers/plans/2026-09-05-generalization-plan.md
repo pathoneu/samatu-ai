@@ -881,3 +881,24 @@ behind one line — „Iš šių 6 faktų išeina 27 sąmatos eilutės. Jos pers
 kai pataisote faktą." — with „Rodyti eilutes"; opened once, it stays open from room to
 room.
 
+## Founder's review prep — what the self-check found and what changed (2026-09-12/13, €0)
+
+Checked the four local G projects myself before his review. Holds: the four dimension-lane
+perimeters (04, 08, 09, 07) match the sheet; 03/06 floors and the banner warning; the fold;
+the server refresh. Against his act (20 rows) and proposal: wall tiles 44,87 vs 46,06 m²;
+floor tiles 14,53 vs 21,50 (the hall 07 and room 05 are tiled 60×60 in his act — our floor
+finish is a purpose default, not read); kampai 305,41 vs 134,72 (act, reveals + outer corners
+only) and 412,94 (proposal); walls 265,91 vs 239,4 (act) — room 02 is an L whose 15,27 m read
+perimeter is ~17 % short (bounding box ≈ 3,3 × 5,9 → ~18,4 m), so the real gap is larger and
+unexplained from the drawing; hidroizoliacija 2 zones vs his 39,5 m² (our material row implies
+39,3 m² — a match hidden behind the unit; his other five sąmatas bill it per zone, so the row's
+unit stays `vnt`).
+
+Changed: (1) the 0,65 m/m² baseboard cap is GONE — it was a factor read off his sąmatas
+(skirting runs on both sides of a shared wall, nothing is counted twice; his lower totals are
+kitchen runs, wardrobes and tiled rooms, his to take out on the sheet); G 65,6 → 87,4 m; eval
+rows and totals unchanged, older blobs' cap marks and warning are dropped on rebuild;
+(2) the four identical „Santechnika: … priimtas POTINKINIU" notes are one note naming every
+fixture. Not changed: hidro unit (above). Next €0 lever: read floor finishes from the grindų
+planas the way areas and dimensions are read.
+

@@ -148,7 +148,10 @@ def test_guessed_concealment_is_disclosed_as_an_assumption():
     out = _build(symbols={"praustuves": 3})
     notes = out["_sanitary_assumptions"]
     assert notes, "a guessed concealment must be disclosed"
-    assert any("POTINKINIU" in n for n in notes), notes
+    # one note per assumption, naming every fixture it covers — singular
+    # „priimtas POTINKINIU" for one family, plural „priimti POTINKINIAIS" for more
+    assert any("POTINKINI" in n for n in notes), notes
+    assert len(notes) == 1, notes
     assert any("santechnika_potinkinis" in n for n in notes), notes
     # …and it reaches the UI channel, tagged so a rebuild can retract it.
     tagged = [w for w in out.get("warnings") or []
