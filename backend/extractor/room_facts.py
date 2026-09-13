@@ -510,6 +510,12 @@ _HEIGHT_SOURCES: dict[str, tuple[str, str, str]] = {
 }
 
 
+# The questions an assumed fact opens with — the default is offered, not
+# asserted. A read fact never gets one.
+_ASK_HEIGHT = "Koks šios patalpos lubų aukštis?"
+_ASK_FLOOR = "Kokia čia grindų danga?"
+
+
 def _fact_aukstis(project: dict, room: dict,
                   region: list[float] | None) -> dict:
     value = _f(room.get("lubu_aukstis_m"))
@@ -559,6 +565,11 @@ def _fact_aukstis(project: dict, room: dict,
     if not sentence:
         sentence = (f"Lubų aukščio brėžinyje neradau — skaičiuoju su "
                     f"{lt_num(value)} m. Įrašykite tikrą.")
+    if status == "assumed":
+        # A default is a QUESTION on the sheet, not a statement (council
+        # verdict 4, 2026-09-13): the row opens with the field showing, the
+        # sentence asks, and the reason we chose this number follows.
+        sentence = f"{_ASK_HEIGHT} {sentence}"
     return _fact("aukstis", round(value, 2), "m", status, kind, page,
                  rect, sentence, editable)
 
@@ -739,6 +750,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
             "plotis_mm": _f(e.get("plotis_mm")),
             "aukstis_mm": _f(e.get("aukstis_mm")),
             "is_zinyno": bool(e.get("_schedule_anchored")),
+            "_dydis_user": bool(e.get("_dydis_user")),
         })
     editable = {"field": "elementai", "kind": "count"}
 
@@ -814,10 +826,11 @@ def _fact_grindys(project: dict, room: dict,
     if override:
         return _fact("grindys", value, None, "read", "grindu_planas", page,
                      rect, "Grindų danga pažymėta šiai patalpai.", editable)
-    # Honest: no lane reads a floor finish. It follows the room's purpose.
-    sentence = ("Grindų danga parinkta pagal patalpos paskirtį"
+    # Honest: no lane reads a floor finish. It follows the room's purpose —
+    # so the sheet ASKS, with the purpose-based default already filled in.
+    sentence = (f"{_ASK_FLOOR} Brėžinys nesako — parinkta pagal patalpos paskirtį"
                 + (f" („{paskirtis}“)." if paskirtis else ".")
-                + " Patikrinkite grindų plane.")
+                + " Patikrinkite grindų plane; jei kitokia — pakeiskite paskirtį.")
     if kept_out:
         sentence += " " + _KEPT_OUT_SENTENCE
     return _fact("grindys", value, None, "assumed", "prielaida", page, rect,

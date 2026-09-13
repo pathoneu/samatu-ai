@@ -273,6 +273,25 @@ def test_an_assumed_height_says_what_it_assumed_and_asks_for_the_real_one():
     assert "Įrašykite tikrą" in f["sentence"]
 
 
+def test_a_default_is_asked_not_stated():
+    """Council verdict 4 (2026-09-13): a default height or a floor picked from
+    the room's purpose opens as a question with the default filled in; a fact
+    the drawing gave is never asked."""
+    assumed = {"patalpos": [{"nr": "1", "puslapio_nr": 2, "lubu_aukstis_m": 2.8,
+                             "lubu_aukstis_saltinis": "section_average", "paskirtis": "miegamoji",
+                             "plotas_m2": 12.0, "pvc_grindys_m2": 12.0}]}
+    h = _fact(build_room_facts(assumed, "1"), "aukstis")
+    assert h["status"] == "assumed" and h["sentence"].startswith("Koks šios patalpos lubų aukštis?")
+    g = _fact(build_room_facts(assumed, "1"), "grindys")
+    assert g["status"] == "assumed" and g["sentence"].startswith("Kokia čia grindų danga?")
+    assert "miegamoji" in g["sentence"] and "pakeiskite paskirtį" in g["sentence"]
+    read = {"patalpos": [{"nr": "1", "puslapio_nr": 2, "lubu_aukstis_m": 3.1,
+                          "lubu_aukstis_saltinis": "section_pjuvis", "tile_floor_override": True,
+                          "plyteles_grindys_m2": 5.0}]}
+    assert not _fact(build_room_facts(read, "1"), "aukstis")["sentence"].startswith("Koks")
+    assert not _fact(build_room_facts(read, "1"), "grindys")["sentence"].startswith("Kokia")
+
+
 def test_a_height_the_user_typed_is_not_called_a_guess():
     project = {"patalpos": [{"nr": "1", "puslapio_nr": 2,
                              "lubu_aukstis_m": 3.1,

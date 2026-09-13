@@ -36,9 +36,40 @@ function mm(v) {
   return Number.isFinite(n) ? ltNumber(n / 1000, 2) : '—';
 }
 
+function SizeEditor({ detail, busy, onSave, t }) {
+  // Centimetres on screen — the unit a contractor says door sizes in.
+  const [w, setW] = useState(() => (Number(detail?.plotis_mm) > 0 ? String(Math.round(detail.plotis_mm / 10)) : ''));
+  const [h, setH] = useState(() => (Number(detail?.aukstis_mm) > 0 ? String(Math.round(detail.aukstis_mm / 10)) : ''));
+  const commit = () => {
+    const pw = parseLtNumber(w);
+    const ph = parseLtNumber(h);
+    if (!(pw > 0) || !(ph > 0)) return;
+    onSave?.(detail, { plotis_mm: pw * 10, aukstis_mm: ph * 10 });
+  };
+  const box = 'h-11 w-16 rounded-[2px] border border-[hsl(var(--conf-med))] bg-card px-2 text-right font-mono text-[15px]';
+  return (
+    <span className="flex flex-wrap items-center gap-1.5 font-sans text-[13px] text-[hsl(var(--ink-2))]">
+      <label className="sr-only" htmlFor={`w-${detail.tipas}-${detail.plotis_mm}`}>{t('project.roomSheet.sizeWidth')}</label>
+      <input id={`w-${detail.tipas}-${detail.plotis_mm}`} className={box} inputMode="numeric" value={w}
+        onChange={(e) => setW(e.target.value)} onFocus={(e) => e.target.select()}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commit(); } }} />
+      <span>×</span>
+      <label className="sr-only" htmlFor={`h-${detail.tipas}-${detail.plotis_mm}`}>{t('project.roomSheet.sizeHeight')}</label>
+      <input id={`h-${detail.tipas}-${detail.plotis_mm}`} className={box} inputMode="numeric" value={h}
+        onChange={(e) => setH(e.target.value)} onFocus={(e) => e.target.select()}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commit(); } }} />
+      <span>{t('project.roomSheet.sizeCm')}</span>
+      <button type="button" disabled={busy} onClick={commit}
+        className={`${BTN} min-h-[36px] border-border bg-card px-2 text-[13px] hover:bg-muted disabled:opacity-50`}>
+        {t('project.roomSheet.sizeSave')}
+      </button>
+    </span>
+  );
+}
+
 export default function FactRow({
   fact, room, busy = false, verified = false,
-  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening,
+  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -57,6 +88,8 @@ export default function FactRow({
 
   const label = t(`project.roomSheet.${FACT_LABEL_KEY[fact?.key] || 'factPlotas'}`);
   const sentence = cleanUserText(fact?.sentence || '');
+  // A default is a question: the accept verb says he is keeping OUR number.
+  const assumed = fact?.status === 'assumed';
   const kind = fact?.editable?.kind;
   const field = fact?.editable?.field;
 
@@ -121,8 +154,13 @@ export default function FactRow({
                 <span className="font-sans text-[13px] text-muted-foreground">
                   {d.is_zinyno
                     ? t('project.roomSheet.openingsFromSchedule')
-                    : t('project.roomSheet.openingsAssumed')}
+                    : d._dydis_user
+                      ? t('project.roomSheet.openingsSizeYours')
+                      : t('project.roomSheet.openingsAssumed')}
                 </span>
+                {editing && kind === 'count' && !d.is_zinyno && (
+                  <SizeEditor detail={d} busy={busy} onSave={onSaveOpeningSize} t={t} />
+                )}
                 {editing && kind === 'count' && (
                   <span className="flex items-center gap-1">
                     <button
@@ -237,7 +275,7 @@ export default function FactRow({
             : 'border-border bg-card hover:bg-muted'} disabled:opacity-50`}
         >
           <Check className="h-4 w-4" aria-hidden="true" />
-          {t('project.roomSheet.correct')}
+          {assumed ? t('project.roomSheet.keepAssumed') : t('project.roomSheet.correct')}
         </button>
         <button
           type="button"

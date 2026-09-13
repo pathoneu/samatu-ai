@@ -41,8 +41,8 @@ import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
   adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
-  progressSummary, rippleText, roomIndex, roomTitle, roomsInDrawingOrder,
-  setSymbolCount, stampVerified, userEditPatch,
+  progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
+  setOpeningSize, setSymbolCount, stampVerified, userEditPatch,
 } from '@/lib/roomSheet';
 import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
@@ -55,6 +55,7 @@ import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
 import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
 import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } from '@/lib/scope';
 import { ltPlural } from '@/lib/ltPlural';
+import { ltNumber } from '@/lib/ledger';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
@@ -257,6 +258,15 @@ export default function RoomSheet() {
       { fromInterior: true });
   }), [run, project, room, roomNr, land]);
 
+  // The size he knows replaces the standard one the reader assumed.
+  const saveOpeningSize = useCallback((detail, size) => run(async () => {
+    const elementai = setOpeningSize(room?.elementai, detail, size);
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
+      { fromInterior: true });
+  }), [run, project, room, roomNr, land]);
+
+  const totals = useMemo(() => roomTotals(room), [room]);
+
   const overrideQuantity = useCallback((quantity, value) => run(async () => {
     const out = overrideRoomQuantity(project, quantity, roomNr, value);
     if (!out.ok) {
@@ -413,6 +423,18 @@ export default function RoomSheet() {
         hasPrev={idx > 0}
         hasNext={idx < rooms.length - 1}
       />
+      {/* What THIS room puts into the sąmata — before any row is opened. */}
+      {totals.length > 0 && (
+        <div className="mx-4 mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-[hsl(var(--ink-2))]" data-testid="room-totals">
+          <span className="font-semibold uppercase tracking-wide text-muted-foreground">{t('project.roomSheet.totalsTitle')}</span>
+          {totals.map((x) => (
+            <span key={x.key}>
+              {t(`project.roomSheet.totals.${x.key}`)}{' '}
+              <span className="font-mono font-semibold text-foreground">{ltNumber(x.value, 2)} {x.unit}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <RereadRoomNote project={project} roomNr={roomNr} />
 
       <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
@@ -487,6 +509,7 @@ export default function RoomSheet() {
                     onSaveNumber={saveNumber}
                     onSaveChoice={saveChoice}
                     onAdjustOpening={adjustOpening}
+                    onSaveOpeningSize={saveOpeningSize}
                   />
                 </div>
               ))}

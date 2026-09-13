@@ -1076,3 +1076,18 @@ Cut or moved, all frontend, no engine change:
 
 Not done: the „DE badge" the council named could not be located in the current UI (no such string
 in the code); the test projects on the founder's dashboard are his local data, not code.
+
+## 2026-09-13 (night): guesses are questions; the room's own totals atop its sheet
+
+Council verdict 4. On the check sheet an `assumed` fact now opens as a question with our default
+filled in: „Koks šios patalpos lubų aukštis? Lubų aukščio brėžinyje neradau — skaičiuoju su 2,80 m.
+Įrašykite tikrą." and „Kokia čia grindų danga? Brėžinys nesako — parinkta pagal patalpos paskirtį
+(„miegamoji“). Patikrinkite grindų plane; jei kitokia — pakeiskite paskirtį." A read fact is never
+asked. The accept verb on an assumed row reads „Taip, palieku" instead of „Teisinga" — he is keeping
+OUR number, and the sheet says so. Standard door and window sizes stop being a note he cannot act on:
+„Ar tokio dydžio? Standartiniai matmenys — pakeiskite, jei kitokie" and, under „Pataisyti", a width ×
+height editor in centimetres per opening row (`roomSheet.setOpeningSize` → `elementai[i].plotis_mm /
+aukstis_mm`, `_dydis_user`, marked `_angos_user_at` so a re-read keeps it; the row then says
+„matmenys — jūsų"; schedule sizes are not editable — they are read). Above the facts, the room's own
+headline quantities (`roomTotals`: sienos, lubos, grindys by kind, sienų plytelės, grindjuostės) —
+what this room puts into the sąmata before any row is opened. Frontend 702; facts tests +1.

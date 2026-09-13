@@ -467,6 +467,50 @@ export function userEditPatch(field, value, now = new Date().toISOString()) {
   return { [field]: value };
 }
 
+/**
+ * `elementai` with one opening's size replaced — the standard size the reader
+ * assumed becomes the size he knows. Only the first match changes (see
+ * `adjustOpeningCount`). Sizes arrive in millimetres; a non-positive or
+ * missing dimension keeps the old one.
+ */
+export function setOpeningSize(elementai, detail, size) {
+  const list = Array.isArray(elementai) ? elementai : [];
+  const w = Number(size?.plotis_mm);
+  const h = Number(size?.aukstis_mm);
+  let done = false;
+  return list.map((el) => {
+    if (done || !sameOpening(el, detail)) return el;
+    done = true;
+    return {
+      ...el,
+      plotis_mm: w > 0 ? Math.round(w) : el.plotis_mm,
+      aukstis_mm: h > 0 ? Math.round(h) : el.aukstis_mm,
+      _schedule_anchored: false,
+      _dydis_user: true,
+    };
+  });
+}
+
+/**
+ * The room's own headline quantities for the top of its sheet — what THIS
+ * room puts into the sąmata before any row is opened (council verdict 4).
+ * Zero entries are left out; a room with nothing returns [].
+ */
+export function roomTotals(room) {
+  const n = (k) => {
+    const v = Number(room?.[k]);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  };
+  const out = [];
+  if (n('walls_paintable_m2')) out.push({ key: 'walls', value: n('walls_paintable_m2'), unit: 'm²' });
+  if (n('ceiling_paintable_m2')) out.push({ key: 'ceiling', value: n('ceiling_paintable_m2'), unit: 'm²' });
+  if (n('pvc_grindys_m2')) out.push({ key: 'floorSoft', value: n('pvc_grindys_m2'), unit: 'm²' });
+  if (n('plyteles_grindys_m2')) out.push({ key: 'floorTile', value: n('plyteles_grindys_m2'), unit: 'm²' });
+  if (n('plyteles_sienos_m2')) out.push({ key: 'wallTiles', value: n('plyteles_sienos_m2'), unit: 'm²' });
+  if (n('grindjuosciu_m')) out.push({ key: 'skirting', value: n('grindjuosciu_m'), unit: 'm' });
+  return out;
+}
+
 /** The room patch for openings he corrected on the sheet, marked as his. */
 export function openingsPatch(elementai, now = new Date().toISOString()) {
   return { elementai, _angos_user_at: now };

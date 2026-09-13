@@ -10,7 +10,7 @@ import {
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings, factMarks,
-  openingsPatch, userEditPatch,
+  openingsPatch, userEditPatch, setOpeningSize, roomTotals,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
   authorFigureRows, bboxToRectPct,
@@ -667,4 +667,34 @@ test('a fact he types on the sheet is marked as his — the sheet says so and a 
   assert.deepEqual(userEditPatch('kitas', 1, 'T'), { kitas: 1 }, 'unknown fields carry no marker');
   const els = [{ tipas: 'duris', kiekis: 2 }];
   assert.deepEqual(openingsPatch(els, 'T'), { elementai: els, _angos_user_at: 'T' });
+});
+
+test('a standard opening size becomes the size he typed, first match only, marked as his', () => {
+  const els = [
+    { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100, kiekis: 2, _schedule_anchored: false },
+    { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100, kiekis: 1 },
+    { tipas: 'langas', plotis_mm: 1200, aukstis_mm: 1500, kiekis: 1 },
+  ];
+  const out = setOpeningSize(els, els[0], { plotis_mm: 800, aukstis_mm: 2000.4 });
+  assert.deepEqual(out[0], { tipas: 'duris', plotis_mm: 800, aukstis_mm: 2000, kiekis: 2, _schedule_anchored: false, _dydis_user: true });
+  assert.deepEqual(out[1], els[1], 'the second identical row is untouched');
+  assert.deepEqual(out[2], els[2]);
+  const keep = setOpeningSize(els, els[2], { plotis_mm: 0, aukstis_mm: null });
+  assert.equal(keep[2].plotis_mm, 1200, 'a missing dimension keeps the old one');
+  assert.equal(keep[2].aukstis_mm, 1500);
+  assert.deepEqual(setOpeningSize(undefined, els[0], { plotis_mm: 1 }), []);
+});
+
+test('roomTotals is the room\'s own headline quantities, zeros left out', () => {
+  const room = { walls_paintable_m2: 45.2, ceiling_paintable_m2: 14.26, pvc_grindys_m2: 14.26,
+    plyteles_grindys_m2: 0, plyteles_sienos_m2: 'x', grindjuosciu_m: 14.93 };
+  assert.deepEqual(roomTotals(room), [
+    { key: 'walls', value: 45.2, unit: 'm²' },
+    { key: 'ceiling', value: 14.26, unit: 'm²' },
+    { key: 'floorSoft', value: 14.26, unit: 'm²' },
+    { key: 'skirting', value: 14.93, unit: 'm' },
+  ]);
+  assert.deepEqual(roomTotals({ plyteles_grindys_m2: 3.52, plyteles_sienos_m2: 18.9 }),
+    [{ key: 'floorTile', value: 3.52, unit: 'm²' }, { key: 'wallTiles', value: 18.9, unit: 'm²' }]);
+  assert.deepEqual(roomTotals(null), []);
 });
