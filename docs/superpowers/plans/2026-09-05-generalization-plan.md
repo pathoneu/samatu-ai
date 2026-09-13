@@ -902,3 +902,11 @@ rows and totals unchanged, older blobs' cap marks and warning are dropped on reb
 fixture. Not changed: hidro unit (above). Next €0 lever: read floor finishes from the grindų
 planas the way areas and dimensions are read.
 
+**Plan pane: whole sheet first (2026-09-13, founder's review note).** „Kai pritraukia prie
+kažkokio specifinio kambario, sunku atskirti" — the room sheet's plan now shows the WHOLE page
+by default with this room's place framed and a dashed rectangle wherever a fact was read
+(labelled like the fact rows; hovering a row lights its rectangle); „Priartinti prie patalpos"
+is the old framed view, one click away and remembered from room to room; „Padidinti lapą" opens
+the zoomable viewer. `factMarks` in lib/roomSheet.js (tested) maps the facts' rectangles into
+whatever crop is shown.
+

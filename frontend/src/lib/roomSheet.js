@@ -32,6 +32,16 @@ export const FACT_ORDER = Object.freeze([
 /** Seconds a contractor is assumed to spend on one unchecked room. */
 export const SECONDS_PER_ROOM = 15;
 
+/** i18n key of each fact's title — the row's heading and the plan's mark share it. */
+export const FACT_LABEL_KEY = Object.freeze({
+  plotas: 'factPlotas',
+  perimetras: 'factPerimetras',
+  aukstis: 'factAukstis',
+  apdaila: 'factApdaila',
+  angos: 'factAngos',
+  grindys: 'factGrindys',
+});
+
 /**
  * Facts in the sheet's order. Unknown keys keep their payload order and go
  * last — a new fact key from the backend must show up, not vanish.
@@ -310,6 +320,32 @@ export function pageToCropPct(point, cropRect) {
 }
 
 /** A whole polygon mapped onto the crop; null when nothing lands inside it. */
+/**
+ * Where each fact was read on the sheet, in the crop's own fractions — the
+ * marks the plan pane draws on the WHOLE page so the reader keeps their
+ * bearings instead of being dropped into a zoomed corner (founder,
+ * 2026-09-13). Facts on another page, whole-sheet facts and rectangles that
+ * fall outside the crop are left out.
+ */
+export function factMarks(facts, page, cropRect) {
+  if (!Array.isArray(facts) || page == null) return [];
+  const out = [];
+  for (const f of facts) {
+    const src = f?.source;
+    if (!src || Number(src.page) !== Number(page) || isWholeSheet(f)) continue;
+    const [x0, y0, x1, y1] = src.rect_pct.map(Number);
+    const a = pageToCropPct([Math.min(x0, x1), Math.min(y0, y1)], cropRect);
+    const b = pageToCropPct([Math.max(x0, x1), Math.max(y0, y1)], cropRect);
+    const left = Math.max(0, a.x);
+    const top = Math.max(0, a.y);
+    const right = Math.min(1, b.x);
+    const bottom = Math.min(1, b.y);
+    if (right - left <= 0 || bottom - top <= 0) continue;   // entirely outside the crop
+    out.push({ key: f.key, x: left, y: top, w: right - left, h: bottom - top });
+  }
+  return out;
+}
+
 export function polygonToCropPct(polygon, cropRect) {
   const pts = (Array.isArray(polygon) ? polygon : [])
     .map((p) => pageToCropPct(p, cropRect));

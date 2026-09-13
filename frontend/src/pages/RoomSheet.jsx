@@ -84,6 +84,11 @@ export default function RoomSheet() {
   // (founder, 2026-09-10). One line says what they are; the fold stays
   // open from room to room once he opens it.
   const [showQuantities, setShowQuantities] = useState(false);
+  // The plan shows the WHOLE sheet by default with this room framed and every
+  // fact's rectangle on it; framed-on-the-room is one click away and stays as
+  // chosen from room to room. Hovering a fact row lights its rectangle.
+  const [wholeSheet, setWholeSheet] = useState(true);
+  const [activeFactKey, setActiveFactKey] = useState(null);
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -416,6 +421,10 @@ export default function RoomSheet() {
                 room={facts.room}
                 projectId={id}
                 highlightCorners={highlightCorners}
+                facts={factList}
+                wholeSheet={wholeSheet}
+                onToggleWhole={setWholeSheet}
+                activeFactKey={activeFactKey}
               />
             )
             : <div className="h-64 animate-pulse rounded-[2px] bg-muted" />}
@@ -460,17 +469,23 @@ export default function RoomSheet() {
               </h2>
 
               {factList.map((fact) => (
-                <FactRow
+                <div
                   key={fact.key}
-                  fact={fact}
-                  room={room}
-                  busy={busy}
-                  verified={seen.has(fact.key)}
-                  onAccept={() => setSeen((prev) => new Set(prev).add(fact.key))}
-                  onSaveNumber={saveNumber}
-                  onSaveChoice={saveChoice}
-                  onAdjustOpening={adjustOpening}
-                />
+                  onMouseEnter={() => setActiveFactKey(fact.key)}
+                  onMouseLeave={() => setActiveFactKey((k) => (k === fact.key ? null : k))}
+                  onFocusCapture={() => setActiveFactKey(fact.key)}
+                >
+                  <FactRow
+                    fact={fact}
+                    room={room}
+                    busy={busy}
+                    verified={seen.has(fact.key)}
+                    onAccept={() => setSeen((prev) => new Set(prev).add(fact.key))}
+                    onSaveNumber={saveNumber}
+                    onSaveChoice={saveChoice}
+                    onAdjustOpening={adjustOpening}
+                  />
+                </div>
               ))}
 
               <h2 className="mt-2 flex items-baseline justify-between border-t border-border px-4 pb-2 pt-3 text-[17px] font-semibold">

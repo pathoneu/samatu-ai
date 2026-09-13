@@ -17,17 +17,9 @@ import { Check, Minus, Pencil, Plus } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { cleanUserText } from '@/lib/userText';
-import { factNeedsInput, factTone, isWholeSheet, prefillValue } from '@/lib/roomSheet';
+import { factNeedsInput, factTone, isWholeSheet, prefillValue, FACT_LABEL_KEY } from '@/lib/roomSheet';
 import EvidenceCrop from './EvidenceCrop';
 
-const LABEL_KEY = {
-  plotas: 'factPlotas',
-  perimetras: 'factPerimetras',
-  aukstis: 'factAukstis',
-  apdaila: 'factApdaila',
-  angos: 'factAngos',
-  grindys: 'factGrindys',
-};
 
 const PASKIRTIS = [
   'gyvenamoji', 'miegamoji', 'virtuve', 'vonia', 'wc', 'koridorius',
@@ -63,7 +55,7 @@ export default function FactRow({
     if (editing && fact?.editable?.kind === 'number') inputRef.current?.focus();
   }, [editing, fact?.editable?.kind]);
 
-  const label = t(`project.roomSheet.${LABEL_KEY[fact?.key] || 'factPlotas'}`);
+  const label = t(`project.roomSheet.${FACT_LABEL_KEY[fact?.key] || 'factPlotas'}`);
   const sentence = cleanUserText(fact?.sentence || '');
   const kind = fact?.editable?.kind;
   const field = fact?.editable?.field;

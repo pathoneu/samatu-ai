@@ -9,7 +9,7 @@ import {
   isWholeSheet, orderFacts, prefillValue, progressSummary, rippleText,
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
-  pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings,
+  pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings, factMarks,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
   authorFigureRows, bboxToRectPct,
@@ -615,3 +615,31 @@ test('rippleText names the moved quantity after a tier split, not the vanished l
   assert.ok(text.includes('+1,98 m²'), text);
   assert.ok(!text.includes('279,08'), text);
 });
+
+test('factMarks: the facts of THIS page, as crop fractions, whole-sheet ones left out', () => {
+  const facts = [
+    { key: 'plotas', source: { page: 2, rect_pct: [0.40, 0.30, 0.50, 0.34] } },
+    { key: 'perimetras', source: { page: 2, rect_pct: [0.36, 0.28, 0.62, 0.53] } },
+    { key: 'aukstis', source: { page: 8, rect_pct: [0.10, 0.10, 0.20, 0.20] } },   // another sheet
+    { key: 'apdaila', source: { page: 2, rect_pct: [0, 0, 1, 1] } },              // whole sheet
+    { key: 'durys', source: null },
+  ];
+  const whole = factMarks(facts, 2, [0, 0, 1, 1]);
+  assert.deepEqual(whole.map((m) => m.key), ['plotas', 'perimetras']);
+  const p = whole[0];
+  assert.ok(Math.abs(p.x - 0.40) < 1e-9 && Math.abs(p.w - 0.10) < 1e-9 && Math.abs(p.h - 0.04) < 1e-9);
+  // zoomed on the room: the same marks land in the crop's own fractions
+  const crop = [0.30, 0.20, 0.70, 0.60];
+  const zoomed = factMarks(facts, 2, crop);
+  assert.equal(zoomed.length, 2);
+  assert.ok(Math.abs(zoomed[0].x - 0.25) < 1e-9, 'x = (0.40 − 0.30) / 0.40');
+  assert.ok(Math.abs(zoomed[0].y - 0.25) < 1e-9);
+  // a mark outside the crop is dropped, one straddling the edge is clipped
+  assert.equal(factMarks(facts, 2, [0.80, 0.80, 1, 1]).length, 0);
+  const clipped = factMarks(facts, 2, [0.45, 0.20, 0.85, 0.60])[0];
+  assert.equal(clipped.key, 'plotas');
+  assert.ok(Math.abs(clipped.x) < 1e-9 && clipped.w > 0 && clipped.w < 0.2);
+  assert.deepEqual(factMarks(facts, null, [0, 0, 1, 1]), []);
+  assert.deepEqual(factMarks(undefined, 2, [0, 0, 1, 1]), []);
+});
+
