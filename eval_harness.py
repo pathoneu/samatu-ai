@@ -181,7 +181,15 @@ METRICS: dict[str, dict[str, Any]] = {
     },
     "walls_paint_total_m2": {
         "label": "Sienų dažomas plotas",
-        "accessor": lambda p: round(_sum_room_field(p, "walls_paintable_m2"), 2),
+        # 2026-09-13: measure what is BILLED, like the ceilings. The Sienų rows
+        # follow the sienų apdailos plano legend when the drawing states the
+        # painted area (objektas_g: rooms 298,66 m², legend 220 m², act 239,4);
+        # Σ room fields is the per-room paintable sum before that anchor.
+        # Falls back to the per-room sum on an extract that emits no Sienų row.
+        "accessor": lambda p: (
+            _pozicijos_sum(p, "sienų glaistymas/dažymas")
+            if _pozicijos_sum(p, "sienų glaistymas/dažymas") is not None
+            else round(_sum_room_field(p, "walls_paintable_m2"), 2)),
         "unit": "m²",
         "tier": "headline",
     },

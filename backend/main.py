@@ -6451,6 +6451,9 @@ class RecomputePayload(BaseModel):
     # — 60.0 m² reverted to the per-room 58.5 and the provenance line saying
     # where the number came from vanished with it. (F4, 2026-09-02 review.)
     ceiling_anchor: dict | None = Field(default=None, alias="_ceiling_anchor")
+    # The drawing's stated painted-wall area (sienų apdailos plano legenda),
+    # same contract as the ceiling anchor (2026-09-13).
+    walls_anchor: dict | None = Field(default=None, alias="_walls_anchor")
     # The reader context `/api/recompute-quantities` already accepts and splats
     # into `parsed` (_door_types, detected_symbols_summary, _plyteliu_specs,
     # _symbol_legend, …). `_build_pozicijos_from_rooms` reads all of them, so
@@ -6636,6 +6639,8 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # over whatever a stale `context` copy carries.
     if payload.ceiling_anchor:
         parsed["_ceiling_anchor"] = payload.ceiling_anchor
+    if payload.walls_anchor:
+        parsed["_walls_anchor"] = payload.walls_anchor
 
     # The project's area follows the rooms he counts: a room switched off
     # („Neskaičiuoju") leaves the header figure as well as the rows (2026-09-10).

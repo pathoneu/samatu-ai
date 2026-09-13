@@ -10408,7 +10408,8 @@
   "_backfill": {
     "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44",
     "plan_dimensions": "2026-09-10: perimeters from the plan's dimension strings backed by their dimension lines (plan_dimensions); a fresh run does the same in Step 2.44b",
-    "wall_outline": "2026-09-13: room outlines traced from the wall geometry (wall_outline); a fresh run does the same in Step 2.44c"
+    "wall_outline": "2026-09-13: room outlines traced from the wall geometry (wall_outline); a fresh run does the same in Step 2.44c",
+    "walls_anchor": "2026-09-13: painted-wall area from the sienų apdailos plano legend (_walls_anchor); a fresh run sets it in Step 2.44"
   },
   "_autoriaus_kiekiai": [
     {
@@ -10596,5 +10597,22 @@
     "total_area_m2": 104.53,
     "label": "plano užrašų suma",
     "page": 4
+  },
+  "_walls_anchor": {
+    "total_area_m2": 220.0,
+    "label": "sienų apdailos plano legenda",
+    "page": 3,
+    "parts": [
+      {
+        "value": 18.0,
+        "label": "Glaistoma dažoma (akcentine spalva-S310-G80Y)",
+        "page": 3
+      },
+      {
+        "value": 202.0,
+        "label": "Glaistoma dažoma (baltai s0601G)",
+        "page": 3
+      }
+    ]
   }
 }

@@ -21,6 +21,7 @@ export function buildRecomputeContext(rawData) {
     v9_meta: d.v9_meta,
     _overrides: d._overrides,
     _ceiling_anchor: d._ceiling_anchor,
+    _walls_anchor: d._walls_anchor,
     // 2026-09-06: the extraction's own record — the plan-label lane result
     // (`plan_area_lane`: the labels no room claimed, offered as rooms on the
     // general page) and the designer's figures. The recompute response is
@@ -34,5 +35,5 @@ export function buildRecomputeContext(rawData) {
 /** Keys the context carries — exported so a test can pin the contract. */
 export const RECOMPUTE_CONTEXT_KEYS = Object.freeze([
   '_door_types', 'detected_symbols_summary', '_plyteliu_specs', '_symbol_legend',
-  'bendras_plotas_m2', 'v9_meta', '_overrides', '_ceiling_anchor', '_meta', '_autoriaus_kiekiai',
+  'bendras_plotas_m2', 'v9_meta', '_overrides', '_ceiling_anchor', '_walls_anchor', '_meta', '_autoriaus_kiekiai',
 ]);

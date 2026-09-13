@@ -1888,6 +1888,94 @@ def _per_room_provenance(rooms: list[dict], stretch_nrs: set[str],
             f"(įtempiamos lubos) = {_lt_num(per_room_sum)} m²")
 
 
+_WALLS_ANCHOR_LABEL = "sienų apdailos plano legenda"
+_WALLS_ANCHOR_MIN = 0.50    # a stated painted-wall area below half the rooms' paintable sum is another scope
+_WALLS_ANCHOR_MAX = 1.10    # …and above it (plus rounding) the legend counts surfaces we do not paint at all
+
+
+def _walls_anchor_from_figures(figures: list[dict] | None) -> dict | None:
+    """The painted-wall area the DRAWING states — the sienų apdailos plano
+    legend („Glaistoma dažoma (baltai) 202 m²", „… (akcentinė spalva) 18 m²")
+    read by the text-layer lane (`_figures_on_page`, family `sienu_dazymas`).
+    objektas_g, 2026-09-13: our per-room paintable sum was 298,66 m², the
+    architect's legend 220 m², the contractor's act 239,4 m² — the drawing
+    itself says which walls are painted, and it is not every wall net of
+    openings (kitchen runs, wardrobes, tiled zones). A figure whose label names
+    the ceiling, the floor or tiles is not a wall figure whatever the family
+    guesser said. Returns {total_area_m2, label, page, parts} or None."""
+    parts: list[dict] = []
+    for f in figures or []:
+        if not isinstance(f, dict) or f.get("family") != "sienu_dazymas":
+            continue
+        if str(f.get("unit") or "").lower() not in ("m2", "m²"):
+            continue
+        label = str(f.get("label") or "")
+        low = label.lower()
+        if any(k in low for k in ("lub", "grind", "plytel")):
+            continue
+        try:
+            value = float(f.get("value") or 0)
+        except (TypeError, ValueError):
+            continue
+        if value <= 0:
+            continue
+        parts.append({"value": round(value, 2), "label": label, "page": f.get("page")})
+    if not parts:
+        return None
+    pages = [p["page"] for p in parts if p.get("page") is not None]
+    page = max(set(pages), key=pages.count) if pages else None
+    return {"total_area_m2": round(sum(p["value"] for p in parts), 2),
+            "label": _WALLS_ANCHOR_LABEL, "page": page, "parts": parts}
+
+
+def _walls_base_meta(parsed: dict, rooms: list[dict], per_room_sum: float) -> dict:
+    """How the billed painted-wall quantity was reached — the walls' twin of
+    `_ceiling_base_meta`. `source` is "anchor" (the drawing's stated painted
+    area minus the rooms nobody does) or "per_room" (Σ of the rooms' paintable
+    walls). The anchor is taken only when it describes these rooms: between
+    half and 110 % of their paintable sum; outside that it is another storey
+    or another scope, the per-room sum stays and a warning says so."""
+    def _per_room() -> dict:
+        return {"base": per_room_sum, "source": "per_room", "total": None, "label": None,
+                "parts": [], "excluded_m2": 0.0, "provenance": None}
+    if per_room_sum <= 0:
+        return _per_room()
+    anchor = parsed.get("_walls_anchor") or {}
+    try:
+        total = float(anchor.get("total_area_m2") or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+    if total <= 0:
+        return _per_room()
+    rooms_sum = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    excluded_m2 = round(sum(float(r.get("walls_paintable_m2") or 0)
+                            for r in (parsed.get("patalpos") or [])
+                            if isinstance(r, dict) and r.get("_neskaiciuoti")), 2)
+    if rooms_sum <= 0 or not (_WALLS_ANCHOR_MIN * rooms_sum <= total <= _WALLS_ANCHOR_MAX * rooms_sum + 0.5):
+        _warns = parsed.setdefault("warnings", [])
+        if not any(isinstance(w, dict) and w.get("code") == "apdailos_legenda_ignored" for w in _warns):
+            _warns.append({
+                "level": "WARN", "code": "apdailos_legenda_ignored",
+                "message": (f"Sienų apdailos plane užrašytas dažomų sienų plotas ({_lt_num(total)} m²) "
+                            f"per daug skiriasi nuo suskaičiuotų patalpų sienų ({_lt_num(rooms_sum)} m²), "
+                            "todėl sienų kiekis imtas iš patalpų sumos. Patikrinkite, ar legenda "
+                            "apima tas pačias patalpas."),
+            })
+        return _per_room()
+    base = round(max(total - excluded_m2, 0.0), 2)
+    if base <= 0:
+        return _per_room()
+    parts = anchor.get("parts") or []
+    arith = " + ".join(_lt_num(float(x.get("value") or 0)) for x in parts) if len(parts) > 1 else ""
+    provenance = (f"Dažomų sienų plotas — iš sienų apdailos plano legendos: "
+                  f"{(arith + ' = ') if arith else ''}{_lt_num(total)} m²"
+                  + (f", be neįtrauktų patalpų {_lt_num(excluded_m2)} m²" if excluded_m2 > 0 else "")
+                  + f". Patalpų sienų suma iš brėžinio kontūrų ir angų — {_lt_num(rooms_sum)} m²; "
+                  "plane dalis sienų nedažoma.")
+    return {"base": base, "source": "anchor", "total": total, "label": anchor.get("label") or _WALLS_ANCHOR_LABEL,
+            "parts": parts, "excluded_m2": excluded_m2, "arith": arith, "provenance": provenance}
+
+
 def _ceiling_paint_base(parsed: dict, rooms: list[dict],
                         stretch_nrs: set[str], per_room_sum: float) -> tuple[float, str | None]:
     """(billed ceiling m², provenance line or None) — see `_ceiling_base_meta`."""
@@ -2240,7 +2328,12 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     _lubos_meta = _ceiling_base_meta(parsed, rooms, stretch_nrs, lubos_paint)
     lubos_billed = _lubos_meta["base"]
     lubos_provenance = _lubos_meta["provenance"]
-    dazymo_total = round(walls_paint + lubos_billed, 2)
+    # The drawing's own painted-wall area, when the sienų apdailos planas states
+    # one, replaces the per-room paintable sum the same way (2026-09-13).
+    _sienos_meta = _walls_base_meta(parsed, rooms, walls_paint)
+    walls_billed = _sienos_meta["base"]
+    walls_provenance = _sienos_meta["provenance"]
+    dazymo_total = round(walls_billed + lubos_billed, 2)
     if dazymo_total <= 0:
         parsed["pozicijos"] = [p for p in pozicijos if not _is_split(p)]
         return
@@ -2281,11 +2374,11 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     for _r, (_vw, _vc) in zip(rooms, _virs):
         _r["_paint_virs_3m_sienos_m2"] = round(_vw, 2)
         _r["_paint_virs_3m_lubu_m2"] = round(_vc, 2)
-    walls_virs = min(max(round(sum(v[0] for v in _virs), 2), 0.0), walls_paint)
-    # The tier split DISTRIBUTES the billed ceiling total: when the anchor moved
-    # it, the virš-3m share must not exceed what we are actually billing.
+    # The tier split DISTRIBUTES the billed totals: when an anchor moved one,
+    # the virš-3m share must not exceed what we are actually billing.
+    walls_virs = min(max(round(sum(v[0] for v in _virs), 2), 0.0), walls_billed)
     lubos_virs = min(max(round(sum(v[1] for v in _virs), 2), 0.0), lubos_billed)
-    walls_iki = round(walls_paint - walls_virs, 2)
+    walls_iki = round(walls_billed - walls_virs, 2)
     lubos_iki = round(lubos_billed - lubos_virs, 2)
 
     # Materials follow their surface. Shares are anchored on the FULL paintable
@@ -2293,6 +2386,10 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
     # leaves the sąmata must take its material with it, not hand it to the walls.
     _all = walls_paint + lubos_paint_all
     w_share = (walls_paint / _all) if _all > 0 else 0.5
+    # …and the walls' share follows the BILLED walls when the legend anchored
+    # them: paint bought for 220 m² of painted wall, not for 298 (2026-09-13).
+    if walls_paint > 0:
+        w_share = w_share * (walls_billed / walls_paint)
     # …and the ceiling's share follows the BILLED ceiling, not the per-room
     # sum: when the eksplikacija / plan-label anchor moves the ceiling line to
     # 104,53 m², its putty, primer and paint move with it. They were bought for
@@ -2379,6 +2476,25 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         label = _ledger.rooms_label(len(contribs))
         if tier != "all":
             label = f"{label} ({_TIER_LT[tier]})"
+        if surf == "Sienų" and _sienos_meta["source"] == "anchor":
+            # Anchored walls: the drawing's stated painted area, minus the rooms
+            # nobody does. NOT Σ-decomposable — the rooms' own m² stay beside it
+            # and the note says why they do not add up.
+            steps = [_ledger.step(
+                "anchor", f"Sienų apdailos plano legenda{': ' + _sienos_meta['arith'] if _sienos_meta.get('arith') else ''}",
+                _sienos_meta["total"],
+                "Patalpų kiekiai — iš brėžinio kontūrų ir angų, o bendras dažomų sienų "
+                "plotas imamas iš sienų apdailos plano legendos: plane dalis sienų "
+                "nedažoma, todėl patalpų suma jam nelygi")]
+            running = float(_sienos_meta["total"])
+            if (_sienos_meta.get("excluded_m2") or 0) > 0:
+                running = round(running - float(_sienos_meta["excluded_m2"]), 2)
+                steps.append(_ledger.step("sum", "− neįtrauktos patalpos", running,
+                                          f"Atimta {_lt_num(_sienos_meta['excluded_m2'])} m²"))
+            if tier != "all":
+                steps.append(_ledger.step("share", f"Dalis {_TIER_LT[tier]}", kiekis,
+                                          "Likusi dalis — atskiroje eilutėje"))
+            return steps
         if surf != "Lubų" or _lubos_meta["source"] != "anchor":
             return [_ledger.sum_step(contribs, label)]
         # Anchored ceiling: a stated total minus the rooms nobody paints. NOT
@@ -2455,7 +2571,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         return out
 
     new_lines: list[dict] = (
-        _surface_lines("Sienų", walls_paint, walls_virs, walls_iki, w_share, None)
+        _surface_lines("Sienų", walls_billed, walls_virs, walls_iki, w_share, walls_provenance)
         + _surface_lines("Lubų", lubos_billed, lubos_virs, lubos_iki, l_share,
                          lubos_provenance)
     )
@@ -5279,6 +5395,12 @@ def extract_interior(
         _text_pages = text_pages_from_classification(parsed.get("puslapiai") or [])
         _scan = scan_text_layer(pdf_bytes, pages=_text_pages or None)
         parsed["_autoriaus_kiekiai"] = _scan["figures"]
+        # The painted-wall area the drawing states (sienų apdailos plano
+        # legenda) — the walls' anchor, see `_walls_anchor_from_figures`.
+        parsed.pop("_walls_anchor", None)
+        _wa = _walls_anchor_from_figures(_scan["figures"])
+        if _wa:
+            parsed["_walls_anchor"] = _wa
         parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
         # The plan's own storey height („H - 2820") for rooms that carry only our
         # default — the same number read, not assumed; a room's own reader wins.

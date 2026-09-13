@@ -459,3 +459,76 @@ def test_every_ledger_string_guides_rather_than_confesses(fixture: Path):
         for s in strings:
             hit = BANNED.search(s)
             assert not hit, f"banned token {hit.group(0)!r} on {row['aprasymas']!r}: {s}"
+
+
+# ── the walls anchor: the drawing's own painted-wall area (2026-09-13) ───────
+
+def test_the_painted_wall_area_the_drawing_states_becomes_the_walls_anchor():
+    from extractor.vision_call import _walls_anchor_from_figures
+    figures = [
+        {"page": 3, "family": "sienu_dazymas", "unit": "m2", "value": 202.0, "label": "Glaistoma dažoma (baltai s0601G)"},
+        {"page": 3, "family": "sienu_dazymas", "unit": "m2", "value": 18.0, "label": "Glaistoma dažoma (akcentine spalva)"},
+        {"page": 4, "family": "sienu_dazymas", "unit": "m2", "value": 104.5, "label": "Lubos glaistomos dažomos"},  # a ceiling, whatever the guesser said
+        {"page": 7, "family": "grindjuostes", "unit": "m", "value": 53.69, "label": "Grindjuostės"},
+        {"page": 3, "family": "sienu_dazymas", "unit": "vnt", "value": 2, "label": "Glaistoma dažoma"},                # not an area
+    ]
+    a = _walls_anchor_from_figures(figures)
+    assert a["total_area_m2"] == 220.0 and a["page"] == 3 and len(a["parts"]) == 2
+    assert a["label"] == "sienų apdailos plano legenda"
+    assert _walls_anchor_from_figures([]) is None and _walls_anchor_from_figures(None) is None
+
+
+@pytest.mark.parametrize("anchor_scale,expect_anchor", [(0.75, True), (0.30, False)],
+                         ids=["legend-below-rooms", "legend-far-off"])
+def test_an_anchored_walls_line_says_anchor_not_sum(blob, anchor_scale, expect_anchor):
+    """objektas_g: per-room paintable walls 298,66 m², the sienų apdailos plano
+    legend 220 m². The billed line follows the drawing's stated area; the
+    rooms' own m² stay listed and the anchor step says why they do not add up.
+    A legend far off the rooms (another storey, another scope) is ignored with
+    a warning and the per-room sum stays."""
+    rooms = blob["patalpos"]
+    parsed = {k: v for k, v in blob.items() if k not in ("darbu_sarasas", "pozicijos")}
+    parsed["pozicijos"] = []
+    parsed.pop("_ceiling_anchor", None)
+    rooms_sum = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
+    parsed["_walls_anchor"] = {"total_area_m2": round(rooms_sum * anchor_scale, 2),
+                               "label": "sienų apdailos plano legenda",
+                               "parts": [{"value": round(rooms_sum * anchor_scale, 2), "label": "Glaistoma dažoma"}]}
+    out = _build_pozicijos_from_rooms(parsed)
+    rows = out["pozicijos"]
+    walls = [r for r in rows if r["aprasymas"].startswith("Sienų glaistymas/dažymas")]
+    assert walls
+    billed = round(sum(float(r["kiekis"]) for r in walls), 2)
+    if expect_anchor:
+        assert billed == pytest.approx(rooms_sum * anchor_scale, abs=0.02)
+        for row in walls:
+            assert row["roll_up"][0]["op"] == "anchor"
+            assert "apdailos plano legenda" in row["roll_up"][0]["label"]
+            assert abs(replay(row["contributions"], row["roll_up"]) - float(row["kiekis"])) <= 0.01
+            assert row["contributions"], "an anchored line still names its rooms"
+            # the flag tells the truth per row: a tier row whose share happens
+            # to equal its rooms' sum may still add up; the anchored one does not
+            adds_up = abs(sum(float(c["value"]) for c in row["contributions"]) - float(row["kiekis"])) <= 0.01
+            assert row["contributions_sum_to_total"] is adds_up
+        assert any(row["contributions_sum_to_total"] is False for row in walls)
+        assert not any(w.get("code") == "apdailos_legenda_ignored" for w in parsed.get("warnings") or [])
+    else:
+        assert billed == pytest.approx(rooms_sum, abs=0.02)
+        assert all(row["roll_up"][0]["op"] == "sum" for row in walls)
+        assert any(w.get("code") == "apdailos_legenda_ignored" for w in parsed.get("warnings") or [])
+
+
+def test_the_walls_anchor_survives_the_recompute_round_trip():
+    from main import RecomputePayload
+    p = RecomputePayload.model_validate({"patalpos": [], "_walls_anchor": {"total_area_m2": 220.0, "label": "x"},
+                                         "_ceiling_anchor": {"total_area_m2": 104.53}})
+    assert p.walls_anchor["total_area_m2"] == 220.0 and p.ceiling_anchor["total_area_m2"] == 104.53
+
+
+@pytest.mark.skipif(not (Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_g" / "ai_extract.json").exists(),
+                    reason="fixture not on this machine")
+def test_the_out_of_sample_drawing_states_its_painted_walls():
+    from extractor.vision_call import _walls_anchor_from_figures
+    fx = json.loads((Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_g" / "ai_extract.json").read_text())
+    a = _walls_anchor_from_figures(fx.get("_autoriaus_kiekiai"))
+    assert a and a["total_area_m2"] == pytest.approx(220.0) and a["page"] == 3
