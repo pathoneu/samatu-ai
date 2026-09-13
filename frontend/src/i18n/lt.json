@@ -851,6 +851,33 @@
       "revoke": "Atšaukti nuorodą",
       "close": "Užverti"
     },
+    "reread": {
+      "title": "Brėžinys perskaitytas iš naujo",
+      "nothing": "Skaičiai nepasikeitė — visos patalpos perskaitytos taip pat.",
+      "changedTitle": "Pasikeitė ({{count}})",
+      "keptTitle": "Palikta kaip buvo ({{count}})",
+      "addedTitle": "Naujos patalpos ({{count}})",
+      "removedTitle": "Naujas skaitymas nerado ({{count}})",
+      "checkHint": "Pasikeitusias patalpas peržiūrėkite Patikros žingsnyje.",
+      "read": "naujas skaitymas: {{value}}",
+      "kept": {
+        "verified": "jūsų patikrinta",
+        "user": "jūsų pataisyta",
+        "missing": "naujas skaitymas jos nerado — palikta"
+      },
+      "fields": {
+        "plotas_m2": "plotas",
+        "perimetras_m": "perimetras",
+        "lubu_aukstis_m": "aukštis",
+        "durys": "durys",
+        "langai": "langai",
+        "paskirtis": "paskirtis",
+        "polygon": "kontūras"
+      },
+      "dismiss": "Supratau",
+      "roomNote": "Perskaičius brėžinį iš naujo:",
+      "roomKept": "Palikta"
+    },
     "reextract": {
       "loadingPdf": "Įkeliamas PDF iš atminties...",
       "pdfNotFound": "PDF nerastas. Perskaityti iš naujo negalime. Sukurkite naują projektą su PDF.",
@@ -867,8 +894,10 @@
       "button": "Skaityti brėžinį iš naujo",
       "confirmTitle": "Skaityti brėžinį iš naujo?",
       "bullet1": "Užtruks 3–8 min, kainuos ~1–2 $",
-      "bullet2": "Ankstesni kiekiai bus pakeisti naujais",
-      "bullet3": "Kainos gali nesutapti su naujomis eilutėmis",
+      "bullet2": "Patikrintos patalpos ir jūsų pataisyti skaičiai lieka",
+      "bullet3": "Kainos ir rankiniai kiekiai eilutėse išsaugomi",
+      "bullet5": "Kas pasikeitė — parodysime po perskaitymo",
+      "rebuilding": "Sujungiame su jūsų pataisymais…",
       "bullet4": "Nustatymai ({{count}} laukų) išsaugomi",
       "yesRepeat": "Taip, pakartoti"
     },

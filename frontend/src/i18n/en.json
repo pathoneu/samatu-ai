@@ -845,6 +845,33 @@
       "revoke": "Revoke link",
       "close": "Close"
     },
+    "reread": {
+      "title": "The drawing was read again",
+      "nothing": "Nothing changed — every room read the same.",
+      "changedTitle": "Changed ({{count}})",
+      "keptTitle": "Kept as they were ({{count}})",
+      "addedTitle": "New rooms ({{count}})",
+      "removedTitle": "Not found by the new read ({{count}})",
+      "checkHint": "Review the changed rooms in the Check step.",
+      "read": "new read: {{value}}",
+      "kept": {
+        "verified": "verified by you",
+        "user": "corrected by you",
+        "missing": "the new read did not find it — kept"
+      },
+      "fields": {
+        "plotas_m2": "area",
+        "perimetras_m": "perimeter",
+        "lubu_aukstis_m": "height",
+        "durys": "doors",
+        "langai": "windows",
+        "paskirtis": "purpose",
+        "polygon": "outline"
+      },
+      "dismiss": "Got it",
+      "roomNote": "After the drawing was read again:",
+      "roomKept": "Kept"
+    },
     "reextract": {
       "loadingPdf": "Loading PDF from memory...",
       "pdfNotFound": "The PDF was not found, so it cannot be read again. Create a new project with the PDF.",
@@ -861,8 +888,10 @@
       "button": "Read the drawing again",
       "confirmTitle": "Read the drawing again?",
       "bullet1": "Takes 3-8 min, costs ~$1-2",
-      "bullet2": "The previous quantities will be replaced",
-      "bullet3": "Prices may not match the new rows",
+      "bullet2": "Verified rooms and the numbers you corrected stay",
+      "bullet3": "Prices and manual quantities on the rows are kept",
+      "bullet5": "What changed is shown after the read",
+      "rebuilding": "Merging with your corrections…",
       "bullet4": "Your settings ({{count}} fields) are kept",
       "yesRepeat": "Yes, re-run"
     },

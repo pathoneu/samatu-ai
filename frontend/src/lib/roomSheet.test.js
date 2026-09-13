@@ -10,6 +10,7 @@ import {
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings, factMarks,
+  openingsPatch, userEditPatch,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
   authorFigureRows, bboxToRectPct,
@@ -655,3 +656,15 @@ test('factMarks: a fact cropped on the ROOM region as a fallback is not a mark',
   assert.equal(factMarks(facts, 2, [0, 0, 1, 1]).length, 3);
 });
 
+
+
+test('a fact he types on the sheet is marked as his — the sheet says so and a re-read keeps it', () => {
+  assert.deepEqual(userEditPatch('perimetras_m', 36.5, 'T'),
+    { perimetras_m: 36.5, perimetras_saltinis: 'user_override' });
+  assert.deepEqual(userEditPatch('plotas_m2', 12.4, 'T'),
+    { plotas_m2: 12.4, plotas_saltinis: 'user_override' });
+  assert.deepEqual(userEditPatch('paskirtis', 'vonia', 'T'), { paskirtis: 'vonia', _paskirtis_user_at: 'T' });
+  assert.deepEqual(userEditPatch('kitas', 1, 'T'), { kitas: 1 }, 'unknown fields carry no marker');
+  const els = [{ tipas: 'duris', kiekis: 2 }];
+  assert.deepEqual(openingsPatch(els, 'T'), { elementai: els, _angos_user_at: 'T' });
+});

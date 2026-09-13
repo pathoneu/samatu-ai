@@ -9,16 +9,16 @@ import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map as MapIcon, ListChecks, MessageSquare, Sliders, ArrowLeft, Trash2, Pencil,
+  Map as MapIcon, ListChecks, Sliders, ArrowLeft, Trash2, Pencil,
   ArrowRight, ClipboardCheck, Send, Phone,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
 import ScaleInfoBanner from '@/components/project/ScaleInfoBanner';
 import PageStructureCard from '@/components/project/PageStructureCard';
-import AiChat from '@/components/project/AiChat';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
+import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 // Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
 // flow never shipped to production after 2026-04-26 rollback.
@@ -1040,6 +1040,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       />
 
       <div className="flex-1 px-4 py-4 space-y-5">
+
+      {/* What the last re-read of the drawing changed — on every step, until
+          he presses „Supratau" (lib/mergeReextract.js records it). */}
+      <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
 
       {/* ── STEP 1 · BRĖŽINYS — the drawing, its rooms, its measurements ── */}
       {/* ── STEP 2 · PATIKRA — the same workspace with the check rail open.

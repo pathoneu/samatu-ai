@@ -1019,3 +1019,39 @@ Numbers: in-sample 9,75 % unchanged; OOS 6,74 → 7,06 % (H walls 315,72 → 320
 G rows within ±10 %: 10 → 15 % (3/20). Suite 3371 passed; frontend units 688. Four local G
 projects rebuilt through `/recompute-interior`: grindjuostės 53,69 m, plytelių grindjuostės
 24,97 m, laminatas 76,65 m², walls 220, lubos 104,53.
+
+## 2026-09-13 (later still): a re-read of the drawing is an event, not a silent refresh
+
+Council verdict 2 („determinism gate"). `ReextractButton` spread the fresh extraction over the
+stored project — every room, every row — so a second read (which is never identical to the first:
+openings and perimeters move between runs) silently undid the contractor's own work and showed no
+diff. Now `lib/mergeReextract.js` (pure, 10 tests) decides what a re-read may replace:
+
+- a room he stamped „Viskas teisinga" keeps its old facts entirely; the diff lists what the new
+  read would have made of them;
+- an unverified room takes the new read except the facts he set himself — a typed area or
+  perimeter (`*_saltinis = user_override`), a typed height, a corrected or drawn polygon
+  (`polygon_source ∈ {corrected, manual}`, `plotas_source = manual_polygon`), openings he adjusted
+  (`_angos_user_at`), a purpose he chose (`_paskirtis_user_at`);
+- a room the new read did not return stays when he touched it (and is listed), else it is dropped
+  and listed; new rooms are listed;
+- rows go through `mergeDarbuSarasasEdits` (prices, manual quantities, symbol-count lines);
+  `_apimtis`, `_overrides`, `_per_room_overrides`, name / company / VAT are his;
+- the rows are then REBUILT on the merged rooms through `/recompute-interior` (the fresh read built
+  them on its own rooms, without his facts and without the scope) and his prices ride again;
+- `_reread_diff = {at, changed, kept, added, removed}` is stored; `RereadDiffBanner` shows it on
+  every step of the project page („Pasikeitė (1): 04 — durys 1 → 2; perimetras 12,68 → 12,90 m",
+  „Palikta kaip buvo (2): 01 — jūsų pataisyta: perimetras 36,56 m (naujas skaitymas: 27,50 m)",
+  new / missing rooms) until „Supratau"; the room's own check sheet carries the same line for that
+  room (`RereadRoomNote`).
+
+The markers had to exist first: the sheet's typed area / perimeter carried NO source marker (the
+facts still called a typed perimeter „pagal sienų kontūrą"), nor did opening or purpose edits.
+`roomSheet.userEditPatch` / `openingsPatch` now write `plotas_saltinis` / `perimetras_saltinis`
+`user_override`, `_paskirtis_user_at`, `_angos_user_at`; `/recompute-interior` hands them back; the
+facts say „Šį plotą / perimetrą įrašėte patys." (or „iš jūsų pataisyto kontūro"). The room-level
+stamp never reached the ground-truth builder (row-level only), so nothing to gate there.
+
+Verified in the browser with a synthetic diff on the demo project: banner on step 1, per-room notes
+on rooms 01 / 02 / 04, dismiss clears the diff locally and in the database. A real re-read was not
+run (paid Vision, €0 rule). Frontend units 698; the confirm dialog's bullets now say what stays.

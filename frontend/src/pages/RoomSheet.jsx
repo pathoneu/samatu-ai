@@ -40,9 +40,9 @@ import {
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
-  adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, orderFacts,
+  adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomsInDrawingOrder,
-  setSymbolCount, stampVerified,
+  setSymbolCount, stampVerified, userEditPatch,
 } from '@/lib/roomSheet';
 import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
@@ -57,6 +57,7 @@ import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } fro
 import { ltPlural } from '@/lib/ltPlural';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
+import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
   + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
@@ -212,8 +213,9 @@ export default function RoomSheet() {
       await land(await saveAssumptionEdit(project, 'lubu_auksciai', next));
       return;
     }
-    // plotas_m2 / perimetras_m live on the room, so they go the room-edit way.
-    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { [field]: value })),
+    // plotas_m2 / perimetras_m live on the room, so they go the room-edit way —
+    // marked as his, so the sheet says so and a re-read keeps them.
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(field, value))),
       { fromInterior: true });
   }), [run, project, roomNr, land]);
 
@@ -245,13 +247,13 @@ export default function RoomSheet() {
       await land(await saveAssumptionEdit(project, 'walls_paint_override', next));
       return;
     }
-    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { paskirtis: value })),
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch('paskirtis', value))),
       { fromInterior: true });
   }), [run, project, roomNr, land]);
 
   const adjustOpening = useCallback((detail, delta) => run(async () => {
     const elementai = adjustOpeningCount(room?.elementai, detail, delta);
-    await land(await saveRoomEdit(project, patchRoom(project, roomNr, { elementai })),
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true });
   }), [run, project, room, roomNr, land]);
 
@@ -411,6 +413,7 @@ export default function RoomSheet() {
         hasPrev={idx > 0}
         hasNext={idx < rooms.length - 1}
       />
+      <RereadRoomNote project={project} roomNr={roomNr} />
 
       <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
         {/* Left — the drawing, framed on this room. */}

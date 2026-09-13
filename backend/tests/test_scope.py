@@ -276,6 +276,22 @@ def test_the_floor_anchors_lose_the_excluded_rooms_share():
     assert _qty(tiles_off, "Grindjuosčių sumontavimas") == pytest.approx(gj * 0.8, abs=0.02)
 
 
+def test_a_typed_perimeter_keeps_its_marker_through_the_recompute():
+    """The sheet marks a typed perimeter `user_override` (lib/roomSheet.js
+    userEditPatch); the recompute must hand it back so the facts say „įrašėte
+    patys" and a re-read of the drawing keeps the number."""
+    rooms = _rooms()
+    rooms[0]["perimetras_m"] = 23.5
+    rooms[0]["perimetras_saltinis"] = "user_override"
+    rooms[0]["plotas_saltinis"] = "user_override"
+    rooms[0]["_angos_user_at"] = "2026-09-13T12:00:00Z"
+    res = client.post("/recompute-interior", json={"patalpos": rooms, "rules_override": {}})
+    assert res.status_code == 200, res.text
+    r01 = next(r for r in res.json()["patalpos"] if r["nr"] == "01")
+    assert r01["perimetras_m"] == 23.5 and r01["perimetras_saltinis"] == "user_override"
+    assert r01["plotas_saltinis"] == "user_override" and r01["_angos_user_at"] == "2026-09-13T12:00:00Z"
+
+
 def test_a_legend_that_describes_another_flat_is_ignored_with_a_warning():
     base = _recompute(anchor=False)
     gj = round(sum(float(r.get("grindjuosciu_m") or 0) for r in base["patalpos"]), 2)

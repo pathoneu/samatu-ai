@@ -214,6 +214,29 @@ def test_a_traced_outline_perimeter_says_so_and_crops_the_outline():
     assert f["source"]["page"] == 2 and f["source"]["rect_pct"] == [0.1, 0.2, 0.4, 0.7]
 
 
+def test_a_perimeter_he_typed_is_his_not_the_readers():
+    """The sheet marks a typed perimeter `user_override` (lib/roomSheet.js
+    userEditPatch); the sentence must say so even when a lane outline is on
+    the room, and a re-read keeps it (lib/mergeReextract.js)."""
+    project = {"patalpos": [{
+        "nr": "01", "puslapio_nr": 2, "plotas_m2": 37.86, "perimetras_m": 36.5,
+        "perimetras_saltinis": "user_override", "_perimetras_pries_kontura": 27.5,
+        "_konturas": {"page": 2, "plotas_m2": 38.4, "perimetras_m": 36.48, "plotas_uzrasas_m2": 37.86}}]}
+    f = _fact(build_room_facts(project, "01"), "perimetras")
+    assert f["value"] == 36.5 and f["status"] == "read"
+    assert "įrašėte patys" in f["sentence"] and "kontūrą" not in f["sentence"]
+
+
+def test_an_area_he_typed_or_drew_is_his():
+    typed = {"patalpos": [{"nr": "1", "puslapio_nr": 1, "plotas_m2": 12.4, "plotas_saltinis": "user_override"}]}
+    f = _fact(build_room_facts(typed, "1"), "plotas")
+    assert f["value"] == 12.4 and f["status"] == "read" and "įrašėte patys" in f["sentence"]
+    drawn = {"patalpos": [{"nr": "1", "puslapio_nr": 1, "plotas_m2": 9.9, "plotas_source": "manual_polygon",
+                           "plotas_saltinis": "plano_uzrasas"}]}
+    f = _fact(build_room_facts(drawn, "1"), "plotas")
+    assert f["value"] == 9.9 and "pataisyto kontūro" in f["sentence"]
+
+
 def test_a_perimeter_nobody_read_is_assumed_and_says_where_it_came_from():
     project = {"patalpos": [{"nr": "1", "puslapio_nr": 1, "plotas_m2": 20.0,
                              "_walls_perimetras_m": 18.7}]}

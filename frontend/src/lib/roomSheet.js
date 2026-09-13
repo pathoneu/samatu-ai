@@ -453,6 +453,25 @@ export function adjustOpeningCount(elementai, detail, delta) {
   });
 }
 
+/**
+ * The room patch for a fact he typed on the sheet, WITH the marker that says
+ * so. Without the marker a typed perimeter read „pagal sienų kontūrą" on the
+ * sheet, and a re-read of the drawing (lib/mergeReextract.js) had no way to
+ * tell his number from the reader's and overwrote it (2026-09-13).
+ */
+export function userEditPatch(field, value, now = new Date().toISOString()) {
+  if (field === 'plotas_m2' || field === 'perimetras_m') {
+    return { [field]: value, [`${field.replace(/_m2?$/, '')}_saltinis`]: 'user_override' };
+  }
+  if (field === 'paskirtis') return { paskirtis: value, _paskirtis_user_at: now };
+  return { [field]: value };
+}
+
+/** The room patch for openings he corrected on the sheet, marked as his. */
+export function openingsPatch(elementai, now = new Date().toISOString()) {
+  return { elementai, _angos_user_at: now };
+}
+
 /** Total openings after an adjustment — what the fact's value will become. */
 export function countOpenings(elementai, kinds = ['langas', 'duris']) {
   return (Array.isArray(elementai) ? elementai : [])

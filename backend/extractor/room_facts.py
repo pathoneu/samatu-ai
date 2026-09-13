@@ -317,6 +317,15 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
                      "Ploto brėžinyje neradau — įrašykite jį patys.",
                      {"field": "plotas_m2", "kind": "number"})
 
+    if saltinis in ("user_override", "manual") or room.get("plotas_source") in ("manual", "manual_polygon"):
+        # He typed it on the sheet or drew the outline himself (2026-09-13:
+        # the sheet marks its edits, and a re-read of the drawing keeps them).
+        sentence = ("Plotas — iš jūsų pataisyto kontūro."
+                    if room.get("plotas_source") == "manual_polygon" else "Šį plotą įrašėte patys.")
+        return _fact("plotas", round(value, 2), "m²", "read", "prielaida",
+                     room.get("puslapio_nr"), region, sentence,
+                     {"field": "plotas_m2", "kind": "number"})
+
     if saltinis == "eksplikacija" or (room.get("plotas_source") == "eksplikacija"):
         page = _row_page(project, room, row)
         sentence = ("Iš patalpų eksplikacijos lentelės"
@@ -417,6 +426,11 @@ def _fact_perimetras(project: dict, room: dict,
                      room.get("puslapio_nr"), region,
                      f"Perimetro brėžinyje neradau — skaičiuoju iš ploto "
                      f"({lt_num(used)} m). Įrašykite tikrą.", editable)
+
+    if room.get("perimetras_saltinis") in ("user_override", "manual"):
+        return _fact("perimetras", round(measured, 2), "m", "read", "prielaida",
+                     room.get("puslapio_nr"), region,
+                     "Šį perimetrą įrašėte patys." + tail, editable)
 
     if (room.get("perimetras_saltinis") == "plano_matmenys"
             and isinstance(room.get("_perimetras_matmenys"), dict)):

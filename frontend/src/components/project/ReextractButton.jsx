@@ -6,7 +6,12 @@
  * - Original extraction had errors / missing rooms
  * - Switching rules_override drastically (full re-extract vs cheap recompute)
  *
- * Flow: confirm → load PDF blob from IndexedDB → POST /extract-interior → replace project data.
+ * Flow: confirm → load PDF blob from IndexedDB → POST /extract-interior →
+ * MERGE the fresh read into the stored project (lib/mergeReextract.js: verified
+ * rooms and the facts he set himself stay, prices ride on the rebuilt rows,
+ * the diff is recorded) → rebuild the rows on the merged rooms through the
+ * same /recompute-interior path a room edit uses → save. The diff shows up as
+ * `RereadDiffBanner` on the project page until he dismisses it.
  * Cost: same as original extract (~$0.40-2 + 90-500s).
  */
 
@@ -17,6 +22,39 @@ import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { API_BASE as API } from '@/lib/apiBase';
+import { mergeReextract } from '@/lib/mergeReextract';
+import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
+import { saveRoomEdit } from '@/lib/roomSheetApi';
+
+/**
+ * The stored project after a fresh read: merged, then its rows rebuilt on the
+ * merged rooms (the fresh read built them on its own rooms — without the facts
+ * he set, without the project's scope). If the rebuild fails, the merged
+ * project is still a complete, honest state: fresh rows with his prices.
+ */
+export async function projectAfterReread(base, result) {
+  const { project: merged } = mergeReextract(base, result);
+  try {
+    const re = await saveRoomEdit(merged, merged.patalpos);
+    const notes = [];
+    return {
+      ...merged,
+      ...re,
+      name: base.name,
+      company_name: base.company_name,
+      vat_rate: base.vat_rate,
+      _overrides: merged._overrides,
+      _apimtis: merged._apimtis,
+      _per_room_overrides: merged._per_room_overrides,
+      _reextracted_at: merged._reextracted_at,
+      _reread_diff: merged._reread_diff,
+      darbu_sarasas: mergeDarbuSarasasEdits(re.darbu_sarasas, base.darbu_sarasas, notes),
+    };
+  } catch (e) {
+    console.warn('[reextract] rebuilding rows on the merged rooms failed — keeping the merged read:', e);
+    return merged;
+  }
+}
 
 export default function ReextractButton({ project, onComplete }) {
   // This component carried a complete set of i18n keys that nothing used: the
@@ -82,25 +120,19 @@ export default function ReextractButton({ project, onComplete }) {
         if (!result.patalpos) {
           throw new Error(t('project.reextract.badFormat'));
         }
+        if (ti != null) { clearInterval(ti); ti = null; }
 
-        // Replace project data — preserve user-edited fields (kainos, name, etc.)
-        //
-        // 2026-07-28 audit: the base of this spread used to be the `project`
+        // 2026-07-28 audit: the base of the merge used to be the `project`
         // PROP — a render-time snapshot taken up to 10 minutes before the
         // extraction returned. Everything the user changed while it ran
         // (prices, measurements, polygons, per-room overrides, the name) was
         // silently rolled back to that snapshot. Re-read the CURRENT stored
-        // project first; same idiom as InteriorWorkspace.jsx (`const fresh =
-        // getProject(project.id) || project`) after its async detect calls.
+        // project first; same idiom as InteriorWorkspace.jsx.
+        //
+        // 2026-09-13: no longer a wholesale replace — see projectAfterReread.
+        setProgress(t('project.reextract.rebuilding'));
         const base = getProject(project.id) || project;
-        const merged = {
-          ...base,
-          ...result,
-          name: base.name,
-          company_name: base.company_name,
-          vat_rate: base.vat_rate,
-          _reextracted_at: new Date().toISOString(),
-        };
+        const merged = await projectAfterReread(base, result);
         updateProject(project.id, merged);
         setProgress(t('project.reextract.updated'));
         setTimeout(() => {
@@ -156,6 +188,7 @@ export default function ReextractButton({ project, onComplete }) {
             <li>{t('project.reextract.bullet1')}</li>
             <li>{t('project.reextract.bullet2')}</li>
             <li>{t('project.reextract.bullet3')}</li>
+            <li>{t('project.reextract.bullet5')}</li>
             <li>{t('project.reextract.bullet4', { count: Object.keys(project._overrides || {}).length })}</li>
           </ul>
           <div className="flex gap-2">
