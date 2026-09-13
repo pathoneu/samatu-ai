@@ -209,6 +209,7 @@ def test_a_traced_outline_perimeter_says_so_and_crops_the_outline():
     f = _fact(build_room_facts(project, "01"), "perimetras")
     assert f["value"] == 36.48 and f["status"] == "read"
     assert "pagal sienų kontūrą" in f["sentence"] and "38,40 m²" in f["sentence"] and "37,86 m²" in f["sentence"]
+    assert "(+1,4 %)" in f["sentence"] and "Plotui imamas užrašas." in f["sentence"]
     assert "Skaitant planą buvo 27,50 m" in f["sentence"]
     assert f["source"]["page"] == 2 and f["source"]["rect_pct"] == [0.1, 0.2, 0.4, 0.7]
 

@@ -937,3 +937,16 @@ Consequence, told plainly: G painted walls 265,91 → 298,66 m² (his act 239,4:
 +21 % after being +7 %); baseboards 87,4 → 100,7 m; OOS 6,61 → 9,30 %. Every metre is on the
 drawing; what his 239,4 excludes is the conversation to have with him.
 
+**Partition inset — measured, left as is (2026-09-13, founder: „02, 03, 05 biški off").** In this
+CAD export a partition's grey FILL is inset ~2–3 pt (0,7–1 mm on paper) from its face lines, the
+rest of the band being hatch and outline strokes the hairline filter drops — so a room bounded by
+partitions runs ~2–5 cm into each such wall (areas +4,6 / +4,9 % on 03 / 02, perimeters ≤ +1 %).
+Four repairs measured on G page 2: line-density hatch mask (2/8 rooms survive — furniture becomes
+wall), fill + own outline strokes within 1–1,5 mm (7/8, bathroom 06 lost to the tub rim), fill +
+all ink within 2–4 mm (5–6/8, perimeters +4–16 %), thin partitions grown by 0,5–1 mm (7→2/8).
+None beats the filled-only mask's 8/8 with ≤ 1,2 % perimeter error against the dimension
+strings, so the mask stays and the sheet states the fit per room: „Kontūro plotas 3,68 m²,
+užrašyta 3,52 m² (+4,6 %). Plotui imamas užrašas." Room 07 (holas) has no door towards the living
+room — one air space — so no outline is claimed; the manual „Taisyti zoną" fill remains the way.
+The precise fix is vector face-snapping (research §6); parked until a drawing needs it.
+

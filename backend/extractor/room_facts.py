@@ -442,9 +442,11 @@ def _fact_perimetras(project: dict, room: dict,
         from .wall_outline import outline_rect_pct
         k = room["_konturas"]
         page = k.get("page") or room.get("puslapio_nr")
+        dev = _f(k.get("paklaida"))
+        dev_txt = f" ({'+' if (_f(k.get('plotas_m2')) or 0) >= (_f(k.get('plotas_uzrasas_m2')) or 0) else '−'}{lt_num(dev * 100, 1)} %)" if dev is not None else ""
         sentence = (f"Perimetras — pagal sienų kontūrą, atsektą iš brėžinio: {lt_num(measured)} m. "
-                    f"Kontūro plotas {lt_num(_f(k.get('plotas_m2')))} m² sutampa su užrašytu "
-                    f"{lt_num(_f(k.get('plotas_uzrasas_m2')))} m².")
+                    f"Kontūro plotas {lt_num(_f(k.get('plotas_m2')))} m², užrašyta "
+                    f"{lt_num(_f(k.get('plotas_uzrasas_m2')))} m²{dev_txt}. Plotui imamas užrašas.")
         prev = _f(room.get("_perimetras_pries_kontura"))
         if prev is not None and abs(prev - measured) > 0.05:
             sentence += f" Skaitant planą buvo {lt_num(prev)} m — imu kontūrą."
