@@ -29,7 +29,6 @@ import { CONFIDENCE_DOT_CLASS, confidenceLabel, normalizeConfidence } from '@/li
 import ReviewQueueSidebar from './ReviewQueueSidebar';
 import RowDetailPanel from './RowDetailPanel';
 import WallElevationsPanel from './WallElevationsPanel';
-import ConfidenceBadge from './ConfidenceBadge';
 import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
@@ -130,7 +129,10 @@ export default function WorkspacePanel({
   // Provenance dots OFF by default — too noisy when most rows are computed.
   // User can toggle via eye icon to inspect data sources when needed.
   const [showProvenance, setShowProvenance] = useState(false);
-  const [collapsed, setCollapsed] = useState({});
+  // The rows start folded: the drawing step is for the drawing and its rooms;
+  // 114 rows under them were the first thing a contractor scrolled past
+  // (council cut list, 2026-09-13). One click opens them, and they stay open.
+  const [collapsed, setCollapsed] = useState({ kiekiai: true });
   // Phase C-2 follow-up (2026-05-02): chip click opens an honest data popover
   // anchored to the chip itself. Replaces the random-flash halo that drew on
   // unreliable PDF coords.
@@ -567,14 +569,6 @@ export default function WorkspacePanel({
                     drėgna
                   </span>
                 )}
-                <ConfidenceBadge
-                  room={r}
-                  projectId={project?.id}
-                  onClick={(e) => {
-                    e?.stopPropagation?.();
-                    if (onJumpToPage && targetPage) onJumpToPage(targetPage, r);
-                  }}
-                />
               </div>
               <span className="mono tabular text-foreground/90 whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
                 {fmt(r.plotas_m2)}
@@ -702,22 +696,24 @@ export default function WorkspacePanel({
           icon={FileText}
           title="Kiekiai"
           count={`${totalPositions} poz.`}
-          summary={fmtEur(totalNet)}
-          collapsed={false}
-          onToggle={null}
+          summary={totalNet > 0 ? fmtEur(totalNet) : ''}
+          collapsed={!!collapsed.kiekiai}
+          onToggle={() => toggleSection('kiekiai')}
           top={0}
         />
         {/* LT contractors habitually quote a work rate „su medžiagomis". Since
             the materials became their own section, entering an all-in rate on a
             work row AND letting the kainynas price the materials bills the same
             purchase twice — so say what these prices are. (2026-09-02) */}
-        <div className="px-3 py-1.5 text-muted-foreground"
-             style={{ fontSize: 10, lineHeight: 1.4,
-                      background: 'hsl(var(--muted) / 0.25)',
-                      borderBottom: '1px solid hsl(var(--border) / 0.5)' }}>
-          {t('project.mainView.worksAreLabourOnly')}
-        </div>
-        {positionGroups.map(group => (
+        {!collapsed.kiekiai && (
+          <div className="px-3 py-1.5 text-muted-foreground"
+               style={{ fontSize: 10, lineHeight: 1.4,
+                        background: 'hsl(var(--muted) / 0.25)',
+                        borderBottom: '1px solid hsl(var(--border) / 0.5)' }}>
+            {t('project.mainView.worksAreLabourOnly')}
+          </div>
+        )}
+        {!collapsed.kiekiai && positionGroups.map(group => (
           <PositionGroup
             key={group.skyrius}
             group={group}

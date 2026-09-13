@@ -43,12 +43,11 @@ const invalidAmountKey = (n) =>
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
-import ReextractButton from './ReextractButton';
 import RowDetailPanel from './RowDetailPanel';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
-import { LAYOUT_PATHON, LAYOUT_TEMPLATE, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
+import { LAYOUT_PATHON, LAYOUT_TEMPLATE, hasLayoutChoice, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
 import { createSession } from '@/lib/telemetry';
 import {
   adjustPositionQuantity,
@@ -516,7 +515,13 @@ export default function ProjectMainView({
   useEffect(() => {
     let alive = true;
     fetchSamataTemplates()
-      .then((list) => { if (alive) setTemplates(list); })
+      .then((list) => {
+        if (!alive) return;
+        setTemplates(list);
+        // An uploaded template IS the default layout until he chooses
+        // otherwise — the switch stays for going back (2026-09-13).
+        if (list.length > 0 && !hasLayoutChoice()) setLayout(LAYOUT_TEMPLATE);
+      })
       .catch(() => { /* no switch, nothing else changes */ });
     return () => { alive = false; };
   }, []);
@@ -734,7 +739,8 @@ export default function ProjectMainView({
                 moved down into the prices block, where the choice is
                 explained instead of hiding in a toolbar. */}
             <div className="flex items-center gap-2 shrink-0">
-              <ReextractButton project={project} onComplete={onProjectChange} />
+              {/* The paid re-read moved to the Nustatymai drawer (council cut
+                  list, 2026-09-13): beside Export it read as a routine step. */}
               <ExportDropdown project={projectWithDarbai} />
             </div>
           </div>

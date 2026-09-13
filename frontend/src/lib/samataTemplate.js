@@ -54,6 +54,16 @@ export function loadLayoutChoice() {
   }
 }
 
+/** True once he has picked a layout himself; until then the uploaded template is the default. */
+export function hasLayoutChoice() {
+  try {
+    const v = globalThis.localStorage?.getItem(LAYOUT_KEY);
+    return v === LAYOUT_TEMPLATE || v === LAYOUT_PATHON;
+  } catch {
+    return false;
+  }
+}
+
 export function saveLayoutChoice(layout) {
   try {
     globalThis.localStorage?.setItem(

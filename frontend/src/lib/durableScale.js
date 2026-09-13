@@ -96,3 +96,27 @@ export function autoPageScalesFromRooms(rooms = []) {
   }
   return out;
 }
+
+/** Metres of reality per PDF point at a drafting ratio (1 pt = 1/72 inch). */
+export const METERS_PER_POINT_AT_1_TO_1 = 0.0254 / 72;
+
+/**
+ * Page scales the DRAWING states — the ratio the dimension-string lane
+ * measured on each plan sheet (`_meta.plan_dimension_lane.mastelis`, e.g.
+ * {"2": 50, "8": 25}: 1:50 on page 2, 1:25 on page 8). Exact, not derived
+ * from areas, so the status bar can say „1:50 (iš brėžinio)" instead of
+ * „nekalibruotas" on a sheet the engine already read (2026-09-13). A user
+ * calibration still wins the merge; this only fills pages nobody calibrated.
+ */
+export function pageScalesFromLane(mastelisByPage) {
+  const out = {};
+  if (!mastelisByPage || typeof mastelisByPage !== 'object') return out;
+  for (const [page, ratio] of Object.entries(mastelisByPage)) {
+    const p = Number(page);
+    const r = Number(ratio);
+    if (!Number.isInteger(p) || p <= 0 || !(r > 0)) continue;
+    const mpp = r * METERS_PER_POINT_AT_1_TO_1;
+    out[p] = { metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true, source: 'plan', label: `1:${r}` };
+  }
+  return out;
+}

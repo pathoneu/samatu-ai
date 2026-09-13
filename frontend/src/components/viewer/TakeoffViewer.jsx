@@ -299,6 +299,8 @@ function isoALabel(wMm, hMm) {
 // label (e.g. standard "1:50") wins over the computed ratio.
 function scaleStatusText(pageScale) {
   if (!pageScale?.calibrated) return 'Mastelis: nekalibruotas — spustelėkite čia';
+  // The dimension strings on the sheet gave the ratio — exact, from the drawing.
+  if (pageScale.source === 'plan' && pageScale.label) return `Mastelis: ${pageScale.label} (iš brėžinio)`;
   if (pageScale.label) return `Mastelis: ${pageScale.label}`;
   const mpp = pageScale.metersPerPointX || 0;
   const ratio = mpp > 0 ? Math.round((mpp * 72) / 0.0254) : 0;
@@ -314,6 +316,9 @@ function scaleStatusText(pageScale) {
 function scaleStatusTitle(pageScale) {
   if (!pageScale?.calibrated) {
     return 'Mastelis dar nenustatytas — matavimai bus be metrų. Spustelėkite ir pažymėkite atkarpą, kurios tikrą ilgį žinote.';
+  }
+  if (pageScale.source === 'plan') {
+    return 'Mastelis perskaitytas iš brėžinyje užrašytų matmenų — tikslus. Spustelėkite, jei norite kalibruoti pagal kitą žinomą atstumą.';
   }
   if (pageScale.source === 'auto') {
     return 'Mastelis apskaičiuotas iš patalpų plotų eksplikacijoje — todėl apytikslis (~). Norėdami tikslesnio, spustelėkite ir nustatykite mastelį pagal žinomą atstumą.';
@@ -546,7 +551,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange }) {
+function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -571,7 +576,9 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
   // derived meters-per-point — measurements read real meters with no manual
   // step. A user calibration (measureScales) always wins the merge.
   const autoScales = useMemo(() => autoPageScalesFromRooms(rooms), [rooms]);
-  const effectiveScales = useMemo(() => ({ ...autoScales, ...measureScales }), [autoScales, measureScales]);
+  const effectiveScales = useMemo(
+    () => ({ ...autoScales, ...(laneScales || {}), ...measureScales }),
+    [autoScales, laneScales, measureScales]);
   // Toolbar toggles removed 2026-07-14 (founder: confusing). Snap stays ON —
   // it only pulls to existing measurement endpoints; ortho off.
   const snapEnabled = true;
@@ -1013,6 +1020,10 @@ export default function TakeoffViewer({
   onClearFocus = null,
   projectId = null,
   pdfBlob = null,
+  // Page scales the drawing states (dimension-string lane, lib/durableScale
+  // pageScalesFromLane) — exact, so a sheet the engine already read as 1:50
+  // never says „nekalibruotas". A user calibration still wins.
+  laneScales = null,
   onRoomPolygonFill = null,
   // External "arm click-to-fill for room nr" request: { nr, t } (t = nonce).
   fillRequest = null,
@@ -1053,6 +1064,7 @@ export default function TakeoffViewer({
           initialMeasureScales={initialMeasureScales}
           initialCountTypes={initialCountTypes}
           onMeasureDataChange={onMeasureDataChange}
+          laneScales={laneScales}
         />
       </EmbedPDF>
     </div>

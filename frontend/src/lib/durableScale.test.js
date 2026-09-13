@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setPageScaleDurable, getPageScaleDurable, pxPerMeterFromDurable, durableFromPxPerMeter, autoPageScalesFromRooms } from './durableScale.js';
+import { setPageScaleDurable, getPageScaleDurable, pxPerMeterFromDurable, durableFromPxPerMeter, autoPageScalesFromRooms, pageScalesFromLane, METERS_PER_POINT_AT_1_TO_1 } from './durableScale.js';
 
 test('set/get durable scale on a project object', () => {
   let project = {};
@@ -130,4 +130,18 @@ test('autoPageScales: the Objektas A demo page 2 still auto-calibrates to ~1:105
   assert.ok(out[2], 'demo page 2 must still get an auto scale');
   const ratio = Math.round((out[2].metersPerPointX * 72) / 0.0254);
   assert.equal(ratio, 105);
+});
+
+test('the dimension-string lane\'s ratios become exact page scales, labelled from the drawing', () => {
+  const out = pageScalesFromLane({ 2: 50, '8': 25, '9': 'x', 0: 50, '-1': 50 });
+  assert.deepEqual(Object.keys(out).sort(), ['2', '8']);
+  assert.equal(out[2].label, '1:50');
+  assert.equal(out[2].source, 'plan');
+  assert.equal(out[2].calibrated, true);
+  // 1 pt = 1/72 in of paper; at 1:50 one point is 50 × 0,3528 mm = 17,64 mm of reality
+  assert.ok(Math.abs(out[2].metersPerPointX - 50 * METERS_PER_POINT_AT_1_TO_1) < 1e-12);
+  assert.ok(Math.abs(out[2].metersPerPointX - 0.017639) < 1e-6);
+  assert.equal(out[8].label, '1:25');
+  assert.deepEqual(pageScalesFromLane(undefined), {});
+  assert.deepEqual(pageScalesFromLane(null), {});
 });

@@ -1055,3 +1055,24 @@ stamp never reached the ground-truth builder (row-level only), so nothing to gat
 Verified in the browser with a synthetic diff on the demo project: banner on step 1, per-room notes
 on rooms 01 / 02 / 04, dismiss clears the diff locally and in the database. A real re-read was not
 run (paid Vision, €0 rule). Frontend units 698; the confirm dialog's bullets now say what stays.
+
+## 2026-09-13 (evening): the council's cut list — one afternoon
+
+Cut or moved, all frontend, no engine change:
+- the room list's confidence chip („🟢 tikslus") is gone; the „UŽRAŠYTA PLANE" source chip stays
+  (evidence, not a grade);
+- the dashboard's three stat cards are gone (`StatsBar` kept on disk, unrendered);
+- the „Klausti apie projektą" chat door in the step footer is gone (`AiChat` kept on disk);
+- the header shows „Kainos dar neįvestos" instead of „0,00 €" twice while no row is priced;
+- the „Kiekiai" rows under the room list start folded on the drawing step (one click opens them,
+  they stay open); the row count still shows in the header;
+- the paid re-read moved from beside Export into the Nustatymai drawer under „Brėžinys";
+- the viewer's status bar reads „Mastelis: 1:50 (iš brėžinio)" on sheets whose ratio the
+  dimension-string lane measured (`_meta.plan_dimension_lane.mastelis` → `pageScalesFromLane`,
+  source `plan`, exact); a user calibration still wins; sheets the lane never read stay
+  „nekalibruotas";
+- an uploaded sąmata template is the default layout of the Sąmata step until he picks one himself
+  (`hasLayoutChoice`); no upload UI exists yet, so today this affects nobody.
+
+Not done: the „DE badge" the council named could not be located in the current UI (no such string
+in the code); the test projects on the founder's dashboard are his local data, not code.

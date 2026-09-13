@@ -19,6 +19,7 @@ import PageStructureCard from '@/components/project/PageStructureCard';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
+import ReextractButton from '@/components/project/ReextractButton';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 // Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
 // flow never shipped to production after 2026-04-26 rollback.
@@ -194,20 +195,30 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
         className="flex items-center pr-3 gap-4 sm:gap-6"
         style={{ borderRight: '1px solid hsl(var(--border))', height: 28 }}
       >
-        <div className="flex items-baseline" style={{ gap: 6 }}>
-          <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.beVat')}</span>
-          <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
-            {totalNet.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+        {/* No prices yet → say so. „0,00 €" twice in the header read as a
+            result, not as an empty field (council cut list, 2026-09-13). */}
+        {!(totalNet > 0) ? (
+          <span className="text-muted-foreground" style={{ fontSize: 12 }}>
+            {t('project.interior.pricesNotEntered')}
           </span>
-        </div>
-        <div className="flex items-baseline" style={{ gap: 6 }}>
-          <span className="skyrius-header" style={{ fontSize: 10 }}>
-            {reverseVat ? t('project.mainView.totalReverse') : t('project.interior.suVat')}
-          </span>
-          <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
-            {totalGross.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-          </span>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-baseline" style={{ gap: 6 }}>
+              <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.beVat')}</span>
+              <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
+                {totalNet.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              </span>
+            </div>
+            <div className="flex items-baseline" style={{ gap: 6 }}>
+              <span className="skyrius-header" style={{ fontSize: 10 }}>
+                {reverseVat ? t('project.mainView.totalReverse') : t('project.interior.suVat')}
+              </span>
+              <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
+                {totalGross.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              </span>
+            </div>
+          </>
+        )}
       </div>
       <button
         onClick={onPrielaidos}
@@ -762,7 +773,6 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   // Bumped by the top-bar sanity pill. ProjectMainView watches it to scroll
   // the banner into view and force the loud groups open — otherwise the jump
   // lands on the Sąmata step somewhere above the warnings the user clicked.
@@ -1204,6 +1214,17 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               notifyBackendDegradations(result);
             }}
           />
+          {/* The paid re-read of the drawing — here, not beside Export: it is
+              a repair, not a step (council cut list, 2026-09-13). */}
+          <div className="border-t border-border pt-4 space-y-2">
+            <h3 className="font-semibold text-foreground" style={{ fontSize: 14 }}>
+              {t('project.interior.rereadSection')}
+            </h3>
+            <ReextractButton
+              project={project}
+              onComplete={(merged) => { setProject(merged); }}
+            />
+          </div>
           </div>
         </div>
       )}
@@ -1738,61 +1759,8 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           if (i >= 0 && i < STEPS.length - 1) goStep(STEPS[i + 1]);
         }}
       >
-        {/* „Klausti apie projektą" — was a top-level tab, now a small button in
-            the bottom-right corner beside the step's own button. A side door,
-            never a step: a contractor must not think the chat is work he owes.
-            In the footer rather than floating over it, so it can never cover
-            the one button the step is asking him to press. */}
-        <button
-          type="button"
-          onClick={() => setChatOpen(true)}
-          title={t('project.steps.chatTitle')}
-          className="inline-flex items-center gap-2 rounded border border-border-strong bg-card text-foreground/85 hover:bg-muted/60 transition-colors"
-          style={{ minHeight: 44, padding: '0 14px', fontSize: 14, fontWeight: 500 }}
-        >
-          <MessageSquare className="w-4 h-4" aria-hidden />
-          {t('project.steps.chat')}
-        </button>
       </StepFooter>
 
-      {chatOpen && (
-        <div className="fixed inset-0 z-40 flex items-end justify-end p-4 sm:p-6">
-          <div
-            className="absolute inset-0"
-            style={{ background: 'hsl(var(--foreground) / 0.18)' }}
-            onClick={() => setChatOpen(false)}
-            aria-hidden
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('project.steps.chat')}
-            className="relative w-full sm:w-[460px] max-h-[80vh] overflow-y-auto rounded-lg border border-border bg-card shadow-xl p-4"
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="min-w-0">
-                <h2 className="font-semibold text-foreground" style={{ fontSize: 16 }}>
-                  {t('project.steps.chat')}
-                </h2>
-                <p className="text-muted-foreground" style={{ fontSize: 13 }}>
-                  {t('project.interior.aiDesc')}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setChatOpen(false)}
-                title={t('project.steps.chatClose')}
-                aria-label={t('project.steps.chatClose')}
-                className="inline-flex items-center justify-center rounded border border-border-strong bg-background text-foreground/80 hover:bg-muted/50 shrink-0"
-                style={{ minHeight: 44, minWidth: 44 }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <AiChat project={project} inline />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

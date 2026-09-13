@@ -30,6 +30,7 @@ import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
+import { pageScalesFromLane } from '@/lib/durableScale';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
@@ -387,6 +388,11 @@ export default function InteriorWorkspace({
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  // The scales the dimension-string lane read off each plan sheet („1:50")
+  // — exact, shown in the status bar instead of „nekalibruotas".
+  const laneMastelis = project?._meta?.plan_dimension_lane?.mastelis;
+  const laneScales = useMemo(() => pageScalesFromLane(laneMastelis), [laneMastelis]);
+
   return (
     // 244 px of chrome above/below: top bar 52 + step bar 46 + page padding 32
     // + the step footer 64 + slack. The footer must stay on screen — it holds
@@ -427,6 +433,7 @@ export default function InteriorWorkspace({
               exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
               initialMeasurements={project?.measurements || []}
               initialMeasureScales={project?.pageScalesDurable || {}}
+              laneScales={laneScales}
               initialCountTypes={project?.countTypes || null}
               onMeasureDataChange={handleMeasureDataChange}
               onRoomZoneClick={(room) => {

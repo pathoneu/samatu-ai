@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EXTRA_SECTION, FILL, acceptSuggestion, canTypeQuantity, darbaiFingerprint,
-  exportRows, groupBySection, isTypedRow, sectionsOf, setPrice, summarize,
-  typeQuantity, typedSourceRow,
+  EXTRA_SECTION, FILL, LAYOUT_PATHON, LAYOUT_TEMPLATE, acceptSuggestion, canTypeQuantity, darbaiFingerprint,
+  exportRows, groupBySection, hasLayoutChoice, isTypedRow, loadLayoutChoice, saveLayoutChoice, sectionsOf,
+  setPrice, summarize, typeQuantity, typedSourceRow,
 } from './samataTemplate.js';
 
 // Every label below is invented — no customer wording.
@@ -143,4 +143,24 @@ test('darbaiFingerprint moves only when something the render reads moves', () =>
     'a relabel does not change the fingerprint');
   assert.notEqual(a, darbaiFingerprint(acceptSuggestion(darbai, suggested, 'now')));
   assert.notEqual(a, darbaiFingerprint(setPrice(darbai, done, 1)));
+});
+
+test('an uploaded template is the default layout until he picks one himself', () => {
+  const store = new Map();
+  const saved = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  try {
+    assert.equal(hasLayoutChoice(), false, 'nothing chosen yet');
+    assert.equal(loadLayoutChoice(), LAYOUT_PATHON, 'the stored default is still Pathon — the page promotes the template when one exists');
+    saveLayoutChoice(LAYOUT_PATHON);
+    assert.equal(hasLayoutChoice(), true, 'going back to Pathon is a choice too');
+    saveLayoutChoice(LAYOUT_TEMPLATE);
+    assert.equal(loadLayoutChoice(), LAYOUT_TEMPLATE);
+  } finally {
+    globalThis.localStorage = saved;
+  }
 });

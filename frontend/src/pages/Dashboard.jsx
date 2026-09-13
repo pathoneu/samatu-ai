@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { FolderPlus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import StatsBar from '@/components/dashboard/StatsBar';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import EmptyState from '@/components/dashboard/EmptyState';
 import UsageMeter from '@/components/billing/UsageMeter';
@@ -117,8 +116,6 @@ export default function Dashboard() {
 
       {projects.length > 0 ? (
         <>
-          <StatsBar projects={projects} />
-
           <div className="mt-8 mb-4">
             <div className="relative max-w-sm">
               <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
