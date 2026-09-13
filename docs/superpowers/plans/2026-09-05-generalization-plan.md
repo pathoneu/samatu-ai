@@ -950,3 +950,33 @@ užrašyta 3,52 m² (+4,6 %). Plotui imamas užrašas." Room 07 (holas) has no d
 room — one air space — so no outline is claimed; the manual „Taisyti zoną" fill remains the way.
 The precise fix is vector face-snapping (research §6); parked until a drawing needs it.
 
+## After the council (2026-09-13): no contractor traces, and the drawing's own painted-wall area
+
+**No traces of the reference contractor in the app** (founder's standing rule, restated 2026-09-13).
+The template feature's strings said „Kaip mano sąmatose", „jūsų sąmatose ši eilutė būna ne visada",
+„Jūsų eilutės" — phrased as if the app knew the user's habits. Now every string names the thing the
+user uploaded: „Mano šablonas", „Šablone ši eilutė pažymėta kaip nebūtina", „Šablono eilutės". The
+local DB held a template built from the reference contractor's four sąmatas on the founder's account
+— deleted; the feature exists only for templates clients upload themselves (there is no upload UI
+yet — API only). Code and docstrings keep codenames only.
+
+**Painted walls anchored to the sienų apdailos plano legend.** The text-layer lane already read
+the designer's figures on objektas_g: „Glaistoma dažoma (baltai) 202 m²" + „(akcentinė) 18 m²" =
+220 m² painted walls (page 3), skirting 53,69 m wooden + 24,97 m tiled, laminate 76,65 m². Our
+per-room paintable sum was 298,66 m²; the contractor's act 239,4 m² is 8,8 % above the architect's
+220 — the outlier was ours: the drawing does not paint every wall net of openings. `_walls_anchor`
+(set in Step 2.44 from figures of family `sienu_dazymas` whose label names no ceiling/floor/tiles) now
+anchors the „Sienų glaistymas/dažymas" row exactly the way `_ceiling_anchor` anchors the ceilings:
+ledger step „Sienų apdailos plano legenda: 18,00 + 202,00 → 220", rooms' own m² listed beside it,
+provenance sentence, materials follow the billed area (paint 53 → 44 l), taken only when the
+legend is 50–110 % of the rooms' sum (else `apdailos_legenda_ignored` + per-room sum), carried
+through `/recompute-interior` (`_walls_anchor` alias) and the frontend context. Skirting and
+laminate anchors: next, same mechanism. Four local G projects rebuilt: walls 220 m². Eval walls
+metric now measures the billed row (as the ceilings' did).
+
+**Determinism gate — assessed, next.** A re-read (`ReextractButton`) replaces `patalpos` and
+`darbu_sarasas` wholesale (only name / company / VAT kept): user perimeters, heights, polygons,
+opening adjustments (which leave no marker) and row prices are lost, and no diff is shown. The
+room-level „Viskas teisinga" stamp stays on rooms and does not reach the ground-truth builder
+(which reads row-level `user_verified_at` only) — no gate needed there.
+
