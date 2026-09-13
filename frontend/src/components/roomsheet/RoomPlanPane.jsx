@@ -15,7 +15,9 @@
  *    whole sheet they would be dots on dots), labelled „kampai iš kontūro" so
  *    nobody reads them as marks printed on the drawing;
  *  • the room-number ring at `marker_pct`;
- *  • the facts' own rectangles (`source.rect_pct`), this page's only.
+ *  • the facts' own rectangles (`source.rect_pct`), this page's only — and only
+ *    where a fact really has a place; a fact cropped on the room's region as
+ *    a fallback (openings the drawing does not position) gets no mark.
  *
  * What it deliberately does NOT draw: doors and windows. `elementai` carries no
  * geometry and never has. Inventing them would be the one thing this screen
@@ -82,7 +84,7 @@ export default function RoomPlanPane({
     .filter((c) => c.inside)), [room?.polygon_pct, crop, wholeSheet]);
   const marker = useMemo(() => (Array.isArray(room?.marker_pct)
     ? pageToCropPct(room.marker_pct, crop) : null), [room?.marker_pct, crop]);
-  const marks = useMemo(() => factMarks(facts, page, crop), [facts, page, crop]);
+  const marks = useMemo(() => factMarks(facts, page, crop, room?.region_pct), [facts, page, crop, room?.region_pct]);
   const frame = useMemo(
     () => (wholeSheet && Array.isArray(room?.region_pct) ? rectToCrop(room.region_pct, crop) : null),
     [wholeSheet, room?.region_pct, crop],

@@ -643,3 +643,15 @@ test('factMarks: the facts of THIS page, as crop fractions, whole-sheet ones lef
   assert.deepEqual(factMarks(undefined, 2, [0, 0, 1, 1]), []);
 });
 
+test('factMarks: a fact cropped on the ROOM region as a fallback is not a mark', () => {
+  const region = [0.3796, 0.7047, 0.5643, 0.7678];
+  const facts = [
+    { key: 'perimetras', source: { page: 2, rect_pct: [0.36, 0.70, 0.60, 0.78] } },
+    { key: 'angos', source: { page: 2, rect_pct: [0.3796, 0.7047, 0.5643, 0.7678] } },   // doors nobody positioned
+    { key: 'plotas', source: { page: 2, rect_pct: [0.40, 0.72, 0.45, 0.735] } },
+  ];
+  assert.deepEqual(factMarks(facts, 2, [0, 0, 1, 1], region).map((m) => m.key), ['perimetras', 'plotas']);
+  // without the room region nothing is filtered — the caller decides
+  assert.equal(factMarks(facts, 2, [0, 0, 1, 1]).length, 3);
+});
+

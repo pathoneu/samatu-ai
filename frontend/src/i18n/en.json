@@ -1391,7 +1391,7 @@
       "planWhole": "Whole sheet",
       "planEnlarge": "Enlarge the sheet",
       "legendFactMarks": "where each number was read",
-      "legendRoomRegion": "this room's place on the sheet",
+      "legendRoomRegion": "this room's approximate place on the sheet",
       "legendOutline": "room outline",
       "legendCorners": "corners from the outline",
       "legendMarker": "room number on the plan",

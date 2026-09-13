@@ -327,12 +327,19 @@ export function pageToCropPct(point, cropRect) {
  * 2026-09-13). Facts on another page, whole-sheet facts and rectangles that
  * fall outside the crop are left out.
  */
-export function factMarks(facts, page, cropRect) {
+export function factMarks(facts, page, cropRect, roomRegion = null) {
   if (!Array.isArray(facts) || page == null) return [];
   const out = [];
   for (const f of facts) {
     const src = f?.source;
     if (!src || Number(src.page) !== Number(page) || isWholeSheet(f)) continue;
+    // A fact with no place of its own (doors and windows the drawing does not
+    // position, a finish read from a table) is cropped on the ROOM's region as
+    // a fallback. Drawing that as „where the number was read" says the
+    // opposite of the truth (founder, 2026-09-13: „perimetras taip ir
+    // suskaičiuotas kaip apibrėžta čia?"), so only a place the fact really has
+    // becomes a mark.
+    if (sameRect(src.rect_pct, roomRegion)) continue;
     const [x0, y0, x1, y1] = src.rect_pct.map(Number);
     const a = pageToCropPct([Math.min(x0, x1), Math.min(y0, y1)], cropRect);
     const b = pageToCropPct([Math.max(x0, x1), Math.max(y0, y1)], cropRect);
@@ -344,6 +351,11 @@ export function factMarks(facts, page, cropRect) {
     out.push({ key: f.key, x: left, y: top, w: right - left, h: bottom - top });
   }
   return out;
+}
+
+function sameRect(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 4 || b.length !== 4) return false;
+  return a.every((v, i) => Math.abs(Number(v) - Number(b[i])) < 1e-4);
 }
 
 export function polygonToCropPct(polygon, cropRect) {
