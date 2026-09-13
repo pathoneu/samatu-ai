@@ -129,28 +129,10 @@
         "w": 0.34,
         "h": 0.45
       },
-      "polygon_pct": [
-        [
-          0.06,
-          0.06
-        ],
-        [
-          0.4,
-          0.06
-        ],
-        [
-          0.4,
-          0.51
-        ],
-        [
-          0.06,
-          0.51
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 37.86,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 27.5,
+      "perimetras_m": 36.56,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -219,7 +201,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -356,7 +337,61 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "polygon_pct": [
+        [
+          0.10688,
+          0.15629
+        ],
+        [
+          0.10731,
+          0.48881
+        ],
+        [
+          0.29329,
+          0.48912
+        ],
+        [
+          0.29201,
+          0.62908
+        ],
+        [
+          0.61351,
+          0.62908
+        ],
+        [
+          0.61351,
+          0.53265
+        ],
+        [
+          0.39034,
+          0.53265
+        ],
+        [
+          0.39034,
+          0.57164
+        ],
+        [
+          0.38008,
+          0.57164
+        ],
+        [
+          0.38008,
+          0.15629
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 2,
+        "plotas_m2": 38.82,
+        "perimetras_m": 36.56,
+        "plotas_uzrasas_m2": 37.86,
+        "paklaida": 0.0254,
+        "durys_m": 1.1,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 27.5,
+      "perimetras_saltinis": "sienu_konturas"
     },
     {
       "nr": "02",
@@ -369,28 +404,10 @@
         "w": 0.27,
         "h": 0.21
       },
-      "polygon_pct": [
-        [
-          0.37,
-          0.06
-        ],
-        [
-          0.64,
-          0.06
-        ],
-        [
-          0.64,
-          0.27
-        ],
-        [
-          0.37,
-          0.27
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 14.26,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 15.27,
+      "perimetras_m": 18.29,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -457,7 +474,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -580,7 +596,45 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "polygon_pct": [
+        [
+          0.59,
+          0.09915
+        ],
+        [
+          0.36939,
+          0.09885
+        ],
+        [
+          0.36725,
+          0.37757
+        ],
+        [
+          0.47328,
+          0.37757
+        ],
+        [
+          0.47371,
+          0.26149
+        ],
+        [
+          0.59042,
+          0.26149
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 6,
+        "plotas_m2": 14.94,
+        "perimetras_m": 18.29,
+        "plotas_uzrasas_m2": 14.26,
+        "paklaida": 0.0478,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 15.27,
+      "perimetras_saltinis": "sienu_konturas"
     },
     {
       "nr": "03",
@@ -593,28 +647,10 @@
         "w": 0.16,
         "h": 0.15
       },
-      "polygon_pct": [
-        [
-          0.47,
-          0.25
-        ],
-        [
-          0.63,
-          0.25
-        ],
-        [
-          0.63,
-          0.4
-        ],
-        [
-          0.47,
-          0.4
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 3.52,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 7.08,
+      "perimetras_m": 8.3,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "pakabinamos",
@@ -668,7 +704,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -791,7 +826,101 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "polygon_pct": [
+        [
+          0.48012,
+          0.26632
+        ],
+        [
+          0.48012,
+          0.37757
+        ],
+        [
+          0.58529,
+          0.37757
+        ],
+        [
+          0.58529,
+          0.32346
+        ],
+        [
+          0.57802,
+          0.32285
+        ],
+        [
+          0.57802,
+          0.31469
+        ],
+        [
+          0.57503,
+          0.31318
+        ],
+        [
+          0.57503,
+          0.31106
+        ],
+        [
+          0.57802,
+          0.30955
+        ],
+        [
+          0.57802,
+          0.29927
+        ],
+        [
+          0.58615,
+          0.29897
+        ],
+        [
+          0.58615,
+          0.28869
+        ],
+        [
+          0.59,
+          0.28839
+        ],
+        [
+          0.59042,
+          0.26632
+        ],
+        [
+          0.52202,
+          0.26632
+        ],
+        [
+          0.52202,
+          0.26844
+        ],
+        [
+          0.51988,
+          0.26995
+        ],
+        [
+          0.51732,
+          0.26995
+        ],
+        [
+          0.51518,
+          0.26874
+        ],
+        [
+          0.51518,
+          0.26632
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 6,
+        "plotas_m2": 3.57,
+        "perimetras_m": 8.3,
+        "plotas_uzrasas_m2": 3.52,
+        "paklaida": 0.0142,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 7.08,
+      "perimetras_saltinis": "sienu_konturas"
     },
     {
       "nr": "04",
@@ -804,24 +933,6 @@
         "w": 0.26,
         "h": 0.18
       },
-      "polygon_pct": [
-        [
-          0.37,
-          0.37
-        ],
-        [
-          0.63,
-          0.37
-        ],
-        [
-          0.63,
-          0.55
-        ],
-        [
-          0.37,
-          0.55
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.05,
       "plotas_saltinis": "plano_uzrasas",
@@ -889,7 +1000,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -1051,6 +1161,34 @@
         "mastelis": 50,
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
+      },
+      "polygon_pct": [
+        [
+          0.39119,
+          0.38029
+        ],
+        [
+          0.39119,
+          0.52781
+        ],
+        [
+          0.61394,
+          0.52781
+        ],
+        [
+          0.61394,
+          0.38029
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 7,
+        "plotas_m2": 10.17,
+        "perimetras_m": 12.81,
+        "plotas_uzrasas_m2": 10.05,
+        "paklaida": 0.012,
+        "durys_m": 0.95,
+        "dpi": 200
       }
     },
     {
@@ -1064,28 +1202,10 @@
         "w": 0.21,
         "h": 0.12
       },
-      "polygon_pct": [
-        [
-          0.09,
-          0.48
-        ],
-        [
-          0.3,
-          0.48
-        ],
-        [
-          0.3,
-          0.6
-        ],
-        [
-          0.09,
-          0.6
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 3.76,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 8.5,
+      "perimetras_m": 8.89,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -1138,7 +1258,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 1.837,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -1257,7 +1376,53 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "polygon_pct": [
+        [
+          0.10731,
+          0.49637
+        ],
+        [
+          0.10688,
+          0.55351
+        ],
+        [
+          0.19367,
+          0.5532
+        ],
+        [
+          0.1941,
+          0.5523
+        ],
+        [
+          0.20009,
+          0.5523
+        ],
+        [
+          0.20051,
+          0.58132
+        ],
+        [
+          0.28516,
+          0.58132
+        ],
+        [
+          0.28516,
+          0.49637
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 4,
+        "plotas_m2": 3.85,
+        "perimetras_m": 8.89,
+        "plotas_uzrasas_m2": 3.76,
+        "paklaida": 0.0233,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 8.5,
+      "perimetras_saltinis": "sienu_konturas"
     },
     {
       "nr": "06",
@@ -1270,28 +1435,10 @@
         "w": 0.19,
         "h": 0.23
       },
-      "polygon_pct": [
-        [
-          0.17,
-          0.57
-        ],
-        [
-          0.36,
-          0.57
-        ],
-        [
-          0.36,
-          0.7999999999999999
-        ],
-        [
-          0.17,
-          0.7999999999999999
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 7.25,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 9.63,
+      "perimetras_m": 12.09,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "pakabinamos",
@@ -1345,7 +1492,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -1473,7 +1619,45 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "polygon_pct": [
+        [
+          0.20051,
+          0.58615
+        ],
+        [
+          0.20051,
+          0.76935
+        ],
+        [
+          0.34844,
+          0.76935
+        ],
+        [
+          0.34844,
+          0.63392
+        ],
+        [
+          0.28516,
+          0.63392
+        ],
+        [
+          0.28516,
+          0.58615
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 3,
+        "plotas_m2": 7.44,
+        "perimetras_m": 12.09,
+        "plotas_uzrasas_m2": 7.25,
+        "paklaida": 0.0255,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 9.63,
+      "perimetras_saltinis": "sienu_konturas"
     },
     {
       "nr": "07",
@@ -1486,24 +1670,6 @@
         "w": 0.22,
         "h": 0.21
       },
-      "polygon_pct": [
-        [
-          0.16,
-          0.6
-        ],
-        [
-          0.38,
-          0.6
-        ],
-        [
-          0.38,
-          0.8099999999999999
-        ],
-        [
-          0.16,
-          0.8099999999999999
-        ]
-      ],
       "plotas_m2": 5.64,
       "plotas_saltinis": "wall_dim_calc",
       "perimetras_m": 9.63,
@@ -1563,7 +1729,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 1.837,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -1692,24 +1857,6 @@
         "w": 0.3,
         "h": 0.16
       },
-      "polygon_pct": [
-        [
-          0.33,
-          0.64
-        ],
-        [
-          0.63,
-          0.64
-        ],
-        [
-          0.63,
-          0.8
-        ],
-        [
-          0.33,
-          0.8
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 10.55,
       "plotas_saltinis": "plano_uzrasas",
@@ -1776,7 +1923,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -1936,6 +2082,34 @@
         "mastelis": 50,
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
+      },
+      "polygon_pct": [
+        [
+          0.35956,
+          0.63392
+        ],
+        [
+          0.35956,
+          0.76935
+        ],
+        [
+          0.61394,
+          0.76935
+        ],
+        [
+          0.61394,
+          0.63392
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 5,
+        "plotas_m2": 10.66,
+        "perimetras_m": 13.25,
+        "plotas_uzrasas_m2": 10.55,
+        "paklaida": 0.0108,
+        "durys_m": 0.95,
+        "dpi": 200
       }
     },
     {
@@ -1949,24 +2123,6 @@
         "w": 0.25,
         "h": 0.15
       },
-      "polygon_pct": [
-        [
-          0.39,
-          0.77
-        ],
-        [
-          0.64,
-          0.77
-        ],
-        [
-          0.64,
-          0.92
-        ],
-        [
-          0.39,
-          0.92
-        ]
-      ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 6.78,
       "plotas_saltinis": "plano_uzrasas",
@@ -2025,7 +2181,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "_zoom": {
         "patalpa_nr": "09",
         "perimetras_m": 10.48,
@@ -2160,6 +2315,34 @@
         "mastelis": 50,
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
+      },
+      "polygon_pct": [
+        [
+          0.41471,
+          0.7766
+        ],
+        [
+          0.41471,
+          0.88755
+        ],
+        [
+          0.61351,
+          0.88755
+        ],
+        [
+          0.61351,
+          0.7766
+        ]
+      ],
+      "polygon_source": "sienu_konturas",
+      "_konturas": {
+        "page": 4,
+        "plotas_m2": 6.81,
+        "perimetras_m": 10.57,
+        "plotas_uzrasas_m2": 6.78,
+        "paklaida": 0.005,
+        "durys_m": 0.95,
+        "dpi": 200
       }
     }
   ],
@@ -2753,6 +2936,39 @@
         "8": 25,
         "9": 25
       }
+    },
+    "wall_outline_lane": {
+      "status": "applied",
+      "pages": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "traced": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "08",
+        "09"
+      ],
+      "confirmed": [],
+      "corrected": [
+        "01",
+        "02",
+        "03",
+        "05",
+        "06"
+      ],
+      "unmatched": [],
+      "skipped": [],
+      "dpi": 200,
+      "seconds": 14.3
     }
   },
   "_voting": {
@@ -7967,26 +8183,50 @@
       },
       "polygon_pct": [
         [
-          0.06,
-          0.06
+          0.10688,
+          0.15629
         ],
         [
-          0.4,
-          0.06
+          0.10731,
+          0.48881
         ],
         [
-          0.4,
-          0.51
+          0.29329,
+          0.48912
         ],
         [
-          0.06,
-          0.51
+          0.29201,
+          0.62908
+        ],
+        [
+          0.61351,
+          0.62908
+        ],
+        [
+          0.61351,
+          0.53265
+        ],
+        [
+          0.39034,
+          0.53265
+        ],
+        [
+          0.39034,
+          0.57164
+        ],
+        [
+          0.38008,
+          0.57164
+        ],
+        [
+          0.38008,
+          0.15629
         ]
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 37.86,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 27.5,
+      "perimetras_m": 36.56,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -8055,7 +8295,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -8192,7 +8432,18 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "sienu_konturas",
+      "_konturas": {
+        "page": 2,
+        "plotas_m2": 38.82,
+        "perimetras_m": 36.56,
+        "plotas_uzrasas_m2": 37.86,
+        "paklaida": 0.0254,
+        "durys_m": 1.1,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 27.5
     },
     {
       "nr": "02",
@@ -8207,26 +8458,34 @@
       },
       "polygon_pct": [
         [
-          0.37,
-          0.06
+          0.59,
+          0.09915
         ],
         [
-          0.64,
-          0.06
+          0.36939,
+          0.09885
         ],
         [
-          0.64,
-          0.27
+          0.36725,
+          0.37757
         ],
         [
-          0.37,
-          0.27
+          0.47328,
+          0.37757
+        ],
+        [
+          0.47371,
+          0.26149
+        ],
+        [
+          0.59042,
+          0.26149
         ]
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 14.26,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 15.27,
+      "perimetras_m": 18.29,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -8293,7 +8552,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -8416,7 +8675,18 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "sienu_konturas",
+      "_konturas": {
+        "page": 6,
+        "plotas_m2": 14.94,
+        "perimetras_m": 18.29,
+        "plotas_uzrasas_m2": 14.26,
+        "paklaida": 0.0478,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 15.27
     },
     {
       "nr": "03",
@@ -8431,26 +8701,90 @@
       },
       "polygon_pct": [
         [
-          0.47,
-          0.25
+          0.48012,
+          0.26632
         ],
         [
-          0.63,
-          0.25
+          0.48012,
+          0.37757
         ],
         [
-          0.63,
-          0.4
+          0.58529,
+          0.37757
         ],
         [
-          0.47,
-          0.4
+          0.58529,
+          0.32346
+        ],
+        [
+          0.57802,
+          0.32285
+        ],
+        [
+          0.57802,
+          0.31469
+        ],
+        [
+          0.57503,
+          0.31318
+        ],
+        [
+          0.57503,
+          0.31106
+        ],
+        [
+          0.57802,
+          0.30955
+        ],
+        [
+          0.57802,
+          0.29927
+        ],
+        [
+          0.58615,
+          0.29897
+        ],
+        [
+          0.58615,
+          0.28869
+        ],
+        [
+          0.59,
+          0.28839
+        ],
+        [
+          0.59042,
+          0.26632
+        ],
+        [
+          0.52202,
+          0.26632
+        ],
+        [
+          0.52202,
+          0.26844
+        ],
+        [
+          0.51988,
+          0.26995
+        ],
+        [
+          0.51732,
+          0.26995
+        ],
+        [
+          0.51518,
+          0.26874
+        ],
+        [
+          0.51518,
+          0.26632
         ]
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 3.52,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 7.08,
+      "perimetras_m": 8.3,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "pakabinamos",
@@ -8504,7 +8838,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -8627,7 +8961,18 @@
         "page_width": 841.89,
         "page_height": 1190.55
       },
-      "_plotas_pries_uzrasa_m2": 3.11
+      "_plotas_pries_uzrasa_m2": 3.11,
+      "perimetras_saltinis": "sienu_konturas",
+      "_konturas": {
+        "page": 6,
+        "plotas_m2": 3.57,
+        "perimetras_m": 8.3,
+        "plotas_uzrasas_m2": 3.52,
+        "paklaida": 0.0142,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 7.08
     },
     {
       "nr": "04",
@@ -8642,20 +8987,20 @@
       },
       "polygon_pct": [
         [
-          0.37,
-          0.37
+          0.39119,
+          0.38029
         ],
         [
-          0.63,
-          0.37
+          0.39119,
+          0.52781
         ],
         [
-          0.63,
-          0.55
+          0.61394,
+          0.52781
         ],
         [
-          0.37,
-          0.55
+          0.61394,
+          0.38029
         ]
       ],
       "eksplikacija_row_idx": null,
@@ -8725,7 +9070,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -8887,7 +9232,16 @@
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
       },
-      "_perimetras_pries_matmenis": 12.68
+      "_perimetras_pries_matmenis": 12.68,
+      "_konturas": {
+        "page": 7,
+        "plotas_m2": 10.17,
+        "perimetras_m": 12.81,
+        "plotas_uzrasas_m2": 10.05,
+        "paklaida": 0.012,
+        "durys_m": 0.95,
+        "dpi": 200
+      }
     },
     {
       "nr": "05",
@@ -8902,26 +9256,42 @@
       },
       "polygon_pct": [
         [
-          0.09,
-          0.48
+          0.10731,
+          0.49637
         ],
         [
-          0.3,
-          0.48
+          0.10688,
+          0.55351
         ],
         [
-          0.3,
-          0.6
+          0.19367,
+          0.5532
         ],
         [
-          0.09,
-          0.6
+          0.1941,
+          0.5523
+        ],
+        [
+          0.20009,
+          0.5523
+        ],
+        [
+          0.20051,
+          0.58132
+        ],
+        [
+          0.28516,
+          0.58132
+        ],
+        [
+          0.28516,
+          0.49637
         ]
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 3.76,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 8.5,
+      "perimetras_m": 8.89,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "gkp",
@@ -8974,7 +9344,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 1.837,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom": {
@@ -9093,7 +9463,18 @@
         ],
         "page_width": 841.89,
         "page_height": 1190.55
-      }
+      },
+      "perimetras_saltinis": "sienu_konturas",
+      "_konturas": {
+        "page": 4,
+        "plotas_m2": 3.85,
+        "perimetras_m": 8.89,
+        "plotas_uzrasas_m2": 3.76,
+        "paklaida": 0.0233,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 8.5
     },
     {
       "nr": "06",
@@ -9108,26 +9489,34 @@
       },
       "polygon_pct": [
         [
-          0.17,
-          0.57
+          0.20051,
+          0.58615
         ],
         [
-          0.36,
-          0.57
+          0.20051,
+          0.76935
         ],
         [
-          0.36,
-          0.7999999999999999
+          0.34844,
+          0.76935
         ],
         [
-          0.17,
-          0.7999999999999999
+          0.34844,
+          0.63392
+        ],
+        [
+          0.28516,
+          0.63392
+        ],
+        [
+          0.28516,
+          0.58615
         ]
       ],
       "eksplikacija_row_idx": null,
       "plotas_m2": 7.25,
       "plotas_saltinis": "plano_uzrasas",
-      "perimetras_m": 9.63,
+      "perimetras_m": 12.09,
       "lubu_aukstis_m": 2.82,
       "lubu_aukstis_saltinis": "section_average",
       "lubu_tipas": "pakabinamos",
@@ -9181,7 +9570,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -9309,7 +9698,18 @@
         "page_width": 841.89,
         "page_height": 1190.55
       },
-      "_plotas_pries_uzrasa_m2": 7.01
+      "_plotas_pries_uzrasa_m2": 7.01,
+      "perimetras_saltinis": "sienu_konturas",
+      "_konturas": {
+        "page": 3,
+        "plotas_m2": 7.44,
+        "perimetras_m": 12.09,
+        "plotas_uzrasas_m2": 7.25,
+        "paklaida": 0.0255,
+        "durys_m": 0.95,
+        "dpi": 200
+      },
+      "_perimetras_pries_kontura": 9.63
     },
     {
       "nr": "07",
@@ -9322,24 +9722,6 @@
         "w": 0.22,
         "h": 0.21
       },
-      "polygon_pct": [
-        [
-          0.16,
-          0.6
-        ],
-        [
-          0.38,
-          0.6
-        ],
-        [
-          0.38,
-          0.8099999999999999
-        ],
-        [
-          0.16,
-          0.8099999999999999
-        ]
-      ],
       "plotas_m2": 5.64,
       "plotas_saltinis": "wall_dim_calc",
       "perimetras_m": 9.63,
@@ -9399,7 +9781,6 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
       "shared_with_neighbors_m": 1.837,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -9530,20 +9911,20 @@
       },
       "polygon_pct": [
         [
-          0.33,
-          0.64
+          0.35956,
+          0.63392
         ],
         [
-          0.63,
-          0.64
+          0.35956,
+          0.76935
         ],
         [
-          0.63,
-          0.8
+          0.61394,
+          0.76935
         ],
         [
-          0.33,
-          0.8
+          0.61394,
+          0.63392
         ]
       ],
       "eksplikacija_row_idx": null,
@@ -9612,7 +9993,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "shared_with_neighbors_m": 0.394,
       "shared_edges_provenance": "polygon_adjacency_audit",
       "_zoom_changes": [
@@ -9772,7 +10153,16 @@
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
       },
-      "_perimetras_pries_matmenis": 11.47
+      "_perimetras_pries_matmenis": 11.47,
+      "_konturas": {
+        "page": 5,
+        "plotas_m2": 10.66,
+        "perimetras_m": 13.25,
+        "plotas_uzrasas_m2": 10.55,
+        "paklaida": 0.0108,
+        "durys_m": 0.95,
+        "dpi": 200
+      }
     },
     {
       "nr": "09",
@@ -9787,20 +10177,20 @@
       },
       "polygon_pct": [
         [
-          0.39,
-          0.77
+          0.41471,
+          0.7766
         ],
         [
-          0.64,
-          0.77
+          0.41471,
+          0.88755
         ],
         [
-          0.64,
-          0.92
+          0.61351,
+          0.88755
         ],
         [
-          0.39,
-          0.92
+          0.61351,
+          0.7766
         ]
       ],
       "eksplikacija_row_idx": null,
@@ -9861,7 +10251,7 @@
           ]
         }
       },
-      "polygon_source": "synthesized_from_bbox",
+      "polygon_source": "sienu_konturas",
       "_zoom": {
         "patalpa_nr": "09",
         "perimetras_m": 10.48,
@@ -9996,7 +10386,16 @@
         "page_width": 841.8900146484375,
         "page_height": 1190.550048828125
       },
-      "_perimetras_pries_matmenis": 10.5
+      "_perimetras_pries_matmenis": 10.5,
+      "_konturas": {
+        "page": 4,
+        "plotas_m2": 6.81,
+        "perimetras_m": 10.57,
+        "plotas_uzrasas_m2": 6.78,
+        "paklaida": 0.005,
+        "durys_m": 0.95,
+        "dpi": 200
+      }
     }
   ],
   "_verify_pass": {
@@ -10008,7 +10407,8 @@
   "_scrubbed_title_block": "2026-09-05: title-block identifiers removed from pastabos before tracking (feedback_client_names_nowhere)",
   "_backfill": {
     "plan_areas": "2026-09-06: plan-area lane applied from the fixture PDF's text layer; a fresh run does the same in Step 2.44",
-    "plan_dimensions": "2026-09-10: perimeters from the plan's dimension strings backed by their dimension lines (plan_dimensions); a fresh run does the same in Step 2.44b"
+    "plan_dimensions": "2026-09-10: perimeters from the plan's dimension strings backed by their dimension lines (plan_dimensions); a fresh run does the same in Step 2.44b",
+    "wall_outline": "2026-09-13: room outlines traced from the wall geometry (wall_outline); a fresh run does the same in Step 2.44c"
   },
   "_autoriaus_kiekiai": [
     {

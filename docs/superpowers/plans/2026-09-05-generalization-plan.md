@@ -910,3 +910,30 @@ is the old framed view, one click away and remembered from room to room; „Padi
 the zoomable viewer. `factMarks` in lib/roomSheet.js (tested) maps the facts' rectangles into
 whatever crop is shown.
 
+## Wall-outline lane — built (2026-09-13, after the founder's „daryk")
+
+`extractor/wall_outline.py`, Step 2.44c. Page rendered without text and stroke-only hairlines
+(walls stay: the filled paths), door gaps bridged along a partition band's own direction (a gap
+continuing a band, whatever closes its far side; band = survives an opening in ONE direction only),
+window / exterior-door gaps bridged between two segments of a THICK band (open 3,5 mm, run 3 ×
+thickness), fill from the room's own area label with a small seed grid, door width swept
+(0,95 / 0,80 / 1,10 m), fill area corrected for the one-pixel boundary strip (perimeter × 1 px),
+accepted at ≤ 5 % of the printed m² with exactly one room label inside; the TIGHTEST outline among
+passing fills wins. Writes `polygon_pct` (`polygon_source = sienu_konturas`), `_konturas`, and the
+perimeter where nobody stated one (`perimetras_saltinis = sienu_konturas`; plan dimensions, table
+and user keep priority; the read figure kept as `_perimetras_pries_kontura`). Zoom re-reads,
+the geometric floor and the merger leave it alone. Sheet: „Perimetras — pagal sienų kontūrą,
+atsektą iš brėžinio: 36,56 m. Kontūro plotas 38,82 m² sutampa su užrašytu 37,86 m²." with the
+outline drawn on the whole sheet and framed.
+
+Numbers. objektas_g: 8 of 9 rooms traced (07 has no plan label); where the dimension strings
+exist the outline agrees within 1,2 % (04 12,81 / 12,68, 08 13,25 / 13,13, 09 10,57 / 10,49);
+new perimeters 01 36,56 (read 27,5), 02 18,29 (15,27), 03 8,30 (7,37), 05 8,89 (8,1), 06 12,09
+(9,63). ~14 s per project. Synthetic two-room CAD-style plan in tests: both rooms within 3 %,
+open plan refused, mismatching label refused, hand-corrected outline kept. A, B: no_match
+(labels sit in tables / no plan-page scale); C, D, H: no dimension strings → no scale → skipped.
+
+Consequence, told plainly: G painted walls 265,91 → 298,66 m² (his act 239,4: we are now
++21 % after being +7 %); baseboards 87,4 → 100,7 m; OOS 6,61 → 9,30 %. Every metre is on the
+drawing; what his 239,4 excludes is the conversation to have with him.
+

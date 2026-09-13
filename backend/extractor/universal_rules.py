@@ -900,7 +900,7 @@ _SYNTHETIC_PERIM_RECT_COEFF = 4.69
 # Perimeters somebody STATED — the plan's dimension strings, the eksplikacija,
 # the user — are never floored: below 4·√A they say the AREA label is the odd
 # one out, not the perimeter.
-_STATED_PERIMETER_SOURCES = ("plano_matmenys", "eksplikacija", "user_override", "manual")
+_STATED_PERIMETER_SOURCES = ("plano_matmenys", "eksplikacija", "sienu_konturas", "user_override", "manual")
 # Areas somebody READ or stated — the plan's own label, the eksplikacija, the
 # user. Only against these is a perimeter below 4·√A provably the wrong one;
 # with the area itself a guess (or of unknown origin — legacy blobs, synthetic

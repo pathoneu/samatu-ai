@@ -212,7 +212,9 @@ export default function RoomPlanPane({
         {frame && (
           <li className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-4 border-2" style={{ borderColor: 'hsl(var(--accent-2))' }} />
-            {t('project.roomSheet.legendRoomRegion')}
+            {/* a traced outline's box is the room's real place; Vision's bbox is a guess */}
+            {t(room?.polygon_source === 'sienu_konturas'
+              ? 'project.roomSheet.legendRoomRegion' : 'project.roomSheet.legendRoomRegionApprox')}
           </li>
         )}
         {outline && (

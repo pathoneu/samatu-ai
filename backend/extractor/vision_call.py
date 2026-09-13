@@ -556,9 +556,10 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     if zoom.get("perimetras_saltinis") == "from_zoom" and zoom.get("perimetras_m") is not None:
         old = room.get("perimetras_m")
         new = float(zoom["perimetras_m"])
-        if room.get("perimetras_saltinis") in ("plano_matmenys", "eksplikacija"):
-            # the drawing STATES the walls (plan_dimensions) or the table does —
-            # a zoomed re-read is weaker evidence; kept beside it
+        if room.get("perimetras_saltinis") in ("plano_matmenys", "eksplikacija", "sienu_konturas"):
+            # the drawing STATES the walls (plan_dimensions), the table does, or
+            # the walls were traced (wall_outline) — a zoomed re-read is weaker
+            # evidence; kept beside it
             room["_perimetras_zoom_m"] = new
         elif abs(new - (old or 0)) > 0.1:  # only update if meaningful diff
             room["perimetras_m"] = new
@@ -1436,6 +1437,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             "plotas_m2", "plotas_saltinis", "plotas_m2_raw",
             "perimetras_m", "perimetras_m_raw", "perimetras_saltinis",
             "_perimetras_matmenys", "_perimetras_pries_matmenis",
+            "_konturas", "_perimetras_pries_kontura", "polygon_pct", "polygon_source",
             "lubu_aukstis_m", "lubu_aukstis_saltinis", "lubu_aukstis_m_raw",
             "lubu_tipas", "elementai", "confidence", "pastabos",
             "eksplikacija_row_idx",
@@ -5326,6 +5328,28 @@ def extract_interior(
                    "unmatched": len(_dl.get("unmatched") or [])})
         except Exception as exc:  # noqa: BLE001
             print(f"[extractor] plan-dimension lane failed: {exc}")
+        # Step 2.44c: room OUTLINES from the wall geometry (2026-09-13, the
+        # founder's „pažymėta vieta, iš kur kas ištraukta" made precise). The
+        # page rendered without text and hairlines is the walls; a fill from
+        # the room's own area label, checked against the printed m², gives the
+        # sheet its frame and the perimeter where nobody stated one
+        # (extractor/wall_outline.py; research 2026-09-13).
+        try:
+            from .wall_outline import apply_wall_outlines
+            _t1 = time.time()
+            _plan_pages_w = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
+            _wl = apply_wall_outlines(
+                parsed.get("patalpos") or [], pdf_bytes, list(_scan.get("dimensions") or []),
+                [a for a in _scan["annotations"] if not _plan_pages_w or a["page"] in _plan_pages_w])
+            _wl["seconds"] = round(time.time() - _t1, 1)
+            parsed.setdefault("_meta", {})["wall_outline_lane"] = _wl
+            _emit({"event": "wall_outline_lane", "status": _wl.get("status"),
+                   "traced": len(_wl.get("traced") or []),
+                   "corrected": len(_wl.get("corrected") or []),
+                   "unmatched": len(_wl.get("unmatched") or []),
+                   "seconds": _wl["seconds"]})
+        except Exception as exc:  # noqa: BLE001
+            print(f"[extractor] wall-outline lane failed: {exc}")
     except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
         print(f"[extractor] plan-area lane failed: {exc}")
 

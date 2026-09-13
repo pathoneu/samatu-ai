@@ -435,6 +435,23 @@ def _fact_perimetras(project: dict, room: dict,
                      dimension_rect_pct(room) or region_on_page(room, page, region),
                      sentence + tail, editable)
 
+    if (room.get("perimetras_saltinis") == "sienu_konturas"
+            and isinstance(room.get("_konturas"), dict)):
+        # 2026-09-13: the outline traced from the wall geometry, checked
+        # against the printed area — the crop is the outline's own box.
+        from .wall_outline import outline_rect_pct
+        k = room["_konturas"]
+        page = k.get("page") or room.get("puslapio_nr")
+        sentence = (f"Perimetras — pagal sienų kontūrą, atsektą iš brėžinio: {lt_num(measured)} m. "
+                    f"Kontūro plotas {lt_num(_f(k.get('plotas_m2')))} m² sutampa su užrašytu "
+                    f"{lt_num(_f(k.get('plotas_uzrasas_m2')))} m².")
+        prev = _f(room.get("_perimetras_pries_kontura"))
+        if prev is not None and abs(prev - measured) > 0.05:
+            sentence += f" Skaitant planą buvo {lt_num(prev)} m — imu kontūrą."
+        return _fact("perimetras", round(measured, 2), "m", "read", "planas", page,
+                     outline_rect_pct(room) or region_on_page(room, page, region),
+                     sentence + tail, editable)
+
     if from_table:
         page = _row_page(project, room, row)
         rect = _bbox_pdf_to_pct(room.get("eksplikacija_row_bbox"),

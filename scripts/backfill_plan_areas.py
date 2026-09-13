@@ -71,6 +71,7 @@ _MIRRORED_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_uzrasas", "_plotas_pr
                   "_area_unconfirmed", "_area_unconfirmed_reason",
                   "lubu_aukstis_m", "lubu_aukstis_saltinis", "_lubu_aukstis_uzrasas",
                   "perimetras_m", "perimetras_saltinis", "_perimetras_matmenys",
+                  "_konturas", "_perimetras_pries_kontura", "polygon_pct", "polygon_source",
                   "_perimetras_pries_matmenis")
 
 

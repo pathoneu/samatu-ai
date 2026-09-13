@@ -180,3 +180,15 @@ The deterministic formulas are essentially **solved** — they match the contrac
 - Vision runs **only after** auth (no unauthenticated budget-drain). Uploads capped at 200 MB.
 - Excel/PDF export: sanitize **any user text written to a cell** with `_safe_cell()` (spreadsheet formula-injection). New cells that render `projektas` / room names / notes must use it.
 - No `dangerouslySetInnerHTML` on user data (the only sink is an app-controlled chart-CSS helper). React auto-escapes everything else.
+
+### Room outlines from the wall geometry (2026-09-13)
+
+`backend/extractor/wall_outline.py` (Step 2.44c in `vision_call.py`) traces each room's outline
+from the drawing's vector walls: text and hairlines dropped, door/window gaps bridged along the
+wall bands, flood fill from the room's printed area label, accepted only when the fill's area
+matches the label (≤ 5 %) with one label inside. It writes `polygon_pct` / `polygon_source =
+sienu_konturas` and, where no stated perimeter exists, `perimetras_m` with `perimetras_saltinis =
+sienu_konturas`. Priority of perimeter sources: plan dimension strings (`plano_matmenys`) > table >
+user > traced outline > Vision read. Research and the objektas_g probe:
+`docs/superpowers/research/2026-09-13-room-geometry-precision.md`.
+

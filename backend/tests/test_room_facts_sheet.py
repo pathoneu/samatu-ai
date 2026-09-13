@@ -198,6 +198,21 @@ def test_an_impossible_perimeter_says_the_least_the_room_can_have():
     assert "stačiakampio" not in f["sentence"]
 
 
+def test_a_traced_outline_perimeter_says_so_and_crops_the_outline():
+    project = {"patalpos": [{
+        "nr": "01", "puslapio_nr": 2, "plotas_m2": 37.86, "perimetras_m": 36.48,
+        "perimetras_saltinis": "sienu_konturas", "_perimetras_pries_kontura": 27.5,
+        "polygon_source": "sienu_konturas",
+        "polygon_pct": [[0.10, 0.20], [0.40, 0.20], [0.40, 0.55], [0.25, 0.55], [0.25, 0.70], [0.10, 0.70]],
+        "_konturas": {"page": 2, "plotas_m2": 38.4, "perimetras_m": 36.48, "plotas_uzrasas_m2": 37.86,
+                      "paklaida": 0.014, "durys_m": 0.95, "dpi": 200}}]}
+    f = _fact(build_room_facts(project, "01"), "perimetras")
+    assert f["value"] == 36.48 and f["status"] == "read"
+    assert "pagal sienų kontūrą" in f["sentence"] and "38,40 m²" in f["sentence"] and "37,86 m²" in f["sentence"]
+    assert "Skaitant planą buvo 27,50 m" in f["sentence"]
+    assert f["source"]["page"] == 2 and f["source"]["rect_pct"] == [0.1, 0.2, 0.4, 0.7]
+
+
 def test_a_perimeter_nobody_read_is_assumed_and_says_where_it_came_from():
     project = {"patalpos": [{"nr": "1", "puslapio_nr": 1, "plotas_m2": 20.0,
                              "_walls_perimetras_m": 18.7}]}
