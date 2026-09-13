@@ -6454,6 +6454,9 @@ class RecomputePayload(BaseModel):
     # The drawing's stated painted-wall area (sienų apdailos plano legenda),
     # same contract as the ceiling anchor (2026-09-13).
     walls_anchor: dict | None = Field(default=None, alias="_walls_anchor")
+    # The floor plan's own grindjuostės / plytelių grindjuostės / laminatas
+    # totals (grindų plano legenda), same contract (2026-09-13).
+    floor_anchors: dict | None = Field(default=None, alias="_floor_anchors")
     # The reader context `/api/recompute-quantities` already accepts and splats
     # into `parsed` (_door_types, detected_symbols_summary, _plyteliu_specs,
     # _symbol_legend, …). `_build_pozicijos_from_rooms` reads all of them, so
@@ -6524,11 +6527,13 @@ def recompute_interior(payload: RecomputePayload, request: Request):
                 # report the room as failed. (audit 2026-07-27)
                 room[_k] = 0.0
                 _room_failed = True
-        if room.get("_neskaiciuoti"):
-            # a room he does not do: kept for the sheet, its quantities zeroed
-            # by `mark_rooms`, nothing recomputed
-            out_rooms.append(room)
-            continue
+        # A room he does not do is recomputed like every other one and zeroed
+        # afterwards by the second `mark_rooms` — which then REMEMBERS what it
+        # zeroed (`scope.EXCLUDED_QUANTITIES_KEY`), so an anchored line (the
+        # table's ceiling, the drawing's painted walls, the floor plan's
+        # skirting) can take that room's own share off the stated total. Skipping
+        # the calc left a room that arrived without numbers with no share at
+        # all, and the anchored line billed the whole flat (2026-09-13).
         # Preserve Vision-emitted fields we don't recompute
         preserved = {
             "nr": room.get("nr"),
@@ -6603,9 +6608,9 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             except Exception as exc:  # noqa: BLE001 — the areas are already right
                 log.warning("[recompute-interior] room %s extras failed: %s", room.get("nr"), exc)
         out_rooms.append(merged)
-    # The per-room calc above rewrote every computed field, so a family switched
-    # off in ONE room (its quantities zeroed by the first `mark_rooms`) has to be
-    # marked again on the recomputed rooms; fully excluded rooms skipped the calc.
+    # The per-room calc above rewrote every computed field, so the rooms and
+    # families he does not do (zeroed by the first `mark_rooms`) have to be
+    # marked — and zeroed, with their shares remembered — again.
     _scope.mark_rooms(out_rooms, apimtis)
     if apimtis:
         _scope.apply_ceiling_choice(out_rooms, apimtis)
@@ -6641,6 +6646,8 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         parsed["_ceiling_anchor"] = payload.ceiling_anchor
     if payload.walls_anchor:
         parsed["_walls_anchor"] = payload.walls_anchor
+    if payload.floor_anchors:
+        parsed["_floor_anchors"] = payload.floor_anchors
 
     # The project's area follows the rooms he counts: a room switched off
     # („Neskaičiuoju") leaves the header figure as well as the rows (2026-09-10).

@@ -10614,5 +10614,46 @@
         "page": 3
       }
     ]
+  },
+  "_floor_anchors": {
+    "plyteliu_grindjuostes": {
+      "total": 24.97,
+      "unit": "m",
+      "label": "grindų plano legenda",
+      "page": 7,
+      "parts": [
+        {
+          "value": 24.97,
+          "label": "Grindjuostės (iš plytelių), h-8cm",
+          "page": 7
+        }
+      ]
+    },
+    "grindjuostes": {
+      "total": 53.69,
+      "unit": "m",
+      "label": "grindų plano legenda",
+      "page": 7,
+      "parts": [
+        {
+          "value": 53.69,
+          "label": "Grindjuostės (derinamos prie durų arba grindų dangos), h-8cm",
+          "page": 7
+        }
+      ]
+    },
+    "laminatas": {
+      "total": 76.65,
+      "unit": "m2",
+      "label": "grindų plano legenda",
+      "page": 7,
+      "parts": [
+        {
+          "value": 76.65,
+          "label": "laminuota grindų danga",
+          "page": 7
+        }
+      ]
+    }
   }
 }

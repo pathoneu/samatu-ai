@@ -50,6 +50,7 @@ __all__ = [
     "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
+    "excluded_quantity", "EXCLUDED_QUANTITIES_KEY",
     "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
@@ -195,10 +196,52 @@ def is_room_excluded(apimtis: dict | None, nr: Any) -> bool:
     return bool(apimtis) and _nr(nr) in set(apimtis.get("patalpos_ne") or [])
 
 
-def _zero(r: dict, fields: Iterable[str]) -> None:
+# The quantities a scope choice took off a room, kept beside the zeroed
+# fields. An anchored line (the eksplikacija's ceiling total, the drawing's
+# painted walls, the floor plan's skirting) bills a STATED total and has to
+# take the excluded rooms' own share off it — a share that is gone from the
+# room by the time the builder runs, because `mark_rooms` runs after the
+# per-room math. Cleared together with the marks (2026-09-13).
+EXCLUDED_QUANTITIES_KEY = "_neskaiciuoti_kiekiai"
+
+
+def _zero(r: dict, fields: Iterable[str], prev: dict | None = None) -> None:
+    """Zero `fields` on the room, remembering what they held. `prev` is the
+    stash of an earlier pass: a field already at 0 (marked before, not
+    recomputed since) keeps the share that pass recorded."""
+    stash = r.setdefault(EXCLUDED_QUANTITIES_KEY, {})
     for f in fields:
         if f in r:
+            try:
+                v = float(r[f] or 0)
+            except (TypeError, ValueError):
+                v = 0.0
+            if not v and prev:
+                try:
+                    v = float(prev.get(f) or 0)
+                except (TypeError, ValueError):
+                    v = 0.0
+            if v:
+                stash[f] = v
             r[f] = 0.0
+    if not stash:
+        r.pop(EXCLUDED_QUANTITIES_KEY, None)
+
+
+def excluded_quantity(r: dict, field: str) -> float:
+    """A room's own share of `field` whether or not a choice zeroed it."""
+    if not isinstance(r, dict):
+        return 0.0
+    try:
+        live = float(r.get(field) or 0)
+    except (TypeError, ValueError):
+        live = 0.0
+    if live:
+        return live
+    try:
+        return float((r.get(EXCLUDED_QUANTITIES_KEY) or {}).get(field) or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
@@ -215,10 +258,12 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
         r.pop("_neskaiciuoti", None)
         r.pop("_neskaiciuoti_kodel", None)
         r.pop("_neskaiciuoti_sritys", None)
+        prev = r.pop(EXCLUDED_QUANTITIES_KEY, None)
+        prev = prev if isinstance(prev, dict) else None
         if is_room_excluded(apimtis, r.get("nr")):
             r["_neskaiciuoti"] = True
             r["_neskaiciuoti_kodel"] = "pasirinkimas"
-            _zero(r, COMPUTED_ROOM_FIELDS)
+            _zero(r, COMPUTED_ROOM_FIELDS, prev)
             marked.append(_nr(r.get("nr")))
             continue
         off = room_families_off(apimtis, r.get("nr"))
@@ -226,7 +271,7 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
             continue
         r["_neskaiciuoti_sritys"] = off
         for fam in off:
-            _zero(r, FAMILY_ROOM_FIELDS[fam])
+            _zero(r, FAMILY_ROOM_FIELDS[fam], prev)
         if "apdaila" in off:
             r["_walls_unpainted_reason"] = "pasirinkimas"
             r["_ceiling_paint_source"] = "pasirinkimas"

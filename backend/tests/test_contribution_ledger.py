@@ -525,6 +525,112 @@ def test_the_walls_anchor_survives_the_recompute_round_trip():
     assert p.walls_anchor["total_area_m2"] == 220.0 and p.ceiling_anchor["total_area_m2"] == 104.53
 
 
+# ── the floor anchors: the floor plan's own skirting and covering totals (2026-09-13) ──
+
+def test_the_floor_plan_states_its_skirting_and_covering():
+    from extractor.vision_call import _floor_anchors_from_figures
+    figures = [
+        {"page": 7, "family": "grindjuostes", "unit": "m", "value": 53.69, "label": "Grindjuostės (derinamos prie durų arba grindų dangos), h-8cm"},
+        {"page": 7, "family": "grindjuostes", "unit": "m", "value": 24.97, "label": "Grindjuostės (iš plytelių), h-8cm"},
+        {"page": 7, "family": "grindu_danga", "unit": "m²", "value": 76.65, "label": "laminuota grindų danga"},
+        {"page": 7, "family": "grindu_danga", "unit": "m2", "value": 12.5, "label": "Grindų plytelės 60×60"},   # tiles — not a covering we lay
+        {"page": 4, "family": "grindjuostes", "unit": "m", "value": 40.0, "label": "Lubų karnizas"},          # a cornice, whatever the guesser said
+        {"page": 7, "family": "grindjuostes", "unit": "vnt", "value": 3, "label": "Grindjuostės"},            # not a length
+        {"page": 3, "family": "sienu_dazymas", "unit": "m2", "value": 202.0, "label": "Glaistoma dažoma"},
+    ]
+    a = _floor_anchors_from_figures(figures)
+    assert set(a) == {"grindjuostes", "plyteliu_grindjuostes", "laminatas"}
+    assert a["grindjuostes"]["total"] == 53.69 and a["grindjuostes"]["unit"] == "m" and a["grindjuostes"]["page"] == 7
+    assert a["plyteliu_grindjuostes"]["total"] == 24.97 and len(a["plyteliu_grindjuostes"]["parts"]) == 1
+    assert a["laminatas"]["total"] == 76.65 and a["laminatas"]["unit"] == "m2"
+    assert all(v["label"] == "grindų plano legenda" for v in a.values())
+    assert _floor_anchors_from_figures([]) == {} and _floor_anchors_from_figures(None) == {}
+
+
+def _tile_base(r: dict) -> float:
+    n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+              if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+    return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
+
+
+def _prepared(source: dict) -> dict:
+    """The blob after the per-room math, with no anchor of any kind on it."""
+    from extractor.vision_call import _recompute_per_room_via_python
+    parsed = {k: v for k, v in source.items() if k not in ("darbu_sarasas", "pozicijos")}
+    parsed["pozicijos"] = []
+    for k in ("_ceiling_anchor", "_walls_anchor", "_floor_anchors"):
+        parsed.pop(k, None)
+    return _recompute_per_room_via_python(parsed, parsed.get("_overrides") or {})
+
+
+@pytest.mark.parametrize("scale,expect_anchor", [(0.75, True), (0.30, False)],
+                         ids=["legend-below-rooms", "legend-far-off"])
+def test_anchored_floor_lines_say_anchor_not_sum(blob, scale, expect_anchor):
+    """objektas_g: the grindų plano legend states 53,69 m of skirting, 24,97 m
+    of tile skirting and 76,65 m² of laminate against the rooms' 91,85 m /
+    39,06 m of wall base / 79,50 m². The billed lines follow the drawing; the
+    rooms' own figures stay listed and the anchor step says why they do not
+    add up. A legend far off the rooms is ignored with one warning per kind."""
+    parsed = _prepared(blob)
+    rooms = parsed["patalpos"]
+    gj = round(sum(float(r.get("grindjuosciu_m") or 0) for r in rooms), 2)
+    lam = round(sum(float(r.get("pvc_grindys_m2") or 0) for r in rooms), 2)
+    tile = round(sum(_tile_base(r) for r in rooms if float(r.get("plyteles_grindys_m2") or 0) > 0), 2)
+    assert gj > 0 and lam > 0 and tile > 0, "the snapshot has all three kinds"
+    def _a(total, unit, label):
+        return {"total": round(total, 2), "unit": unit, "label": "grindų plano legenda", "page": 7,
+                "parts": [{"value": round(total, 2), "label": label, "page": 7}]}
+    parsed["_floor_anchors"] = {
+        "grindjuostes": _a(gj * scale, "m", "Grindjuostės"),
+        "plyteliu_grindjuostes": _a(tile * scale, "m", "Grindjuostės (iš plytelių)"),
+        "laminatas": _a(lam * scale, "m2", "laminuota grindų danga"),
+    }
+    rows = _build_pozicijos_from_rooms(parsed)["pozicijos"]
+    by = {r["aprasymas"]: r for r in rows}
+    expected = [("Grindjuosčių sumontavimas", gj), ("Grindjuosčių dažymas", gj),
+                ("Parketo / laminato klojimas", lam),
+                ("Plytelių grindjuosčių supjovimas ir suklijavimas", tile)]
+    warns = [w for w in parsed.get("warnings") or [] if w.get("code") == "grindu_plano_legenda_ignored"]
+    if expect_anchor:
+        for label, ref in expected:
+            row = by[label]
+            assert float(row["kiekis"]) == pytest.approx(ref * scale, abs=0.02), label
+            assert row["roll_up"][0]["op"] == "anchor" and "Grindų plano legenda" in row["roll_up"][0]["label"], label
+            assert abs(replay(row["contributions"], row["roll_up"]) - float(row["kiekis"])) <= 0.01, label
+            assert row["contributions"] and row["contributions_sum_to_total"] is False, label
+            assert "grindų plano legendos" in (row.get("_confidence_reason") or ""), label
+        # the materials follow the billed quantity (lifted into their own rows)
+        assert by["Grindjuostės (m + 10% atliekų)"]["kiekis"] == pytest.approx(gj * scale * 1.10, abs=0.02)
+        assert by["Grindų danga (m² + 10% atliekų)"]["kiekis"] == pytest.approx(lam * scale * 1.10, abs=0.02)
+        assert by["Grindų dangos pamušalas"]["kiekis"] == pytest.approx(lam * scale, abs=0.02)
+        assert not warns
+    else:
+        for label, ref in expected[:3]:
+            row = by[label]
+            assert float(row["kiekis"]) == pytest.approx(ref, abs=0.02), label
+            assert row["roll_up"][0]["op"] == "sum", label
+        tile_row = by.get("Plytelių grindjuosčių supjovimas ir suklijavimas")
+        assert tile_row is None or not any(s.get("op") == "anchor" for s in tile_row.get("roll_up") or [])
+        assert sorted(w.get("kind") for w in warns) == ["grindjuostes", "laminatas", "plyteliu_grindjuostes"]
+
+
+def test_the_floor_anchors_survive_the_recompute_round_trip():
+    from main import RecomputePayload
+    p = RecomputePayload.model_validate({"patalpos": [], "_floor_anchors": {"grindjuostes": {"total": 53.69, "unit": "m"}}})
+    assert p.floor_anchors["grindjuostes"]["total"] == 53.69
+
+
+@pytest.mark.skipif(not (Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_g" / "ai_extract.json").exists(),
+                    reason="fixture not on this machine")
+def test_the_out_of_sample_floor_plan_states_its_skirting_and_covering():
+    from extractor.vision_call import _floor_anchors_from_figures
+    fx = json.loads((Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_g" / "ai_extract.json").read_text())
+    a = _floor_anchors_from_figures(fx.get("_autoriaus_kiekiai"))
+    assert a["grindjuostes"]["total"] == pytest.approx(53.69) and a["grindjuostes"]["page"] == 7
+    assert a["plyteliu_grindjuostes"]["total"] == pytest.approx(24.97)
+    assert a["laminatas"]["total"] == pytest.approx(76.65)
+
+
 @pytest.mark.skipif(not (Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_g" / "ai_extract.json").exists(),
                     reason="fixture not on this machine")
 def test_the_out_of_sample_drawing_states_its_painted_walls():

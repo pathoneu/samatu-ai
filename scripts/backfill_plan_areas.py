@@ -25,6 +25,7 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "backend"))
 
+from extractor.vision_call import _floor_anchors_from_figures, _walls_anchor_from_figures  # noqa: E402
 from extractor.plan_area_annotations import (  # noqa: E402
     SOURCE_LABEL, apply_height_statements, lane_warnings, most_common_page,
     plan_pages_from_classification, reconcile_rooms_with_annotations, scan_text_layer,
@@ -123,6 +124,22 @@ def backfill(slug: str, entry: dict) -> str:
         parsed["_autoriaus_kiekiai"] = scan["figures"]
         path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         notes.append(f"author figures: {len(parsed['_autoriaus_kiekiai'])}")
+    # The anchors the builder bills off (same as Step 2.44): the sienų apdailos
+    # plano painted-wall area and the grindų plano skirting / covering totals.
+    # Re-derived from the figures on every run — they are a pure function of them.
+    anchors_before = (parsed.get("_walls_anchor"), parsed.get("_floor_anchors"))
+    parsed.pop("_walls_anchor", None)
+    parsed.pop("_floor_anchors", None)
+    wa = _walls_anchor_from_figures(parsed.get("_autoriaus_kiekiai"))
+    if wa:
+        parsed["_walls_anchor"] = wa
+    fa = _floor_anchors_from_figures(parsed.get("_autoriaus_kiekiai"))
+    if fa:
+        parsed["_floor_anchors"] = fa
+    if anchors_before != (parsed.get("_walls_anchor"), parsed.get("_floor_anchors")):
+        path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        notes.append("anchors: walls " + (f"{wa['total_area_m2']} m²" if wa else "—")
+                     + ", floors " + (", ".join(f"{k} {v['total']} {v['unit']}" for k, v in fa.items()) if fa else "—"))
     if meta.get("plan_area_lane") and REFRESH_LANE:
         _undo_lane(parsed)
         notes.append("lane re-read")

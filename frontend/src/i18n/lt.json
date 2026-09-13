@@ -1235,7 +1235,7 @@
         "share": "dalis",
         "coefficient": "daugiklis",
         "constant": "pastovus",
-        "anchor": "iš lentelės",
+        "anchor": "iš brėžinio",
         "round": "apvalinimas"
       },
       "notASum": "Patalpų skaičiai rodo, iš ko surinktas kiekis; galutinį skaičių nustato skaičiavimo eiga aukščiau, todėl jų suma su juo nesutampa.",

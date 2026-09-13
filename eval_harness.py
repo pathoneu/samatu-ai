@@ -278,8 +278,14 @@ METRICS: dict[str, dict[str, Any]] = {
         # Engine bucket = non-tile finished floor covering (rt_rules floor ==
         # "parquet" family: PVC / parketas / laminatas). Truth wires the
         # project's covering line (objektas_c/objektas_d: PVC; objektas_b: parketas).
+        # 2026-09-13: measure what is BILLED — the row follows the grindų plano
+        # legend when the drawing states the covering area (objektas_g: rooms
+        # 79,50 m², legend 76,65 m²); the santrauka total is the per-room sum.
         "label": "Grindų danga (PVC/parketas)",
-        "accessor": lambda p: _santrauka_get(p, "pvc_grindys_m2_total"),
+        "accessor": lambda p: (
+            _pozicijos_sum(p, "parketo / laminato klojimas")
+            if _pozicijos_sum(p, "parketo / laminato klojimas") is not None
+            else _santrauka_get(p, "pvc_grindys_m2_total")),
         "unit": "m²",
         "tier": "category",
     },
@@ -291,7 +297,21 @@ METRICS: dict[str, dict[str, Any]] = {
     },
     "grindjuostes_total_m": {
         "label": "Grindjuostės (viso)",
-        "accessor": lambda p: _santrauka_get(p, "grindjuosciu_m_total"),
+        # 2026-09-13: the billed row (anchored to the grindų plano legend when
+        # the drawing states the skirting length), else the per-room sum.
+        "accessor": lambda p: (
+            _pozicijos_sum(p, "grindjuosčių sumontavimas")
+            if _pozicijos_sum(p, "grindjuosčių sumontavimas") is not None
+            else _santrauka_get(p, "grindjuosciu_m_total")),
+        "unit": "m",
+        "tier": "category",
+    },
+    "plyteliu_grindjuostes_m": {
+        # Tile skirting — the metres cut from the floor tiles along painted
+        # walls (objektas_g act row „Plytelės - grindjuostės" 26,87 m; the
+        # drawing's legend 24,97 m). A separate line from the MDF skirting.
+        "label": "Plytelių grindjuostės",
+        "accessor": lambda p: _pozicijos_sum(p, "plytelių grindjuosčių"),
         "unit": "m",
         "tier": "category",
     },

@@ -172,6 +172,30 @@ def test_hidden_door_metric_reads_pozicija_not_the_dead_santrauka_key(harness):
     assert accessor({"santrauka": {}, "pozicijos": []}) is None
 
 
+def test_floor_metrics_read_the_billed_rows_before_the_per_room_sums(harness):
+    """2026-09-13: the skirting and covering rows follow the grindų plano legend
+    when the drawing states them (objektas_g: 53,69 m / 76,65 m² against the
+    rooms' 91,85 m / 79,50 m²), and tile skirting is its own act line (26,87 m)
+    that no santrauka key carries."""
+    M = harness.METRICS
+    parsed = {
+        "santrauka": {"grindjuosciu_m_total": 91.85, "pvc_grindys_m2_total": 79.5},
+        "pozicijos": [
+            {"aprasymas": "Grindjuosčių sumontavimas", "kiekis": 53.69, "vnt": "m"},
+            {"aprasymas": "Grindjuostės (m + 10% atliekų)", "kiekis": 59.06, "vnt": "m", "_medziaga": True},
+            {"aprasymas": "Parketo / laminato klojimas", "kiekis": 76.65, "vnt": "m2"},
+            {"aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas", "kiekis": 24.97, "vnt": "m"},
+        ],
+    }
+    assert M["grindjuostes_total_m"]["accessor"](parsed) == 53.69
+    assert M["pvc_grindys_m2"]["accessor"](parsed) == 76.65
+    assert M["plyteliu_grindjuostes_m"]["accessor"](parsed) == 24.97
+    bare = {"santrauka": {"grindjuosciu_m_total": 91.85, "pvc_grindys_m2_total": 79.5}, "pozicijos": []}
+    assert M["grindjuostes_total_m"]["accessor"](bare) == 91.85
+    assert M["pvc_grindys_m2"]["accessor"](bare) == 79.5
+    assert M["plyteliu_grindjuostes_m"]["accessor"](bare) is None, "scores missing, never a phantom 0"
+
+
 def test_summary_shape(harness, objektas_a_truth):
     parsed = harness.run_pipeline_use_gt_inputs(objektas_a_truth)
     results = harness.evaluate(parsed, objektas_a_truth)

@@ -980,3 +980,42 @@ opening adjustments (which leave no marker) and row prices are lost, and no diff
 room-level „Viskas teisinga" stamp stays on rooms and does not reach the ground-truth builder
 (which reads row-level `user_verified_at` only) — no gate needed there.
 
+
+## 2026-09-13 (later): the floor plan's own skirting and covering totals; excluded rooms come off every anchor
+
+**Three more anchors from the grindų plano legend**, the same mechanism as the walls:
+`_floor_anchors_from_figures` (Step 2.44, `_floor_anchors = {grindjuostes, plyteliu_grindjuostes,
+laminatas}`) reads the designer's figures of family `grindjuostes` (split by „plytel" into wooden and
+tile skirting; „lub"/„karniz" labels rejected) and `grindu_danga` (only labels that name a plank
+covering — lamin/parket/vinil/pvc/medin/lent — never tiles, stone, concrete, epoxy, carpet).
+objektas_g: 53,69 m wooden skirting, 24,97 m tile skirting, 76,65 m² laminate against the rooms'
+geometry 91,85 m / 39,06 m of tile-room wall base / 79,50 m². The rows „Grindjuosčių sumontavimas /
+dažymas", „Plytelių grindjuosčių supjovimas ir suklijavimas" and „Parketo / laminato klojimas"
+(underlay and materials following) bill the legend when, net of the rooms a choice keeps out, it is
+40–110 % of the rooms' own figure (`_floor_anchor_meta`; else `grindu_plano_legenda_ignored` per kind
+and the per-room figure stays). Ledger: `anchor` step „Grindų plano legenda", „− neįtrauktos
+patalpos", rooms' own metres beside it, `contributions_sum_to_total = false`, a provenance sentence
+on the row. The tile-skirting line, when anchored, lists EVERY tile-floor room — wet ones too — since
+the legend covers them (the per-room rule „tile floor next to painted walls, wet rooms out" gave
+8,84 m; the act bills 26,87 m: −67 % → −7 %). Carried through `/recompute-interior`
+(`_floor_anchors` alias), the frontend recompute context, the fixture backfill (which now derives
+both anchors from the figures on every run). Eval: skirting and covering metrics read the billed
+rows; `plyteliu_grindjuostes_m` is a scored category metric. objektas_a's legend states „Parketlentės
+(~135 m²)" and „Grindjuostės, h=60 mm (~56 m)" (rooms 123,08 m² / 111,87 m) — both anchored; its act
+has neither row, so nothing moves in its score. objektas_h's „Sienų dažai 320 m²" now anchors its
+walls (recomputed rooms 315,72; act 269,61 — +17,1 → +18,7 %, within the legend-vs-rooms noise).
+
+**Excluded rooms now really come off the anchors.** `scope.mark_rooms` runs AFTER the per-room math
+and zeroed the room's quantities, so `_walls_base_meta`'s „− neįtrauktos patalpos" read 0,00 and an
+anchored Sienų line billed the whole flat whatever room was switched off (yesterday's commit; the
+ceiling anchor was unaffected because it subtracts `plotas_m2`, which is never zeroed). `mark_rooms`
+now remembers what it zeroed on the room (`_neskaiciuoti_kiekiai`, kept across marking passes,
+cleared when the room comes back) and every anchor reads the share through `scope.excluded_quantity`;
+`/recompute-interior` recomputes an excluded room like any other before zeroing it, so the share is
+known even for a room that arrived without numbers. Gates compare the legend NET of excluded rooms
+with the in-scope rooms' sum. Frontend: the anchor op badge reads „iš brėžinio" (was „iš lentelės").
+
+Numbers: in-sample 9,75 % unchanged; OOS 6,74 → 7,06 % (H walls 315,72 → 320, the legend);
+G rows within ±10 %: 10 → 15 % (3/20). Suite 3371 passed; frontend units 688. Four local G
+projects rebuilt through `/recompute-interior`: grindjuostės 53,69 m, plytelių grindjuostės
+24,97 m, laminatas 76,65 m², walls 220, lubos 104,53.

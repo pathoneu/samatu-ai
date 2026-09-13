@@ -5488,5 +5488,33 @@
       "page_width": 842.0,
       "page_height": 1191.0
     }
-  ]
+  ],
+  "_floor_anchors": {
+    "grindjuostes": {
+      "total": 56.0,
+      "unit": "m",
+      "label": "grindų plano legenda",
+      "page": 9,
+      "parts": [
+        {
+          "value": 56.0,
+          "label": "Grindjuostės, h=60 mm",
+          "page": 9
+        }
+      ]
+    },
+    "laminatas": {
+      "total": 135.0,
+      "unit": "m2",
+      "label": "grindų plano legenda",
+      "page": 9,
+      "parts": [
+        {
+          "value": 135.0,
+          "label": "Parketlentės",
+          "page": 9
+        }
+      ]
+    }
+  }
 }

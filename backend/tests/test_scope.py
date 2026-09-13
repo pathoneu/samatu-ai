@@ -17,8 +17,8 @@ os.environ.setdefault("SAMATU_AUTH_DISABLED", "1")
 
 from extractor.ledger import replay  # noqa: E402
 from extractor.scope import (  # noqa: E402
-    EXCLUDED_BECAUSE, apply_ceiling_choice, filter_rows_by_families, mark_rooms,
-    normalize_apimtis, section_family,
+    EXCLUDED_BECAUSE, EXCLUDED_QUANTITIES_KEY, apply_ceiling_choice, excluded_quantity,
+    filter_rows_by_families, mark_rooms, normalize_apimtis, section_family,
 )
 from main import app  # noqa: E402
 
@@ -50,12 +50,16 @@ def _rooms():
     ]
 
 
-def _recompute(apimtis=None, anchor=True):
+def _recompute(apimtis=None, anchor=True, walls_anchor=None, floor_anchors=None):
     body = {"patalpos": _rooms(), "rules_override": {}}
     if apimtis is not None:
         body["rules_override"]["apimtis"] = apimtis
     if anchor:
         body["_ceiling_anchor"] = {"total_area_m2": 50.0, "label": "Iš viso", "page": 1}
+    if walls_anchor is not None:
+        body["_walls_anchor"] = walls_anchor
+    if floor_anchors is not None:
+        body["_floor_anchors"] = floor_anchors
     res = client.post("/recompute-interior", json=body)
     assert res.status_code == 200, res.text
     out = res.json()
@@ -159,6 +163,130 @@ def test_an_excluded_room_leaves_every_row_but_stays_on_the_sheet():
     assert any(e.get("room_nr") == "02" and e.get("excluded_because") == EXCLUDED_BECAUSE
                for e in walls.get("excluded") or []), "the ledger says why the room is out"
     assert all(c.get("room_nr") != "02" for c in walls.get("contributions") or [])
+
+
+def test_mark_rooms_remembers_what_it_zeroed():
+    """An anchored line bills a STATED total (the eksplikacija's ceiling, the
+    drawing's painted walls, the floor plan's skirting) and takes the excluded
+    rooms' own share off it — a share `mark_rooms` zeroes before the builder
+    runs. So the zeroed values stay beside the marks, survive a second marking
+    pass over a room nobody recomputed, and go when the room comes back."""
+    rooms = _rooms()
+    rooms[1]["walls_paintable_m2"] = 33.0
+    rooms[1]["grindjuosciu_m"] = 12.5
+    mark_rooms(rooms, normalize_apimtis({"patalpos_ne": ["02"]}))
+    assert rooms[1]["walls_paintable_m2"] == 0.0 and rooms[1]["grindjuosciu_m"] == 0.0
+    assert rooms[1][EXCLUDED_QUANTITIES_KEY] == {"walls_paintable_m2": 33.0, "grindjuosciu_m": 12.5}
+    assert excluded_quantity(rooms[1], "walls_paintable_m2") == 33.0
+    assert excluded_quantity(rooms[0], "walls_paintable_m2") == 0.0, "nothing held, nothing to remember"
+    assert EXCLUDED_QUANTITIES_KEY not in rooms[0]
+    mark_rooms(rooms, normalize_apimtis({"patalpos_ne": ["02"]}))   # a second pass: fields already 0
+    assert rooms[1][EXCLUDED_QUANTITIES_KEY]["walls_paintable_m2"] == 33.0
+    # a family off in one room remembers that family's share only
+    rooms = _rooms()
+    rooms[0]["walls_paintable_m2"] = 40.0
+    rooms[0]["grindjuosciu_m"] = 20.0
+    mark_rooms(rooms, normalize_apimtis({"patalpu_sritys_ne": {"01": ["grindys"]}}))
+    assert rooms[0]["walls_paintable_m2"] == 40.0 and rooms[0]["grindjuosciu_m"] == 0.0
+    assert rooms[0][EXCLUDED_QUANTITIES_KEY] == {"grindjuosciu_m": 20.0}
+    assert excluded_quantity(rooms[0], "walls_paintable_m2") == 40.0, "a live value is the share"
+    mark_rooms(rooms, None)
+    assert EXCLUDED_QUANTITIES_KEY not in rooms[0], "switching the room back on clears the memory"
+
+
+def test_the_walls_anchor_loses_the_excluded_rooms_share():
+    """The sienų apdailos plano legend counts every room; a room he does not do
+    comes off it by what THAT room's walls held before the choice zeroed them.
+    (2026-09-13: the share read 0,00 — `mark_rooms` runs after the per-room
+    math — so an anchored Sienų line never dropped when a room was switched off.)"""
+    base = _recompute(anchor=False)
+    rooms = {r["nr"]: r for r in base["patalpos"]}
+    walls_sum = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms.values()), 2)
+    share_02 = round(float(rooms["02"]["walls_paintable_m2"]), 2)
+    assert walls_sum > 0 and share_02 > 0
+    legend = round(walls_sum * 0.9, 2)
+    wa = {"total_area_m2": legend, "label": "sienų apdailos plano legenda", "page": 1,
+          "parts": [{"value": legend, "label": "Glaistoma dažoma"}]}
+    anchored = _recompute(anchor=False, walls_anchor=wa)
+    assert _qty(anchored, "Sienų glaistymas/dažymas") == pytest.approx(legend, abs=0.02)
+    out = _recompute({"patalpos_ne": ["02"]}, anchor=False, walls_anchor=wa)
+    assert _qty(out, "Sienų glaistymas/dažymas") == pytest.approx(legend - share_02, abs=0.02)
+    walls = _row(out, "Sienų glaistymas/dažymas")
+    assert walls["roll_up"][0]["op"] == "anchor"
+    chain = " ".join(f"{s.get('label') or ''} {s.get('note') or ''}" for s in walls["roll_up"])
+    assert "neįtrauktos patalpos" in chain
+    assert f"Atimta {share_02:.2f}".replace(".", ",") in chain
+    assert abs(replay(walls["contributions"], walls["roll_up"]) - float(walls["kiekis"])) <= 0.01
+    # the room that is out is named, and its share is remembered on the room itself
+    assert any(e.get("room_nr") == "02" for e in walls.get("excluded") or [])
+    r02 = next(r for r in out["patalpos"] if r["nr"] == "02")
+    assert r02.get(EXCLUDED_QUANTITIES_KEY, {}).get("walls_paintable_m2") == pytest.approx(share_02, abs=0.01)
+
+
+def _tile_base(r: dict) -> float:
+    n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+              if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+    return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
+
+
+def test_the_floor_anchors_lose_the_excluded_rooms_share():
+    """The grindų plano legend states the skirting metres and the covering m²
+    for the whole flat; a room he does not do comes off each by its own share,
+    and a room whose tiles he does not do leaves the tile-skirting line."""
+    base = _recompute(anchor=False)
+    rooms = {r["nr"]: r for r in base["patalpos"]}
+    gj = round(sum(float(r.get("grindjuosciu_m") or 0) for r in rooms.values()), 2)
+    lam = round(sum(float(r.get("pvc_grindys_m2") or 0) for r in rooms.values()), 2)
+    tile_rooms = [r for r in rooms.values() if float(r.get("plyteles_grindys_m2") or 0) > 0]
+    tile = round(sum(_tile_base(r) for r in tile_rooms), 2)
+    assert gj > 0 and lam > 0 and tile > 0 and [r["nr"] for r in tile_rooms] == ["03"]
+    fa = {"grindjuostes": {"total": round(gj * 0.8, 2), "unit": "m", "label": "grindų plano legenda", "page": 1,
+                           "parts": [{"value": round(gj * 0.8, 2), "label": "Grindjuostės"}]},
+          "laminatas": {"total": round(lam * 0.95, 2), "unit": "m2", "label": "grindų plano legenda", "page": 1,
+                        "parts": [{"value": round(lam * 0.95, 2), "label": "laminuota grindų danga"}]},
+          "plyteliu_grindjuostes": {"total": round(tile * 0.7, 2), "unit": "m", "label": "grindų plano legenda", "page": 1,
+                                    "parts": [{"value": round(tile * 0.7, 2), "label": "Grindjuostės (iš plytelių)"}]}}
+    anchored = _recompute(anchor=False, floor_anchors=fa)
+    assert _qty(anchored, "Grindjuosčių sumontavimas") == pytest.approx(gj * 0.8, abs=0.02)
+    assert _qty(anchored, "Parketo / laminato klojimas") == pytest.approx(lam * 0.95, abs=0.02)
+    assert _qty(anchored, "Plytelių grindjuosčių") == pytest.approx(tile * 0.7, abs=0.02)
+    assert _qty(anchored, "Grindų dangos pamušalas") == pytest.approx(lam * 0.95, abs=0.02), "the underlay follows the billed covering"
+    for prefix in ("Grindjuosčių sumontavimas", "Grindjuosčių dažymas", "Parketo / laminato klojimas", "Plytelių grindjuosčių"):
+        row = _row(anchored, prefix)
+        assert row["roll_up"][0]["op"] == "anchor" and row["contributions"], prefix
+        assert row["contributions_sum_to_total"] is False, prefix
+        assert abs(replay(row["contributions"], row["roll_up"]) - float(row["kiekis"])) <= 0.01, prefix
+    assert any(c.get("room_nr") == "03" for c in _row(anchored, "Plytelių grindjuosčių")["contributions"]), \
+        "the wet room is behind the tile-skirting line — its walls are painted above a tiled base"
+
+    out = _recompute({"patalpos_ne": ["02"]}, anchor=False, floor_anchors=fa)
+    share_gj = float(rooms["02"]["grindjuosciu_m"])
+    share_lam = float(rooms["02"]["pvc_grindys_m2"])
+    assert share_gj > 0 and share_lam > 0
+    assert _qty(out, "Grindjuosčių sumontavimas") == pytest.approx(gj * 0.8 - share_gj, abs=0.02)
+    assert _qty(out, "Parketo / laminato klojimas") == pytest.approx(lam * 0.95 - share_lam, abs=0.02)
+    assert _qty(out, "Plytelių grindjuosčių") == pytest.approx(tile * 0.7, abs=0.02), "02 has no tile floor"
+    chain = " ".join(f"{s.get('label') or ''} {s.get('note') or ''}" for s in _row(out, "Grindjuosčių sumontavimas")["roll_up"])
+    assert "neįtrauktos patalpos" in chain and f"Atimta {share_gj:.2f}".replace(".", ",") in chain
+    assert any(e.get("room_nr") == "02" and e.get("excluded_because") == EXCLUDED_BECAUSE
+               for e in _row(out, "Grindjuosčių sumontavimas").get("excluded") or [])
+
+    tiles_off = _recompute({"patalpu_sritys_ne": {"03": ["plyteles"]}}, anchor=False, floor_anchors=fa)
+    assert _row(tiles_off, "Plytelių grindjuosčių") is None, "no tile room left in scope — no line, anchored or not"
+    assert _qty(tiles_off, "Grindjuosčių sumontavimas") == pytest.approx(gj * 0.8, abs=0.02)
+
+
+def test_a_legend_that_describes_another_flat_is_ignored_with_a_warning():
+    base = _recompute(anchor=False)
+    gj = round(sum(float(r.get("grindjuosciu_m") or 0) for r in base["patalpos"]), 2)
+    fa = {"grindjuostes": {"total": round(gj * 3.0, 2), "unit": "m", "label": "grindų plano legenda", "page": 1,
+                           "parts": [{"value": round(gj * 3.0, 2), "label": "Grindjuostės"}]}}
+    out = _recompute(anchor=False, floor_anchors=fa)
+    assert _qty(out, "Grindjuosčių sumontavimas") == pytest.approx(gj, abs=0.02)
+    assert _row(out, "Grindjuosčių sumontavimas")["roll_up"][0]["op"] == "sum"
+    warns = [w for w in out.get("warnings") or [] if w.get("code") == "grindu_plano_legenda_ignored"]
+    assert len(warns) == 1 and warns[0].get("kind") == "grindjuostes"
+    assert "Patikrinkite" in warns[0]["message"]
 
 
 def test_the_ceiling_anchor_loses_the_excluded_rooms_area():

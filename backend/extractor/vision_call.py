@@ -1948,10 +1948,16 @@ def _walls_base_meta(parsed: dict, rooms: list[dict], per_room_sum: float) -> di
     if total <= 0:
         return _per_room()
     rooms_sum = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
-    excluded_m2 = round(sum(float(r.get("walls_paintable_m2") or 0)
+    # The rooms a choice keeps out are zeroed by the time the builder runs
+    # (`scope.mark_rooms` runs after the per-room math), so their share comes
+    # from what they held before the choice — `scope.excluded_quantity`. The
+    # legend counts them; the billed line must not.
+    excluded_m2 = round(sum(_scope.excluded_quantity(r, "walls_paintable_m2")
                             for r in (parsed.get("patalpos") or [])
-                            if isinstance(r, dict) and r.get("_neskaiciuoti")), 2)
-    if rooms_sum <= 0 or not (_WALLS_ANCHOR_MIN * rooms_sum <= total <= _WALLS_ANCHOR_MAX * rooms_sum + 0.5):
+                            if isinstance(r, dict)
+                            and (r.get("_neskaiciuoti") or "apdaila" in (r.get("_neskaiciuoti_sritys") or []))), 2)
+    ours = round(total - excluded_m2, 2)
+    if rooms_sum <= 0 or not (_WALLS_ANCHOR_MIN * rooms_sum <= ours <= _WALLS_ANCHOR_MAX * rooms_sum + 0.5):
         _warns = parsed.setdefault("warnings", [])
         if not any(isinstance(w, dict) and w.get("code") == "apdailos_legenda_ignored" for w in _warns):
             _warns.append({
@@ -1974,6 +1980,136 @@ def _walls_base_meta(parsed: dict, rooms: list[dict], per_room_sum: float) -> di
                   "plane dalis sienų nedažoma.")
     return {"base": base, "source": "anchor", "total": total, "label": anchor.get("label") or _WALLS_ANCHOR_LABEL,
             "parts": parts, "excluded_m2": excluded_m2, "arith": arith, "provenance": provenance}
+
+
+_FLOOR_ANCHOR_LABEL = "grindų plano legenda"
+_FLOOR_ANCHOR_MIN = 0.40    # a stated length/area below 40 % of the rooms' own geometry is another scope
+_FLOOR_ANCHOR_MAX = 1.10    # …and above it (plus rounding) the legend counts rooms we do not have
+_FLOOR_ANCHOR_WARN = "grindu_plano_legenda_ignored"
+# The floor plan's figures the builder can bill off — kind, the reader family
+# that carries it, the unit it must be in, label words that must / must not
+# appear. Skirting splits by "plytel": the legend states wooden and tile
+# skirting as two figures and the sąmata bills them on two lines.
+_FLOOR_ANCHOR_KINDS: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
+    ("plyteliu_grindjuostes", "grindjuostes", "m", ("plytel",), ("lub", "karniz")),
+    ("grindjuostes", "grindjuostes", "m", (), ("plytel", "lub", "karniz")),
+    ("laminatas", "grindu_danga", "m2",
+     ("lamin", "parket", "vinil", "pvc", "medin", "lent"),
+     ("plytel", "akmen", "beton", "epoks", "kilim")),
+)
+_FLOOR_ANCHOR_LT = {
+    "grindjuostes": ("Grindjuosčių ilgis", "m"),
+    "plyteliu_grindjuostes": ("Plytelių grindjuosčių ilgis", "m"),
+    "laminatas": ("Grindų dangos plotas", "m²"),
+}
+
+
+def _floor_anchors_from_figures(figures: list[dict] | None) -> dict:
+    """The floor plan's own totals — grindjuostės (m), plytelių grindjuostės
+    (m), parketas/laminatas (m²) — read by the text-layer lane from the grindų
+    plano legend (`_figures_on_page`, families `grindjuostes` / `grindu_danga`).
+    objektas_g, 2026-09-13: „Grindjuostės (derinamos prie durų arba grindų
+    dangos) 53,69 m", „Grindjuostės (iš plytelių) 24,97 m", „laminuota grindų
+    danga 76,65 m²" against 76,75 m / 8,84 m / 79,50 m² from the rooms'
+    geometry; the contractor's act bills 26,87 m of tile skirting, which the
+    per-room rule (tile floors next to painted walls, wet rooms out) could not
+    see. Returns {kind: {total, unit, label, page, parts}} for the kinds the
+    drawing states — {} when it states none."""
+    out: dict[str, dict] = {}
+    for kind, family, unit, need, deny in _FLOOR_ANCHOR_KINDS:
+        parts: list[dict] = []
+        for f in figures or []:
+            if not isinstance(f, dict) or f.get("family") != family:
+                continue
+            if str(f.get("unit") or "").lower().replace("²", "2") != unit:
+                continue
+            label = str(f.get("label") or "")
+            low = label.lower()
+            if need and not any(k in low for k in need):
+                continue
+            if any(k in low for k in deny):
+                continue
+            try:
+                value = float(f.get("value") or 0)
+            except (TypeError, ValueError):
+                continue
+            if value <= 0:
+                continue
+            parts.append({"value": round(value, 2), "label": label, "page": f.get("page")})
+        if not parts:
+            continue
+        pages = [x["page"] for x in parts if x.get("page") is not None]
+        page = max(set(pages), key=pages.count) if pages else None
+        out[kind] = {"total": round(sum(x["value"] for x in parts), 2), "unit": unit,
+                     "label": _FLOOR_ANCHOR_LABEL, "page": page, "parts": parts}
+    return out
+
+
+def _floor_anchor_meta(parsed: dict, kind: str, *, reference: float, excluded: float) -> dict:
+    """How a floor-plan-anchored quantity was reached — the floors' twin of
+    `_walls_base_meta`. `reference` is what the rooms' own geometry gives for
+    this kind (the skirting metres, the tile rooms' wall base, the covering
+    m²) over the rooms in scope; `excluded` the share of the rooms a choice
+    keeps out (what they held before the choice zeroed them). `source` is
+    "anchor" (the legend's total minus the excluded rooms) or "per_room". The
+    legend is taken only when, net of the excluded rooms, it describes these
+    rooms — 40–110 % of the reference; outside that it is another storey or
+    another scope, the per-room figure stays and a warning says so once."""
+    what_lt, unit_lt = _FLOOR_ANCHOR_LT[kind]
+
+    def _per_room() -> dict:
+        return {"base": round(reference, 2), "source": "per_room", "total": None, "label": None,
+                "parts": [], "excluded": 0.0, "arith": "", "provenance": None, "kind": kind}
+    anchor = (parsed.get("_floor_anchors") or {}).get(kind) or {}
+    try:
+        total = float(anchor.get("total") or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+    if total <= 0 or reference <= 0:
+        return _per_room()
+    excluded = round(max(float(excluded or 0), 0.0), 2)
+    ours = round(total - excluded, 2)
+    if not (_FLOOR_ANCHOR_MIN * reference <= ours <= _FLOOR_ANCHOR_MAX * reference + 0.5):
+        _warns = parsed.setdefault("warnings", [])
+        if not any(isinstance(w, dict) and w.get("code") == _FLOOR_ANCHOR_WARN and w.get("kind") == kind
+                   for w in _warns):
+            _warns.append({
+                "level": "WARN", "code": _FLOOR_ANCHOR_WARN, "kind": kind,
+                "message": (f"Grindų plane užrašytas {what_lt.lower()} ({_lt_num(total)} {unit_lt}) "
+                            f"per daug skiriasi nuo suskaičiuoto iš patalpų ({_lt_num(reference)} {unit_lt}), "
+                            "todėl kiekis imtas iš patalpų sumos. Patikrinkite, ar legenda "
+                            "apima tas pačias patalpas."),
+            })
+        return _per_room()
+    if ours <= 0:
+        return _per_room()
+    parts = anchor.get("parts") or []
+    arith = " + ".join(_lt_num(float(x.get("value") or 0)) for x in parts) if len(parts) > 1 else ""
+    provenance = (f"{what_lt} — iš grindų plano legendos: "
+                  f"{(arith + ' = ') if arith else ''}{_lt_num(total)} {unit_lt}"
+                  + (f", be neįtrauktų patalpų {_lt_num(excluded)} {unit_lt}" if excluded > 0 else "")
+                  + f". Iš patalpų geometrijos brėžinyje — {_lt_num(reference)} {unit_lt}.")
+    return {"base": ours, "source": "anchor", "total": total, "label": anchor.get("label") or _FLOOR_ANCHOR_LABEL,
+            "parts": parts, "excluded": excluded, "arith": arith, "provenance": provenance, "kind": kind}
+
+
+def _floor_anchor_steps(meta: dict, note: str) -> list[dict]:
+    """The roll-up of a line billed off the grindų plano legend: the stated
+    total, then the excluded rooms taken off it. NOT Σ-decomposable — the
+    rooms' own figures stay beside it and `note` says why they do not add up."""
+    unit_lt = _FLOOR_ANCHOR_LT[meta["kind"]][1]
+    steps = [_ledger.step(
+        "anchor", f"Grindų plano legenda{': ' + meta['arith'] if meta.get('arith') else ''}",
+        meta["total"], note)]
+    if (meta.get("excluded") or 0) > 0:
+        steps.append(_ledger.step("sum", "− neįtrauktos patalpos",
+                                  round(float(meta["total"]) - float(meta["excluded"]), 2),
+                                  f"Atimta {_lt_num(meta['excluded'])} {unit_lt}"))
+    return steps
+
+
+_FLOOR_ANCHOR_NOTE = ("Patalpų kiekiai — iš brėžinio geometrijos, o bendras kiekis imamas iš "
+                      "grindų plano legendos, todėl patalpų suma jam nelygi")
 
 
 def _ceiling_paint_base(parsed: dict, rooms: list[dict],
@@ -3340,10 +3476,20 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if isinstance(parsed.get("warnings"), list):
         parsed["warnings"] = [w for w in parsed["warnings"]
                               if not (isinstance(w, dict) and w.get("code") == "grindjuosciu_cap_fired")]
-    grindjuostes_total = round(grindjuostes_raw, 2)
+    # The floor plan's own skirting length (grindų plano legenda), when the
+    # drawing states one and it describes these rooms — see
+    # `_floor_anchors_from_figures`. The rooms' metres stay on the ledger.
+    _gj_meta = _floor_anchor_meta(
+        parsed, "grindjuostes", reference=grindjuostes_raw,
+        excluded=sum(_scope.excluded_quantity(r, "grindjuosciu_m") for r in _all_rooms
+                     if isinstance(r, dict)
+                     and (r.get("_neskaiciuoti") or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
+    grindjuostes_total = round(_gj_meta["base"], 2)
     if grindjuostes_total > 0:
         # The ledger: every room's own metres, then one sum step.
         _g_contribs, _g_excluded = [], []
+        for r in _excluded_rooms:
+            _g_excluded.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
         for r in rooms:
             _gm = round(float(r.get("grindjuosciu_m") or 0), 2)
             if _gm <= 0:
@@ -3374,8 +3520,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 }
             _g_contribs.append(_ledger.contribution(
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
-        _g_roll = [_ledger.sum_step(_g_contribs,
-                                    _ledger.rooms_label(len(_g_contribs)))]
+        if _gj_meta["source"] == "anchor":
+            _g_roll = _floor_anchor_steps(_gj_meta, _FLOOR_ANCHOR_NOTE)
+            _g_reason = {"_confidence_reason": _gj_meta["provenance"]}
+        else:
+            _g_roll = [_ledger.sum_step(_g_contribs,
+                                        _ledger.rooms_label(len(_g_contribs)))]
+            _g_reason = {}
         # Two lines, two ledgers. They must not SHARE the lists or the dicts
         # inside them: a consumer that edits one row's contribution (a merge
         # carrying a correction, a serializer normalising a value) would silently
@@ -3391,11 +3542,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                  "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL,
                  "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
                  "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
-                 "medziagos_vnt": "m"},
+                 "medziagos_vnt": "m", **_g_reason},
                 *_g_copy()),
             _ledger.attach(
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių dažymas",
-                 "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL},
+                 "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL, **_g_reason},
                 *_g_copy()),
         ])
 
@@ -3781,17 +3932,54 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # +6.6%). The 0.65 m/m² ratio cap is deliberately NOT applied: it exists
         # to remove interior walls double-counted across a whole flat, and these
         # are 1-3 small rooms whose perimeter/area ratio is legitimately high.
+        def _tile_wall_base_m(r: dict) -> float:
+            """The wall base a tile-floor room offers skirting: perimeter less
+            0,85 m per door, +10 % waste — the same primitives as the MDF line."""
+            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+                      if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
+            return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
+
+        # The floor plan's own tile-skirting length (grindų plano legenda,
+        # „Grindjuostės (iš plytelių)"), when the drawing states one. It covers
+        # every tile-floor room — wet ones too, where the walls are painted
+        # above a tiled base — so it is gated against the wall base of ALL
+        # tile-floor rooms, not against the narrow per-room rule below
+        # (objektas_g: legend 24,97 m, act 26,87 m, the rule 8,84 m).
+        _tile_floor_rooms = [r for r in rooms if float(r.get("plyteles_grindys_m2") or 0) > 0]
+        _pg_meta = _floor_anchor_meta(
+            parsed, "plyteliu_grindjuostes",
+            reference=round(sum(_tile_wall_base_m(r) for r in _tile_floor_rooms), 2),
+            excluded=sum(_tile_wall_base_m(r) for r in _all_rooms
+                         if isinstance(r, dict)
+                         and (r.get("_neskaiciuoti") or "plyteles" in (r.get("_neskaiciuoti_sritys") or []))
+                         and _scope.excluded_quantity(r, "plyteles_grindys_m2") > 0))
+        if _pg_meta["source"] == "anchor":
+            pozicijos.append(_ledger.attach(
+                {"skyrius": SK_PL,
+                 "aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas",
+                 "vnt": "m", "kiekis": _pg_meta["base"], "saltinis": SAL,
+                 "confidence": "high",
+                 "_confidence_reason": _pg_meta["provenance"],
+                 "_assumption": (
+                     "Ilgis — iš grindų plano legendos. Patalpų skaičiai šalia — "
+                     "jų sienų pagrindas iš brėžinio (perimetras be durų + 10 % "
+                     "atliekų), todėl jų suma su kiekiu nesutampa. Plytelės "
+                     "pjaunamos iš tos pačios dangos, todėl atskiros medžiagos "
+                     "eilutės nėra.")},
+                [_ledger.contribution(r, _tile_wall_base_m(r), "m",
+                                      "Plytelių grindys — grindjuostės pagal grindų plano legendą")
+                 for r in _tile_floor_rooms],
+                _choice_excluded("plyteles", lambda r: _scope.excluded_quantity(r, "plyteles_grindys_m2") > 0),
+                _floor_anchor_steps(_pg_meta, _FLOOR_ANCHOR_NOTE)))
         plyteliu_gj = 0.0
         for r in rooms:
             if float(r.get("plyteles_grindys_m2") or 0) <= 0:
                 continue
             if _pask(r) in WET:
                 continue  # fully tiled walls → no skirting (contractor agrees)
-            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
-                      if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
-            plyteliu_gj += max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85)
-        plyteliu_gj = round(plyteliu_gj * 1.10, 2)
-        if plyteliu_gj > 0:
+            plyteliu_gj += _tile_wall_base_m(r)
+        plyteliu_gj = round(plyteliu_gj, 2)
+        if plyteliu_gj > 0 and _pg_meta["source"] != "anchor":
             pozicijos.append({
                 "skyrius": SK_PL,
                 "aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas",
@@ -3883,27 +4071,43 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         }, _i_contribs, _choice_excluded("grindys")))
 
     pvc_grindys = _sum("pvc_grindys_m2")
-    if pvc_grindys > 0:
+    # The floor plan's own covering area („laminuota grindų danga 76,65 m²"),
+    # when the drawing states one — see `_floor_anchors_from_figures`.
+    _lam_meta = _floor_anchor_meta(
+        parsed, "laminatas", reference=pvc_grindys,
+        excluded=sum(_scope.excluded_quantity(r, "pvc_grindys_m2") for r in _all_rooms
+                     if isinstance(r, dict)
+                     and (r.get("_neskaiciuoti") or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
+    pvc_billed = round(_lam_meta["base"], 2)
+    if pvc_billed > 0:
+        _lam_contribs = [_ledger.contribution(r, round(float(r.get("pvc_grindys_m2") or 0), 2), "m2",
+                                              "Grindys — parketas arba laminatas")
+                         for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0]
+        _lam_excluded = (
+            [_ledger.excluded(r, "Grindys klojamos plytelėmis — dangos nėra")
+             for r in rooms
+             if float(r.get("pvc_grindys_m2") or 0) <= 0
+             and float(r.get("plyteles_grindys_m2") or 0) > 0]
+            + _choice_excluded("grindys", lambda r: not _floor_rule_is_tile(r)))
+        _lam_row = {
+            "skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
+            "vnt": "m2", "kiekis": pvc_billed, "saltinis": SAL,
+            "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
+            "medziagos_kiekis": round(pvc_billed * 1.10, 2),
+            "medziagos_vnt": "m2"}
+        if _lam_meta["source"] == "anchor":
+            _lam_row["_confidence_reason"] = _lam_meta["provenance"]
+            _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,
+                                      _floor_anchor_steps(_lam_meta, _FLOOR_ANCHOR_NOTE))
+        else:
+            _lam_row = _family_ledger(_lam_row, _lam_contribs, _lam_excluded)
         pozicijos.extend([
             # The underlay roll itself — same m² as the row it used to clone.
             {"skyrius": SK_GR, "aprasymas": "Grindų dangos pamušalas",
-             "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
+             "vnt": "m2", "kiekis": pvc_billed, "saltinis": SAL,
              "susijes_darbas": "Parketo / laminato klojimas",
              _IS_MATERIAL_LINE: True},
-            _family_ledger({
-                "skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
-                "vnt": "m2", "kiekis": pvc_grindys, "saltinis": SAL,
-                "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
-                "medziagos_kiekis": round(pvc_grindys * 1.10, 2),
-                "medziagos_vnt": "m2"},
-                [_ledger.contribution(r, round(float(r.get("pvc_grindys_m2") or 0), 2), "m2",
-                                      "Grindys — parketas arba laminatas")
-                 for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0],
-                [_ledger.excluded(r, "Grindys klojamos plytelėmis — dangos nėra")
-                 for r in rooms
-                 if float(r.get("pvc_grindys_m2") or 0) <= 0
-                 and float(r.get("plyteles_grindys_m2") or 0) > 0]
-                + _choice_excluded("grindys", lambda r: not _floor_rule_is_tile(r))),
+            _lam_row,
         ])
 
     # Slenksniai — perėjimai tarp patalpų (per kambarį 1 vnt)
@@ -5401,6 +5605,12 @@ def extract_interior(
         _wa = _walls_anchor_from_figures(_scan["figures"])
         if _wa:
             parsed["_walls_anchor"] = _wa
+        # …and the floor plan's own grindjuostės / plytelių grindjuostės /
+        # laminatas totals — the floors' anchors, `_floor_anchors_from_figures`.
+        parsed.pop("_floor_anchors", None)
+        _fa = _floor_anchors_from_figures(_scan["figures"])
+        if _fa:
+            parsed["_floor_anchors"] = _fa
         parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
         # The plan's own storey height („H - 2820") for rooms that carry only our
         # default — the same number read, not assumed; a room's own reader wins.

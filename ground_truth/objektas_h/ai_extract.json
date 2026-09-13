@@ -11341,5 +11341,17 @@
       "page_width": 595.0,
       "page_height": 842.0
     }
-  ]
+  ],
+  "_walls_anchor": {
+    "total_area_m2": 320.0,
+    "label": "sienų apdailos plano legenda",
+    "page": 6,
+    "parts": [
+      {
+        "value": 320.0,
+        "label": "Sienų dažai",
+        "page": 6
+      }
+    ]
+  }
 }

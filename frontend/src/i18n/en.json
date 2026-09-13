@@ -1226,7 +1226,7 @@
         "share": "share",
         "coefficient": "multiplier",
         "constant": "constant",
-        "anchor": "from table",
+        "anchor": "from drawing",
         "round": "rounding"
       },
       "notASum": "The per-room figures show what the quantity is assembled from; the chain above decides the final number, so they do not add up to it.",
