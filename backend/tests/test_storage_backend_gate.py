@@ -24,7 +24,8 @@ R2_ENV = {
     "R2_ACCOUNT_ID": "acct", "R2_ACCESS_KEY_ID": "ak",
     "R2_SECRET_ACCESS_KEY": "sk", "R2_BUCKET": "a-bucket",
 }
-_ALL = tuple(R2_ENV) + ("STORAGE_BACKEND", "ENV", "LOCAL_STORAGE_DIR",
+_ALL = tuple(R2_ENV) + ("STORAGE_BACKEND", "ENV", "ENVIRONMENT",
+                        "RAILWAY_ENVIRONMENT", "RENDER", "LOCAL_STORAGE_DIR",
                         "SAMATU_DATA_DIR")
 
 
@@ -165,3 +166,35 @@ def test_missing_var_names_appear_in_the_reason(monkeypatch):
             monkeypatch.setenv(k, v)
     ok, why = storage.r2_decision()
     assert ok is False and "R2_BUCKET" in why
+
+
+# ── A deploy is recognised the way the rest of the backend recognises it ────
+@pytest.mark.parametrize("var, value, want", [
+    ("ENV", "production", "r2"),
+    ("ENV", "prod", "r2"),                       # main.py / auth.py accept both
+    ("ENV", "Production ", "r2"),                # case and whitespace as elsewhere
+    ("ENVIRONMENT", "production", "r2"),
+    ("RAILWAY_ENVIRONMENT", "production", "r2"),  # what the Railway deploy sets
+    ("RENDER", "true", "r2"),                    # what a Render deploy sets
+    ("RAILWAY_ENVIRONMENT", "staging", "local"),  # a preview environment is not prod
+    ("ENV", "development", "local"),
+])
+def test_every_production_signal_selects_r2_with_credentials(monkeypatch, var, value, want):
+    """2026-09-15: the rule read `ENV == "production"` exactly. The Railway deploy
+    does not necessarily set ENV, so with credentials present it would have
+    fallen to the container's disk — every upload lost on the next deploy."""
+    _env(monkeypatch, creds=True)
+    monkeypatch.setenv(var, value)
+    use_r2, why = storage.r2_decision()
+    assert (use_r2, storage.selected_backend_name()) == (want == "r2", want)
+    if want == "r2":
+        assert why == f"{var}=production" or why == "RENDER=true"
+    else:
+        assert "credentials present but unused" in why
+
+
+def test_a_production_signal_without_credentials_is_still_local(monkeypatch):
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
+    use_r2, why = storage.r2_decision()
+    assert not use_r2 and storage.selected_backend_name() == "local"
+    assert "missing" in why

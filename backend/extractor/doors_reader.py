@@ -248,8 +248,10 @@ def _room_resolver(rooms: list[dict]):
         named = by_name.get(nm)
         if named and len(named) == 1:
             return named[0]
-        # "01 Svetainė" / "Svetainė (01)" — a number somewhere in the string
-        m = re.search(r"\b(\d{1,3})\b", key)
+        # "01 Svetainė" / "P-07" / "07 (miegamasis)" — the number LEADS the
+        # string. A number after a name („Miegamasis 2") names the room, it
+        # is not room 02 (2026-09-15 review).
+        m = re.match(r"^\s*(?:[A-Za-z]{1,2}[-.\s]?)?0*(\d{1,3})(?![.,]\d)(?![A-Za-z]{2})", key)
         if m:
             short = by_short.get(m.group(1).lstrip("0") or "0")
             if short and len(short) == 1:

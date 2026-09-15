@@ -29,6 +29,9 @@ from __future__ import annotations
 
 import hashlib
 import io
+import threading
+import time
+from collections import OrderedDict
 import logging
 from pathlib import Path
 
@@ -243,15 +246,49 @@ def safe_dpi(requested: int, page_w_pt: float, page_h_pt: float) -> int:
     return dpi
 
 
-def render_crop(pdf_bytes: bytes, page: int, rect: list[float], dpi: int) -> bytes:
-    """PNG bytes for `rect` (page-percent, padded) on `page` (1-based)."""
-    from pdf2image import convert_from_bytes
+# A room's check sheet asks for six crops on one or two sheets, and the zoom
+# viewer for a fresh rect on every gesture — each used to refetch the PDF and
+# rasterise the whole page again (2026-09-15 review). Small in-process LRUs:
+# the rendered page per (project, page, dpi) and the page count/size per
+# project; the crop is cut from the cached raster.
+# Entries live for a couple of minutes: long enough for one room's burst of
+# crops, short enough that a project whose PDF changes under the same id (a
+# re-read after a new upload) is never served the old sheet for long. A page
+# raster is bounded by MAX_PAGE_PX (≈ 40 MB RGB at the cap), so three of them
+# is the most the container is asked to hold.
+_PAGE_CACHE: "OrderedDict[tuple, tuple[float, object]]" = OrderedDict()
+_PAGE_CACHE_MAX = 3
+_SIZE_CACHE: "OrderedDict[str, tuple[float, tuple]]" = OrderedDict()
+_SIZE_CACHE_MAX = 8
+_CACHE_TTL_S = 120.0
+_cache_lock = threading.Lock()
 
-    pages, w_pt, h_pt = _page_count_and_size(pdf_bytes)
-    if pages is not None and not (1 <= page <= pages):
-        raise HTTPException(status_code=404,
-                            detail=f"Brėžinyje nėra {page} puslapio")
-    dpi = safe_dpi(dpi, w_pt, h_pt)
+
+def _cached(cache: "OrderedDict", key, maxsize: int, make, ttl_s: float = _CACHE_TTL_S):
+    now = time.monotonic()
+    with _cache_lock:
+        hit = cache.get(key)
+        if hit is not None and now - hit[0] < ttl_s:
+            cache.move_to_end(key)
+            return hit[1]
+    value = make()
+    with _cache_lock:
+        cache[key] = (time.monotonic(), value)
+        cache.move_to_end(key)
+        while len(cache) > maxsize:
+            cache.popitem(last=False)
+    return value
+
+
+def _reset_render_caches_for_test() -> None:
+    with _cache_lock:
+        _PAGE_CACHE.clear()
+        _SIZE_CACHE.clear()
+        _PDF_CACHE.clear()
+
+
+def _render_page(pdf_bytes: bytes, page: int, dpi: int):
+    from pdf2image import convert_from_bytes
     try:
         imgs = convert_from_bytes(pdf_bytes, dpi=dpi, fmt="png",
                                   first_page=page, last_page=page)
@@ -262,7 +299,28 @@ def render_crop(pdf_bytes: bytes, page: int, rect: list[float], dpi: int) -> byt
     if not imgs:
         raise HTTPException(status_code=404,
                             detail=f"Brėžinyje nėra {page} puslapio")
-    img = imgs[0]
+    return imgs[0]
+
+
+def render_crop(pdf_bytes: bytes, page: int, rect: list[float], dpi: int,
+                cache_key: str | None = None) -> bytes:
+    """PNG bytes for `rect` (page-percent, padded) on `page` (1-based).
+    `cache_key` (the project id) lets the page raster and size be reused
+    across crops; without it every call renders afresh."""
+    if cache_key:
+        pages, w_pt, h_pt = _cached(_SIZE_CACHE, cache_key, _SIZE_CACHE_MAX,
+                                    lambda: _page_count_and_size(pdf_bytes))
+    else:
+        pages, w_pt, h_pt = _page_count_and_size(pdf_bytes)
+    if pages is not None and not (1 <= page <= pages):
+        raise HTTPException(status_code=404,
+                            detail=f"Brėžinyje nėra {page} puslapio")
+    dpi = safe_dpi(dpi, w_pt, h_pt)
+    if cache_key:
+        img = _cached(_PAGE_CACHE, (cache_key, page, dpi), _PAGE_CACHE_MAX,
+                      lambda: _render_page(pdf_bytes, page, dpi))
+    else:
+        img = _render_page(pdf_bytes, page, dpi)
     W, H = img.size
     x0, y0, x1, y1 = _padded(rect)
     box = (int(W * x0), int(H * y0),
@@ -305,7 +363,7 @@ def api_project_evidence(
         proj = _db.get_project(project_id, user_id=user_filter)
         if not proj:
             raise HTTPException(status_code=404,
-                                detail=f"Project {project_id} not found")
+                                detail="Projektas nerastas")
         target = str(room).strip()
         match = next((r for r in (proj.get("patalpos") or [])
                       if str(r.get("nr") or "").strip() == target), None)
@@ -325,7 +383,7 @@ def api_project_evidence(
     else:
         if not _db.project_exists(project_id, user_id=user_filter):
             raise HTTPException(status_code=404,
-                                detail=f"Project {project_id} not found")
+                                detail="Projektas nerastas")
         if page is None or rect is None:
             raise HTTPException(
                 status_code=400,
@@ -344,12 +402,22 @@ def api_project_evidence(
     data = _cache_read(path)
     if data is None:
         pdf_bytes = _load_pdf(project_id)
-        data = render_crop(pdf_bytes, page_v, rect_v, dpi_v)
+        data = render_crop(pdf_bytes, page_v, rect_v, dpi_v, cache_key=project_id)
         _cache_write(path, data)
     return Response(content=data, media_type="image/png", headers=_headers(etag))
 
 
+_PDF_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_PDF_CACHE_MAX = 2
+
+
 def _load_pdf(project_id: str) -> bytes:
+    """The project's PDF bytes — fetched once per project while its crops are
+    being asked for (two projects kept), not once per crop."""
+    return _cached(_PDF_CACHE, project_id, _PDF_CACHE_MAX, lambda: _load_pdf_uncached(project_id))
+
+
+def _load_pdf_uncached(project_id: str) -> bytes:
     from storage import get_storage, pdf_key
     try:
         data = get_storage().get(pdf_key(project_id))

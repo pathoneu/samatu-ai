@@ -110,3 +110,18 @@ def test_a_mostly_placeable_enumeration_replaces_and_reports_the_rest():
     assert merge_doors_into_rooms(rooms, res) == 1
     assert [_n_doors(r) for r in rooms] == [0, 0, 2]
     assert res["_unattributed"] == 1 and not res.get("_kept_pass1_doors")
+
+
+def test_a_room_number_binds_only_when_it_leads_the_reference():
+    """„01 Svetainė" and „P-07" are room numbers; „Miegamasis 2" is a room
+    NAME with a digit in it and must not become room 02 (2026-09-15 review)."""
+    from extractor.doors_reader import _room_resolver
+    rooms = [{"nr": "01", "pavadinimas": "Svetainė"}, {"nr": "02", "pavadinimas": "Vonia"},
+             {"nr": "07", "pavadinimas": "Miegamasis"}]
+    resolve = _room_resolver(rooms)
+    assert resolve("01 Svetainė") is rooms[0]
+    assert resolve("7") is rooms[2] and resolve("P-07") is rooms[2] and resolve("07 (miegamasis)") is rooms[2]
+    assert resolve("Vonia") is rooms[1]
+    assert resolve("Miegamasis 2") is None
+    assert resolve("Miegamasis 02") is None
+    assert resolve("exterior") is None

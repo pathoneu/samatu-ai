@@ -887,6 +887,11 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
             continue
         if w <= 0 or h <= 0 or k <= 0:
             continue
+        if w < 0.3 or h < 1.0:
+            # Not a door size (centimetres typed into a millimetre field, a
+            # vent flap tagged as a door): treated as unsized so the standard
+            # opening applies instead of a silent 0 (2026-09-15 review).
+            continue
         sized += k
         area = w * h
         if _opening_should_deduct(area, standard):

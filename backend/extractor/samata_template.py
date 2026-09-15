@@ -76,9 +76,7 @@ import unicodedata
 from typing import Any, Iterable, Sequence
 
 from .position_id import position_id
-from .row_scorecard import (
-    app_concept_of, load_concepts, normalize_unit, priced_rows,
-)
+from .row_scorecard import (_app_name, _app_qty, _app_unit, _norm, app_concept_of, load_concepts, normalize_unit, priced_rows)
 
 log = logging.getLogger("pathon.samata_template")
 
@@ -178,12 +176,6 @@ def _fold(value: Any) -> str:
     """Lowercase, diacritics dropped. „Plytelių" → "pluteliu"-shaped ASCII."""
     s = unicodedata.normalize("NFKD", str(value or ""))
     return "".join(ch for ch in s if not unicodedata.combining(ch)).lower()
-
-
-def _norm(value: Any) -> str:
-    """His label as one line of whitespace — the parsed sąmata keeps the PDF's
-    hard line breaks inside a cell."""
-    return _WS_RE.sub(" ", str(value or "").replace("\n", " ")).strip()
 
 
 def _stems(name: Any) -> tuple[str, ...]:
@@ -311,11 +303,6 @@ def _status_for(seen_in: int, n_sources: int) -> tuple[str, bool]:
     threshold = min(DEFAULT_ON_MIN_SOURCES, max(1, n_sources))
     on = seen_in >= threshold
     return (STATUS_DEFAULT if on else STATUS_OPTIONAL), on
-
-
-def _blank_template(name: str) -> dict:
-    return {"version": TEMPLATE_VERSION, "name": name, "sources": [],
-            "n_projects": 0, "sections": []}
 
 
 def _observe(acc: dict, samata: dict, source: str, table: Sequence) -> None:
@@ -650,24 +637,6 @@ def is_fillable(row: dict) -> bool:
 
 
 # ── Rendering ────────────────────────────────────────────────────────────────
-
-def _app_name(row: dict) -> str:
-    return _norm(row.get("aprasymas") or row.get("pavadinimas"))
-
-
-def _app_unit(row: dict) -> str | None:
-    return row.get("mato_vnt") or row.get("vnt")
-
-
-def _app_qty(row: dict) -> float | None:
-    q = row.get("kiekis")
-    if q is None or isinstance(q, bool):
-        return None
-    try:
-        return float(q)
-    except (TypeError, ValueError):
-        return None
-
 
 def _app_price(row: dict) -> float | None:
     p = row.get("kaina")

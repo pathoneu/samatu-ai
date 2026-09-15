@@ -39,7 +39,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from .plan_area_annotations import _f, _rel
-from .plan_dimensions import _PT_M, _label_position, frame_groups
+from .plan_dimensions import _label_position, frame_groups
 
 DPI = 200
 WALL_GREY = 245            # darker than this on the walls-only render = wall (fills are grey)
@@ -373,6 +373,3 @@ def outline_rect_pct(room: dict) -> list[float] | None:
     ys = [float(p[1]) for p in poly]
     return [round(max(0.0, min(xs)), 4), round(max(0.0, min(ys)), 4), round(min(1.0, max(xs)), 4), round(min(1.0, max(ys)), 4)]
 
-
-def outline_mastelis(m_per_pt: float | None) -> int | None:
-    return int(round(m_per_pt / _PT_M)) if m_per_pt else None

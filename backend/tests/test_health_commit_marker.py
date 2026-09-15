@@ -43,3 +43,22 @@ def test_healthz_alias_carries_the_marker_too(monkeypatch):
     must stay that way."""
     monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "0123456789")
     assert TestClient(app).get("/healthz").json()["commit"] == "0123456"
+
+
+def test_health_names_the_storage_backend(monkeypatch):
+    """2026-09-15: the storage rule is pure over the environment, so /health
+    saying which backend a deploy picked lets it be checked from outside —
+    the Railway env may lack the production marker the rule looks for."""
+    import storage
+    from fastapi.testclient import TestClient
+    from main import app
+    for k in ("STORAGE_BACKEND", "ENV", "ENVIRONMENT", "RAILWAY_ENVIRONMENT", "RENDER"):
+        monkeypatch.delenv(k, raising=False)
+    storage.reset_storage_for_test()
+    body = TestClient(app).get("/health").json()
+    assert body["storage"] == "local"
+    monkeypatch.setenv("STORAGE_BACKEND", "r2")
+    for k, v in {"R2_ACCOUNT_ID": "a", "R2_ACCESS_KEY_ID": "k", "R2_SECRET_ACCESS_KEY": "s", "R2_BUCKET": "b"}.items():
+        monkeypatch.setenv(k, v)
+    assert TestClient(app).get("/health").json()["storage"] == "r2"
+    storage.reset_storage_for_test()

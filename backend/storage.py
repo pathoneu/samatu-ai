@@ -189,6 +189,25 @@ _instance: _Backend | None = None
 _R2_VARS = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
 
 
+def _hosted_production() -> str:
+    """Which signal says this process is a production deploy — "" when none.
+
+    The same production test main.py / auth.py apply (`ENV` or `ENVIRONMENT`,
+    `prod` or `production`), plus the hosts' own markers: Railway sets
+    RAILWAY_ENVIRONMENT to the environment's name, Render sets RENDER=true.
+    2026-09-15 review: the rule read `ENV == "production"` exactly, which the
+    Railway deploy does not necessarily set, so the next push could have sent
+    every production PDF to the container's disk."""
+    for var in ("ENV", "ENVIRONMENT"):
+        if (os.environ.get(var) or "").strip().lower() in ("prod", "production"):
+            return f"{var}=production"
+    if (os.environ.get("RAILWAY_ENVIRONMENT") or "").strip().lower() == "production":
+        return "RAILWAY_ENVIRONMENT=production"
+    if (os.environ.get("RENDER") or "").strip().lower() == "true":
+        return "RENDER=true"
+    return ""
+
+
 def r2_decision() -> tuple[bool, str]:
     """(use_r2, why) — the whole backend-selection rule, pure over os.environ.
 
@@ -214,10 +233,12 @@ def r2_decision() -> tuple[bool, str]:
         return False, f"R2 not configured, missing: {', '.join(missing)}"
     if explicit == "r2":
         return True, "STORAGE_BACKEND=r2"
-    if os.environ.get("ENV") == "production":
-        return True, "ENV=production"
+    prod = _hosted_production()
+    if prod:
+        return True, prod
     return False, ("R2 credentials present but unused — neither ENV=production "
-                   "nor STORAGE_BACKEND=r2, so this process must not write to "
+                   "(nor ENVIRONMENT / RAILWAY_ENVIRONMENT / RENDER) nor "
+                   "STORAGE_BACKEND=r2, so this process must not write to "
                    "the production bucket")
 
 
@@ -256,7 +277,7 @@ def get_storage() -> _Backend:
             )
             _instance = LocalDiskStorage(root)
             msg = "storage backend: LOCAL DISK at %s — %s"
-            if os.environ.get("ENV") == "production":
+            if _hosted_production():
                 # Unchanged and deliberate: prod on local disk is data loss
                 # waiting to happen, whatever the reason.
                 log.error(msg + " | PRODUCTION uploads are NOT durable", root, why)

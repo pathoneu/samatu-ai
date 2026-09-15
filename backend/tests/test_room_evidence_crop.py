@@ -46,6 +46,7 @@ def _isolate(tmp_path, monkeypatch, *, auth_disabled=True):
     monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "pdfs"))
     storage.reset_storage_for_test()
     monkeypatch.setattr(ev, "CACHE_ROOT", tmp_path / "crops")
+    ev._reset_render_caches_for_test()
     db.init_schema()
     db._migrate_schema()
 
@@ -361,3 +362,32 @@ def test_evidence_url_round_trips_through_the_parser():
 def test_evidence_url_is_none_when_there_is_nothing_to_point_at():
     assert ev.evidence_url("p1", None, [0, 0, 1, 1]) is None
     assert ev.evidence_url("p1", 2, None) is None
+
+
+@needs_pdf
+def test_a_rooms_burst_of_crops_renders_the_page_once(tmp_path, monkeypatch):
+    """Six facts on one sheet = one PDF fetch and one rasterisation, not six
+    (2026-09-15 review). The crop still comes out of the cached raster."""
+    _isolate(tmp_path, monkeypatch)
+    _project()
+    _store_pdf()
+    calls = {"render": 0, "load": 0}
+    real_render, real_load = ev._render_page, ev._load_pdf_uncached
+
+    def counting_render(pdf_bytes, page, dpi):
+        calls["render"] += 1
+        return real_render(pdf_bytes, page, dpi)
+
+    def counting_load(project_id):
+        calls["load"] += 1
+        return real_load(project_id)
+    monkeypatch.setattr(ev, "_render_page", counting_render)
+    monkeypatch.setattr(ev, "_load_pdf_uncached", counting_load)
+    c = TestClient(app)
+    for rect in ("0.1,0.1,0.3,0.3", "0.5,0.5,0.7,0.7", "0.2,0.6,0.4,0.9"):
+        r = c.get("/api/projects/p1/evidence", params={"page": 1, "rect": rect})
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert calls == {"render": 1, "load": 1}
+    ev._reset_render_caches_for_test()
+    r = c.get("/api/projects/p1/evidence", params={"page": 1, "rect": "0.6,0.1,0.8,0.3"})
+    assert r.status_code == 200 and calls == {"render": 2, "load": 2}

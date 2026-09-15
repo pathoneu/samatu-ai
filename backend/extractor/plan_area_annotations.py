@@ -188,13 +188,7 @@ def _number_runs(chars: list[dict]) -> list[dict]:
 
 # ── the text layer, one page at a time ───────────────────────────────────────
 
-_UPRIGHT_RAD = 0.15     # |angle| above this is rotated text: dimension strings, stamps
 _TWO_PI = 6.283185307179586
-
-
-def _is_upright(angle_rad: float) -> bool:
-    a = float(angle_rad) % _TWO_PI          # PDFium reports a full turn (6.28) for some horizontal text
-    return a < _UPRIGHT_RAD or a > _TWO_PI - _UPRIGHT_RAD
 
 
 def _identity(bbox):
@@ -648,8 +642,13 @@ _MIN_FIGURE = {"m2": 1.0, "m": 2.0, "vnt": 1, "kompl": 1}
 
 
 def _norm_unit(u: str) -> str:
-    u = u.lower().rstrip(".")
-    return "m2" if u in ("m²", "m2") else u
+    """The plan's unit spelling through the one unit table (`kv.m` and `kvm`
+    are m², `kompl.` is a kompl) — the two-line map here knew only „m²"."""
+    from .row_scorecard import normalize_unit   # a leaf module: no cycle
+    canon = normalize_unit(u)
+    if len(canon) == 1:
+        return next(iter(canon))
+    return u.lower().rstrip(".")
 
 
 def _line_text(line: list[dict]) -> str:

@@ -32,15 +32,22 @@ def api_room_facts(request: Request, project_id: str, room_nr: str,
     user_filter = None if user.get("is_admin") else user["id"]
     project = _db.get_project(project_id, user_id=user_filter)
     if not project:
-        raise HTTPException(status_code=404,
-                            detail=f"Project {project_id} not found")
+        raise HTTPException(status_code=404, detail="Projektas nerastas")
 
-    payload = build_room_facts(project, room_nr)
+    try:
+        payload = build_room_facts(project, room_nr)
+    except Exception as exc:  # noqa: BLE001 — a malformed legacy blob is not a 500 trace
+        log.error("room facts failed project=%s room=%s: %r", project_id, room_nr, exc)
+        raise HTTPException(status_code=500,
+                            detail="Nepavyko sudaryti patalpos lapo — patikrinkite projektą") from exc
     if payload is None:
         raise HTTPException(status_code=404, detail=f"Patalpa {room_nr} nerasta")
 
     from extractor.room_facts import attach_crop_urls
-    attach_crop_urls(payload, project_id, dpi)
+    try:
+        attach_crop_urls(payload, project_id, dpi)
+    except Exception as exc:  # noqa: BLE001 — a crop URL is an extra, never the sheet
+        log.warning("room facts crop urls failed project=%s room=%s: %r", project_id, room_nr, exc)
     # Same guard as /api/projects/{id}: prose persisted by an older engine is
     # never trusted on the way out. `sentence` and `formula` are generated
     # fresh here, but `included_because` / `excluded_because` / `reason` ride

@@ -1212,11 +1212,16 @@ def recompute(
                    # money but not the 'manual' flag that protects it, so the
                    # next "Taikyti kainyną" overwrote a hand-typed price.
                    *_PRICE_PROVENANCE_KEYS)
+    # Verification rides only with a quantity that survived (`_carry_verification`);
+    # everything else is carried outright. The by-label fallback below used to
+    # copy the checkmark unconditionally (2026-09-15 review).
+    _MONEY_KEYS = tuple(k for k in _CARRY_KEYS if k not in _VERIFICATION_KEYS)
     if len(darbu_sarasas) == len(pozicijos):
         for row, poz in zip(darbu_sarasas, pozicijos):
-            for key in _CARRY_KEYS:
+            for key in _MONEY_KEYS:
                 if poz.get(key) is not None:
                     row[key] = poz[key]
+            _carry_verification(poz, row)
     else:
         # The 1:1 invariant broke (a compat-emit change, a dropped/merged row).
         # There was NO else here: the response's darbu_sarasas silently came
@@ -1239,9 +1244,10 @@ def recompute(
             poz = by_label.get(str(row.get("aprasymas") or "").strip())
             if not poz:
                 continue
-            for key in _CARRY_KEYS:
+            for key in _MONEY_KEYS:
                 if poz.get(key) is not None:
                     row[key] = poz[key]
+            _carry_verification(poz, row)
             recovered += 1
         log.warning("compat emit length mismatch: %d rows vs %d pozicijos "
                     "(%d recovered by label)",

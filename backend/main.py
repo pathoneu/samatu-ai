@@ -7856,6 +7856,13 @@ def health():
     except Exception as exc:  # noqa: BLE001
         log.warning("health check DB probe failed: %r", exc)
     body = {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "error"}
+    # WHERE the PDFs go (2026-09-15): the storage rule is pure over the
+    # environment, so saying it here lets a deploy be checked from outside.
+    try:
+        from storage import selected_backend_name
+        body["storage"] = selected_backend_name()
+    except Exception:  # noqa: BLE001 — a probe never fails on this
+        pass
     # WHICH COMMIT IS ACTUALLY LIVE (2026-07-29). Twice in one day a fix was
     # pushed and then verified by guesswork, because nothing served by the API
     # named its own build — and once that guess was wrong. Railway injects

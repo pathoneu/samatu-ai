@@ -335,8 +335,9 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
             # Anything short of that returns empty and Vision runs as before.
             #
             # Measured on the six fixture PDFs after the widening: objektas_a,
-            # objektas_c and sernu still MISS; objektas_b (15 rooms) and romainiai
-            # (11) were already hits and return byte-identical numbers; objektas_d
+            # objektas_c and the holdout still MISS; objektas_b (15 rooms) and the
+            # fifth in-sample project (11) were already hits and return
+            # byte-identical numbers; objektas_d
             # flipped MISS -> HIT (4 rooms) and its four areas match the cached
             # Vision read exactly. No fixture's numbers changed.
             meta = pdf_attempt.get("_meta") or {}
