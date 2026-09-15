@@ -42,6 +42,10 @@ UNIVERSAL_RULES = {
     # Standart angų dydžiai (m²)
     # FORMULA CORRECTION (formula-validation.md §2.4):
     "default_door_area_m2": 1.85,    # LT STR 2.02.09 typical 0.9×2.05m opening
+    # The reveal depth a door's paintable jambs get when the user has not set a
+    # wall thickness (Prielaidos „Sienos storis") — a GK partition. Feeds the
+    # door NET deduction below; the same number the reveal-area line uses.
+    "default_wall_thickness_m": 0.10,
     # FORMULA CORRECTION (formula-validation.md §2.3): was 1.40 (US standard wrong)
     "default_window_area_m2": 1.80,  # LT STR standard 1200×1500mm = 1.80 m²
 
@@ -412,6 +416,15 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
 
     rules = {k: dict(v) for k, v in ROOM_TYPE_RULES.items()}
 
+    # Prielaidos „Sienos storis" — the reveal depth the door net deduction and
+    # the reveal-area line share (2026-09-15).
+    try:
+        _t = float(prefs.get("sienos_storis_m") or 0)
+    except (TypeError, ValueError):
+        _t = 0.0
+    if _t > 0:
+        for rt in rules:
+            rules[rt]["wall_thickness_m"] = _t
     # Apimtis (2026-09-06): walls measured without deducting the openings.
     if (prefs.get("apimtis") or {}).get("sienos_angos") == "neatimti":
         for rt in rules:
@@ -841,6 +854,55 @@ def _opening_should_deduct(area_m2: float, standard: str) -> bool:
     if standard in ("NRM2", "VOB"):
         return area_m2 >= UNIVERSAL_RULES["nrm2_no_deduct_threshold_m2"]
     return area_m2 >= UNIVERSAL_RULES["openings_threshold_m2"]
+
+
+_DOOR_KINDS = ("duris", "pasleptos_duris")
+_STANDARD_DOOR_M = (0.9, 2.1)   # the LT interior door opening when a room's elementai carry no size
+
+
+def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, standard: str) -> float:
+    """What the room's doors take out of the paintable wall: each opening's
+    area LESS the jambs and head that get painted, (w + 2h) × wall thickness.
+
+    Real sizes from the room's `elementai` when they carry one — so a door he
+    corrected on the check sheet moves the wall area — the standard 0,9 × 2,1
+    opening for doors that have none. A door under the deduction threshold
+    (LT 1,0 m², NRM2/VOB 0,5 m²) is not deducted at all.
+
+    Until 2026-09-15 this was a flat 1,125 m² per door, calibrated on one
+    contractor's sąmata (0,9 × 2,1 less 0,15 m reveals): the door size and the
+    wall thickness the sheet let him change did not reach the wall area.
+    """
+    t = max(0.0, float(wall_thickness_m or 0))
+    total = 0.0
+    sized = 0
+    for el in room.get("elementai") or []:
+        if not isinstance(el, dict) or (el.get("tipas") or "").lower() not in _DOOR_KINDS:
+            continue
+        try:
+            w = float(el.get("plotis_mm") or 0) / 1000.0
+            h = float(el.get("aukstis_mm") or 0) / 1000.0
+            k = int(el.get("kiekis") or 1)
+        except (TypeError, ValueError):
+            continue
+        if w <= 0 or h <= 0 or k <= 0:
+            continue
+        sized += k
+        area = w * h
+        if _opening_should_deduct(area, standard):
+            total += k * max(0.0, area - (w + 2 * h) * t)
+    # Doors without a size: the mean door area the reader derived for the room
+    # (`door_area_m2`, from elements that carried sizes elsewhere) or the
+    # standard opening, with the standard door's jamb length.
+    w, h = _STANDARD_DOOR_M
+    try:
+        fallback_area = float(room.get("door_area_m2") or 0) or w * h
+    except (TypeError, ValueError):
+        fallback_area = w * h
+    for _ in range(max(0, int(n_doors) - sized)):
+        if _opening_should_deduct(fallback_area, standard):
+            total += max(0.0, fallback_area - (w + 2 * h) * t)
+    return round(total, 3)
 
 
 def _opening_adds_reveal(area_m2: float, standard: str) -> bool:
@@ -1322,7 +1384,9 @@ def calc_room_quantities(room: dict,
     # because LT samata uses uniform per-door deduction. Sliding doors get a
     # tall above-door wall that's already in walls_gross; the opening−reveal
     # balance lands at 1.125 m² average for the mixed-door population.
-    DOOR_NET_DEDUCTION = 1.125  # m² per door (LT contractor convention)
+    # 2026-09-15: the flat 1,125 m² per door is gone — see _door_net_deduction_m2.
+    wall_thickness_m = float(rt_rules.get("wall_thickness_m")
+                             or UNIVERSAL_RULES["default_wall_thickness_m"])
 
     # Per-room overrides for project-specific contractor conventions.
     walls_paint_factor_override = room.get("walls_paint_factor_override")
@@ -1345,7 +1409,7 @@ def calc_room_quantities(room: dict,
     # so the presence/absence of an optional Vision field can no longer flip
     # the double-billing rule (a fully tiled wet room billed as tile AND as
     # paint). See resolve_wall_tile_read() for the priority order.
-    doors_deduction = n_doors * DOOR_NET_DEDUCTION
+    doors_deduction = _door_net_deduction_m2(room, n_doors, wall_thickness_m, standard)
     if not rt_rules.get("deduct_openings", True):
         doors_deduction = 0.0          # apimtis: „sienų plotas be angų" — see the openings block above
     wall_area_available = max(0.0, walls_gross - doors_deduction)
@@ -1533,8 +1597,11 @@ def calc_room_quantities(room: dict,
         # `full_tile` predicate, not a strip deduction.
         tile_zone_deducted = 0.0 if is_full_tile else _tile_zone_in_paint_base(
             tile_walls_area, tile_read["height_m"], tile_read["share"],
-            doors_total + windows_total)
-        walls_net = max(0, walls_gross - doors_total - windows_total - tile_zone_deducted)
+            doors_deduction + windows_total)
+        # Doors at the same net deduction every branch uses (2026-09-15);
+        # windows stay as this branch always had them — the two window
+        # conventions in this engine are a separate, declared decision.
+        walls_net = max(0, walls_gross - doors_deduction - windows_total - tile_zone_deducted)
         walls_paintable = walls_net * walls_paint_factor
 
     if tile_zone_deducted > 0 and not is_full_tile and tile_read["missing"]:
@@ -2024,7 +2091,7 @@ def calc_room_quantities(room: dict,
         # Per-project tuning beyond ±15% is calibrator territory (use the
         # /calibrate endpoint), not a single-multiplier fix.
         "silikonavimas_m": round(perim * 2.3 if paskirtis in ("vonia", "wc", "san") else 0, 2),
-        "doors_deducted_m2": round(doors_total, 2),
+        "doors_deducted_m2": round(doors_deduction, 2),
         "windows_deducted_m2": round(windows_total, 2),
         # 2026-07-05 audit fix (bug 2): echo the resolved per-opening areas so
         # the merger persists them on the room. They are not PRIMITIVE_KEYS and

@@ -23,6 +23,8 @@ half of this file pins.
 """
 from __future__ import annotations
 
+import pytest
+
 import copy
 
 from extractor.lt_rules import apply_lt_sanity
@@ -79,28 +81,34 @@ def _pipeline(room: dict) -> dict:
     return parsed["patalpos"][0]
 
 
-def test_room_110_without_primitives_is_5375():
-    """perim 20.0 × H 2.80 = 56.00 gross, − 2 durys × 1.125 = 53.75 paintable.
-    This is what Vision's numbers give, and it is arithmetically correct for
-    them."""
+def test_room_110_without_primitives_is_gross_less_its_two_doors():
+    """perim 20.0 × H 2.80 = 56.00 gross, less the two doors NET of their
+    painted jambs at the default 0,10 m wall: 0,8 × 2,1 − 5,0 × 0,10 = 1,18 and
+    2,2 × 2,1 − 6,4 × 0,10 = 3,98 → 50,84 paintable (2026-09-15; the flat
+    1,125 per door gave 53,75). This is what Vision's numbers give, and it is
+    arithmetically correct for them."""
     q = _pipeline(_without_extras(ROOM_110_GT))
     assert q["walls_gross_m2"] == 56.0
-    assert q["walls_paintable_m2"] == 53.75
-    assert round(56.0 - 2 * 1.125, 2) == 53.75
+    door_a = 0.8 * 2.1 - (0.8 + 2 * 2.1) * 0.10
+    door_b = 2.2 * 2.1 - (2.2 + 2 * 2.1) * 0.10
+    assert q["walls_paintable_m2"] == pytest.approx(56.0 - door_a - door_b, abs=0.02)
+    assert round(56.0 - door_a - door_b, 2) == 50.84
     # 2.8 m nominal room, no explicit high zone → nothing above 3 m.
     assert q["gkp_lubu_virs_3m_m2"] == 0
     assert q["gkp_lubu_standart_m2"] == 23.97
 
 
-def test_room_110_with_primitives_is_10743():
-    """The same room WITH the GT primitives: 53.75 + 47.44 + 6.24 = 107.43.
+def test_room_110_with_primitives_is_the_walls_plus_its_two_extras():
+    """The same room WITH the GT primitives: 50.84 + 47.44 + 6.24 = 104.52
+    (53.75 + … = 107.43 while the doors were the flat 1,125 m² each).
 
     The formula is not the defect — feed it the primitives and it lands on
-    truth exactly.
+    the walls plus the two extras exactly.
     """
     q = _pipeline(ROOM_110_GT)
-    assert q["walls_paintable_m2"] == 107.43
-    assert round(53.75 + 47.44 + 6.24, 2) == 107.43
+    base = _pipeline(_without_extras(ROOM_110_GT))["walls_paintable_m2"]
+    assert q["walls_paintable_m2"] == pytest.approx(base + 47.44 + 6.24, abs=0.02)
+    assert q["walls_paintable_m2"] == pytest.approx(104.52, abs=0.02)
     # high_ceiling_area_m2 splits the ceiling instead of adding to it.
     assert q["gkp_lubu_virs_3m_m2"] == 12.28
     assert q["gkp_lubu_standart_m2"] == round(23.97 - 12.28, 2)

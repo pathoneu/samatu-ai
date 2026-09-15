@@ -44,6 +44,11 @@ from extractor.universal_rules import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+# One unsized door (the calc assumes one when a room says nothing) net of its
+# painted jambs at the default 0,10 m wall — 1,38 m² (2026-09-15; was 1,125).
+DOOR_NET = 0.9 * 2.1 - (0.9 + 2 * 2.1) * 0.10
+
+
 def _room(**kw):
     """A Objektas A-shaped wet room: 8.59 m², 12.4 m perimeter, 2.8 m ceiling."""
     r = {"nr": "107", "pavadinimas": "Vaikų san. mazgas", "paskirtis": "san",
@@ -203,15 +208,15 @@ def test_elevation_overread_means_full_tile_not_proportional_paint():
     assert q["_walls_full_tile"] is True
     assert q["walls_paintable_m2"] == 0.0
     # tile is billed on the whole wall net of the door opening (11.0 × 2.8
-    # − 1.125 per LT door convention), NOT on the over-read 46.32 m².
-    assert q["plyteles_sienos_m2"] == pytest.approx(11.0 * 2.8 - 1.125, abs=0.01)
+    # − the door's net deduction), NOT on the over-read 46.32 m².
+    assert q["plyteles_sienos_m2"] == pytest.approx(11.0 * 2.8 - DOOR_NET, abs=0.01)
 
 
 def test_elevation_partial_read_still_leaves_paint_above_the_tile():
     q = calc_room_quantities(_room(
         perimetras_m=11.0, plotas_m2=6.59, _tile_area_from_elevation_m2=12.0))
     assert q["_walls_full_tile"] is False
-    assert q["walls_paintable_m2"] == pytest.approx(30.8 - 1.125 - 12.0, abs=0.01)
+    assert q["walls_paintable_m2"] == pytest.approx(30.8 - DOOR_NET - 12.0, abs=0.01)
 
 
 # ══════════════════════════════════════════════════════════════════════════

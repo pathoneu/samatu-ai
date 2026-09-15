@@ -74,6 +74,16 @@ class TestResolveDeductionStandard:
 
 # ── End-to-end calc_room_quantities tests ───────────────────────────────
 
+# A door without a size in `elementai` is deducted at its (mean) area LESS the
+# standard door's painted jambs, (0,9 + 2 × 2,1) m × the 0,10 m default wall
+# (2026-09-15). The threshold still looks at the opening area itself.
+JAMBS_M2 = (0.9 + 2 * 2.1) * 0.10
+
+
+def net(area: float) -> float:
+    return area - JAMBS_M2
+
+
 class TestCalcRoomQuantitiesNRM2:
     @pytest.fixture
     def base_room(self):
@@ -95,18 +105,18 @@ class TestCalcRoomQuantitiesNRM2:
     def test_lt_default_deducts_both(self, base_room):
         out = calc_room_quantities(base_room)
         # LT: doors+windows >= 1.0 → both deducted
-        assert out["doors_deducted_m2"] == pytest.approx(1.85, abs=0.01)
+        assert out["doors_deducted_m2"] == pytest.approx(net(1.85), abs=0.01)
         assert out["windows_deducted_m2"] == pytest.approx(1.80, abs=0.01)
-        # walls_paintable = 50.76 - 1.85 - 1.80 = 47.11
-        assert out["walls_paintable_m2"] == pytest.approx(47.11, abs=0.05)
+        # walls_paintable = 50.76 - net(1.85) - 1.80
+        assert out["walls_paintable_m2"] == pytest.approx(50.76 - net(1.85) - 1.80, abs=0.05)
 
     def test_nrm2_deducts_same_as_lt_for_standard_openings(self, base_room):
         rules = translate_user_prefs_to_room_rules({"paint_deduction_standard": "NRM2"})
         out = calc_room_quantities(base_room, rules=rules)
         # Both 1.85 and 1.80 m² are in NRM2's 0.5-3.0 deduct range
-        assert out["doors_deducted_m2"] == pytest.approx(1.85, abs=0.01)
+        assert out["doors_deducted_m2"] == pytest.approx(net(1.85), abs=0.01)
         assert out["windows_deducted_m2"] == pytest.approx(1.80, abs=0.01)
-        assert out["walls_paintable_m2"] == pytest.approx(47.11, abs=0.05)
+        assert out["walls_paintable_m2"] == pytest.approx(50.76 - net(1.85) - 1.80, abs=0.05)
 
     def test_nrm2_skips_tiny_openings_below_0_5(self, base_room):
         # Tiny vent door 0.6×0.5 = 0.30 m² (vent / pet flap)
@@ -133,7 +143,7 @@ class TestCalcRoomQuantitiesNRM2:
         rules_nrm2 = translate_user_prefs_to_room_rules({"paint_deduction_standard": "NRM2"})
         out_nrm2 = calc_room_quantities(room, rules=rules_nrm2)
         assert out_lt["doors_deducted_m2"] == 0  # LT skips < 1.0
-        assert out_nrm2["doors_deducted_m2"] == pytest.approx(0.84, abs=0.01)
+        assert out_nrm2["doors_deducted_m2"] == pytest.approx(net(0.84), abs=0.01)
 
 
 class TestTranslateUserPrefsCarriesStandard:

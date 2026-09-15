@@ -16,7 +16,10 @@ from extractor.universal_rules import (
     TILE_BAND_DOOR_H_M, _tile_zone_in_paint_base, calc_room_quantities,
 )
 
-DOOR = 1.85      # legacy-path door deduction for one standard door
+# One standard 0,9 × 2,1 door NET of its painted jambs at the default 0,10 m wall
+# thickness — the deduction every branch uses since 2026-09-15 (was a flat 1,85
+# gross on the legacy path and 1,125 on the apdailos path).
+DOOR = round(0.9 * 2.1 - (0.9 + 2 * 2.1) * 0.10, 3)   # 1,38
 
 
 def test_helper_adds_back_the_part_of_the_openings_inside_the_band():
@@ -86,13 +89,13 @@ def test_apdailos_branch_deducts_the_band_like_the_others():
     zone = 0.75 * 9.63 * 2.4
     assert out["plyteles_sienos_m2"] == pytest.approx(zone, abs=0.02)
     gross = 9.63 * 2.82
-    # apdailos branch: doors at the net 1,125 m² deduction, no window deduction
+    # apdailos branch: doors at the net deduction, no window deduction
     door_net = gross - out["walls_paintable_m2"] - out["_tile_zone_deducted_m2"]
-    assert door_net == pytest.approx(1.125, abs=0.02)
-    assert out["_tile_zone_deducted_m2"] == pytest.approx(zone - 1.125 * 0.75, abs=0.02)
+    assert door_net == pytest.approx(DOOR, abs=0.02)
+    assert out["_tile_zone_deducted_m2"] == pytest.approx(zone - DOOR * 0.75, abs=0.02)
     # untiled quarter of the walls at full height + the strip above the band
     assert out["walls_paintable_m2"] == pytest.approx(
-        gross - 1.125 - (zone - 1.125 * 0.75), abs=0.02)
+        gross - DOOR - (zone - DOOR * 0.75), abs=0.02)
 
 
 def test_default_band_is_disclosed_and_not_billed_twice():

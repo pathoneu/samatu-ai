@@ -52,11 +52,26 @@ def _reference_walls_paintable_m2(room: dict) -> float:
         if tipas in ("duris", "pasleptos_duris"):
             door_count += int(el.get("kiekis") or 1)
 
-    # Production engine uses DOOR_NET_DEDUCTION = 1.125 m² (the LT contractor
-    # convention: opening − reveal; calibrated to Objektas A to-the-dot match,
-    # documented in universal_rules.py source). The reference mirrors that.
-    DOOR_NET_DEDUCTION = 1.125
-    doors_deduction = door_count * DOOR_NET_DEDUCTION
+    # Production engine (2026-09-15): each door's opening LESS its painted
+    # jambs, (w + 2h) × wall thickness (0,10 m unless the user set one); a
+    # door without a size is the standard 0,9 × 2,1. The reference mirrors
+    # that instead of the flat 1,125 m² the sąmata calibration once fixed.
+    t = float(room.get("_wall_thickness_m") or 0.10)
+    doors_deduction = 0.0
+    sized = 0
+    for el in elementai:
+        tipas = (el.get("tipas") or "").lower()
+        if tipas not in ("duris", "pasleptos_duris"):
+            continue
+        w = float(el.get("plotis_mm") or 0) / 1000
+        h = float(el.get("aukstis_mm") or 0) / 1000
+        k = int(el.get("kiekis") or 1)
+        if w > 0 and h > 0:
+            sized += k
+            if w * h >= 1.0:
+                doors_deduction += k * max(0.0, w * h - (w + 2 * h) * t)
+    for _ in range(max(0, door_count - sized)):
+        doors_deduction += 0.9 * 2.1 - (0.9 + 2 * 2.1) * t
 
     apdaila = room.get("sienu_apdailos_breakdown") or {}
     # Full-tile rooms have walls_paintable = 0

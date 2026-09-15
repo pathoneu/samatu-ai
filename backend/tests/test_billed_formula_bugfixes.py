@@ -79,8 +79,9 @@ def test_bug2_measured_door_area_survives_recompute_roundtrip():
     persisted = {**primitives, **out1}
     out2 = calc_room_quantities(persisted)   # recompute (e.g. ceiling-height edit)
     assert out2["doors_deducted_m2"] == out1["doors_deducted_m2"]
-    # and specifically it is the measured area, not the default:
-    assert out2["doors_deducted_m2"] == 1.40
+    # and specifically it is the measured area — net of the standard door's
+    # painted jambs at the default 0,10 m wall (2026-09-15) — not the default:
+    assert out2["doors_deducted_m2"] == pytest.approx(1.40 - (0.9 + 2 * 2.1) * 0.10, abs=0.01)
 
 
 def test_bug2_calc_echoes_measured_window_area():
@@ -147,7 +148,8 @@ def test_bug3_legacy_path_deducts_the_tiled_band_from_paint():
         # no sienu_apdailos_breakdown, no _tile_area_from_elevation_m2 → legacy
     }
     out = calc_room_quantities(room)
-    gross, door, band_h = 27.0, 1.85, 2.0          # default vonia band = 2,0 m
+    # one standard door net of its painted jambs (2026-09-15: was the 1,85 gross)
+    gross, door, band_h = 27.0, 0.9 * 2.1 - (0.9 + 2 * 2.1) * 0.10, 2.0   # default vonia band = 2,0 m
     zone = 10.0 * band_h                            # 20 m² of tile, billed once
     door_in_band = door * 1.0 * (band_h / 2.1)      # the door sits in the band
     expected = gross - door - (zone - door_in_band)

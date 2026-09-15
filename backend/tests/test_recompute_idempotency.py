@@ -14,7 +14,7 @@ calculator saw them absent and applied its ``1 door / 1 window`` fallback. The
 first ceiling edit on any room therefore rewrote its geometry as if it had
 exactly one of each:
 
-    walls_paintable_m2  +1.125 m² per lost door  (un-deducted wall)
+    walls_paintable_m2  +its net area per lost door  (un-deducted wall)
     kampu_metrai        −5.0 m  per lost door    (lost reveal contour)
 
 so RAISING a ceiling LOWERED the corner metres (375.8 → 374.8 m live), and the
@@ -299,9 +299,10 @@ def test_opening_counts_survive_a_ceiling_edit(client):
     exactly 5.0 m of corner and gaining a door's worth of paintable wall.
 
     With no apdailos/elevation read this room takes the legacy wall branch,
-    which deducts the openings' MEASURED areas (0.9×2.1 and 1.2×1.5 from
-    elementai) rather than the flat per-door convention — so the counts AND
-    the per-opening areas both have to survive, and both come from elementai.
+    which deducts the openings' MEASURED areas from elementai — the doors net
+    of their painted jambs (0,9×2,1 − (0,9+2×2,1)×0,10, since 2026-09-15) and
+    the window gross (1,2×1,5) — so the counts AND the per-opening sizes both
+    have to survive, and both come from elementai.
     """
     room = {
         "nr": "1", "pavadinimas": "Miegamasis", "paskirtis": "gyvenamoji",
@@ -324,11 +325,12 @@ def test_opening_counts_survive_a_ceiling_edit(client):
     # 1 door / 1 window would give 45.6 m — 5.0 m short.
     assert out["kampu_metrai"] > 4 * 3.0 + 1 * 5.0 + 1 * 4.2 + 20.0
 
-    # walls = perim × H − Σ(door areas) − Σ(window areas), from elementai
-    expected_walls = 20.0 * 3.0 - 2 * (0.9 * 2.1) - 1 * (1.2 * 1.5)
+    # walls = perim × H − Σ(door net areas) − Σ(window areas), from elementai
+    door_net = 0.9 * 2.1 - (0.9 + 2 * 2.1) * 0.10
+    expected_walls = 20.0 * 3.0 - 2 * door_net - 1 * (1.2 * 1.5)
     assert out["walls_paintable_m2"] == pytest.approx(expected_walls, abs=0.01)
-    # 1 door / 1 window would give 56.31 m² — 1.89 m² of phantom wall.
-    assert out["walls_paintable_m2"] < 20.0 * 3.0 - 1 * (0.9 * 2.1) - 1 * (1.2 * 1.5)
+    # 1 door / 1 window would leave one door's worth of phantom wall.
+    assert out["walls_paintable_m2"] < 20.0 * 3.0 - 1 * door_net - 1 * (1.2 * 1.5)
 
 
 def test_ceiling_edit_does_not_invent_openings(client):

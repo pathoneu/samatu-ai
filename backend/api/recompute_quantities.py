@@ -221,6 +221,21 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
     cov_walls, cov_ceil = paint_coverage_for_class(paint_class)
     per_room_h = assumptions.get("lubu_auksciai") or {}
     per_room_paint = assumptions.get("walls_paint_override") or {}
+    # The Prielaidos that change the per-room GEOMETRY (wall thickness → the
+    # doors' painted jambs; the deduction standard) reach the calc as rules —
+    # the same translation /recompute-interior applies (2026-09-15: the wall
+    # thickness edit used to move a reveal field no row reads, and nothing else).
+    try:
+        from extractor.universal_rules import translate_user_prefs_to_room_rules
+        rules_all = translate_user_prefs_to_room_rules(assumptions) or None
+    except Exception as exc:  # noqa: BLE001 — degrade, never 500
+        rules_all = None
+        _degrade(degradations, "*", "rules", "translate_failed", error=str(exc)[:120])
+    thickness_edited = assumptions.get("sienos_storis_m") not in (None, "", _MISSING)
+    _GEOMETRY_KEYS = ("walls_gross_m2", "walls_paintable_m2",
+                      "ceiling_paintable_m2", "dazymo_plotas_m2",
+                      "kampai_m", "kampu_metrai", *_KAMPAI_TERMS,
+                      "lubu_karnizo_m", "glaistas_kg", "gruntas_l", "doors_deducted_m2")
     default_h = _num_field(
         assumptions.get("lubu_aukstis") or _MISSING, 2.82,
         degradations, "lubu_aukstis")  # noqa: F841 — kept for call-site parity
@@ -250,7 +265,7 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                 try:
                     from extractor.universal_rules import calc_room_quantities
                     recalc = calc_room_quantities(
-                        _calc_input(room), ceiling_height_m=new_h)
+                        _calc_input(room), ceiling_height_m=new_h, rules=rules_all)
                     # Carry forward the recomputed wall/ceiling/cornice fields.
                     for k in ("walls_gross_m2", "walls_paintable_m2",
                               "ceiling_paintable_m2", "dazymo_plotas_m2",
@@ -278,6 +293,21 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                     _degrade(degradations, nr, "lubu_aukstis",
                              "recompute_failed", stage="calc_room_quantities",
                              error=str(exc)[:120])
+        elif thickness_edited and rules_all:
+            # No height override on this room, but the wall thickness changed:
+            # its doors' net deduction moves with it, so the walls do too.
+            try:
+                from extractor.universal_rules import calc_room_quantities
+                own_h = _num(room.get("lubu_aukstis_m"), 0) or 2.82
+                recalc = calc_room_quantities(
+                    _calc_input(room), ceiling_height_m=own_h, rules=rules_all)
+                for k in _GEOMETRY_KEYS:
+                    if k in recalc:
+                        room[k] = recalc[k]
+            except Exception as exc:  # noqa: BLE001 — degrade, never 500
+                _degrade(degradations, nr, "sienos_storis_m",
+                         "recompute_failed", stage="calc_room_quantities",
+                         error=str(exc)[:120])
         # Per-room finishing override (2026-07-05): flip walls_paint (raw↔painted)
         # and recompute the paint geometry. Runs AFTER the height block so a room
         # with BOTH overrides gets the combined result (calc reads the already-set
@@ -289,7 +319,8 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                     calc_room_quantities, ROOM_TYPE_RULES, normalize_paskirtis,
                 )
                 pask = normalize_paskirtis(room.get("paskirtis") or "")
-                rt = dict(ROOM_TYPE_RULES.get(pask) or ROOM_TYPE_RULES["gyvenamoji"])
+                rt = dict((rules_all or {}).get(pask) or ROOM_TYPE_RULES.get(pask)
+                          or ROOM_TYPE_RULES["gyvenamoji"])
                 rt["walls_paint"] = wp
                 room["_walls_paint_override"] = wp
                 recalc = calc_room_quantities(_calc_input(room),
