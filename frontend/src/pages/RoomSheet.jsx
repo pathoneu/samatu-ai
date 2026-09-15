@@ -344,8 +344,10 @@ export default function RoomSheet() {
     const onKey = (e) => {
       if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = e.target?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA'
-        || e.target?.isContentEditable) return;
+      // A focused button, link or field keeps its own Enter (2026-09-15
+      // review: Enter on „Pataisyti" used to stamp the room verified instead).
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A'
+        || e.target?.getAttribute?.('role') === 'button' || e.target?.isContentEditable) return;
       e.preventDefault();
       acceptRoom();
     };

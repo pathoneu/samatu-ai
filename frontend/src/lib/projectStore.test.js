@@ -512,13 +512,19 @@ test('refreshProjectFromBackend: an older server copy leaves the cache alone; a 
     json: async () => ({ id: 'p9', name: 'Serverio', updated_at: '2026-09-10T09:00:00Z' }) });
   const got = await refreshProjectFromBackend('p9');
   assert.equal(got.name, 'Vietinė');
-  assert.equal(_getServerVersion('p9'), '2026-09-10T09:00:00Z', 'the conflict base is recorded either way');
+  // An older server copy is NOT adopted and does not become the base either:
+  // the local copy keeps the version it was made on, so a stale-but-newer
+  // cache can only 409, never silently overwrite (2026-09-15 review).
+  assert.equal(_getServerVersion('p9'), undefined);
 
   globalThis.fetch = async () => ({ ok: true, status: 200,
     json: async () => ({ id: 'p10', name: 'Tiesioginis adresas', updated_at: '2026-09-10T09:30:00Z' }) });
   const added = await refreshProjectFromBackend('p10');
   assert.equal(added.name, 'Tiesioginis adresas');
   assert.equal(getProjects().length, 2);
+  assert.equal(_getServerVersion('p10'), '2026-09-10T09:30:00Z', 'an adopted server copy is the base');
+  assert.equal(JSON.parse(globalThis.localStorage.getItem('samatu_server_versions') || '{}').p10,
+    '2026-09-10T09:30:00Z', 'and the base survives a reload');
 });
 
 test('refreshProjectFromBackend: an unsaved local edit is not swapped away, and a failed fetch is harmless', async () => {

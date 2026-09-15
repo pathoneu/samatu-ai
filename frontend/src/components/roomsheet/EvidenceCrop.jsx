@@ -27,14 +27,6 @@ import {
   visibleRect, withRect, zoomForRect,
 } from '@/lib/sheetZoom';
 
-/** Kept for callers that only want the same crop at the sharpest dpi. */
-export function sharpCropUrl(cropUrl, dpi = 160) {
-  if (!cropUrl) return null;
-  return /([?&])dpi=\d+/.test(cropUrl)
-    ? cropUrl.replace(/([?&])dpi=\d+/, `$1dpi=${dpi}`)
-    : `${cropUrl}${cropUrl.includes('?') ? '&' : '?'}dpi=${dpi}`;
-}
-
 const SETTLE_MS = 220;
 // Ask for a little more than what is on screen so a small pan needs no refetch.
 const TILE_MARGIN = 0.1;

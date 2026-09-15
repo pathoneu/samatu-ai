@@ -1144,3 +1144,47 @@ contribution) and with the real UI for door size, height, wall thickness and the
 metres; a typed perimeter moves walls and skirting; a door added or resized moves walls, reveals and
 skirting by exactly its size; a room switched off comes off every anchored line by its own share; the
 Q level moves the putty only; every ledger chain still ends at its kiekis.
+
+### The review pass (2026-09-15, later) — what the read-through found and what changed
+
+A file-by-file review of everything since the last push (the council steps, the door formula, the
+kainynas parser), verified by hand because the review tooling kept dying on rate limits.
+
+**Fixed.**
+- **Where production PDFs go.** `storage.r2_decision` accepted `ENV=production` exactly; the
+  Railway deploy does not necessarily set `ENV`, so with the new gate every upload could have gone
+  to the container's disk and vanished on the next deploy. Now the same production test the rest
+  of the backend uses (`ENV`/`ENVIRONMENT` = prod/production) plus the hosts' own markers
+  (`RAILWAY_ENVIRONMENT=production`, `RENDER=true`); `/health` reports `"storage": "r2"|"local"`
+  so a deploy can be checked from outside. **Before the push the founder must confirm the Railway
+  service has one of those variables — or set `STORAGE_BACKEND=r2` explicitly.**
+- A door reference like „Miegamasis 2" bound to room 02 (any number anywhere in the string); now a
+  number binds only when it leads („01 Svetainė", „P-07"). A door „sized" 0,05×0,2 (centimetres in
+  a millimetre field) deducted nothing; sizes under 0,3×1,0 m fall back to the standard opening.
+- The recompute's by-label row fallback carried the verification checkmark unconditionally; now it
+  rides only with a quantity that survived, like the positional path.
+- The evidence endpoint refetched the PDF and rasterised the whole sheet for every crop (six per
+  room, one per zoom gesture); now one fetch and one raster per (project, page, dpi), two-minute
+  TTL, three pages held. The room-facts endpoint fails in Lithuanian instead of a 500 trace on a
+  malformed legacy blob. The front end downloaded the drawing three times on every first open
+  (viewer, rail, room list all missing the cache at once) — one shared in-flight load now.
+- The confidential-terms denylist was bundled into the public JS (a VITE_* variable); removed —
+  scrubbing stays server-side. A project-page refresh no longer rebases the conflict version when
+  the local copy is dirty or newer; the bases persist across reloads.
+- The price-list matcher's stemmed overlap paired siblings (iki/virš 3 m, Q2/Q4, lubų/sienų at
+  0,80–0,83); replaced by a coverage rule — the shorter label's every stem must appear in the
+  longer one. Enter in a room-sheet button no longer accepts the fact behind it.
+- Dead code out (`_blank_template`, `_is_upright`, `outline_mastelis`), the template module uses
+  `row_scorecard`'s label/unit/quantity helpers (1304 stored rows carry both unit keys, none
+  differ), the plan-text unit goes through the one unit table, a reader comment named two projects.
+
+**Noted, not changed:** `db.scrub_all_projects` runs at every startup; `wall_outline` flood-fill
+copies; `YourRowsPanel` has no debounce; the templates count query; four copies of the land-merge;
+the perimeter floor on legacy blobs. The two untracked council files from 2026-08-03 under
+`docs/superpowers/research/` contain a client term — not to be committed as they are.
+
+**Verified after the pass:** consistency script 66/66 (after teaching it the scratch project's
+stored 0,20 m wall thickness — a leftover of the UI test, not an engine change); frontend units
+709/0, eslint clean; the check sheet on a project with a stored PDF serves six crops 200; one
+`/pdf` GET per project open. Backend: full suite 3363 passed / 3 skipped, plus the 20 evidence-crop tests run on their own (one new).
+

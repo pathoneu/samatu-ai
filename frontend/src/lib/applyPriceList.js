@@ -80,19 +80,21 @@ function stemmed(setA) {
 }
 
 /**
- * Overlap coefficient: how much of the SHORTER label the longer one covers.
- * A contractor's sąmata line is wordier than ours („Sienų lyginimas sausu
- * gipsiniu tinku Rotband" vs „Sienų lyginimas Knauf Rotband", „Nišų iš GKP
- * paslėptam led apšvietimui glaistymas" vs „LED nišų glaistymas/dažymas");
- * Jaccard punishes every extra word, this does not. Asked only of labels
- * with at least three real tokens — two-token labels coincide too easily
- * („Durų montavimas" / „Durų dažymas" share half their words).
+ * Coverage: 1 when EVERY word of the shorter label is in the longer one, else 0.
+ * A contractor's sąmata line is wordier than ours („Nišų iš GKP paslėptam led
+ * apšvietimui glaistymas dažymas" vs „LED nišų glaistymas/dažymas", „Sienų,
+ * lubų glaistymas/dažymas" vs „Sienų glaistymas/dažymas"); Jaccard punishes
+ * every extra word, this does not. Anything less than full coverage is NOT the
+ * same work: siblings differ by exactly one word — „iki 3m" / „virš 3m",
+ * „Q2" / „Q4", „lubų" / „sienų" — and a partial overlap priced the premium
+ * tier from the plain one (2026-09-15 review). Asked only of labels with at
+ * least three real tokens; two-token labels coincide too easily.
  */
-function overlap(setA, setB) {
+function covered(setA, setB) {
   if (setA.size < 3 || setB.size < 3) return 0;
-  let intersect = 0;
-  for (const t of setA) if (setB.has(t)) intersect += 1;
-  return intersect / Math.min(setA.size, setB.size);
+  const [small, big] = setA.size <= setB.size ? [setA, setB] : [setB, setA];
+  for (const t of small) if (!big.has(t)) return 0;
+  return 1;
 }
 
 function jaccard(setA, setB) {
@@ -129,9 +131,9 @@ export function scorePair(pozAprasymas, itemAprasymas) {
   if (a.includes(b) || b.includes(a)) return 0.92;
   const ta = tokens(a);
   const tb = tokens(b);
-  // Stemmed overlap is capped just under the substring tier: a wordier line
-  // that covers every word of ours is „similar", never „exact".
-  return Math.max(jaccard(ta, tb), Math.min(0.9, overlap(stemmed(ta), stemmed(tb))));
+  // Full stemmed coverage sits just under the substring tier: a wordier line
+  // that carries every word of ours is „similar", never „exact".
+  return Math.max(jaccard(ta, tb), covered(stemmed(ta), stemmed(tb)) ? 0.9 : 0);
 }
 
 /**

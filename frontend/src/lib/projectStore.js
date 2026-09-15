@@ -187,7 +187,28 @@ function _handleSyncError(e) {
 // edit, so it drifts ahead of the server immediately. Populated from the backend
 // pull and from each successful PUT response; sent back as `base_updated_at` so
 // the backend can refuse a write that would clobber another tab.
-const _serverVersions = new Map();
+// Persisted (2026-09-15 review): in memory only, the first PUT after a page
+// load carried no base at all and the backend skipped its 409 check — the
+// lost-update guard silently switched itself off on every reload.
+const VERSIONS_KEY = 'samatu_server_versions';
+function _loadVersions() {
+  try {
+    const raw = globalThis.localStorage?.getItem(VERSIONS_KEY);
+    const obj = raw ? JSON.parse(raw) : null;
+    return new Map(obj && typeof obj === 'object' ? Object.entries(obj) : []);
+  } catch {
+    return new Map();
+  }
+}
+const _serverVersions = _loadVersions();
+function _saveVersions() {
+  try { globalThis.localStorage?.setItem(VERSIONS_KEY, JSON.stringify(Object.fromEntries(_serverVersions))); } catch { /* private window, quota */ }
+}
+function _setServerVersion(id, updatedAt) {
+  if (!id || !updatedAt) return;
+  _serverVersions.set(id, updatedAt);
+  _saveVersions();
+}
 
 export function _getServerVersion(id) {   // test hook
   return _serverVersions.get(id);
@@ -198,7 +219,7 @@ export function _getServerVersion(id) {   // test hook
 // Without re-basing here, the tab's next write-through carries a stale
 // base_updated_at, trips the 409 guard below and falsely reports lost work.
 export function noteServerVersion(id, updatedAt) {
-  if (id && updatedAt) _serverVersions.set(id, updatedAt);
+  _setServerVersion(id, updatedAt);
 }
 
 // In-flight PUT per project id — used to supersede a slow earlier request so a
@@ -247,7 +268,7 @@ const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
       // Track what the server now holds so the NEXT save carries a fresh base.
       try {
         const saved = await res.json();
-        if (saved?.updated_at) _serverVersions.set(id, saved.updated_at);
+        if (saved?.updated_at) _setServerVersion(id, saved.updated_at);
       } catch { /* body not JSON — leave the old base, worst case a false 409 */ }
     }
     return verdict;
@@ -429,6 +450,7 @@ export function resetPullCache() {
   for (const c of _inflight.values()) { try { c.abort(); } catch { /* settled */ } }
   _inflight.clear();
   _serverVersions.clear();
+  _saveVersions();
   // Price lists are user-scoped and backend-backed since 2026-09-02 — releasing
   // their once-per-session guard here is what makes the NEXT user's first
   // Kainynai visit fetch his own lists instead of reusing the previous pull.
@@ -495,7 +517,7 @@ export async function pullProjectsFromBackend({ force = false } = {}) {
     // conflict check. Without this the first PUT after a load carries no base
     // and a two-tab overwrite would still go through unnoticed.
     for (const p of valid) {
-      if (p?.id && p.updated_at) _serverVersions.set(p.id, p.updated_at);
+      if (p?.id && p.updated_at) _setServerVersion(p.id, p.updated_at);
     }
     _replaceAll(valid);
     return valid;
@@ -536,14 +558,18 @@ export async function refreshProjectFromBackend(id) {
     return getProject(id);
   }
   if (!fresh || fresh.id !== id) return getProject(id);
-  if (fresh.updated_at) _serverVersions.set(id, fresh.updated_at);
-  if (_dirtyIds.has(id)) return getProject(id);      // an unsaved local edit is pushed first, then compared
+  // An unsaved local edit is pushed first, then compared — and its base stays
+  // the version it was made on. Rebasing here (2026-09-13 – 09-15) handed the
+  // pending PUT the server's NEWER stamp, so a stale cache plus one edit
+  // overwrote another device's work with no 409.
+  if (_dirtyIds.has(id)) return getProject(id);
   const raw = _readProjectsRaw();
   const projects = Array.isArray(raw) ? raw : [];
   const cached = projects.find(p => p?.id === id) || null;
   const newer = !cached || !cached.updated_at
     || (!!fresh.updated_at && fresh.updated_at > cached.updated_at);
-  if (!newer) return getProject(id);
+  if (!newer) return getProject(id);   // a conflicted local copy keeps its old base → the next save 409s again
+  if (fresh.updated_at) _setServerVersion(id, fresh.updated_at);
   const next = cached ? projects.map(p => (p?.id === id ? fresh : p)) : [fresh, ...projects];
   _memProjects = next;
   // a refused localStorage write leaves the flag set, so the next flush retries it
@@ -667,6 +693,7 @@ export function permanentlyDeleteProject(id) {
   _inflight.delete(id);
   _lastSeq.set(id, ++_seqCounter);   // invalidate any late response
   _serverVersions.delete(id);
+  _saveVersions();
   _saveNow(projects, null);
   _deleteFromBackend(id);
 }

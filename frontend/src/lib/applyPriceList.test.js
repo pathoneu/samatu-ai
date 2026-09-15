@@ -479,6 +479,13 @@ test('scorePair: a wordier sąmata line that covers every word of ours is simila
   // one word of four differs → not the same work (a floor-tile row must never take a wall-tile price)
   assert.ok(scorePair('Nuolydžio formavimas dušo zonoje', 'Nuolydžio formavimas dušo kabinoje') < 0.78);
   assert.ok(scorePair('Sienų lyginimas Knauf Rotband', 'Sienų lyginimas sausu gipsiniu tinku "Rotband"') < 0.78);
+  // siblings that differ by ONE word are different priced lines — never filled from each other
+  assert.ok(scorePair('Sienų glaistymas/dažymas (iki 3m aukščio)', 'Sienų glaistymas/dažymas (virš 3m aukščio)') < 0.78, 'height tiers');
+  assert.ok(scorePair('Sienų glaistymas 2 sluoksniais Q2', 'Sienų glaistymas 2 sluoksniais Q4') < 0.78, 'Q levels');
+  assert.ok(scorePair('Lubų glaistymas/dažymas (standartinis aukštis)', 'Sienų glaistymas/dažymas (standartinis aukštis)') < 0.78, 'ceiling vs walls');
+  assert.ok(scorePair('GKP lubų montavimas ant metalinio karkaso', 'GKP sienų montavimas ant metalinio karkaso') < 0.78, 'GKP ceiling vs walls');
+  // …while one sąmata line that carries every word of ours prices both our tiers
+  assert.ok(scorePair('Sienų glaistymas/dažymas (iki 3m aukščio)', 'Sienų glaistymas/dažymas') >= 0.78);
   // two-token labels are not overlapped at all
   assert.ok(scorePair('Durų montavimas', 'Durų dažymas') < 0.78);
   assert.ok(scorePair('Grindjuosčių sumontavimas', 'Grindjuosčių dažymas') < 0.78);

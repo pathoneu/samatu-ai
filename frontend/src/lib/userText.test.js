@@ -21,14 +21,13 @@ test('a clean clause survives next to a banned one', () => {
     'Palyginkite su durų specifikacija.');
 });
 
-test('customer terms come from the environment', () => {
+test('customer terms are never read from the environment — a VITE_* value would ship in the public bundle', () => {
   process.env.VITE_CONFIDENTIAL_TERMS = 'Slaptas klientas, Kita gatvė 7';
   _resetConfidentialCache();
-  assert.equal(isBannedText('pagal Slaptas Klientas projektą'), true);
-  assert.equal(cleanUserText('Pagal Slaptas klientas projektą. Patikrinkite.'), 'Patikrinkite.');
+  assert.equal(isBannedText('pagal Slaptas Klientas projektą'), false);
+  assert.equal(cleanUserText('Pagal Slaptas klientas projektą. Patikrinkite.'), 'Pagal Slaptas klientas projektą. Patikrinkite.');
   delete process.env.VITE_CONFIDENTIAL_TERMS;
   _resetConfidentialCache();
-  assert.equal(isBannedText('pagal Slaptas Klientas projektą'), false);
 });
 
 test('non-strings and empties are returned as-is', () => {

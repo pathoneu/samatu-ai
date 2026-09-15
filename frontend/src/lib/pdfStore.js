@@ -14,7 +14,7 @@
  *   await deletePdf(projectId)
  */
 
-import { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase.js';   // the .js lets node's test runner resolve it
 
 const DB_NAME = 'samatu_pdfs';
 const STORE = 'pdfs';
@@ -81,7 +81,7 @@ async function fetchPdfFromBackend(projectId) {
   }
 }
 
-export async function getPdfBlob(projectId) {
+async function loadPdfBlob(projectId) {
   // 1) fast browser cache
   const cached = await getPdfFromIdb(projectId);
   if (cached) return cached;
@@ -92,6 +92,25 @@ export async function getPdfBlob(projectId) {
     return remote;
   }
   return null;
+}
+
+// The viewer, the thumbnail rail and the room list all ask for the PDF while
+// the project mounts. Before the first answer lands in IndexedDB every one of
+// them missed the cache and downloaded the whole drawing — three identical
+// multi-MB fetches on every first open (seen 2026-09-15). One in-flight
+// promise per project; it is dropped once settled so a later open re-checks
+// the cache as before.
+const inflight = new Map();
+
+export function getPdfBlob(projectId, { load = loadPdfBlob } = {}) {
+  const key = String(projectId);
+  const pending = inflight.get(key);
+  if (pending) return pending;
+  const p = Promise.resolve()
+    .then(() => load(projectId))
+    .finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+  inflight.set(key, p);
+  return p;
 }
 
 export async function getPdfUrl(projectId) {

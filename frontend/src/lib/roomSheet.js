@@ -22,6 +22,7 @@
  */
 
 import { ltNumber } from './ledger.js';
+import { MIN_CROP_H_PCT, MIN_CROP_W_PCT, PAD_PCT, paddedRect } from './sheetZoom.js';
 import { ltPlural } from './ltPlural.js';
 
 /** Drawing-order of the six facts, as the founder's sheet lists them. */
@@ -273,32 +274,21 @@ export function termRows(terms) {
  * both floors firing) the returned pixel size divided by the predicted padded
  * size is the same page constant to within integer rounding.
  */
-export const CROP_PAD_PCT = 0.012;
-export const CROP_MIN_W_PCT = 0.10;
-export const CROP_MIN_H_PCT = 0.045;
-
+// One frontend mirror of evidence.py's padding — `sheetZoom.paddedRect` (the
+// zoom viewer reads it too). The copy that lived here drifted apart from it by
+// name only, which is how a padding change would have reached one and not the
+// other (2026-09-15 review).
+export const CROP_PAD_PCT = PAD_PCT;
+export const CROP_MIN_W_PCT = MIN_CROP_W_PCT;
+export const CROP_MIN_H_PCT = MIN_CROP_H_PCT;
+/** `paddedRect` with the sheet's own guard: junk → the whole page, a reversed rect is normalised. */
 export function paddedCropRect(rect) {
   if (!Array.isArray(rect) || rect.length !== 4) return [0, 0, 1, 1];
   let [x0, y0, x1, y1] = rect.map(Number);
   if (![x0, y0, x1, y1].every(Number.isFinite)) return [0, 0, 1, 1];
   if (x1 < x0) [x0, x1] = [x1, x0];
   if (y1 < y0) [y0, y1] = [y1, y0];
-  x0 -= CROP_PAD_PCT; y0 -= CROP_PAD_PCT;
-  x1 += CROP_PAD_PCT; y1 += CROP_PAD_PCT;
-  if (x1 - x0 < CROP_MIN_W_PCT) {
-    const cx = (x0 + x1) / 2;
-    x0 = cx - CROP_MIN_W_PCT / 2; x1 = cx + CROP_MIN_W_PCT / 2;
-  }
-  if (y1 - y0 < CROP_MIN_H_PCT) {
-    const cy = (y0 + y1) / 2;
-    y0 = cy - CROP_MIN_H_PCT / 2; y1 = cy + CROP_MIN_H_PCT / 2;
-  }
-  // Slide, don't squash — the requested region must stay inside the crop.
-  if (x0 < 0) { x1 = Math.min(1, x1 - x0); x0 = 0; }
-  if (x1 > 1) { x0 = Math.max(0, x0 - (x1 - 1)); x1 = 1; }
-  if (y0 < 0) { y1 = Math.min(1, y1 - y0); y0 = 0; }
-  if (y1 > 1) { y0 = Math.max(0, y0 - (y1 - 1)); y1 = 1; }
-  return [Math.max(0, x0), Math.max(0, y0), Math.min(1, x1), Math.min(1, y1)];
+  return paddedRect([x0, y0, x1, y1]);
 }
 
 /**

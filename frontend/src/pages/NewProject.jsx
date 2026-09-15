@@ -550,8 +550,8 @@ export default function NewProject() {
         } else {
           ({ json, res, projType } = await detectAndExtract(
             file, projTypeChoice, controller.signal,
-            { interiorSubtype },
-          ), { scope: scopeChoice() });
+            { interiorSubtype, scope: scopeChoice() },
+          ));
         }
         setStatus(t('newProject.statusSaving'));
       } finally {
