@@ -1055,7 +1055,7 @@
       "windowsNotFound": "No windows found in the drawings",
       "windowsNotFoundDesc": "Standard suggestions by room type are provided. Check and adjust below.",
       "wallThickness": "Wall thickness (partitions)",
-      "wallThicknessNote": "0.10 m — used only for the reveal area; it barely moves the quantities. LT partitions are typically 0.075–0.10 m, blockwork 0.20–0.25 m.",
+      "wallThicknessNote": "0.10 m — reveal area and the door openings in the wall area (opening less the painted jambs). LT partitions are typically 0.075–0.10 m, block walls 0.20–0.25 m.",
       "puttyLevel": "Putty level",
       "puttyLevelNote": "A higher level means more skim and more sanding labour.",
       "ceilingHeightLabel": "Ceiling height ",

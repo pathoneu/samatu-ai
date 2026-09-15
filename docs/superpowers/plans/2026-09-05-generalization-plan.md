@@ -1108,3 +1108,39 @@ minutes from first opening to first export, exports, facts accepted vs corrected
 correction, rooms verified, rows edited / deleted / added, re-reads — the pilot's „corrections per
 project 15 → <5", „minutes upload→sent", „export sent" in one table (`--json` for machines).
 Tests: telemetry.test.js +3, test_pilot_report.py +2. Frontend 705.
+
+## 2026-09-15: the pre-push check — numbers that move together, a sąmata as a price list
+
+The founder's three asks before the push: debug the code, check in the app that changing numbers
+(heights, partitions, doors) keeps everything consistent, and upload an old contractor sąmata as a
+price list. Done on a scratch copy of the demo project (`Tikrinimas (kopija G)`, left in the local
+DB) with a script that replays every edit the sheet and the Prielaidos panel can make through the
+same endpoints the app calls (66 checks: heights, perimeter, doors +1, door size, wall thickness,
+room switched off, Q level; ledger chains, Σ-rows, santrauka, the sheet strip vs the row's
+contribution) and with the real UI for door size, height, wall thickness and the price list.
+
+**Found and fixed.**
+- The wall formula deducted a flat 1,125 m² per door (0,9×2,1 less 0,15 m reveals, calibrated on
+  one contractor's sąmata in May) and 1,85 m² gross on the legacy branch — the door size editor and
+  the wall thickness control changed nothing on the walls. Now every branch deducts each door's
+  opening less its painted jambs, (w + 2h) × wall thickness, from the room's own `elementai`
+  (standard 0,9×2,1 when a door has no size); the user's „Sienos storis" reaches the calc on both
+  recompute paths. Cost: in-sample 9,75 → 9,91 % (A walls −8,3 → −11,2 %; C, D improve; B worsens);
+  OOS unchanged. A 0,15 m default would restore A's number and would be the same constant renamed —
+  the drawing's partition widths are the honest next source. Windows keep their two conventions
+  (not deducted on the apdailos branch, gross on the legacy one) — a declared decision, not touched.
+- The price-list xlsx parser could not read a sąmata (header in row 8 beyond its 5-row window,
+  headers „Darbų aprašymai" / „Darbų kaina € be PVM" over a „vnt. | viso" sub-row, section rows).
+  Now it does, carries the section and the material price. The matcher accepts a wordier line that
+  covers all of ours (stemmed overlap, ≥ 3 tokens, capped below „exact"): H's 36-row sąmata prices
+  18 of G's 74 work rows offline (10 before), 17 through the UI; 26 of its lines find no row —
+  the two vocabularies differ, not the matcher.
+- `ApplyPriceListButton` called a helper defined in another component (from the telemetry commit)
+  — a ReferenceError on every click; eslint's `no-undef` had never run because the config's `rules:`
+  replaced the recommended set. Fixed, rule on, 0 errors.
+- The council's „DE badge" is the sidebar avatar: the dev account's initials („dev@samatu.local").
+
+**Confirmed working** (API and UI): a typed height moves the room's walls by P×Δh and the corner
+metres; a typed perimeter moves walls and skirting; a door added or resized moves walls, reveals and
+skirting by exactly its size; a room switched off comes off every anchored line by its own share; the
+Q level moves the putty only; every ledger chain still ends at its kiekis.

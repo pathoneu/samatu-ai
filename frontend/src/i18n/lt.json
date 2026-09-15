@@ -1064,7 +1064,7 @@
       "windowsNotFound": "Langai nerasti brėžiniuose",
       "windowsNotFoundDesc": "Pateikiami standartiniai pasiūlymai pagal patalpų tipus. Patikrinkite ir pakoreguokite apačioje.",
       "wallThickness": "Sienos storis (pertvaros)",
-      "wallThicknessNote": "0,10 m — tik angokraščių plotui; kiekių beveik nekeičia. LT pertvaroms tipiniai 0,075–0,10 m, blokeliams 0,20–0,25 m.",
+      "wallThicknessNote": "0,10 m — angokraščių plotui ir durų angoms sienų plote (anga minus dažomi angokraščiai). LT pertvaroms tipiniai 0,075–0,10 m, blokeliams 0,20–0,25 m.",
       "puttyLevel": "Glaistymo lygis",
       "puttyLevelNote": "Aukštesnis lygis = daugiau glaisto ir šlifavimo darbo.",
       "ceilingHeightLabel": "Lubų aukštis ",
