@@ -45,7 +45,7 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 20_000
 # Header row must appear near the top — a real kainynas has at most a title and
 # a blank line above it.
-HEADER_SCAN_ROWS = 5
+HEADER_SCAN_ROWS = 20   # a contractor's sąmata carries a title block before its header (2026-09-15)
 MAX_ITEMS_PER_LIST = 50_000
 
 # Per-row bounds for a PUT. `aprasymas` matches what the importer already
@@ -302,6 +302,40 @@ def _sanitize_items(items: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
+# Substring synonyms for headers that are not a bare word — a contractor's own
+# sąmata reads „Darbų aprašymai", „Darbų kaina € be PVM", „Medžiagų kaina € be
+# PVM" (a two-row header whose „vnt. / viso" sub-cells sit UNDER those). The
+# exact map above stays first; these run when it finds nothing. Order matters:
+# the material price is recognised before the plain „kaina" substring so it is
+# never mistaken for the work price.
+_HEADER_SUBSTRINGS: tuple[tuple[str, str], ...] = (
+    ("medziag", "medziagu_kaina"),     # „Medžiagų kaina" — kept as an extra field
+    ("aprasym", "aprasymas"),
+    ("pavadinim", "aprasymas"),
+    ("matovnt", "mato_vnt"),
+    ("matovien", "mato_vnt"),
+    ("ikain", "kaina"),
+    ("kaina", "kaina"),                 # „Darbų kaina € be PVM", „Vnt. kaina"
+)
+
+
+def _map_header(cell: Any) -> str | None:
+    key = _norm_header(cell)
+    if not key:
+        return None
+    mapped = _HEADER_MAP.get(key)
+    if mapped:
+        return mapped
+    if "kiek" in key or "suma" in key or "viso" in key:
+        return None                     # quantities and totals are never a price list column
+    for needle, field in _HEADER_SUBSTRINGS:
+        if needle in key:
+            if field == "medziagu_kaina" and "kain" not in key:
+                continue                # „Medžiagos" alone is a section, not a price column
+            return field
+    return None
+
+
 def _norm_header(value: Any) -> str:
     """Fold a header cell to its comparison key: lowercase, accents dropped,
     everything that is not a letter or digit removed."""
@@ -407,13 +441,17 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
         for r, row in enumerate(head):
             candidate: dict[str, int] = {}
             for i, cell in enumerate(row or ()):
-                mapped = _HEADER_MAP.get(_norm_header(cell))
+                mapped = _map_header(cell)
                 if mapped and mapped not in candidate:
                     candidate[mapped] = i
             if "aprasymas" in candidate and "kaina" in candidate:
                 col_idx = candidate
                 header_row = r
                 break
+        # A two-row header („Darbų kaina" over „vnt. | viso"): the unit price
+        # sits in the header's own column, the total one to the right — the
+        # sub-row carries no new columns, so it is consumed as a data row and
+        # skipped for lacking a price. Nothing to do here; noted for the reader.
 
         if header_row < 0:
             raise HTTPException(
@@ -425,31 +463,46 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
         items: list[dict[str, Any]] = []
         skipped = 0
         row_count = 0
+        # A sąmata names its sections on their own rows („Skyrius | Gipso
+        # kartono montavimas", or just the name in the description column with
+        # no price); they are carried onto the rows below instead of skipped.
+        current_section = ""
 
         def _consume(row: tuple[Any, ...] | None) -> None:
-            nonlocal skipped
+            nonlocal skipped, current_section
             if not row or all(c is None or str(c).strip() == "" for c in row):
                 return
-            aprasymas = _cell_text(row[col_idx["aprasymas"]]
-                                   if col_idx["aprasymas"] < len(row) else None)
+            cells = [_cell_text(c) for c in row]
+            aprasymas = cells[col_idx["aprasymas"]] if col_idx["aprasymas"] < len(cells) else ""
+            kaina = _parse_price(row[col_idx["kaina"]]
+                                 if col_idx["kaina"] < len(row) else None)
+            sk_i = col_idx.get("skyrius")
+            vnt_i = col_idx.get("mato_vnt")
+            if kaina is None:
+                texts = [c for c in cells if c]
+                # „Skyrius | <name>" or a lone name: a section row
+                if texts and (_norm_header(texts[0]) == "skyrius" and len(texts) >= 2):
+                    current_section = texts[1][:200]
+                elif aprasymas and len(texts) == 1:
+                    current_section = aprasymas[:200]
+                skipped += 1
+                return
             if not aprasymas:
                 skipped += 1
                 return
-            kaina = _parse_price(row[col_idx["kaina"]]
-                                 if col_idx["kaina"] < len(row) else None)
-            if kaina is None:
-                skipped += 1
-                return
-            sk_i = col_idx.get("skyrius")
-            vnt_i = col_idx.get("mato_vnt")
-            items.append({
-                "skyrius": (_cell_text(row[sk_i]) if sk_i is not None and sk_i < len(row)
-                            else "") or "Kiti darbai",
+            section = (cells[sk_i] if sk_i is not None and sk_i < len(cells) else "") or current_section
+            item = {
+                "skyrius": section or "Kiti darbai",
                 "aprasymas": aprasymas[:400],
-                "mato_vnt": (_cell_text(row[vnt_i])
-                             if vnt_i is not None and vnt_i < len(row) else ""),
+                "mato_vnt": (cells[vnt_i] if vnt_i is not None and vnt_i < len(cells) else ""),
                 "kaina": kaina,
-            })
+            }
+            mk_i = col_idx.get("medziagu_kaina")
+            if mk_i is not None and mk_i < len(row):
+                mk = _parse_price(row[mk_i])
+                if mk is not None and mk > 0:
+                    item["medziagu_kaina"] = mk
+            items.append(item)
 
         for row in head[header_row + 1:]:
             row_count += 1

@@ -134,9 +134,10 @@ def test_missing_header_is_a_400_not_a_crash():
 
 
 def test_header_below_the_scan_window_is_rejected():
-    """A header on row 6 is out of the documented 5-row window — better a clear
+    """A header on row 22 is out of the documented 20-row window (a sąmata's
+    title block fits, a header buried in data does not) — better a clear
     Lithuanian error than a silent zero-row import."""
-    rows = [[None]] * 5 + [["Aprašymas", "Kaina"], ["Sienų dažymas", "7,5"]]
+    rows = [[None]] * 21 + [["Aprašymas", "Kaina"], ["Sienų dažymas", "7,5"]]
     with pytest.raises(HTTPException) as exc:
         pl_mod.parse_xlsx_items(_wb_bytes(rows))
     assert exc.value.status_code == 400

@@ -65,6 +65,36 @@ function tokens(s) {
   );
 }
 
+/**
+ * A token's stem: LT inflects at the end („montavimas / montavimo",
+ * „sienų / sienos", „plytelių / plytelės"), so two labels naming the same
+ * work in different cases share their first letters. Six letters keep
+ * „glaistymas" and „glaistas" apart; short tokens are compared whole.
+ */
+function stem(t) {
+  return t.length > 6 ? t.slice(0, 6) : t;
+}
+
+function stemmed(setA) {
+  return new Set([...setA].map(stem));
+}
+
+/**
+ * Overlap coefficient: how much of the SHORTER label the longer one covers.
+ * A contractor's sąmata line is wordier than ours („Sienų lyginimas sausu
+ * gipsiniu tinku Rotband" vs „Sienų lyginimas Knauf Rotband", „Nišų iš GKP
+ * paslėptam led apšvietimui glaistymas" vs „LED nišų glaistymas/dažymas");
+ * Jaccard punishes every extra word, this does not. Asked only of labels
+ * with at least three real tokens — two-token labels coincide too easily
+ * („Durų montavimas" / „Durų dažymas" share half their words).
+ */
+function overlap(setA, setB) {
+  if (setA.size < 3 || setB.size < 3) return 0;
+  let intersect = 0;
+  for (const t of setA) if (setB.has(t)) intersect += 1;
+  return intersect / Math.min(setA.size, setB.size);
+}
+
 function jaccard(setA, setB) {
   if (setA.size === 0 || setB.size === 0) return 0;
   let intersect = 0;
@@ -97,7 +127,11 @@ export function scorePair(pozAprasymas, itemAprasymas) {
   if (!a || !b) return 0;
   if (a === b) return 1.0;
   if (a.includes(b) || b.includes(a)) return 0.92;
-  return jaccard(tokens(a), tokens(b));
+  const ta = tokens(a);
+  const tb = tokens(b);
+  // Stemmed overlap is capped just under the substring tier: a wordier line
+  // that covers every word of ours is „similar", never „exact".
+  return Math.max(jaccard(ta, tb), Math.min(0.9, overlap(stemmed(ta), stemmed(tb))));
 }
 
 /**

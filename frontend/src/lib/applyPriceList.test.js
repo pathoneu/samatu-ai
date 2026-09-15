@@ -22,9 +22,11 @@ test('scorePair: substring → 0.92', () => {
 test('scorePair: Jaccard on shared tokens', () => {
   const s = scorePair('Sienų pirminis glaistymas Q1', 'Sienų antrinis glaistymas Q2');
   // Shared tokens: ['sienu', 'glaistymas']; the Q-levels count as tokens since
-  // 2026-09-02 (they are the priced difference), so jaccard = 2/6 ≈ 0.33.
-  // Either way this is well under MIN_SCORE — different work, no fill.
-  assert.ok(s >= 0.25 && s <= 0.45, `expected ~0.33, got ${s}`);
+  // 2026-09-02 (they are the priced difference), so jaccard = 2/6 ≈ 0.33 and
+  // the stemmed overlap (2026-09-15) 2/4 = 0.5. Either way this is well under
+  // MIN_SCORE — different work, no fill.
+  assert.ok(s >= 0.25 && s <= 0.55, `expected 0.33–0.5, got ${s}`);
+  assert.ok(s < 0.78);
 });
 
 test('scorePair: empty inputs → 0', () => {
@@ -464,4 +466,21 @@ test('the ambiguity guard really does report the row it skipped', () => {
   assert.equal(out.applied, 0);
   assert.deepEqual(out.ambiguous.map(a => a.aprasymas), ['Sienų glaistymas']);
   assert.equal(describeAmbiguous(out.ambiguous, tRows), 'Sienų glaistymas');
+});
+
+test('scorePair: a wordier sąmata line that covers every word of ours is similar (stemmed overlap)', () => {
+  // the same work in the contractor's words — every one of OUR tokens is in his line
+  assert.ok(scorePair('LED nišų glaistymas/dažymas', 'Nišų iš GKP paslėptam led apšvietimui glaistymas dažymas') >= 0.78);
+  assert.ok(scorePair('Sienų glaistymas/dažymas', 'Sienų, lubų glaistymas/dažymas') >= 0.78, 'his one line prices our two');
+  // inflection does not break the match
+  assert.ok(scorePair('Grindų plytelių klijavimas', 'Grindų plytelės klijavimo darbai') >= 0.78);
+  // the overlap never reaches the exact tier
+  assert.ok(scorePair('Sienų glaistymas/dažymas', 'Sienų, lubų glaistymas/dažymas') < 0.92);
+  // one word of four differs → not the same work (a floor-tile row must never take a wall-tile price)
+  assert.ok(scorePair('Nuolydžio formavimas dušo zonoje', 'Nuolydžio formavimas dušo kabinoje') < 0.78);
+  assert.ok(scorePair('Sienų lyginimas Knauf Rotband', 'Sienų lyginimas sausu gipsiniu tinku "Rotband"') < 0.78);
+  // two-token labels are not overlapped at all
+  assert.ok(scorePair('Durų montavimas', 'Durų dažymas') < 0.78);
+  assert.ok(scorePair('Grindjuosčių sumontavimas', 'Grindjuosčių dažymas') < 0.78);
+  assert.ok(scorePair('Vonios sienų plytelių fugavimas', 'Plytelių klijavimas ant sienų ir grindų') < 0.78, 'fugavimas is not klijavimas');
 });

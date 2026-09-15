@@ -35,6 +35,10 @@ export default [
       "unused-imports": pluginUnusedImports,
     },
     rules: {
+      // The `rules:` key below REPLACES the recommended set spread above, so
+      // `no-undef` never ran — two undefined helpers reached the browser on
+      // 2026-09-15 (`laneScales`, `pilot`) before a click found them. Keep it.
+      "no-undef": "error",
       "no-unused-vars": "off",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",

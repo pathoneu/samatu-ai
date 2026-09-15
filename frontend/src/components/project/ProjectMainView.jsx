@@ -1151,7 +1151,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
   }, [open]);
 
   const handleApply = (priceList, opts = {}) => {
-    pilot('kainynas_apply', { kind: 'kainynas', id: '' });
+    recordPilot(project?.id, 'kainynas_apply', { kind: 'kainynas', id: '' });
     setOpen(false);
     // Price each list from its OWN rows and write back ONLY that list. The old
     // code priced `pozicijos || darbu_sarasas` and wrote the SAME result into
