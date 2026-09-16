@@ -12,18 +12,21 @@ healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-# The `dev` environment (2026-09-16). Railway no longer lets a service created
-# today use nixpacks (config-as-code accepts only RAILPACK or DOCKERFILE, and
-# Railpack cannot detect this repo), so dev builds the proven backend/Dockerfile
-# (Python 3.14-slim; production still runs the legacy nixpacks image, py3.12).
-# Scoped to the environment: production settings are untouched.
+# The `dev` environment (2026-09-16). Railway's config-as-code (this file) is
+# deprecated and only read for LEGACY services — the production service — so the
+# block below documents dev but does not drive it. What actually builds dev:
+#   · service `api-dev` in environment `dev`, deployed with `railway up` from a
+#     local checkout (GitHub source could not be attached from the CLI);
+#   · variable RAILWAY_DOCKERFILE_PATH=backend/Dockerfile → the Dockerfile
+#     builder (Railway no longer offers nixpacks to a new service; Railpack
+#     cannot detect this repo); the image's CMD is the start command;
+#   · STORAGE_BACKEND=local on its own /data volume, ENV=production, own
+#     SAMATU_SECRET_KEY, a placeholder ANTHROPIC_API_KEY (no Vision on dev).
 [environments.dev.build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [environments.dev.deploy]
-# The image installs into the system interpreter — no /opt/venv to activate.
 startCommand = "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
-

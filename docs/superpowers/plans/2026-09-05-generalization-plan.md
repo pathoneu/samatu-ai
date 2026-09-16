@@ -1189,3 +1189,31 @@ stored 0,20 m wall thickness — a leftover of the UI test, not an engine change
 709/0, eslint clean; the check sheet on a project with a stored PDF serves six crops 200; one
 `/pdf` GET per project open. Backend: full suite 3363 passed / 3 skipped, plus the 20 evidence-crop tests run on their own (one new).
 
+## 2026-09-16: a `dev` deployment before the push — and what it proved
+
+The founder asked to hold the paid Codex audit, stand up a dev environment, push the branch there
+and check everything through it. Built and verified:
+
+- **Railway** environment `dev`, service `api-dev`, `https://api-dev-dev-ab27.up.railway.app`,
+  own `/data` volume, `STORAGE_BACKEND=local`, own session secret, placeholder Anthropic key
+  (no Vision runs on dev, spend caps 0). Deployed with `railway up` from the local checkout;
+  builds from `backend/Dockerfile` via `RAILWAY_DOCKERFILE_PATH` (a service created today cannot
+  use nixpacks — Railway offers only Railpack or Dockerfile, and Railpack cannot detect this
+  repo). Production is untouched: same project, separate environment, no shared bucket.
+- **GitHub branch `dev`** = the branch tip + one preview-only commit: `frontend/vercel.json`
+  rewrites every backend path to the dev API and sets `VITE_API_SAME_ORIGIN=1`, so the Vercel
+  preview talks to its own origin and the session cookie stays first-party (no DNS, no CORS).
+  Vercel built it: `https://samatu-ai-git-dev-pathoneus-projects.vercel.app` (behind Vercel's
+  deployment protection — the founder's Vercel login opens it). Never merge that commit to main.
+- **Code:** `R2_KEY_PREFIX` (a second deployment may share the bucket under its own prefix) and
+  the `VITE_API_SAME_ORIGIN` build flag; `.railwayignore` (tests/docs/frontend/data stay out of
+  the backend upload; a dangling fixture symlink had broken it); `railway.toml` documents dev.
+- **Verified on dev over HTTP and through the real front end (local Vite proxy → dev API):**
+  register/login (Secure cookie), project upsert, 22 MB PDF upload and download, room facts,
+  six evidence crops, the check sheet, the sąmata step, the old sąmata `.xlsx` as a price list
+  (36 items, header row 8) applied through the UI („Pritaikyta: 14 eilučių, 3 tikslios,
+  11 panašios"), and 54 consistency checks (height, perimeter, door +1, door size, wall
+  thickness, room switched off, putty Q level, contributions vs rows, santrauka) — 54/54, same
+  as locally. The dev `/health` reports `commit: dev` (CLI uploads carry no git SHA).
+- Not verified: the Vercel preview itself (protected), a paid extraction on dev.
+
