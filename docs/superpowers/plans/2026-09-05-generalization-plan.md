@@ -1217,3 +1217,37 @@ and check everything through it. Built and verified:
   as locally. The dev `/health` reports `commit: dev` (CLI uploads carry no git SHA).
 - Not verified: the Vercel preview itself (protected), a paid extraction on dev.
 
+## 2026-09-16 (afternoon): pushed to production, one real run, two hotfixes
+
+The founder said „push". Fast-forward of 102 commits (b9ac871 → 79db21e), Railway + Vercel
+auto-deployed, `/health` reports `storage: r2`. Then one paid extraction on production through the
+real endpoints (objektas G drawing, 16 pages, 22 MB, test account) and the whole flow after it.
+
+**What the run showed.**
+- 34 min end to end; the SSE stream was cut at 15 min (Railway), the backend finished detached
+  and saved the project with its PDF in R2 („orphan drain"); polling `/api/projects/{id}` picked
+  it up. 9 rooms, 114 rows, `consistency_checker: 1 warn`, `perimeter_validator: all within bounds`.
+- **Bug found and hot-fixed (abf3505):** `extract_interior` assigned a local `_re = _reclaim(...)`
+  (from 6261581, 09-06), which made the module's `import re as _re` an unbound free variable for
+  the nested `_nkey` in the eksplikacija merge — „eksplikacija merge failed" on EVERY fresh
+  extraction for ten days, silently. No unit test runs that path; an AST guard test now forbids any
+  function in extractor/, main.py, api/ from assigning a module import alias.
+- **Bug found and hot-fixed (399be6f):** after every deploy the API froze for 60–90 s — a room
+  sheet took 93 s, logins timed out. Cause: `scrub_all_projects` at startup parsed every customer
+  blob under the GIL. Now once per SCRUB_VERSION (marker in the new `app_state` table), yielding
+  between rows. Also a one-off Vision `voting round 2: json_decode_failure` (tolerated by design).
+
+**Verified on production (API + real UI at app.pathon.eu):** registration, login, dashboard, the
+drawing step (single PDF fetch), the check sheet with six evidence crops (1,2–1,6 s each after the
+first render), a height edit 2,82 → 3,00 m through the UI (walls 90,40 → 96,98 m², recompute
+514 ms, saved), the old sąmata `.xlsx` as a price list (36 items) applied through the UI (total
+0 → 6 589,67 € su PVM), 54 consistency checks against the live backend (54/54), exports: Excel
+server-side (6 KB), Excel template layout and plain (30 KB), PDF (4 pages, 58 KB). Test data left
+on production: account test-run-2026-09-16@pathon.eu (the project and the price list are deleted
+at the end of the session).
+
+**Open after this:** the extraction start still starves the API briefly (pdfplumber preflight under
+the GIL, ~30 s once per run) — one instance, no worker separation; a 34-minute run is long
+(voting + zoom passes); `generate-excel?layout=template` returned the same bytes as the plain
+layout for a project without a chosen template (expected? check with a template selected).
+
