@@ -1,0 +1,16 @@
+# Railway CLI uploads (`railway up`) and builds: the backend image needs
+# backend/ (minus tests), nixpacks.toml and railway.toml — nothing else.
+# 2026-09-16: the dev environment is deployed from the CLI; a dangling test
+# fixture symlink broke the upload, and tests/docs/frontend only add weight.
+backend/tests/
+backend/data/
+backend/telemetry/*.jsonl
+frontend/
+docs/
+detector_bench/
+training-data/
+eval_runs/
+node_modules/
+venv/
+*.pdf
+.claude/
