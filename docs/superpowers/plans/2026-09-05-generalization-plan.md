@@ -1156,8 +1156,9 @@ kainynas parser), verified by hand because the review tooling kept dying on rate
   to the container's disk and vanished on the next deploy. Now the same production test the rest
   of the backend uses (`ENV`/`ENVIRONMENT` = prod/production) plus the hosts' own markers
   (`RAILWAY_ENVIRONMENT=production`, `RENDER=true`); `/health` reports `"storage": "r2"|"local"`
-  so a deploy can be checked from outside. **Before the push the founder must confirm the Railway
-  service has one of those variables — or set `STORAGE_BACKEND=r2` explicitly.**
+  so a deploy can be checked from outside. Verified 2026-09-16 through the Railway CLI: the
+  `samatu-api` service carries `ENV=production` and both `RAILWAY_ENVIRONMENT*` markers, so the
+  deploy will pick R2 (`/health` must say `"storage": "r2"` after it).
 - A door reference like „Miegamasis 2" bound to room 02 (any number anywhere in the string); now a
   number binds only when it leads („01 Svetainė", „P-07"). A door „sized" 0,05×0,2 (centimetres in
   a millimetre field) deducted nothing; sizes under 0,3×1,0 m fall back to the standard opening.
