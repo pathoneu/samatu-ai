@@ -167,6 +167,5 @@
     "env": {
       "VITE_API_SAME_ORIGIN": "1"
     }
-  },
-  "_dev_note": "dev branch only (2026-09-16): the Vercel preview proxies backend paths to the Railway dev service so cookies stay first-party. Never merge this file into main."
+  }
 }
