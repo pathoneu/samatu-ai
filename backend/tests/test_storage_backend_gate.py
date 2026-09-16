@@ -25,8 +25,8 @@ R2_ENV = {
     "R2_SECRET_ACCESS_KEY": "sk", "R2_BUCKET": "a-bucket",
 }
 _ALL = tuple(R2_ENV) + ("STORAGE_BACKEND", "ENV", "ENVIRONMENT",
-                        "RAILWAY_ENVIRONMENT", "RENDER", "LOCAL_STORAGE_DIR",
-                        "SAMATU_DATA_DIR")
+                        "RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME", "RENDER",
+                        "LOCAL_STORAGE_DIR", "SAMATU_DATA_DIR")
 
 
 @pytest.fixture(autouse=True)
@@ -175,6 +175,7 @@ def test_missing_var_names_appear_in_the_reason(monkeypatch):
     ("ENV", "Production ", "r2"),                # case and whitespace as elsewhere
     ("ENVIRONMENT", "production", "r2"),
     ("RAILWAY_ENVIRONMENT", "production", "r2"),  # what the Railway deploy sets
+    ("RAILWAY_ENVIRONMENT_NAME", "production", "r2"),  # its current spelling — both are injected
     ("RENDER", "true", "r2"),                    # what a Render deploy sets
     ("RAILWAY_ENVIRONMENT", "staging", "local"),  # a preview environment is not prod
     ("ENV", "development", "local"),

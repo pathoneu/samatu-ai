@@ -194,15 +194,19 @@ def _hosted_production() -> str:
 
     The same production test main.py / auth.py apply (`ENV` or `ENVIRONMENT`,
     `prod` or `production`), plus the hosts' own markers: Railway sets
-    RAILWAY_ENVIRONMENT to the environment's name, Render sets RENDER=true.
+    RAILWAY_ENVIRONMENT / RAILWAY_ENVIRONMENT_NAME to the environment's name,
+    Render sets RENDER=true.
     2026-09-15 review: the rule read `ENV == "production"` exactly, which the
     Railway deploy does not necessarily set, so the next push could have sent
     every production PDF to the container's disk."""
     for var in ("ENV", "ENVIRONMENT"):
         if (os.environ.get(var) or "").strip().lower() in ("prod", "production"):
             return f"{var}=production"
-    if (os.environ.get("RAILWAY_ENVIRONMENT") or "").strip().lower() == "production":
-        return "RAILWAY_ENVIRONMENT=production"
+    # Railway injects both (the older RAILWAY_ENVIRONMENT and the current
+    # RAILWAY_ENVIRONMENT_NAME); checked live on the samatu-api service 2026-09-16.
+    for var in ("RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME"):
+        if (os.environ.get(var) or "").strip().lower() == "production":
+            return f"{var}=production"
     if (os.environ.get("RENDER") or "").strip().lower() == "true":
         return "RENDER=true"
     return ""
