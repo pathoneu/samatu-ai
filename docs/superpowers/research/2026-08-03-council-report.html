@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pathon — Council Verdict · 2026-08-03</title>
+<style>
+  :root{
+    --paper:#F7F4EE; --panel:#FFFFFF; --ink:#1F2933; --muted:#6B7280;
+    --clay:#AD4E1F; --line:#E4DFD5; --green:#2F6B4F; --amber:#9A6B1F; --red:#9C3B2E;
+    font-size:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:400 1rem/1.55 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;padding:2.5rem 1rem 4rem}
+  .wrap{max-width:52rem;margin:0 auto}
+  header{border-bottom:2px solid var(--ink);padding-bottom:1rem;margin-bottom:1.75rem}
+  .eyebrow{font:600 .72rem/1 "IBM Plex Mono",monospace;letter-spacing:.14em;color:var(--clay);text-transform:uppercase}
+  h1{font-size:1.6rem;line-height:1.2;margin:.4rem 0 .3rem}
+  .sub{color:var(--muted);font-size:.9rem}
+  h2{font-size:1.05rem;letter-spacing:.02em;margin:2.2rem 0 .7rem;border-left:3px solid var(--clay);padding-left:.6rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:1.1rem 1.25rem;margin:.8rem 0}
+  .verdict{border-left:4px solid var(--clay)}
+  ul{margin:.4rem 0 .4rem 1.1rem;padding:0}
+  li{margin:.35rem 0}
+  .mono{font-family:"IBM Plex Mono",monospace;font-size:.85em}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;margin:.6rem 0}
+  th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font:600 .72rem/1.2 "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .tag{display:inline-block;font:600 .68rem/1 "IBM Plex Mono",monospace;padding:.22em .5em;border-radius:2px;letter-spacing:.06em}
+  .in{background:#E7EFE9;color:var(--green)} .later{background:#F4ECDD;color:var(--amber)} .no{background:#F5E4E0;color:var(--red)}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:2px;margin:.55rem 0}
+  summary{cursor:pointer;padding:.75rem 1rem;font-weight:600;font-size:.92rem}
+  summary .who{color:var(--clay)}
+  details p{margin:.35rem 0}
+  details>div{padding:0 1.15rem 1rem;color:#333;font-size:.92rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.7rem}
+  .pos{font-size:.85rem}
+  .pos b{display:block;font-size:.8rem;letter-spacing:.03em}
+  footer{margin-top:3rem;color:var(--muted);font-size:.8rem;border-top:1px solid var(--line);padding-top:.9rem}
+  .one{background:var(--ink);color:var(--paper);padding:1.1rem 1.25rem;border-radius:2px;margin:1rem 0}
+  .one .eyebrow{color:#E7B08C}
+  .spectrum{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Pathon · LLM Council · 2026-08-03</div>
+  <h1>What ships before the contractor test — and what waits</h1>
+  <div class="sub">5 Opus advisors, anonymized peer review (3 reviewers), Fable 5 chairman. Fed by the same-day 4-workstream research sweep: model landscape · latency · accuracy decomposition · app audit. Corpus n=4, MAE 9.31%, ±2 pts = noise.</div>
+</header>
+
+<div class="one">
+  <div class="eyebrow">The one thing to do first</div>
+  <b>Verify R2 on Railway — 10 minutes.</b> The only item whose failure mode is "the contractor's PDF and project are unrecoverable", and it gates the consent answer you owe him before he uploads a client's drawings. <span class="mono">curl /api/admin/v2/system-health → storage_backend == "r2"</span>
+</div>
+
+<h2>Where the council agrees</h2>
+<div class="card">
+<ul>
+  <li><b>corrections = 0 is the central fact, and the confidence bug caused it.</b> 164/273 engine-flagged rows render green, the queue shows zero, the app says "visi duomenys patvirtinti" — no user was ever told there is anything to correct. The flywheel isn't unused; it's severed.</li>
+  <li><b>The pre-contractor cut is app-side only:</b> confidence fix (with € framing), kaina_source, LT error messages, zero-room salvage, R2 check, done-notification. No model work, no truth edits.</li>
+  <li><b>Gemini probe: not now.</b> A ≥2-pt gate inside a ±2-pt noise band decides nothing. Revisit at n≥15 human-verified rows; keep the provider-swappable env as pricing leverage.</li>
+  <li><b>Truth-file fixes wait</b> — truth-only commit, before/after in the message, after the contractor.</li>
+  <li><b>The test is a data-acquisition event:</b> ≥20 correction rows, session recorded, and he brings one already-priced project (free human n=5). Sit beside him.</li>
+</ul>
+</div>
+
+<h2>Where the council clashes — and the resolution</h2>
+<div class="card">
+<table>
+<tr><th>Question</th><th>Positions</th><th>Chairman's resolution</th></tr>
+<tr><td>Speed before the test?</td><td>Contrarian: pre-run night before, ship no speed. Executor/Expansionist: validate the parse cache. Outsider: only the notification matters.</td><td><b>All three:</b> pre-run his PDF the night before; enable <i>cache only</i> after one €2.50 validation; voting/zoom/reader parallelization stays off (sub-readers lack timeout/retry).</td></tr>
+<tr><td>Confidence fix — risk or headline?</td><td>Contrarian: "164 unverified" churns a first-timer. Expansionist: honest uncertainty is the category wedge.</td><td><b>The framing is the feature.</b> Ship only with €-impact ranking + reasons shown; rehearse the walkthrough.</td></tr>
+<tr><td>Session goal — trust or data?</td><td>Named by reviewers, missed by every advisor.</td><td><b>Sequence it:</b> his flow untouched first (fresh PDF), then a guided correction pass on the pre-run project, top-€ rows first.</td></tr>
+</table>
+</div>
+
+<h2>Blind spots only peer review caught</h2>
+<div class="card">
+<ul>
+  <li><b>Truth-laundering:</b> "fix truth via the correction workspace" would stamp the founder's own re-derivation as human-confirmed. Only the contractor's hands write corrections.</li>
+  <li><b>Privacy:</b> a real client's priced project enters a system with an unverified backup and a prior client-name-leak history. Consent + retention answer before upload.</li>
+  <li><b>n=1 isn't an oracle either</b> — two LT estimators differ 10–15%. His numbers are a better prior, not gospel.</li>
+  <li><b>No re-run story in the room</b> — the night-before pre-run is what makes live iteration possible.</li>
+  <li><b>Nobody watches the run live</b> — founder on the call, logs tailed, no pushes that day.</li>
+  <li><b>Nobody has said what he pays.</b> Have the price conversation at the test.</li>
+</ul>
+</div>
+
+<h2>The roadmap</h2>
+<div class="card verdict">
+<table>
+<tr><th></th><th>Item</th><th>Verdict</th></tr>
+<tr><td class="mono">D1</td><td>Merge train (idempotency, tile 27+28, PATALPOS, height-boundary, parse cache, two P0 fix sessions) + R2 check first thing</td><td><span class="tag in">IN</span></td></tr>
+<tr><td class="mono">D2</td><td>LED gate (−1.5 pts) · LT PDF errors · zero-room salvage · one €2.50 cache-validation run</td><td><span class="tag in">IN</span></td></tr>
+<tr><td class="mono">D3</td><td>Price-entry editor port (330 clicks → 82 keystrokes) · done-notification · fix "2–20 min" copy · full rehearsal</td><td><span class="tag in">IN</span></td></tr>
+<tr><td class="mono">Test</td><td>Night-before pre-run · consent said aloud · sit-beside protocol · ≥20 corrections · his priced project = n=5 · price talk</td><td><span class="tag in">IN</span></td></tr>
+<tr><td class="mono">W2</td><td>Speed levers one-at-a-time behind flags (voting → zoom → readers, after timeouts) · truth-only commit · foreign-project room-key matching · save-prices-as-kainynas · error-log persistence · restore rehearsal</td><td><span class="tag later">AFTER</span></td></tr>
+<tr><td class="mono">n≥15</td><td>Gemini 3 Pro symbol-reader probe (evidence is real; instrument isn't, yet)</td><td><span class="tag later">DEFER</span></td></tr>
+<tr><td class="mono">—</td><td>VOTING_N=2 · mixed-provider voting · cheap-model page classification · full Gemini migration · tuning against "derived" truth metrics</td><td><span class="tag no">REJECT</span></td></tr>
+</table>
+</div>
+
+<h2>Advisor positions</h2>
+<div class="grid">
+  <div class="card pos"><b style="color:var(--red)">The Contrarian</b>Pre-run the demo; speed out of the cut. The confidence fix backfires without framing. Distrust your own truth edit. Gemini gate can't detect its own success.</div>
+  <div class="card pos"><b style="color:var(--clay)">First Principles</b>You have no oracle — every accuracy number is arithmetic on a severed instrument. The confidence bug is <i>why</i> corrections=0. Two fixes are the whole cut.</div>
+  <div class="card pos"><b style="color:var(--green)">The Expansionist</b>Honest uncertainty is the wedge competitors can't copy. The test is data acquisition. The kainynas is a second moat. Speed = headroom to spend <i>more</i> compute.</div>
+  <div class="card pos"><b style="color:var(--amber)">The Outsider</b>27 vs 13 min is the same event — the ping is what matters. 330 clicks is where he quits. Nobody said what he pays.</div>
+  <div class="card pos"><b style="color:var(--ink)">The Executor</b>Day-by-day merge plan; R2 first; parallelizing timeout-less readers ships a hang; sit with him and get ≥20 rows written.</div>
+</div>
+
+<h2>Full advisor responses</h2>
+<details><summary><span class="who">The Contrarian</span> — "You are optimizing a demo you should not be running live"</summary><div><p>The fatal flaw: you are optimizing a demo you should not be running live. 27 min → 13 min is still a dead room. Pre-run the contractor's PDF the night before, on the current code, at €2.53. That deletes speed from the pre-contractor cut entirely — cache, parallel voting, zoom parallelization, all of it. "Zero-accuracy-risk by construction" is an argument, not a measurement; parallel voting already had one race, and races surface on an unfamiliar PDF at 3pm, not in 8 tests. Ship them after.</p><p>The confidence fix is a demo risk, not a demo win. Today the app lies pleasantly. Fixed, it tells a first-time contractor that 164 of 273 rows are unverified. Ship it only with the €-ranked queue framing attached and rehearsed — the fix without the framing makes retention worse.</p><p>Truth-file edit: not now, and be suspicious of it. The engine's author declaring the truth file wrong, on n=4, moving the corpus 9.31→5.19, is the textbook way to fool yourself. The contractor is a better arbiter than your own derivation. Label it, park it. Gemini probe: never, as specified — a ≥2pt gate inside a ±2pt noise band cannot distinguish a win from nothing.</p><p>What the test must measure, and doesn't: you have no persisted error log, no alerting, no restore path. If his run fails you'll have poppler stderr and a shrug. Biggest omission: no story for being wrong. His PDF is out-of-distribution from your four; 9.31% predicts nothing about it. The correction workspace shouldn't be a feature he might find — it should be the thing you sit beside him and use.</p></div></details>
+<details><summary><span class="who">First Principles</span> — "You have no oracle, and everything downstream is theater"</summary><div><p>n=4. Truth files you now know are wrong. A metric that moves 4 points when you fix bookkeeping instead of the product. Corrections table: 0 rows, ever. You are not measuring accuracy — you are measuring agreement between Claude and a founder's earlier reading of the same PDF.</p><p>The load-bearing insight: the corrections table is empty not because of low usage — because the app tells every user there is nothing to correct. You built a feedback loop and then shipped a bug that severs it. That bug is not a P0 UI defect. It is the reason your entire ground-truth strategy has produced nothing in months. The confidence-predicate fix and the kaina_source fix are the whole pre-contractor cut.</p><p>Truth files — don't "correct" them, retire them; contractor-verified numbers supersede them within days. Gemini — never on n=4; revisit at n≥15 human-verified. 27 minutes isn't the problem; 27 <i>unexplained</i> minutes is. Biggest miss: no telemetry on the one experiment that matters — run this test blind and you spend a real estimator's attention to learn a vibe.</p></div></details>
+<details><summary><span class="who">The Expansionist</span> — "Honest uncertainty is the wedge; the test is data acquisition"</summary><div><p>The corrections table reading 0 is the only number on this page that matters. Reframe the confidence bug as the flagship feature: a €-ranked review queue that says <i>these 12 rows carry €40k of your bid, check these three</i> is something Togal, Kreo and Bluebeam do not ship. Nobody else can honestly price uncertainty because nobody else knows where their numbers came from.</p><p>Make the contractor test a data-acquisition event: he brings one finished project with his own final quantities — n=4→n=5 with human truth, free, the first non-AI-seeded fixture you'll ever own. Record the session. Measure corrections written, minutes to first correction, which rows he distrusts before opening them.</p><p>Speed is not comfort, it's headroom — permission to spend <i>more</i> compute per run. And the kainynas is a second moat: accumulate prices per contractor and it becomes a Lithuanian price benchmark nobody can replicate.</p></div></details>
+<details><summary><span class="who">The Outsider</span> — "27 and 13 minutes are the same event; the ping matters"</summary><div><p>Nothing in the speed workstream matters to the person arriving — "leave, come back later" is the same event at 27 or 13 minutes. What breaks it is the missing done-notification; that's P0, not P1. The loudest fact in the brief: the app says "visi duomenys patvirtinti" while 164 of 273 rows are flagged — the product asserting a falsehood about a number the contractor will sign his name under. And silently eating hand-typed prices is data destruction in front of a customer.</p><p>330 pointer actions for 82 rows is where he quits; he can type prices into Excel faster. Watch where he stops scrolling, which number he reaches for first, whether he finishes. Ask him to bring a job he already priced — free ground truth. Biggest miss: you wrote "first impressions decide retention," then built a roadmap of work he will never see. Also — nobody has said what he pays.</p></div></details>
+<details><summary><span class="who">The Executor</span> — day-by-day</summary><div><p><b>Day 1</b> (merge day, no new code): land everything already green — Prielaidos idempotency, tile 27+28, PATALPOS labels, height-marker boundary, PDF-parse cache, the two running P0 sessions. R2 env verification + healthcheck→/health first thing. Gates once at end of day. <b>Day 2:</b> LED gate, LT error messages, zero-room salvage, then the €2.50 validation run before the test — cache only, parallel voting off. <b>Day 3:</b> price-entry port and done-notification — the only two P1s the contractor physically experiences. Ship. Test.</p><p>Rejected pre-test: Gemini, truth edits, room-key matching, price memory, ops alerting, zoom/sub-reader parallelization (no timeout, no retry — parallelizing that ships a hang). The test measures corrections: sit with him, get ≥20 rows in the table, instrument which rows he touched and where he stopped trusting it. Biggest miss: nobody's job is "watch the run live." Be on the call.</p></div></details>
+
+<h2>Peer-review highlights</h2>
+<details><summary>Three reviewers, three different "strongest" picks — and the shared blind spots</summary><div>
+<p><b>R1 → strongest C</b> (only sequenced plan + the timeout-hang catch); blind spot E (truth-laundering via workspace). <b>R2 → strongest B</b> (the causal chain reframes all six questions); blind spot A (calls the truth edit costless). <b>R3 → strongest D</b> (dissolves the speed question via pre-run; kills the Gemini gate on statistics); blind spot B ("two fixes are the whole cut" discards durability).</p>
+<p><b>Convergent misses named by reviewers, no advisor:</b> the trust-vs-data goal conflict; client-PDF consent/retention; n=1 isn't an oracle; no in-room re-run plan; no rehearsal/code-freeze.</p>
+</div></details>
+
+<footer>
+Counciled 2026-08-03 · Chairman: Claude Fable 5 (director) · Advisors/reviewers: Claude Opus 5 · Method: Karpathy LLM Council (llm-council skill) · Transcript: <span class="mono">docs/superpowers/research/2026-08-03-council-verdict.md</span>
+</footer>
+</div>
+</body>
+</html>
