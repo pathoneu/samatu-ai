@@ -86,3 +86,23 @@ def test_scrub_all_projects_rewrites_only_dirty_blobs(tmp_path, monkeypatch):
     assert db.scrub_all_projects() == 1
     assert not user_text.is_banned(db.get_project("p-dirty")["darbu_sarasas"][0]["_confidence_reason"])
     assert db.scrub_all_projects() == 0  # idempotent
+
+
+def test_scrub_all_projects_runs_once_per_version_and_can_be_forced(tmp_path, monkeypatch):
+    """2026-09-16: the pass froze production for ~90 s after every deploy.
+    It now runs once per SCRUB_VERSION; a bumped version or force=True re-runs."""
+    import db
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "scrub.db")
+    db.init_schema()
+    db.upsert_project("p1", {"name": "A", "pastabos": ["Pagal metodiką"]})
+    assert db.get_state("scrub_all_projects") is None
+    db.scrub_all_projects()
+    assert db.get_state("scrub_all_projects") == db.SCRUB_VERSION
+    # a dirty blob written behind the scrubber's back is left alone by a repeat boot…
+    with db._conn() as c:
+        c.execute("UPDATE projects SET data = ? WHERE id = ?", ('{"name": "A", "pastabos": ["Pagal metodiką"]}', "p1"))
+    assert db.scrub_all_projects() == 0
+    # …until the version bumps or the caller forces it
+    monkeypatch.setattr(db, "SCRUB_VERSION", "next")
+    assert db.scrub_all_projects() >= 0 and db.get_state("scrub_all_projects") == "next"
+    assert db.scrub_all_projects(force=True) >= 0

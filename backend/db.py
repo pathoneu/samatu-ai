@@ -57,6 +57,11 @@ def init_schema() -> None:
     """Create tables if missing. Safe to call repeatedly (idempotent)."""
     with _conn() as c:
         c.executescript("""
+            CREATE TABLE IF NOT EXISTS app_state (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS users (
                 id            TEXT PRIMARY KEY,
                 email         TEXT UNIQUE NOT NULL,
@@ -1962,26 +1967,58 @@ _migrate_schema()
 _backfill_orphan_project_owners()
 
 
-def scrub_all_projects() -> int:
+def get_state(key: str) -> str | None:
+    """A small key→value store for one-shot maintenance markers."""
+    with _conn() as c:
+        row = c.execute("SELECT value FROM app_state WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_state(key: str, value: str) -> None:
+    from datetime import datetime, timezone
+    with _conn() as c:
+        c.execute("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) "
+                  "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                  (key, value, datetime.now(timezone.utc).isoformat()))
+
+
+# Bump when `scrub_prose` learns a new rule: the next boot re-scrubs every blob once.
+SCRUB_VERSION = "2026-09-16"
+
+
+def scrub_all_projects(force: bool = False) -> int:
     """One-shot, idempotent: rewrite every stored project blob through
     `extractor.user_text.scrub_prose` so no old prose (methodology confessions,
     another customer's project name) survives in the database. Runs at startup;
-    only rows whose blob actually changes are written. Returns the count."""
+    only rows whose blob actually changes are written. Returns the count.
+
+    2026-09-16, measured on production: the pass parsed every customer blob on
+    EVERY boot and, being pure-Python JSON work under the GIL, froze the whole
+    API for 60–90 s after each deploy (a room sheet took 93 s, logins timed
+    out). Now it runs once per SCRUB_VERSION — the marker lives in app_state —
+    and yields between rows so requests keep flowing during that one pass.
+    New blobs are scrubbed on write, so a repeat pass has nothing to do."""
     from extractor.user_text import scrub_prose
+    marker = "scrub_all_projects"
+    if not force and get_state(marker) == SCRUB_VERSION:
+        return 0
     changed = 0
     with _conn() as c:
         rows = c.execute("SELECT id, data FROM projects").fetchall()
-        for row in rows:
-            raw = row["data"]
-            try:
-                data = json.loads(raw or "{}")
-            except (json.JSONDecodeError, TypeError, ValueError):
-                continue  # corrupt blobs are the read path's problem, not ours
-            cleaned = scrub_prose(data)
-            if cleaned != data:
+    for row in rows:
+        raw = row["data"]
+        try:
+            data = json.loads(raw or "{}")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue  # corrupt blobs are the read path's problem, not ours
+        cleaned = scrub_prose(data)
+        if cleaned != data:
+            with _conn() as c:
                 c.execute("UPDATE projects SET data = ? WHERE id = ?",
                           (json.dumps(cleaned, ensure_ascii=False), row["id"]))
-                changed += 1
+            changed += 1
+        time.sleep(0.002)   # let the event loop breathe between blobs
+    set_state(marker, SCRUB_VERSION)
     if changed:
         log.warning("scrub_all_projects: rewrote %d project blob(s) carrying legacy prose", changed)
     return changed
