@@ -6140,9 +6140,14 @@ def extract_interior(
             if _lane_now.get("status") == "applied":
                 from .plan_area_annotations import (
                     lane_warnings as _lane_warnings, reclaim_after_refinement as _reclaim)
-                _re = _reclaim(parsed.get("patalpos") or [], _lane_now)
-                if _re:
-                    print(f"[extractor] plan-area lane: {len(_re)} room(s) confirmed after zoom: {_re}")
+                # NOT `_re`: that name is the module's `import re as _re`, and a
+                # local assignment here makes every `_re.sub(...)` inside this
+                # function (the eksplikacija merge's `_nkey`) an unbound free
+                # variable — the merge failed on every fresh extraction from
+                # 2026-09-06 to 2026-09-16 (found on the first production run).
+                _reclaimed = _reclaim(parsed.get("patalpos") or [], _lane_now)
+                if _reclaimed:
+                    print(f"[extractor] plan-area lane: {len(_reclaimed)} room(s) confirmed after zoom: {_reclaimed}")
                 _keep = [w for w in (parsed.get("warnings") or [])
                          if not (isinstance(w, dict)
                                  and w.get("code") in ("room_area_unconfirmed", "plan_area_unclaimed"))]
