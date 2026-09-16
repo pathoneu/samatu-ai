@@ -4,6 +4,142 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/v9/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/v9/:path*"
+    },
+    {
+      "source": "/export/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/export/:path*"
+    },
+    {
+      "source": "/extract-interior",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-interior"
+    },
+    {
+      "source": "/extract-interior/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-interior/:path*"
+    },
+    {
+      "source": "/extract-interior-stream",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-interior-stream"
+    },
+    {
+      "source": "/extract-interior-stream/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-interior-stream/:path*"
+    },
+    {
+      "source": "/extract-facade",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-facade"
+    },
+    {
+      "source": "/extract-facade/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-facade/:path*"
+    },
+    {
+      "source": "/extract-roof",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-roof"
+    },
+    {
+      "source": "/extract-roof/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-roof/:path*"
+    },
+    {
+      "source": "/extract-earthworks",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-earthworks"
+    },
+    {
+      "source": "/extract-earthworks/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-earthworks/:path*"
+    },
+    {
+      "source": "/extract-concrete",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-concrete"
+    },
+    {
+      "source": "/extract-concrete/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/extract-concrete/:path*"
+    },
+    {
+      "source": "/chat-project",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/chat-project"
+    },
+    {
+      "source": "/chat-project/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/chat-project/:path*"
+    },
+    {
+      "source": "/pdf-lines",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/pdf-lines"
+    },
+    {
+      "source": "/pdf-lines/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/pdf-lines/:path*"
+    },
+    {
+      "source": "/detect-type",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/detect-type"
+    },
+    {
+      "source": "/detect-type/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/detect-type/:path*"
+    },
+    {
+      "source": "/detect-scale-hint",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/detect-scale-hint"
+    },
+    {
+      "source": "/detect-scale-hint/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/detect-scale-hint/:path*"
+    },
+    {
+      "source": "/generate-excel",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/generate-excel"
+    },
+    {
+      "source": "/generate-excel/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/generate-excel/:path*"
+    },
+    {
+      "source": "/generate-pdf",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/generate-pdf"
+    },
+    {
+      "source": "/generate-pdf/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/generate-pdf/:path*"
+    },
+    {
+      "source": "/recompute-interior",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/recompute-interior"
+    },
+    {
+      "source": "/recompute-interior/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/recompute-interior/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/health"
+    },
+    {
+      "source": "/health/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/health/:path*"
+    },
+    {
+      "source": "/healthz",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/healthz"
+    },
+    {
+      "source": "/healthz/:path*",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/healthz/:path*"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://api-dev-dev-ab27.up.railway.app/openapi.json"
+    },
+    {
       "source": "/((?!assets|.*\\..*).*)",
       "destination": "/index.html"
     }
@@ -12,10 +148,25 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "VITE_API_SAME_ORIGIN": "1"
+    }
+  },
+  "_dev_note": "dev branch only (2026-09-16): the Vercel preview proxies backend paths to the Railway dev service so cookies stay first-party. Never merge this file into main."
 }
