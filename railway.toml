@@ -5,15 +5,25 @@
 # explicitly because Root Directory setting did not stick). startCommand
 # below activates the venv that nixpacks installs into /opt/venv.
 
-[build]
-# Explicit: production was set to NIXPACKS in the dashboard; a service created
-# from the CLI (the dev environment, 2026-09-16) defaults to Railpack, which
-# ignores nixpacks.toml and fails to build this repo.
-builder = "NIXPACKS"
-
 [deploy]
 startCommand = ". /opt/venv/bin/activate && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
 healthcheckPath = "/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+# The `dev` environment (2026-09-16). Railway no longer lets a service created
+# today use nixpacks (config-as-code accepts only RAILPACK or DOCKERFILE, and
+# Railpack cannot detect this repo), so dev builds the proven backend/Dockerfile
+# (Python 3.14-slim; production still runs the legacy nixpacks image, py3.12).
+# Scoped to the environment: production settings are untouched.
+[environments.dev.build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+
+[environments.dev.deploy]
+# The image installs into the system interpreter — no /opt/venv to activate.
+startCommand = "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+
