@@ -199,3 +199,28 @@ def test_a_production_signal_without_credentials_is_still_local(monkeypatch):
     use_r2, why = storage.r2_decision()
     assert not use_r2 and storage.selected_backend_name() == "local"
     assert "missing" in why
+
+
+def test_r2_key_prefix_namespaces_every_object(monkeypatch):
+    """R2_KEY_PREFIX=dev/ (2026-09-16): the dev deployment shares the production
+    bucket under its own prefix; production, with no prefix, keeps its keys."""
+    import types
+    calls = []
+
+    class _Client:
+        def put_object(self, **kw): calls.append(("put", kw["Key"]))
+        def get_object(self, **kw): calls.append(("get", kw["Key"])); return {"Body": types.SimpleNamespace(read=lambda: b"x")}
+        def head_object(self, **kw): calls.append(("head", kw["Key"]))
+        def delete_object(self, **kw): calls.append(("delete", kw["Key"]))
+
+    fake_boto3 = types.SimpleNamespace(client=lambda *a, **k: _Client())
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    monkeypatch.setitem(sys.modules, "botocore", types.SimpleNamespace(config=types.SimpleNamespace(Config=lambda **k: None)))
+    monkeypatch.setitem(sys.modules, "botocore.config", types.SimpleNamespace(Config=lambda **k: None))
+    dev = storage.R2Storage("acct", "ak", "sk", "bucket", key_prefix=" dev/ ")
+    dev.put("projects/p1.pdf", b"x"); dev.get("projects/p1.pdf"); dev.exists("projects/p1.pdf"); dev.delete("projects/p1.pdf")
+    assert [k for _, k in calls] == ["dev/projects/p1.pdf"] * 4
+    calls.clear()
+    prod = storage.R2Storage("acct", "ak", "sk", "bucket")
+    prod.put("projects/p1.pdf", b"x")
+    assert calls == [("put", "projects/p1.pdf")]

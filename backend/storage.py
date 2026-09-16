@@ -119,11 +119,18 @@ class LocalDiskStorage(_Backend):
 
 
 class R2Storage(_Backend):
-    def __init__(self, account_id: str, access_key: str, secret_key: str, bucket: str):
+    def __init__(self, account_id: str, access_key: str, secret_key: str, bucket: str,
+                 key_prefix: str = ""):
         import boto3
         from botocore.config import Config
 
         self.bucket = bucket
+        # R2_KEY_PREFIX (2026-09-16): a second deployment (the Railway `dev`
+        # environment) can share the production bucket under its own prefix,
+        # e.g. "dev/", instead of mixing its test objects into `projects/`.
+        # Empty for production — keys stay exactly as they were.
+        prefix = key_prefix.strip().strip("/")
+        self.key_prefix = prefix + "/" if prefix else ""
         self._client = boto3.client(
             "s3",
             endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
@@ -136,8 +143,11 @@ class R2Storage(_Backend):
             ),
         )
 
+    def _k(self, key: str) -> str:
+        return self.key_prefix + key
+
     def put(self, key: str, data: bytes, content_type: str = "application/pdf") -> None:
-        self._client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=content_type)
+        self._client.put_object(Bucket=self.bucket, Key=self._k(key), Body=data, ContentType=content_type)
 
     def _is_missing(self, exc: Exception) -> bool:
         from botocore.exceptions import ClientError
@@ -148,7 +158,7 @@ class R2Storage(_Backend):
 
     def get(self, key: str) -> bytes | None:
         try:
-            resp = self._client.get_object(Bucket=self.bucket, Key=key)
+            resp = self._client.get_object(Bucket=self.bucket, Key=self._k(key))
             return resp["Body"].read()
         except Exception as exc:  # noqa: BLE001
             if self._is_missing(exc):
@@ -157,14 +167,14 @@ class R2Storage(_Backend):
 
     def exists(self, key: str) -> bool:
         try:
-            self._client.head_object(Bucket=self.bucket, Key=key)
+            self._client.head_object(Bucket=self.bucket, Key=self._k(key))
             return True
         except Exception:  # noqa: BLE001
             return False
 
     def stat(self, key: str) -> dict | None:
         try:
-            resp = self._client.head_object(Bucket=self.bucket, Key=key)
+            resp = self._client.head_object(Bucket=self.bucket, Key=self._k(key))
         except Exception:  # noqa: BLE001 — missing key or transient R2 error
             return None
         lm = resp.get("LastModified")
@@ -177,7 +187,7 @@ class R2Storage(_Backend):
 
     def delete(self, key: str) -> None:
         try:
-            self._client.delete_object(Bucket=self.bucket, Key=key)
+            self._client.delete_object(Bucket=self.bucket, Key=self._k(key))
         except Exception:  # noqa: BLE001 — best effort
             pass
 
@@ -272,7 +282,8 @@ def get_storage() -> _Backend:
         if use_r2:
             _instance = R2Storage(
                 os.environ["R2_ACCOUNT_ID"], os.environ["R2_ACCESS_KEY_ID"],
-                os.environ["R2_SECRET_ACCESS_KEY"], os.environ["R2_BUCKET"])
+                os.environ["R2_SECRET_ACCESS_KEY"], os.environ["R2_BUCKET"],
+                **({"key_prefix": _prefix} if (_prefix := os.environ.get("R2_KEY_PREFIX", "").strip()) else {}))
             log.info("storage backend: R2 (bucket=%s) — %s",
                      os.environ["R2_BUCKET"], why)
         else:
