@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import io
 import math
+import warnings
 from typing import Sequence
 
 import pdfplumber
@@ -52,7 +53,11 @@ def _fill_colour(obj: dict) -> tuple:
 
 
 def _is_wall_shape(poly: Polygon) -> bool:
-    rect = poly.minimum_rotated_rectangle
+    if len(poly.exterior.coords) < 4 or poly.area <= 0:
+        return False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)      # degenerate (collinear) fills
+        rect = poly.minimum_rotated_rectangle
     if rect.is_empty or rect.geom_type != "Polygon":
         return False
     xs = list(rect.exterior.coords)
