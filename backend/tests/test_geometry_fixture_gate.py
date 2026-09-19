@@ -39,6 +39,7 @@ def test_geometry_gate(slug):
     pdf, extract = fx
     want = GATE[slug]
     parsed = copy.deepcopy(extract)
+    extract_perimeters = {str(r["nr"]): r.get("perimetras_m") for r in extract["patalpos"]}
     out = gl.apply_geometry(parsed, pdf)
     rooms = {str(r["nr"]): r for r in parsed["patalpos"]}
     print(f"{slug}: {out['seconds']} s | kontūrai {out['konturai']} | atviros {out['atviros_erdves']} | "
@@ -50,9 +51,12 @@ def test_geometry_gate(slug):
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.02, (nr, rooms[nr]["perimetras_m"])
         assert rooms[nr]["_perimetras_suma"]["sutampa"] is True
     for nr, metres in want["atviru_erdviu_iverciai"].items():
-        assert rooms[nr]["perimetras_m"] is None and rooms[nr]["_perimetras_ivertis_saltinis"] == "atviros_erdves_konturas"
-        assert abs(rooms[nr]["_perimetras_ivertis_m"] - metres) <= 0.05, (nr, rooms[nr]["_perimetras_ivertis_m"])
-    blanks = [r for r in rooms.values() if r.get("perimetras_m") is None]
+        assert rooms[nr]["perimetras_saltinis"] == "atviros_erdves_ivertis"
+        assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.05, (nr, rooms[nr]["perimetras_m"])
+    blanks = [r for r in rooms.values() if r.get("perimetras_saltinis") in ("konturo_ivertis", "atviros_erdves_ivertis")]
+    # an estimate is a NUMBER (the sąmata rows are built from it) that the sheet shows as a blank
+    assert all(r.get("perimetras_m") and r["perimetras_m"] == r.get("_perimetras_ivertis_m") for r in blanks)
+    assert not [r["nr"] for r in rooms.values() if r.get("perimetras_m") is None and extract_perimeters.get(str(r["nr"])) is not None]
     assert len(blanks) >= want["min_tusti_su_iverciu"]
     # a blank is never a silent one: it carries the reason and the estimate to accept
     assert all(r.get("_perimetras_priezastis") and r.get("_perimetras_ivertis_m") for r in blanks)

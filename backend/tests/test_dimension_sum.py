@@ -66,7 +66,8 @@ def test_a_wall_without_a_string_leaves_the_perimeter_blank_with_the_outline_est
     rooms = [_room("01", 0.2, 0.2, 4.2, 3.2)]
     out = _run([sheet], rooms)
     r = rooms[0]
-    assert r["perimetras_m"] is None and r["perimetras_saltinis"] is None
+    # not read — an ESTIMATE the sheet shows as a blank; it is still a number, the sąmata rows are built from it
+    assert r["perimetras_saltinis"] == "konturo_ivertis" and r["perimetras_m"] == r["_perimetras_ivertis_m"]
     assert "2 iš 4 sienų be matmens" in r["_perimetras_priezastis"]
     assert abs(r["_perimetras_ivertis_m"] - 14.0) < 0.2 and r["_perimetras_ivertis_saltinis"] == "konturas"
     assert [s["ilgis_m"] for s in r["_sienos"]].count(None) == 2 and out["blank"] == ["01"]
@@ -123,7 +124,7 @@ def test_a_chain_with_a_hole_in_it_does_not_state_the_wall():
     sheet.dims += [("1200", 0.2, 0.35, 1.4, 0.35), ("1900", 2.3, 0.35, 4.2, 0.35)]                 # …and the chain's 0,9 m middle is not written
     rooms = [_room("01", 0.2, 0.2, 4.2, 3.2)]
     _run([sheet], rooms)
-    assert rooms[0]["perimetras_m"] is None and rooms[0]["_sienos"][0]["ilgis_m"] is None
+    assert rooms[0]["perimetras_saltinis"] == "konturo_ivertis" and rooms[0]["_sienos"][0]["ilgis_m"] is None
 
 
 def test_a_string_moved_away_from_a_crowded_wall_still_states_it():
@@ -144,7 +145,7 @@ def test_a_string_that_runs_past_the_walls_corners_is_not_its_length():
     sheet.dims.append(("4300", 0.05, 0.35, 4.35, 0.35))
     rooms = [_room("01", 0.2, 0.2, 4.2, 3.2)]
     _run([sheet], rooms)
-    assert rooms[0]["perimetras_m"] is None and "2 iš 4 sienų be matmens" in rooms[0]["_perimetras_priezastis"]
+    assert rooms[0]["perimetras_saltinis"] == "konturo_ivertis" and "2 iš 4 sienų be matmens" in rooms[0]["_perimetras_priezastis"]
 
 
 def test_a_short_jog_nobody_dimensioned_is_taken_from_the_outline_and_said_so():
@@ -170,7 +171,7 @@ def test_an_outline_that_disagrees_with_the_table_states_nothing():
     r = _room("01", 0.2, 0.2, 4.2, 3.2)
     r["_konturas"]["plotas_nesutampa"] = True
     out = _run([two_rooms()], [r])
-    assert r["perimetras_m"] is None and "nesutampa su lentele" in r["_perimetras_priezastis"]
+    assert r["perimetras_saltinis"] == "konturo_ivertis" and "nesutampa su lentele" in r["_perimetras_priezastis"]
     assert abs(r["_perimetras_ivertis_m"] - 14.0) < 0.2 and out["blank"] == ["01"]
 
 
@@ -179,7 +180,7 @@ def test_a_slanted_wall_has_no_string_the_reader_can_read():
     cut = [(0.2, 0.2), (3.2, 0.2), (4.2, 1.2), (4.2, 3.2), (0.2, 3.2)]                             # the top-right corner cut at 45°
     rooms = [_outline("01", cut)]
     _run([sheet], rooms)
-    assert rooms[0]["perimetras_m"] is None
+    assert rooms[0]["perimetras_saltinis"] == "konturo_ivertis"
     assert "įstriž" in rooms[0]["_perimetras_priezastis"]
 
 
@@ -234,4 +235,16 @@ def test_the_wall_opposite_is_not_borrowed_when_it_is_not_the_same_length():
     rooms = [_outline("01", cut)]
     _run([sheet], rooms)
     right = next(s for s in rooms[0]["_sienos"] if abs(s["kontrole_m"] - 2.0) < 0.02)
-    assert right["ilgis_m"] is None and rooms[0]["perimetras_m"] is None
+    assert right["ilgis_m"] is None and rooms[0]["perimetras_saltinis"] == "konturo_ivertis"
+
+
+def test_an_estimate_is_tried_again_on_the_next_run_and_replaced_when_the_walls_can_be_read():
+    sheet = two_rooms()
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and min(abs(d[1] - x) for x in (0.35, 4.05, 4.55)) < 1e-6)]
+    sheet.dims.append(("2000", 9.0, 5.0, 9.0, 7.0))
+    rooms = [_room("01", 0.2, 0.2, 4.2, 3.2)]
+    _run([sheet], rooms)
+    assert rooms[0]["perimetras_saltinis"] == "konturo_ivertis"
+    out = _run([two_rooms()], rooms)                       # a later run reads every wall
+    assert out["stated"] == ["01"] and rooms[0]["perimetras_m"] == 14.0 and rooms[0]["perimetras_saltinis"] == "matmenu_eilutes"
+    assert "_perimetras_priezastis" not in rooms[0]

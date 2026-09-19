@@ -91,7 +91,8 @@ def test_an_open_plan_names_its_members_and_offers_the_shared_walls_as_an_estima
     # The walls of the shared space are real; what each room's share of them is, is not written anywhere.
     # objektas_h, 2026-09-19: with the two rooms' guessed perimeters the painted walls came to 340 m², with
     # the shared outline split by area to 320,3 m² — the designer's own legend says 320 m².
-    assert r1["perimetras_m"] is None and r2["perimetras_m"] is None
+    assert r1["perimetras_saltinis"] == "atviros_erdves_ivertis" and r2["perimetras_saltinis"] == "atviros_erdves_ivertis"
+    assert r1["perimetras_m"] == r1["_perimetras_ivertis_m"]          # a number the rows are built from; the SOURCE says estimate
     assert r1["_perimetras_ivertis_saltinis"] == "atviros_erdves_konturas" and r1["_perimetras_pries_geometrija"] == 13.9
     assert abs(r1["_perimetras_ivertis_m"] + r2["_perimetras_ivertis_m"] - erdve["perimetras_m"]) < 0.02
     assert abs(r1["_perimetras_ivertis_m"] / r2["_perimetras_ivertis_m"] - 12.6 / 9.0) < 0.01
@@ -106,7 +107,7 @@ def test_an_open_plan_member_whose_perimeter_someone_stated_keeps_it():
     gl.apply_geometry(parsed, build_plan([a]))
     r1, r2 = parsed["patalpos"]
     assert r1["perimetras_m"] == 15.5 and "_perimetras_ivertis_m" not in r1
-    assert r2["perimetras_m"] is None and r2["_perimetras_ivertis_m"] > 0
+    assert r2["perimetras_saltinis"] == "atviros_erdves_ivertis" and r2["_perimetras_ivertis_m"] > 0
 
 
 def test_the_lane_never_raises():
@@ -164,3 +165,18 @@ def test_nothing_the_lane_writes_for_the_sheet_is_developer_speak():
     said = [str(r.get(k)) for r in parsed["patalpos"] for k in ("_konturo_priezastis", "_perimetras_priezastis") if r.get(k)]
     assert len(said) >= 2 and not [s for s in said if is_banned(s)], said
     assert all("." not in s.split("m²")[0][-5:] for s in said if "m²" in s), said      # decimal commas
+
+
+def test_running_the_lane_twice_changes_nothing_the_second_time():
+    import copy
+    parsed = _parsed()
+    a = two_rooms()
+    a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]       # an open plan: estimates, the case that could drift
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    pdf = build_plan([a])
+    gl.apply_geometry(parsed, pdf)
+    once = copy.deepcopy(parsed["patalpos"])
+    gl.apply_geometry(parsed, pdf)
+    for before, after in zip(once, parsed["patalpos"]):
+        for key in ("perimetras_m", "perimetras_saltinis", "_perimetras_ivertis_m", "_perimetras_pries_geometrija", "polygon_source"):
+            assert before.get(key) == after.get(key), (before["nr"], key)

@@ -1272,15 +1272,14 @@ def calc_room_quantities(room: dict,
     perim = float(room.get("perimetras_m") or 0)
     H = float(room.get("lubu_aukstis_m") or ceiling_height_m)
 
-    # 2026-09-19: WHERE the wall length comes from is part of the result. A
-    # perimeter the drawing did not state stays BLANK on the room (the sheet
-    # asks, nothing downstream calls it read); the walls are computed from the
-    # estimate the geometry lane left — the outline's length — or, with no
-    # outline either, from the square guess below. Same number in, same
-    # quantities out: only the label differs.
-    perim_stated = perim > 0
-    walls_perim_src = ((room.get("perimetras_saltinis") or "").strip().lower() or "vision") if perim_stated else None
-    if not perim_stated:
+    # 2026-09-19: WHERE the wall length comes from is part of the result
+    # (`_walls_perimetras_saltinis`): a stated source, „vision" (a figure with
+    # no source), „konturo_ivertis" / „atviros_erdves_ivertis" (the geometry
+    # lane's estimates — the outline's length, or the room's share of an open
+    # plan's walls; the check sheet shows those as a blank with the number to
+    # accept), or „kvadrato_ivertis" (nothing at all: the square guess below).
+    walls_perim_src = ((room.get("perimetras_saltinis") or "").strip().lower() or "vision") if perim > 0 else None
+    if perim <= 0:
         try:
             estimate = float(room.get("_perimetras_ivertis_m") or 0)
         except (TypeError, ValueError):
@@ -2021,7 +2020,7 @@ def calc_room_quantities(room: dict,
         "paskirtis": paskirtis,
         "puslapio_nr": room.get("puslapio_nr"),
         "plotas_m2": round(plotas, 2),
-        "perimetras_m": round(perim, 2) if perim_stated else None,
+        "perimetras_m": round(perim, 2),
         "_walls_perimetras_saltinis": walls_perim_src,
         # Wall geometry MODELED (not measured) when the floor fired — disclosed,
         # not hidden, per CLAUDE.md. _walls_perimetras_m is the length actually

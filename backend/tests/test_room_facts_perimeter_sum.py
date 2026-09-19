@@ -58,7 +58,8 @@ def test_a_length_used_for_the_wall_opposite_and_a_piece_from_the_outline_are_sa
 
 def test_blank_perimeter_gives_the_reason_and_offers_the_outline_estimate():
     room = {"nr": "03", "pavadinimas": "Koridorius", "plotas_m2": 10.12, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
-            "perimetras_m": None, "_perimetras_priezastis": "2 iš 8 sienų be matmens", "_walls_perimetras_m": 21.23,
+            "perimetras_m": 21.23, "perimetras_saltinis": "konturo_ivertis",
+            "_perimetras_priezastis": "2 iš 8 sienų be matmens", "_walls_perimetras_m": 21.23,
             "_perimetras_ivertis_m": 21.23, "_perimetras_ivertis_saltinis": "konturas", "_perimetras_pries_geometrija": 16.4,
             "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
     p = _perimetras(room)
@@ -80,7 +81,8 @@ def test_a_perimeter_he_typed_after_a_blank_is_his():
 def test_an_open_plan_member_is_told_how_its_share_was_made():
     space = {"nariai": ["04", "05"], "polygon_pct": OUTLINE, "perimetras_m": 37.77, "plotas_m2": 60.55, "page": 1}
     room = {"nr": "04", "pavadinimas": "Virtuvė", "plotas_m2": 26.31, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
-            "perimetras_m": None, "_perimetras_ivertis_m": 16.08, "_perimetras_ivertis_saltinis": "atviros_erdves_konturas",
+            "perimetras_m": 16.08, "perimetras_saltinis": "atviros_erdves_ivertis",
+            "_perimetras_ivertis_m": 16.08, "_perimetras_ivertis_saltinis": "atviros_erdves_konturas",
             "_perimetras_priezastis": "atvira erdvė su 05 — sienos šių patalpų neskiria; bendras erdvės sienų ilgis 37,77 m padalytas pagal plotą",
             "_atvira_erdve": space, "polygon_source": "synthesized_from_bbox",
             "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]]}
@@ -98,3 +100,11 @@ def test_accepting_the_estimate_is_not_called_typing_it():
     p = _perimetras(room)
     assert p["value"] == 21.23 and "suggestion" not in p
     assert "Priėmėte" in p["sentence"] and "2 iš 8 sienų be matmens" in p["sentence"] and "įrašėte patys" not in p["sentence"]
+
+
+def test_a_stored_blank_from_before_the_estimate_became_a_number_still_reads_as_a_blank():
+    room = {"nr": "03", "pavadinimas": "Koridorius", "plotas_m2": 10.12, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": None, "_perimetras_priezastis": "2 iš 8 sienų be matmens", "_perimetras_ivertis_m": 21.23,
+            "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] is None and p["suggestion"]["value"] == 21.23

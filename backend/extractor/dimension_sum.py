@@ -31,9 +31,11 @@ Slanted walls are not read yet (the string reader is horizontal/vertical).
 
 Writes on the room: `_sienos` [{edge_pct, ilgis_m|None, saltinis "eilute" |
 "priesinga_siena" | "konturas" | None, eilutes, kontrole_m}] and either perimetras_m +
-perimetras_saltinis="matmenu_eilutes" + _perimetras_suma, or perimetras_m=None
-+ _perimetras_priezastis + _perimetras_ivertis_m (outline length × scale) +
-_perimetras_ivertis_saltinis="konturas". Rooms whose perimeter someone STATED
+perimetras_saltinis="matmenu_eilutes" + _perimetras_suma, or the outline's
+length as perimetras_m with perimetras_saltinis="konturo_ivertis" (an ESTIMATE:
+the sheet shows a blank and offers it; the sąmata rows need a number) +
+_perimetras_priezastis + _perimetras_ivertis_m + _perimetras_ivertis_saltinis=
+"konturas". Rooms whose perimeter someone STATED
 (plan pair, table, user) are left alone; rooms whose outline is only Vision's
 box are skipped — a box cannot say which strings are its walls; an outline
 that disagrees with the table states nothing (one of the two is wrong, and a
@@ -59,6 +61,7 @@ WALL_TOL = 0.03             # a row's sum agrees with its wall's own outline len
 WALL_TOL_M = 0.06           # …or to this many metres (objektas_g: strings are to the FINISHED faces, 2–3 cm inside the fills)
 CORNER_DEG = 20.0
 SOURCE = "matmenu_eilutes"
+ESTIMATE_SOURCE = "konturo_ivertis"          # perimetras_m holds the outline's length: an estimate to accept, never „read"
 KEEP = ("plano_matmenys", "eksplikacija", "user_override", "manual", SOURCE)
 NO_OUTLINE = (None, "", "synthesized_from_bbox")
 
@@ -248,8 +251,12 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                 room.pop(key, None)
             summary["stated"].append(nr)
         else:
-            room["perimetras_m"] = None
-            room["perimetras_saltinis"] = None
+            # NOT a read figure — the sheet shows a blank and offers this number. It still has to BE the
+            # room's perimeter: the sąmata rows (grindjuostės, silikonavimas, hidroizoliacijos juosta…)
+            # are built straight from `perimetras_m`, and a None there silently zeroed objektas_g's
+            # bathroom rows (eval 2026-09-19: rows within ±10 % fell 15 → 10 %). The SOURCE carries the truth.
+            room["perimetras_m"] = control_total if control_total > 0 else None
+            room["perimetras_saltinis"] = ESTIMATE_SOURCE if control_total > 0 else None
             room["_perimetras_priezastis"] = reason
             room["_perimetras_ivertis_m"] = control_total
             room["_perimetras_ivertis_saltinis"] = "konturas"

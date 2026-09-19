@@ -11,11 +11,13 @@ What it leaves on a room: `_vieta`; `polygon_pct` + `polygon_source =
 "vektoriniai_konturai"` + `_konturas`, or `_konturo_priezastis`; for an open
 plan `_atvira_erdve` {nariai, polygon_pct, plotas_m2, perimetras_m,
 lenteles_suma_m2, page} — the shared outline, never an invented cut — and a
-blank perimeter whose estimate is the room's share (by floor area) of the
-shared space's real walls (`_perimetras_ivertis_saltinis =
-"atviros_erdves_konturas"`); and what
-dimension_sum writes (`_sienos`, `_perimetras_suma`, a stated perimeter or a
-blank one with its reason and the outline's estimate). The figure a stated or
+perimeter that is the room's share (by floor area) of the shared space's
+real walls, marked as an ESTIMATE (`perimetras_saltinis =
+"atviros_erdves_ivertis"`); and what
+dimension_sum writes (`_sienos`, `_perimetras_suma`, a stated perimeter or the
+outline's length marked `konturo_ivertis`, with its reason). An estimate is a
+number — the sąmata rows are built from `perimetras_m` — that the check sheet
+shows as a BLANK with the number to accept. The figure a stated or
 blanked perimeter replaces is kept as `_perimetras_pries_geometrija`. A room
 the lane cannot place or outline is left exactly as it was.
 
@@ -26,7 +28,7 @@ from __future__ import annotations
 import time
 from typing import Sequence
 
-from .dimension_sum import KEEP as STATED_PERIMETERS, sum_perimeters
+from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, sum_perimeters
 from .pdf_vectors import page_geometry
 from .plan_area_annotations import plan_pages_from_classification
 from .plan_dimensions import read_dimension_strings
@@ -35,6 +37,8 @@ from .sheet_alignment import align_sheets, from_base, to_base
 from .vector_rooms import SOURCE as VECTOR_SOURCE, trace_vector_rooms
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
+OPEN_PLAN_ESTIMATE = "atviros_erdves_ivertis"
+ESTIMATES = (ESTIMATE_SOURCE, OPEN_PLAN_ESTIMATE)
 _PT_M = 25.4 / 72 / 1000          # metres per PDF point at 1:1
 
 
@@ -73,25 +77,35 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 r["_vieta"] = v
                 meta["vietos"][v["saltinis"]] = meta["vietos"].get(v["saltinis"], 0) + 1
 
-        alignment = align_sheets(pdf_bytes, sheets)
-        meta["grupes"] = alignment["groups"]
-        for group in alignment["groups"]:                     # a sheet without strings of its own takes its plan's scale
-            known = next((p for p in group if p in scale), None)
-            if known is None:
-                continue
-            per_base_pt = scale[known] / (alignment["transform"][known]["k"] or 1.0)
-            for p in group:
-                scale.setdefault(p, per_base_pt * (alignment["transform"][p]["k"] or 1.0))
+        def lay_over(pages: Sequence[int]) -> dict:
+            """Align these sheets; a sheet without strings of its own takes its plan's scale."""
+            al = align_sheets(pdf_bytes, sorted(pages))
+            for group in al["groups"]:
+                known = next((p for p in group if p in scale), None)
+                if known is None:
+                    continue
+                per_base_pt = scale[known] / (al["transform"][known]["k"] or 1.0)
+                for p in group:
+                    scale.setdefault(p, per_base_pt * (al["transform"][p]["k"] or 1.0))
+            return al
 
-        # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
-        meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
+        # Laying sheets over each other means reading every sheet's walls — seconds per heavy sheet
+        # (objektas_b: 19 dimensioned sheets, 17 s). The rooms' own sheets come first; the rest are read
+        # only when there is an outline whose walls their strings could state.
+        anchors = {int(v["page"]) for v in where.values()} | traced_on
+        everything = any(p not in scale for p in anchors)      # an anchor sheet with no strings needs its plan's scale
+        alignment = lay_over(sheets if everything else anchors)
 
         areas = {_nr(r): float(r.get("plotas_m2") or 0) for r in rooms}
         sizes: dict[int, tuple[float, float]] = {}
+        for d in dims:                                        # the strings already carry their sheet's size — no parsing
+            if d.get("page_width") and d.get("page_height"):
+                sizes.setdefault(int(d["page"]), (float(d["page_width"]), float(d["page_height"])))
         for p in sheets:
-            W, H, _ = page_geometry(pdf_bytes, p)
-            if W > 0 and H > 0:
-                sizes[p] = (W, H)
+            if p not in sizes:
+                W, H, _ = page_geometry(pdf_bytes, p)
+                if W > 0 and H > 0:
+                    sizes[p] = (W, H)
         for group in alignment["groups"]:
             located = [r for r in rooms if r.get("_vieta") and int(r["_vieta"]["page"]) in group]
             todo = {_nr(r) for r in located if str(r.get("polygon_source") or "") not in KEEP_POLYGONS}
@@ -153,17 +167,25 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     if total_area <= 0 or not (areas.get(_nr(r)) or 0) > 0:
                         continue
                     others = ", ".join(n for n in g["nariai"] if n != _nr(r))
-                    if r.get("perimetras_m") is not None:
+                    if r.get("perimetras_m") is not None and r.get("perimetras_saltinis") not in ESTIMATES:
                         r.setdefault("_perimetras_pries_geometrija", r["perimetras_m"])
-                    r["perimetras_m"] = None
-                    r["perimetras_saltinis"] = None
-                    r["_perimetras_ivertis_m"] = round(g["perimetras_m"] * areas[_nr(r)] / total_area, 2)
+                    share = round(g["perimetras_m"] * areas[_nr(r)] / total_area, 2)
+                    r["perimetras_m"] = share                  # a number the rows can use; the SOURCE says it is an estimate
+                    r["perimetras_saltinis"] = OPEN_PLAN_ESTIMATE
+                    r["_perimetras_ivertis_m"] = share
                     r["_perimetras_ivertis_saltinis"] = "atviros_erdves_konturas"
                     r["_perimetras_priezastis"] = (f"atvira erdvė su {others} — sienos šių patalpų neskiria; bendras erdvės sienų ilgis "
                                                    f"{g['perimetras_m']:.2f} m padalytas pagal plotą").replace(".", ",")
                     meta["perimetrai_tusti"].append(_nr(r))
 
-        before = {_nr(r): r.get("perimetras_m") for r in rooms}
+        outlined = any(str(r.get("polygon_source") or "") in KEEP_POLYGONS for r in rooms)
+        if outlined and not everything:
+            alignment = lay_over(sheets)
+        meta["grupes"] = alignment["groups"]
+        # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
+        meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
+
+        before = {_nr(r): (r.get("perimetras_m") if r.get("perimetras_saltinis") not in ESTIMATES else None) for r in rooms}
         done = sum_perimeters(rooms, dims, alignment, scale, page_sizes=sizes)
         meta["perimetrai_sudeti"] = done["stated"]
         meta["perimetrai_tusti"] = sorted(set(meta["perimetrai_tusti"]) | set(done["blank"]))

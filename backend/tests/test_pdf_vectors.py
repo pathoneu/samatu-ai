@@ -81,7 +81,8 @@ def test_every_rotation_agrees_with_pdfplumbers_displayed_frame(degrees):
 
 
 def test_paths_carry_fill_stroke_and_width():
-    paths = pv.page_paths(build_plan([two_rooms()]), 1)
+    assert all(p["fill"] for p in pv.page_paths(build_plan([two_rooms()]), 1))       # by default only what walls need
+    paths = pv.page_paths(build_plan([two_rooms()]), 1, strokes=True)
     fills = [p for p in paths if p["fill"] == (0.91, 0.91, 0.91)]
     assert len(fills) == 7
     furniture = [p for p in paths if p["fill"] is None and p["stroke"] == (0.0, 0.0, 0.0) and abs(p["width"] - 0.3) < 0.05]
@@ -104,10 +105,10 @@ def test_the_page_cache_is_bounded_by_paths_not_only_by_pages():
     for a whole extraction would be hundreds of megabytes on the server."""
     pv._pages.clear()
     for i in range(5):
-        pv._pages[(b"doc", i)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 60_000}
+        pv._pages[(b"doc", i, False)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 60_000}
         pv._evict()
-    assert list(pv._pages) == [(b"doc", 3), (b"doc", 4)]                # 120 000 paths kept, the oldest gone
-    pv._pages[(b"doc", 9)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 400_000}
+    assert list(pv._pages) == [(b"doc", 3, False), (b"doc", 4, False)]  # 120 000 paths kept, the oldest gone
+    pv._pages[(b"doc", 9, False)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 400_000}
     pv._evict()
-    assert list(pv._pages) == [(b"doc", 9)]                             # one huge page still stays: it is in use
+    assert list(pv._pages) == [(b"doc", 9, False)]                      # one huge page still stays: it is in use
     pv._pages.clear()

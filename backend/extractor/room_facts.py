@@ -448,11 +448,13 @@ def _fact_perimetras(project: dict, room: dict,
             tail = (f" Sienų plotui naudoju {lt_num(used)} m — patalpos kontūras "
                     "brėžinyje nepažymėtas, todėl imu stačiakampio perimetrą.")
 
-    if measured is None and _f(room.get("_perimetras_ivertis_m")):
-        # 2026-09-19: the geometry lane could not ADD this room's wall lengths —
-        # the field stays blank and says why; the outline's length is the
-        # number the walls are computed with meanwhile, one click to accept.
-        est = round(float(room["_perimetras_ivertis_m"]), 2)
+    estimated = str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis")
+    if (measured is None or estimated) and _f(room.get("_perimetras_ivertis_m") if measured is None else measured):
+        # 2026-09-19: the geometry lane could not ADD this room's wall lengths.
+        # The room carries the outline's length so the rows can be computed —
+        # but it was not READ, so the sheet shows a blank, says why, and offers
+        # the number: one click to accept, or type the real one.
+        est = round(float(room["_perimetras_ivertis_m"] if measured is None else measured), 2)
         why = str(room.get("_perimetras_priezastis") or "ne visos sienos plane turi matmenį").rstrip(".")
         page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
         if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas":

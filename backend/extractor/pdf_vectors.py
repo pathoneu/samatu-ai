@@ -18,7 +18,9 @@ use: pdfplumber needs ~60 s just to open objektas_g (pdfminer re-parses its
 object streams), PDFium reads the same page's 50 000 paths in 0,4 s and gives
 the same geometry (objektas_h page 6: the wall solids differ by 0,04 pt² of
 20 577). A parsed page is kept for the document it came from, so the units
-that share a page (walls, alignment, outlines) parse it once.
+that share a page (walls, alignment, outlines) parse it once. Black fills and
+stroke-only paths are not walked at all unless asked for: objektas_b's 65
+sheets carry millions of them, and the first version spent 93 s there.
 
 Everything is in the DISPLAY frame the strings and badges use: PDF points,
 origin top-left, y down, /Rotate applied.
@@ -36,12 +38,13 @@ from shapely.geometry import Polygon
 
 MAX_WALL_THICK_PT = 16.0
 MIN_WALL_LEN_PT = 12.0
+MIN_FILL_PT = 3.0
 _BLACK = (0.0, 0.0, 0.0)
 _FORM_DEPTH = 4
 _CACHE_PAGES = 12
 _CACHE_PATHS = 150_000      # …and at most this many paths in all: objektas_g's furniture sheet alone has 50 000
 
-_pages: "collections.OrderedDict[tuple[bytes, int], dict]" = collections.OrderedDict()
+_pages: "collections.OrderedDict[tuple[bytes, int, bool], dict]" = collections.OrderedDict()
 
 
 def _doc_key(pdf_bytes: bytes) -> bytes:
@@ -65,12 +68,17 @@ def _colour(r: int, g: int, b: int) -> tuple[float, float, float]:
     return round(r / 255, 2), round(g / 255, 2), round(b / 255, 2)
 
 
-def _read_page(pdf_bytes: bytes, page_nr: int) -> dict:
+def _read_page(pdf_bytes: bytes, page_nr: int, strokes: bool) -> dict:
     """{width, height, rotation, paths} of a 1-based page; paths are
     {fill, stroke, width, subpaths} with colours as 0–1 rgb rounded to 0,01
     (None when the path is not filled / not stroked), width in points and
     subpaths as point lists in the display frame. An unreadable or missing
-    page is an empty page."""
+    page is an empty page.
+
+    Only what geometry needs is read: FILLED paths that are not black (black
+    fills are text outlines and symbols — objektas_b has hundreds of thousands
+    per sheet, and walking their points took a minute), plus stroke-only paths
+    when `strokes` is asked for. Everything else costs two calls per object."""
     empty = {"width": 0.0, "height": 0.0, "rotation": 0, "paths": []}
     try:
         import pypdfium2 as pdfium
@@ -90,18 +98,22 @@ def _read_page(pdf_bytes: bytes, page_nr: int) -> dict:
             rotation = int(page.get_rotation() or 0) % 360
             raw_paths: list[tuple] = []
             xmax = ymax = 0.0
+            fill_mode, stroked = ctypes.c_int(), ctypes.c_int()
+            r, g, b, a = (ctypes.c_uint() for _ in range(4))
+            width = ctypes.c_float()
+            px, py = ctypes.c_float(), ctypes.c_float()
             for obj in page.get_objects(max_depth=_FORM_DEPTH):
                 if obj.type != C.FPDF_PAGEOBJ_PATH:
                     continue
                 handle = obj.raw
-                fill_mode, stroked = ctypes.c_int(), ctypes.c_int()
                 if not C.FPDFPath_GetDrawMode(handle, fill_mode, stroked):
                     continue
-                r, g, b, a = (ctypes.c_uint() for _ in range(4))
                 fill = stroke = None
                 if fill_mode.value and C.FPDFPageObj_GetFillColor(handle, r, g, b, a):
                     fill = _colour(r.value, g.value, b.value)
-                if stroked.value and C.FPDFPageObj_GetStrokeColor(handle, r, g, b, a):
+                    if fill == _BLACK:
+                        fill = None
+                if strokes and stroked.value and C.FPDFPageObj_GetStrokeColor(handle, r, g, b, a):
                     stroke = _colour(r.value, g.value, b.value)
                 if fill is None and stroke is None:
                     continue
@@ -111,7 +123,6 @@ def _read_page(pdf_bytes: bytes, page_nr: int) -> dict:
                 while parent is not None:
                     mats.append(parent.get_matrix().get())
                     parent = parent.container
-                width = ctypes.c_float()
                 C.FPDFPageObj_GetStrokeWidth(handle, width)
                 scale = 1.0
                 for (ma, mb, mc, md, _, _) in mats:
@@ -120,7 +131,6 @@ def _read_page(pdf_bytes: bytes, page_nr: int) -> dict:
                 cur: list[tuple[float, float]] = []
                 for i in range(C.FPDFPath_CountSegments(handle)):
                     seg = C.FPDFPath_GetPathSegment(handle, i)
-                    px, py = ctypes.c_float(), ctypes.c_float()
                     if not C.FPDFPathSegment_GetPoint(seg, px, py):
                         continue
                     x, y = float(px.value), float(py.value)
@@ -157,13 +167,15 @@ def _read_page(pdf_bytes: bytes, page_nr: int) -> dict:
         doc.close()
 
 
-def _page(pdf_bytes: bytes, page_nr: int) -> dict:
-    key = (_doc_key(pdf_bytes), int(page_nr))
-    hit = _pages.get(key)
-    if hit is not None:
-        _pages.move_to_end(key)
-        return hit
-    parsed = _read_page(pdf_bytes, int(page_nr))
+def _page(pdf_bytes: bytes, page_nr: int, strokes: bool = False) -> dict:
+    doc = _doc_key(pdf_bytes)
+    key = (doc, int(page_nr), bool(strokes))
+    for k in ((key,) if strokes else (key, (doc, int(page_nr), True))):      # a read with strokes has the fills too
+        hit = _pages.get(k)
+        if hit is not None:
+            _pages.move_to_end(k)
+            return hit
+    parsed = _read_page(pdf_bytes, int(page_nr), bool(strokes))
     _pages[key] = parsed
     _evict()
     return parsed
@@ -182,9 +194,9 @@ def page_geometry(pdf_bytes: bytes, page_nr: int) -> tuple[float, float, int]:
     return p["width"], p["height"], p["rotation"]
 
 
-def page_paths(pdf_bytes: bytes, page_nr: int) -> list[dict]:
-    """Every filled or stroked path of the page (see _read_page)."""
-    return _page(pdf_bytes, page_nr)["paths"]
+def page_paths(pdf_bytes: bytes, page_nr: int, strokes: bool = False) -> list[dict]:
+    """The page's filled paths — and, when asked, its stroke-only ones (see _read_page)."""
+    return _page(pdf_bytes, page_nr, strokes)["paths"]
 
 
 def _is_wall_shape(poly: Polygon) -> bool:
@@ -213,6 +225,10 @@ def filled_shapes(pdf_bytes: bytes, page_nr: int) -> list[tuple[tuple, Polygon]]
         for pts in path["subpaths"]:
             if len(pts) < 3:
                 continue
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            if max(xs) - min(xs) < MIN_FILL_PT and max(ys) - min(ys) < MIN_FILL_PT:
+                continue                                   # a hatch dot, a speck: a millimetre on paper is no wall
             poly = Polygon(pts)
             if not poly.is_valid:
                 poly = poly.buffer(0)

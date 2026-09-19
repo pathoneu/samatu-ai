@@ -1826,6 +1826,29 @@ perimeter offers its share of the shared walls by floor area.
 | G | 8/9 raster outlines, 3 perimeters from string pairs, 5 „pagal kontūrą" shown as read | unchanged outlines and pairs; the 5 outline-measured perimeters are now blank + the same number as the estimate (the founder's rule: a measured length is not a read one) |
 | speed | — | H 0,4–1,3 s, G 3,7–6,5 s, no Vision |
 
+**Regression gates (2026-09-19)**
+
+| gate | before | with the lane |
+|---|---|---|
+| backend suite | 3363 | 3485 passed, 3 skipped |
+| frontend units | 709 | 709 |
+| eval `--totals-only --recompute` (`--geometry` added to the harness), in-sample MAE | 9,91 % | 9,83 % (objektas_a 3,06 → 2,78: one room outlined) |
+| out-of-sample MAE | 7,06 % | 7,06 % |
+| his rows within ±10 % — G / H / corpus | 15,0 / 29,2 / 24,3 % | 15,0 / 29,2 / 24,3 % |
+| lane time, no Vision | — | H 0,7 s · G 3,8 s · objektas_a 2,7 s · objektas_b (65 sheets) 5,5 s |
+
+Two things the gates caught that the unit tests did not:
+- **A blank perimeter must still be a NUMBER.** Task 8 as written set `perimetras_m = None`. The sąmata rows
+  (grindjuostės, silikonavimas, plytelių grindjuostės, hidroizoliacijos juosta…) are built straight from
+  `room["perimetras_m"]` in a dozen places of `vision_call.py`; with None they silently became 0 and G's rows
+  fell 15 → 10 %. Now an estimate is the number plus `perimetras_saltinis = "konturo_ivertis"` /
+  `"atviros_erdves_ivertis"`; the check sheet turns that SOURCE into a blank with the number to accept.
+- **Speed on a real 65-sheet set.** First version 93 s on objektas_b: every sheet's millions of black fills
+  (text outlines) and strokes were walked point by point, every fill became a shapely polygon, and the page
+  cache thrashed. Now black fills and strokes are skipped at two calls per object, specks are dropped before
+  shapely, sheet sizes come from the strings, and sheets beyond the rooms' own are laid over only when an
+  outline exists whose walls their strings could state.
+
 The spec's targets (H ≥ 9/11 summed, ≥ 9/11 outlines ±5 %) were set before anyone had looked at
 H's topology: three of its rooms are one open space, two bathrooms are bounded by partitions drawn
 as LINES (not fills), the table is stale for three rooms, one room has a slanted wall whose string

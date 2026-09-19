@@ -85,6 +85,13 @@ function getFieldConfidence(room, field) {
 
   if (field === 'perimetras_m') {
     if (val <= 0) return 'low';
+    // 2026-09-19: the geometry lane says where the figure came from. Wall
+    // lengths READ from the plan and added up (or a pair of them, the table,
+    // his own entry) are the drawing's word; the outline's length and an open
+    // plan's share are estimates the check sheet asks him to accept.
+    const perimSrc = room?.perimetras_saltinis;
+    if (['matmenu_eilutes', 'plano_matmenys', 'eksplikacija', 'user_override', 'manual'].includes(perimSrc)) return 'high';
+    if (['konturo_ivertis', 'atviros_erdves_ivertis'].includes(perimSrc)) return 'medium';
     // _zoom_changes proves perimetras was zoom-refined
     const zoomChanges = room?._zoom_changes || [];
     if (zoomChanges.some(c => c.startsWith('perimetras'))) return 'high';
