@@ -49,6 +49,9 @@ def test_geometry_gate(slug):
         assert rooms[nr].get("perimetras_saltinis") == "matmenu_eilutes", (nr, rooms[nr].get("_perimetras_priezastis"))
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.02, (nr, rooms[nr]["perimetras_m"])
         assert rooms[nr]["_perimetras_suma"]["sutampa"] is True
+    for nr, metres in want["atviru_erdviu_iverciai"].items():
+        assert rooms[nr]["perimetras_m"] is None and rooms[nr]["_perimetras_ivertis_saltinis"] == "atviros_erdves_konturas"
+        assert abs(rooms[nr]["_perimetras_ivertis_m"] - metres) <= 0.05, (nr, rooms[nr]["_perimetras_ivertis_m"])
     blanks = [r for r in rooms.values() if r.get("perimetras_m") is None]
     assert len(blanks) >= want["min_tusti_su_iverciu"]
     # a blank is never a silent one: it carries the reason and the estimate to accept

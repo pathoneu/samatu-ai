@@ -35,7 +35,13 @@ import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 
-const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_needed'];
+// Outlines that must never be re-detected over. The last two are traced by the
+// BACKEND during extraction (wall_outline.py, vector_rooms.py): before
+// 2026-09-19 they were missing here, so the first time a project was opened
+// the browser's flood-fill ran anyway and replaced them — objektas_h's eight
+// wall-exact outlines came back as `manual_needed` with no polygon at all.
+const DETECTED_SOURCES = ['auto_floodfill', 'corrected', 'manual', 'manual_needed',
+  'sienu_konturas', 'vektoriniai_konturai'];
 
 // Apply a per-room field patch (keyed by nr) to BOTH patalpos and v8_rooms so
 // the two room arrays the app reads (`v8_rooms || patalpos`) never diverge.

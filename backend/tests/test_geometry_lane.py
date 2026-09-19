@@ -88,7 +88,25 @@ def test_an_open_plan_names_its_members_and_offers_the_shared_walls_as_an_estima
     erdve = r1["_atvira_erdve"]
     assert erdve["nariai"] == ["01", "02"] and abs(erdve["perimetras_m"] - 20.4) < 0.4 and len(erdve["polygon_pct"]) >= 4
     assert parsed["_meta"]["geometrija"]["atviros_erdves"] == [["01", "02"]]
-    assert r1["perimetras_m"] == 13.9                              # Vision's figure stays until someone decides
+    # The walls of the shared space are real; what each room's share of them is, is not written anywhere.
+    # objektas_h, 2026-09-19: with the two rooms' guessed perimeters the painted walls came to 340 m², with
+    # the shared outline split by area to 320,3 m² — the designer's own legend says 320 m².
+    assert r1["perimetras_m"] is None and r2["perimetras_m"] is None
+    assert r1["_perimetras_ivertis_saltinis"] == "atviros_erdves_konturas" and r1["_perimetras_pries_geometrija"] == 13.9
+    assert abs(r1["_perimetras_ivertis_m"] + r2["_perimetras_ivertis_m"] - erdve["perimetras_m"]) < 0.02
+    assert abs(r1["_perimetras_ivertis_m"] / r2["_perimetras_ivertis_m"] - 12.6 / 9.0) < 0.01
+    assert "atvira erdvė su 02" in r1["_perimetras_priezastis"] and "20," in r1["_perimetras_priezastis"]
+
+
+def test_an_open_plan_member_whose_perimeter_someone_stated_keeps_it():
+    a = two_rooms()
+    a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]
+    parsed = _parsed(perimetras_m=15.5, perimetras_saltinis="user_override")
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    gl.apply_geometry(parsed, build_plan([a]))
+    r1, r2 = parsed["patalpos"]
+    assert r1["perimetras_m"] == 15.5 and "_perimetras_ivertis_m" not in r1
+    assert r2["perimetras_m"] is None and r2["_perimetras_ivertis_m"] > 0
 
 
 def test_the_lane_never_raises():
@@ -107,7 +125,7 @@ def test_rooms_located_on_different_sheets_of_one_plan_meet_on_the_sheet_that_is
     gl.apply_geometry(parsed, _two_sheets())
     r7 = parsed["patalpos"][2]
     assert r7.get("polygon_source") != "vektoriniai_konturai"
-    assert "pataikė į patalpą 01" in r7["_konturo_priezastis"]
+    assert "pateko į patalpą 01" in r7["_konturo_priezastis"]
 
 
 def test_an_outline_traced_on_a_sheet_that_is_not_a_plan_still_gets_its_walls_read():
@@ -132,3 +150,17 @@ def test_a_sheet_the_classifier_called_something_else_still_gives_its_wall_strin
     gl.apply_geometry(parsed, _two_sheets())
     r1 = parsed["patalpos"][0]
     assert r1["perimetras_m"] == 14.0 and r1["_perimetras_suma"]["lapai"] == [2]
+
+
+def test_nothing_the_lane_writes_for_the_sheet_is_developer_speak():
+    """Reasons end up on the check sheet. The 2026-09-04 trust guard bans
+    pipeline words there; the lane's own strings must pass it."""
+    from extractor.user_text import is_banned
+    parsed = _parsed()
+    parsed["patalpos"].append({"nr": "07", "pavadinimas": "C", "plotas_m2": 12.0, "puslapio_nr": 2,
+                               "bbox_pct": {"x": (60 + 1.2 * 28.3465) / 595.2756, "y": (80 + 1.0 * 28.3465) / 841.8898, "w": 0.05, "h": 0.03}})
+    parsed["patalpos"][1]["plotas_m2"] = 30.0                     # far from the 9 m² drawn: refused with a reason
+    gl.apply_geometry(parsed, _two_sheets())
+    said = [str(r.get(k)) for r in parsed["patalpos"] for k in ("_konturo_priezastis", "_perimetras_priezastis") if r.get(k)]
+    assert len(said) >= 2 and not [s for s in said if is_banned(s)], said
+    assert all("." not in s.split("m²")[0][-5:] for s in said if "m²" in s), said      # decimal commas

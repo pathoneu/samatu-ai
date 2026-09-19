@@ -10,7 +10,10 @@ strings written along those outlines' walls, from every sheet of the plan.
 What it leaves on a room: `_vieta`; `polygon_pct` + `polygon_source =
 "vektoriniai_konturai"` + `_konturas`, or `_konturo_priezastis`; for an open
 plan `_atvira_erdve` {nariai, polygon_pct, plotas_m2, perimetras_m,
-lenteles_suma_m2, page} — the shared outline, never an invented cut; and what
+lenteles_suma_m2, page} — the shared outline, never an invented cut — and a
+blank perimeter whose estimate is the room's share (by floor area) of the
+shared space's real walls (`_perimetras_ivertis_saltinis =
+"atviros_erdves_konturas"`); and what
 dimension_sum writes (`_sienos`, `_perimetras_suma`, a stated perimeter or a
 blank one with its reason and the outline's estimate). The figure a stated or
 blanked perimeter replaces is kept as `_perimetras_pries_geometrija`. A room
@@ -32,6 +35,7 @@ from .sheet_alignment import align_sheets, from_base, to_base
 from .vector_rooms import SOURCE as VECTOR_SOURCE, trace_vector_rooms
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
+_PT_M = 25.4 / 72 / 1000          # metres per PDF point at 1:1
 
 
 def _nr(room: dict) -> str:
@@ -78,6 +82,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
             per_base_pt = scale[known] / (alignment["transform"][known]["k"] or 1.0)
             for p in group:
                 scale.setdefault(p, per_base_pt * (alignment["transform"][p]["k"] or 1.0))
+
+        # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
+        meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
 
         areas = {_nr(r): float(r.get("plotas_m2") or 0) for r in rooms}
         sizes: dict[int, tuple[float, float]] = {}
@@ -131,13 +138,35 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     meta["konturu_priezastys"][nr] = res["reasons"][nr]
             for g in res["groups"]:
                 meta["atviros_erdves"].append(g["nariai"])
-                for r in rooms:
-                    if _nr(r) in g["nariai"] and _nr(r) in todo:
-                        r["_atvira_erdve"] = dict(g)
+                members = [r for r in rooms if _nr(r) in g["nariai"]]
+                total_area = sum(areas.get(_nr(r)) or 0 for r in members)
+                for r in members:
+                    if _nr(r) not in todo:
+                        continue
+                    r["_atvira_erdve"] = dict(g)
+                    # The shared space's walls are real; each room's share of them is written nowhere.
+                    # The share by floor area is the ESTIMATE the walls are computed with — blank, reason,
+                    # a number to accept. objektas_h: the rooms' guessed perimeters gave 340 m² of painted
+                    # wall, this gives 320,3 m² — the designer's own legend on that drawing says 320 m².
+                    if str(r.get("perimetras_saltinis") or "") in STATED_PERIMETERS and r.get("perimetras_m"):
+                        continue
+                    if total_area <= 0 or not (areas.get(_nr(r)) or 0) > 0:
+                        continue
+                    others = ", ".join(n for n in g["nariai"] if n != _nr(r))
+                    if r.get("perimetras_m") is not None:
+                        r.setdefault("_perimetras_pries_geometrija", r["perimetras_m"])
+                    r["perimetras_m"] = None
+                    r["perimetras_saltinis"] = None
+                    r["_perimetras_ivertis_m"] = round(g["perimetras_m"] * areas[_nr(r)] / total_area, 2)
+                    r["_perimetras_ivertis_saltinis"] = "atviros_erdves_konturas"
+                    r["_perimetras_priezastis"] = (f"atvira erdvė su {others} — sienos šių patalpų neskiria; bendras erdvės sienų ilgis "
+                                                   f"{g['perimetras_m']:.2f} m padalytas pagal plotą").replace(".", ",")
+                    meta["perimetrai_tusti"].append(_nr(r))
 
         before = {_nr(r): r.get("perimetras_m") for r in rooms}
         done = sum_perimeters(rooms, dims, alignment, scale, page_sizes=sizes)
-        meta["perimetrai_sudeti"], meta["perimetrai_tusti"] = done["stated"], done["blank"]
+        meta["perimetrai_sudeti"] = done["stated"]
+        meta["perimetrai_tusti"] = sorted(set(meta["perimetrai_tusti"]) | set(done["blank"]))
         for r in rooms:
             nr = _nr(r)
             if nr in done["stated"] or nr in done["blank"]:

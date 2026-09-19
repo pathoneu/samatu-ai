@@ -1,0 +1,100 @@
+"""The perimeter fact shows the strings that were added — on the sheet they
+were read from, framed on the room — or a blank with the reason and the
+outline's estimate to accept."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from extractor.room_facts import build_room_facts  # noqa: E402
+
+OUTLINE = [[0.5, 0.2], [0.7, 0.2], [0.7, 0.4], [0.5, 0.4]]
+
+
+def _project(room):
+    return {"patalpos": [room], "puslapiai": [{"nr": 1, "tipas": "floor_plan"}, {"nr": 6, "tipas": "floor_plan"}]}
+
+
+def _wall(texts, metres, saltinis="eilute", page=6):
+    return {"edge_pct": [[0.5, 0.2], [0.7, 0.2]], "ilgis_m": metres, "saltinis": saltinis, "kontrole_m": metres,
+            "eilutes": [{"text": t, "value_m": int(t) / 1000, "page": page} for t in texts]}
+
+
+def _perimetras(room):
+    return {f["key"]: f for f in build_room_facts(_project(room), room["nr"])["facts"]}["perimetras"]
+
+
+def test_summed_strings_are_written_out_with_their_sheet_and_framed_on_the_room():
+    room = {"nr": "02", "pavadinimas": "Katilinė", "plotas_m2": 6.9, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 12.17, "perimetras_saltinis": "matmenu_eilutes", "_walls_perimetras_m": 12.17,
+            "_perimetras_suma": {"suma_m": 12.17, "kontrole_m": 12.2, "sutampa": True, "lapai": [6], "is_konturo_m": 0, "pakartota": 0,
+                                 "eilutes": ["1586", "4500", "1586", "4500"]},
+            "_sienos": [_wall(["1586"], 1.586), _wall(["4500"], 4.5), _wall(["1586"], 1.586), _wall(["4500"], 4.5)],
+            "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] == 12.17 and p["status"] == "read" and p["source"]["kind"] == "planas"
+    assert "1586 + 4500 + 1586 + 4500 = 12,17 m" in p["sentence"] and "6 psl." in p["sentence"]
+    assert "12,20 m" in p["sentence"]                                   # the outline's check, said
+    assert p["source"]["page"] == 6                                     # the sheet the numbers are on…
+    x0, y0, x1, y1 = p["source"]["rect_pct"]
+    assert x0 < 0.5 and y0 < 0.2 and x1 > 0.7 and y1 > 0.4 and x1 - x0 < 0.5   # …framed on the room, not the whole sheet
+    assert "suggestion" not in p
+
+
+def test_a_length_used_for_the_wall_opposite_and_a_piece_from_the_outline_are_said():
+    room = {"nr": "04", "pavadinimas": "Miegamasis", "plotas_m2": 10.05, "puslapio_nr": 2, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 12.86, "perimetras_saltinis": "matmenu_eilutes",
+            "_perimetras_suma": {"suma_m": 12.86, "kontrole_m": 12.9, "sutampa": True, "lapai": [7], "is_konturo_m": 0.15, "pakartota": 1,
+                                 "eilutes": ["3290", "3065", "3290"]},
+            "_sienos": [_wall(["3290"], 3.29, page=7), _wall(["3065"], 3.065, page=7), _wall(["3290"], 3.29, page=7),
+                        _wall(["3065"], 3.065, "priesinga_siena", page=7), _wall([], 0.15, "konturas")],
+            "_konturas": {"page": 2}, "polygon_pct": OUTLINE, "polygon_source": "sienu_konturas"}
+    s = _perimetras(room)["sentence"]
+    assert "3290 + 3065 + 3290 + 3065 + 0,15 = 12,86 m" in s
+    assert "priešing" in s and "0,15 m" in s and "kontūr" in s
+
+
+def test_blank_perimeter_gives_the_reason_and_offers_the_outline_estimate():
+    room = {"nr": "03", "pavadinimas": "Koridorius", "plotas_m2": 10.12, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": None, "_perimetras_priezastis": "2 iš 8 sienų be matmens", "_walls_perimetras_m": 21.23,
+            "_perimetras_ivertis_m": 21.23, "_perimetras_ivertis_saltinis": "konturas", "_perimetras_pries_geometrija": 16.4,
+            "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] is None and p["status"] == "missing"
+    assert "2 iš 8 sienų be matmens" in p["sentence"] and "21,23 m" in p["sentence"]
+    assert p["suggestion"] == {"value": 21.23, "label": "Priimti 21,23 m"}
+    assert p["editable"] == {"field": "perimetras_m", "kind": "number"}
+    assert p["source"]["page"] == 1 and p["source"]["rect_pct"][2] - p["source"]["rect_pct"][0] < 0.5
+
+
+def test_a_perimeter_he_typed_after_a_blank_is_his():
+    room = {"nr": "03", "pavadinimas": "Koridorius", "plotas_m2": 10.12, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 21.0, "perimetras_saltinis": "user_override", "_perimetras_priezastis": "2 iš 8 sienų be matmens",
+            "_perimetras_ivertis_m": 21.23, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] == 21.0 and "įrašėte patys" in p["sentence"] and "suggestion" not in p
+
+
+def test_an_open_plan_member_is_told_how_its_share_was_made():
+    space = {"nariai": ["04", "05"], "polygon_pct": OUTLINE, "perimetras_m": 37.77, "plotas_m2": 60.55, "page": 1}
+    room = {"nr": "04", "pavadinimas": "Virtuvė", "plotas_m2": 26.31, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": None, "_perimetras_ivertis_m": 16.08, "_perimetras_ivertis_saltinis": "atviros_erdves_konturas",
+            "_perimetras_priezastis": "atvira erdvė su 05 — sienos šių patalpų neskiria; bendras erdvės sienų ilgis 37,77 m padalytas pagal plotą",
+            "_atvira_erdve": space, "polygon_source": "synthesized_from_bbox",
+            "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]]}
+    p = _perimetras(room)
+    assert p["value"] is None and p["suggestion"]["value"] == 16.08
+    assert "atvira erdvė su 05" in p["sentence"] and "37,77 m" in p["sentence"] and "tenka 16,08 m" in p["sentence"]
+    assert p["source"]["rect_pct"][0] > 0.4                     # framed on the shared space, not on Vision's box
+
+
+def test_accepting_the_estimate_is_not_called_typing_it():
+    room = {"nr": "03", "pavadinimas": "Koridorius", "plotas_m2": 10.12, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 21.23, "perimetras_saltinis": "user_override", "_perimetras_priezastis": "2 iš 8 sienų be matmens",
+            "_perimetras_ivertis_m": 21.23, "_perimetras_ivertis_saltinis": "konturas",
+            "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] == 21.23 and "suggestion" not in p
+    assert "Priėmėte" in p["sentence"] and "2 iš 8 sienų be matmens" in p["sentence"] and "įrašėte patys" not in p["sentence"]

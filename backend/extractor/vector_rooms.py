@@ -193,6 +193,11 @@ def _fuse(parts: Sequence[Polygon]) -> Polygon | None:
     return max(polys, key=lambda p: p.area)
 
 
+def _lt(value: float) -> str:
+    """A number the way the sheet writes it: two decimals, decimal comma."""
+    return f"{value:.2f}".replace(".", ",")
+
+
 def _to_pct(poly: Polygon, W: float, H: float) -> list[list[float]]:
     ring = poly.simplify(SIMPLIFY_PT, preserve_topology=True).exterior
     return [[round(x / W, 5), round(y / H, 5)] for x, y in list(ring.coords)[:-1]]
@@ -279,7 +284,7 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
         area = poly.area * m2
         err = abs(area - want) / want
         if err > tol:
-            reasons[nr] = f"nesutampa su lentele: kontūras {area:.2f} m², lentelė {want:.2f} m²"
+            reasons[nr] = f"nesutampa su lentele: kontūras {_lt(area)} m², lentelė {_lt(want)} m²"
             return
         outline = poly.simplify(SIMPLIFY_PT, preserve_topology=True)
         rooms[nr] = {"polygon_pct": _to_pct(poly, W, H), "plotas_m2": round(area, 2),
@@ -317,9 +322,9 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
             continue
         taken = sorted({o for k in ks for o in owners.get(k, [])} | {o for o, poly in solved.items() if poly.contains(pts[nr])})
         if taken:
-            reasons[nr] = f"vieta netiksli (Vision langelis pataikė į patalpą {', '.join(taken)})"
+            reasons[nr] = f"patalpos vieta plane nerasta tiksliai — spėjama vieta pateko į patalpą {', '.join(taken)}"
         elif len({w for k in ks for w in weak_in.get(k, [])}) > 1:
-            reasons[nr] = "vieta netiksli (keli Vision langeliai vienoje erdvėje)"
+            reasons[nr] = "patalpos vieta plane nerasta tiksliai — kelios spėjamos vietos vienoje erdvėje"
         else:
             accept(nr, ks, AREA_TOL)                           # an unreliable seat must at least agree on the area
     for nr in pts:

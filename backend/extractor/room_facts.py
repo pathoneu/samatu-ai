@@ -392,6 +392,38 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
 
 # ── perimetras ──────────────────────────────────────────────────────────────
 
+def _open_space_rect_pct(room: dict) -> list[float] | None:
+    """The shared outline of the open plan this room is part of — its evidence box."""
+    space = room.get("_atvira_erdve")
+    poly = space.get("polygon_pct") if isinstance(space, dict) else None
+    if not isinstance(poly, list) or len(poly) < 3:
+        return None
+    try:
+        xs = [float(p[0]) for p in poly]
+        ys = [float(p[1]) for p in poly]
+    except (TypeError, ValueError, IndexError):
+        return None
+    m = MARKER_MARGIN_PCT / 2
+    return _clamp_rect([min(xs) - m, min(ys) - m, max(xs) + m, max(ys) + m])
+
+
+def _outline_rect_pct(room: dict) -> list[float] | None:
+    """The traced outline's box with a margin — the crop for a fact that is
+    about the room's walls. Sheets of one plan share the frame, so the same
+    box frames the room on the sheet the wall lengths were read from. Vision's
+    box is not an outline."""
+    poly = room.get("polygon_pct")
+    if str(room.get("polygon_source") or "") in ("", "synthesized_from_bbox") or not isinstance(poly, list) or len(poly) < 3:
+        return None
+    try:
+        xs = [float(p[0]) for p in poly]
+        ys = [float(p[1]) for p in poly]
+    except (TypeError, ValueError, IndexError):
+        return None
+    m = MARKER_MARGIN_PCT / 2
+    return _clamp_rect([min(xs) - m, min(ys) - m, max(xs) + m, max(ys) + m])
+
+
 def _fact_perimetras(project: dict, room: dict,
                      region: list[float] | None) -> dict:
     measured = _f(room.get("perimetras_m"))
@@ -416,6 +448,23 @@ def _fact_perimetras(project: dict, room: dict,
             tail = (f" Sienų plotui naudoju {lt_num(used)} m — patalpos kontūras "
                     "brėžinyje nepažymėtas, todėl imu stačiakampio perimetrą.")
 
+    if measured is None and _f(room.get("_perimetras_ivertis_m")):
+        # 2026-09-19: the geometry lane could not ADD this room's wall lengths —
+        # the field stays blank and says why; the outline's length is the
+        # number the walls are computed with meanwhile, one click to accept.
+        est = round(float(room["_perimetras_ivertis_m"]), 2)
+        why = str(room.get("_perimetras_priezastis") or "ne visos sienos plane turi matmenį").rstrip(".")
+        page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
+        if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas":
+            sentence = (f"Perimetro nesudėjau: {why}. Šiai patalpai tenka {lt_num(est)} m — priimkite arba įrašykite "
+                        f"tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
+        else:
+            sentence = (f"Perimetro nesudėjau: {why}. Pagal sienų kontūrą brėžinyje būtų {lt_num(est)} m — "
+                        f"priimkite arba įrašykite tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
+        return _fact("perimetras", None, "m", "missing", "nera", page,
+                     _outline_rect_pct(room) or _open_space_rect_pct(room) or region_on_page(room, page, region),
+                     sentence, editable, suggestion={"value": est, "label": f"Priimti {lt_num(est)} m"})
+
     if measured is None:
         if used is None:
             return _fact("perimetras", None, "m", "missing", "nera",
@@ -428,6 +477,18 @@ def _fact_perimetras(project: dict, room: dict,
                      f"({lt_num(used)} m). Įrašykite tikrą.", editable)
 
     if room.get("perimetras_saltinis") in ("user_override", "manual"):
+        est = _f(room.get("_perimetras_ivertis_m"))
+        if est is not None and abs(est - measured) < 0.005:
+            # he took the number the sheet offered — say which number that was, not „you typed it"
+            why = str(room.get("_perimetras_priezastis") or "").rstrip(".")
+            head = ("Priėmėte šiai patalpai tenkančią bendros erdvės sienų dalį"
+                    if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas"
+                    else "Priėmėte įvertį pagal sienų kontūrą brėžinyje")
+            sentence = head + (f" (plane sienų ilgių nesudėjau: {why})." if why else ".")
+            page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
+            return _fact("perimetras", round(measured, 2), "m", "read", "prielaida", page,
+                         _outline_rect_pct(room) or _open_space_rect_pct(room) or region_on_page(room, page, region),
+                         sentence + tail, editable)
         return _fact("perimetras", round(measured, 2), "m", "read", "prielaida",
                      room.get("puslapio_nr"), region,
                      "Šį perimetrą įrašėte patys." + tail, editable)
@@ -448,6 +509,37 @@ def _fact_perimetras(project: dict, room: dict,
         return _fact("perimetras", round(measured, 2), "m", "read", "planas", page,
                      dimension_rect_pct(room) or region_on_page(room, page, region),
                      sentence + tail, editable)
+
+    if room.get("perimetras_saltinis") == "matmenu_eilutes" and isinstance(room.get("_perimetras_suma"), dict):
+        # 2026-09-19: „perskaityti skaičius ir sudėti" — every wall's written
+        # length, in the order the walls go round the room, on the sheet they
+        # were read from. The outline only checked the sum; it is said too.
+        suma = room["_perimetras_suma"]
+        terms: list[str] = []
+        for wall in room.get("_sienos") or []:
+            if wall.get("saltinis") == "konturas":
+                terms.append(lt_num(_f(wall.get("ilgis_m"))))
+            else:
+                terms.extend(str(e.get("text")) for e in (wall.get("eilutes") or []))
+        if not terms:
+            terms = [str(t) for t in (suma.get("eilutes") or [])]
+        shown = terms if len(terms) <= 14 else terms[:13] + ["…"]
+        pages = [int(p) for p in (suma.get("lapai") or [])]
+        page = pages[0] if pages else ((room.get("_konturas") or {}).get("page") or room.get("puslapio_nr"))
+        where = f" ({', '.join(str(p) for p in pages)} psl.)" if pages else ""
+        sentence = (f"Perimetras — sudėjau plane užrašytus šios patalpos sienų ilgius{where}: "
+                    f"{' + '.join(shown)} = {lt_num(measured)} m. "
+                    f"Sienų kontūras brėžinyje rodo {lt_num(_f(suma.get('kontrole_m')))} m — sutampa.")
+        repeated = int(suma.get("pakartota") or 0)
+        if repeated:
+            sentence += (" Viena siena plane užrašyta tik iš vienos pusės — priešingai, tokio pat ilgio sienai ėmiau tą patį skaičių."
+                         if repeated == 1 else
+                         f" {repeated} sienos plane užrašytos tik iš vienos pusės — priešingoms, tokio pat ilgio sienoms ėmiau tuos pačius skaičius.")
+        from_outline = _f(suma.get("is_konturo_m")) or 0.0
+        if from_outline > 0:
+            sentence += f" {lt_num(from_outline)} m trumpų atkarpų be užrašo paėmiau iš kontūro."
+        return _fact("perimetras", round(measured, 2), "m", "read", "planas", page,
+                     _outline_rect_pct(room) or region_on_page(room, page, region), sentence + tail, editable)
 
     if (room.get("perimetras_saltinis") == "sienu_konturas"
             and isinstance(room.get("_konturas"), dict)):

@@ -162,7 +162,7 @@ def test_a_room_located_only_by_visions_box_does_not_break_the_room_it_lands_in(
     locs = {"01": _at(2.2, 1.5), "02": _at(5.7, 1.5), "07": _at(2.6, 2.0, "bbox")}
     out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, locs, {"01": 12.0, "02": 9.0, "07": 5.0}, SCALE)
     assert {"01", "02"} <= set(out["rooms"])
-    assert "07" not in out["rooms"] and "vieta" in out["reasons"]["07"]
+    assert "07" not in out["rooms"] and "pateko į patalpą 01" in out["reasons"]["07"]
 
 
 def test_a_location_on_a_doorway_takes_the_parts_on_both_sides():

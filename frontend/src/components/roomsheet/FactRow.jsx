@@ -216,6 +216,18 @@ export default function FactRow({
             >
               {busy ? t('project.roomSheet.saving') : t('project.roomSheet.save')}
             </button>
+            {/* A blank with a number to accept: the sentence said where the number
+                comes from — one click takes it, typing another overrides it. */}
+            {fact.value == null && isValidAmount(Number(fact.suggestion?.value)) && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { onSaveNumber?.(field, Number(fact.suggestion.value)); setEditing(false); }}
+                className={`${BTN} border-border bg-card hover:bg-muted disabled:opacity-50`}
+              >
+                {cleanUserText(fact.suggestion.label || '')}
+              </button>
+            )}
           </div>
         )}
 

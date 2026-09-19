@@ -237,7 +237,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                 reason += f" ({len(slanted)} įstriža — įstrižų matmenų dar neskaitau)" if len(slanted) == 1 else \
                           f" ({len(slanted)} įstrižos — įstrižų matmenų dar neskaitau)"
         elif not control_total or abs(total - control_total) / control_total > CONTROL_TOL:
-            reason = f"matmenų suma {total:.2f} m nesutampa su kontūru {control_total:.2f} m"
+            reason = (f"matmenų suma {total:.2f} m nesutampa su kontūru {control_total:.2f} m").replace(".", ",")
         else:
             reason = None
         if reason is None:

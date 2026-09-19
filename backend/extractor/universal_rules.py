@@ -1287,7 +1287,8 @@ def calc_room_quantities(room: dict,
             estimate = 0.0
         if estimate > 0:
             perim = estimate
-            walls_perim_src = "konturo_ivertis"
+            walls_perim_src = ("atviros_erdves_ivertis" if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas"
+                               else "konturo_ivertis")
 
     # Jei perimetras nepateiktas — aproks pagal stačiakampį 1.3:1
     if perim <= 0 and plotas > 0:
@@ -1311,7 +1312,7 @@ def calc_room_quantities(room: dict,
                 perimetras_floor_applied = True
                 perimetras_floor_reason = "sintetinis_plotas"
         elif (area_src in _READ_AREA_SOURCES and perim_src not in _STATED_PERIMETER_SOURCES
-              and walls_perim_src != "konturo_ivertis"):          # an outline's length is geometry, not Vision's guess
+              and walls_perim_src not in ("konturo_ivertis", "atviros_erdves_ivertis")):   # an outline's length is geometry, not Vision's guess
             # A READ area with an IMPOSSIBLE perimeter: no room of area A goes
             # around in less than 4·√A — the square — yet Vision's read
             # perimeters did on three of objektas_g's rooms (2026-09-10: 7,08 m

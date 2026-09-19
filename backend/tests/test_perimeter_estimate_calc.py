@@ -56,3 +56,12 @@ def test_nothing_at_all_still_computes_but_says_it_is_the_square_guess():
 def test_a_figure_without_a_source_is_visions_and_is_kept_as_before():
     out = calc_room_quantities(_room(perimetras_m=13.9))
     assert out["perimetras_m"] == 13.9 and out["_walls_perimetras_saltinis"] == "vision"
+
+
+def test_a_share_of_an_open_plans_walls_is_not_floored_to_the_rooms_own_square():
+    """A room that is part of an open plan has FEWER walls than a closed room
+    of its area — its share may be shorter than 4·√A, and that is right."""
+    out = calc_room_quantities(_room(plotas_m2=26.31, perimetras_m=None, _perimetras_ivertis_m=16.08,
+                                     _perimetras_ivertis_saltinis="atviros_erdves_konturas"))      # 4·√26,31 = 20,5
+    assert out["_walls_perimetras_m"] == 16.08 and out["_walls_perimetras_saltinis"] == "atviros_erdves_ivertis"
+    assert out["_perimetras_floor_applied"] is False and out["perimetras_m"] is None
