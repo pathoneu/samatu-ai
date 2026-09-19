@@ -115,6 +115,15 @@ def _marker_xy(room: dict) -> tuple[float, float] | None:
         x, y = _f(m[0]), _f(m[1])
         if x is not None and y is not None:
             return x, y
+    # 2026-09-19: the geometry lane finds the room's PRINTED number (or its area
+    # label) in the text layer. That is the room's place on the plan; Vision's
+    # box is a guess and is not.
+    v = room.get("_vieta")
+    if isinstance(v, dict) and v.get("saltinis") in ("zenkliukas", "plotas_uzrasas"):
+        x, y = _f(v.get("cx")), _f(v.get("cy"))
+        page, own = v.get("page"), room.get("puslapio_nr")
+        if x is not None and y is not None and (own is None or page is None or int(page) == int(own)):
+            return x, y
     return None
 
 
@@ -391,6 +400,40 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
 
 
 # ── perimetras ──────────────────────────────────────────────────────────────
+
+_NOT_AN_OUTLINE = ("", "synthesized_from_bbox", "bbox_fallback", "manual_needed")
+
+
+def _perimeter_drawing(room: dict) -> dict:
+    """What the drawing pane shows for the perimeter: the traced OUTLINE, every
+    wall of it with the strings that state its length (each with its place on
+    the sheet it is written on), and for an open plan the shared outline.
+    Vision's box is not an outline: no outline, no walls, and the reason why."""
+    kont = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
+    page = kont.get("page") or room.get("puslapio_nr")
+    traced = str(room.get("polygon_source") or "") not in _NOT_AN_OUTLINE
+    poly = normalize_polygon(room.get("polygon_pct")) if traced else None
+    outline: dict | None = {"page": page, "polygon_pct": poly} if poly else None
+    space = room.get("_atvira_erdve")
+    shared = normalize_polygon(space.get("polygon_pct")) if isinstance(space, dict) else None
+    if shared:
+        outline = outline or {"page": space.get("page") or page, "polygon_pct": None}
+        outline["open_space"] = {"nariai": [str(n) for n in (space.get("nariai") or [])], "polygon_pct": shared,
+                                 "perimetras_m": _f(space.get("perimetras_m")), "page": space.get("page") or page}
+    walls = []
+    if poly:
+        for w in room.get("_sienos") or []:
+            if not isinstance(w, dict) or not isinstance(w.get("edge_pct"), (list, tuple)) or len(w["edge_pct"]) != 2:
+                continue
+            walls.append({"page": page, "edge_pct": [[_f(c[0]), _f(c[1])] for c in w["edge_pct"]],
+                          "ilgis_m": _f(w.get("ilgis_m")), "saltinis": w.get("saltinis"), "kontrole_m": _f(w.get("kontrole_m")),
+                          "eilutes": [{"text": str(e.get("text")), "page": e.get("page"), "line_pct": e.get("line_pct")}
+                                      for e in (w.get("eilutes") or []) if isinstance(e, dict)]})
+    out = {"outline": outline, "walls": walls}
+    if outline is None and room.get("_konturo_priezastis"):
+        out["outline_reason"] = str(room["_konturo_priezastis"])
+    return out
+
 
 def _open_space_rect_pct(room: dict) -> list[float] | None:
     """The shared outline of the open plan this room is part of — its evidence box."""
@@ -1066,7 +1109,7 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
     region = room_region_pct(room)
     facts = [
         _fact_plotas(project, room, region),
-        _fact_perimetras(project, room, region),
+        {**_fact_perimetras(project, room, region), **_perimeter_drawing(room)},
         _fact_aukstis(project, room, region),
         _fact_apdaila(project, room, region),
         _fact_angos(project, room, region),

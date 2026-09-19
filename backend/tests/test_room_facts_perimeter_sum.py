@@ -108,3 +108,67 @@ def test_a_stored_blank_from_before_the_estimate_became_a_number_still_reads_as_
             "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
     p = _perimetras(room)
     assert p["value"] is None and p["suggestion"]["value"] == 21.23
+
+
+# ── what the drawing pane needs: the walls and the outline, on the fact ─────────
+
+def _summed_room():
+    walls = [_wall(["1586"], 1.586), _wall(["4500"], 4.5), _wall(["1586"], 1.586), _wall(["4500"], 4.5, "priesinga_siena")]
+    for w in walls:
+        for e in w["eilutes"]:
+            e["line_pct"] = [[0.39, 0.25], [0.46, 0.25]]
+    return {"nr": "02", "pavadinimas": "Katilinė", "plotas_m2": 6.9, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 12.17, "perimetras_saltinis": "matmenu_eilutes",
+            "_perimetras_suma": {"suma_m": 12.17, "kontrole_m": 12.2, "sutampa": True, "lapai": [6], "is_konturo_m": 0, "pakartota": 1,
+                                 "eilutes": ["1586", "4500", "1586"]},
+            "_sienos": walls, "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
+
+
+def test_the_perimeter_fact_carries_every_wall_with_its_strings_and_the_outline():
+    p = _perimetras(_summed_room())
+    assert p["outline"] == {"page": 1, "polygon_pct": OUTLINE}
+    assert len(p["walls"]) == 4
+    first, borrowed = p["walls"][0], p["walls"][3]
+    assert first["page"] == 1 and first["edge_pct"] == [[0.5, 0.2], [0.7, 0.2]] and first["ilgis_m"] == 1.586
+    assert first["saltinis"] == "eilute" and first["eilutes"] == [{"text": "1586", "page": 6, "line_pct": [[0.39, 0.25], [0.46, 0.25]]}]
+    assert borrowed["saltinis"] == "priesinga_siena"
+
+
+def test_a_room_whose_walls_could_not_all_be_read_still_shows_which_ones():
+    room = _summed_room()
+    room["_sienos"][2] = {"edge_pct": [[0.7, 0.4], [0.5, 0.4]], "ilgis_m": None, "saltinis": None, "kontrole_m": 1.585, "eilutes": []}
+    room.update({"perimetras_m": 12.2, "perimetras_saltinis": "konturo_ivertis", "_perimetras_ivertis_m": 12.2,
+                 "_perimetras_priezastis": "1 iš 4 sienų be matmens"})
+    p = _perimetras(room)
+    assert p["value"] is None and [w["ilgis_m"] for w in p["walls"]].count(None) == 1
+    assert p["walls"][2]["kontrole_m"] == 1.585
+
+
+def test_visions_box_is_not_an_outline_and_has_no_walls():
+    room = {"nr": "01", "pavadinimas": "Tambūras", "plotas_m2": 4.48, "puslapio_nr": 1, "lubu_aukstis_m": 2.7, "perimetras_m": 8.6,
+            "polygon_pct": OUTLINE, "polygon_source": "synthesized_from_bbox",
+            "_konturo_priezastis": "nesutampa su lentele: kontūras 2,86 m², lentelė 4,48 m²"}
+    p = _perimetras(room)
+    assert p["outline"] is None and p["walls"] == [] and p["outline_reason"].startswith("nesutampa su lentele")
+
+
+def test_an_open_plan_member_gets_the_shared_outline():
+    space = {"nariai": ["04", "05"], "polygon_pct": OUTLINE, "perimetras_m": 37.77, "plotas_m2": 60.55, "page": 1}
+    room = {"nr": "04", "pavadinimas": "Virtuvė", "plotas_m2": 26.31, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+            "perimetras_m": 16.08, "perimetras_saltinis": "atviros_erdves_ivertis", "_perimetras_ivertis_m": 16.08,
+            "_perimetras_ivertis_saltinis": "atviros_erdves_konturas", "_perimetras_priezastis": "atvira erdvė su 05",
+            "_atvira_erdve": space, "polygon_source": "synthesized_from_bbox", "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]]}
+    p = _perimetras(room)
+    assert p["outline"] == {"page": 1, "polygon_pct": None,
+                            "open_space": {"nariai": ["04", "05"], "polygon_pct": OUTLINE, "perimetras_m": 37.77, "page": 1}}
+    assert p["walls"] == []
+
+
+def test_the_room_number_found_on_the_plan_is_the_rooms_marker():
+    from extractor.room_facts import build_room_facts
+    room = {"nr": "01", "pavadinimas": "Tambūras", "plotas_m2": 4.48, "puslapio_nr": 1, "lubu_aukstis_m": 2.7, "perimetras_m": 8.6,
+            "_vieta": {"page": 1, "cx": 0.429, "cy": 0.428, "saltinis": "zenkliukas"}}
+    sheet = build_room_facts(_project(room), "01")
+    assert sheet["room"]["marker_pct"] == [0.429, 0.428]
+    room["_vieta"]["saltinis"] = "bbox"                       # Vision's box is a guess, not the printed number
+    assert build_room_facts(_project(room), "01")["room"]["marker_pct"] is None
