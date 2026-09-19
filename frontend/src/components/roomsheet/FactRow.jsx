@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Minus, Pencil, Plus } from 'lucide-react';
+import { Check, MapPin, Minus, Pencil, Plus } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { cleanUserText } from '@/lib/userText';
@@ -69,7 +69,7 @@ function SizeEditor({ detail, busy, onSave, t }) {
 
 export default function FactRow({
   fact, room, busy = false, verified = false,
-  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize,
+  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onShowOnDrawing = null,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -83,7 +83,9 @@ export default function FactRow({
   }, [fact]);
 
   useEffect(() => {
-    if (editing && fact?.editable?.kind === 'number') inputRef.current?.focus();
+    // preventScroll: a blank fact opens with its field focused, and a focus that
+    // scrolls yanked the whole sheet down past the drawing on every such room.
+    if (editing && fact?.editable?.kind === 'number') inputRef.current?.focus({ preventScroll: true });
   }, [editing, fact?.editable?.kind]);
 
   const label = t(`project.roomSheet.${FACT_LABEL_KEY[fact?.key] || 'factPlotas'}`);
@@ -127,6 +129,21 @@ export default function FactRow({
         </p>
         {sentence && (
           <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{sentence}</p>
+        )}
+        {/* The sharp drawing is one click away from every number: the pane on the
+            left jumps to the sheet and the place this fact was read from. */}
+        {onShowOnDrawing && fact?.source?.page != null && (
+          <button
+            type="button"
+            onClick={onShowOnDrawing}
+            className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-[hsl(var(--accent-2))] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('project.roomSheet.showOnDrawing')}
+            <span className="font-mono font-medium text-muted-foreground">
+              · {t('project.roomSheet.sourcePage', { page: fact.source.page })}
+            </span>
+          </button>
         )}
         {isWholeSheet(fact) && (
           <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">

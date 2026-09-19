@@ -145,3 +145,14 @@ test('the dimension-string lane\'s ratios become exact page scales, labelled fro
   assert.deepEqual(pageScalesFromLane(undefined), {});
   assert.deepEqual(pageScalesFromLane(null), {});
 });
+
+test('laneMastelisOf: the pair lane first, else the geometry lane\'s exact sheet scales', async () => {
+  const { laneMastelisOf } = await import('./durableScale.js');
+  assert.deepEqual(laneMastelisOf({ _meta: { plan_dimension_lane: { mastelis: { 2: 50 } }, geometrija: { masteliai: { 1: { mastelis: 115 } } } } }), { 2: 50 });
+  assert.deepEqual(
+    laneMastelisOf({ _meta: { plan_dimension_lane: { mastelis: {} }, geometrija: { masteliai: { 1: { m_per_pt: 0.04065, mastelis: 115 }, 6: { mastelis: 115 }, 9: { mastelis: 0 } } } } }),
+    { 1: 115, 6: 115 },
+  );
+  assert.deepEqual(laneMastelisOf({ _meta: {} }), {});
+  assert.deepEqual(laneMastelisOf(null), {});
+});

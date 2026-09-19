@@ -38,7 +38,8 @@ the sheet shows a blank and offers it; the sąmata rows need a number) +
 _perimetras_priezastis + _perimetras_ivertis_m + _perimetras_ivertis_saltinis=
 "konturas". Rooms whose perimeter someone STATED
 (plan pair, table, user) are left alone; rooms whose outline is only Vision's
-box are skipped — a box cannot say which strings are its walls; an outline
+box or a browser flood-fill are skipped — those cannot say which strings are
+its walls; an outline
 that disagrees with the table states nothing (one of the two is wrong, and a
 sum along the wrong walls would look exact).
 """
@@ -64,7 +65,9 @@ CORNER_DEG = 20.0
 SOURCE = "matmenu_eilutes"
 ESTIMATE_SOURCE = "konturo_ivertis"          # perimetras_m holds the outline's length: an estimate to accept, never „read"
 KEEP = ("plano_matmenys", "eksplikacija", "user_override", "manual", SOURCE)
-NO_OUTLINE = (None, "", "synthesized_from_bbox")
+# outlines that follow the WALLS (traced from them, or drawn by a person) — a browser flood-fill
+# contour or Vision's box is a place on the plan, not the room's walls
+WALL_OUTLINES = ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual")
 
 
 def _corners(poly_pct: Sequence[Sequence[float]], W: float, H: float) -> list[tuple[float, float]]:
@@ -176,7 +179,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
             summary["skipped"].append(nr)
             continue
         poly_pct = room.get("polygon_pct")
-        if not poly_pct or room.get("polygon_source") in NO_OUTLINE:
+        if not poly_pct or room.get("polygon_source") not in WALL_OUTLINES:
             summary["skipped"].append(nr)
             continue
         kont = room.get("_konturas") or {}

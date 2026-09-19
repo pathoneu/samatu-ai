@@ -615,6 +615,16 @@ def _fact_perimetras(project: dict, room: dict,
                      rect or region_on_page(room, page, region),
                      "Iš patalpų eksplikacijos lentelės." + tail, editable)
 
+    if isinstance((project.get("_meta") or {}).get("geometrija"), dict):
+        # 2026-09-19: the geometry lane ran on this project and could neither add
+        # this room's wall lengths nor trace its outline — so the figure is what
+        # the program estimated from the picture of the plan, checked by nothing.
+        # An amber row with the number in the field, not a quiet „read" one.
+        return _fact("perimetras", round(measured, 2), "m", "assumed", "prielaida",
+                     room.get("puslapio_nr"), region,
+                     "Perimetras — programos įvertis iš plano vaizdo, brėžinyje užrašytais "
+                     "matmenimis nepatikrintas. Palikite arba įrašykite tikrą." + tail, editable)
+
     return _fact("perimetras", round(measured, 2), "m", "read", "planas",
                  room.get("puslapio_nr"), region,
                  "Perimetras — pagal patalpos kontūrą plane." + tail, editable)

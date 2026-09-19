@@ -30,7 +30,7 @@ import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
-import { pageScalesFromLane } from '@/lib/durableScale';
+import { laneMastelisOf, pageScalesFromLane } from '@/lib/durableScale';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
@@ -396,7 +396,7 @@ export default function InteriorWorkspace({
 
   // The scales the dimension-string lane read off each plan sheet („1:50")
   // — exact, shown in the status bar instead of „nekalibruotas".
-  const laneMastelis = project?._meta?.plan_dimension_lane?.mastelis;
+  const laneMastelis = useMemo(() => laneMastelisOf(project), [project]);
   const laneScales = useMemo(() => pageScalesFromLane(laneMastelis), [laneMastelis]);
 
   return (

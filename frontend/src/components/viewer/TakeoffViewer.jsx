@@ -22,7 +22,7 @@ import { usePrint } from '@embedpdf/plugin-print/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
-import { displayRotationFor, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
+import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
@@ -551,7 +551,64 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   return null;
 }
 
-function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null }) {
+/**
+ * FocusZoomer — „show me THIS place": jump to a page and fit a rectangle of it
+ * in the viewport (check-sheet mode). `focus = { page, rect: [x0, y0, x1, y1]
+ * in display-space page fractions, nonce }`; a new nonce re-runs it.
+ *
+ * zoomToArea reads the scroll layout, and the target page's box only exists in
+ * it once the scroller has laid it out — so: scroll to the page, then retry for
+ * a few frames until the page is there (same lesson as FocusScroller: a jump can
+ * land on nothing). The rect is given to the plugin in the page's DISPLAYED
+ * frame at zoom 1, which is the frame its layout boxes live in.
+ */
+function FocusZoomer({ documentId, focus, pages }) {
+  const { provides: scrollApi } = useScroll(documentId);
+  const { provides: zoomApi } = useZoom(documentId);
+  const scrollRef = useRef(scrollApi);
+  const zoomRef = useRef(zoomApi);
+  const pagesRef = useRef(pages);
+  useEffect(() => { scrollRef.current = scrollApi; zoomRef.current = zoomApi; pagesRef.current = pages; });
+  const nonce = focus?.nonce;
+  useEffect(() => {
+    if (!focus || !focus.page) return undefined;
+    let cancelled = false;
+    let tries = 0;
+    let raf = 0;
+    const pageIndex = Number(focus.page) - 1;
+    const run = () => {
+      if (cancelled) return;
+      const sApi = scrollRef.current;
+      const zApi = zoomRef.current;
+      const size = pagesRef.current?.[pageIndex]?.size;
+      const rot = normalizeRotation(pagesRef.current?.[pageIndex]?.rotation ?? 0);
+      const laidOut = sApi?.getLayout?.()?.virtualItems?.some((it) => it.pageLayouts?.some((p) => p.pageIndex === pageIndex));
+      if (!sApi || !zApi || !size || !laidOut) {
+        if (tries++ < 60) raf = requestAnimationFrame(run);
+        return;
+      }
+      const Wd = rot === 90 || rot === 270 ? size.height : size.width;
+      const Hd = rot === 90 || rot === 270 ? size.width : size.height;
+      const [x0, y0, x1, y1] = Array.isArray(focus.rect) && focus.rect.length === 4 ? focus.rect : [0, 0, 1, 1];
+      sApi.scrollToPage({ pageNumber: Number(focus.page), behavior: 'auto' });
+      // one more frame: the scroll position must be in place before the zoom
+      // plugin measures where the rectangle's centre is on screen
+      raf = requestAnimationFrame(() => {
+        if (cancelled) return;
+        zApi.zoomToArea(pageIndex, {
+          origin: { x: x0 * Wd, y: y0 * Hd },
+          size: { width: Math.max(1, (x1 - x0) * Wd), height: Math.max(1, (y1 - y0) * Hd) },
+        });
+      });
+    };
+    raf = requestAnimationFrame(run);
+    return () => { cancelled = true; cancelAnimationFrame(raf); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonce, documentId]);
+  return null;
+}
+
+function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -840,28 +897,30 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
         if (!isLoaded) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
         const totalPages = documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null;
         // No explicit user choice yet → open by default on multi-page documents.
-        const railOpen = thumbsPref ?? ((totalPages ?? 1) > 1);
+        // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
+        const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         return (
         <div className="flex flex-col h-full" data-tv-root>
           <Toolbar
             documentId={activeDocumentId}
             totalPages={totalPages}
-            focusedRoomNr={onRoomPolygonFill ? focusedRoomNr : null}
+            focusedRoomNr={onRoomPolygonFill && !check ? focusedRoomNr : null}
             fillFor={fillFor}
             onStartFill={startFill}
             onCancelFill={() => setFillFor(null)}
             railOpen={railOpen}
             onToggleThumbs={() => setRailOpen(!railOpen)}
             measureTool={measureTool}
-            onMeasureTool={armMeasureTool}
+            onMeasureTool={check ? null : armMeasureTool}
             searchOpen={searchOpen}
             onToggleSearch={() => setSearchOpen((v) => !v)}
             onCloseSearch={() => setSearchOpen(false)}
             zoneFillsVisible={zoneFillsVisible}
-            onToggleZoneFills={() => setZoneFillsVisible((v) => !v)}
+            onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             onDownload={handleDownload}
           />
-          <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />
+          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
+          {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
@@ -893,6 +952,8 @@ function ViewerInner({ rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRo
                       rooms={rooms}
                       pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
                       pageSizePt={documentState?.document?.pages?.[layout.pageIndex]?.size ?? null}
+                      checkMode={!!check}
+                      checkData={check?.pages?.[layout.pageNumber] || null}
                       focusedRoomNr={focusedRoomNr}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
@@ -1035,6 +1096,12 @@ export default function TakeoffViewer({
   initialMeasureScales = null,
   initialCountTypes = null,
   onMeasureDataChange = null,
+  // Check-sheet mode (Patikra v2): `check = { pages: {[pageNr]: overlay} }` from
+  // lib/checkOverlay draws what was READ about one room instead of the all-rooms
+  // zones, the measuring tools step aside, and `focus = { page, rect, nonce }`
+  // jumps to a place and fits it. Absent → the viewer is exactly what it was.
+  check = null,
+  focus = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1047,6 +1114,8 @@ export default function TakeoffViewer({
     <div className="h-full">
       <EmbedPDF engine={engine} plugins={plugins}>
         <ViewerInner
+          check={check}
+          focus={focus}
           rooms={rooms}
           focusedRoom={focusedRoom}
           focusedPage={focusedPage}

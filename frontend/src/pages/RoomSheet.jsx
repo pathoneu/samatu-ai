@@ -17,9 +17,9 @@
  *    instead of offering a button that cannot keep its promise.
  *
  * v1 boundaries, stated rather than hidden:
- *  • the drawing is a cached server-side crop, not the EmbedPDF viewer — the
- *    viewer has no focus-region entry point that could be added without editing
- *    its files, and the crop is honest and fast;
+ *  • the drawing is the real viewer since 2026-09-19 (RoomDrawingPane: sharp at
+ *    any zoom, the room's outline, its walls with the numbers that were added);
+ *    the cached server-side crop remains as the fallback (phones, no PDF);
  *  • the per-fact „Teisinga" is a reading aid: it marks the row as looked-at for
  *    this session and drives the footer. The durable verification is the footer
  *    button, which stamps `user_verified_at` through `markRoomVerified`;
@@ -48,7 +48,7 @@ import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
 } from '@/lib/roomSheetApi';
 import RoomSheetStrip from '@/components/roomsheet/RoomSheetStrip';
-import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
+import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FactRow from '@/components/roomsheet/FactRow';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
@@ -92,6 +92,9 @@ export default function RoomSheet() {
   // chosen from room to room. Hovering a fact row lights its rectangle.
   const [wholeSheet, setWholeSheet] = useState(true);
   const [activeFactKey, setActiveFactKey] = useState(null);
+  // „Rodyti brėžinyje" on a fact: the drawing pane jumps to that fact's own place
+  // ({key, nonce} — the nonce lets the same fact be asked for twice).
+  const [focusRequest, setFocusRequest] = useState(null);
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -459,14 +462,17 @@ export default function RoomSheet() {
         <div className="min-w-0 flex-1 lg:sticky lg:top-4 lg:basis-[52%]">
           {facts?.room
             ? (
-              <RoomPlanPane
-                room={facts.room}
+              <RoomDrawingPane
+                project={project}
                 projectId={id}
-                highlightCorners={highlightCorners}
+                room={facts.room}
                 facts={factList}
-                wholeSheet={wholeSheet}
-                onToggleWhole={setWholeSheet}
                 activeFactKey={activeFactKey}
+                focusRequest={focusRequest}
+                fallback={{
+                  room: facts.room, projectId: id, highlightCorners, facts: factList,
+                  wholeSheet, onToggleWhole: setWholeSheet, activeFactKey,
+                }}
               />
             )
             : <div className="h-64 animate-pulse rounded-[2px] bg-muted" />}
@@ -530,6 +536,7 @@ export default function RoomSheet() {
                     onSaveChoice={saveChoice}
                     onAdjustOpening={adjustOpening}
                     onSaveOpeningSize={saveOpeningSize}
+                    onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
                   />
                 </div>
               ))}

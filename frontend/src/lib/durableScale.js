@@ -108,6 +108,26 @@ export const METERS_PER_POINT_AT_1_TO_1 = 0.0254 / 72;
  * „nekalibruotas" on a sheet the engine already read (2026-09-13). A user
  * calibration still wins the merge; this only fills pages nobody calibrated.
  */
+/**
+ * `{page: ratio}` the extraction read off the drawing: the dimension-pair
+ * lane's, else the geometry lane's (2026-09-19 — exact, from the sheets' own
+ * dimension lines; objektas_h had no pairs and said „nekalibruotas" although
+ * every sheet's scale was known).
+ */
+export function laneMastelisOf(project) {
+  const pairs = project?._meta?.plan_dimension_lane?.mastelis;
+  if (pairs && typeof pairs === 'object' && Object.keys(pairs).length) return pairs;
+  const out = {};
+  const exact = project?._meta?.geometrija?.masteliai;
+  if (exact && typeof exact === 'object') {
+    for (const [page, v] of Object.entries(exact)) {
+      const ratio = Number(v?.mastelis);
+      if (ratio > 0) out[page] = ratio;
+    }
+  }
+  return out;
+}
+
 export function pageScalesFromLane(mastelisByPage) {
   const out = {};
   if (!mastelisByPage || typeof mastelisByPage !== 'object') return out;

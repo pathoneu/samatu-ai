@@ -21,6 +21,7 @@ import { uncalibratedScale } from '@/lib/measureGeometry';
 import { polygonCentroid } from '@/lib/polygonGeometry';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 import MeasureLayer from './MeasureLayer';
+import CheckLayer from './CheckLayer';
 
 function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
@@ -81,6 +82,11 @@ export default function PageOverlayHost({
   onMeasureDraftAction = null,
   measureCalibA = null,
   onMeasureCalibAChange = null,
+  // Check-sheet mode (Patikra v2): what was READ about one room, for this page
+  // (lib/checkOverlay). While it is on, the all-rooms zone layer stays out —
+  // one room is being checked, nothing may compete with its outline.
+  checkMode = false,
+  checkData = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -156,6 +162,12 @@ export default function PageOverlayHost({
       </div>
       <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
+      {checkMode && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <CheckLayer data={checkData} renderedSize={{ width, height }} />
+        </div>
+      )}
+      {!checkMode && (
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <RoomZoneLayer
           rooms={displayRooms}
@@ -169,6 +181,7 @@ export default function PageOverlayHost({
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
+      )}
       {/* Measure layer — top of the page z-stack. Mounted always so committed
           measurements render; tool='pan' when idle keeps its SVG click-through. */}
       {adapter && (

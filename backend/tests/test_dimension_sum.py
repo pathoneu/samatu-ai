@@ -270,3 +270,16 @@ def test_every_read_string_says_where_it_is_written_on_its_own_sheet():
     assert abs(left["eilutes"][0]["line_pct"][0][1] - left["eilutes"][0]["line_pct"][1][1]) > 0.05      # a vertical line
     # a borrowed wall shows the string it borrowed — with the same place
     assert all(e.get("line_pct") for s in rooms[0]["_sienos"] for e in s["eilutes"])
+
+
+def test_only_wall_exact_or_human_outlines_assign_strings():
+    """objektas_g room 07 (local demo, 2026-09-19): a ragged browser flood-fill
+    outline — 45 edges, 23 of them slanted — produced „45 iš 45 sienų be
+    matmens" and an estimate from its jagged length. Such an outline is a place
+    on the plan, not the room's walls."""
+    r = _room("01", 0.2, 0.2, 4.2, 3.2, polygon_source="auto_floodfill", perimetras_m=13.9)
+    out = _run([two_rooms()], [r])
+    assert out["skipped"] == ["01"] and r["perimetras_m"] == 13.9 and "_sienos" not in r
+    for source in ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual"):
+        ok = _room("01", 0.2, 0.2, 4.2, 3.2, polygon_source=source)
+        assert _run([two_rooms()], [ok])["stated"] == ["01"], source

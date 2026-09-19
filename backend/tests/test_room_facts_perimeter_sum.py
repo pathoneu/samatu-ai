@@ -172,3 +172,20 @@ def test_the_room_number_found_on_the_plan_is_the_rooms_marker():
     assert sheet["room"]["marker_pct"] == [0.429, 0.428]
     room["_vieta"]["saltinis"] = "bbox"                       # Vision's box is a guess, not the printed number
     assert build_room_facts(_project(room), "01")["room"]["marker_pct"] is None
+
+
+def test_a_figure_nobody_could_check_is_not_called_read_from_the_outline():
+    """objektas_h room 01 after the geometry lane: no outline, no strings — the
+    8,6 m is what the program estimated from the picture of the plan. The sheet
+    used to say „pagal patalpos kontūrą plane" with a quiet, read-looking row."""
+    room = {"nr": "01", "pavadinimas": "Tambūras", "plotas_m2": 4.48, "puslapio_nr": 1, "lubu_aukstis_m": 2.7, "perimetras_m": 8.6,
+            "polygon_pct": OUTLINE, "polygon_source": "synthesized_from_bbox",
+            "_konturo_priezastis": "nesutampa su lentele: kontūras 2,86 m², lentelė 4,48 m²"}
+    project = _project(room)
+    project["_meta"] = {"geometrija": {"konturai": []}}                 # the lane ran and could not read this room's walls
+    p = {f["key"]: f for f in build_room_facts(project, "01")["facts"]}["perimetras"]
+    assert p["status"] == "assumed" and p["value"] == 8.6
+    assert "kontūrą plane" not in p["sentence"] and "nepatikrin" in p["sentence"]
+    # a project the lane never ran on keeps the sentence it had (nothing new is known about it)
+    old = {f["key"]: f for f in build_room_facts(_project(room), "01")["facts"]}["perimetras"]
+    assert old["status"] == "read"
