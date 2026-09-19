@@ -52,3 +52,27 @@ def test_a_reprint_at_another_scale_gets_a_scale_factor():
     al = sa.align_sheets(build_plan([a, b]), plan_pages=[1, 2])
     assert al["groups"] == [[1, 2]]
     assert abs(al["transform"][2]["k"] - 2.0) < 0.02
+
+
+def test_another_storey_inside_the_same_outside_walls_is_not_the_same_plan():
+    """Two floors of a house share the outside walls to the millimetre; their
+    partitions differ. Strings of one floor must not be read for the rooms of
+    the other — the walls themselves have to coincide, not only their box."""
+    ground = two_rooms()
+    upper = two_rooms()
+    upper.walls = [w for w in upper.walls if abs(w[0] - 4.2) > 0.01]                # no partition at x = 4,2 m…
+    upper.walls += [(0.2, 1.5, 7.4, 1.7), (2.0, 1.7, 2.2, 3.2), (5.0, 0.2, 5.2, 1.5)]   # …a corridor wall and two others instead
+    al = sa.align_sheets(build_plan([ground, upper]), plan_pages=[1, 2])
+    assert al["groups"] == [[1], [2]]
+
+
+def test_a_point_goes_to_the_base_and_back():
+    a = two_rooms()
+    b = two_rooms()
+    b.offset_m = (1.0, -0.5)
+    b.scale = 0.5
+    al = sa.align_sheets(build_plan([a, b]), plan_pages=[1, 2])
+    x, y = sa.to_base(al, 2, 123.0, 234.0)
+    back = sa.from_base(al, 2, x, y)
+    assert abs(back[0] - 123.0) < 1e-6 and abs(back[1] - 234.0) < 1e-6
+    assert sa.from_base(al, 1, 50.0, 60.0) == (50.0, 60.0)
