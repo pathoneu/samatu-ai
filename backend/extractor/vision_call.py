@@ -5682,6 +5682,25 @@ def extract_interior(
                    "seconds": _wl["seconds"]})
         except Exception as exc:  # noqa: BLE001
             print(f"[extractor] wall-outline lane failed: {exc}")
+        # Step 2.44d: geometry READ from the drawing (2026-09-19, after the
+        # founder's first production run of objektas_h: every perimeter was a
+        # square guess, every outline Vision's box). Rooms are located by
+        # their number badges, the sheets of one plan are laid over each
+        # other, outlines come from the vector walls, and a perimeter is the
+        # SUM of the strings written along those walls — the outline only
+        # assigns and checks. What the drawing does not state stays blank,
+        # with the reason and the outline's estimate (extractor/geometry_lane.py).
+        try:
+            from .geometry_lane import apply_geometry
+            _gl = apply_geometry(parsed, pdf_bytes, list(_scan.get("dimensions") or []))
+            _emit({"event": "geometry_lane", "status": _gl.get("status"),
+                   "konturai": len(_gl.get("konturai") or []),
+                   "atviros_erdves": len(_gl.get("atviros_erdves") or []),
+                   "perimetrai_sudeti": len(_gl.get("perimetrai_sudeti") or []),
+                   "perimetrai_tusti": len(_gl.get("perimetrai_tusti") or []),
+                   "seconds": _gl.get("seconds")})
+        except Exception as exc:  # noqa: BLE001
+            print(f"[extractor] geometry lane failed: {exc}")
     except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
         print(f"[extractor] plan-area lane failed: {exc}")
 

@@ -48,13 +48,15 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         plan_pages = plan_pages_from_classification(parsed.get("puslapiai"))
         if not plan_pages:
             plan_pages = sorted({int(r["puslapio_nr"]) for r in rooms if r.get("puslapio_nr")}) or [1]
-        # a sheet an earlier lane traced a room on is part of the plan, whatever it was classified as
-        # (objektas_g: two outlines came from the plumbing plan)
-        traced_on = {int(r["_konturas"]["page"]) for r in rooms if isinstance(r.get("_konturas"), dict) and r["_konturas"].get("page")}
-        plan_pages = sorted(set(plan_pages) | traced_on)
         if dims is None:
-            dims = read_dimension_strings(pdf_bytes, pages=plan_pages)
-        dims = [d for d in dims if int(d.get("page") or 0) in plan_pages]
+            dims = read_dimension_strings(pdf_bytes, pages=None)
+        # Which sheets belong to the plan is decided by ALIGNMENT — the same walls in the same place —
+        # not by the page classifier (objektas_g, 2026-09-10: the dimensioned sheet was called something
+        # else and every wall was lost; two of its outlines were traced on the plumbing plan). So every
+        # sheet that carries line-backed strings, or an earlier lane's outline, is a candidate.
+        traced_on = {int(r["_konturas"]["page"]) for r in rooms if isinstance(r.get("_konturas"), dict) and r["_konturas"].get("page")}
+        dimensioned = {int(d["page"]) for d in dims if d.get("span_source") == "line"}
+        sheets = sorted(set(plan_pages) | traced_on | dimensioned)
         scale: dict[int, float] = {}
         for d in dims:
             if d.get("scale_m_per_pt"):
@@ -67,7 +69,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 r["_vieta"] = v
                 meta["vietos"][v["saltinis"]] = meta["vietos"].get(v["saltinis"], 0) + 1
 
-        alignment = align_sheets(pdf_bytes, plan_pages)
+        alignment = align_sheets(pdf_bytes, sheets)
         meta["grupes"] = alignment["groups"]
         for group in alignment["groups"]:                     # a sheet without strings of its own takes its plan's scale
             known = next((p for p in group if p in scale), None)
@@ -79,7 +81,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
 
         areas = {_nr(r): float(r.get("plotas_m2") or 0) for r in rooms}
         sizes: dict[int, tuple[float, float]] = {}
-        for p in plan_pages:
+        for p in sheets:
             W, H, _ = page_geometry(pdf_bytes, p)
             if W > 0 and H > 0:
                 sizes[p] = (W, H)

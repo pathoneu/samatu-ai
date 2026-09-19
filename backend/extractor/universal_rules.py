@@ -967,7 +967,7 @@ _SYNTHETIC_PERIM_RECT_COEFF = 4.69
 # Perimeters somebody STATED — the plan's dimension strings, the eksplikacija,
 # the user — are never floored: below 4·√A they say the AREA label is the odd
 # one out, not the perimeter.
-_STATED_PERIMETER_SOURCES = ("plano_matmenys", "eksplikacija", "sienu_konturas", "user_override", "manual")
+_STATED_PERIMETER_SOURCES = ("plano_matmenys", "matmenu_eilutes", "eksplikacija", "sienu_konturas", "user_override", "manual")
 # Areas somebody READ or stated — the plan's own label, the eksplikacija, the
 # user. Only against these is a perimeter below 4·√A provably the wrong one;
 # with the area itself a guess (or of unknown origin — legacy blobs, synthetic
@@ -1272,9 +1272,27 @@ def calc_room_quantities(room: dict,
     perim = float(room.get("perimetras_m") or 0)
     H = float(room.get("lubu_aukstis_m") or ceiling_height_m)
 
+    # 2026-09-19: WHERE the wall length comes from is part of the result. A
+    # perimeter the drawing did not state stays BLANK on the room (the sheet
+    # asks, nothing downstream calls it read); the walls are computed from the
+    # estimate the geometry lane left — the outline's length — or, with no
+    # outline either, from the square guess below. Same number in, same
+    # quantities out: only the label differs.
+    perim_stated = perim > 0
+    walls_perim_src = ((room.get("perimetras_saltinis") or "").strip().lower() or "vision") if perim_stated else None
+    if not perim_stated:
+        try:
+            estimate = float(room.get("_perimetras_ivertis_m") or 0)
+        except (TypeError, ValueError):
+            estimate = 0.0
+        if estimate > 0:
+            perim = estimate
+            walls_perim_src = "konturo_ivertis"
+
     # Jei perimetras nepateiktas — aproks pagal stačiakampį 1.3:1
     if perim <= 0 and plotas > 0:
         perim = 4.18 * math.sqrt(plotas)
+        walls_perim_src = "kvadrato_ivertis"
 
     # Perimeter floor for synthetic (non-eksplikacija) geometry — WALL-PAINT path
     # only. See _SYNTHETIC_PERIM_RECT_COEFF above. `perim` itself (and everything
@@ -1292,7 +1310,8 @@ def calc_room_quantities(room: dict,
                 perim_walls = floored
                 perimetras_floor_applied = True
                 perimetras_floor_reason = "sintetinis_plotas"
-        elif area_src in _READ_AREA_SOURCES and perim_src not in _STATED_PERIMETER_SOURCES:
+        elif (area_src in _READ_AREA_SOURCES and perim_src not in _STATED_PERIMETER_SOURCES
+              and walls_perim_src != "konturo_ivertis"):          # an outline's length is geometry, not Vision's guess
             # A READ area with an IMPOSSIBLE perimeter: no room of area A goes
             # around in less than 4·√A — the square — yet Vision's read
             # perimeters did on three of objektas_g's rooms (2026-09-10: 7,08 m
@@ -2001,7 +2020,8 @@ def calc_room_quantities(room: dict,
         "paskirtis": paskirtis,
         "puslapio_nr": room.get("puslapio_nr"),
         "plotas_m2": round(plotas, 2),
-        "perimetras_m": round(perim, 2),
+        "perimetras_m": round(perim, 2) if perim_stated else None,
+        "_walls_perimetras_saltinis": walls_perim_src,
         # Wall geometry MODELED (not measured) when the floor fired — disclosed,
         # not hidden, per CLAUDE.md. _walls_perimetras_m is the length actually
         # used for walls_gross; perimetras_m above stays the measured value.

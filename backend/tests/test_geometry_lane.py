@@ -121,3 +121,14 @@ def test_an_outline_traced_on_a_sheet_that_is_not_a_plan_still_gets_its_walls_re
     r1 = parsed["patalpos"][0]
     assert r1["perimetras_m"] == 14.0 and r1["perimetras_saltinis"] == "matmenu_eilutes"
     assert r1["_perimetras_pries_geometrija"] == 13.9
+
+
+def test_a_sheet_the_classifier_called_something_else_still_gives_its_wall_strings():
+    """objektas_g, run 2 (2026-09-10): the dimensioned sheet was classified as
+    something other than a plan and every wall was lost. Alignment — the same
+    walls in the same place — decides what belongs to the plan, not the label."""
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}, {"nr": 2, "tipas": "electrical"}]
+    gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert r1["perimetras_m"] == 14.0 and r1["_perimetras_suma"]["lapai"] == [2]
