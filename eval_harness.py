@@ -1711,6 +1711,9 @@ def _infer_slug_from_run_name(name: str) -> str | None:
     return max(hits, key=len) if hits else None
 
 
+GEOMETRY_LANE = False        # set by --geometry
+
+
 def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     """Re-run the deterministic (zero-API) tail of the pipeline on a saved
     extract's primitives:
@@ -1769,6 +1772,20 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
                       f"{(leg.get('difuzoriai') or {}).get('defined')}")
             except Exception as exc:
                 print(f"  ⚠ symbol-legend scan failed during rescore: {exc}")
+            # The geometry lane (2026-09-19, Step 2.44d in production): room
+            # outlines from the vector walls and perimeters ADDED from the
+            # plan's dimension strings. Zero API, needs the PDF. Behind
+            # --geometry so a run can be scored with and without it.
+            if GEOMETRY_LANE:
+                try:
+                    from extractor.geometry_lane import apply_geometry
+                    g = apply_geometry(parsed, pdf_path.read_bytes())
+                    print(f"  ⤴ geometry lane: {g.get('status')} — kontūrai {g.get('konturai')}, "
+                          f"atviros erdvės {g.get('atviros_erdves')}, perimetrai sudėti "
+                          f"{g.get('perimetrai_sudeti')}, tušti su įverčiu {g.get('perimetrai_tusti')} "
+                          f"({g.get('seconds')} s)")
+                except Exception as exc:
+                    print(f"  ⚠ geometry lane failed during rescore: {exc}")
         else:
             print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
 
@@ -2137,6 +2154,11 @@ def main() -> int:
                          "API. WITHOUT it, --totals-only scores the numbers "
                          "frozen in ai_extract.json and cannot see a fix or a "
                          "regression")
+    ap.add_argument("--geometry", action="store_true",
+                    help="with --recompute: also run the geometry lane (outlines "
+                         "from the vector walls, perimeters added from the plan's "
+                         "dimension strings) on the fixture PDF before the "
+                         "recompute — zero API. Compare a run with and without it.")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -2182,6 +2204,8 @@ def main() -> int:
                          "--model: experiments must be FRESH reads). Output "
                          "lands in eval_runs/<model-or-config>__<experiment>/")
     args = ap.parse_args()
+    global GEOMETRY_LANE
+    GEOMETRY_LANE = bool(args.geometry)
 
     if args.model:
         # FAIL LOUDLY on any cache-reading mode: --replay reuses a saved

@@ -1784,3 +1784,56 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Success criteria: H/G minimums live in `fixtures_geometry_gate.json` and are tightened toward ≥ 9/11 and ≥ 7/9 (Task 7 step 7); eval gate Task 10.
 - Types: `locate_rooms` returns `{nr: {page, cx, cy, saltinis}}` (+ `W`, `H` if Task 6 needs them); `trace_vector_rooms` returns `{rooms, reasons}`; `sum_perimeters` writes `_sienos`, `_perimetras_suma`, `_perimetras_priezastis`, `_perimetras_ivertis_m`, `_perimetras_ivertis_saltinis`; `calc_room_quantities` writes `_walls_perimetras_saltinis` ∈ {stated source, `konturo_ivertis`, `kvadrato_ivertis`}; the fact carries `suggestion`. These names are used consistently across Tasks 5, 7, 8, 9.
 - Not in this plan (by design): Patikra on the viewer, crisp crops, floor covering — sub-projects 2 and 3.
+
+---
+
+## Execution log — 2026-09-19 (what the real drawings changed)
+
+The plan above was written from the 2026-09-17 research. Executing it against the two real
+drawings (objektas_g, objektas_h — every step re-run on them, not only on synthetic sheets)
+overturned several of its assumptions. What was built differs from the task text in these
+places; the code and its tests are the record, this is the why.
+
+**Measured facts that drove the changes**
+
+| what | finding |
+|---|---|
+| pdfplumber on objektas_g | ~60 s just to open (pdfminer re-parses object streams on every open). PDFium reads the same page's 50 000 paths in 0,4 s with identical geometry (H p6: 0,04 pt² of 20 577 differ). `pdf_vectors` and `room_locator` were moved to PDFium. |
+| wall fills | CAD exports a wall as TRIANGLES (H: 176 pieces). Per-piece axes point anywhere → the first `vector_rooms` traced 1/11 on H. Everything is now decided on the MERGED solid. |
+| openings | H has 0,2 m outside walls with 1–5 m windows, doors between the corners of two wall boxes (no wall END at all), a slanted bay window. One rule covers them: two solid edges FACING each other across free space, overlapping ≤ a wall's thickness, with free space on both sides of the strip. Door limit swept 1,25 → 1,6 m (G's living room must not be cut at 1,6; H's 03/08/09 need it). |
+| table vs drawing | H's designer moved partitions and kept the architect's areas: 4,04 m² drawn vs 4,90 m² listed. ≤ 8 % = agrees; ≤ 25 % = outline kept, `plotas_nesutampa`, nothing summed; beyond = refused. |
+| G's fills | are the masonry faces; strings go to the FINISHED faces 2–3 cm inside → outline areas run +2…+6 %, each wall 3–6 cm long. |
+| where wall strings sit | H's wall painting plan, 51 strings against the designer's own wall lines: the dimension line ends within 0,02 m of the wall's corners; its distance from the wall is 0,11–0,22 m, sometimes 0,94 m. So `dimension_sum` assigns by the ENDS (corner to corner, no hole, sum agrees with the wall), not by distance/overlap as Task 5 said. |
+| same line, two sheets | H room 02: the layout sheet's worktop chain „1189 | 397" lies on exactly the line of the painting plan's „1586". A row is one SHEET's strings on one line. |
+| two equal hairlines | a partition dimensioned on both sides has two equal lines a wall thickness apart; `plan_dimensions` now takes the hairline the string is written ON. |
+| sheet alignment | two storeys share the outside walls to the millimetre, and one missing wall piece at a sheet's edge moves its bounding box (G: „aligned" identical sheets at IoU 0,78). Sheets are one plan only when the wall solids coincide ≥ 0,9, tried as printed and box-on-box. The page classifier no longer decides which sheets belong (G run 2 lost every wall that way). |
+| the browser overwrote the backend | first open of a project ran the client flood-fill over backend-traced outlines (`DETECTED_SOURCES` did not know them). Found in the browser check; fixed. |
+
+**Dropped:** Task 6 (`_label_position` accepts `_vieta`). With badge seeds the raster lane still
+traced 0–2 of H's 11 rooms (furniture on the layout sheet, thick finish lines on the clean one);
+the vector lane covers those drawings, so the raster lane keeps its label seeds.
+**Dropped:** the open-plan „split by table ratio" — an invented cut line accepted BY CONSTRUCTION
+(its area always matches). An open plan is a group with the shared outline; each member's blank
+perimeter offers its share of the shared walls by floor area.
+
+**Results on the real drawings (fixture gate, `backend/tests/fixtures_geometry_gate.json`)**
+
+| | before | now |
+|---|---|---|
+| H outlines from the drawing | 0/11 (Vision boxes) | 8/11 wall-exact + open plan 04+05 as a group; 01 refused (2,86 m² drawn vs 4,48 listed) |
+| H perimeters READ and added | 0/11 (all ≈ 4·√A guesses) | 4/11: 02 = 12,17 · 06 = 16,14 · 10 = 7,06 · 11 = 16,41 m (within 1–3 cm of the designer's wall lines); 6 blank with reason + estimate; 1 untouched |
+| H painted walls vs the designer's own legend (320 m²) | 315,7 m² | 320,3 m² |
+| G | 8/9 raster outlines, 3 perimeters from string pairs, 5 „pagal kontūrą" shown as read | unchanged outlines and pairs; the 5 outline-measured perimeters are now blank + the same number as the estimate (the founder's rule: a measured length is not a read one) |
+| speed | — | H 0,4–1,3 s, G 3,7–6,5 s, no Vision |
+
+The spec's targets (H ≥ 9/11 summed, ≥ 9/11 outlines ±5 %) were set before anyone had looked at
+H's topology: three of its rooms are one open space, two bathrooms are bounded by partitions drawn
+as LINES (not fills), the table is stale for three rooms, one room has a slanted wall whose string
+the reader cannot read yet. They are not met and should not be forced.
+
+**Known limits, in the order they would pay off**
+1. Slanted dimension strings are not read (`plan_dimensions` is horizontal/vertical): H room 09, the living room.
+2. Partitions drawn as strokes, not fills (H 08|09 glass screen): closed today only by the 1,6 m door pass.
+3. A room refused for a stale table (H 01, −36 %) gets no outline at all; the check sheet could show the face and ask.
+4. G's raster outlines are kept although vector ones exist (they place strings better: 02 would be read). Replace-when-better needs its own measurement.
+5. `_meta.geometrija.masteliai` holds the exact sheet scales; the viewer still says „nekalibruotas" (sub-project 2).
