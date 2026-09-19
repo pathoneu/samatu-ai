@@ -30,7 +30,8 @@ SHORT_SHARE of the perimeter, and the sum says how much (`is_konturo_m`).
 Slanted walls are not read yet (the string reader is horizontal/vertical).
 
 Writes on the room: `_sienos` [{edge_pct, ilgis_m|None, saltinis "eilute" |
-"priesinga_siena" | "konturas" | None, eilutes, kontrole_m}] and either perimetras_m +
+"priesinga_siena" | "konturas" | None, eilutes [{text, value_m, page, line_pct —
+the string's dimension line on its own sheet}], kontrole_m}] and either perimetras_m +
 perimetras_saltinis="matmenu_eilutes" + _perimetras_suma, or the outline's
 length as perimetras_m with perimetras_saltinis="konturo_ivertis" (an ESTIMATE:
 the sheet shows a blank and offers it; the sąmata rows need a number) +
@@ -109,8 +110,17 @@ def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
         horiz = d.get("orientation") == "h"
         along, across = (t["dx"], t["dy"]) if horiz else (t["dy"], t["dx"])
         s0, s1 = t["k"] * a0 + along, t["k"] * a1 + along
+        # where the string's dimension line is on ITS OWN sheet (page fractions) — the check sheet marks
+        # the very numbers that were added, on the sheet they are written on
+        W, H = float(d.get("page_width") or 0), float(d.get("page_height") or 0)
+        lp = float(d["line_pos"])
+        line_pct = None
+        if W > 0 and H > 0:
+            ends = [(a0, lp), (a1, lp)] if horiz else [(lp, a0), (lp, a1)]
+            line_pct = [[round(x / W, 5), round(y / H, 5)] for x, y in ends]
         by_base.setdefault(b, []).append({"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "horiz": horiz,
-                                          "s0": min(s0, s1), "s1": max(s0, s1), "pos": t["k"] * float(d["line_pos"]) + across})
+                                          "s0": min(s0, s1), "s1": max(s0, s1), "pos": t["k"] * lp + across,
+                                          "line_pct": line_pct})
     return by_base
 
 
@@ -193,7 +203,8 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                                         [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
                            "ilgis_m": round(sum(s["value_m"] for s in row), 3) if row else None,
                            "saltinis": "eilute" if row else None,
-                           "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"]} for s in (row or [])],
+                           "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"]}
+                                       for s in (row or [])],
                            "kontrole_m": control, "istriza": horiz is None, "_frame": (horiz, e0, e1)})
         # A length written once: the wall OPPOSITE with the same extent is as
         # long — the same number is read for both, and the wall says whose it is.

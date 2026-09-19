@@ -55,7 +55,7 @@ patalpas; grindų dangos skaitymas iš grindų plano; apdaila be procentų (3 su
 
 - `dimension_sum`: kiekviena `_sienos[i].eilutes[j]` gauna `line_pct` — tos eilutės matmens linijos
   atkarpą JOS lape (lapo dalimis), kad brėžinyje būtų galima pažymėti pačius perskaitytus skaičius.
-- `geometry_lane`: `_meta.geometrija.lapai` = `{lapas: {base, k, dx_pct, dy_pct}}` — kaip to paties
+- `geometry_lane`: `_meta.geometrija.sutapdinimas` = `{lapas: {base, k, kx, ky, dx_pct, dy_pct}}` — kaip to paties
   plano lapai gula vienas ant kito (H 6 lapas pastumtas 2 pt), kad kontūrą būtų galima parodyti ir
   tame lape, kuriame užrašyti skaičiai.
 - `room_facts`: perimetro faktas papildomai neša `walls` (iš `_sienos`: `edge_pct`, `ilgis_m`,
@@ -65,7 +65,7 @@ patalpas; grindų dangos skaitymas iš grindų plano; apdaila be procentų (3 su
 
 ### Frontend
 
-- `lib/checkOverlay.js` (grynos funkcijos, testuojamos): iš patalpos, faktų ir `lapai` sudaro
+- `lib/checkOverlay.js` (grynos funkcijos, testuojamos): iš patalpos, faktų ir `sutapdinimas` sudaro
   vieno LAPO sluoksnio duomenis — kontūro taškai, sienų atkarpos su būsena ir etikete, eilučių
   linijos, fakto rėmelis; lapų perkėlimas (`mapPct`); fokusavimo stačiakampis (`focusRectFor`).
 - `components/viewer/CheckLayer.jsx`: SVG sluoksnis viename lape (kaip `RoomZoneLayer`), piešia tai,

@@ -180,3 +180,19 @@ def test_running_the_lane_twice_changes_nothing_the_second_time():
     for before, after in zip(once, parsed["patalpos"]):
         for key in ("perimetras_m", "perimetras_saltinis", "_perimetras_ivertis_m", "_perimetras_pries_geometrija", "polygon_source"):
             assert before.get(key) == after.get(key), (before["nr"], key)
+
+
+def test_the_lane_says_how_the_plans_sheets_lie_over_each_other():
+    """So the room's outline can be shown on the sheet its numbers are written on."""
+    a = two_rooms()
+    a.dims = []
+    b = two_rooms()
+    b.badges = []
+    b.offset_m = (1.0, -0.5)
+    parsed = _parsed()
+    gl.apply_geometry(parsed, build_plan([a, b]))
+    lapai = parsed["_meta"]["geometrija"]["sutapdinimas"]
+    assert lapai["1"] == {"base": 1, "k": 1.0, "kx": 1.0, "ky": 1.0, "dx_pct": 0.0, "dy_pct": 0.0}
+    two = lapai["2"]                       # base_pct = k{x,y} · sheet_pct + d{x,y}_pct
+    assert two["base"] == 1 and abs(two["k"] - 1.0) < 0.01 and abs(two["kx"] - 1.0) < 0.01
+    assert abs(two["dx_pct"] + 28.3465 / 595.2756) < 0.003 and abs(two["dy_pct"] - 0.5 * 28.3465 / 841.8898) < 0.003

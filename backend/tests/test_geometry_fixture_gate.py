@@ -50,6 +50,12 @@ def test_geometry_gate(slug):
         assert rooms[nr].get("perimetras_saltinis") == "matmenu_eilutes", (nr, rooms[nr].get("_perimetras_priezastis"))
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.02, (nr, rooms[nr]["perimetras_m"])
         assert rooms[nr]["_perimetras_suma"]["sutampa"] is True
+        # every number that was added can be marked on the sheet it is written on
+        for wall in rooms[nr]["_sienos"]:
+            for e in wall["eilutes"]:
+                (x0, y0), (x1, y1) = e["line_pct"]
+                assert 0 < min(x0, x1, y0, y1) and max(x0, x1, y0, y1) < 1 and (x0 == x1 or y0 == y1), (nr, e)
+    assert all(str(p) in out["sutapdinimas"] for g in out["grupes"] for p in g)
     for nr, metres in want["atviru_erdviu_iverciai"].items():
         assert rooms[nr]["perimetras_saltinis"] == "atviros_erdves_ivertis"
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.05, (nr, rooms[nr]["perimetras_m"])

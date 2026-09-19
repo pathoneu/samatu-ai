@@ -248,3 +248,25 @@ def test_an_estimate_is_tried_again_on_the_next_run_and_replaced_when_the_walls_
     out = _run([two_rooms()], rooms)                       # a later run reads every wall
     assert out["stated"] == ["01"] and rooms[0]["perimetras_m"] == 14.0 and rooms[0]["perimetras_saltinis"] == "matmenu_eilutes"
     assert "_perimetras_priezastis" not in rooms[0]
+
+
+def test_every_read_string_says_where_it_is_written_on_its_own_sheet():
+    """The check sheet marks the very numbers that were added — on the sheet
+    they are written on, which need not be the sheet the outline was traced on."""
+    a = two_rooms()
+    a.dims = []
+    b = two_rooms()
+    b.badges = []
+    b.offset_m = (1.0, -0.5)                                   # the painting plan is drawn 1 m right, 0,5 m up
+    rooms = [_room("01", 0.2, 0.2, 4.2, 3.2)]
+    _run([a, b], rooms, pages=(1, 2))
+    top = rooms[0]["_sienos"][0]
+    assert rooms[0]["perimetras_m"] == 14.0 and [e["page"] for e in top["eilutes"]] == [2]
+    (x0, y0), (x1, y1) = top["eilutes"][0]["line_pct"]
+    # on sheet 2 the string's line runs from x = 0,2+1 m to 4,2+1 m at y = 0,35−0,5 m
+    assert abs(min(x0, x1) - (60 + 1.2 * PT_PER_M) / W_PT) < 0.002 and abs(max(x0, x1) - (60 + 5.2 * PT_PER_M) / W_PT) < 0.002
+    assert abs(y0 - (80 - 0.15 * PT_PER_M) / H_PT) < 0.002 and abs(y0 - y1) < 1e-6
+    left = next(s for s in rooms[0]["_sienos"] if s["eilutes"] and abs(s["eilutes"][0]["line_pct"][0][0] - s["eilutes"][0]["line_pct"][1][0]) < 1e-6)
+    assert abs(left["eilutes"][0]["line_pct"][0][1] - left["eilutes"][0]["line_pct"][1][1]) > 0.05      # a vertical line
+    # a borrowed wall shows the string it borrowed — with the same place
+    assert all(e.get("line_pct") for s in rooms[0]["_sienos"] for e in s["eilutes"])

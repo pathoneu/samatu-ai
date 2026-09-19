@@ -48,7 +48,7 @@ def _nr(room: dict) -> str:
 
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
     t0 = time.time()
-    meta: dict = {"vietos": {}, "grupes": [], "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
+    meta: dict = {"vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
                   "perimetrai_sudeti": [], "perimetrai_tusti": [], "seconds": 0.0}
     status = "insufficient"
     try:
@@ -182,6 +182,17 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         if outlined and not everything:
             alignment = lay_over(sheets)
         meta["grupes"] = alignment["groups"]
+        # how the plan's sheets lie over each other (sheet → its base, in page fractions of the BASE) — the
+        # check sheet shows a room's outline on the sheet its numbers are written on
+        for p, t in sorted(alignment["transform"].items()):
+            base = int(t.get("base", p))
+            if p not in sizes or base not in sizes:
+                continue
+            meta["sutapdinimas"][str(p)] = {"base": base, "k": round(float(t["k"]), 5),
+                                            "kx": round(float(t["k"]) * sizes[p][0] / sizes[base][0], 6),
+                                            "ky": round(float(t["k"]) * sizes[p][1] / sizes[base][1], 6),
+                                            "dx_pct": round(float(t["dx"]) / sizes[base][0], 6),
+                                            "dy_pct": round(float(t["dy"]) / sizes[base][1], 6)}
         # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
         meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
 
