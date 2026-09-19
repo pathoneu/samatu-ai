@@ -29,8 +29,8 @@ def test_badges_locate_both_rooms_on_the_plan_page():
 
 
 def test_table_rows_are_not_badges():
-    """A room list repeats the numbers: '01  Kambarys  12,00'. A number with a
-    name to its right on the same line is a table row, not a badge."""
+    """A room list repeats the numbers: '01  Kambarys  12,00' — stacked a few
+    millimetres apart in one column. Rooms are metres apart; a column is a table."""
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
     buf = io.BytesIO()
@@ -46,6 +46,42 @@ def test_table_rows_are_not_badges():
     where = rl.locate_rooms(buf.getvalue(), _rooms(), plan_pages=[1])
     assert where["01"]["saltinis"] == "bbox"                # fell back to Vision's box
     assert "02" not in where                                # nothing to fall back on
+
+
+def test_a_label_on_the_badges_line_does_not_disqualify_it():
+    """objektas_h, 2026-09-19: badge „4" has the furniture label „LENTYNOS" 30 pt
+    to its right on the same line — still a badge."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 4)
+    c.drawString(300, 400, "4")
+    c.drawString(332, 400, "LENTYNOS")
+    c.showPage()
+    c.save()
+    where = rl.locate_rooms(buf.getvalue(), [{"nr": "04", "plotas_m2": 26.0}], plan_pages=[1])
+    assert where["04"]["saltinis"] == "zenkliukas" and abs(where["04"]["cx"] * 595 - 301) < 3
+
+
+def test_a_piece_of_a_longer_number_is_not_a_badge():
+    """objektas_h, 2026-09-19: the character reader splits a spaced „885" into
+    „8" + „85" — the stray „8" must not locate room 08. A badge stands alone:
+    no other number touches it on its line."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 4)
+    c.drawString(60, 700, "PERTVARU PLANAS")  # the reader skips a direction with under 8 characters
+    c.drawString(200, 500, "8")
+    c.drawString(204.3, 500, "85")            # 2 pt after the „8": the same number, letter-spaced
+    c.drawString(300, 400, "8")               # the real badge, alone
+    c.showPage()
+    c.save()
+    where = rl.locate_rooms(buf.getvalue(), [{"nr": "08", "plotas_m2": 4.0}], plan_pages=[1])
+    assert where["08"]["saltinis"] == "zenkliukas"
+    assert abs(where["08"]["cx"] * 595 - 301) < 3 and abs(where["08"]["cy"] * 842 - (842 - 401.5)) < 4
 
 
 def test_no_badge_no_label_no_bbox_means_unlocated():
