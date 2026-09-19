@@ -28,6 +28,7 @@ class Sheet:
     furniture: list[tuple[float, float, float, float]] = field(default_factory=list)   # stroked rectangles (metres)
     offset_m: tuple[float, float] = (0.0, 0.0)                                      # shift the whole sheet
     scale: float = 1.0                                                              # 1.0 = 1:100
+    triangulate: bool = False                                                       # each wall as two triangles, the way CAD exports fills
 
 
 def _pt(x_m: float, y_m: float, sheet: Sheet) -> tuple[float, float]:
@@ -47,7 +48,16 @@ def build_plan(sheets: list[Sheet]) -> bytes:
         for x0, y0, x1, y1 in sheet.walls:
             ax, ay = _pt(x0, y0, sheet)
             bx, by = _pt(x1, y1, sheet)
-            c.rect(min(ax, bx), min(ay, by), abs(bx - ax), abs(by - ay), stroke=0, fill=1)
+            if sheet.triangulate:
+                for tri in (((ax, ay), (bx, ay), (bx, by)), ((ax, ay), (bx, by), (ax, by))):
+                    path = c.beginPath()
+                    path.moveTo(*tri[0])
+                    path.lineTo(*tri[1])
+                    path.lineTo(*tri[2])
+                    path.close()
+                    c.drawPath(path, stroke=0, fill=1)
+            else:
+                c.rect(min(ax, bx), min(ay, by), abs(bx - ax), abs(by - ay), stroke=0, fill=1)
         c.setStrokeGray(0.0)
         c.setLineWidth(0.3)
         for x0, y0, x1, y1 in sheet.furniture:

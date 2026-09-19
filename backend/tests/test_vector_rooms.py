@@ -1,6 +1,8 @@
-"""Room outlines from the vector walls: faces of the free space once door
-gaps are bridged along the walls; a face is a room when its area matches the
-table and exactly one located room lies inside. Synthetic only."""
+"""Room outlines from the vector walls: the free-space faces of the merged wall
+solid once its openings are bridged; a face is a room when exactly one located
+room lies inside and its area agrees with the table. Every case below was
+first seen on a real sheet (objektas_g, objektas_h, 2026-09-19) and is
+redrawn here with invented geometry."""
 from __future__ import annotations
 
 import sys
@@ -14,9 +16,12 @@ from tests.synthetic_plan import PT_PER_M, Sheet, build_plan, two_rooms  # noqa:
 SCALE = 1 / PT_PER_M           # metres per point at 1:100
 
 
+def _at(x_m: float, y_m: float, saltinis: str = "zenkliukas") -> dict:
+    return {"page": 1, "cx": (60 + x_m * PT_PER_M) / 595.2756, "cy": (80 + y_m * PT_PER_M) / 841.8898, "saltinis": saltinis}
+
+
 def _locations():
-    return {"01": {"page": 1, "cx": (60 + 2.2 * PT_PER_M) / 595, "cy": (80 + 1.5 * PT_PER_M) / 842, "saltinis": "zenkliukas"},
-            "02": {"page": 1, "cx": (60 + 5.7 * PT_PER_M) / 595, "cy": (80 + 1.5 * PT_PER_M) / 842, "saltinis": "zenkliukas"}}
+    return {"01": _at(2.2, 1.5), "02": _at(5.7, 1.5)}
 
 
 def test_two_rooms_are_traced_within_two_percent_of_their_areas():
@@ -27,22 +32,44 @@ def test_two_rooms_are_traced_within_two_percent_of_their_areas():
     assert abs(a["plotas_m2"] - 12.0) / 12.0 <= 0.02 and abs(b["plotas_m2"] - 9.0) / 9.0 <= 0.02
     assert abs(a["perimetras_m"] - 14.0) <= 0.3 and abs(b["perimetras_m"] - 12.0) <= 0.3
     assert 4 <= len(a["polygon_pct"]) <= 8 and all(0 <= v <= 1 for p in a["polygon_pct"] for v in p)
-    assert a["padalyta"] is False
+    assert a["plotas_nesutampa"] is False and a["page"] == 1
 
 
-def test_the_outside_is_not_a_room_and_a_wrong_area_is_refused():
+def test_walls_exported_as_triangles_trace_the_same_rooms():
+    """CAD exports fill a wall as triangles (objektas_h: 176 of them). A
+    triangle's own axis points anywhere; the MERGED solid is what has walls."""
+    sheet = two_rooms()
+    sheet.triangulate = True
+    out = vr.trace_vector_rooms(build_plan([sheet]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert set(out["rooms"]) == {"01", "02"}, out
+    assert abs(out["rooms"]["01"]["plotas_m2"] - 12.0) / 12.0 <= 0.02
+
+
+def test_the_outside_is_not_a_room_and_a_far_off_area_is_refused():
     out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 30.0, "02": 9.0}, SCALE)
     assert "01" not in out["rooms"] and out["reasons"]["01"].startswith("nesutampa su lentele")
     assert "02" in out["rooms"]
 
 
-def test_an_open_plan_face_with_two_rooms_is_split_by_the_table_ratio():
+def test_a_table_that_is_a_little_off_keeps_the_outline_and_says_so():
+    """objektas_h: the designer moved partitions and kept the architect's
+    areas — room 07 is drawn 4,04 m², listed 4,90 m². The outline is the
+    room's; the disagreement is shown, not hidden."""
+    out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 13.8, "02": 9.0}, SCALE)   # 12 drawn, −13 %
+    assert out["rooms"]["01"]["plotas_nesutampa"] is True and 0.12 < out["rooms"]["01"]["paklaida"] < 0.14
+    assert out["rooms"]["02"]["plotas_nesutampa"] is False
+
+
+def test_an_open_plan_is_a_group_not_an_invented_cut():
     sheet = two_rooms()
     sheet.walls = [w for w in sheet.walls if not (abs(w[0] - 4.2) < 0.01)]     # remove the partition
-    out = vr.trace_vector_rooms(build_plan([sheet]), 1, _locations(), {"01": 12.6, "02": 9.45}, SCALE)   # 7,0×3,0 = 21 → 60/40
-    assert set(out["rooms"]) == {"01", "02"}, out
-    assert abs(out["rooms"]["01"]["plotas_m2"] - 12.6) / 12.6 <= 0.05
-    assert out["rooms"]["01"]["padalyta"] is True and out["rooms"]["02"]["padalyta"] is True
+    out = vr.trace_vector_rooms(build_plan([sheet]), 1, _locations(), {"01": 12.6, "02": 9.0}, SCALE)   # 7,2 × 3,0 = 21,6 together
+    assert out["rooms"] == {}
+    assert "atvira erdvė" in out["reasons"]["01"] and "02" in out["reasons"]["01"]
+    assert len(out["groups"]) == 1
+    g = out["groups"][0]
+    assert g["nariai"] == ["01", "02"] and abs(g["plotas_m2"] - 21.6) < 0.4 and abs(g["lenteles_suma_m2"] - 21.6) < 0.01
+    assert len(g["polygon_pct"]) >= 4
 
 
 def test_no_walls_means_a_reason_not_a_crash():
@@ -55,4 +82,109 @@ def test_a_room_whose_walls_do_not_close_gets_a_reason():
     sheet.walls = [w for w in sheet.walls if w[1] != 0.0]          # drop the top wall: rooms open to the outside
     out = vr.trace_vector_rooms(build_plan([sheet]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
     assert out["rooms"] == {}
-    assert all("neuždaro" in r or "atviras" in r for r in out["reasons"].values()), out["reasons"]
+    assert all("neuždaro" in r for r in out["reasons"].values()), out["reasons"]
+
+
+def _box(x0, y0, x1, y1, t=0.2, gaps=()):
+    """The four walls of a box whose INNER faces are x0…x1 × y0…y1; `gaps` are
+    (side, from, to) openings along a side's own axis ("top"/"bottom": x, "left"/"right": y)."""
+    def pieces(a0, a1, side):
+        cuts = sorted((g[1], g[2]) for g in gaps if g[0] == side)
+        out, cur = [], a0
+        for c0, c1 in cuts:
+            if c0 > cur:
+                out.append((cur, c0))
+            cur = c1
+        if cur < a1:
+            out.append((cur, a1))
+        return out
+    walls = []
+    walls += [(a, y0 - t, b, y0) for a, b in pieces(x0 - t, x1 + t, "top")]
+    walls += [(a, y1, b, y1 + t) for a, b in pieces(x0 - t, x1 + t, "bottom")]
+    walls += [(x0 - t, a, x0, b) for a, b in pieces(y0, y1, "left")]
+    walls += [(x1, a, x1 + t, b) for a, b in pieces(y0, y1, "right")]
+    return walls
+
+
+def test_a_door_between_two_corners_is_closed():
+    """objektas_h room 11: the door stands between the corner of one wall box
+    and the corner of the next — no wall END faces it, two wall FACES do."""
+    walls = [(1.0, 0.0, 3.2, 0.2), (1.0, 1.9, 3.2, 2.1), (1.0, 0.0, 1.2, 2.1), (3.0, 0.0, 3.2, 2.1)]   # a closed box, 1,8 × 1,7 m inside
+    walls += [(3.0, -0.2, 7.2, 0.0), (7.0, -0.2, 7.2, 3.2), (3.0, 3.0, 7.2, 3.2)]   # the room to its right: top, right, bottom
+    # the room's left side is the box's wall down to y = 2,1, then a 0,9 m door
+    # between the box's bottom face and the bottom wall's top face (they overlap 0,2 m)
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"01": _at(2.1, 1.05), "02": _at(5.0, 1.5)},
+                                {"01": 3.06, "02": 11.4}, SCALE)
+    assert set(out["rooms"]) == {"01", "02"}, out["reasons"]
+    assert abs(out["rooms"]["02"]["plotas_m2"] - 11.4) < 0.3
+
+
+def test_a_window_in_a_thin_outside_wall_is_closed():
+    """objektas_h: outside walls 0,2 m thick with 2 m windows — thickness cannot
+    decide what may be bridged; two wall ENDS facing each other do."""
+    walls = _box(0, 0, 4, 3, gaps=(("top", 1.0, 3.0),))
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"01": _at(2, 1.5)}, {"01": 12.0}, SCALE)
+    assert "01" in out["rooms"], out["reasons"]
+    assert abs(out["rooms"]["01"]["plotas_m2"] - 12.0) < 0.3
+
+
+def test_a_short_wall_piece_facing_the_wall_opposite_is_not_a_door():
+    """objektas_h room 10 (1,09 m wide): the 0,5 m of wall beside its door
+    faces the wall across the room at door distance. That is the room, not an
+    opening — an opening has free space on both of its sides."""
+    walls = _box(0, 0, 1.1, 2.4, gaps=(("left", 0.5, 1.4),))             # a 0,9 m door, 0,5 m from the corner
+    walls += _box(-3.2, 0, -0.2, 2.4, gaps=(("right", 0.5, 1.4),))       # the room the door opens to
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls, offset_m=(3.5, 0))]), 1,
+                                {"10": _at(3.5 + 0.55, 1.2), "09": _at(3.5 - 1.7, 1.2)}, {"10": 2.64, "09": 7.2}, SCALE)
+    assert "10" in out["rooms"], out["reasons"]
+    assert abs(out["rooms"]["10"]["plotas_m2"] - 2.64) < 0.15
+
+
+def test_an_opening_without_a_door_joins_the_two_parts_the_table_counts_as_one_room():
+    """objektas_g room 01: the kitchen is reached through a 1,15 m opening with
+    no door. Every gap that narrow is bridged, so the room arrives in two
+    faces; the part without a room of its own is added when that is what makes
+    the area agree with the table."""
+    walls = _box(0, 0, 4, 3, gaps=(("right", 1.0, 2.15),)) + _box(4.2, 0, 6.2, 3, gaps=(("left", 1.0, 2.15),))
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"01": _at(2, 1.5)}, {"01": 18.2}, SCALE)
+    assert "01" in out["rooms"], out["reasons"]
+    assert abs(out["rooms"]["01"]["plotas_m2"] - 18.2) < 0.5 and out["rooms"]["01"]["sujungta"] == 2
+
+
+def test_a_part_is_not_added_when_the_room_already_agrees():
+    walls = _box(0, 0, 4, 3, gaps=(("right", 1.0, 2.15),)) + _box(4.2, 0, 6.2, 3, gaps=(("left", 1.0, 2.15),))
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"01": _at(2, 1.5)}, {"01": 12.0}, SCALE)
+    assert abs(out["rooms"]["01"]["plotas_m2"] - 12.0) < 0.3 and out["rooms"]["01"]["sujungta"] == 1
+
+
+def test_a_room_located_only_by_visions_box_does_not_break_the_room_it_lands_in():
+    """objektas_g: room 07 had no label, and Vision's box put it inside room 06."""
+    locs = {"01": _at(2.2, 1.5), "02": _at(5.7, 1.5), "07": _at(2.6, 2.0, "bbox")}
+    out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, locs, {"01": 12.0, "02": 9.0, "07": 5.0}, SCALE)
+    assert {"01", "02"} <= set(out["rooms"])
+    assert "07" not in out["rooms"] and "vieta" in out["reasons"]["07"]
+
+
+def test_a_location_on_a_doorway_takes_the_parts_on_both_sides():
+    """objektas_g room 05: the area label sits in the opening between the
+    room's two parts."""
+    walls = _box(0, 0, 2, 2, gaps=(("right", 0.5, 1.5),)) + _box(2.2, 0, 3.4, 2, gaps=(("left", 0.5, 1.5),))
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"05": _at(2.1, 1.0, "plotas_uzrasas")}, {"05": 6.6}, SCALE)
+    assert "05" in out["rooms"], out["reasons"]
+    assert abs(out["rooms"]["05"]["plotas_m2"] - 6.6) < 0.3
+
+
+def test_a_wider_opening_is_bridged_only_for_rooms_the_narrow_limit_left_open():
+    """objektas_h rooms 08 | 09: a 1,4 m opening (a demolished wall, now a door
+    and a glass screen drawn as lines). objektas_g room 01 must NOT be cut at
+    1,6 m — so the wider limit is a second pass, for the rooms still open."""
+    # the partition stops 1,4 m short of the bottom wall: a wall END facing a wall FACE
+    # (two ENDS facing each other would be a window, bridged at any width)
+    walls = [w for w in _box(0, 0, 6.2, 3)] + [(4.0, 0.0, 4.2, 1.6)]
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"09": _at(2, 1.5), "08": _at(5.2, 1.5)},
+                                {"09": 12.0, "08": 6.0}, SCALE)
+    assert set(out["rooms"]) == {"08", "09"}, out["reasons"]
+    assert out["rooms"]["09"]["durys_m"] == 1.6 and out["groups"] == []
+    # …and a room the narrow limit already solved keeps that outline
+    solved = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert solved["rooms"]["01"]["durys_m"] == 1.25
