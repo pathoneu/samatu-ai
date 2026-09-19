@@ -212,12 +212,21 @@ def _attach_lines_on_page(dims: list[dict], lines: dict) -> int:
     scale = statistics.median(votes)
     accepted: list[tuple[dict, tuple[float, float, float], float]] = []
     for d, c in zip(dims, cands):
+        x0, top, x1, bottom = (float(v) for v in d["bbox"])
+        across = (top + bottom) / 2 if d["orientation"] == "h" else (x0 + x1) / 2
         best = None
         for a0, a1, p, length in c:
             ratio = d["value_m"] / length
             dev = abs(ratio - scale) / scale
-            if dev <= SCALE_TOL and (best is None or dev < best[0]):
-                best = (dev, (a0, a1, p), ratio)
+            if dev > SCALE_TOL:
+                continue
+            # Among hairlines of the right length the string's OWN is the one
+            # it is written on: a partition dimensioned on both sides has two
+            # equal lines a wall thickness apart (objektas_h, 2026-09-19), and
+            # length cannot choose between them.
+            key = (round(abs(p - across), 1), dev)
+            if best is None or key < best[0]:
+                best = (key, (a0, a1, p), ratio)
         if best:
             accepted.append((d, best[1], best[2]))
     if len(accepted) < MIN_SCALED or len(accepted) < MIN_SCALED_SHARE * len(dims):

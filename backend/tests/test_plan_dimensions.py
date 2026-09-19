@@ -242,6 +242,36 @@ def test_dimension_lines_are_read_from_the_vector_layer():
     assert room["_perimetras_matmenys"]["mastelis"] == 50
 
 
+def test_a_string_takes_the_hairline_it_is_written_on_not_an_equal_one_nearby():
+    """A partition's length is written on BOTH of its sides (objektas_h's wall
+    painting plan: „4500" | „4500", „2445" | „2445"), two equal dimension
+    lines ~12 pt apart. Length cannot choose between them — distance does."""
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    c.setFont("Helvetica", 8)
+    length = 3.0 / SCALE
+
+    def vdim(x, value=3.0):
+        c.line(x, 400, x, 400 + value / SCALE)
+        c.saveState()
+        c.translate(x - 2, 400)
+        c.rotate(90)
+        c.drawCentredString(value / SCALE / 2, 0, f"{value:.3f}")
+        c.restoreState()
+
+    vdim(300); vdim(312)                                  # the two sides of one partition
+    for i, v in enumerate((1.0, 2.5, 4.0, 0.6, 1.5)):     # a page needs five backed strings to have a scale
+        c.line(100, 900 + i * 40, 100 + v / SCALE, 900 + i * 40)
+        c.drawCentredString(100 + v / SCALE / 2, 903 + i * 40, f"{v:.3f}")
+    c.showPage()
+    c.save()
+    sides = [d for d in read_dimension_strings(buf.getvalue()) if d["text"] == "3.000"]
+    assert len(sides) == 2 and all(d.get("span_source") == "line" for d in sides)
+    assert sorted(round(d["line_pos"]) for d in sides) == [300, 312], [d["line_pos"] for d in sides]
+    assert all(d["span"] == pytest.approx([H - 400 - length, H - 400], abs=1.5) for d in sides)
+
+
 @pytest.mark.skipif(not (FIXTURE / "ai_extract.json").exists(), reason="fixture not on this machine")
 def test_the_out_of_sample_drawing_states_its_rooms_walls():
     truth = json.loads((FIXTURE / "truth.json").read_text())

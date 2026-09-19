@@ -91,7 +91,8 @@ def build_plan(sheets: list[Sheet]) -> bytes:
 def two_rooms() -> Sheet:
     """Two rooms side by side — 4×3 m and 3×3 m inside 0,2 m walls — with a
     0,9 m door between them (partition split at 1,0–1,9 m) and one 0,9 m door
-    to the outside in room 2's bottom wall; every wall carries its length."""
+    to the outside in room 2's bottom wall; every wall carries its length,
+    written inside the room."""
     t = 0.2
     walls = [
         (0, 0, 7 + 3 * t, t),                        # top
@@ -103,15 +104,19 @@ def two_rooms() -> Sheet:
         (4 + t, 1.9, 4 + 2 * t, 3 + t),              # partition, lower piece
     ]
     badges = [("1", 2.2, 1.5), ("2", 5.7, 1.5)]
+    # Wall lengths the way a designer's finish plan writes them (objektas_h's
+    # wall painting plan, measured 2026-09-19): INSIDE the room, 0,11–0,22 m
+    # off the wall face, the dimension line running corner to corner.
+    o = 0.15
     dims = [
-        ("4000", t, -0.4, 4 + t, -0.4),                                  # room 1 top
-        ("3000", 4 + 2 * t, -0.4, 7 + 2 * t, -0.4),                      # room 2 top
-        ("3000", -0.4, t, -0.4, 3 + t),                                  # left wall
-        ("3000", 7 + 3 * t + 0.4, t, 7 + 3 * t + 0.4, 3 + t),            # right wall
-        ("4000", t, 3 + 2 * t + 0.4, 4 + t, 3 + 2 * t + 0.4),            # room 1 bottom
-        ("3000", 4 + 2 * t, 3 + 2 * t + 0.4, 7 + 2 * t, 3 + 2 * t + 0.4),  # room 2 bottom
-        ("3000", 4 + t - 0.3, t, 4 + t - 0.3, 3 + t),                    # partition, room 1 side
-        ("3000", 4 + 2 * t + 0.3, t, 4 + 2 * t + 0.3, 3 + t),            # partition, room 2 side
+        ("4000", t, t + o, 4 + t, t + o),                                # room 1 top
+        ("4000", t, 3 + t - o, 4 + t, 3 + t - o),                        # room 1 bottom
+        ("3000", t + o, t, t + o, 3 + t),                                # room 1 left
+        ("3000", 4 + t - o, t, 4 + t - o, 3 + t),                        # room 1 right (the partition)
+        ("3000", 4 + 2 * t, t + o, 7 + 2 * t, t + o),                    # room 2 top
+        ("3000", 4 + 2 * t, 3 + t - o, 7 + 2 * t, 3 + t - o),            # room 2 bottom
+        ("3000", 4 + 2 * t + o, t, 4 + 2 * t + o, 3 + t),                # room 2 left (the partition)
+        ("3000", 7 + 2 * t - o, t, 7 + 2 * t - o, 3 + t),                # room 2 right
     ]
     furniture = [(0.5, 0.5, 2.0, 1.4), (5.0, 2.0, 6.5, 2.9)]
     return Sheet(walls=walls, badges=badges, dims=dims, furniture=furniture)
