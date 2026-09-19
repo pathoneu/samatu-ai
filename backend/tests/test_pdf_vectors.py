@@ -97,3 +97,17 @@ def test_a_page_is_parsed_once_per_document():
 def test_a_page_that_does_not_exist_is_empty():
     assert pv.page_paths(build_plan([two_rooms()]), 7) == []
     assert pv.wall_fills(build_plan([two_rooms()]), 7) == []
+
+
+def test_the_page_cache_is_bounded_by_paths_not_only_by_pages():
+    """objektas_g's furniture sheet has 50 000 paths; a dozen such pages kept
+    for a whole extraction would be hundreds of megabytes on the server."""
+    pv._pages.clear()
+    for i in range(5):
+        pv._pages[(b"doc", i)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 60_000}
+        pv._evict()
+    assert list(pv._pages) == [(b"doc", 3), (b"doc", 4)]                # 120 000 paths kept, the oldest gone
+    pv._pages[(b"doc", 9)] = {"width": 1.0, "height": 1.0, "rotation": 0, "paths": [None] * 400_000}
+    pv._evict()
+    assert list(pv._pages) == [(b"doc", 9)]                             # one huge page still stays: it is in use
+    pv._pages.clear()

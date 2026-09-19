@@ -39,6 +39,7 @@ MIN_WALL_LEN_PT = 12.0
 _BLACK = (0.0, 0.0, 0.0)
 _FORM_DEPTH = 4
 _CACHE_PAGES = 12
+_CACHE_PATHS = 150_000      # …and at most this many paths in all: objektas_g's furniture sheet alone has 50 000
 
 _pages: "collections.OrderedDict[tuple[bytes, int], dict]" = collections.OrderedDict()
 
@@ -164,9 +165,15 @@ def _page(pdf_bytes: bytes, page_nr: int) -> dict:
         return hit
     parsed = _read_page(pdf_bytes, int(page_nr))
     _pages[key] = parsed
-    while len(_pages) > _CACHE_PAGES:
-        _pages.popitem(last=False)
+    _evict()
     return parsed
+
+
+def _evict() -> None:
+    """Oldest pages go first; the newest always stays (the caller is using it)."""
+    while len(_pages) > 1 and (len(_pages) > _CACHE_PAGES
+                               or sum(len(p["paths"]) for p in _pages.values()) > _CACHE_PATHS):
+        _pages.popitem(last=False)
 
 
 def page_geometry(pdf_bytes: bytes, page_nr: int) -> tuple[float, float, int]:
