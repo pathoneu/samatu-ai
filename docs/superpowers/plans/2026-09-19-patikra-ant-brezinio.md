@@ -121,3 +121,31 @@ i18n `lt.json` / `en.json`.
   (`--totals-only --recompute --geometry`).
 - [ ] Browser regression on G (room 04) and H (rooms 01–04): accept estimate, edit height, next room.
 - [ ] Execution log appended here; memory resume point updated; commit. No push.
+
+---
+
+## Execution log — 2026-09-19
+
+All seven tasks done the same day, each verified in the browser on `demo-objektas_h` (rooms 01–04) and
+`demo-objektas_g` (room 02) before its commit. Local only, not pushed.
+
+| task | commit | what the browser / the real data showed |
+|---|---|---|
+| 1 positions | `72fa09f` | every read string on H carries `line_pct` on sheet 6; `_meta.geometrija.sutapdinimas` (the plan used the name `lapai` — taken: it already lists the traced sheets) |
+| 2 fact payload | `9067b8e` | perimeter fact has `walls`, `outline`, `outline_reason`; `_vieta` becomes the room's marker |
+| 3 `lib/checkOverlay` | `025a2da` | 11 node tests: sheet lay-over there and back, wall states, open plan, no outline, focus boxes |
+| 4–6 viewer + pane + scale | `b42df8d` | H 02: outline on the walls, four green walls 1586/4500/4500/1586, sharp at 312–360 %; „Rodyti brėžinyje · psl. 6" jumps to the wall-painting sheet with the room laid over it (2 pt sheet shift handled) and the added strings marked; H 03: two red dashed walls „—", „Priimti 21,23 m" works and the drawing does not move; H 04: dashed shared outline + number ring + sentence; H 01: number ring + why there is no outline; G 02: chains shown as „4.235 + 0.900 + 0.700"; status bar „1:115 (iš brėžinio)" / „1:50 (iš brėžinio)"; step 1 viewer unchanged; console clean throughout |
+
+Found while checking, fixed in the same commit:
+- a blank fact's input took focus WITH scrolling — opening room 03 threw the whole sheet down past the drawing
+  (`focus({ preventScroll: true })`);
+- a perimeter nobody could check (H 01: no outline, no strings) still said „pagal patalpos kontūrą plane" as a
+  quiet read row → amber „programos įvertis iš plano vaizdo, … nepatikrintas" once the geometry lane has run on
+  the project (older stored projects keep their sentence);
+- G's local demo had a ragged browser flood-fill outline for room 07 (45 edges) that `dimension_sum` treated as
+  walls → only wall-exact or human outlines assign strings now.
+
+Not in this slice (next, each with its own plan): dragging outline vertices on the sheet and re-reading the walls
+after a correction; the correction's consequence strip, „jūsų" badge and undo; fact-type columns across rooms;
+floor covering read from the floor plan; finishes without percentages; crisp thumbnails in the fact rows (they
+are still 110–160 dpi rasters — the sharp drawing is one click away, but the thumbnails themselves are not).
