@@ -1,0 +1,14 @@
+{
+  "objektas_h": {
+    "konturai": ["02", "03", "06", "07", "08", "09", "10", "11"],
+    "atviros_erdves": [["04", "05"]],
+    "perimetrai_sudeti": {"02": 12.17, "06": 16.14, "10": 7.06, "11": 16.41},
+    "min_tusti_su_iverciu": 4
+  },
+  "objektas_g": {
+    "konturai": [],
+    "atviros_erdves": [],
+    "perimetrai_sudeti": {},
+    "min_tusti_su_iverciu": 3
+  }
+}

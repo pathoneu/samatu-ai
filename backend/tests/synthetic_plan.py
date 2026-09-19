@@ -29,6 +29,7 @@ class Sheet:
     offset_m: tuple[float, float] = (0.0, 0.0)                                      # shift the whole sheet
     scale: float = 1.0                                                              # 1.0 = 1:100
     triangulate: bool = False                                                       # each wall as two triangles, the way CAD exports fills
+    title: str = "PLANAS M 1:100"                                                   # the title block — a real sheet always has text
 
 
 def _pt(x_m: float, y_m: float, sheet: Sheet) -> tuple[float, float]:
@@ -83,6 +84,9 @@ def build_plan(sheets: list[Sheet]) -> bytes:
         for text, x, y in sheet.badges:
             px, py = _pt(x, y, sheet)
             c.drawCentredString(px, py - 1.4, text)
+        if sheet.title:
+            c.setFont("Helvetica", 7)
+            c.drawString(ORIGIN[0], 30, sheet.title)             # in the title block, the lowest part of the sheet
         c.showPage()
     c.save()
     return buf.getvalue()
