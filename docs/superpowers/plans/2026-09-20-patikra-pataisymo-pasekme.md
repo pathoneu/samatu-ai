@@ -41,3 +41,20 @@ Spec: `docs/superpowers/specs/2026-09-20-patikra-pataisymo-pasekme-design.md`.
 
 ### Task 4: gates and record
 - [ ] Backend full suite, frontend units; execution log here; memory; commit. No push.
+
+---
+
+## Execution log — 2026-09-20
+
+| task | commit | what the browser showed (local `demo-objektas_h`, `demo-objektas_g`) |
+|---|---|---|
+| 1 `yours` | `ad87383` | one flag per fact, the same signals a re-read keeps (`mergeReextract.roomTouched`) |
+| 2–3 strip, badge, undo | `832830a` | H 03: „Priimti 21,23 m" → perimeter 21,23 m with „jūsų", strip „Pakeista. Sąmatos eilutės nepasikeitė." (true — the estimate was already what the rows used), „Atšaukti pataisymą" → blank field again, toast; G 09: floor covering → strip „Sąmatoje pasikeitė 5 eilutės: … plytelių klijavimas 10,54 → 3,76 m² … ir dar 2", undo → back to „perskaityta iš grindų plano"; the page does not move; console clean (one stale HMR entry from editing the viewer while it was mounted) |
+
+Notes: the undo writes the PREVIOUS project object back (`lib/roomSheet.undoPatch` — plus `null` for keys the
+fix added), so the numbers return exactly, not through a recompute. One level, the last fix on the room; it is
+forgotten when he moves to another room. The bottom „Persiskaičiavo…" line remains for actions that are not a
+fact fix (scope, quantity override).
+
+Not done here: dragging outline vertices on the sheet and re-reading the walls after it; fact-type columns
+across rooms; multi-level undo.
