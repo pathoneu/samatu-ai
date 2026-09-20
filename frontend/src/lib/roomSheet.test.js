@@ -784,3 +784,14 @@ test('a plain „+ Durys" / „+ Langas" adds the standard size, and nonsense ad
   assert.deepEqual(addOpening([], { tipas: 'led_nisa', plotis_mm: 100, aukstis_mm: 100 }), []);
   assert.deepEqual(addOpening([], { tipas: 'duris', plotis_mm: 0, aukstis_mm: 2100 }), []);
 });
+
+// ── one answer for every room that asks the same thing (2026-09-20) ─────────
+test('a height typed once is written for every room that asked for it, and nobody else', async () => {
+  const { heightsForRooms } = await import('./roomSheet.js');
+  const project = { _overrides: { lubu_auksciai: { '05': 3.1 } } };
+  assert.deepEqual(heightsForRooms(project, ['01', '02', '04'], 2.7), { '05': 3.1, '01': 2.7, '02': 2.7, '04': 2.7 });
+  assert.deepEqual(heightsForRooms({}, ['01'], 2.7), { '01': 2.7 });
+  assert.deepEqual(heightsForRooms(project, [], 2.7), { '05': 3.1 });
+  assert.deepEqual(heightsForRooms(project, ['01', '01', null, ''], 2.7), { '05': 3.1, '01': 2.7 });
+  assert.equal(project._overrides.lubu_auksciai['01'], undefined, 'the project is not mutated');
+});

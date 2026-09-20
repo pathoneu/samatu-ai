@@ -1500,6 +1500,7 @@
       "addWindow": "Window 1.20 × 1.50 m",
       "openingsAddConsequence": "An added opening is taken off the painted wall area, shortens the skirting and adds reveals. You can change its size afterwards.",
       "legendOpenings": "opening in the wall (door, window or passage)",
+      "saveForAll": "Save for all {{count}} rooms that ask this",
       "outlinePick": "Show the room",
       "outlinePickFromFact": "Show the room on the drawing",
       "outlinePickHint": "Click INSIDE room {{room}} — I will draw its outline along the walls and read their lengths.",

@@ -674,9 +674,45 @@ _ASK_HEIGHT = "Koks šios patalpos lubų aukštis?"
 _ASK_FLOOR = "Kokia čia grindų danga?"
 
 
+def _height_is_a_question(project: dict, room: dict) -> bool:
+    """Does this room's height still wait for an answer — a default of ours (or nothing at all), which
+    neither a reader nor he has replaced?"""
+    own = ((project.get("_overrides") or {}).get("lubu_auksciai") or {})
+    if str(room.get("nr") or "").strip() in {str(k).strip() for k in own}:
+        return False
+    if _f(room.get("lubu_aukstis_m")) is None:
+        return True
+    saltinis = (room.get("lubu_aukstis_saltinis") or "").strip().lower()
+    return _HEIGHT_SOURCES.get(saltinis, ("assumed", "", ""))[0] == "assumed"
+
+
+def _same_height_question(project: dict, room: dict) -> list[str]:
+    """The OTHER rooms that ask the same thing (2026-09-20). A drawing that writes no storey height
+    leaves every room with the question; he knows the answer once, for the whole flat."""
+    me = str(room.get("nr") or "").strip()
+    if not _height_is_a_question(project, room):
+        return []
+    out = []
+    for r in project.get("patalpos") or []:
+        nr = str(r.get("nr") or "").strip() if isinstance(r, dict) else ""
+        if nr and nr != me and _height_is_a_question(project, r):
+            out.append(nr)
+    return out
+
+
+def _asked_elsewhere(rooms: list[str]) -> str:
+    if not rooms:
+        return ""
+    n = len(rooms)
+    where = "patalpoje" if n % 10 == 1 and n % 100 != 11 else "patalpose"
+    shown = ", ".join(rooms if n <= 12 else rooms[:11] + ["…"])
+    return f" Tas pats klausimas dar {n} {where} ({shown}) — atsakyti galite visoms iš karto."
+
+
 def _fact_aukstis(project: dict, room: dict,
                   region: list[float] | None) -> dict:
     value = _f(room.get("lubu_aukstis_m"))
+    same = _same_height_question(project, room)
     saltinis = (room.get("lubu_aukstis_saltinis") or "").strip().lower()
     editable = {"field": "lubu_auksciai", "kind": "number"}
     ev = room.get("_height_marker_evidence")
@@ -718,8 +754,8 @@ def _fact_aukstis(project: dict, room: dict,
     rect = rect or region_on_page(room, page, region)
     if value is None:
         return _fact("aukstis", None, "m", "missing", "nera", page, rect,
-                     "Lubų aukščio brėžinyje neradau — įrašykite jį patys.",
-                     editable)
+                     "Lubų aukščio brėžinyje neradau — įrašykite jį patys." + _asked_elsewhere(same),
+                     editable, same_question=same)
     if not sentence:
         sentence = (f"Lubų aukščio brėžinyje neradau — skaičiuoju su "
                     f"{lt_num(value)} m. Įrašykite tikrą.")
@@ -727,9 +763,9 @@ def _fact_aukstis(project: dict, room: dict,
         # A default is a QUESTION on the sheet, not a statement (council
         # verdict 4, 2026-09-13): the row opens with the field showing, the
         # sentence asks, and the reason we chose this number follows.
-        sentence = f"{_ASK_HEIGHT} {sentence}"
+        sentence = f"{_ASK_HEIGHT} {sentence}" + _asked_elsewhere(same)
     return _fact("aukstis", round(value, 2), "m", status, kind, page,
-                 rect, sentence, editable)
+                 rect, sentence, editable, same_question=same if status == "assumed" else [])
 
 
 # ── apdaila ─────────────────────────────────────────────────────────────────

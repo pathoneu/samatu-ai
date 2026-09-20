@@ -504,6 +504,20 @@ export function roomTotals(room) {
   return out;
 }
 
+/**
+ * `_overrides.lubu_auksciai` with ONE height written for several rooms — his answer to a question
+ * many rooms ask (a drawing that writes no storey height leaves every room asking). Rooms he
+ * answered before keep their own number unless they are in the list.
+ */
+export function heightsForRooms(project, roomNrs, value) {
+  const next = { ...((project?._overrides || {}).lubu_auksciai || {}) };
+  for (const nr of Array.isArray(roomNrs) ? roomNrs : []) {
+    if (nr == null || String(nr) === '') continue;
+    next[String(nr)] = value;
+  }
+  return next;
+}
+
 /** What „+ Durys" / „+ Langas" add when nothing says otherwise — the sizes the engine assumes too. */
 export const STANDARD_OPENINGS = {
   duris: { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100 },

@@ -42,7 +42,7 @@ import {
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
-  addOpening, adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
+  addOpening, adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, heightsForRooms, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
   consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
   userEditPatch,
@@ -238,10 +238,12 @@ export default function RoomSheet() {
   }, [id]);
   const pilot = useCallback((type, target = {}) => recordPilot(id, type, { room: roomNr, ...target }), [id, roomNr]);
 
-  const saveNumber = useCallback((field, value) => run(async () => {
-    pilot('fact_number', { kind: 'fact', id: field });
+  // `alsoRooms`: the other rooms that ask the same question (fact.same_question) — one answer, one
+  // recompute, one consequence strip, one undo for all of them.
+  const saveNumber = useCallback((field, value, alsoRooms = null) => run(async () => {
+    pilot(alsoRooms?.length ? 'fact_number_all' : 'fact_number', { kind: 'fact', id: field });
     if (field === 'lubu_auksciai') {
-      const next = { ...((project?._overrides || {}).lubu_auksciai || {}), [String(roomNr)]: value };
+      const next = heightsForRooms(project, [roomNr, ...(alsoRooms || [])], value);
       await land(await saveAssumptionEdit(project, 'lubu_auksciai', next), { factKey: factKeyForField(field) });
       return;
     }

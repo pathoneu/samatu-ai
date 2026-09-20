@@ -111,6 +111,14 @@ export default function FactRow({
     onSaveNumber?.(field, num);
     setEditing(false);
   };
+  // The other rooms that ask the same question (room_facts `same_question`): one answer for all.
+  const alsoRooms = Array.isArray(fact?.same_question) ? fact.same_question.map(String) : [];
+  const commitNumberForAll = () => {
+    const num = parseLtNumber(draft);
+    if (!isValidAmount(num)) return;
+    onSaveNumber?.(field, num, alsoRooms);
+    setEditing(false);
+  };
 
   return (
     <div
@@ -303,6 +311,17 @@ export default function FactRow({
             >
               {busy ? t('project.roomSheet.saving') : t('project.roomSheet.save')}
             </button>
+            {alsoRooms.length > 0 && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={commitNumberForAll}
+                className={`${BTN} border-[hsl(var(--accent-2))] bg-card text-[hsl(var(--accent-2))] hover:bg-[hsl(var(--accent-2)/0.08)] disabled:opacity-50`}
+                data-testid="save-for-all"
+              >
+                {t('project.roomSheet.saveForAll', { count: alsoRooms.length + 1 })}
+              </button>
+            )}
             {/* A blank with a number to accept: the sentence said where the number
                 comes from — one click takes it, typing another overrides it. */}
             {fact.value == null && isValidAmount(Number(fact.suggestion?.value)) && (
