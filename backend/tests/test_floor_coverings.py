@@ -227,3 +227,34 @@ def test_a_vertical_dimension_string_does_not_end_up_in_a_label():
                        vertical=[("0.586", 6.75, 2.0, BLUE), ("0.800", 5.35, 2.0, BLUE)])
     got = _read(sheet, _rooms(("05", BATH, None)))["rooms"]["05"]
     assert got["tekstas"] == "plytelės 60X60cm 13vnt. 3.95 m²"
+
+
+def test_a_sheet_stored_sideways_is_read_the_way_it_is_displayed():
+    """A landscape drawing stored in a portrait page with /Rotate 90: its labels are
+    drawn sideways in the file and read left to right on screen. The reader works in
+    the DISPLAYED frame — the room is given there, the label is found there."""
+    import io
+
+    import pypdfium2 as pdfium
+
+    from extractor import pdf_vectors
+    from synthetic_floor_plan import A3
+
+    sheet = FloorSheet(rooms=[LIVING, BATH], vertical=[("plytelės 3.95 m2", 6.2, 2.0, BLUE)],      # drawn turned in the file…
+                       labels=[(["laminuota grindų danga"], 1.0, 1.0, BLUE)])                      # …this one displays sideways
+    doc = pdfium.PdfDocument(build_floor_pdf([sheet]))
+    doc[0].set_rotation(90)
+    buf = io.BytesIO()
+    doc.save(buf)
+    doc.close()
+    W, H = A3
+
+    def displayed(rect):
+        # display-frame points (origin top-left) of the unrotated sheet → the page as displayed with /Rotate 90
+        return [list(pdf_vectors._to_display(x, H - y, W, H, 1)) for x, y in room_pt(rect)]
+    out = read_floor_coverings(buf.getvalue(), 1, [{"nr": "05", "polygon": displayed(BATH), "point": None},
+                                                   {"nr": "01", "polygon": displayed(LIVING), "point": None}], m_per_pt=M_PER_PT)
+    assert out["rooms"]["05"]["danga"] == "plyteles" and out["rooms"]["05"]["plotas_m2"] == pytest.approx(3.95)
+    assert "01" not in out["rooms"]                      # text that displays sideways is not read as a label
+    x0, y0, x1, y1 = out["rooms"]["05"]["rect_pct"]
+    assert 0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1

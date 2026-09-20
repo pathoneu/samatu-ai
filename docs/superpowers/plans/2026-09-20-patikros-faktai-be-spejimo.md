@@ -134,3 +134,46 @@ classify_line(text) -> "plyteles" | "minksta" | None
 - [ ] Browser regression: H rooms 01–04, G rooms 02 and 09 — crops sharp, finishes in m², floor fact, accept,
   next room.
 - [ ] Execution log appended here; memory updated; commit. No push.
+
+---
+
+## Execution log — 2026-09-20
+
+All seven tasks done the same day; each user-visible change was checked in the browser on the local
+`demo-objektas_h` and `demo-objektas_g` before its commit. Local only, not pushed.
+
+| task | commit | what the real data / the browser showed |
+|---|---|---|
+| 1 sharp crops | `2bec252` | a place is rendered on its own through PDFium (≤ 600 dpi, ~13 ms for a room on the real wall-painting sheet); the enlarge dialog at ×4,7 shows „1586" / „4500" sharp. **PDFium is not thread-safe**: four parallel region renders without a lock segfault the process (exit 139, measured) → `extractor/pdfium_guard.PDFIUM_LOCK` around every `PdfDocument` in the backend, guarded by a structural test |
+| 2 finishes in m² | `70cc0b5` | G: „Sienos: dažoma 93,04 m², plytelės 5,86 m²; lubos: dažomos 37,86 m²" (was „92 %, 8 %"); H bathrooms: „dažoma 2,75 m², plytelės 21,50 m²" (was a bare „dažoma" beside 21,5 m² of billed tiles) |
+| 3 engine | `7c554eb` | `grindu_danga` ∈ plyteles / minksta / be_dangos drives tiles, soft floor, skirting and levelling together; without the field the whole result dict is identical for five purposes |
+| 4 reader | `06f4af2` | `floor_coverings.py`: label in the room + hatch in its legend line's colour; raster closing over the room's core (6 s → 0,07 s on the real sheet) |
+| 5 lane + fact | `defd6c9` | real drawings (fixture gate): H 11/11 read — 01 tambūras → parquet (the purpose rule said tiles); G 03/05/06/09 tiles with the written m² — 09 plant room → tiles (the rule said laminate); G 01 = two coverings written in one room (said, not chosen); G 02/04/08 never claimed |
+| 6 direct choice | `e6721ea` | three buttons on the fact row; choosing moves 9 sąmata rows and the fact turns to „pasirinkote patys" — with „Grindų plane (7 psl.) nubraižyta kitaip: …" when his choice differs from the drawing; „Rodyti brėžinyje" lands on the very label („plytelės … 7.24 m²") on the floor sheet |
+
+Found while checking on real drawings / in the browser, fixed in the same commits:
+- shapely buffers with flat caps and mitred joins ate a dense herringbone (a fully hatched room measured
+  0–56 %); round buffers were right but 6 s per sheet → raster closing;
+- a tile grid never draws its last line (the wall is the edge) → coverage is judged over the room's CORE;
+- a raised „2" of „m²" arrives as its own text line above the number; a vertical dimension string's digits
+  fall on a label's baseline; bare dimension numbers sit among a label's lines — all three polluted the quote
+  and lost the area;
+- a note on an elevation sheet („…vadovautis grindų planu") made two wall-tile sheets look like floor plans →
+  the title must be short and in the nominative;
+- a label outside every room (a terrace) must not become a colour key in the sheet's annotation colour;
+- after saving a fix the fact list was swapped for a „loading" line: the sheet collapsed and jumped to the
+  top, hiding the fact he had just changed and the „what moved in the sąmata" line → the same room's facts
+  stay on screen while they are re-read (`lib/roomSheet.factsStayOnScreen`);
+- EmbedPDF's `zoomToArea` ignores that a sheet narrower than the widest one is laid out centred: a room on a
+  portrait A3 among landscape sheets landed ~420 px to the side → the place is centred from the DOM after
+  the zoom (`lib/checkOverlay.centreDelta`, `FocusZoomer`).
+
+Gates: backend **3592 passed, 3 skipped** (was 3494), frontend **724/724**, eslint 0 errors; eval
+(`--totals-only --recompute --geometry`) in-sample **9,83 %**, OOS **7,06 %** (unchanged); rows
+±10 % **G 15,0 → 20,0 %**, H 29,2 %, corpus 24,3 % (unchanged). Designer's own figures on the two floor
+sheets, for reference only: H parquet 98,37 m² vs ours 100,84 (+2,5 %); G laminate 76,65 m² vs ours 72,72.
+
+Not in this slice (next): the m² a label writes („3,95 m²") is quoted, not billed; a room with two written
+coverings is not split; G's unlabelled bedrooms stay a question (their hatch is the same grey as the tiles');
+H tambūras walls are still „nedažomos" by the purpose rule; the correction's consequence strip / „jūsų"
+badge / undo (sub-project 2 slice 2).
