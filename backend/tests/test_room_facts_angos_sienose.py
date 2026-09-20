@@ -1,0 +1,127 @@
+"""The door-and-window fact against the openings the WALLS show.
+
+Until 2026-09-20 this was the one fact with no evidence on the drawing („Brėžinys jų
+vietos nenurodo, todėl pažymėti negaliu"), and its count came from Vision alone: on
+objektas_h four rooms had no door at all while the wall solid shows each of their
+doors. The geometry lane now leaves `_angos_sienose` on every outlined room; the
+fact marks those openings on the drawing, says whether the counted list agrees
+with them, and offers a one-click add only where nothing else could be meant.
+
+Quantities never change on their own — only when he adds the opening.
+"""
+from __future__ import annotations
+
+from extractor.room_facts import build_room_facts
+
+OUTLINE = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
+
+
+def _opening(i: str, width: float, x: float = 0.4) -> dict:
+    return {"i": i, "plotis_m": width, "storis_m": 0.2, "line_pct": [[x, 0.25], [x, 0.29]]}
+
+
+def _fact(elementai: list[dict], angos: list[dict] | None, **room) -> dict:
+    r = {"nr": "06", "puslapio_nr": 2, "plotas_m2": 12.0, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai",
+         "_konturas": {"page": 1}, "elementai": elementai, **room}
+    if angos is not None:
+        r["_angos_sienose"] = {"page": 1, "angos": angos}
+    facts = build_room_facts({"patalpos": [r]}, "06")["facts"]
+    return next(f for f in facts if f["key"] == "angos")
+
+
+DOOR = {"tipas": "duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2100}
+WINDOW = {"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500}
+
+
+def test_a_list_that_agrees_with_the_walls_is_read_and_marked_on_the_drawing():
+    f = _fact([WINDOW, DOOR], [_opening("03", 0.77), _opening("laukas", 1.37, x=0.2)])
+    assert f["status"] == "read" and f["value"] == 2
+    assert f["sentence"] == ("1 langas, 1 durys. Sienose tiek pat angų: į patalpą 03 (0,77 m), į lauką (1,37 m) — "
+                             "pažymėtos brėžinyje.")
+    # the crop and the marks are on the sheet the room's outline is drawn on
+    assert f["source"]["page"] == 1 and f["source"]["kind"] == "sienu_angos"
+    assert f["source"]["rect_pct"] == [0.17, 0.17, 0.43, 0.38]
+    assert f["openings"] == {"page": 1, "items": [
+        {"line_pct": [[0.4, 0.25], [0.4, 0.29]], "plotis_m": 0.77, "i": "03", "lauko": False},
+        {"line_pct": [[0.2, 0.25], [0.2, 0.29]], "plotis_m": 1.37, "i": "laukas", "lauko": True}]}
+    assert f["suggestions"] == []
+
+
+def test_a_door_the_list_lacks_is_asked_about_and_offered():
+    """objektas_h room 06: one window counted, no door — and a 0,77 m opening to the corridor in its wall."""
+    f = _fact([WINDOW], [_opening("03", 0.77), _opening("laukas", 1.37, x=0.2)])
+    assert f["status"] == "assumed"
+    assert f["sentence"] == ("1 langas. Sienose angų daugiau — 2: į patalpą 03 (0,77 m), į lauką (1,37 m). "
+                             "Durų nesuskaičiuota, nors sienoje yra anga į patalpą 03 — patikrinkite brėžinyje ir pridėkite.")
+    assert f["suggestions"] == [{"tipas": "duris", "plotis_mm": 800, "aukstis_mm": 2100, "i": "03", "plotis_m": 0.77,
+                                 "label": "Pridėti duris 0,80 × 2,10 m — anga į patalpą 03",
+                                 "line_pct": [[0.4, 0.25], [0.4, 0.29]]}]
+
+
+def test_a_window_the_list_lacks_is_offered_at_the_standard_height():
+    f = _fact([DOOR], [_opening("03", 0.9), _opening("laukas", 1.37, x=0.2)])
+    assert f["status"] == "assumed"
+    assert "Langų nesuskaičiuota, nors sienoje yra anga į lauką" in f["sentence"]
+    assert [(s["tipas"], s["plotis_mm"], s["aukstis_mm"]) for s in f["suggestions"]] == [("langas", 1400, 1500)]
+    assert f["suggestions"][0]["label"] == "Pridėti langą 1,40 × 1,50 m — anga į lauką"
+
+
+def test_a_room_with_nothing_counted_stays_a_blank_but_shows_what_the_walls_have():
+    f = _fact([], [_opening("03", 0.8)])
+    assert f["status"] == "missing" and f["value"] == 0 and f["details"] == []
+    assert f["sentence"] == ("Durų ir langų nesuskaičiuota, o sienose yra 1 anga: į patalpą 03 (0,80 m). "
+                             "Patikrinkite brėžinyje ir pridėkite.")
+    assert [s["tipas"] for s in f["suggestions"]] == ["duris"]
+    assert len(f["openings"]["items"]) == 1
+
+
+def test_more_openings_than_counted_without_an_obvious_gap_asks_but_offers_nothing():
+    """One door counted, three openings to other rooms: which two are missing is his to say."""
+    f = _fact([DOOR, WINDOW], [_opening("03", 0.87), _opening("08", 1.4), _opening("10", 1.18), _opening("laukas", 0.97, x=0.2)])
+    assert f["status"] == "assumed" and f["suggestions"] == []
+    assert f["sentence"] == ("1 durys, 1 langas. Sienose angų daugiau — 4: į patalpą 03 (0,87 m), į patalpą 08 (1,40 m), "
+                             "į patalpą 10 (1,18 m), į lauką (0,97 m). Patikrinkite brėžinyje, ar sąraše netrūksta durų ar lango.")
+
+
+def test_fewer_openings_in_the_walls_is_said_without_alarm():
+    """The walls do not show everything (a window behind a sill fill, a glazed wall): the count stands."""
+    f = _fact([DOOR, DOOR, WINDOW], [_opening("03", 0.8)])
+    assert f["status"] == "read" and f["suggestions"] == []
+    assert f["sentence"] == ("2 durys, 1 langas. Sienose matyti 1 anga: į patalpą 03 (0,80 m); kitų angų sienos nerodo — "
+                             "patikrinkite patalpoje.")
+
+
+def test_a_space_without_its_own_outline_is_a_neighbouring_room():
+    f = _fact([WINDOW, DOOR], [_opening("vidus", 0.64), _opening("laukas", 1.0, x=0.2)])
+    assert "į gretimą patalpą (0,64 m)" in f["sentence"]
+
+
+def test_a_roof_window_is_not_looked_for_in_the_walls():
+    skylight = {"tipas": "stoglangis", "kiekis": 1, "plotis_mm": 780, "aukstis_mm": 1400}
+    f = _fact([skylight, DOOR], [_opening("03", 0.8)])
+    assert f["status"] == "read" and f["value"] == 2
+    assert f["sentence"].startswith("1 stoglangis, 1 durys. Sienose tiek pat angų: į patalpą 03 (0,80 m)")
+
+
+def test_sizes_from_the_schedule_are_still_credited():
+    anchored = {**DOOR, "_schedule_anchored": True, "_schedule_page": 9}
+    f = _fact([anchored], [_opening("03", 0.9)])
+    assert f["sentence"] == ("1 durys. Matmenys — iš žiniaraščio, psl. 9. Sienose tiek pat angų: į patalpą 03 (0,90 m) — "
+                             "pažymėtos brėžinyje.")
+
+
+def test_without_wall_openings_the_fact_is_what_it_was():
+    f = _fact([WINDOW, DOOR], None)
+    assert f["status"] == "read" and f["source"]["page"] == 2 and f["source"]["kind"] == "planas"
+    assert f["openings"] is None and f["suggestions"] == []
+    assert f["sentence"].startswith("1 langas, 1 durys. Durys ir langai suskaičiuoti plane.")
+    empty = _fact([WINDOW], [])                                   # an outlined room whose walls show no gap at all
+    assert empty["openings"] is None and empty["status"] == "read"
+
+
+def test_the_plural_of_anga():
+    many = [_opening(f"{n:02d}", 0.8) for n in range(1, 11)]
+    f = _fact([DOOR] * 10, many)
+    assert "Sienose tiek pat angų" in f["sentence"]
+    five = _fact([DOOR], [_opening("03", 0.8), _opening("04", 0.8), _opening("05", 0.8), _opening("07", 0.8), _opening("08", 0.8)])
+    assert "Sienose angų daugiau — 5:" in five["sentence"]

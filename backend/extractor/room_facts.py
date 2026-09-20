@@ -55,7 +55,7 @@ from .page_classifier import canonical_tipas
 FACT_KEYS = ("plotas", "perimetras", "aukstis", "apdaila", "angos", "grindys")
 
 SOURCE_KINDS = ("eksplikacija", "planas", "pjuvis", "apdailos_lentele",
-                "duru_zinynas", "grindu_planas", "prielaida", "nera")
+                "duru_zinynas", "grindu_planas", "sienu_angos", "prielaida", "nera")
 STATUSES = ("read", "assumed", "missing")
 
 # How far around a single printed marker to crop, as a fraction of the page.
@@ -893,6 +893,98 @@ def element_label(tipas: str, n: int) -> str:
     return many
 
 
+# What the WALLS show (geometry lane, `_angos_sienose`): the fact marks those
+# openings on the drawing and says whether the counted list agrees with them.
+_DOOR_TIPAI = ("duris", "pasleptos_duris")
+_STANDARD_DOOR_H_MM = 2100
+_STANDARD_WINDOW_H_MM = 1500
+
+
+def _anga_word(n: int) -> str:
+    tail, hundred = n % 10, n % 100
+    if tail == 1 and hundred != 11:
+        return "anga"
+    if 2 <= tail <= 9 and not (11 <= hundred <= 19):
+        return "angos"
+    return "angų"
+
+
+def _leads_to(i: str) -> str:
+    if i == "laukas":
+        return "į lauką"
+    if i == "vidus":
+        return "į gretimą patalpą"
+    return f"į patalpą {i}"
+
+
+def _wall_openings(room: dict) -> tuple[int | None, list[dict]]:
+    """(the sheet they are marked on, the openings the wall solid shows in this room's walls)."""
+    rec = room.get("_angos_sienose")
+    if not isinstance(rec, dict):
+        return None, []
+    items = []
+    for a in rec.get("angos") or []:
+        line = a.get("line_pct") if isinstance(a, dict) else None
+        width = _f(a.get("plotis_m")) if isinstance(a, dict) else None
+        if not (isinstance(line, (list, tuple)) and len(line) == 2 and width):
+            continue
+        try:
+            pts = [[float(line[0][0]), float(line[0][1])], [float(line[1][0]), float(line[1][1])]]
+        except (TypeError, ValueError, IndexError):
+            continue
+        i = str(a.get("i") or "vidus")
+        items.append({"line_pct": pts, "plotis_m": round(width, 2), "i": i, "lauko": i == "laukas"})
+    page = _f(rec.get("page"))
+    return (int(page) if page else None), items
+
+
+def _suggestion(tipas: str, opening: dict) -> dict:
+    """One click adds this opening: the width the wall shows (to the nearest 10 cm), the standard height."""
+    width_mm = int(round(opening["plotis_m"] * 10)) * 100
+    height_mm = _STANDARD_DOOR_H_MM if tipas == "duris" else _STANDARD_WINDOW_H_MM
+    what = "duris" if tipas == "duris" else "langą"
+    return {"tipas": tipas, "plotis_mm": width_mm, "aukstis_mm": height_mm, "i": opening["i"], "plotis_m": opening["plotis_m"],
+            "label": (f"Pridėti {what} {lt_num(width_mm / 1000)} × {lt_num(height_mm / 1000)} m — "
+                      f"anga {_leads_to(opening['i'])}"),
+            "line_pct": opening["line_pct"]}
+
+
+def _against_the_walls(per_type: dict[str, int], openings: list[dict]) -> tuple[str, bool, list[dict]]:
+    """(what to say about the walls' openings, does the list look short, what one click could add).
+
+    Only the total is compared — an entrance door is an opening to the outside, so doors and windows
+    cannot be matched side by side. The walls never show everything (a window behind a sill fill, a
+    glazed wall), so FEWER openings in the walls is said without alarm; MORE means the list is short.
+    An add is offered only where nothing else could be meant: no door counted and an opening to another
+    room, no window counted and an opening to the outside."""
+    n = len(openings)
+    listed = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in openings)
+    doors = sum(v for t, v in per_type.items() if t in _DOOR_TIPAI)
+    windows = per_type.get("langas", 0)
+    counted = doors + windows                                   # a roof window is not in a wall
+    inside = [o for o in openings if not o["lauko"]]
+    outside = [o for o in openings if o["lauko"]]
+    if n == counted:
+        return f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje.", False, []
+    if n < counted:
+        return (f"Sienose matyti {n} {_anga_word(n)}: {listed}; kitų angų sienos nerodo — "
+                f"patikrinkite patalpoje."), False, []
+    suggestions = []
+    gaps = []
+    if doors == 0 and inside:
+        suggestions += [_suggestion("duris", o) for o in inside]
+        gaps.append(f"Durų nesuskaičiuota, nors sienoje yra anga {_leads_to(inside[0]['i'])}")
+    if windows == 0 and outside:
+        suggestions += [_suggestion("langas", o) for o in outside]
+        gaps.append(f"Langų nesuskaičiuota, nors sienoje yra anga {_leads_to(outside[0]['i'])}")
+    if counted == 0:
+        return (f"Durų ir langų nesuskaičiuota, o sienose yra {n} {_anga_word(n)}: {listed}. "
+                f"Patikrinkite brėžinyje ir pridėkite."), True, suggestions
+    tail = (". ".join(gaps) + " — patikrinkite brėžinyje ir pridėkite." if gaps
+            else "Patikrinkite brėžinyje, ar sąraše netrūksta durų ar lango.")
+    return f"Sienose angų daugiau — {n}: {listed}. {tail}", True, suggestions
+
+
 def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
     elems = [e for e in (room.get("elementai") or [])
              if isinstance(e, dict) and (e.get("tipas") or "") in _OPENING_TIPAI]
@@ -920,19 +1012,35 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
             "_dydis_user": bool(e.get("_dydis_user")),
         })
     editable = {"field": "elementai", "kind": "count"}
+    walls_page, openings = _wall_openings(room)
+    if openings:
+        # the sheet the room's outline is drawn on: there the openings can be marked
+        walls_said, short, suggestions = _against_the_walls(per_type, openings)
+        shown = {"openings": {"page": walls_page, "items": openings}, "suggestions": suggestions}
+        where = (walls_page, _outline_rect_pct(room))
+    else:
+        walls_said, short, suggestions = None, False, []
+        shown = {"openings": None, "suggestions": []}
+        where = (room.get("puslapio_nr"), region)
 
     if not details:
-        return _fact("angos", 0, "vnt.", "missing", "nera",
-                     room.get("puslapio_nr"), region,
-                     "Durų ir langų šioje patalpoje neradau — jei jų yra, "
-                     "įrašykite.", editable, details=[])
+        return _fact("angos", 0, "vnt.", "missing", "sienu_angos" if openings else "nera",
+                     where[0], where[1],
+                     walls_said or "Durų ir langų šioje patalpoje neradau — jei jų yra, įrašykite.",
+                     editable, details=[], **shown)
 
     # Summed per type, not per element: two door rows of one door each read as
     # „2 durys", the way he would say it.
     counts = ", ".join(f"{n} {element_label(t, n)}" for t, n in per_type.items())
+    zin = None
     if anchored:
         zin = (int(schedule_page) if schedule_page
                else first_page_of_type(project, "door_window_schedule"))
+    if openings:
+        sizes = ("Matmenys — iš žiniaraščio" + (f", psl. {zin}. " if zin else ". ")) if anchored else ""
+        return _fact("angos", total, "vnt.", "assumed" if short else "read", "sienu_angos",
+                     where[0], where[1], f"{counts}. {sizes}{walls_said}", editable, details=details, **shown)
+    if anchored:
         sentence = ("Durys ir langai suskaičiuoti plane; matmenys — iš "
                     "žiniaraščio"
                     + (f", psl. {zin}." if zin else "."))
@@ -946,7 +1054,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
     # is what he checks, and he checks it on his own room.
     return _fact("angos", total, "vnt.", "read", kind,
                  room.get("puslapio_nr"), region,
-                 f"{counts}. {sentence}", editable, details=details)
+                 f"{counts}. {sentence}", editable, details=details, **shown)
 
 
 # ── grindys ─────────────────────────────────────────────────────────────────
