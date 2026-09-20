@@ -19,6 +19,7 @@ import PageStructureCard from '@/components/project/PageStructureCard';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
+import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ReextractButton from '@/components/project/ReextractButton';
 import { pilotSession, releasePilotSession } from '@/lib/telemetry';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
@@ -1061,6 +1062,8 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
       {/* What the last re-read of the drawing changed — on every step, until
           he presses „Supratau" (lib/mergeReextract.js records it). */}
+      {/* A project read before the geometry lane existed can be read again for free (no Vision). */}
+      <FreeRereadBanner project={project} onComplete={(next) => setProject(next)} className="mt-3" />
       <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
 
       {/* ── STEP 1 · BRĖŽINYS — the drawing, its rooms, its measurements ── */}

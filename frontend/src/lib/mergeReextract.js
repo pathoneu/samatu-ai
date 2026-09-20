@@ -100,6 +100,10 @@ export function factDiff(before, after) {
   const pa = src(before?.paskirtis);
   const pb = src(after?.paskirtis);
   if (pa !== pb) out.push({ key: 'paskirtis', from: before?.paskirtis ?? null, to: after?.paskirtis ?? null });
+  // the floor covering the floor plan draws (or he chose) — it moves the floor rows
+  const ga = src(before?.grindu_danga);
+  const gb = src(after?.grindu_danga);
+  if (ga !== gb) out.push({ key: 'grindu_danga', from: before?.grindu_danga ?? null, to: after?.grindu_danga ?? null });
   return out;
 }
 

@@ -99,13 +99,17 @@ export default function RoomDrawingPane({
   // A new room → look at it. (Facts arrive a moment after the room changes; the
   // outline is in them, so this waits for the room focus to exist.)
   const roomKey = room?.nr != null ? String(room.nr) : null;
+  // …and look again when the SAME room's place changes — a free re-read or a corrected
+  // outline gives it a new frame; a fixed height or floor covering does not.
+  const focusKey = roomKey && overlay.roomFocus
+    ? `${roomKey}|${overlay.roomFocus.page}|${(overlay.roomFocus.rect || []).join(',')}` : null;
   const focusedFor = useRef(null);
   useEffect(() => {
-    if (!roomKey || !overlay.roomFocus || focusedFor.current === roomKey) return;
-    focusedFor.current = roomKey;
+    if (!focusKey || focusedFor.current === focusKey) return;
+    focusedFor.current = focusKey;
     go(overlay.roomFocus);
     // `go` is recreated every render — the room and its focus are what this waits for
-  }, [roomKey, overlay.roomFocus]);
+  }, [focusKey]);
 
   // „Rodyti brėžinyje" on a fact → its own place, else the room.
   const requestNonce = focusRequest?.nonce;

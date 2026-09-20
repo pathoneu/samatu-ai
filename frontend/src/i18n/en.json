@@ -875,6 +875,17 @@
       "roomNote": "After the drawing was read again:",
       "roomKept": "Kept"
     },
+    "freeReread": {
+      "title": "This drawing can be read more precisely — for free",
+      "body": "Since this project was extracted the program has learned to take wall lengths from the drawing itself (it adds the dimensions written on the plan), exact room outlines and floor coverings. No new extraction is needed and it costs nothing. Your corrections, prices and verified rooms stay as they are.",
+      "cta": "Read for free",
+      "running": "Reading the drawing…",
+      "later": "Not now",
+      "done": "Drawing read. Exact outlines: {{konturai}} rooms; wall lengths added from dimensions: {{perimetrai}}; floor covering from the floor plan: {{dangos}}. What changed in each room is written on its sheet.",
+      "alreadyRunning": "This project is already being read — wait for it to finish.",
+      "nothingRead": "The drawing could not be read this time — the project is unchanged.",
+      "failed": "Could not read: {{msg}}"
+    },
     "reextract": {
       "loadingPdf": "Loading PDF from memory...",
       "pdfNotFound": "The PDF was not found, so it cannot be read again. Create a new project with the PDF.",

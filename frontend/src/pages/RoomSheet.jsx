@@ -62,6 +62,7 @@ import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry'
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/pages/InteriorProject';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
+import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
   + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
@@ -490,6 +491,11 @@ export default function RoomSheet() {
           ))}
         </div>
       )}
+      <FreeRereadBanner
+        project={project}
+        className="mx-4 mt-3"
+        onComplete={(next) => { setProject(next); setLastFix(null); setRipple(null); loadFacts(); }}
+      />
       <RereadRoomNote project={project} roomNr={roomNr} />
 
       <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
