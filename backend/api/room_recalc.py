@@ -122,6 +122,8 @@ def _recalc_room(room: dict[str, Any], primitive_overrides: dict[str, Any]) -> d
         "ceiling_geometry", "slope_angle_deg", "max_height_m", "room_type",
         "door_area_m2", "window_area_m2",
         "walls_paint_factor_override", "tile_floor_override",
+        # the room's own floor covering (floor plan / his choice, 2026-09-20)
+        "grindu_danga", "grindu_danga_saltinis", "_grindu_danga",
         "extra_walls_m2", "extra_walls_virs_3m_m2", "high_ceiling_area_m2",
         "plyteles_grindys_m2_override", "gkp_extra_area_m2",
         "n_exterior_doors", "n_exterior_windows",

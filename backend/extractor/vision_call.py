@@ -3029,7 +3029,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         """Whether this room's purpose rule lays tiles — read off the rule, not
         the (possibly zeroed) quantity, so an excluded bathroom still counts
         as a tiled one."""
-        from .universal_rules import ROOM_TYPE_RULES, normalize_paskirtis
+        from .universal_rules import FLOOR_COVERINGS, ROOM_TYPE_RULES, normalize_paskirtis
+        covering = FLOOR_COVERINGS.get(str(r.get("grindu_danga") or "").strip().lower())
+        if covering:                      # read off the floor plan, or his choice
+            return covering[1]
         if r.get("tile_floor_override") is not None:
             return bool(r.get("tile_floor_override"))
         rule = ROOM_TYPE_RULES.get(normalize_paskirtis(r.get("paskirtis") or "")) or {}

@@ -1248,6 +1248,16 @@ def _perimeter_floor_enabled() -> bool:
         return True
 
 
+# `grindu_danga` on a room → (the purpose rule's floor type it stands for,
+# whether the floor is tiled). „minksta" is every laid soft covering the sąmata
+# bills on one line — parketas, laminatas, vinilas, kiliminė danga.
+FLOOR_COVERINGS: dict[str, tuple[str, bool]] = {
+    "plyteles": ("tile", True),
+    "minksta": ("parquet", False),
+    "be_dangos": ("concrete", False),
+}
+
+
 def calc_room_quantities(room: dict,
                           ceiling_height_m: float = 2.82,
                           rules: dict | None = None) -> dict:
@@ -1842,7 +1852,17 @@ def calc_room_quantities(room: dict,
     # Plytelės grindyse — per-room override beats paskirtis default. This is
     # important for contractor projects where Tambūras / Garažas / Skalbykla
     # get tile floors even though their paskirtis defaults disagree.
-    if tile_floor_override is not None:
+    # The room's OWN floor covering (2026-09-20) — read off the floor plan
+    # (extractor/floor_coverings.py) or chosen on the check sheet. One field
+    # for every floor quantity: until now `tile_floor_override` moved the tiles
+    # only, while the soft floor, the skirting and the levelling kept reading
+    # the purpose rule — „plytelės" on a bedroom billed both coverings. Absent
+    # or unknown → exactly the old behaviour.
+    floor_covering = FLOOR_COVERINGS.get(str(room.get("grindu_danga") or "").strip().lower())
+    floor_type = floor_covering[0] if floor_covering else rt_rules.get("floor")
+    if floor_covering:
+        tile_floor = floor_covering[1]
+    elif tile_floor_override is not None:
         tile_floor = bool(tile_floor_override)
     else:
         tile_floor = bool(rt_rules.get("tile_floor"))
@@ -1986,7 +2006,7 @@ def calc_room_quantities(room: dict,
     # Sprint §38 (2026-04-29): also skip on concrete floors (garažas, parter)
     # — no plinth where there's no finished surface.
     door_widths_total = n_doors * 0.85
-    floor_type_for_grindjuostes = rt_rules.get("floor")
+    floor_type_for_grindjuostes = floor_type
     grindjuostes_base = (
         max(0, perim - door_widths_total)
         if (not tile_floor and floor_type_for_grindjuostes != "concrete" and walls_paint_factor > 0)
@@ -2008,7 +2028,6 @@ def calc_room_quantities(room: dict,
             grindjuosciu_praleista = "perimetras"
 
     # PVC/parketas/laminatas grindys
-    floor_type = rt_rules.get("floor")
     pvc_grindys = plotas if floor_type == "parquet" else 0
 
     # Išlyginamasis grindims

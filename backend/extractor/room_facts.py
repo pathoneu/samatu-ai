@@ -951,14 +951,25 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
 
 # ── grindys ─────────────────────────────────────────────────────────────────
 
+# `grindu_danga` → the words the sheet uses for it
+_FLOOR_LT = {
+    "plyteles": "plytelės",
+    "minksta": "parketas arba laminatas",
+    "be_dangos": "betonas, be dangos",
+}
+
+
 def _floor_by_rule(room: dict) -> str:
     """The floor finish the calculator would give this room — read off the
     same purpose rule, for a room whose floor quantities a choice zeroed."""
+    from .universal_rules import FLOOR_COVERINGS, ROOM_TYPE_RULES, normalize_paskirtis
+    danga = str(room.get("grindu_danga") or "").strip().lower()
+    if danga in FLOOR_COVERINGS:
+        return _FLOOR_LT[danga]
     if room.get("tile_floor_override") is not None:
         return "plytelės" if room.get("tile_floor_override") else "parketas arba laminatas"
     if (_f(room.get("plyteles_grindys_m2_override")) or 0) > 0:
         return "plytelės"
-    from .universal_rules import ROOM_TYPE_RULES, normalize_paskirtis
     rule = ROOM_TYPE_RULES.get(normalize_paskirtis(room.get("paskirtis") or "")) or {}
     if rule.get("tile_floor") or rule.get("floor") == "tile":
         return "plytelės"
