@@ -224,7 +224,7 @@ def test_the_floor_plan_says_which_covering_a_room_gets():
     r1, r2 = parsed["patalpos"]
     assert r2["grindu_danga"] == "plyteles" and r2["grindu_danga_saltinis"] == "grindu_planas"
     ev = r2["_grindu_danga"]
-    assert ev["page"] == 3 and ev["irodymas"] == "uzrasas" and ev["plotas_m2"] == 8.95
+    assert ev["page"] == 3 and ev["irodymas"] == "uzrasas" and ev["plotas_m2"] == 8.95 and ev["danga"] == "plyteles"
     assert ev["tekstas"].startswith("plytelės 60X60cm") and len(ev["rect_pct"]) == 4
     assert "grindu_danga" not in r1                               # nothing is written there: stays a question
     g = parsed["_meta"]["geometrija"]["grindu_dangos"]
@@ -251,6 +251,8 @@ def test_his_own_choice_of_covering_is_never_overwritten():
     gl.apply_geometry(parsed, pdf)
     r2 = parsed["patalpos"][1]
     assert r2["grindu_danga"] == "minksta" and r2["grindu_danga_saltinis"] == "user_override"
+    # …but what the floor plan draws there is kept beside it, so the sheet can say the two differ
+    assert r2["_grindu_danga"]["danga"] == "plyteles" and r2["_grindu_danga"]["page"] == 3
 
 
 def test_a_reading_that_is_gone_on_the_next_run_is_taken_back():

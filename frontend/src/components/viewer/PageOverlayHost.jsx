@@ -123,7 +123,7 @@ export default function PageOverlayHost({
   const deleteAt = selectedMeasurement ? deleteAnchorFor(selectedMeasurement, adapter) : null;
 
   return (
-    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'relative', width, height }}>
+    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }}>
       {/* ── Rotated page content ─────────────────────────────────────────────
           EmbedPDF draws ALL page content in UNROTATED mediabox space:
           <RenderLayer>'s raster ignores /Rotate (PDFium matrix render path),

@@ -81,6 +81,7 @@ export function roomTouched(room) {
     || USER_POLYGON_SOURCES.includes(src(room.polygon_source))
     || !!room._angos_user_at
     || !!room._paskirtis_user_at
+    || (USER_SOURCES.includes(src(room.grindu_danga_saltinis)) && !!room.grindu_danga)
     || !!room._prideta_is_plano;
 }
 
@@ -154,6 +155,15 @@ export function carryUserFacts(oldRoom, freshRoom) {
     }
     room.paskirtis = oldRoom.paskirtis;
     room._paskirtis_user_at = oldRoom._paskirtis_user_at;
+  }
+  if (USER_SOURCES.includes(src(oldRoom.grindu_danga_saltinis)) && oldRoom.grindu_danga) {
+    if (src(oldRoom.grindu_danga) !== src(freshRoom.grindu_danga) && freshRoom.grindu_danga != null) {
+      carried.push({ key: 'grindu_danga', kept: oldRoom.grindu_danga, read: freshRoom.grindu_danga });
+    }
+    room.grindu_danga = oldRoom.grindu_danga;
+    room.grindu_danga_saltinis = oldRoom.grindu_danga_saltinis;
+    // `_grindu_danga` (what the floor plan draws there) stays as the fresh read gave it:
+    // the check sheet shows his choice AND says when the drawing differs.
   }
   if (oldRoom._prideta_is_plano) room._prideta_is_plano = true;
   return { room, carried };

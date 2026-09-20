@@ -5,6 +5,7 @@ local backend exactly the way a room edit on the check sheet does, and save.
 
     SAMATU_AUTH_DISABLED=1 venv/bin/python scripts/apply_geometry_to_local_project.py demo-objektas_h
     … --dry-run      print what the lane reads, change nothing
+    … --forget-floor-choices   drop a test choice of floor covering first (demo projects)
     … --api URL      the local backend (default http://localhost:8000)
 
 A real extraction gets the lane as Step 2.44d of vision_call; this script is
@@ -32,6 +33,8 @@ def main() -> int:
     ap.add_argument("project_id")
     ap.add_argument("--api", default="http://localhost:8000")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--forget-floor-choices", action="store_true",
+                    help="take a TEST choice of floor covering back off the rooms first (a demo project only)")
     args = ap.parse_args()
     if urlparse(args.api).hostname not in ("localhost", "127.0.0.1"):
         print("refusing: --api must be the local backend")
@@ -51,10 +54,18 @@ def main() -> int:
         print("the project's PDF is not in storage")
         return 1
 
+    if args.forget_floor_choices:
+        for key in ("patalpos", "v8_rooms"):
+            for r in project.get(key) or []:
+                if isinstance(r, dict) and r.get("grindu_danga_saltinis") == "user_override":
+                    r.pop("grindu_danga", None)
+                    r.pop("grindu_danga_saltinis", None)
+
     out = apply_geometry(project, pdf)
     print(f"status {out['status']} in {out['seconds']} s | vietos {out['vietos']} | plano lapai {out['grupes']}")
     print(f"kontūrai {out['konturai']} | atviros erdvės {out['atviros_erdves']}")
     print(f"perimetrai sudėti {out['perimetrai_sudeti']} | tušti {out['perimetrai_tusti']}")
+    print(f"grindų dangos {out['grindu_dangos']}")
     for r in project.get("patalpos") or []:
         suma = r.get("_perimetras_suma") or {}
         print(f"  {r.get('nr')} {str(r.get('pavadinimas'))[:24]:24} P={r.get('perimetras_m')} ({r.get('perimetras_saltinis')}) "

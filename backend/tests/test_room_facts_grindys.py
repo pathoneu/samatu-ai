@@ -85,3 +85,22 @@ def test_a_room_kept_out_by_choice_keeps_the_reading_of_its_floor():
 def test_the_old_exact_tile_area_override_still_reads_as_marked():
     f = _grindys({"plyteles_grindys_m2_override": 8.54, "plyteles_grindys_m2": 8.54})
     assert f["status"] == "read" and f["value"] == "plytelės"
+
+
+def test_his_choice_against_the_drawing_says_what_the_drawing_shows():
+    """He may know better than the floor plan — but the sheet does not hide that the two differ."""
+    f = _grindys({"grindu_danga": "plyteles", "grindu_danga_saltinis": "user_override", "plyteles_grindys_m2": 4.48,
+                  "_grindu_danga": {"danga": "minksta", "page": 7, "irodymas": "rastas", "tekstas": "Grindys - ąžuolas, eglutės raštas",
+                                    "plotas_m2": None, "rect_pct": [0.38, 0.39, 0.47, 0.46]}})
+    assert f["status"] == "read" and f["value"] == "plytelės"
+    assert f["sentence"] == ("Grindų dangą šiai patalpai pasirinkote patys. Grindų plane (7 psl.) nubraižyta kitaip: "
+                             "parketas arba laminatas.")
+    assert f["source"]["page"] == 7 and f["source"]["rect_pct"] == [0.38, 0.39, 0.47, 0.46]
+
+
+def test_his_choice_that_agrees_with_the_drawing_is_just_his():
+    f = _grindys({"grindu_danga": "plyteles", "grindu_danga_saltinis": "user_override",
+                  "_grindu_danga": {"danga": "plyteles", "page": 7, "irodymas": "uzrasas", "tekstas": "plytelės 3.95 m²",
+                                    "plotas_m2": 3.95, "rect_pct": [0.15, 0.5, 0.24, 0.55]}})
+    assert f["sentence"] == "Grindų dangą šiai patalpai pasirinkote patys."
+    assert f["source"]["page"] == 7 and f["source"]["rect_pct"] == [0.15, 0.5, 0.24, 0.55]

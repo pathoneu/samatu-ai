@@ -176,3 +176,19 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   if (focusShape && focusPage != null) out.roomFocus = { page: Number(focusPage), rect: focusRectFor(focusShape) };
   return out;
 }
+
+/**
+ * How far the viewer still has to scroll for the place `rect` (display-space page
+ * fractions) to sit in the middle of its window. `page` and `view` are DOM
+ * rectangles ({left, top, width, height}) of the sheet as laid out and of the
+ * scrolling window. Nothing to go on → no move.
+ */
+export function centreDelta(page, view, rect) {
+  const ok = (r) => r && [r.left, r.top, r.width, r.height].every((v) => Number.isFinite(Number(v))) && r.width > 0 && r.height > 0;
+  if (!ok(page) || !ok(view) || !Array.isArray(rect) || rect.length !== 4 || rect.some((v) => num(v) == null)) {
+    return { dx: 0, dy: 0 };
+  }
+  const tx = page.left + ((Number(rect[0]) + Number(rect[2])) / 2) * page.width;
+  const ty = page.top + ((Number(rect[1]) + Number(rect[3])) / 2) * page.height;
+  return { dx: tx - (view.left + view.width / 2), dy: ty - (view.top + view.height / 2) };
+}

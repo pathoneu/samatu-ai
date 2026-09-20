@@ -57,6 +57,8 @@ test('roomTouched sees every kind of his work', () => {
   assert.equal(roomTouched({ polygon_source: 'corrected' }), true);
   assert.equal(roomTouched({ plotas_source: 'manual_polygon' }), true);
   assert.equal(roomTouched({ _prideta_is_plano: true }), true);
+  assert.equal(roomTouched({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'user_override' }), true, 'a chosen floor covering');
+  assert.equal(roomTouched({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' }), false, 'a covering the floor plan gave is not his work');
   assert.equal(roomTouched({ polygon_source: 'auto_floodfill' }), false, 'the reader\'s own polygon is not his');
 });
 
@@ -180,4 +182,19 @@ test('rereadEntriesFor hands the check sheet one room\'s share of the diff', () 
     { changed: [], kept: { why: 'verified', fields: [{ key: 'perimetras_m', kept: 18.29, read: 18.9 }, { key: 'langai', kept: 1, read: 2 }] } });
   assert.equal(rereadEntriesFor(diff, '05'), null, 'a new room has no before');
   assert.equal(rereadEntriesFor(null, '01'), null);
+});
+
+test('a floor covering he chose survives a fresh read, and the difference is reported', () => {
+  const old = { nr: '09', grindu_danga: 'plyteles', grindu_danga_saltinis: 'user_override' };
+  const fresh = { nr: '09', grindu_danga: 'minksta', grindu_danga_saltinis: 'grindu_planas', _grindu_danga: { page: 7 } };
+  const { room, carried } = carryUserFacts(old, fresh);
+  assert.equal(room.grindu_danga, 'plyteles');
+  assert.equal(room.grindu_danga_saltinis, 'user_override');
+  assert.deepEqual(room._grindu_danga, { page: 7 }, 'what the floor plan draws stays beside his choice — the sheet says when they differ');
+  assert.deepEqual(carried, [{ key: 'grindu_danga', kept: 'plyteles', read: 'minksta' }]);
+  // the same covering read again is nothing to report
+  assert.deepEqual(carryUserFacts(old, { nr: '09', grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' }).carried, []);
+  // a covering the floor plan gave is simply replaced by the new read
+  const planOnly = carryUserFacts({ nr: '09', grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' }, fresh);
+  assert.equal(planOnly.room.grindu_danga, 'minksta');
 });

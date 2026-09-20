@@ -1017,12 +1017,23 @@ def _fact_grindys(project: dict, room: dict,
     editable = {"field": "grindu_danga", "kind": "choice"}
     tail = (" " + _KEPT_OUT_SENTENCE) if kept_out else ""
 
+    ev = room.get("_grindu_danga")
     if danga in _FLOOR_LT and saltinis == "user_override":
+        sentence = "Grindų dangą šiai patalpai pasirinkote patys."
+        if isinstance(ev, dict) and ev.get("page"):
+            # the place on the floor sheet stays the place to look at — and when
+            # the plan draws something else, the sheet says so rather than hide it
+            page = int(ev["page"])
+            rect = ev.get("rect_pct") if isinstance(ev.get("rect_pct"), list) and len(ev["rect_pct"]) == 4 else None
+            drawn = str(ev.get("danga") or "").strip().lower()
+            if drawn in _FLOOR_LT and drawn != danga:
+                verb = "parašyta" if ev.get("irodymas") == "uzrasas" else "nubraižyta"
+                sentence += f" Grindų plane ({page} psl.) {verb} kitaip: {_FLOOR_LT[drawn]}."
+            return _fact("grindys", value, None, "read", "prielaida", page, rect, sentence + tail, editable)
         page = _floor_sheet_page(project) or first_page_of_type(project, "floor_plan") or room.get("puslapio_nr")
         return _fact("grindys", value, None, "read", "prielaida", page, region_on_page(room, page, region),
-                     "Grindų dangą šiai patalpai pasirinkote patys." + tail, editable)
+                     sentence + tail, editable)
 
-    ev = room.get("_grindu_danga")
     if danga in _FLOOR_LT and saltinis == "grindu_planas" and isinstance(ev, dict) and ev.get("page"):
         page = int(ev["page"])
         quote = str(ev.get("tekstas") or "").strip()

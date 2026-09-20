@@ -28,6 +28,7 @@ import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/l
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
+import { centreDelta } from '@/lib/checkOverlay';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
@@ -568,6 +569,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   const scrollRef = useRef(scrollApi);
   const zoomRef = useRef(zoomApi);
   const pagesRef = useRef(pages);
+  const anchorRef = useRef(null);            // a node inside the viewer, to find THIS viewer's pages in the DOM
   useEffect(() => { scrollRef.current = scrollApi; zoomRef.current = zoomApi; pagesRef.current = pages; });
   const nonce = focus?.nonce;
   useEffect(() => {
@@ -599,13 +601,39 @@ function FocusZoomer({ documentId, focus, pages }) {
           origin: { x: x0 * Wd, y: y0 * Hd },
           size: { width: Math.max(1, (x1 - x0) * Wd), height: Math.max(1, (y1 - y0) * Hd) },
         });
+        settle(0);
+      });
+    };
+    // The engine's zoom-to-area is right about the ZOOM and, in a document of mixed
+    // sheet sizes, wrong about the PLACE: a sheet narrower than the widest one is laid
+    // out centred, and that offset is not in its arithmetic (measured 2026-09-20: a
+    // room on a portrait A3 among landscape sheets landed ~420 px to the side). So
+    // once the new zoom is laid out, the place is put in the middle from the DOM.
+    const settle = (attempt) => {
+      if (cancelled) return;
+      raf = requestAnimationFrame(() => {
+        if (cancelled) return;
+        const root = anchorRef.current?.closest('[data-takeoff-viewer]');
+        const host = root?.querySelector(`[data-page-number="${Number(focus.page)}"]`);
+        let scroller = host?.parentElement || null;
+        while (scroller && scroller !== root && !(scroller.scrollHeight > scroller.clientHeight + 1
+          && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+        if (!host || !scroller || scroller === root) {
+          if (attempt < 30) settle(attempt + 1);
+          return;
+        }
+        const d = centreDelta(host.getBoundingClientRect(), scroller.getBoundingClientRect(),
+          Array.isArray(focus.rect) && focus.rect.length === 4 ? focus.rect : [0, 0, 1, 1]);
+        if (Math.abs(d.dx) > 2 || Math.abs(d.dy) > 2) scroller.scrollBy({ left: d.dx, top: d.dy, behavior: 'auto' });
+        // the first frames after a big zoom change are still laying tiles out — look again a few times
+        if (attempt < 4) settle(attempt + 1);
       });
     };
     raf = requestAnimationFrame(run);
     return () => { cancelled = true; cancelAnimationFrame(raf); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `focus` is read when its nonce changes — a new object with the same nonce is not a new request
   }, [nonce, documentId]);
-  return null;
+  return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
 function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null }) {
@@ -1111,7 +1139,7 @@ export default function TakeoffViewer({
   if (error) return <div className="p-5 text-sm text-red-600">Variklio klaida: {String(error.message || error)}</div>;
   if (isLoading || !engine || !plugins) return <div className="p-5 text-sm text-muted-foreground">Kraunamas PDF variklis…</div>;
   return (
-    <div className="h-full">
+    <div className="h-full" data-takeoff-viewer>
       <EmbedPDF engine={engine} plugins={plugins}>
         <ViewerInner
           check={check}

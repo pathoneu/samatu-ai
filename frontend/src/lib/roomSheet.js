@@ -454,6 +454,9 @@ export function userEditPatch(field, value, now = new Date().toISOString()) {
     return { [field]: value, [`${field.replace(/_m2?$/, '')}_saltinis`]: 'user_override' };
   }
   if (field === 'paskirtis') return { paskirtis: value, _paskirtis_user_at: now };
+  // The floor covering he chose (2026-09-20): the engine reads `grindu_danga`, and the
+  // source keeps the floor-plan reader and a re-read of the drawing off it.
+  if (field === 'grindu_danga') return { grindu_danga: value, grindu_danga_saltinis: 'user_override' };
   return { [field]: value };
 }
 
@@ -748,4 +751,17 @@ export function rippleText(diff, t) {
   return t('project.roomSheet.rippleTop', {
     count: s.count, rowsWord, label: s.top.aprasymas, delta,
   });
+}
+
+/**
+ * Whether the fact list is rendered right now. While ANOTHER room's facts are
+ * on their way the list is replaced by a loading line; while the SAME room is
+ * re-read after a fix, what is shown stays — replacing it collapsed the sheet,
+ * the page scrolled to the top and the fact he had just changed (with the line
+ * saying what moved in the sąmata) was gone from view.
+ */
+export function factsStayOnScreen(facts, roomNr, loading) {
+  if (!loading) return true;
+  const shown = facts?.room?.nr;
+  return shown != null && roomNr != null && String(shown).trim() === String(roomNr).trim();
 }

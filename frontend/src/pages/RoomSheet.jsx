@@ -42,7 +42,7 @@ import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
   adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
-  setOpeningSize, setSymbolCount, stampVerified, userEditPatch,
+  factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, userEditPatch,
 } from '@/lib/roomSheet';
 import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
@@ -263,7 +263,10 @@ export default function RoomSheet() {
       await land(await saveAssumptionEdit(project, 'walls_paint_override', next));
       return;
     }
-    await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch('paskirtis', value))),
+    // `grindu_danga` (the covering itself) or `paskirtis` (older blobs' floor fact) —
+    // both live on the room and are marked as his by `userEditPatch`.
+    const roomField = field === 'grindu_danga' ? 'grindu_danga' : 'paskirtis';
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(roomField, value))),
       { fromInterior: true });
   }), [run, project, roomNr, land, pilot]);
 
@@ -417,6 +420,8 @@ export default function RoomSheet() {
     );
   }
 
+  // After a fix the same room is re-read: its facts stay on screen meanwhile (lib/roomSheet).
+  const keepFacts = factsStayOnScreen(facts, roomNr, loading);
   const factList = orderFacts(facts?.facts);
   const quantities = facts?.quantities || [];
   const excluded = facts?.excluded || [];
@@ -480,7 +485,7 @@ export default function RoomSheet() {
 
         {/* Right — the two layers. */}
         <div className="min-w-0 flex-1 rounded-[2px] border border-border bg-card lg:basis-[48%]">
-          {loading && (
+          {loading && !keepFacts && (
             <p className="flex items-center gap-2 p-4 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               {t('project.roomSheet.loading')}
@@ -500,7 +505,7 @@ export default function RoomSheet() {
             </div>
           )}
 
-          {!loading && !loadError && (
+          {keepFacts && !loadError && (
             <>
               <RoomScopeSwitch
                 included={isRoomIncluded(project?._apimtis, roomNr)}

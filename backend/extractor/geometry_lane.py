@@ -23,8 +23,8 @@ the lane cannot place or outline is left exactly as it was.
 
 Last, the FLOOR COVERING the floor plan draws in each room (2026-09-20,
 extractor/floor_coverings.py): `grindu_danga` + `grindu_danga_saltinis =
-"grindu_planas"` + `_grindu_danga` {page, irodymas, tekstas, plotas_m2,
-rect_pct}; `_grindu_dangos_dvi` when the sheet writes two kinds of covering in
+"grindu_planas"` + `_grindu_danga` {danga, page, irodymas, tekstas,
+plotas_m2, rect_pct}; `_grindu_dangos_dvi` when the sheet writes two kinds of covering in
 one room. His own choice (`user_override`) is never touched.
 
 `_meta.geometrija` says how many rooms came from where. Never raises.
@@ -116,14 +116,22 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
             r["_grindu_dangos_dvi"] = two[nr]
         else:
             r.pop("_grindu_dangos_dvi", None)
-        if str(r.get("grindu_danga_saltinis") or "") == "user_override":
-            continue
         hit = read.get(nr)
+        evidence = {k: hit[k] for k in ("danga", "page", "irodymas", "tekstas", "plotas_m2", "rect_pct")} if hit else None
+        if hit:
+            meta["grindu_dangos"]["perskaityta"][nr] = hit["danga"]
+        if str(r.get("grindu_danga_saltinis") or "") == "user_override":
+            # his choice stands; what the plan draws is kept BESIDE it, so the
+            # check sheet can say when the two differ
+            if evidence:
+                r["_grindu_danga"] = evidence
+            else:
+                r.pop("_grindu_danga", None)
+            continue
         if hit:
             r["grindu_danga"] = hit["danga"]
             r["grindu_danga_saltinis"] = FLOOR_PLAN_SOURCE
-            r["_grindu_danga"] = {k: hit[k] for k in ("page", "irodymas", "tekstas", "plotas_m2", "rect_pct")}
-            meta["grindu_dangos"]["perskaityta"][nr] = hit["danga"]
+            r["_grindu_danga"] = evidence
         elif str(r.get("grindu_danga_saltinis") or "") == FLOOR_PLAN_SOURCE:
             for key in FLOOR_KEYS:
                 r.pop(key, None)

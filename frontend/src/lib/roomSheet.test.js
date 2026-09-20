@@ -10,7 +10,7 @@ import {
   legacyKeyIsUnique, legacyRowKey, roomIndex, roomTitle, roomsInDrawingOrder,
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings, factMarks,
-  openingsPatch, userEditPatch, setOpeningSize, roomTotals,
+  openingsPatch, userEditPatch, setOpeningSize, roomTotals, factsStayOnScreen,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
   authorFigureRows, bboxToRectPct,
@@ -664,6 +664,9 @@ test('a fact he types on the sheet is marked as his — the sheet says so and a 
   assert.deepEqual(userEditPatch('plotas_m2', 12.4, 'T'),
     { plotas_m2: 12.4, plotas_saltinis: 'user_override' });
   assert.deepEqual(userEditPatch('paskirtis', 'vonia', 'T'), { paskirtis: 'vonia', _paskirtis_user_at: 'T' });
+  assert.deepEqual(userEditPatch('grindu_danga', 'plyteles', 'T'),
+    { grindu_danga: 'plyteles', grindu_danga_saltinis: 'user_override' },
+    'a covering he chose is his — the floor plan reader never overwrites it');
   assert.deepEqual(userEditPatch('kitas', 1, 'T'), { kitas: 1 }, 'unknown fields carry no marker');
   const els = [{ tipas: 'duris', kiekis: 2 }];
   assert.deepEqual(openingsPatch(els, 'T'), { elementai: els, _angos_user_at: 'T' });
@@ -697,4 +700,17 @@ test('roomTotals is the room\'s own headline quantities, zeros left out', () => 
   assert.deepEqual(roomTotals({ plyteles_grindys_m2: 3.52, plyteles_sienos_m2: 18.9 }),
     [{ key: 'floorTile', value: 3.52, unit: 'm²' }, { key: 'wallTiles', value: 18.9, unit: 'm²' }]);
   assert.deepEqual(roomTotals(null), []);
+});
+
+test('after a fix the facts stay on screen while they are re-read — the sheet must not collapse and jump', () => {
+  // Measured in the browser (2026-09-20): choosing a floor covering swapped the whole fact list
+  // for a „loading" line, the page shrank and scrolled to the top — he lost sight of the very
+  // fact he had just changed and of the line that says what moved in the sąmata.
+  const facts = { room: { nr: '01' }, facts: [] };
+  assert.equal(factsStayOnScreen(facts, '01', true), true, 'same room, reloading: keep what is shown');
+  assert.equal(factsStayOnScreen(facts, 1, true), false, 'another room is loading: its facts are not these');
+  assert.equal(factsStayOnScreen(facts, '02', true), false);
+  assert.equal(factsStayOnScreen(null, '01', true), false, 'nothing to keep yet');
+  assert.equal(factsStayOnScreen(facts, '01', false), true, 'loaded');
+  assert.equal(factsStayOnScreen(null, '01', false), true, 'loaded and empty is still the loaded state');
 });

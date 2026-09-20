@@ -874,6 +874,7 @@
         "durys": "durys",
         "langai": "langai",
         "paskirtis": "paskirtis",
+        "grindu_danga": "grindų danga",
         "polygon": "kontūras"
       },
       "dismiss": "Supratau",
@@ -1506,6 +1507,10 @@
       "wallsConsequence": "Nedažomos: sienų glaistymo, dažymo ir kampų šiam kambariui sąmatoje nebus.",
       "paskirtisLabel": "Patalpos paskirtis",
       "paskirtisConsequence": "Paskirtis lemia ne tik grindis — pagal ją parenkamos ir sienų bei plytelių taisyklės.",
+      "floorTiles": "Plytelės",
+      "floorSoft": "Parketas, laminatas ar vinilas",
+      "floorNone": "Be dangos (betonas)",
+      "floorConsequence": "Pasirinkta danga perskaičiuoja šios patalpos grindų dangą, grindjuostes ir plytelių grindjuostes. Sienų ir lubų nekeičia.",
       "paskirtis_gyvenamoji": "Gyvenamoji",
       "paskirtis_miegamoji": "Miegamasis",
       "paskirtis_virtuve": "Virtuvė",

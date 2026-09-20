@@ -868,6 +868,7 @@
         "durys": "doors",
         "langai": "windows",
         "paskirtis": "purpose",
+        "grindu_danga": "floor covering",
         "polygon": "outline"
       },
       "dismiss": "Got it",
@@ -1492,6 +1493,10 @@
       "wallsConsequence": "Not painted: no wall skimming, painting or corners for this room in the estimate.",
       "paskirtisLabel": "Room use",
       "paskirtisConsequence": "The use drives more than the floor — wall and tile rules follow from it too.",
+      "floorTiles": "Tiles",
+      "floorSoft": "Parquet, laminate or vinyl",
+      "floorNone": "No covering (concrete)",
+      "floorConsequence": "The covering you choose recalculates this room's flooring, skirting and tile skirting. Walls and ceiling stay as they are.",
       "paskirtis_gyvenamoji": "Living",
       "paskirtis_miegamoji": "Bedroom",
       "paskirtis_virtuve": "Kitchen",

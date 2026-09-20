@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCheckOverlay, focusRectFor, mapPct, wallLabel, wallState } from './checkOverlay.js';
+import { buildCheckOverlay, centreDelta, focusRectFor, mapPct, wallLabel, wallState } from './checkOverlay.js';
 
 const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 
@@ -140,4 +140,18 @@ test('focus rectangles are padded, clamped and never degenerate', () => {
   const dot = focusRectFor([[0.5, 0.5]], 0.0);
   assert.ok(dot[2] - dot[0] >= 0.08 && dot[3] - dot[1] >= 0.08);
   assert.equal(focusRectFor(null), null);
+});
+
+test('how far the view must still move for a place on the page to sit in its middle', () => {
+  // Measured in the browser (2026-09-20): in a document of mixed sheet sizes the engine's own
+  // zoom-to-area ignores that a narrower sheet is centred — a room on a portrait A3 among landscape
+  // sheets landed ~420 px to the side. The correction is measured from the DOM, after the zoom.
+  const page = { left: 100, top: -400, width: 2000, height: 3000 };     // the sheet as laid out on screen
+  const view = { left: 300, top: 100, width: 700, height: 500 };        // the viewer's window
+  const d = centreDelta(page, view, [0.4, 0.75, 0.6, 0.85]);
+  assert.equal(d.dx, 100 + 0.5 * 2000 - (300 + 350));
+  assert.equal(d.dy, -400 + 0.8 * 3000 - (100 + 250));
+  assert.deepEqual(centreDelta(page, view, null), { dx: 0, dy: 0 });
+  assert.deepEqual(centreDelta(null, view, [0, 0, 1, 1]), { dx: 0, dy: 0 });
+  assert.deepEqual(centreDelta({ ...page, width: 0 }, view, [0, 0, 1, 1]), { dx: 0, dy: 0 });
 });

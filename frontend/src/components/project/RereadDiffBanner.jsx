@@ -19,8 +19,12 @@ import { rereadDiffIsEmpty, rereadEntriesFor } from '@/lib/mergeReextract';
 const UNIT = { plotas_m2: ' m²', perimetras_m: ' m', lubu_aukstis_m: ' m' };
 const COUNTS = new Set(['durys', 'langai']);
 
+// A floor covering is stored as the engine's word for it; he reads the sheet's words.
+const FLOOR_LT = { plyteles: 'plytelės', minksta: 'parketas arba laminatas', be_dangos: 'be dangos' };
+
 function fmt(key, v) {
   if (v == null || v === '') return '—';
+  if (key === 'grindu_danga') return FLOOR_LT[String(v)] || String(v);
   if (key === 'paskirtis' || key === 'polygon') return String(v);
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);

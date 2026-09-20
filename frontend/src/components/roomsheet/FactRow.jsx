@@ -27,6 +27,11 @@ const PASKIRTIS = [
   'katiline', 'laiptine',
 ];
 
+// `grindu_danga` values the engine knows (universal_rules.FLOOR_COVERINGS) → their button labels.
+const FLOOR_COVERINGS = [
+  ['plyteles', 'floorTiles'], ['minksta', 'floorSoft'], ['be_dangos', 'floorNone'],
+];
+
 const BTN = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 '
   + 'rounded-[2px] border px-3 text-[14px] font-semibold transition-colors '
   + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -267,6 +272,32 @@ export default function FactRow({
             </div>
             <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
               {t('project.roomSheet.wallsConsequence')}
+            </p>
+          </div>
+        )}
+
+        {/* The floor covering, chosen directly (2026-09-20). It used to be answered by
+            changing the room's PURPOSE, which moves its walls and ceiling too. */}
+        {editing && kind === 'choice' && field === 'grindu_danga' && (
+          <div className="mt-2">
+            <div className="flex flex-wrap gap-2">
+              {FLOOR_COVERINGS.map(([v, key]) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={busy}
+                  aria-pressed={room?.grindu_danga === v}
+                  onClick={() => { onSaveChoice?.(field, v); setEditing(false); }}
+                  className={`${BTN} ${room?.grindu_danga === v
+                    ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]'
+                    : 'border-border bg-card hover:bg-muted'} disabled:opacity-50`}
+                >
+                  {t(`project.roomSheet.${key}`)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+              {t('project.roomSheet.floorConsequence')}
             </p>
           </div>
         )}
