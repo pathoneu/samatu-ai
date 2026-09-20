@@ -64,9 +64,11 @@ def _nr(room: dict) -> str:
 # (api/free_reread.py offers a free re-read when the project's is lower):
 # 1 — outlines + summed perimeters; 2 — positions for the check sheet (line_pct,
 # sutapdinimas); 3 — floor coverings off the floor plan; 4 — the openings in each
-# outlined room's walls. RAISE it when the lane starts reading something a
-# stored project would gain from.
-LANE_VERSION = 4
+# outlined room's walls; 5 — sheets of one plan are found by a shared corner of
+# their wall boxes too (objektas_g: all seven sheets one plan → a perimeter summed
+# from strings, every neighbour named). RAISE it when the lane starts reading
+# something a stored project would gain from.
+LANE_VERSION = 5
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

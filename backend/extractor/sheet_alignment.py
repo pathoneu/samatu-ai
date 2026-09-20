@@ -4,13 +4,19 @@ page 6 (wall painting plan, with every wall's length) are the same plan at
 the same scale and position — the strings of page 6 belong to the rooms of
 page 1.
 
-Signature of a sheet: its wall fills. Two sheets are one plan when the boxes
-around their walls have the same aspect (±SIZE_TOL) AND the walls themselves
-coincide once one is laid over the other (SAME_WALLS of the union): two
-storeys of a house share the outside walls to the millimetre, and the strings
-of one floor must never be read for the rooms of the other. The transform
-onto the base page is the size ratio (a plan re-printed at another scale) plus
-the translation between the boxes. Pages with too few wall fills stay alone.
+Signature of a sheet: its wall fills. Two sheets are one plan when the walls
+themselves coincide once one is laid over the other (SAME_WALLS of the union):
+two storeys of a house share the outside walls to the millimetre, and the
+strings of one floor must never be read for the rooms of the other. Ways to lay
+a sheet over the base: as printed; box onto box when the boxes have the same
+aspect (±SIZE_TOL — a plan re-printed at another scale); and, at the same
+scale, one CORNER of the wall box onto the same corner of the base's (the plan
+drawn elsewhere on its sheet while a wall piece at one edge is missing, so the
+boxes differ — objektas_g, 2026-09-20). Pages with too few wall fills stay alone.
+
+SAME_WALLS, measured on four real sets (2026-09-20): sheets of one plan overlap
+≥ 0,89 once laid right — a sheet may draw a few partitions differently — and
+sheets of other plans ≤ 0,55, with nothing in between.
 """
 from __future__ import annotations
 
@@ -22,7 +28,7 @@ from shapely.ops import unary_union
 from .pdf_vectors import wall_fills
 
 SIZE_TOL = 0.015
-SAME_WALLS = 0.9            # overlap / union of the two wall solids, laid over each other
+SAME_WALLS = 0.85           # overlap / union of the two wall solids, laid over each other
 MIN_WALLS = 3
 
 
@@ -64,6 +70,8 @@ def align_sheets(pdf_bytes: bytes, plan_pages: Sequence[int]) -> dict:
             if kx > 0 and abs(kx - ky) / kx <= SIZE_TOL:
                 k = (kx + ky) / 2
                 fits.append((k, bs[0] - k * s[0], bs[1] - k * s[1]))     # base_x = k * x + dx: the box corners coincide
+            # …or, at the same scale, one corner of the box onto the same corner of the base's
+            fits += [(1.0, bs[i] - s[i], bs[j] - s[j]) for i, j in ((0, 1), (2, 1), (0, 3), (2, 3))]
             best = None
             for k, dx, dy in fits:
                 laid = affinity.affine_transform(solid, [k, 0, 0, k, dx, dy])

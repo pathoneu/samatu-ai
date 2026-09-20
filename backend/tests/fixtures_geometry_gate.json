@@ -121,12 +121,23 @@
       "01",
       "04",
       "05"
+    ],
+    "vienas_planas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
     ]
   },
   "objektas_g": {
     "konturai": [],
     "atviros_erdves": [],
-    "perimetrai_sudeti": {},
+    "perimetrai_sudeti": {
+      "02": 18.25
+    },
     "min_tusti_su_iverciu": 3,
     "atviru_erdviu_iverciai": {},
     "grindu_dangos": {
@@ -150,6 +161,10 @@
     "angos_sienose": {
       "01": [
         [
+          "02",
+          0.9
+        ],
+        [
           "04",
           0.9
         ],
@@ -162,11 +177,19 @@
           0.8
         ],
         [
+          "08",
+          0.9
+        ],
+        [
           "laukas",
           2.84
         ]
       ],
       "02": [
+        [
+          "01",
+          0.9
+        ],
         [
           "03",
           0.85
@@ -203,10 +226,29 @@
           "01",
           0.8
         ]
+      ],
+      "08": [
+        [
+          "01",
+          0.9
+        ],
+        [
+          "laukas",
+          2.2
+        ]
       ]
     },
     "angu_nera": [
       "07"
+    ],
+    "vienas_planas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
     ]
   }
 }

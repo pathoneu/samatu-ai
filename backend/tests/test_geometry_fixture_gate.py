@@ -56,6 +56,8 @@ def test_geometry_gate(slug):
                 (x0, y0), (x1, y1) = e["line_pct"]
                 assert 0 < min(x0, x1, y0, y1) and max(x0, x1, y0, y1) < 1 and (x0 == x1 or y0 == y1), (nr, e)
     assert all(str(p) in out["sutapdinimas"] for g in out["grupes"] for p in g)
+    # the sheets that draw ONE plan lie over each other (objektas_g: two of seven stayed alone until 2026-09-20)
+    assert any(set(want["vienas_planas"]) <= set(g) for g in out["grupes"]), out["grupes"]
     for nr, metres in want["atviru_erdviu_iverciai"].items():
         assert rooms[nr]["perimetras_saltinis"] == "atviros_erdves_ivertis"
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.05, (nr, rooms[nr]["perimetras_m"])

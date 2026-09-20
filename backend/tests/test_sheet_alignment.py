@@ -76,3 +76,29 @@ def test_a_point_goes_to_the_base_and_back():
     back = sa.from_base(al, 2, x, y)
     assert abs(back[0] - 123.0) < 1e-6 and abs(back[1] - 234.0) < 1e-6
     assert sa.from_base(al, 1, 50.0, 60.0) == (50.0, 60.0)
+
+
+# ── what objektas_g's sheets taught (2026-09-20) ─────────────────────────────
+# Seven sheets draw ONE plan; two of them stayed alone: on one the plan is shifted AND a wall piece is
+# missing at an edge (the wall boxes differ, so neither „as printed" nor box-onto-box fits), on the other a
+# few partitions are drawn differently (overlap 0,89). Measured on four real sets: sheets of one plan
+# overlap ≥ 0,89 once laid right, other plans ≤ 0,55 — nothing in between.
+
+def test_a_shifted_sheet_whose_wall_box_differs_is_laid_corner_onto_corner():
+    a = two_rooms()
+    a.walls = a.walls + [(-0.8, 1.0, 0.0, 1.2)]           # a garden wall only the layout sheet draws: its box is wider
+    b = two_rooms()
+    b.offset_m = (0.7, -0.1)                              # the same plan, drawn elsewhere on its sheet
+    al = sa.align_sheets(build_plan([a, b]), plan_pages=[1, 2])
+    assert al["groups"] == [[1, 2]]
+    t = al["transform"][2]
+    assert abs(t["k"] - 1.0) < 1e-6
+    assert abs(t["dx"] + 0.7 * PT_PER_M) < 0.5 and abs(t["dy"] - 0.1 * PT_PER_M) < 0.5
+
+
+def test_a_sheet_that_draws_one_partition_more_is_still_the_same_plan():
+    a = two_rooms()
+    b = two_rooms()
+    b.walls = b.walls + [(0.2, 1.6, 3.2, 1.8)]            # 0,6 m² of wall more: the solids overlap ≈ 0,88
+    al = sa.align_sheets(build_plan([a, b]), plan_pages=[1, 2])
+    assert al["groups"] == [[1, 2]]
