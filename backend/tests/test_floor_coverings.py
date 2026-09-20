@@ -59,8 +59,10 @@ def test_the_floor_sheet_is_found_by_its_title():
         FloorSheet(title="GRINDŲ DANGŲ PLANAS M 1:100"),
         FloorSheet(title="ŠILDOMŲ GRINDŲ PLANAS M 1:100"),
         FloorSheet(title="1A. GRINDŲ PLANAS M 1:50"),
+        # a note on a wall-tile sheet is not a title (real project: two elevation sheets)
+        FloorSheet(title="SIENŲ IŠKLOTINĖS", legend=[("4. Sienų plytelių siūles suvesti su grindų plytelių siūlėmis (vadovautis grindų planu).", BLACK)]),
     ])
-    assert find_floor_sheets(pdf, [1, 2, 3, 4]) == [2, 4]
+    assert find_floor_sheets(pdf, [1, 2, 3, 4, 5]) == [2, 4]
     assert find_floor_sheets(pdf, [1, 3]) == []
     assert find_floor_sheets(b"not a pdf", [1]) == []
 

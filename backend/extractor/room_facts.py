@@ -978,17 +978,35 @@ def _floor_by_rule(room: dict) -> str:
     return "parketas arba laminatas"
 
 
+def _floor_sheet_page(project: dict) -> int | None:
+    """The floor-covering sheet the geometry lane found by its title, if any."""
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    lapai = ((meta.get("geometrija") or {}).get("grindu_dangos") or {}).get("lapai") or []
+    try:
+        return int(lapai[0]) if lapai else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _fact_grindys(project: dict, room: dict,
                   region: list[float] | None) -> dict:
+    """Which floor covering this room gets — READ off the floor plan when the
+    plan says it (extractor/floor_coverings.py: written in the room, or hatched
+    in a legend line's colour), his own choice when he made one, otherwise the
+    purpose rule as a QUESTION. The answer is a direct choice of covering
+    (`grindu_danga`); until 2026-09-20 the only way to answer was to change the
+    room's purpose, which moves its walls and ceiling too."""
     tile = _f(room.get("plyteles_grindys_m2")) or 0.0
     soft = _f(room.get("pvc_grindys_m2")) or 0.0
-    override = (room.get("plyteles_grindys_m2_override") is not None
-                or room.get("tile_floor_override") is not None)
+    danga = str(room.get("grindu_danga") or "").strip().lower()
+    saltinis = str(room.get("grindu_danga_saltinis") or "").strip().lower()
     kept_out = (_kept_out_by_choice(room, "grindys")
                 or _kept_out_by_choice(room, "plyteles"))
-    if kept_out:
+    if danga in _FLOOR_LT:
+        value = _FLOOR_LT[danga]
+    elif kept_out:
         # the floor quantities are zeroed by the choice; the finish still
-        # follows the room's purpose (no lane reads a floor finish)
+        # follows the room's purpose
         value = _floor_by_rule(room)
     elif tile > 0:
         value = "plytelės"
@@ -996,23 +1014,54 @@ def _fact_grindys(project: dict, room: dict,
         value = "parketas arba laminatas"
     else:
         value = "betonas, be dangos"
-    page = first_page_of_type(project, "floor_plan") or room.get("puslapio_nr")
-    editable = {"field": "paskirtis", "kind": "choice"}
-    paskirtis = (room.get("paskirtis") or "").strip()
+    editable = {"field": "grindu_danga", "kind": "choice"}
+    tail = (" " + _KEPT_OUT_SENTENCE) if kept_out else ""
 
+    if danga in _FLOOR_LT and saltinis == "user_override":
+        page = _floor_sheet_page(project) or first_page_of_type(project, "floor_plan") or room.get("puslapio_nr")
+        return _fact("grindys", value, None, "read", "prielaida", page, region_on_page(room, page, region),
+                     "Grindų dangą šiai patalpai pasirinkote patys." + tail, editable)
+
+    ev = room.get("_grindu_danga")
+    if danga in _FLOOR_LT and saltinis == "grindu_planas" and isinstance(ev, dict) and ev.get("page"):
+        page = int(ev["page"])
+        quote = str(ev.get("tekstas") or "").strip()
+        if ev.get("irodymas") == "uzrasas":
+            sentence = f"Grindų plane ({page} psl.) šioje patalpoje parašyta: „{quote}“."
+        else:
+            sentence = (f"Grindų plane ({page} psl.) ši patalpa nubraižyta tuo pačiu raštu ir spalva kaip "
+                        f"legendos eilutė „{quote}“.")
+        rect = ev.get("rect_pct") if isinstance(ev.get("rect_pct"), list) and len(ev["rect_pct"]) == 4 else None
+        return _fact("grindys", value, None, "read", "grindu_planas", page, rect, sentence + tail, editable)
+
+    override = (room.get("plyteles_grindys_m2_override") is not None
+                or room.get("tile_floor_override") is not None)
+    page = _floor_sheet_page(project) or first_page_of_type(project, "floor_plan") or room.get("puslapio_nr")
     rect = region_on_page(room, page, region)
     if override:
         return _fact("grindys", value, None, "read", "grindu_planas", page,
-                     rect, "Grindų danga pažymėta šiai patalpai.", editable)
-    # Honest: no lane reads a floor finish. It follows the room's purpose —
-    # so the sheet ASKS, with the purpose-based default already filled in.
-    sentence = (f"{_ASK_FLOOR} Brėžinys nesako — parinkta pagal patalpos paskirtį"
-                + (f" („{paskirtis}“)." if paskirtis else ".")
-                + " Patikrinkite grindų plane; jei kitokia — pakeiskite paskirtį.")
-    if kept_out:
-        sentence += " " + _KEPT_OUT_SENTENCE
+                     rect, "Grindų danga pažymėta šiai patalpai." + tail, editable)
+
+    paskirtis = (room.get("paskirtis") or "").strip()
+    by_purpose = "parinkta pagal patalpos paskirtį" + (f" („{paskirtis}“)" if paskirtis else "")
+    two = room.get("_grindu_dangos_dvi")
+    if isinstance(two, dict) and len(two.get("tekstai") or []) >= 2:
+        page = int(two.get("page") or page or 0) or page
+        quotes = " ir ".join(f"„{str(t).strip()}“" for t in two["tekstai"][:3])
+        sentence = (f"{_ASK_FLOOR} Grindų plane ({page} psl.) šioje patalpoje parašytos dvi dangos: {quotes}. "
+                    f"Skaičiuoju visą plotą kaip „{value}“ — pasirinkite pagrindinę dangą, o kitos plotą "
+                    "pataisykite sąmatoje.")
+        return _fact("grindys", value, None, "assumed", "prielaida", page,
+                     region_on_page(room, page, region), sentence + tail, editable)
+
+    sheet = _floor_sheet_page(project)
+    if sheet:
+        sentence = (f"{_ASK_FLOOR} Grindų plane ({sheet} psl.) šiai patalpai dangos neradau — {by_purpose}. "
+                    "Patikrinkite grindų plane ir pasirinkite.")
+    else:
+        sentence = f"{_ASK_FLOOR} Brėžinys nesako — {by_purpose}. Patikrinkite grindų plane ir pasirinkite."
     return _fact("grindys", value, None, "assumed", "prielaida", page, rect,
-                 sentence, editable)
+                 sentence + tail, editable)
 
 
 # ── quantities, straight out of the ledger ──────────────────────────────────

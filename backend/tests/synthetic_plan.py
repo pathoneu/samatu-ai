@@ -12,8 +12,17 @@ from __future__ import annotations
 import io
 from dataclasses import dataclass, field
 
+from pathlib import Path
+
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+
+# Lithuanian letters must reach the text layer as themselves (a floor sheet's
+# title is „GRINDŲ DANGŲ PLANAS") — the bundled export font has them.
+LT_FONT = "SyntheticPlanSans"
+pdfmetrics.registerFont(TTFont(LT_FONT, str(Path(__file__).resolve().parents[1] / "assets" / "fonts" / "DejaVuSans.ttf")))
 
 PT_PER_M = 72 / 25.4 * 10          # 1:100 → 10 mm per metre = 28,346 pt
 WALL_GREY = 0.91
@@ -30,6 +39,9 @@ class Sheet:
     scale: float = 1.0                                                              # 1.0 = 1:100
     triangulate: bool = False                                                       # each wall as two triangles, the way CAD exports fills
     title: str = "PLANAS M 1:100"                                                   # the title block — a real sheet always has text
+    texts: list[tuple[str, float, float, tuple[float, float, float]]] = field(default_factory=list)   # text, x, y (metres), rgb — Lithuanian letters survive
+    hatches: list[tuple[float, float, float, float, tuple[float, float, float], float]] = field(default_factory=list)   # x0, y0, x1, y1 (metres), rgb, grid step — a floor covering's hatch
+    legend: list[tuple[str, tuple[float, float, float]]] = field(default_factory=list)                # coloured lines beside the drawing
 
 
 def _pt(x_m: float, y_m: float, sheet: Sheet) -> tuple[float, float]:
@@ -84,8 +96,27 @@ def build_plan(sheets: list[Sheet]) -> bytes:
         for text, x, y in sheet.badges:
             px, py = _pt(x, y, sheet)
             c.drawCentredString(px, py - 1.4, text)
+        c.setLineWidth(0.4)
+        for x0, y0, x1, y1, rgb, step in sheet.hatches:
+            c.setStrokeColorRGB(*rgb)
+            x = x0 + step
+            while x < x1 - 1e-6:
+                c.line(*_pt(x, y0, sheet), *_pt(x, y1, sheet))
+                x += step
+            y = y0 + step
+            while y < y1 - 1e-6:
+                c.line(*_pt(x0, y, sheet), *_pt(x1, y, sheet))
+                y += step
+        c.setFont(LT_FONT, 5)
+        for text, x, y, rgb in sheet.texts:
+            c.setFillColorRGB(*rgb)
+            c.drawString(*_pt(x, y, sheet), text)
+        for i, (text, rgb) in enumerate(sheet.legend):
+            c.setFillColorRGB(*rgb)
+            c.drawString(ORIGIN[0], 110 - i * 8, text)           # under the drawing, outside every room
+        c.setFillGray(0.0)
         if sheet.title:
-            c.setFont("Helvetica", 7)
+            c.setFont(LT_FONT, 7)
             c.drawString(ORIGIN[0], 30, sheet.title)             # in the title block, the lowest part of the sheet
         c.showPage()
     c.save()

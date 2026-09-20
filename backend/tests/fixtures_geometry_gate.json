@@ -26,13 +26,49 @@
     "atviru_erdviu_iverciai": {
       "04": 16.08,
       "05": 21.69
-    }
+    },
+    "grindu_dangos": {
+      "01": "minksta",
+      "02": "plyteles",
+      "03": "minksta",
+      "04": "plyteles",
+      "05": "minksta",
+      "06": "minksta",
+      "07": "plyteles",
+      "08": "plyteles",
+      "09": "minksta",
+      "10": "minksta",
+      "11": "minksta"
+    },
+    "grindu_lapai": [
+      7
+    ],
+    "dvi_dangos": [],
+    "dangos_neskaitomos": []
   },
   "objektas_g": {
     "konturai": [],
     "atviros_erdves": [],
     "perimetrai_sudeti": {},
     "min_tusti_su_iverciu": 3,
-    "atviru_erdviu_iverciai": {}
+    "atviru_erdviu_iverciai": {},
+    "grindu_dangos": {
+      "03": "plyteles",
+      "05": "plyteles",
+      "06": "plyteles",
+      "09": "plyteles"
+    },
+    "grindu_lapai": [
+      7
+    ],
+    "dvi_dangos": [
+      "01"
+    ],
+    "dangos_neskaitomos": [
+      "01",
+      "02",
+      "04",
+      "08"
+    ]
   }
 }

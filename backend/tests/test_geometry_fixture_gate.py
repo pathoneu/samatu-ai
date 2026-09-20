@@ -70,4 +70,14 @@ def test_geometry_gate(slug):
     for nr, before in ((str(r["nr"]), r) for r in extract["patalpos"]):
         if before.get("perimetras_saltinis") in ("plano_matmenys", "eksplikacija", "user_override", "manual"):
             assert rooms[nr]["perimetras_m"] == before["perimetras_m"]
+    # the floor covering the floor plan draws (2026-09-20): what is read stays read, and what the sheet
+    # does NOT say is never claimed — a wrong „read" is worse than a question
+    floors = out["grindu_dangos"]
+    assert floors["lapai"] == want["grindu_lapai"]
+    for nr, danga in want["grindu_dangos"].items():
+        assert (rooms[nr].get("grindu_danga"), rooms[nr].get("grindu_danga_saltinis")) == (danga, "grindu_planas"), nr
+        ev = rooms[nr]["_grindu_danga"]
+        assert ev["page"] in want["grindu_lapai"] and ev["tekstas"] and len(ev["rect_pct"]) == 4
+    assert set(want["dvi_dangos"]) <= set(floors["dvi_dangos"])
+    assert not [nr for nr in want["dangos_neskaitomos"] if rooms[nr].get("grindu_danga")]
     assert out["seconds"] < 20

@@ -21,6 +21,12 @@ shows as a BLANK with the number to accept. The figure a stated or
 blanked perimeter replaces is kept as `_perimetras_pries_geometrija`. A room
 the lane cannot place or outline is left exactly as it was.
 
+Last, the FLOOR COVERING the floor plan draws in each room (2026-09-20,
+extractor/floor_coverings.py): `grindu_danga` + `grindu_danga_saltinis =
+"grindu_planas"` + `_grindu_danga` {page, irodymas, tekstas, plotas_m2,
+rect_pct}; `_grindu_dangos_dvi` when the sheet writes two kinds of covering in
+one room. His own choice (`user_override`) is never touched.
+
 `_meta.geometrija` says how many rooms came from where. Never raises.
 """
 from __future__ import annotations
@@ -29,12 +35,13 @@ import time
 from typing import Sequence
 
 from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, sum_perimeters
+from .floor_coverings import find_floor_sheets, read_floor_coverings
 from .pdf_vectors import page_geometry
 from .plan_area_annotations import plan_pages_from_classification
 from .plan_dimensions import read_dimension_strings
 from .room_locator import locate_rooms
 from .sheet_alignment import align_sheets, from_base, to_base
-from .vector_rooms import SOURCE as VECTOR_SOURCE, trace_vector_rooms
+from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, trace_vector_rooms
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
 OPEN_PLAN_ESTIMATE = "atviros_erdves_ivertis"
@@ -46,10 +53,88 @@ def _nr(room: dict) -> str:
     return str(room.get("nr") or "").strip()
 
 
+FLOOR_PLAN_SOURCE = "grindu_planas"
+FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
+
+
+def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta) -> None:
+    """Which covering the FLOOR PLAN draws in each room (extractor/floor_coverings.py).
+
+    The rooms are laid onto the floor sheet the way their outlines are laid onto
+    the wall-painting sheet: a wall-exact or human outline when the room has one,
+    otherwise the place of its printed number — and only a place that was READ
+    (a badge, an area label), never Vision's box. His own choice is never
+    touched; a reading that is gone on this run is taken back."""
+    floor_sheets = find_floor_sheets(pdf_bytes, sheets)
+    meta["grindu_dangos"]["lapai"] = floor_sheets
+    read: dict[str, dict] = {}
+    two: dict[str, dict] = {}
+    if floor_sheets:
+        al = alignment
+        if any(p not in (al.get("transform") or {}) for p in floor_sheets):
+            al = lay_over(sorted(set(al.get("transform") or {}) | set(floor_sheets)))
+        group_of = {p: i for i, g in enumerate(al["groups"]) for p in g}
+        for fp in floor_sheets:
+            if fp not in sizes or fp not in group_of:
+                continue
+            W, H = sizes[fp]
+
+            def onto(page: int, x_pct: float, y_pct: float):
+                if page == fp:
+                    return x_pct * W, y_pct * H
+                if page not in sizes or group_of.get(page) != group_of[fp]:
+                    return None
+                bx, by = to_base(al, page, x_pct * sizes[page][0], y_pct * sizes[page][1])
+                return from_base(al, fp, bx, by)
+
+            asked = []
+            for r in rooms:
+                nr = _nr(r)
+                if nr in read:
+                    continue
+                polygon = point = None
+                poly = r.get("polygon_pct")
+                if str(r.get("polygon_source") or "") in KEEP_POLYGONS and isinstance(poly, list) and len(poly) >= 3:
+                    page = int((r.get("_konturas") or {}).get("page") or r.get("puslapio_nr") or 0)
+                    pts = [onto(page, float(x), float(y)) for x, y in poly]
+                    if all(q is not None for q in pts):
+                        polygon = [[q[0], q[1]] for q in pts]
+                v = r.get("_vieta")
+                if polygon is None and isinstance(v, dict) and v.get("saltinis") in STRONG:
+                    q = onto(int(v["page"]), float(v["cx"]), float(v["cy"]))
+                    if q is not None:
+                        point = (q[0], q[1])
+                if polygon is not None or point is not None:
+                    asked.append({"nr": nr, "polygon": polygon, "point": point})
+            got = read_floor_coverings(pdf_bytes, fp, asked, m_per_pt=scale.get(fp))
+            read.update(got["rooms"])
+            for nr, texts in got["dvi_dangos"].items():
+                two.setdefault(nr, {"page": fp, "tekstai": list(texts)})
+    for r in rooms:
+        nr = _nr(r)
+        if nr in two and nr not in read:
+            r["_grindu_dangos_dvi"] = two[nr]
+        else:
+            r.pop("_grindu_dangos_dvi", None)
+        if str(r.get("grindu_danga_saltinis") or "") == "user_override":
+            continue
+        hit = read.get(nr)
+        if hit:
+            r["grindu_danga"] = hit["danga"]
+            r["grindu_danga_saltinis"] = FLOOR_PLAN_SOURCE
+            r["_grindu_danga"] = {k: hit[k] for k in ("page", "irodymas", "tekstas", "plotas_m2", "rect_pct")}
+            meta["grindu_dangos"]["perskaityta"][nr] = hit["danga"]
+        elif str(r.get("grindu_danga_saltinis") or "") == FLOOR_PLAN_SOURCE:
+            for key in FLOOR_KEYS:
+                r.pop(key, None)
+    meta["grindu_dangos"]["dvi_dangos"] = sorted(nr for nr in two if nr not in read)
+
+
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
     t0 = time.time()
     meta: dict = {"vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
-                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "seconds": 0.0}
+                  "perimetrai_sudeti": [], "perimetrai_tusti": [],
+                  "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"
     try:
         rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict) and _nr(r)]
@@ -206,7 +291,8 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 old = before.get(nr)
                 if old is not None and str(r.get("perimetras_saltinis") or "") not in [s for s in STATED_PERIMETERS if s != "matmenu_eilutes"]:
                     r.setdefault("_perimetras_pries_geometrija", old)
-        if meta["konturai"] or done["stated"]:
+        _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
+        if meta["konturai"] or done["stated"] or meta["grindu_dangos"]["perskaityta"]:
             status = "applied"
         elif rooms:
             status = "no_match"

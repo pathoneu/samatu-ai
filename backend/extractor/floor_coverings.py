@@ -48,7 +48,10 @@ FLOOR_WORD_RE = re.compile(r"\bgrindys\b|grind[ųu]\s+dang", re.I)
 NOT_A_COVERING_RE = re.compile(
     r"grindjuost|juostel|klojimo|si[ūu]l|tarpai|slenkst|šild|sild|kolektor|termostat|\bplanas\b|pripjov|"
     r"hidroizol|\bsien|beton|epoksid|poliuret|šlifuot|liejam|teras", re.I)
-FLOOR_TITLE_RE = re.compile(r"grind[ųu]\s+(dang(ų|u|os)\s+)?plan", re.I)
+# a TITLE, in the nominative: a note on an elevation sheet („siūles suvesti … vadovautis grindų
+# planu") made two wall-tile sheets of a real project look like floor plans
+FLOOR_TITLE_RE = re.compile(r"grind[ųu]\s+(dang(ų|u|os)\s+)?planas\b", re.I)
+TITLE_MAX_CHARS = 70
 AREA_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*m\s*[²2]", re.I)
 BARE_NUMBER_RE = re.compile(r"^[\d.,\s]+$")
 
@@ -218,7 +221,8 @@ def find_floor_sheets(pdf_bytes: bytes, pages: Iterable[int] | None) -> list[int
     for pn in sorted({int(p) for p in (pages or [])}):
         _, _, plain, _ = _page_text(pdf_bytes, pn)
         for line in plain.splitlines():
-            if FLOOR_TITLE_RE.search(line) and not re.search(r"šild|sild", line, re.I):
+            if len(line.strip()) <= TITLE_MAX_CHARS and FLOOR_TITLE_RE.search(line) \
+                    and not re.search(r"šild|sild", line, re.I):
                 out.append(pn)
                 break
     return out

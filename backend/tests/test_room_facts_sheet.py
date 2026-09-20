@@ -284,7 +284,10 @@ def test_a_default_is_asked_not_stated():
     assert h["status"] == "assumed" and h["sentence"].startswith("Koks šios patalpos lubų aukštis?")
     g = _fact(build_room_facts(assumed, "1"), "grindys")
     assert g["status"] == "assumed" and g["sentence"].startswith("Kokia čia grindų danga?")
-    assert "miegamoji" in g["sentence"] and "pakeiskite paskirtį" in g["sentence"]
+    # the answer is a direct choice of covering since 2026-09-20 — changing the
+    # room's purpose moved its walls too (tests/test_room_facts_grindys.py)
+    assert "miegamoji" in g["sentence"] and "pasirinkite" in g["sentence"]
+    assert g["editable"] == {"field": "grindu_danga", "kind": "choice"}
     read = {"patalpos": [{"nr": "1", "puslapio_nr": 2, "lubu_aukstis_m": 3.1,
                           "lubu_aukstis_saltinis": "section_pjuvis", "tile_floor_override": True,
                           "plyteles_grindys_m2": 5.0}]}

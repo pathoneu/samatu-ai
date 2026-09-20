@@ -196,3 +196,84 @@ def test_the_lane_says_how_the_plans_sheets_lie_over_each_other():
     two = lapai["2"]                       # base_pct = k{x,y} · sheet_pct + d{x,y}_pct
     assert two["base"] == 1 and abs(two["k"] - 1.0) < 0.01 and abs(two["kx"] - 1.0) < 0.01
     assert abs(two["dx_pct"] + 28.3465 / 595.2756) < 0.003 and abs(two["dy_pct"] - 0.5 * 28.3465 / 841.8898) < 0.003
+
+
+# ── the floor covering, read off the floor plan (2026-09-20) ─────────────────
+
+GREEN = (0.07, 0.61, 0.28)
+BLUE = (0.0, 0.0, 1.0)
+
+
+def _with_floor_sheet(floor):
+    a = two_rooms()
+    a.dims = []                        # the layout sheet: badges, no wall lengths
+    b = two_rooms()
+    b.badges = []                      # the wall painting plan: wall lengths, no badges
+    floor.badges, floor.dims, floor.furniture = [], [], []
+    floor.title = "GRINDŲ DANGŲ PLANAS M 1:100"
+    parsed = _parsed()
+    parsed["puslapiai"].append({"nr": 3, "tipas": "floor_plan"})
+    return parsed, build_plan([a, b, floor])
+
+
+def test_the_floor_plan_says_which_covering_a_room_gets():
+    floor = two_rooms()
+    floor.texts = [("plytelės", 5.2, 1.4, BLUE), ("60X60cm", 5.2, 1.65, BLUE), ("8,95 m2", 5.2, 1.9, BLUE)]
+    parsed, pdf = _with_floor_sheet(floor)
+    out = gl.apply_geometry(parsed, pdf)
+    r1, r2 = parsed["patalpos"]
+    assert r2["grindu_danga"] == "plyteles" and r2["grindu_danga_saltinis"] == "grindu_planas"
+    ev = r2["_grindu_danga"]
+    assert ev["page"] == 3 and ev["irodymas"] == "uzrasas" and ev["plotas_m2"] == 8.95
+    assert ev["tekstas"].startswith("plytelės 60X60cm") and len(ev["rect_pct"]) == 4
+    assert "grindu_danga" not in r1                               # nothing is written there: stays a question
+    g = parsed["_meta"]["geometrija"]["grindu_dangos"]
+    assert g["lapai"] == [3] and g["perskaityta"] == {"02": "plyteles"}
+    assert out["grindu_dangos"]["perskaityta"] == {"02": "plyteles"}
+
+
+def test_a_hatch_in_its_legend_colour_is_read_through_the_rooms_outline():
+    floor = two_rooms()
+    floor.hatches = [(4.4, 0.2, 7.4, 3.2, GREEN, 0.6)]
+    floor.legend = [("60 x 60cm plytelė", GREEN)]
+    parsed, pdf = _with_floor_sheet(floor)
+    gl.apply_geometry(parsed, pdf)
+    r1, r2 = parsed["patalpos"]
+    assert r2["grindu_danga"] == "plyteles" and r2["_grindu_danga"]["irodymas"] == "rastas"
+    assert "grindu_danga" not in r1
+
+
+def test_his_own_choice_of_covering_is_never_overwritten():
+    floor = two_rooms()
+    floor.texts = [("plytelės", 5.2, 1.4, BLUE)]
+    parsed, pdf = _with_floor_sheet(floor)
+    parsed["patalpos"][1].update({"grindu_danga": "minksta", "grindu_danga_saltinis": "user_override"})
+    gl.apply_geometry(parsed, pdf)
+    r2 = parsed["patalpos"][1]
+    assert r2["grindu_danga"] == "minksta" and r2["grindu_danga_saltinis"] == "user_override"
+
+
+def test_a_reading_that_is_gone_on_the_next_run_is_taken_back():
+    parsed, pdf = _with_floor_sheet(two_rooms())                   # a floor sheet that says nothing
+    parsed["patalpos"][1].update({"grindu_danga": "plyteles", "grindu_danga_saltinis": "grindu_planas",
+                                  "_grindu_danga": {"page": 3}})
+    gl.apply_geometry(parsed, pdf)
+    r2 = parsed["patalpos"][1]
+    assert "grindu_danga" not in r2 and "_grindu_danga" not in r2 and "grindu_danga_saltinis" not in r2
+
+
+def test_two_coverings_written_in_one_room_are_put_on_the_room_as_a_note():
+    floor = two_rooms()
+    floor.texts = [("laminuota grindų danga", 0.6, 1.0, BLUE), ("plytelės 7,01 m2", 2.6, 2.6, BLUE)]
+    parsed, pdf = _with_floor_sheet(floor)
+    gl.apply_geometry(parsed, pdf)
+    r1 = parsed["patalpos"][0]
+    assert "grindu_danga" not in r1
+    assert r1["_grindu_dangos_dvi"] == {"page": 3, "tekstai": ["laminuota grindų danga", "plytelės 7,01 m2"]}
+
+
+def test_without_a_floor_sheet_nothing_about_floors_is_written():
+    parsed = _parsed()
+    gl.apply_geometry(parsed, _two_sheets())
+    assert all("grindu_danga" not in r for r in parsed["patalpos"])
+    assert parsed["_meta"]["geometrija"]["grindu_dangos"] == {"lapai": [], "perskaityta": {}, "dvi_dangos": []}
