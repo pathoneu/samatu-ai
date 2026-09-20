@@ -31,6 +31,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { fetchOutlineAt } from '@/lib/roomOutlineApi';
+import { outlineFailureKey, roomsWithOutline } from '@/lib/roomOutline';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import {
@@ -101,6 +103,7 @@ export default function RoomSheet() {
   // The last fix made on this room: which fact, what it moved in the sąmata, and the
   // project as it was before — shown under that fact with „Atšaukti pataisymą".
   const [lastFix, setLastFix] = useState(null);
+  const [picking, setPicking] = useState(false);            // „Parodyti patalpą" waits for a click on the drawing
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -145,6 +148,7 @@ export default function RoomSheet() {
     setSeen(new Set());
     setRipple(null);
     setLastFix(null);
+    setPicking(false);
     setHighlightCorners(false);
   }, [loadFacts]);
 
@@ -291,6 +295,23 @@ export default function RoomSheet() {
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true, factKey: factKeyForField('elementai') });
   }), [run, project, room, roomNr, land, pilot]);
+
+  // „Parodyti patalpą": one click inside the room on the drawing → the wall-exact outline, its walls
+  // read again (api/room_outline.py). A click that may not become an outline is said and the pick
+  // stays on, so he can try another place.
+  const pickOutline = useCallback((point) => run(async () => {
+    if (!point) return;
+    pilot('outline_pick', { kind: 'room', id: String(roomNr) });
+    const answer = await fetchOutlineAt(id, roomNr, point);
+    const rooms = roomsWithOutline(project, roomNr, answer);
+    if (!rooms) {
+      const { key, params } = outlineFailureKey(answer);
+      toast.error(t(`project.roomSheet.${key}`, params));
+      return;
+    }
+    setPicking(false);
+    await land(await saveRoomEdit(project, rooms), { fromInterior: true, factKey: 'perimetras' });
+  }), [run, id, project, roomNr, land, pilot, t]);
 
   // A door or window the reader missed — one the walls show, or a standard one („+ Durys").
   const addRoomOpening = useCallback((opening) => run(async () => {
@@ -519,6 +540,12 @@ export default function RoomSheet() {
                 facts={factList}
                 activeFactKey={activeFactKey}
                 focusRequest={focusRequest}
+                pick={{
+                  active: picking, busy,
+                  onStart: () => setPicking(true),
+                  onCancel: () => setPicking(false),
+                  onPoint: pickOutline,
+                }}
                 fallback={{
                   room: facts.room, projectId: id, highlightCorners, facts: factList,
                   wholeSheet, onToggleWhole: setWholeSheet, activeFactKey,
@@ -587,6 +614,7 @@ export default function RoomSheet() {
                     onAdjustOpening={adjustOpening}
                     onSaveOpeningSize={saveOpeningSize}
                     onAddOpening={addRoomOpening}
+                    onPickOutline={fact.key === 'perimetras' ? () => setPicking(true) : null}
                     onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
                   />
                   {lastFix?.factKey === fact.key && (

@@ -21,11 +21,12 @@
 
 import { Component, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Maximize2, ScanSearch } from 'lucide-react';
+import { Loader2, Maximize2, MousePointerClick, ScanSearch, X } from 'lucide-react';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { buildCheckOverlay } from '@/lib/checkOverlay';
+import { displayPointOf } from '@/lib/roomOutline';
 import { laneMastelisOf, pageScalesFromLane } from '@/lib/durableScale';
 import { cleanUserText } from '@/lib/userText';
 
@@ -48,7 +49,7 @@ class ViewerBoundary extends Component {
 }
 
 export default function RoomDrawingPane({
-  project, projectId, room, facts = [], activeFactKey = null, focusRequest = null, fallback,
+  project, projectId, room, facts = [], activeFactKey = null, focusRequest = null, fallback, pick = null,
 }) {
   const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -159,10 +160,48 @@ export default function RoomDrawingPane({
             <Maximize2 className="h-4 w-4" aria-hidden="true" />
             {t('project.roomSheet.drawWholeSheet')}
           </button>
+          {/* „Parodyti patalpą": one click inside the room → its outline along the walls (lib/roomOutline). */}
+          {pick && (
+            <button
+              type="button"
+              className={`${BTN} ${pick.active ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
+              aria-pressed={pick.active}
+              disabled={pick.busy}
+              onClick={() => (pick.active ? pick.onCancel?.() : pick.onStart?.())}
+              data-testid="outline-pick"
+            >
+              <MousePointerClick className="h-4 w-4" aria-hidden="true" />
+              {t('project.roomSheet.outlinePick')}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="h-[68vh] min-h-[460px] overflow-hidden rounded-[2px] border border-border bg-card">
+      {pick?.active && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-3 py-2 text-[14px]"
+          role="status"
+          data-testid="outline-pick-banner"
+        >
+          <p className="flex items-center gap-2 font-semibold text-foreground">
+            {pick.busy
+              ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              : <MousePointerClick className="h-4 w-4" aria-hidden="true" />}
+            {pick.busy
+              ? t('project.roomSheet.outlineReading')
+              : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
+          </p>
+          <button type="button" className={BTN} disabled={pick.busy} onClick={() => pick.onCancel?.()}>
+            <X className="h-4 w-4" aria-hidden="true" />
+            {t('project.roomSheet.cancel')}
+          </button>
+        </div>
+      )}
+
+      <div
+        className={`h-[68vh] min-h-[460px] overflow-hidden rounded-[2px] border bg-card
+          ${pick?.active ? 'border-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : 'border-border'}`}
+      >
         {pdfState === 'ready' && pdfUrl ? (
           <ViewerBoundary onFail={() => setPdfState('failed')}>
             <TakeoffViewer
@@ -172,6 +211,7 @@ export default function RoomDrawingPane({
               check={check}
               focus={focus}
               laneScales={laneScales}
+              onPagePoint={pick?.active && !pick.busy ? (pt) => pick.onPoint?.(displayPointOf(pt)) : null}
             />
           </ViewerBoundary>
         ) : (

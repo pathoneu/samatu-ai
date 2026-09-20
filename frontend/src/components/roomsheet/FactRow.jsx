@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, MapPin, Minus, Pencil, Plus } from 'lucide-react';
+import { Check, MapPin, Minus, MousePointerClick, Pencil, Plus } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { cleanUserText } from '@/lib/userText';
@@ -75,6 +75,7 @@ function SizeEditor({ detail, busy, onSave, t }) {
 export default function FactRow({
   fact, room, busy = false, verified = false,
   onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onAddOpening, onShowOnDrawing = null,
+  onPickOutline = null,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -157,6 +158,20 @@ export default function FactRow({
             <span className="font-mono font-medium text-muted-foreground">
               · {t('project.roomSheet.sourcePage', { page: fact.source.page })}
             </span>
+          </button>
+        )}
+        {/* A room without an outline of its own: one click inside it on the drawing gives it one,
+            and its walls are read again — the fix for the reason the sentence above gives. */}
+        {onPickOutline && fact?.key === 'perimetras' && !fact?.outline?.polygon_pct && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onPickOutline}
+            className={`${BTN} mt-2 border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            data-testid="fact-pick-outline"
+          >
+            <MousePointerClick className="h-4 w-4" aria-hidden="true" />
+            {t('project.roomSheet.outlinePickFromFact')}
           </button>
         )}
         {isWholeSheet(fact) && (
