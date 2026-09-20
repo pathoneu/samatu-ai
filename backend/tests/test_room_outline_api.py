@@ -143,3 +143,25 @@ def test_a_strange_project_id_is_rejected(tmp_path, monkeypatch, bad):
     x, y = _pct(2.0, 2.5)
     r = TestClient(app).post(f"/api/projects/{bad}/rooms/01/outline-at", json={"page": 1, "x_pct": x, "y_pct": y})
     assert r.status_code in (400, 404)
+
+
+# ── the perimeter fact says whose outline it is ──────────────────────────────
+
+def _perimeter_fact(**konturas):
+    from extractor.room_facts import build_room_facts
+    ring = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
+    room = {"nr": "01", "puslapio_nr": 1, "plotas_m2": 4.48, "polygon_pct": ring, "polygon_source": "corrected",
+            "perimetras_m": 6.85, "perimetras_saltinis": "matmenu_eilutes",
+            "_perimetras_suma": {"suma_m": 6.85, "kontrole_m": 6.77, "sutampa": True, "lapai": [1], "eilutes": ["600", "996"]},
+            "_sienos": [], "_konturas": {"page": 1, "plotas_m2": 2.86, "plotas_uzrasas_m2": 4.48, **konturas}}
+    return next(f for f in build_room_facts({"patalpos": [room]}, "01")["facts"] if f["key"] == "perimetras")
+
+
+def test_an_outline_he_pointed_at_is_said_and_its_area_is_compared_with_the_table():
+    f = _perimeter_fact(saltinis="parodyta", paklaida=0.3616)
+    assert f["status"] == "read"
+    assert f["sentence"].endswith("Patalpą brėžinyje parodėte patys: kontūro plotas 2,86 m², lentelėje užrašyta 4,48 m².")
+    agrees = _perimeter_fact(saltinis="parodyta", paklaida=0.02)
+    assert agrees["sentence"].endswith("Patalpą brėžinyje parodėte patys.")
+    traced = _perimeter_fact(saltinis="vektoriniai_konturai", paklaida=0.3616)
+    assert "parodėte" not in traced["sentence"]

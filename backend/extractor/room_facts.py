@@ -491,6 +491,17 @@ def _fact_perimetras(project: dict, room: dict,
             tail = (f" Sienų plotui naudoju {lt_num(used)} m — patalpos kontūras "
                     "brėžinyje nepažymėtas, todėl imu stačiakampio perimetrą.")
 
+    # 2026-09-20: an outline he POINTED AT on the check sheet (api/room_outline.py). Whose outline it is
+    # gets said; a disagreement with the table is shown — it no longer stops the walls from being added.
+    kont = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
+    if kont.get("saltinis") == "parodyta":
+        dev = _f(kont.get("paklaida"))
+        if dev is not None and dev > 0.08 and _f(kont.get("plotas_m2")) and _f(kont.get("plotas_uzrasas_m2")):
+            tail += (f" Patalpą brėžinyje parodėte patys: kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², "
+                     f"lentelėje užrašyta {lt_num(_f(kont.get('plotas_uzrasas_m2')))} m².")
+        else:
+            tail += " Patalpą brėžinyje parodėte patys."
+
     estimated = str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis")
     if (measured is None or estimated) and _f(room.get("_perimetras_ivertis_m") if measured is None else measured):
         # 2026-09-19: the geometry lane could not ADD this room's wall lengths.
