@@ -873,6 +873,29 @@ def _ceiling_description(room: dict) -> str:
     return f"dažomos {_m2(area)}" if area > 0 else "dažomos"
 
 
+DESIGNER_TOTAL_TOL = 0.03        # the designer's own total and ours „agree" within this share
+
+
+def _designer_wall_total(project: dict) -> dict | None:
+    """The designer's OWN total for painted walls, written on the drawing (`_autoriaus_kiekiai`, family
+    `sienu_dazymas`, m²), beside the sum of our rooms: {ours, theirs, page, rect_pct, agrees}. A second
+    reading of the same drawing to compare against — never a value we take."""
+    figures = [f for f in (project.get("_autoriaus_kiekiai") or [])
+               if isinstance(f, dict) and f.get("family") == "sienu_dazymas"
+               and str(f.get("unit") or "").lower().replace("²", "2") == "m2" and (_f(f.get("value")) or 0) > 0]
+    if not figures:
+        return None
+    theirs = round(sum(_f(f.get("value")) or 0.0 for f in figures), 2)
+    ours = round(sum(_f(r.get("walls_paintable_m2")) or 0.0 for r in (project.get("patalpos") or []) if isinstance(r, dict)), 2)
+    if theirs <= 0 or ours <= 0:
+        return None
+    first = figures[0]
+    page = _f(first.get("page"))
+    return {"ours": ours, "theirs": theirs, "page": int(page) if page else None,
+            "rect_pct": _bbox_pdf_to_pct(first.get("bbox"), first.get("page_width"), first.get("page_height")),
+            "agrees": abs(ours - theirs) / theirs <= DESIGNER_TOTAL_TOL}
+
+
 def _fact_apdaila(project: dict, room: dict,
                   region: list[float] | None) -> dict:
     tile_src = (room.get("_tile_read_source") or "").strip().lower()
@@ -899,7 +922,22 @@ def _fact_apdaila(project: dict, room: dict,
     value = (f"Sienos: {_walls_description(room)}; "
              f"lubos: {_ceiling_description(room)}")
     sentence = opening
-    if status == "read":
+    rect = None
+    # 2026-09-20: a finish chosen by the room's PURPOSE stops being a question when the designer's own
+    # total for painted walls agrees with the sum of our rooms — the sąmata bills that total, and the
+    # drawing confirms it (objektas_h: 320 m² written, 320,28 m² ours; nine amber rows asked him to
+    # check išklotinės the drawing does not have).
+    total = _designer_wall_total(project) if status != "read" else None
+    if total and total["agrees"] and total["page"]:
+        status, kind, page = "read", "planas", total["page"]
+        m = MARKER_MARGIN_PCT
+        if total["rect_pct"]:
+            x0, y0, x1, y1 = total["rect_pct"]
+            rect = [max(0.0, x0 - m), max(0.0, y0 - m), min(1.0, x1 + m), min(1.0, y1 + m)]
+        sentence = (f"Sienų apdaila — pagal patalpos paskirtį. Visų patalpų dažomų sienų suma {_m2(total['ours'])} sutampa su "
+                    f"projekto autoriaus užrašyta {_m2(total['theirs'])} ({total['page']} psl.) — kiekvienos patalpos "
+                    f"atskirai tikrinti nereikia. Lubos — patikrinkite lubų plane.")
+    elif status == "read":
         sentence += " Lubos — patikrinkite lubų plane."
     else:
         sentence += " Patikrinkite išklotinėse arba apdailų lentelėje."
@@ -910,7 +948,7 @@ def _fact_apdaila(project: dict, room: dict,
     # frames it usefully; otherwise the crop is the whole sheet and the
     # sentence says which one to read.
     return _fact("apdaila", value, None, status, kind, page,
-                 region_on_page(room, page, region), sentence,
+                 rect or region_on_page(room, page, region), sentence,
                  {"field": "walls_paint_override", "kind": "choice"})
 
 
