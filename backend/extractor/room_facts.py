@@ -414,6 +414,9 @@ def _perimeter_drawing(room: dict) -> dict:
     traced = str(room.get("polygon_source") or "") not in _NOT_AN_OUTLINE
     poly = normalize_polygon(room.get("polygon_pct")) if traced else None
     outline: dict | None = {"page": page, "polygon_pct": poly} if poly else None
+    if outline is not None and isinstance(kont.get("menamos"), list) and kont["menamos"]:
+        # the boundary a person drew through a shared space: an edge of the outline, not a wall — drawn dashed
+        outline["menamos"] = [[[_f(a[0]), _f(a[1])], [_f(b[0]), _f(b[1])]] for a, b in kont["menamos"]]
     space = room.get("_atvira_erdve")
     shared = normalize_polygon(space.get("polygon_pct")) if isinstance(space, dict) else None
     if shared:
@@ -494,13 +497,24 @@ def _fact_perimetras(project: dict, room: dict,
     # 2026-09-20: an outline he POINTED AT on the check sheet (api/room_outline.py). Whose outline it is
     # gets said; a disagreement with the table is shown — it no longer stops the walls from being added.
     kont = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
+    whose = ""                                                 # said whether the walls were added or not
     if kont.get("saltinis") == "parodyta":
         dev = _f(kont.get("paklaida"))
         if dev is not None and dev > 0.08 and _f(kont.get("plotas_m2")) and _f(kont.get("plotas_uzrasas_m2")):
-            tail += (f" Patalpą brėžinyje parodėte patys: kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², "
+            whose = (f" Patalpą brėžinyje parodėte patys: kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², "
                      f"lentelėje užrašyta {lt_num(_f(kont.get('plotas_uzrasas_m2')))} m².")
         else:
-            tail += " Patalpą brėžinyje parodėte patys."
+            whose = " Patalpą brėžinyje parodėte patys."
+    elif kont.get("saltinis") == "padalinta":
+        # 2026-09-21: one side of a line he drew through a space two rooms share (api/room_outline.py)
+        others = ", ".join(str(n) for n in (kont.get("su") or []))
+        whose = (f" Bendrą erdvę su patalpa {others} padalijote patys" if others else " Bendrą erdvę padalijote patys")
+        whose += " — riba tarp jų menama (sienos ten nėra), į perimetrą neįskaičiuota."
+        dev = _f(kont.get("paklaida"))
+        if dev is not None and dev > 0.08 and _f(kont.get("plotas_m2")) and _f(kont.get("plotas_uzrasas_m2")):
+            whose += (f" Šios dalies kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², "
+                      f"lentelėje užrašyta {lt_num(_f(kont.get('plotas_uzrasas_m2')))} m².")
+    tail += whose
 
     estimated = str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis")
     if (measured is None or estimated) and _f(room.get("_perimetras_ivertis_m") if measured is None else measured):
@@ -519,7 +533,7 @@ def _fact_perimetras(project: dict, room: dict,
                         f"priimkite arba įrašykite tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
         return _fact("perimetras", None, "m", "missing", "nera", page,
                      _outline_rect_pct(room) or _open_space_rect_pct(room) or region_on_page(room, page, region),
-                     sentence, editable, suggestion={"value": est, "label": f"Priimti {lt_num(est)} m"})
+                     sentence + whose, editable, suggestion={"value": est, "label": f"Priimti {lt_num(est)} m"})
 
     if measured is None:
         if used is None:

@@ -189,3 +189,19 @@ test('a fact without wall openings draws none, and a broken one is skipped', () 
   const o = buildCheckOverlay({ room, facts: [perimetras, broken], sutapdinimas: SUT });
   assert.equal(o.pages[1].openings.length, 1);
 });
+
+// ── a space divided by a person: the boundary is drawn, and it is not a wall (2026-09-21) ──
+test('an imaginary boundary is drawn on every sheet the room is drawn on', () => {
+  const divided = { ...perimetras, outline: { ...perimetras.outline, menamos: [[[0.46, 0.25], [0.46, 0.38]]] } };
+  const o = buildCheckOverlay({ room, facts: [divided], sutapdinimas: SUT });
+  assert.deepEqual(o.pages[1].imaginary, [{ a: [0.46, 0.25], b: [0.46, 0.38] }]);
+  near(o.pages[6].imaginary[0].a[1], 0.25 - 0.0024);
+  const plain = buildCheckOverlay({ room, facts: [perimetras], sutapdinimas: SUT });
+  assert.deepEqual(plain.pages[1].imaginary, []);
+});
+
+test('the points he has clicked so far are shown on their sheet', () => {
+  const o = buildCheckOverlay({ room, facts: [perimetras], sutapdinimas: SUT, pickPoints: [{ page: 6, x_pct: 0.5, y_pct: 0.3 }] });
+  assert.deepEqual(o.pages[6].pickPoints, [{ x: 0.5, y: 0.3 }]);
+  assert.deepEqual(o.pages[1].pickPoints, []);
+});

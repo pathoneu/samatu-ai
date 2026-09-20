@@ -31,8 +31,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { fetchOutlineAt } from '@/lib/roomOutlineApi';
-import { outlineFailureKey, roomsWithOutline } from '@/lib/roomOutline';
+import { fetchOutlineAt, fetchSplitSpace } from '@/lib/roomOutlineApi';
+import { nextSplitClick, outlineFailureKey, roomsWithOutline, roomsWithSplit, splitFailureKey } from '@/lib/roomOutline';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import {
@@ -103,7 +103,11 @@ export default function RoomSheet() {
   // The last fix made on this room: which fact, what it moved in the sąmata, and the
   // project as it was before — shown under that fact with „Atšaukti pataisymą".
   const [lastFix, setLastFix] = useState(null);
-  const [picking, setPicking] = useState(false);            // „Parodyti patalpą" waits for a click on the drawing
+  // Waiting for clicks on the drawing: `'outline'` („Parodyti patalpą", one click) or `'split'`
+  // („Padalinti erdvę", two clicks — `splitFirst` is the first of them).
+  const [picking, setPickingMode] = useState(false);
+  const [splitFirst, setSplitFirst] = useState(null);
+  const setPicking = useCallback((mode) => { setPickingMode(mode || false); setSplitFirst(null); }, []);
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -313,7 +317,27 @@ export default function RoomSheet() {
     }
     setPicking(false);
     await land(await saveRoomEdit(project, rooms), { fromInterior: true, factKey: 'perimetras' });
-  }), [run, id, project, roomNr, land, pilot, t]);
+  }), [run, id, project, roomNr, land, pilot, t, setPicking]);
+
+  // „Padalinti erdvę": two clicks draw the boundary between two rooms no wall separates; BOTH rooms
+  // get their outlines, the boundary is never a wall (api/room_outline.py split-space). One undo for both.
+  const pickSplit = useCallback((point) => {
+    const { first, request } = nextSplitClick(splitFirst, point);
+    setSplitFirst(first);
+    if (!request) return;
+    run(async () => {
+      pilot('space_split', { kind: 'room', id: String(roomNr) });
+      const answer = await fetchSplitSpace(id, roomNr, request);
+      const rooms = roomsWithSplit(project, answer);
+      if (!rooms) {
+        const { key, params } = splitFailureKey(answer);
+        toast.error(t(`project.roomSheet.${key}`, params));
+        return;
+      }
+      setPicking(false);
+      await land(await saveRoomEdit(project, rooms), { fromInterior: true, factKey: 'perimetras' });
+    });
+  }, [run, id, project, roomNr, land, pilot, t, splitFirst, setPicking]);
 
   // A door or window the reader missed — one the walls show, or a standard one („+ Durys").
   const addRoomOpening = useCallback((opening) => run(async () => {
@@ -543,10 +567,10 @@ export default function RoomSheet() {
                 activeFactKey={activeFactKey}
                 focusRequest={focusRequest}
                 pick={{
-                  active: picking, busy,
-                  onStart: () => setPicking(true),
+                  active: Boolean(picking), mode: picking || null, first: splitFirst, busy,
+                  onStart: (mode) => setPicking(mode || 'outline'),
                   onCancel: () => setPicking(false),
-                  onPoint: pickOutline,
+                  onPoint: picking === 'split' ? pickSplit : pickOutline,
                 }}
                 fallback={{
                   room: facts.room, projectId: id, highlightCorners, facts: factList,
@@ -616,7 +640,8 @@ export default function RoomSheet() {
                     onAdjustOpening={adjustOpening}
                     onSaveOpeningSize={saveOpeningSize}
                     onAddOpening={addRoomOpening}
-                    onPickOutline={fact.key === 'perimetras' ? () => setPicking(true) : null}
+                    onPickOutline={fact.key === 'perimetras' ? () => setPicking('outline') : null}
+                    onSplitSpace={fact.key === 'perimetras' ? () => setPicking('split') : null}
                     onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
                   />
                   {lastFix?.factKey === fact.key && (

@@ -9,6 +9,9 @@
  *    wall opposite; grey: a short piece from the outline; red dashed: the plan
  *    writes no length for it;
  *  • the dimension STRINGS that were added, marked on the sheet they are on;
+ *  • the IMAGINARY boundary a person drew through a space two rooms share — dashed
+ *    in the room's blue: an edge of the outline, not a wall; and the points he has
+ *    clicked so far while showing a room or dividing a space;
  *  • the OPENINGS the wall solid shows in the room's walls — a violet bar across
  *    each gap; its width appears while the door-and-window fact is looked at;
  *  • the rectangle a fact was read from, solid while that fact is active;
@@ -111,6 +114,14 @@ export default function CheckLayer({ data, renderedSize }) {
         );
       })}
 
+      {(data.imaginary || []).map((seg, i) => (
+        <line
+          key={`im${i}`} data-check-imaginary
+          x1={X(seg.a)} y1={Y(seg.a)} x2={X(seg.b)} y2={Y(seg.b)}
+          stroke={ROOM} strokeWidth={2.5} strokeDasharray="9 6" strokeLinecap="round"
+        />
+      ))}
+
       {(data.openings || []).map((g, i) => (
         <g key={`o${i}`} data-check-opening>
           <line x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)} stroke="#ffffff" strokeOpacity={0.9} strokeWidth={9} strokeLinecap="round" />
@@ -156,6 +167,14 @@ export default function CheckLayer({ data, renderedSize }) {
           />
         );
       })}
+
+      {(data.pickPoints || []).map((pt, i) => (
+        <g key={`pk${i}`} transform={`translate(${(pt.x * width).toFixed(1)}, ${(pt.y * height).toFixed(1)})`} data-check-pick>
+          <circle r={7} fill="#ffffff" fillOpacity={0.9} stroke={ROOM} strokeWidth={2.5} />
+          <line x1={-11} y1={0} x2={11} y2={0} stroke={ROOM} strokeWidth={1.5} />
+          <line x1={0} y1={-11} x2={0} y2={11} stroke={ROOM} strokeWidth={1.5} />
+        </g>
+      ))}
 
       {data.marker && (
         <g transform={`translate(${(data.marker.x * width).toFixed(1)}, ${(data.marker.y * height).toFixed(1)})`}>

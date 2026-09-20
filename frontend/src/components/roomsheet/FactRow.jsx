@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, MapPin, Minus, MousePointerClick, Pencil, Plus } from 'lucide-react';
+import { Check, MapPin, Minus, MousePointerClick, Pencil, Plus, Scissors } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { cleanUserText } from '@/lib/userText';
@@ -75,7 +75,7 @@ function SizeEditor({ detail, busy, onSave, t }) {
 export default function FactRow({
   fact, room, busy = false, verified = false,
   onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onAddOpening, onShowOnDrawing = null,
-  onPickOutline = null,
+  onPickOutline = null, onSplitSpace = null,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -170,12 +170,27 @@ export default function FactRow({
         )}
         {/* A room without an outline of its own: one click inside it on the drawing gives it one,
             and its walls are read again — the fix for the reason the sentence above gives. */}
-        {onPickOutline && fact?.key === 'perimetras' && !fact?.outline?.polygon_pct && (
+        {/* …and a room that shares its space with another (no wall between them): one line he draws
+            gives both their own outlines — a click inside would only find the shared space again. */}
+        {onSplitSpace && fact?.key === 'perimetras' && !fact?.outline?.polygon_pct
+          && (fact?.outline?.open_space?.nariai || []).length === 2 && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onSplitSpace}
+            className={`${BTN} mt-2 flex w-fit border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            data-testid="fact-split-space"
+          >
+            <Scissors className="h-4 w-4" aria-hidden="true" />
+            {t('project.roomSheet.splitFromFact')}
+          </button>
+        )}
+        {onPickOutline && fact?.key === 'perimetras' && !fact?.outline?.polygon_pct && !fact?.outline?.open_space && (
           <button
             type="button"
             disabled={busy}
             onClick={onPickOutline}
-            className={`${BTN} mt-2 border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            className={`${BTN} mt-2 flex w-fit border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
             data-testid="fact-pick-outline"
           >
             <MousePointerClick className="h-4 w-4" aria-hidden="true" />

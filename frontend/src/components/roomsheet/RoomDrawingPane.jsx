@@ -21,7 +21,7 @@
 
 import { Component, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Maximize2, MousePointerClick, ScanSearch, X } from 'lucide-react';
+import { Loader2, Maximize2, MousePointerClick, ScanSearch, Scissors, X } from 'lucide-react';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import { getPdfUrl } from '@/lib/pdfStore';
@@ -84,9 +84,10 @@ export default function RoomDrawingPane({
   }, [projectId]);
 
   const sutapdinimas = project?._meta?.geometrija?.sutapdinimas || null;
+  const pickFirst = pick?.first || null;
   const overlay = useMemo(
-    () => buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey }),
-    [room, facts, sutapdinimas, activeFactKey],
+    () => buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey, pickPoints: pickFirst ? [pickFirst] : null }),
+    [room, facts, sutapdinimas, activeFactKey, pickFirst],
   );
   const check = useMemo(() => ({ pages: overlay.pages }), [overlay.pages]);
   const laneScales = useMemo(() => pageScalesFromLane(laneMastelisOf(project)), [project]);
@@ -164,14 +165,28 @@ export default function RoomDrawingPane({
           {pick && (
             <button
               type="button"
-              className={`${BTN} ${pick.active ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
-              aria-pressed={pick.active}
+              className={`${BTN} ${pick.active && pick.mode !== 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
+              aria-pressed={pick.active && pick.mode !== 'split'}
               disabled={pick.busy}
-              onClick={() => (pick.active ? pick.onCancel?.() : pick.onStart?.())}
+              onClick={() => (pick.active && pick.mode !== 'split' ? pick.onCancel?.() : pick.onStart?.('outline'))}
               data-testid="outline-pick"
             >
               <MousePointerClick className="h-4 w-4" aria-hidden="true" />
               {t('project.roomSheet.outlinePick')}
+            </button>
+          )}
+          {/* „Padalinti erdvę": two rooms no wall separates — one line he draws gives each its own outline. */}
+          {pick && space && (
+            <button
+              type="button"
+              className={`${BTN} ${pick.active && pick.mode === 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
+              aria-pressed={pick.active && pick.mode === 'split'}
+              disabled={pick.busy}
+              onClick={() => (pick.active && pick.mode === 'split' ? pick.onCancel?.() : pick.onStart?.('split'))}
+              data-testid="space-split"
+            >
+              <Scissors className="h-4 w-4" aria-hidden="true" />
+              {t('project.roomSheet.splitPick')}
             </button>
           )}
         </div>
@@ -189,7 +204,9 @@ export default function RoomDrawingPane({
               : <MousePointerClick className="h-4 w-4" aria-hidden="true" />}
             {pick.busy
               ? t('project.roomSheet.outlineReading')
-              : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
+              : pick.mode === 'split'
+                ? t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') })
+                : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
           </p>
           <button type="button" className={BTN} disabled={pick.busy} onClick={() => pick.onCancel?.()}>
             <X className="h-4 w-4" aria-hidden="true" />

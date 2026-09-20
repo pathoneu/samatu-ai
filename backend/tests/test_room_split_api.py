@@ -109,3 +109,42 @@ def test_bad_requests_and_strangers(tmp_path, monkeypatch):
     assert _split(c, nr="77").status_code == 404
     bad = c.post("/api/projects/p1/rooms/01/split-space", json={"page": 1, "a": {"x_pct": 1.5, "y_pct": 0.2}, "b": _pct(4.3, 3.3)})
     assert bad.status_code == 422
+
+
+# ── the perimeter fact of a divided room ─────────────────────────────────────
+
+def _perimeter_fact(**konturas):
+    from extractor.room_facts import build_room_facts
+    ring = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
+    room = {"nr": "04", "puslapio_nr": 1, "plotas_m2": 26.31, "polygon_pct": ring, "polygon_source": "corrected",
+            "perimetras_m": 18.39, "perimetras_saltinis": "matmenu_eilutes",
+            "_perimetras_suma": {"suma_m": 18.39, "kontrole_m": 18.4, "sutampa": True, "lapai": [1], "eilutes": ["4100", "3000"]},
+            "_sienos": [], "_konturas": {"page": 1, "plotas_m2": 26.61, "plotas_uzrasas_m2": 26.31, "paklaida": 0.0113,
+                                         "menamos": [[[0.4, 0.2], [0.4, 0.35]]], "su": ["05"], "saltinis": "padalinta", **konturas}}
+    return next(f for f in build_room_facts({"patalpos": [room]}, "04")["facts"] if f["key"] == "perimetras")
+
+
+def test_a_divided_room_says_the_boundary_is_not_a_wall_and_draws_it():
+    f = _perimeter_fact()
+    assert f["status"] == "read"
+    assert f["sentence"].endswith("Bendrą erdvę su patalpa 05 padalijote patys — riba tarp jų menama (sienos ten nėra), "
+                                  "į perimetrą neįskaičiuota.")
+    assert f["outline"]["menamos"] == [[[0.4, 0.2], [0.4, 0.35]]]
+    off = _perimeter_fact(paklaida=0.21, plotas_m2=31.9)
+    assert "kontūro plotas 31,90 m², lentelėje užrašyta 26,31 m²" in off["sentence"]
+
+
+def test_a_divided_room_whose_walls_could_not_all_be_added_still_says_whose_boundary_it_is():
+    f = _perimeter_fact()
+    from extractor.room_facts import build_room_facts
+    ring = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
+    room = {"nr": "04", "puslapio_nr": 1, "plotas_m2": 26.31, "polygon_pct": ring, "polygon_source": "corrected",
+            "perimetras_m": 18.41, "perimetras_saltinis": "konturo_ivertis", "_perimetras_ivertis_m": 18.41,
+            "_perimetras_ivertis_saltinis": "konturas", "_perimetras_priezastis": "1 iš 9 sienų be matmens",
+            "_konturas": {"page": 1, "plotas_m2": 26.61, "plotas_uzrasas_m2": 26.31, "paklaida": 0.0113,
+                          "menamos": [[[0.4, 0.2], [0.4, 0.35]]], "su": ["05"], "saltinis": "padalinta"}}
+    blank = next(x for x in build_room_facts({"patalpos": [room]}, "04")["facts"] if x["key"] == "perimetras")
+    assert blank["status"] == "missing" and blank["suggestion"]["value"] == 18.41
+    assert blank["sentence"].endswith("Bendrą erdvę su patalpa 05 padalijote patys — riba tarp jų menama (sienos ten nėra), "
+                                      "į perimetrą neįskaičiuota.")
+    assert f["sentence"].count("padalijote patys") == 1

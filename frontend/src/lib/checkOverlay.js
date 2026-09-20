@@ -99,17 +99,17 @@ function validPolygon(poly) {
 
 /**
  * Everything the viewer draws for this room, per page, plus where to look.
- *   pages[p] = { outline, openSpace, walls, strings, openings, marks, marker }
+ *   pages[p] = { outline, openSpace, walls, strings, openings, imaginary, pickPoints, marks, marker }
  *   roomFocus = { page, rect }   — „Į patalpą"
  *   factFocus = { page, rect } | null   — the active fact's own place
  */
-export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFactKey = null } = {}) {
+export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFactKey = null, pickPoints = null } = {}) {
   const out = { pages: {}, roomFocus: null, factFocus: null, outlineReason: null };
   if (!room) return out;
   const list = Array.isArray(facts) ? facts : [];
   const pageOf = (p) => {
     const key = Number(p);
-    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], openings: [], marks: [], marker: null };
+    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], openings: [], imaginary: [], pickPoints: [], marks: [], marker: null };
     return out.pages[key];
   };
 
@@ -138,6 +138,10 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
       const lay = (pt) => mapPct(pt, outlinePage, sheet, sutapdinimas);
       if (outline) page.outline = outline.map(lay);
       if (outline) {
+        // the boundary a person drew through a shared space (room_facts `outline.menamos`): an edge, not a wall
+        page.imaginary = (Array.isArray(perim?.outline?.menamos) ? perim.outline.menamos : [])
+          .filter((seg) => Array.isArray(seg) && seg.length === 2 && seg.every((pt) => Array.isArray(pt) && num(pt[0]) != null && num(pt[1]) != null))
+          .map((seg) => ({ a: lay(seg[0].map(Number)), b: lay(seg[1].map(Number)) }));
         page.openings = gaps.map((g) => ({
           a: mapPct(g.line_pct[0].map(Number), gapsPage, sheet, sutapdinimas),
           b: mapPct(g.line_pct[1].map(Number), gapsPage, sheet, sutapdinimas),
@@ -161,6 +165,12 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
         points: shared, nariai: (space.nariai || []).map(String), perimetras_m: num(space.perimetras_m),
       };
     }
+  }
+
+  // what he has clicked so far while showing a room or dividing a space
+  for (const pt of Array.isArray(pickPoints) ? pickPoints : []) {
+    if (num(pt?.page) == null || num(pt?.x_pct) == null || num(pt?.y_pct) == null) continue;
+    pageOf(pt.page).pickPoints.push({ x: Number(pt.x_pct), y: Number(pt.y_pct) });
   }
 
   // the room's printed number: the only mark a room without its own outline has

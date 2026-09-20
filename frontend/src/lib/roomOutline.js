@@ -40,23 +40,50 @@ export function displayPointOf(pt) {
   return { page: Number(pt.pageIndex) + 1, x_pct: dx, y_pct: dy };
 }
 
-/** The project's rooms with the answer applied, or null when the answer is not an outline. */
-export function roomsWithOutline(project, roomNr, answer) {
-  if (answer?.status !== 'ok' || !answer.room || typeof answer.room !== 'object') return null;
+/** A room with the server's geometry keys applied — and nothing else of it touched. */
+function withGeometry(room, geometry) {
+  const next = { ...room };
+  for (const key of GEOMETRY_ROOM_KEYS) {
+    if (!(key in geometry)) continue;
+    if (geometry[key] == null) delete next[key];
+    else next[key] = geometry[key];
+  }
+  return next;
+}
+
+function applyGeometry(project, byRoom, answer) {
   const others = answer.kitu_angos && typeof answer.kitu_angos === 'object' ? answer.kitu_angos : {};
   return (Array.isArray(project?.patalpos) ? project.patalpos : []).map((r) => {
     const nr = String(r?.nr ?? '');
-    if (nr === String(roomNr)) {
-      const next = { ...r };
-      for (const key of GEOMETRY_ROOM_KEYS) {
-        if (!(key in answer.room)) continue;
-        if (answer.room[key] == null) delete next[key];
-        else next[key] = answer.room[key];
-      }
-      return next;
-    }
+    if (byRoom[nr] && typeof byRoom[nr] === 'object') return withGeometry(r, byRoom[nr]);
     return others[nr] ? { ...r, _angos_sienose: others[nr] } : r;
   });
+}
+
+/** The project's rooms with the answer applied, or null when the answer is not an outline. */
+export function roomsWithOutline(project, roomNr, answer) {
+  if (answer?.status !== 'ok' || !answer.room || typeof answer.room !== 'object') return null;
+  return applyGeometry(project, { [String(roomNr)]: answer.room }, answer);
+}
+
+/** …the same for a divided space: BOTH rooms of `answer.rooms` get their geometry. */
+export function roomsWithSplit(project, answer) {
+  if (answer?.status !== 'ok' || !answer.rooms || typeof answer.rooms !== 'object') return null;
+  return applyGeometry(project, answer.rooms, answer);
+}
+
+/**
+ * „Padalinti erdvę" takes two clicks on ONE sheet: where the boundary starts and where it ends.
+ * `{first, request}` — the point to remember, or the request to send once both are there.
+ */
+export function nextSplitClick(first, point) {
+  if (!point) return { first: first || null, request: null };
+  if (!first || Number(first.page) !== Number(point.page)) return { first: point, request: null };
+  if (Math.hypot(point.x_pct - first.x_pct, point.y_pct - first.y_pct) < 0.002) return { first, request: null };
+  return {
+    first: null,
+    request: { page: Number(first.page), a: { x_pct: first.x_pct, y_pct: first.y_pct }, b: { x_pct: point.x_pct, y_pct: point.y_pct } },
+  };
 }
 
 /** Which sentence says why the click gave no outline (i18n key under `project.roomSheet`). */
@@ -71,6 +98,17 @@ export function outlineFailureKey(answer) {
         : { key: 'outlineOpen', params: { area } };
     }
     case 'outside': return { key: 'outlineOutside', params: {} };
+    case 'no_walls': return { key: 'outlineNoWalls', params: {} };
+    default: return { key: 'outlineFailed', params: {} };
+  }
+}
+
+/** …and why a line did not divide the space. */
+export function splitFailureKey(answer) {
+  switch (answer?.status) {
+    case 'bad_line': return { key: 'splitBadLine', params: {} };
+    case 'not_shared': return { key: 'splitNotShared', params: {} };
+    case 'too_many': return { key: 'splitTooMany', params: {} };
     case 'no_walls': return { key: 'outlineNoWalls', params: {} };
     default: return { key: 'outlineFailed', params: {} };
   }

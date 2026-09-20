@@ -64,3 +64,50 @@ test('what a click may not do has its own sentence', () => {
   assert.deepEqual(outlineFailureKey({ status: 'no_walls' }), { key: 'outlineNoWalls', params: {} });
   assert.deepEqual(outlineFailureKey({ status: 'whatever' }), { key: 'outlineFailed', params: {} });
 });
+
+// ── dividing a shared space with one line (2026-09-21) ──────────────────────
+test('the answer of a split patches BOTH rooms, geometry only', async () => {
+  const { roomsWithSplit } = await import('./roomOutline.js');
+  const project = { patalpos: [
+    { nr: '04', pavadinimas: 'Virtuvė', plotas_m2: 26.31, perimetras_m: 16.08, perimetras_saltinis: 'atviros_erdves_ivertis',
+      _atvira_erdve: { nariai: ['04', '05'] }, walls_paintable_m2: 30.2 },
+    { nr: '05', pavadinimas: 'Svetainė', plotas_m2: 35.5, perimetras_m: 21.69, _atvira_erdve: { nariai: ['04', '05'] } },
+    { nr: '03', pavadinimas: 'Koridorius', _angos_sienose: { page: 1, angos: [{ i: 'vidus', plotis_m: 2.13 }] } },
+  ] };
+  const geometry = (p) => ({ polygon_pct: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]], polygon_source: 'corrected', perimetras_m: p,
+    perimetras_saltinis: 'konturo_ivertis', _atvira_erdve: null, _konturas: { page: 1, saltinis: 'padalinta', menamos: [[[0.2, 0.1], [0.2, 0.2]]] } });
+  const answer = { status: 'ok', rooms: { '04': geometry(18.39), '05': geometry(19.38) },
+    kitu_angos: { '03': { page: 1, angos: [{ i: '04', plotis_m: 2.13 }] } } };
+  const rooms = roomsWithSplit(project, answer);
+  assert.equal(rooms[0].perimetras_m, 18.39);
+  assert.equal(rooms[1].perimetras_m, 19.38);
+  assert.equal('_atvira_erdve' in rooms[0], false);
+  assert.equal('_atvira_erdve' in rooms[1], false);
+  assert.equal(rooms[0].pavadinimas, 'Virtuvė');
+  assert.equal(rooms[0].plotas_m2, 26.31);
+  assert.equal(rooms[0].walls_paintable_m2, 30.2);
+  assert.deepEqual(rooms[2]._angos_sienose.angos, [{ i: '04', plotis_m: 2.13 }]);
+  assert.equal(project.patalpos[0].perimetras_m, 16.08, 'the project is not mutated');
+  assert.equal(roomsWithSplit(project, { status: 'bad_line' }), null);
+});
+
+test('why a line did not divide the space has its own sentence', async () => {
+  const { splitFailureKey } = await import('./roomOutline.js');
+  assert.deepEqual(splitFailureKey({ status: 'bad_line' }), { key: 'splitBadLine', params: {} });
+  assert.deepEqual(splitFailureKey({ status: 'not_shared' }), { key: 'splitNotShared', params: {} });
+  assert.deepEqual(splitFailureKey({ status: 'too_many' }), { key: 'splitTooMany', params: {} });
+  assert.deepEqual(splitFailureKey({ status: 'no_walls' }), { key: 'outlineNoWalls', params: {} });
+  assert.deepEqual(splitFailureKey({ status: '???' }), { key: 'outlineFailed', params: {} });
+});
+
+test('a split takes two clicks on ONE sheet', async () => {
+  const { nextSplitClick } = await import('./roomOutline.js');
+  const a = { page: 1, x_pct: 0.634, y_pct: 0.46 };
+  const b = { page: 1, x_pct: 0.634, y_pct: 0.57 };
+  assert.deepEqual(nextSplitClick(null, a), { first: a, request: null });
+  assert.deepEqual(nextSplitClick(a, b), { first: null, request: { page: 1, a: { x_pct: 0.634, y_pct: 0.46 }, b: { x_pct: 0.634, y_pct: 0.57 } } });
+  // a second click on ANOTHER sheet starts over there; a click on the same spot is not a line
+  assert.deepEqual(nextSplitClick(a, { ...b, page: 6 }), { first: { ...b, page: 6 }, request: null });
+  assert.deepEqual(nextSplitClick(a, { ...a }), { first: a, request: null });
+  assert.deepEqual(nextSplitClick(a, null), { first: a, request: null });
+});

@@ -6,15 +6,14 @@
 
 import { API_BASE } from '@/lib/apiBase';
 
-/** `{status: 'ok', room, kitu_angos}` | `{status: 'taken'|'open'|'outside'|'no_walls', …}` */
-export async function fetchOutlineAt(projectId, roomNr, point, { signal } = {}) {
+async function post(projectId, roomNr, action, payload, signal) {
   const res = await fetch(
-    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/rooms/${encodeURIComponent(roomNr)}/outline-at`,
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/rooms/${encodeURIComponent(roomNr)}/${action}`,
     {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page: point.page, x_pct: point.x_pct, y_pct: point.y_pct }),
+      body: JSON.stringify(payload),
       signal: signal || AbortSignal.timeout(120_000),
     },
   );
@@ -26,4 +25,14 @@ export async function fetchOutlineAt(projectId, roomNr, point, { signal } = {}) 
     throw err;
   }
   return body;
+}
+
+/** `{status: 'ok', room, kitu_angos}` | `{status: 'taken'|'open'|'outside'|'no_walls', …}` */
+export async function fetchOutlineAt(projectId, roomNr, point, { signal } = {}) {
+  return post(projectId, roomNr, 'outline-at', { page: point.page, x_pct: point.x_pct, y_pct: point.y_pct }, signal);
+}
+
+/** `{status: 'ok', rooms: {nr: geometry}, kitu_angos}` | `{status: 'bad_line'|'not_shared'|'too_many'|'no_walls'}` */
+export async function fetchSplitSpace(projectId, roomNr, request, { signal } = {}) {
+  return post(projectId, roomNr, 'split-space', request, signal);
 }
