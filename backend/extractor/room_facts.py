@@ -1202,6 +1202,39 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
     return payload
 
 
+_HIS_SOURCES = ("user_override", "manual")
+
+
+def _is_yours(project: dict, room: dict, key: str) -> bool:
+    """Whether this fact's value is the CONTRACTOR's — typed, chosen, accepted or
+    drawn by him — so the sheet can badge it „jūsų" (2026-09-20: a corrected fact
+    differed from a read one only by a sentence; looking down a room nothing
+    marked what was his). The same signals a re-read of the drawing keeps
+    (frontend/src/lib/mergeReextract.js `roomTouched`)."""
+    src = lambda v: str(v or "").strip().lower()      # noqa: E731
+    nr = str(room.get("nr") or "").strip()
+    overrides = project.get("_overrides") if isinstance(project.get("_overrides"), dict) else {}
+
+    def per_room(name: str) -> bool:
+        table = overrides.get(name)
+        return isinstance(table, dict) and table.get(nr) is not None
+
+    if key == "plotas":
+        return src(room.get("plotas_saltinis")) in _HIS_SOURCES or src(room.get("plotas_source")) in ("manual", "manual_polygon")
+    if key == "perimetras":
+        return src(room.get("perimetras_saltinis")) in _HIS_SOURCES
+    if key == "aukstis":
+        return src(room.get("lubu_aukstis_saltinis")) == "user_override" or per_room("lubu_auksciai")
+    if key == "apdaila":
+        return room.get("_walls_paint_override") is not None or per_room("walls_paint_override")
+    if key == "angos":
+        return bool(room.get("_angos_user_at")) or any(
+            isinstance(e, dict) and e.get("_dydis_user") for e in (room.get("elementai") or []))
+    if key == "grindys":
+        return src(room.get("grindu_danga_saltinis")) == "user_override" and bool(room.get("grindu_danga"))
+    return False
+
+
 def build_room_facts(project: dict, room_nr: str) -> dict | None:
     """The whole check sheet for one room, or None when there is no such room."""
     room = find_room(project, room_nr)
@@ -1216,6 +1249,8 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
         _fact_angos(project, room, region),
         _fact_grindys(project, room, region),
     ]
+    for fact in facts:
+        fact["yours"] = _is_yours(project, room, fact["key"])
     quantities, excluded = room_quantities(project, room_nr)
     return {
         "room": {
