@@ -134,11 +134,14 @@ def test_the_crop_lands_where_the_percentages_say_on_a_real_page():
     A rectangle in the TOP tenth of the page must produce the top tenth of the
     rendered image — not the bottom tenth. This is the assertion that would
     have caught a y-flip, and it is made against an independently rendered
-    full page, not against the crop code's own arithmetic.
+    full page, not against the crop code's own arithmetic. Since 2026-09-20 a
+    region is rendered on its own through PDFium (sharper, another rasteriser),
+    so the two pictures are compared as pictures — shrunk to one size, mean
+    difference — not byte for byte.
     """
     import io
 
-    from PIL import Image
+    from PIL import Image, ImageChops, ImageStat
     from pdf2image import convert_from_bytes
 
     data = SAMPLE_PDF.read_bytes()
@@ -146,18 +149,26 @@ def test_the_crop_lands_where_the_percentages_say_on_a_real_page():
     full = convert_from_bytes(data, dpi=dpi, fmt="png",
                               first_page=2, last_page=2)[0]
     W, H = full.size
-    rect = [0.0, 0.0, 1.0, 0.10]
-    x0, y0, x1, y1 = ev._padded(rect)
-    expected = full.crop((int(W * x0), int(H * y0),
+
+    def expected_for(rect):
+        x0, y0, x1, y1 = ev._padded(rect)
+        return full.crop((int(W * x0), int(H * y0),
                           max(int(W * x1), int(W * x0) + 1),
-                          max(int(H * y1), int(H * y0) + 1)))
-    got = Image.open(io.BytesIO(ev.render_crop(data, 2, rect, dpi)))
-    assert got.size == expected.size
-    assert got.tobytes() == expected.convert(got.mode).tobytes()
+                          max(int(H * y1), int(H * y0) + 1))).convert("L")
+
+    def difference(got_png, want):
+        got = Image.open(io.BytesIO(got_png)).convert("L")
+        ratio = (got.width / got.height) / (want.width / want.height)
+        assert 0.98 < ratio < 1.02                                  # the same shape of place
+        small = (160, max(8, round(160 * want.height / want.width)))
+        return ImageStat.Stat(ImageChops.difference(got.resize(small), want.resize(small))).mean[0]
+
+    top, bottom = [0.0, 0.0, 1.0, 0.10], [0.0, 0.90, 1.0, 1.0]
+    got_top = ev.render_crop(data, 2, top, dpi)
+    assert difference(got_top, expected_for(top)) < 12
     # …and the bottom strip is a different picture, so the test is not vacuous.
-    bottom = Image.open(io.BytesIO(ev.render_crop(data, 2, [0.0, 0.90, 1.0, 1.0],
-                                                  dpi)))
-    assert bottom.tobytes() != got.tobytes()
+    assert difference(got_top, expected_for(bottom)) > 2 * difference(got_top, expected_for(top))
+    assert difference(ev.render_crop(data, 2, bottom, dpi), expected_for(bottom)) < 12
 
 
 # ── the endpoint ────────────────────────────────────────────────────────────
@@ -365,9 +376,12 @@ def test_evidence_url_is_none_when_there_is_nothing_to_point_at():
 
 
 @needs_pdf
-def test_a_rooms_burst_of_crops_renders_the_page_once(tmp_path, monkeypatch):
-    """Six facts on one sheet = one PDF fetch and one rasterisation, not six
-    (2026-09-15 review). The crop still comes out of the cached raster."""
+def test_a_rooms_burst_of_crops_fetches_the_pdf_once(tmp_path, monkeypatch):
+    """Six facts on one sheet = one PDF fetch, not six (2026-09-15 review).
+    Since 2026-09-20 a PLACE is rendered on its own through PDFium, so the
+    whole sheet is not rasterised at all for it; the whole-sheet request (what
+    the enlarge dialog opens with) still rasterises the page once and shares
+    it."""
     _isolate(tmp_path, monkeypatch)
     _project()
     _store_pdf()
@@ -387,7 +401,11 @@ def test_a_rooms_burst_of_crops_renders_the_page_once(tmp_path, monkeypatch):
     for rect in ("0.1,0.1,0.3,0.3", "0.5,0.5,0.7,0.7", "0.2,0.6,0.4,0.9"):
         r = c.get("/api/projects/p1/evidence", params={"page": 1, "rect": rect})
         assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert calls == {"render": 0, "load": 1}
+    for rect in ("0,0,1,1", "0.05,0.05,0.95,0.95"):
+        r = c.get("/api/projects/p1/evidence", params={"page": 1, "rect": rect})
+        assert r.status_code == 200
     assert calls == {"render": 1, "load": 1}
     ev._reset_render_caches_for_test()
     r = c.get("/api/projects/p1/evidence", params={"page": 1, "rect": "0.6,0.1,0.8,0.3"})
-    assert r.status_code == 200 and calls == {"render": 2, "load": 2}
+    assert r.status_code == 200 and calls == {"render": 1, "load": 2}

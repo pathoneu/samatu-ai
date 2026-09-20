@@ -218,6 +218,16 @@ def _turn_box(box: list[float], k: int, W: float, H: float) -> list[float]:
 
 
 def _iter_pages_pdfium(pdf_bytes: bytes, wanted: set[int] | None):
+    """`_iter_pages_pdfium_unlocked`, read in full under the process-wide PDFium
+    lock and yielded afterwards — a generator must not hold the lock across a
+    `yield` (pdfium_guard)."""
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        items = list(_iter_pages_pdfium_unlocked(pdf_bytes, wanted))
+    yield from items
+
+
+def _iter_pages_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None):
     """Chars are analysed in a frame where the sheet's text reads left to
     right; `to_display` maps a finished bbox into the display frame (/Rotate
     applied, points from the top-left — what pdf2image renders and the crops

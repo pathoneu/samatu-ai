@@ -61,6 +61,13 @@ _KEPT_POLYGONS = ("corrected", "manual")
 # ── the walls-only raster ────────────────────────────────────────────────────
 
 def render_walls_only(pdf_bytes: bytes, page_nr: int, dpi: int = DPI) -> np.ndarray | None:
+    """`_render_walls_only_unlocked` under the process-wide PDFium lock (pdfium_guard)."""
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        return _render_walls_only_unlocked(pdf_bytes, page_nr, dpi)
+
+
+def _render_walls_only_unlocked(pdf_bytes: bytes, page_nr: int, dpi: int = DPI) -> np.ndarray | None:
     """Grayscale raster of one page (1-based) in the DISPLAY frame, with text
     objects and stroke-only hairlines removed — walls, filled or hatched,
     stay. None when pypdfium2 or the page is unavailable."""

@@ -118,6 +118,13 @@ def _dimensions_on_page(pn: int, W: float, H: float, chars: list[dict], to_displ
 # ── the vector layer: the hairline under each string ─────────────────────────
 
 def _page_lines_pdfium(pdf_bytes: bytes, wanted: set[int] | None) -> dict[int, dict]:
+    """`_page_lines_pdfium_unlocked` under the process-wide PDFium lock (pdfium_guard)."""
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        return _page_lines_pdfium_unlocked(pdf_bytes, wanted)
+
+
+def _page_lines_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None) -> dict[int, dict]:
     """Hairline segments per page, in the DISPLAY frame the strings use:
     {page: {"h": [(x0, x1, y, thickness)], "v": [(y0, y1, x, thickness)]}}
     — the bounds PDFium reports, which include the stroke and the caps, so a

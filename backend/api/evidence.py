@@ -59,6 +59,19 @@ MAX_PAGE_PX = 4000
 # The returned crop, after cropping. Bigger than this is not more legible on a
 # check-sheet card, it is just bytes.
 MAX_CROP_PX = 1600
+# A PLACE on the sheet (a table row, a pair of dimension strings, one room) is
+# rendered on its own, at the resolution that makes it ~MAX_CROP_PX on its long
+# edge — never below the requested dpi, never above this. Cut out of the
+# 110–160 dpi whole-sheet raster the same place was 180–260 px wide, which is
+# the „blurry" of the first real Patikra run (2026-09-17). PDFium renders only
+# the region: 13 ms for a room on a real wall-painting sheet at 600 dpi.
+REGION_MAX_DPI = 600
+# A request for (nearly) the whole sheet keeps the pixel-capped page raster —
+# it is what the enlarge dialog opens with, and it is shared between crops.
+WHOLE_SHEET_SHARE = 0.6
+# Part of every cache key: files written by an older renderer are never served
+# again (the sweep removes them in time).
+CACHE_VERSION = "v2"
 
 # Padding around the requested rectangle, as a fraction of the page, so the
 # crop carries enough context to be recognisable ("this is the eksplikacija
@@ -150,7 +163,7 @@ def _padded(rect: list[float]) -> tuple[float, float, float, float]:
 # ── disk cache ──────────────────────────────────────────────────────────────
 
 def cache_key(project_id: str, page: int, rect: list[float], dpi: int) -> str:
-    raw = (f"{project_id}|{page}|"
+    raw = (f"{CACHE_VERSION}|{project_id}|{page}|"
            + ",".join(f"{v:.4f}" for v in rect)
            + f"|{dpi}")
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
@@ -316,17 +329,27 @@ def render_crop(pdf_bytes: bytes, page: int, rect: list[float], dpi: int,
         raise HTTPException(status_code=404,
                             detail=f"Brėžinyje nėra {page} puslapio")
     dpi = safe_dpi(dpi, w_pt, h_pt)
-    if cache_key:
-        img = _cached(_PAGE_CACHE, (cache_key, page, dpi), _PAGE_CACHE_MAX,
-                      lambda: _render_page(pdf_bytes, page, dpi))
-    else:
-        img = _render_page(pdf_bytes, page, dpi)
-    W, H = img.size
     x0, y0, x1, y1 = _padded(rect)
-    box = (int(W * x0), int(H * y0),
-           max(int(W * x1), int(W * x0) + 1),
-           max(int(H * y1), int(H * y0) + 1))
-    crop = img.crop(box)
+    crop = None
+    if (x1 - x0) < WHOLE_SHEET_SHARE or (y1 - y0) < WHOLE_SHEET_SHARE:
+        try:
+            crop = _render_region(pdf_bytes, page, (x0, y0, x1, y1), dpi)
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001 — the page raster below still answers
+            log.warning("evidence region render failed (page=%s): %r", page, exc)
+            crop = None
+    if crop is None:
+        if cache_key:
+            img = _cached(_PAGE_CACHE, (cache_key, page, dpi), _PAGE_CACHE_MAX,
+                          lambda: _render_page(pdf_bytes, page, dpi))
+        else:
+            img = _render_page(pdf_bytes, page, dpi)
+        W, H = img.size
+        box = (int(W * x0), int(H * y0),
+               max(int(W * x1), int(W * x0) + 1),
+               max(int(H * y1), int(H * y0) + 1))
+        crop = img.crop(box)
     cw, ch = crop.size
     scale = min(1.0, MAX_CROP_PX / max(cw, ch, 1))
     if scale < 1.0:
@@ -334,6 +357,42 @@ def render_crop(pdf_bytes: bytes, page: int, rect: list[float], dpi: int,
     buf = io.BytesIO()
     crop.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
+
+
+def _render_region(pdf_bytes: bytes, page: int, box: tuple[float, float, float, float],
+                   min_dpi: int):
+    """The padded rectangle `box` (fractions of the page AS DISPLAYED) rendered
+    on its own through PDFium. Returns a PIL image, or None when PDFium is not
+    installed or the page has no size — the caller falls back to the raster."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return None
+    from extractor.pdfium_guard import PDFIUM_LOCK
+
+    x0, y0, x1, y1 = box
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf_bytes)
+        try:
+            if not (1 <= page <= len(doc)):
+                raise HTTPException(status_code=404,
+                                    detail=f"Brėžinyje nėra {page} puslapio")
+            pg = doc[page - 1]
+            try:
+                # get_size() is the page as DISPLAYED (/Rotate applied), and so
+                # is the frame `crop` cuts in — left, bottom, right, top.
+                W, H = (float(v) for v in pg.get_size())
+                if W <= 0 or H <= 0:
+                    return None
+                long_in = max((x1 - x0) * W, (y1 - y0) * H) / 72.0
+                dpi = MAX_CROP_PX / max(long_in, 1e-6)
+                dpi = max(float(min_dpi), min(float(REGION_MAX_DPI), dpi))
+                cut = (x0 * W, (1.0 - y1) * H, (1.0 - x1) * W, y0 * H)
+                return pg.render(scale=dpi / 72.0, crop=cut).to_pil().convert("RGB")
+            finally:
+                pg.close()
+        finally:
+            doc.close()
 
 
 # ── the endpoint ────────────────────────────────────────────────────────────

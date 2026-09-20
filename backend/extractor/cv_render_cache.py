@@ -36,10 +36,12 @@ def render_page(pdf_bytes: bytes, page_idx: int, dpi: int = 200) -> np.ndarray:
     if cache_path.exists():
         return cv2.imread(str(cache_path), cv2.IMREAD_GRAYSCALE)
 
-    doc = pdfium.PdfDocument(pdf_bytes)
-    page = doc[page_idx]
-    scale = dpi / 72.0
-    pil_image = page.render(scale=scale, grayscale=True).to_pil()
-    arr = np.array(pil_image)
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:                       # PDFium is not thread-safe (pdfium_guard)
+        doc = pdfium.PdfDocument(pdf_bytes)
+        page = doc[page_idx]
+        scale = dpi / 72.0
+        pil_image = page.render(scale=scale, grayscale=True).to_pil()
+        arr = np.array(pil_image)
     cv2.imwrite(str(cache_path), arr)
     return arr

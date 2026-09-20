@@ -69,6 +69,13 @@ def _colour(r: int, g: int, b: int) -> tuple[float, float, float]:
 
 
 def _read_page(pdf_bytes: bytes, page_nr: int, strokes: bool) -> dict:
+    """`_read_page_unlocked` under the process-wide PDFium lock (pdfium_guard)."""
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        return _read_page_unlocked(pdf_bytes, page_nr, strokes)
+
+
+def _read_page_unlocked(pdf_bytes: bytes, page_nr: int, strokes: bool) -> dict:
     """{width, height, rotation, paths} of a 1-based page; paths are
     {fill, stroke, width, subpaths} with colours as 0–1 rgb rounded to 0,01
     (None when the path is not filled / not stroked), width in points and
