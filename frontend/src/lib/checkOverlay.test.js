@@ -205,3 +205,13 @@ test('the points he has clicked so far are shown on their sheet', () => {
   assert.deepEqual(o.pages[6].pickPoints, [{ x: 0.5, y: 0.3 }]);
   assert.deepEqual(o.pages[1].pickPoints, []);
 });
+
+// ── a wall whose chain had holes: the label adds up, what was not READ stands in brackets (2026-09-21) ──
+test('a wall made of strings and a door nobody wrote shows every part in order', () => {
+  const w = { saltinis: 'eilute', ilgis_m: 3.598, eilutes: [{ text: '660' }, { text: '1538' }],
+    dalys: [{ text: '660' }, { anga_m: 1.4, i: '08' }, { text: '1538' }] };
+  assert.equal(wallLabel(w), '660 + (1,40) + 1538');
+  const pier = { saltinis: 'eilute', ilgis_m: 0.92, eilutes: [{ text: '0.800' }], dalys: [{ trumpa_m: 0.12 }, { text: '0.800' }] };
+  assert.equal(wallLabel(pier), '(0,12) + 0.800');
+  assert.equal(wallLabel({ saltinis: 'eilute', eilutes: [{ text: '3665' }], dalys: [] }), '3665');
+});

@@ -67,9 +67,12 @@ def _nr(room: dict) -> str:
 # outlined room's walls; 5 — sheets of one plan are found by a shared corner of
 # their wall boxes too (objektas_g: all seven sheets one plan → a perimeter summed
 # from strings, every neighbour named); 6 — rooms numbered with three digits
-# („101", „102" — a house) are found by their number (objektas_a: 1 → 11 outlines).
+# („101", „102" — a house) are found by their number (objektas_a: 1 → 11 outlines);
+# 7 — a slanted wall's length is read off its slanted dimension line, and a wall
+# written in pieces either side of a door is added up through the door
+# (objektas_h bedroom 09: an estimate → 16,01 m READ).
 # RAISE it when the lane starts reading something a stored project would gain from.
-LANE_VERSION = 6
+LANE_VERSION = 7
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -377,6 +380,10 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
         meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
 
+        # The openings come BEFORE the walls are added: a designer writes the wall pieces either side of a door
+        # and never the door itself, so a wall's chain of strings has a hole exactly where the room's own
+        # opening is (objektas_h bedroom 09: „660" | door 1,40 m | „1538") — dimension_sum fills it and says so.
+        _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta)
         before = {_nr(r): (r.get("perimetras_m") if r.get("perimetras_saltinis") not in ESTIMATES else None) for r in rooms}
         done = sum_perimeters(rooms, dims, alignment, scale, page_sizes=sizes)
         meta["perimetrai_sudeti"] = done["stated"]
@@ -387,7 +394,6 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 old = before.get(nr)
                 if old is not None and str(r.get("perimetras_saltinis") or "") not in [s for s in STATED_PERIMETERS if s != "matmenu_eilutes"]:
                     r.setdefault("_perimetras_pries_geometrija", old)
-        _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta)
         _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
         if meta["konturai"] or done["stated"] or meta["grindu_dangos"]["perskaityta"]:
             status = "applied"

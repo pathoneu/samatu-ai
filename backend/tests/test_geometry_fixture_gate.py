@@ -50,11 +50,13 @@ def test_geometry_gate(slug):
         assert rooms[nr].get("perimetras_saltinis") == "matmenu_eilutes", (nr, rooms[nr].get("_perimetras_priezastis"))
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.02, (nr, rooms[nr]["perimetras_m"])
         assert rooms[nr]["_perimetras_suma"]["sutampa"] is True
-        # every number that was added can be marked on the sheet it is written on
+        # every number that was added can be marked on the sheet it is written on — a horizontal or vertical
+        # dimension line, or (since 2026-09-21) the slanted line of a slanted wall
         for wall in rooms[nr]["_sienos"]:
             for e in wall["eilutes"]:
                 (x0, y0), (x1, y1) = e["line_pct"]
-                assert 0 < min(x0, x1, y0, y1) and max(x0, x1, y0, y1) < 1 and (x0 == x1 or y0 == y1), (nr, e)
+                assert 0 < min(x0, x1, y0, y1) and max(x0, x1, y0, y1) < 1 and (x0, y0) != (x1, y1), (nr, e)
+                assert x0 == x1 or y0 == y1 or wall.get("saltinis") == "eilute" and len(wall["eilutes"]) == 1, (nr, e)
     assert all(str(p) in out["sutapdinimas"] for g in out["grupes"] for p in g)
     # the sheets that draw ONE plan lie over each other (objektas_g: two of seven stayed alone until 2026-09-20)
     assert any(set(want["vienas_planas"]) <= set(g) for g in out["grupes"]), out["grupes"]

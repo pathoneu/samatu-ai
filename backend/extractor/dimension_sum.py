@@ -61,6 +61,9 @@ AXIS_DEG = 3.0              # a wall this close to horizontal/vertical carries a
 SLANT_PARALLEL_DEG = 4.0    # …a slanted one carries the string whose dimension line runs this parallel to it
 SHORT_EDGE_M = 0.4
 SHORT_SHARE = 0.05
+SHORT_HOLES_MAX_M = 0.5     # undimensioned piers inside ONE wall's chain may add up to this much
+HOLE_IGNORE_M = 0.03        # …and a gap this small between two strings is no gap at all
+OPENING_NEAR_M = 0.6        # an opening's line (the wall's axis) lies this close to the room's face of that wall
 CONTROL_TOL = 0.03
 WALL_TOL = 0.03             # a row's sum agrees with its wall's own outline length this closely…
 WALL_TOL_M = 0.06           # …or to this many metres (objektas_g: strings are to the FINISHED faces, 2–3 cm inside the fills)
@@ -204,10 +207,47 @@ def _page_size(dims: Sequence[dict], page: int) -> tuple[float, float]:
     return 595.2756, 841.8898
 
 
+def _fill_holes(row: Sequence[dict], e0: float, e1: float, tol: float, m_per_pt: float,
+                openings: Sequence[tuple[float, float, float, str]]) -> list[dict] | None:
+    """The wall from corner to corner as its PARTS in order — strings, and what fills the holes between them:
+    {"text"} | {"anga_m", "i"} (the room's own opening in this wall, exactly where the hole is — a designer
+    never writes a door's width into a wall chain) | {"trumpa_m"} (a pier shorter than SHORT_EDGE_M nobody
+    dimensioned). A hole that is neither → None. Short fills may add up to SHORT_HOLES_MAX_M per wall."""
+    parts: list[dict] = []
+    short_total = 0.0
+
+    def hole(a: float, b: float) -> bool:
+        nonlocal short_total
+        length = (b - a) * m_per_pt
+        if length <= HOLE_IGNORE_M:
+            return True                                        # the strings touch
+        for g0, g1, width_m, leads_to in openings:
+            if abs(g0 - a) <= tol and abs(g1 - b) <= tol:
+                parts.append({"anga_m": round(width_m, 3), "i": leads_to})
+                return True
+        if length < SHORT_EDGE_M and short_total + length <= SHORT_HOLES_MAX_M:
+            short_total += length
+            parts.append({"trumpa_m": round(length, 2)})
+            return True
+        return False
+
+    cur = e0
+    for s in row:
+        if not hole(cur, s["s0"]):
+            return None
+        parts.append({"text": s["text"]})
+        cur = max(cur, s["s1"])
+    return parts if hole(cur, e1) else None
+
+
 def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epos: float, near: float, tol: float,
-                 inside: Polygon | None, length_m: float) -> list[dict] | None:
-    """The row of strings that runs from one end of the wall to the other
-    without a hole (module doc for the order rows are tried in)."""
+                 inside: Polygon | None, length_m: float, m_per_pt: float = 0.0,
+                 openings: Sequence[tuple[float, float, float, str]] = ()) -> tuple[list[dict], list[dict] | None] | None:
+    """(the row of strings that states the wall, its PARTS when holes had to be filled — else None).
+
+    A row runs from one end of the wall to the other without a hole (module doc for the order rows are
+    tried in). Only when no such row exists is a row WITH holes taken — each hole the room's own opening
+    in this wall or a short pier (`_fill_holes`), and the whole still adding up to the wall's length."""
     cands = [s for s in strings if s["horiz"] == horiz and abs(s["pos"] - epos) <= near
              and s["s0"] >= e0 - tol and s["s1"] <= e1 + tol]
     rows: list[list[dict]] = []
@@ -225,7 +265,8 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
         return inside.contains(Point(x, y))
 
     # the room's own side first; the wall's one string before a chain that adds up to it; then the nearest
-    for row in sorted(rows, key=lambda r: (not own_side(r), len(r) > 1, abs(r[0]["pos"] - epos))):
+    ordered = sorted(rows, key=lambda r: (not own_side(r), len(r) > 1, abs(r[0]["pos"] - epos)))
+    for row in ordered:
         row.sort(key=lambda s: s["s0"])
         if abs(row[0]["s0"] - e0) > tol or abs(row[-1]["s1"] - e1) > tol:
             continue
@@ -235,7 +276,21 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
         # wall (objektas_g room 06): the row's sum must be the wall's length too.
         if abs(sum(s["value_m"] for s in row) - length_m) > max(WALL_TOL * length_m, WALL_TOL_M):
             continue
-        return row
+        return row, None
+    if m_per_pt <= 0:
+        return None
+    # No row runs corner to corner. A row with HOLES states the wall when every hole is accounted for
+    # (objektas_h bedroom 09: „660" | the 1,40 m door to the bathroom | „1538" = the 3,60 m wall).
+    for row in ordered:
+        if any(b["s0"] < a["s1"] - tol for a, b in zip(row, row[1:])):
+            continue                                           # strings that overlap are not one chain
+        parts = _fill_holes(row, e0, e1, tol, m_per_pt, openings)
+        if parts is None:
+            continue
+        total = sum(s["value_m"] for s in row) + sum(p.get("anga_m", 0.0) + p.get("trumpa_m", 0.0) for p in parts)
+        if abs(total - length_m) > max(WALL_TOL * length_m, WALL_TOL_M):
+            continue
+        return row, parts
     return None
 
 
@@ -273,21 +328,50 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         imaginary = [(to_base(alignment, page, float(a[0]) * W, float(a[1]) * H), to_base(alignment, page, float(b[0]) * W, float(b[1]) * H))
                      for a, b in (kont.get("menamos") or [])]
         edges = [e for e in edges if not any(_on_segment(e, seg, IMAGINARY_TOL_PT) for seg in imaginary)]
+        # the room's OWN openings (geometry lane, `_angos_sienose`), on the base page: what may fill a hole in a chain
+        gaps = []
+        rec = room.get("_angos_sienose") if isinstance(room.get("_angos_sienose"), dict) else {}
+        o_page = int(rec.get("page") or page)
+        oW, oH = (page_sizes or {}).get(o_page) or _page_size(dims, o_page)
+        for o in rec.get("angos") or []:
+            try:
+                (x0, y0), (x1, y1) = o["line_pct"]
+                p0 = to_base(alignment, o_page, float(x0) * oW, float(y0) * oH)
+                p1 = to_base(alignment, o_page, float(x1) * oW, float(y1) * oH)
+                gaps.append((p0, p1, float(o["plotis_m"]), str(o.get("i") or "")))
+            except (KeyError, TypeError, ValueError):
+                continue
         sienos = []
         for edge in edges:
             horiz, e0, e1, epos = _edge_frame(edge)
             control = round(math.dist(*edge) * m_per_pt, 3)
+            parts = None
             if horiz is None:                                  # a slanted wall: the string written along its own slanted line
                 row = _slanted_row(slanted_by_base.get(base, []), edge, near, tol, inside, control)
             else:
-                row = _stating_row(by_base.get(base, []), horiz, e0, e1, epos, near, tol, inside, control)
-            sienos.append({"edge_pct": [[round(edge[0][0] / W, 5), round(edge[0][1] / H, 5)],
-                                        [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
-                           "ilgis_m": round(sum(s["value_m"] for s in row), 3) if row else None,
-                           "saltinis": "eilute" if row else None,
-                           "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"]}
-                                       for s in (row or [])],
-                           "kontrole_m": control, "istriza": horiz is None, "_frame": (horiz, e0, e1)})
+                on_wall = []
+                for p0, p1, width_m, leads_to in gaps:
+                    if (abs(p1[0] - p0[0]) >= abs(p1[1] - p0[1])) != horiz:
+                        continue
+                    pos = (p0[1] + p1[1]) / 2 if horiz else (p0[0] + p1[0]) / 2
+                    g0, g1 = sorted((p0[0], p1[0]) if horiz else (p0[1], p1[1]))
+                    if abs(pos - epos) <= OPENING_NEAR_M / m_per_pt and g0 >= e0 - tol and g1 <= e1 + tol:
+                        on_wall.append((g0, g1, width_m, leads_to))
+                hit = _stating_row(by_base.get(base, []), horiz, e0, e1, epos, near, tol, inside, control, m_per_pt, on_wall)
+                row, parts = hit if hit else (None, None)
+            length = None
+            if row:
+                length = sum(s["value_m"] for s in row) + sum(p.get("anga_m", 0.0) + p.get("trumpa_m", 0.0) for p in (parts or []))
+            wall = {"edge_pct": [[round(edge[0][0] / W, 5), round(edge[0][1] / H, 5)],
+                                 [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
+                    "ilgis_m": round(length, 3) if length is not None else None,
+                    "saltinis": "eilute" if row else None,
+                    "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"]}
+                                for s in (row or [])],
+                    "kontrole_m": control, "istriza": horiz is None, "_frame": (horiz, e0, e1)}
+            if parts:
+                wall["dalys"] = parts                          # in order along the wall: what was read, what filled the holes
+            sienos.append(wall)
         # A length written once: the wall OPPOSITE with the same extent is as
         # long — the same number is read for both, and the wall says whose it is.
         for s in sienos:
@@ -321,8 +405,12 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         total = round(sum(s["ilgis_m"] or 0.0 for s in sienos), 2)
         pages = sorted({int(e["page"]) for s in sienos for e in s["eilutes"]})
         texts = [e["text"] for s in sienos if s["saltinis"] == "eilute" for e in s["eilutes"]]
+        # what the chains' holes added: the rooms' own openings, and piers nobody dimensioned (said with the short pieces)
+        from_openings = round(sum(p.get("anga_m", 0.0) for w in sienos for p in (w.get("dalys") or [])), 2)
+        from_piers = round(sum(p.get("trumpa_m", 0.0) for w in sienos for p in (w.get("dalys") or [])), 2)
         suma = {"suma_m": total, "kontrole_m": control_total, "sutampa": False, "lapai": pages, "eilutes": texts,
-                "is_konturo_m": from_outline if not missing else 0.0, "pakartota": repeated}
+                "is_konturo_m": round(from_outline + from_piers, 2) if not missing else 0.0, "pakartota": repeated,
+                "angos_m": from_openings if not missing else 0.0}
         if kont.get("plotas_nesutampa"):
             reason = "kontūro plotas nesutampa su lentele — kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju"
         elif not sienos:

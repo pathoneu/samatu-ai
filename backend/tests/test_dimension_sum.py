@@ -209,7 +209,10 @@ def test_a_row_that_fits_the_corners_loosely_but_not_the_length_is_not_the_walls
     rooms = [_outline("01", nook)]
     _run([sheet], rooms)
     recess = next(s for s in rooms[0]["_sienos"] if abs(s["kontrole_m"] - 0.9) < 0.02)
-    assert recess["ilgis_m"] is None, recess
+    # never 0,80 m for a 0,90 m wall. Since 2026-09-21 the piers either side of the door are counted off the
+    # outline and SAID (`dalys`), so the wall is its own 0,9 m: 0,05 + „800" + 0,05 — or it states nothing.
+    assert recess["ilgis_m"] is None or (abs(recess["ilgis_m"] - recess["kontrole_m"]) <= 0.03
+                                         and [p for p in recess["dalys"] if "trumpa_m" in p]), recess
 
 
 def test_a_wall_written_once_states_the_equal_wall_opposite():
@@ -305,3 +308,90 @@ def test_an_edge_on_the_imaginary_boundary_is_neither_summed_nor_missed():
     assert out["stated"] == ["01"], room.get("_perimetras_priezastis")
     assert room["perimetras_m"] == 11.0 and room["perimetras_saltinis"] == "matmenu_eilutes"      # 4 + 3 + 4, not 14
     assert len(room["_sienos"]) == 3 and room["_perimetras_suma"]["sutampa"] is True
+
+
+# ── a wall whose DOOR the plan does not write (2026-09-21) ────────────────────
+# objektas_h, bedroom 09: the bottom wall carries „660" and „1538" — the wall pieces either side of the door
+# to the bathroom — and nothing over the 1,40 m door itself; the wall is 3,60 m. The designer never writes a
+# door's width into a wall chain. The hole is not a missing dimension when the room's OWN opening in that
+# wall (read off the wall solid) fills it exactly; a short pier nobody dimensioned (objektas_g: 0,19 m
+# between two doors) is filled from the outline like any short piece. Both are said, never passed for read.
+
+def _door_in_the_partition(o=0.15, t=0.2):
+    """Room 1 of `two_rooms`, its right wall written in PIECES either side of the 1,0…1,9 m door — and its
+    left wall not written at all, so nothing can be borrowed from the wall opposite unless the right one is read."""
+    sheet = two_rooms()
+    gone = (4 + t - o, t + o, 4 + 2 * t + o)                # the partition from both sides, and room 1's left wall
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - d[3]) < 1e-6 and any(abs(d[1] - x) < 1e-6 for x in gone))]
+    sheet.dims += [("800", 4 + t - o, t, 4 + t - o, 1.0), ("1300", 4 + t - o, 1.9, 4 + t - o, 3 + t)]
+    return sheet
+
+
+def _opening(y0, y1, to="02", width=0.9, x=4.3):
+    fx = lambda m: (60 + m * PT_PER_M) / W_PT              # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / H_PT              # noqa: E731
+    return {"i": to, "plotis_m": width, "storis_m": 0.2, "line_pct": [[fx(x), fy(y0)], [fx(x), fy(y1)]]}
+
+
+def test_a_hole_in_the_chain_that_is_the_rooms_own_door_is_filled_with_the_doors_width():
+    room = _room("01", 0.2, 0.2, 4.2, 3.2, _angos_sienose={"page": 1, "angos": [_opening(1.0, 1.9)]})
+    out = _run([_door_in_the_partition()], [room])
+    assert out["stated"] == ["01"], room.get("_perimetras_priezastis")
+    assert room["perimetras_m"] == 14.0                              # 4 + (0,8 + 0,9 + 1,3) + 4 + 3
+    wall = next(w for w in room["_sienos"] if [e["text"] for e in w["eilutes"]] == ["800", "1300"] and w["saltinis"] == "eilute")
+    assert wall["ilgis_m"] == 3.0
+    assert wall["dalys"] == [{"text": "800"}, {"anga_m": 0.9, "i": "02"}, {"text": "1300"}]
+    assert room["_perimetras_suma"]["angos_m"] == 0.9 and room["_perimetras_suma"]["sutampa"] is True
+
+
+def test_without_an_opening_there_the_hole_is_a_missing_dimension():
+    room = _room("01", 0.2, 0.2, 4.2, 3.2)                          # no openings read for this room
+    out = _run([_door_in_the_partition()], [room])
+    assert out["blank"] == ["01"] and room["_perimetras_priezastis"] == "2 iš 4 sienų be matmens"
+    elsewhere = _room("01", 0.2, 0.2, 4.2, 3.2, _angos_sienose={"page": 1, "angos": [_opening(1.0, 1.9, x=0.1)]})   # a door in the OTHER wall
+    assert _run([_door_in_the_partition()], [elsewhere])["blank"] == ["01"]
+    smaller = _room("01", 0.2, 0.2, 4.2, 3.2, _angos_sienose={"page": 1, "angos": [_opening(1.2, 1.7, width=0.5)]})    # does not fill the hole
+    assert _run([_door_in_the_partition()], [smaller])["blank"] == ["01"]
+
+
+def _left_wall_written_as(*pieces, o=0.15, t=0.2):
+    sheet = two_rooms()
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - (t + o)) < 1e-6)]          # room 1's left wall…
+    sheet.dims += [(text, t + o, y0, t + o, y1) for text, y0, y1 in pieces]                               # …written like this instead
+    return sheet
+
+
+def test_a_short_pier_nobody_dimensioned_is_filled_from_the_outline_and_said():
+    room = _room("01", 0.2, 0.2, 4.2, 3.2)
+    out = _run([_left_wall_written_as(("2700", 0.2, 2.9))], [room])                                       # …up to a 0,3 m pier
+    assert out["stated"] == ["01"], room.get("_perimetras_priezastis")
+    assert abs(room["perimetras_m"] - 14.0) <= 0.02                  # the pier is MEASURED off the outline, to the centimetre
+    wall = next(w for w in room["_sienos"] if [e["text"] for e in w["eilutes"]] == ["2700"])
+    assert wall["saltinis"] == "eilute" and wall["dalys"][0] == {"text": "2700"} and len(wall["dalys"]) == 2
+    assert abs(wall["dalys"][1]["trumpa_m"] - 0.3) <= 0.02
+    assert abs(room["_perimetras_suma"]["is_konturo_m"] - 0.3) <= 0.02 and room["_perimetras_suma"]["angos_m"] == 0
+
+
+def test_a_long_hole_is_never_filled():
+    """1,0 m of the wall unwritten is not a pier: the wall's own strings state nothing — its length comes, as
+    before, from the equal wall opposite."""
+    room = _room("01", 0.2, 0.2, 4.2, 3.2)
+    out = _run([_left_wall_written_as(("2000", 0.2, 2.2))], [room])
+    assert out["stated"] == ["01"]
+    left = next(w for w in room["_sienos"] if abs(w["edge_pct"][0][0] - w["edge_pct"][1][0]) < 1e-6 and w["edge_pct"][0][0] < 0.2)
+    assert left["saltinis"] == "priesinga_siena" and "dalys" not in left
+
+
+def test_a_pier_about_as_long_as_the_corner_tolerance_is_still_counted():
+    """objektas_g bathroom 06: a 0,94 m wall is a 0,12 m pier + the 0,80 m door the plan writes. The pier is
+    within the corner tolerance, so the chain „reaches" the corner — but the wall is NOT 0,80 m long."""
+    sheet = two_rooms()
+    o, t = 0.15, 0.2
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - d[3]) < 1e-6 and abs(d[1] - (t + o)) < 1e-6)]
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - d[3]) < 1e-6 and abs(d[1] - (4 + t - o)) < 1e-6)]
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - d[3]) < 1e-6 and abs(d[1] - (4 + 2 * t + o)) < 1e-6)]
+    sheet.dims += [("2890", t + o, t + 0.11, t + o, 3 + t)]                                   # 0,11 m short of the top corner
+    room = _room("01", 0.2, 0.2, 4.2, 3.2)
+    _run([sheet], [room])
+    left = next(w for w in room["_sienos"] if [e["text"] for e in w["eilutes"]] == ["2890"] and w["saltinis"] == "eilute")
+    assert abs(left["ilgis_m"] - 3.0) <= 0.02 and abs(left["dalys"][0]["trumpa_m"] - 0.11) <= 0.02

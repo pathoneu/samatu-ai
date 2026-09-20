@@ -94,3 +94,27 @@ def test_a_slanted_wall_nobody_dimensioned_is_still_said_so():
     out = ds.sum_perimeters([room], dims, align_sheets(pdf, [1]), scale)
     assert out["blank"] == ["01"]
     assert room["_perimetras_priezastis"] == "1 iš 5 sienų be matmens (1 įstriža — jos ilgis plane neužrašytas)"
+
+
+# ── the sentence adds up — with what filled the chain said as what it is ─────
+
+def test_the_perimeter_sentence_names_a_door_that_filled_the_chain():
+    from extractor.room_facts import build_room_facts
+    ring = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
+    walls = [
+        {"edge_pct": [[0.2, 0.35], [0.4, 0.35]], "ilgis_m": 3.598, "saltinis": "eilute", "kontrole_m": 3.6,
+         "eilutes": [{"text": "660", "page": 6}, {"text": "1538", "page": 6}],
+         "dalys": [{"text": "660"}, {"anga_m": 1.4, "i": "08"}, {"text": "1538"}]},
+        {"edge_pct": [[0.4, 0.35], [0.4, 0.2]], "ilgis_m": 3.665, "saltinis": "eilute", "kontrole_m": 3.67, "eilutes": [{"text": "3665", "page": 6}]},
+        {"edge_pct": [[0.4, 0.2], [0.2, 0.2]], "ilgis_m": 0.91, "saltinis": "eilute", "kontrole_m": 0.92,
+         "eilutes": [{"text": "800", "page": 6}], "dalys": [{"trumpa_m": 0.11}, {"text": "800"}]},
+    ]
+    room = {"nr": "09", "puslapio_nr": 1, "plotas_m2": 16.0, "polygon_pct": ring, "polygon_source": "vektoriniai_konturai",
+            "perimetras_m": 8.17, "perimetras_saltinis": "matmenu_eilutes", "_konturas": {"page": 1}, "_sienos": walls,
+            "_perimetras_suma": {"suma_m": 8.17, "kontrole_m": 8.19, "sutampa": True, "lapai": [6], "eilutes": [],
+                                 "is_konturo_m": 0.11, "angos_m": 1.4, "pakartota": 0}}
+    f = next(x for x in build_room_facts({"patalpos": [room]}, "09")["facts"] if x["key"] == "perimetras")
+    assert f["status"] == "read"
+    assert "660 + 1,40 (durų anga) + 1538 + 3665 + 0,11 + 800 = 8,17 m" in f["sentence"]
+    assert "Durų angų pločio (1,40 m) planas neužrašo — paėmiau jį iš sienų brėžinio." in f["sentence"]
+    assert "0,11 m trumpų atkarpų be užrašo paėmiau iš kontūro." in f["sentence"]

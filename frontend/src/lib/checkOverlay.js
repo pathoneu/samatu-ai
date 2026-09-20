@@ -59,6 +59,17 @@ export function wallState(wall) {
 export function wallLabel(wall) {
   const state = wallState(wall);
   if (state === 'missing') return '—';
+  // a chain whose holes were filled (dimension_sum `dalys`): every part in order, what was not READ —
+  // a door's width off the wall solid, a pier off the outline — in brackets, so the label adds up
+  const parts = Array.isArray(wall?.dalys) ? wall.dalys : [];
+  if (parts.length && state !== 'outline') {
+    const shown = parts.map((part) => {
+      if (part?.text != null) return String(part.text);
+      const filled = num(part?.anga_m) ?? num(part?.trumpa_m);
+      return filled != null ? `(${ltNumber(filled, 2)})` : '';
+    }).filter(Boolean);
+    if (shown.length) return shown.join(' + ');
+  }
   const texts = (wall?.eilutes || []).map((e) => String(e?.text ?? '')).filter(Boolean);
   if (texts.length && state !== 'outline') return texts.join(' + ');
   return num(wall?.ilgis_m) != null ? ltNumber(Number(wall.ilgis_m), 2) : '—';

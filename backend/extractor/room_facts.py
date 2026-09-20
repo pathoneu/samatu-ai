@@ -430,6 +430,7 @@ def _perimeter_drawing(room: dict) -> dict:
                 continue
             walls.append({"page": page, "edge_pct": [[_f(c[0]), _f(c[1])] for c in w["edge_pct"]],
                           "ilgis_m": _f(w.get("ilgis_m")), "saltinis": w.get("saltinis"), "kontrole_m": _f(w.get("kontrole_m")),
+                          "dalys": [dict(part) for part in (w.get("dalys") or []) if isinstance(part, dict)],
                           "eilutes": [{"text": str(e.get("text")), "page": e.get("page"), "line_pct": e.get("line_pct")}
                                       for e in (w.get("eilutes") or []) if isinstance(e, dict)]})
     out = {"outline": outline, "walls": walls}
@@ -589,6 +590,16 @@ def _fact_perimetras(project: dict, room: dict,
         for wall in room.get("_sienos") or []:
             if wall.get("saltinis") == "konturas":
                 terms.append(lt_num(_f(wall.get("ilgis_m"))))
+            elif isinstance(wall.get("dalys"), list) and wall["dalys"] and wall.get("saltinis") == "eilute":
+                # 2026-09-21: a chain whose holes were filled — every part in the order it lies along the wall,
+                # a door's width said to be a door's, so the sum he reads adds up
+                for part in wall["dalys"]:
+                    if part.get("text") is not None:
+                        terms.append(str(part["text"]))
+                    elif part.get("anga_m") is not None:
+                        terms.append(f"{lt_num(_f(part['anga_m']))} (durų anga)")
+                    elif part.get("trumpa_m") is not None:
+                        terms.append(lt_num(_f(part["trumpa_m"])))
             else:
                 terms.extend(str(e.get("text")) for e in (wall.get("eilutes") or []))
         if not terms:
@@ -605,6 +616,9 @@ def _fact_perimetras(project: dict, room: dict,
             sentence += (" Viena siena plane užrašyta tik iš vienos pusės — priešingai, tokio pat ilgio sienai ėmiau tą patį skaičių."
                          if repeated == 1 else
                          f" {repeated} sienos plane užrašytos tik iš vienos pusės — priešingoms, tokio pat ilgio sienoms ėmiau tuos pačius skaičius.")
+        from_openings = _f(suma.get("angos_m")) or 0.0
+        if from_openings > 0:
+            sentence += f" Durų angų pločio ({lt_num(from_openings)} m) planas neužrašo — paėmiau jį iš sienų brėžinio."
         from_outline = _f(suma.get("is_konturo_m")) or 0.0
         if from_outline > 0:
             sentence += f" {lt_num(from_outline)} m trumpų atkarpų be užrašo paėmiau iš kontūro."

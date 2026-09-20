@@ -78,7 +78,8 @@
     "konturai": [],
     "atviros_erdves": [],
     "perimetrai_sudeti": {
-      "02": 18.25
+      "02": 18.25,
+      "06": 11.89
     },
     "min_tusti_su_iverciu": 3,
     "atviru_erdviu_iverciai": {},
@@ -214,9 +215,10 @@
       "02": 12.17,
       "06": 16.14,
       "10": 7.06,
-      "11": 16.41
+      "11": 16.41,
+      "09": 16.01
     },
-    "min_tusti_su_iverciu": 6,
+    "min_tusti_su_iverciu": 5,
     "atviru_erdviu_iverciai": {
       "04": 16.08,
       "05": 21.69
