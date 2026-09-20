@@ -276,3 +276,65 @@ def test_an_outline_that_reaches_over_the_wall_does_not_take_the_neighbours_side
     out = vr.wall_openings(build_plan([two_rooms()]), 1, {"01": one, "02": two}, SCALE)
     assert [a["i"] for a in out["01"]] == ["02"]
     assert sorted(a["i"] for a in out["02"]) == ["01", "laukas"]
+
+
+# ── the room a PERSON points at (2026-09-20) ─────────────────────────────────
+# Patikra could only show WHY a room has no outline; one click inside the room now gives it the face of
+# the wall solid under the click. The person is the authority on which room it is — the table's area is
+# only compared, never a reason to refuse — but a click never takes another room's space.
+
+def _pct(x_m: float, y_m: float) -> tuple[float, float]:
+    return (60 + x_m * PT_PER_M) / 595.2756, (80 + y_m * PT_PER_M) / 841.8898
+
+
+def test_a_click_inside_a_room_gives_its_outline():
+    x, y = _pct(2.0, 2.5)                                  # anywhere in room 1, not where its badge stands
+    out = vr.outline_at(build_plan([two_rooms()]), 1, x, y, 12.0, SCALE)
+    assert out["status"] == "ok" and out["page"] == 1
+    assert abs(out["plotas_m2"] - 12.0) / 12.0 <= 0.02 and abs(out["perimetras_m"] - 14.0) <= 0.3
+    assert out["paklaida"] <= 0.02 and 4 <= len(out["polygon_pct"]) <= 8
+
+
+def test_the_tables_area_is_compared_not_obeyed():
+    x, y = _pct(2.0, 2.5)
+    off = vr.outline_at(build_plan([two_rooms()]), 1, x, y, 17.0, SCALE)          # the table says 17, the walls close 12
+    assert off["status"] == "ok" and abs(off["plotas_m2"] - 12.0) < 0.3 and 0.28 < off["paklaida"] < 0.31
+    blank = vr.outline_at(build_plan([two_rooms()]), 1, x, y, None, SCALE)        # no area in the table at all
+    assert blank["status"] == "ok" and blank["paklaida"] is None
+
+
+def test_a_click_never_takes_another_rooms_space():
+    two = [list(_pct(4.4, 0.2)), list(_pct(7.4, 0.2)), list(_pct(7.4, 3.2)), list(_pct(4.4, 3.2))]
+    x, y = _pct(5.5, 1.0)
+    out = vr.outline_at(build_plan([two_rooms()]), 1, x, y, 12.0, SCALE, others_pct={"02": two})
+    assert out == {"status": "taken", "nr": "02"}
+
+
+def test_a_click_outside_the_walls_or_on_a_sheet_without_walls():
+    x, y = _pct(-2.0, 1.0)
+    assert vr.outline_at(build_plan([two_rooms()]), 1, x, y, 12.0, SCALE) == {"status": "outside"}
+    assert vr.outline_at(build_plan([Sheet(walls=[])]), 1, 0.5, 0.5, 12.0, SCALE) == {"status": "no_walls"}
+
+
+def test_a_space_the_walls_do_not_divide_is_not_given_to_one_room():
+    """An open plan: the walls close 21 m² and the table gives this room 9 — the outline would be two rooms'."""
+    sheet = two_rooms()
+    sheet.walls = [w for w in sheet.walls if abs(w[0] - 4.2) > 0.01]              # no partition between the two rooms
+    x, y = _pct(2.0, 1.5)
+    out = vr.outline_at(build_plan([sheet]), 1, x, y, 9.0, SCALE)
+    assert out["status"] == "open" and abs(out["plotas_m2"] - 21.6) < 0.6 and out["su"] == []
+    # …and whatever the areas say, a space another room's printed number stands in is shared
+    sx, sy = _pct(5.7, 1.5)
+    shared = vr.outline_at(build_plan([sheet]), 1, x, y, 21.0, SCALE, other_seats_pct={"02": (sx, sy)})
+    assert shared["status"] == "open" and shared["su"] == ["02"]
+
+
+def test_a_click_is_one_space_unless_taking_the_next_one_in_explains_the_table():
+    """objektas_g room 01: the kitchen behind a doorless 1,15 m opening belongs to the living room — the
+    table's area says so. A neighbour that merely brings the area CLOSER is not taken in."""
+    walls = _box(0, 0, 4, 3, gaps=(("right", 1.0, 2.15),)) + _box(4.2, 0, 6.2, 3, gaps=(("left", 1.0, 2.15),))
+    x, y = _pct(2.0, 1.5)
+    both = vr.outline_at(build_plan([Sheet(walls=walls)]), 1, x, y, 18.2, SCALE)
+    assert both["status"] == "ok" and both["sujungta"] == 2 and both["paklaida"] <= 0.08
+    one = vr.outline_at(build_plan([Sheet(walls=walls)]), 1, x, y, 15.5, SCALE)       # 12 → 18,2 would be closer, not right
+    assert one["status"] == "ok" and one["sujungta"] == 1 and abs(one["plotas_m2"] - 12.0) < 0.3

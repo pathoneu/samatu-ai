@@ -63,6 +63,7 @@ MIN_WALLS = 3
 STRONG = ("zenkliukas", "plotas_uzrasas")
 SIDE_PROBE_PT = 1.0            # how far outside an opening's free side the space it leads to is looked up
 FOREIGN_OUTLINE_TOL_PT = 3.0   # an outline traced from a raster or drawn by hand sits this far off the wall face
+OPEN_FACTOR = 1.6              # a face this many times the table's area is a space shared with another room
 UNCLOSED = "sienos neuždaro patalpos (vieta ne uždaroje erdvėje)"
 SOURCE = "vektoriniai_konturai"
 
@@ -218,10 +219,13 @@ def _to_pct(poly: Polygon, W: float, H: float) -> list[list[float]]:
 
 
 def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set[str], table_areas: dict[str, float],
-           m_per_pt: float, W: float, H: float, page: int, door_m: float, solved: dict[str, Polygon]) -> tuple[dict, dict, dict, list]:
+           m_per_pt: float, W: float, H: float, page: int, door_m: float, solved: dict[str, Polygon],
+           strong_tol: float = AREA_WARN) -> tuple[dict, dict, dict, list]:
     """One pass: the faces behind these bridges, given to the rooms standing in
     them. Rooms `solved` by an earlier pass keep their outlines: they still own
-    the faces they stand in, and every face inside their outline."""
+    the faces they stand in, and every face inside their outline. `strong_tol`
+    is how far a reliably seated room's outline may be from the table's area —
+    infinite when a PERSON pointed at the room (`outline_at`)."""
     m2 = m_per_pt ** 2
     faces = _faces(solid, bridges)
     near_bridge = [[k for k, f in enumerate(faces) if f.distance(b) <= 1.0] for b in bridges]
@@ -287,7 +291,7 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
 
     def accept(nr: str, start: list[int], tol: float) -> None:
         want = float(table_areas.get(nr) or 0)
-        if want <= 0:
+        if want <= 0 and tol != math.inf:
             reasons[nr] = "lentelėje nėra ploto"
             return
         grown = grow(nr, start)
@@ -296,14 +300,16 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
             return
         poly, n_parts = grown
         area = poly.area * m2
-        err = abs(area - want) / want
-        if err > tol:
+        err = abs(area - want) / want if want > 0 else None
+        if err is not None and err > tol:
             reasons[nr] = f"nesutampa su lentele: kontūras {_lt(area)} m², lentelė {_lt(want)} m²"
             return
         outline = poly.simplify(SIMPLIFY_PT, preserve_topology=True)
         rooms[nr] = {"polygon_pct": _to_pct(poly, W, H), "plotas_m2": round(area, 2),
-                     "perimetras_m": round(outline.exterior.length * m_per_pt, 2), "paklaida": round(err, 4),
-                     "plotas_nesutampa": err > AREA_TOL, "sujungta": n_parts, "durys_m": door_m, "page": page}
+                     "perimetras_m": round(outline.exterior.length * m_per_pt, 2),
+                     "paklaida": round(err, 4) if err is not None else None,
+                     "plotas_nesutampa": bool(err is not None and err > AREA_TOL), "sujungta": n_parts,
+                     "durys_m": door_m, "page": page}
         polygons[nr] = poly
 
     done: set[str] = set(solved)
@@ -317,7 +323,7 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
             done.add(nr)
             continue
         if len(sharing) == 1:
-            accept(nr, ks, AREA_WARN)
+            accept(nr, ks, strong_tol)
             done.add(nr)
             continue
         poly = _fuse([faces[k] for k in sorted({k for o in sharing for k in seat[o]})])
@@ -388,6 +394,90 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
     return {"rooms": rooms, "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms}, "groups": groups}
 
 
+def _outlines(outlines_pct: dict[str, Sequence[Sequence[float]]] | None, W: float, H: float) -> dict[str, Polygon]:
+    """Outlines given in page fractions, as polygons in points; a broken ring is left out."""
+    polys: dict[str, Polygon] = {}
+    for nr, ring in (outlines_pct or {}).items():
+        try:
+            poly = Polygon([(float(x) * W, float(y) * H) for x, y in ring])
+        except (TypeError, ValueError):
+            continue
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.geom_type == "Polygon" and poly.area > 0:
+            polys[str(nr)] = poly
+    return polys
+
+
+_CLICK = "__paspaudimas__"
+
+
+def outline_at(pdf_bytes: bytes, page: int, x_pct: float, y_pct: float, table_area_m2: float | None, m_per_pt: float,
+               page_size: tuple[float, float] | None = None,
+               others_pct: dict[str, Sequence[Sequence[float]]] | None = None,
+               other_seats_pct: dict[str, Sequence[float]] | None = None) -> dict:
+    """The room a PERSON pointed at: the free-space face of the wall solid under the click.
+
+    {status: "ok", polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa, sujungta, durys_m, page}
+    The person is the authority on WHICH room this is, so the table's area is compared (`paklaida`), never a
+    reason to refuse. The face takes in a neighbouring face across a doorless opening only when that makes
+    the outline AGREE with the table (objektas_g room 01: the kitchen behind a 1,15 m opening) — a click is
+    one space unless the table says otherwise. What a click may not do:
+      {status: "taken", nr}            — the place belongs to another room's trusted outline (`others_pct`);
+      {status: "open", plotas_m2, su}  — the space is shared: another room's printed number stands in it
+                                         (`other_seats_pct`), or the walls close far more than the table gives;
+      {status: "outside"}              — not inside any closed space;  {status: "no_walls"} — no vector walls."""
+    if page_size is None:
+        W, H, _ = page_geometry(pdf_bytes, page)
+    else:
+        W, H = page_size
+    if W <= 0 or H <= 0 or not m_per_pt:
+        return {"status": "no_walls"}
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    if solid is None or n_walls < MIN_WALLS:
+        return {"status": "no_walls"}
+    point = Point(float(x_pct) * W, float(y_pct) * H)
+    others = _outlines(others_pct, W, H)
+    for nr in sorted(others):
+        if others[nr].contains(point):
+            return {"status": "taken", "nr": nr}
+    seats = {}
+    for nr, xy in (other_seats_pct or {}).items():
+        try:
+            seats[str(nr)] = Point(float(xy[0]) * W, float(xy[1]) * H)
+        except (TypeError, ValueError, IndexError):
+            continue
+    want = float(table_area_m2 or 0)
+    edges = _edges(solid)
+    for door_m in DOOR_SWEEP_M:
+        bridges = _bridges(solid, edges, m_per_pt, door_m)
+
+        def face(area: float):
+            found, polygons, _, _ = _match(solid, bridges, {_CLICK: point, **seats}, {_CLICK}, {_CLICK: area},
+                                           m_per_pt, W, H, page, door_m, others, strong_tol=math.inf)
+            return (found[_CLICK], polygons[_CLICK]) if _CLICK in found else None
+
+        got = face(want)
+        if got is None:
+            continue
+        if got[0]["sujungta"] > 1 and not (got[0]["paklaida"] is not None and got[0]["paklaida"] <= AREA_TOL):
+            got = face(0.0)                                    # growing did not explain the table: the plain face
+            if got is None:
+                continue
+        hit, poly = got
+        area = hit["plotas_m2"]
+        if want > 0:
+            hit = {**hit, "paklaida": round(abs(area - want) / want, 4), "plotas_nesutampa": abs(area - want) / want > AREA_TOL}
+        for nr in sorted(others):                              # the face is somebody's, though the click missed their outline
+            if poly.intersection(others[nr]).area > 0.5 * min(poly.area, others[nr].area):
+                return {"status": "taken", "nr": nr}
+        sharing = sorted(nr for nr, seat in seats.items() if poly.contains(seat))
+        if sharing or (want > 0 and area > OPEN_FACTOR * want):
+            return {"status": "open", "plotas_m2": area, "su": sharing}
+        return {"status": "ok", **hit}
+    return {"status": "outside"}
+
+
 def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[Sequence[float]]], m_per_pt: float,
                   page_size: tuple[float, float] | None = None) -> dict[str, list[dict]]:
     """The openings in the walls of rooms whose outline came from ELSEWHERE (the raster outline lane, a
@@ -403,16 +493,7 @@ def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[
     solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
     if solid is None or n_walls < MIN_WALLS:
         return {}
-    polys: dict[str, Polygon] = {}
-    for nr, ring in outlines_pct.items():
-        try:
-            poly = Polygon([(float(x) * W, float(y) * H) for x, y in ring])
-        except (TypeError, ValueError):
-            continue
-        if not poly.is_valid:
-            poly = poly.buffer(0)
-        if poly.geom_type == "Polygon" and poly.area > 0:
-            polys[str(nr)] = poly
+    polys = _outlines(outlines_pct, W, H)
     found = _openings(solid, _edges(solid), polys, m_per_pt, W, H, tol_pt=FOREIGN_OUTLINE_TOL_PT)
     return {nr: found.get(nr, []) for nr in polys}
 
