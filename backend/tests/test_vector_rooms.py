@@ -338,3 +338,76 @@ def test_a_click_is_one_space_unless_taking_the_next_one_in_explains_the_table()
     assert both["status"] == "ok" and both["sujungta"] == 2 and both["paklaida"] <= 0.08
     one = vr.outline_at(build_plan([Sheet(walls=walls)]), 1, x, y, 15.5, SCALE)       # 12 → 18,2 would be closer, not right
     assert one["status"] == "ok" and one["sujungta"] == 1 and abs(one["plotas_m2"] - 12.0) < 0.3
+
+
+# ── two rooms no wall separates, divided by ONE line a person draws (2026-09-21) ─────────────
+# A kitchen and a living room are usually the biggest rooms of a flat and share one space. The lane says
+# so and gives each an ESTIMATE (the shared walls by floor area). Only a person knows where one room ends.
+
+def _open_plan() -> Sheet:
+    sheet = two_rooms()
+    sheet.walls = [w for w in sheet.walls if abs(w[0] - 4.2) > 0.01]              # no partition: one space 7,2 × 3 m
+    return sheet
+
+
+def _seats():
+    return {"01": _pct(2.2, 1.5), "02": _pct(5.7, 1.5)}
+
+
+def test_a_line_between_the_two_numbers_gives_each_room_its_own_outline():
+    a, b = _pct(4.3, 0.1), _pct(4.3, 3.3)                                         # drawn a little past both walls
+    out = vr.split_space(build_plan([_open_plan()]), 1, a, b, _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert out["status"] == "ok" and set(out["rooms"]) == {"01", "02"}
+    one, two = out["rooms"]["01"], out["rooms"]["02"]
+    assert abs(one["plotas_m2"] - 4.1 * 3.0) < 0.3 and abs(two["plotas_m2"] - 3.1 * 3.0) < 0.3
+    assert one["page"] == 1 and len(one["polygon_pct"]) == 4
+    # the boundary between them is NOT a wall: one imaginary edge each, the same place, left out of the perimeter
+    assert len(one["menamos"]) == 1 and len(two["menamos"]) == 1
+    (p, q), = one["menamos"]
+    fx = (60 + 4.3 * PT_PER_M) / 595.2756
+    assert abs(p[0] - fx) < 0.002 and abs(q[0] - fx) < 0.002
+    assert abs(one["perimetras_m"] - (4.1 + 3.0 + 4.1)) < 0.2 and abs(two["perimetras_m"] - (3.1 + 3.0 + 3.1)) < 0.2
+    assert one["paklaida"] is not None and one["paklaida"] < 0.05
+
+
+def test_a_line_that_does_not_separate_the_two_numbers_is_refused():
+    a, b = _pct(6.8, 0.1), _pct(6.8, 3.3)                                         # both numbers stay on its left
+    out = vr.split_space(build_plan([_open_plan()]), 1, a, b, _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert out == {"status": "bad_line"}
+
+
+def test_a_line_outside_the_shared_space_or_a_space_of_three():
+    pdf = build_plan([_open_plan()])
+    far = vr.split_space(pdf, 1, _pct(-3.0, 0.1), _pct(-3.0, 3.3), _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert far == {"status": "bad_line"}
+    apart = vr.split_space(build_plan([two_rooms()]), 1, _pct(4.3, 0.1), _pct(4.3, 3.3), _seats(), {}, SCALE)
+    assert apart == {"status": "not_shared"}                                       # a wall already separates them
+    three = {**_seats(), "03": _pct(3.6, 2.6)}
+    assert vr.split_space(pdf, 1, _pct(4.3, 0.1), _pct(4.3, 3.3), three, {}, SCALE) == {"status": "too_many"}
+    assert vr.split_space(build_plan([Sheet(walls=[])]), 1, (0.4, 0.2), (0.4, 0.6), _seats(), {}, SCALE) == {"status": "no_walls"}
+
+
+def test_a_sliver_the_line_cuts_off_a_niche_goes_to_the_room_it_touches():
+    """objektas_h: the line between kitchen and living room runs through a small recess in a wall stub and
+    leaves a 0,1 m² third piece. That is not a bad line — the sliver belongs to the room it touches most."""
+    sheet = _open_plan()
+    # a stub hanging from the top wall at x 4,2…4,8 m down to y = 1,3 m, with a 0,4 × 0,5 m recess on its left side
+    sheet.walls = sheet.walls + [(4.6, 0.2, 4.8, 1.3), (4.2, 0.2, 4.6, 0.5), (4.2, 1.0, 4.6, 1.3)]
+    a, b = _pct(4.3, 0.1), _pct(4.3, 3.3)                                         # through the recess: 0,15 m² cut off
+    out = vr.split_space(build_plan([sheet]), 1, a, b, _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert out["status"] == "ok", out
+    total = out["rooms"]["01"]["plotas_m2"] + out["rooms"]["02"]["plotas_m2"]
+    assert abs(total - (7.2 * 3.0 - 0.6 * 1.1 + 0.4 * 0.5)) < 0.1                  # nothing of the space is lost
+
+
+def test_the_space_is_the_one_whose_area_agrees_with_the_two_rooms():
+    """objektas_h: at the narrow door limit a 1,4 m opening stays open and the „space" is 71 m² with a
+    neighbour in it; at the wider limit it is the 60 m² the two rooms add up to."""
+    sheet = _open_plan()
+    # room 3 beyond the right wall; that wall stops 1,4 m short of the bottom wall — an opening between a wall
+    # END and a wall FACE, wider than the first door limit
+    sheet.walls = [w for w in sheet.walls if abs(w[0] - 7.4) > 0.01] + [(7.4, 0.0, 7.6, 1.8),
+                                                                         (7.6, 0.0, 10.8, 0.2), (7.6, 3.2, 10.8, 3.4), (10.6, 0.0, 10.8, 3.4)]
+    out = vr.split_space(build_plan([sheet]), 1, _pct(4.3, 0.1), _pct(4.3, 3.3), _seats(), {"01": 12.3, "02": 9.3}, SCALE)
+    assert out["status"] == "ok"
+    assert abs(out["rooms"]["02"]["plotas_m2"] - 3.1 * 3.0) < 0.4                  # not 9,3 + the 9 m² of room 3

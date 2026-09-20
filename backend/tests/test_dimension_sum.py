@@ -283,3 +283,25 @@ def test_only_wall_exact_or_human_outlines_assign_strings():
     for source in ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual"):
         ok = _room("01", 0.2, 0.2, 4.2, 3.2, polygon_source=source)
         assert _run([two_rooms()], [ok])["stated"] == ["01"], source
+
+
+# ── an imaginary boundary is not a wall (2026-09-21) ─────────────────────────
+def test_an_edge_on_the_imaginary_boundary_is_neither_summed_nor_missed():
+    """Room 1 of `two_rooms` with its right side declared imaginary (an open plan divided by a person): the
+    three real walls carry their strings, the boundary carries none — and nobody asks for one."""
+    from extractor import dimension_sum as ds
+    from extractor.plan_dimensions import read_dimension_strings
+    from extractor.sheet_alignment import align_sheets
+    from tests.synthetic_plan import PT_PER_M, build_plan, two_rooms
+    pdf = build_plan([two_rooms()])
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    ring = [[fx(0.2), fy(0.2)], [fx(4.2), fy(0.2)], [fx(4.2), fy(3.2)], [fx(0.2), fy(3.2)]]
+    room = {"nr": "01", "puslapio_nr": 1, "polygon_pct": ring, "polygon_source": "corrected",
+            "_konturas": {"page": 1, "menamos": [[[fx(4.2), fy(0.2)], [fx(4.2), fy(3.2)]]]}}
+    dims = read_dimension_strings(pdf, pages=None)
+    scale = {1: next(d["scale_m_per_pt"] for d in dims if d.get("scale_m_per_pt"))}
+    out = ds.sum_perimeters([room], dims, align_sheets(pdf, [1]), scale)
+    assert out["stated"] == ["01"], room.get("_perimetras_priezastis")
+    assert room["perimetras_m"] == 11.0 and room["perimetras_saltinis"] == "matmenu_eilutes"      # 4 + 3 + 4, not 14
+    assert len(room["_sienos"]) == 3 and room["_perimetras_suma"]["sutampa"] is True

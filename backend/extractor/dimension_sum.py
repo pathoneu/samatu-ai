@@ -70,6 +70,24 @@ KEEP = ("plano_matmenys", "eksplikacija", "user_override", "manual", SOURCE)
 WALL_OUTLINES = ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual")
 
 
+IMAGINARY_TOL_PT = 1.5
+
+
+def _on_segment(edge, seg, tol: float) -> bool:
+    """Does this outline edge lie ON the segment (both ends within `tol` of its line, inside its extent)?"""
+    (ax, ay), (bx, by) = seg
+    length = math.hypot(bx - ax, by - ay)
+    if length <= 0:
+        return False
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    for px, py in edge:
+        along = (px - ax) * ux + (py - ay) * uy
+        across = abs((px - ax) * uy - (py - ay) * ux)
+        if across > tol or along < -tol or along > length + tol:
+            return False
+    return True
+
+
 def _corners(poly_pct: Sequence[Sequence[float]], W: float, H: float) -> list[tuple[float, float]]:
     """The outline's corners: vertices with a real turn at them."""
     pts = [(float(x) * W, float(y) * H) for x, y in poly_pct]
@@ -197,6 +215,11 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         if inside is not None and not inside.is_valid:
             inside = inside.buffer(0) if not inside.buffer(0).is_empty else None
         near, tol = NEAR_M / m_per_pt, END_TOL_M / m_per_pt
+        # An open plan a person divided (vector_rooms.split_space): the boundary between the two rooms is
+        # an edge of both outlines and a wall of neither — not summed, not checked, never asked a length for.
+        imaginary = [(to_base(alignment, page, float(a[0]) * W, float(a[1]) * H), to_base(alignment, page, float(b[0]) * W, float(b[1]) * H))
+                     for a, b in (kont.get("menamos") or [])]
+        edges = [e for e in edges if not any(_on_segment(e, seg, IMAGINARY_TOL_PT) for seg in imaginary)]
         sienos = []
         for edge in edges:
             horiz, e0, e1, epos = _edge_frame(edge)

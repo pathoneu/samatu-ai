@@ -64,6 +64,7 @@ STRONG = ("zenkliukas", "plotas_uzrasas")
 SIDE_PROBE_PT = 1.0            # how far outside an opening's free side the space it leads to is looked up
 FOREIGN_OUTLINE_TOL_PT = 3.0   # an outline traced from a raster or drawn by hand sits this far off the wall face
 OPEN_FACTOR = 1.6              # a face this many times the table's area is a space shared with another room
+SLIVER_MAX_M2 = 0.5            # a piece this small, cut off a recess by a dividing line, goes to the room beside it
 UNCLOSED = "sienos neuždaro patalpos (vieta ne uždaroje erdvėje)"
 SOURCE = "vektoriniai_konturai"
 
@@ -476,6 +477,90 @@ def outline_at(pdf_bytes: bytes, page: int, x_pct: float, y_pct: float, table_ar
             return {"status": "open", "plotas_m2": area, "su": sharing}
         return {"status": "ok", **hit}
     return {"status": "outside"}
+
+
+def split_space(pdf_bytes: bytes, page: int, a_pct: Sequence[float], b_pct: Sequence[float],
+                seats_pct: dict[str, Sequence[float]], table_areas: dict[str, float], m_per_pt: float,
+                page_size: tuple[float, float] | None = None) -> dict:
+    """Two rooms no wall separates, divided by ONE line a person draws through `a` and `b` (extended to
+    the walls). {status: "ok", rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa,
+    menamos, page}}} — `menamos` are the outline's edges that lie on the drawn boundary: there is NO wall
+    there, so they are left out of `perimetras_m` (and of every wall sum later). The table's areas are only
+    compared. Otherwise: "no_walls"; "too_many" (more than two rooms in the space — not supported);
+    "not_shared" (the two numbers do not stand in one space); "bad_line" (the line does not cut the space
+    in two with one number on each side)."""
+    if page_size is None:
+        W, H, _ = page_geometry(pdf_bytes, page)
+    else:
+        W, H = page_size
+    if W <= 0 or H <= 0 or not m_per_pt:
+        return {"status": "no_walls"}
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    if solid is None or n_walls < MIN_WALLS:
+        return {"status": "no_walls"}
+    seats = {str(nr): Point(float(xy[0]) * W, float(xy[1]) * H) for nr, xy in (seats_pct or {}).items()}
+    if len(seats) > 2:
+        return {"status": "too_many"}
+    if len(seats) < 2:
+        return {"status": "not_shared"}
+    edges = _edges(solid)
+    # The space both numbers stand in — at the door limit where its area best agrees with what the table
+    # gives the two rooms (objektas_h: 71 m² with a neighbour in it at the narrow limit, 60 m² at the wider).
+    want_both = sum(float((table_areas or {}).get(nr) or 0) for nr in seats)
+    found = []
+    for door_m in DOOR_SWEEP_M:
+        for f in _faces(solid, _bridges(solid, edges, m_per_pt, door_m)):
+            if all(f.contains(p) for p in seats.values()):
+                found.append(f)
+                break
+    if not found:
+        return {"status": "not_shared"}
+    face = min(found, key=lambda f: abs(f.area * m_per_pt ** 2 - want_both)) if want_both > 0 else found[0]
+    ax, ay, bx, by = float(a_pct[0]) * W, float(a_pct[1]) * H, float(b_pct[0]) * W, float(b_pct[1]) * H
+    length = math.hypot(bx - ax, by - ay)
+    if length < 1.0:
+        return {"status": "bad_line"}
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    reach = math.hypot(W, H)
+    cut = LineString([(ax - ux * reach, ay - uy * reach), (bx + ux * reach, by + uy * reach)])
+    from shapely.ops import split as _split
+    pieces = [g for g in _split(face, cut).geoms if g.geom_type == "Polygon" and not g.is_empty]
+    seated = {nr: [k for k, part in enumerate(pieces) if part.contains(seat)] for nr, seat in seats.items()}
+    if any(len(ks) != 1 for ks in seated.values()) or len({ks[0] for ks in seated.values()}) != 2:
+        return {"status": "bad_line"}                          # the line leaves both numbers on one side, or misses
+    owners = {nr: ks[0] for nr, ks in seated.items()}
+    parts = {k: pieces[k] for k in owners.values()}
+    for k, piece in enumerate(pieces):
+        if k in parts:
+            continue
+        # A sliver the line cut off a recess (objektas_h: 0,1 m² of a niche in a wall stub): it belongs to the
+        # room it touches most. Anything bigger is a third space — the line does not divide the space in two.
+        if piece.area * m_per_pt ** 2 > SLIVER_MAX_M2:
+            return {"status": "bad_line"}
+        host = max(parts, key=lambda h: parts[h].boundary.intersection(piece.boundary).length)
+        merged = _fuse([parts[host], piece])
+        if merged is not None:
+            parts[host] = merged
+    inner = face.buffer(-0.5)
+    rooms = {}
+    for nr, k in owners.items():
+        outline = parts[k].simplify(SIMPLIFY_PT, preserve_topology=True)
+        ring = list(outline.exterior.coords)
+        imaginary, off = [], 0.0
+        for p0, p1 in zip(ring, ring[1:]):
+            on_cut = all(abs((x - ax) * uy - (y - ay) * ux) <= 0.75 for x, y in (p0, p1))
+            mid = Point((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)
+            if on_cut and inner.contains(mid):                 # on the drawn line AND inside the space: no wall there
+                imaginary.append([[round(p0[0] / W, 5), round(p0[1] / H, 5)], [round(p1[0] / W, 5), round(p1[1] / H, 5)]])
+                off += math.dist(p0, p1)
+        area = parts[k].area * m_per_pt ** 2
+        want = float((table_areas or {}).get(nr) or 0)
+        err = abs(area - want) / want if want > 0 else None
+        rooms[nr] = {"polygon_pct": [[round(x / W, 5), round(y / H, 5)] for x, y in ring[:-1]],
+                     "plotas_m2": round(area, 2), "perimetras_m": round((outline.exterior.length - off) * m_per_pt, 2),
+                     "paklaida": round(err, 4) if err is not None else None,
+                     "plotas_nesutampa": bool(err is not None and err > AREA_TOL), "menamos": imaginary, "page": page}
+    return {"status": "ok", "rooms": rooms}
 
 
 def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[Sequence[float]]], m_per_pt: float,
