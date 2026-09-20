@@ -66,9 +66,10 @@ def _nr(room: dict) -> str:
 # sutapdinimas); 3 — floor coverings off the floor plan; 4 — the openings in each
 # outlined room's walls; 5 — sheets of one plan are found by a shared corner of
 # their wall boxes too (objektas_g: all seven sheets one plan → a perimeter summed
-# from strings, every neighbour named). RAISE it when the lane starts reading
-# something a stored project would gain from.
-LANE_VERSION = 5
+# from strings, every neighbour named); 6 — rooms numbered with three digits
+# („101", „102" — a house) are found by their number (objektas_a: 1 → 11 outlines).
+# RAISE it when the lane starts reading something a stored project would gain from.
+LANE_VERSION = 6
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

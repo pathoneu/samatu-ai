@@ -7,7 +7,12 @@ objektas_h 2026-09-17: 11/11 found), then Vision's box (`bbox_pct`, coarse).
 The source is recorded so the sheet can say it.
 
 A badge is a 1–2 digit word in a small font inside the drawing area that
-STANDS ALONE. Numbers in the room TABLE match too, so a word is rejected as a
+STANDS ALONE — or the room's own number of three digits and more („101",
+„102"… the way architects number the rooms of a house; objektas_a
+2026-09-21: 10 of 11 rooms had no place until these were read), which is
+written larger, so it gets its own size limit (LONG_BADGE_*). The small-font
+rule is NOT loosened for short numbers: measured, that cost objektas_h two
+outlines and turned objektas_b's furniture item numbers into rooms. Numbers in the room TABLE match too, so a word is rejected as a
 badge when it is a cell of a COLUMN — another short number sits straight
 above or below it within TABLE_ROW_PT („01", „02", „03"… down the table;
 rooms are metres apart, table rows a few millimetres) — when another number
@@ -33,6 +38,8 @@ from .plan_area_annotations import _iter_pages, _words
 
 BADGE_MAX_H_PT = 6.5
 BADGE_MAX_W_PT = 9.0
+LONG_BADGE_MIN_DIGITS = 3        # „101": a house's room number, written larger than a designer's „01"
+LONG_BADGE_MAX_H_PT = 14.0       # …but still a label in a room, not a sheet title
 TABLE_ROW_PT = 14.0              # numbers stacked closer than this are a table column, not rooms
 COLUMN_ALIGN_PT = 1.5
 SAME_LINE_PT = 2.5
@@ -53,13 +60,22 @@ def _short_number(text: str) -> bool:
     return text.isdigit() and 1 <= len(text) <= 2
 
 
-def _badge_words(words: list[dict]) -> list[dict]:
-    """The words of ONE text direction (its own left-to-right frame) that are badges."""
-    numbers = [w for w in words if _short_number(w["text"])]
+def _long_number(text: str) -> bool:
+    return text.isdigit() and LONG_BADGE_MIN_DIGITS <= len(text) <= 4 and not text.startswith("0")
+
+
+def _badge_words(words: list[dict], long_numbers: frozenset[str] = frozenset()) -> list[dict]:
+    """The words of ONE text direction (its own left-to-right frame) that are badges. `long_numbers` are
+    the three-and-more-digit room numbers being looked for: only those exact words count, never any
+    3–4 digit number (the sheet is full of dimensions)."""
+    numbers = [w for w in words if _short_number(w["text"]) or (w["text"] in long_numbers and _long_number(w["text"]))]
     out = []
     for w in numbers:
         height = w["bottom"] - w["top"]
-        if height > BADGE_MAX_H_PT or (w["x1"] - w["x0"]) > BADGE_MAX_W_PT:
+        if _short_number(w["text"]):
+            if height > BADGE_MAX_H_PT or (w["x1"] - w["x0"]) > BADGE_MAX_W_PT:
+                continue
+        elif height > LONG_BADGE_MAX_H_PT:
             continue
         # a cell of a table column: another short number straight above or below
         if any(o is not w and 0 < abs(o["top"] - w["top"]) <= TABLE_ROW_PT
@@ -116,8 +132,9 @@ def locate_rooms(pdf_bytes: bytes, rooms: Sequence[dict], plan_pages: Sequence[i
             directions = list(_iter_pages(pdf_bytes, pages))
         except Exception:  # noqa: BLE001 — no text layer is not a failure
             directions = []
+        long_numbers = frozenset(str(n) for n in want if _long_number(str(n)))
         for pn, W, H, chars, to_display in directions:
-            for w in _badge_words(_words(chars)):
+            for w in _badge_words(_words(chars), long_numbers):
                 x0, top, x1, bottom = to_display([w["x0"], w["top"], w["x1"], w["bottom"]])
                 if top > TITLE_BLOCK_FRAC * H:
                     continue

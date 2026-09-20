@@ -1,4 +1,198 @@
 {
+  "objektas_a": {
+    "konturai": [
+      "101",
+      "102",
+      "103",
+      "104",
+      "105",
+      "106",
+      "107",
+      "108",
+      "109",
+      "110",
+      "111"
+    ],
+    "atviros_erdves": [],
+    "perimetrai_sudeti": {},
+    "min_tusti_su_iverciu": 11,
+    "atviru_erdviu_iverciai": {},
+    "grindu_dangos": {},
+    "grindu_lapai": [],
+    "dvi_dangos": [],
+    "dangos_neskaitomos": [],
+    "angos_sienose": {
+      "105": [
+        [
+          "106",
+          0.86
+        ],
+        [
+          "laukas",
+          1.91
+        ]
+      ],
+      "106": [
+        [
+          "105",
+          0.86
+        ]
+      ],
+      "107": [
+        [
+          "103",
+          0.86
+        ]
+      ],
+      "108": [
+        [
+          "103",
+          0.86
+        ],
+        [
+          "laukas",
+          2.06
+        ]
+      ],
+      "109": [
+        [
+          "103",
+          0.86
+        ],
+        [
+          "laukas",
+          2.06
+        ]
+      ]
+    },
+    "angu_nera": [],
+    "vienas_planas": [
+      2,
+      3,
+      4,
+      8,
+      9
+    ]
+  },
+  "objektas_g": {
+    "konturai": [],
+    "atviros_erdves": [],
+    "perimetrai_sudeti": {
+      "02": 18.25
+    },
+    "min_tusti_su_iverciu": 3,
+    "atviru_erdviu_iverciai": {},
+    "grindu_dangos": {
+      "03": "plyteles",
+      "05": "plyteles",
+      "06": "plyteles",
+      "09": "plyteles"
+    },
+    "grindu_lapai": [
+      7
+    ],
+    "dvi_dangos": [
+      "01"
+    ],
+    "dangos_neskaitomos": [
+      "01",
+      "02",
+      "04",
+      "08"
+    ],
+    "angos_sienose": {
+      "01": [
+        [
+          "02",
+          0.9
+        ],
+        [
+          "04",
+          0.9
+        ],
+        [
+          "05",
+          0.8
+        ],
+        [
+          "06",
+          0.8
+        ],
+        [
+          "08",
+          0.9
+        ],
+        [
+          "laukas",
+          2.84
+        ]
+      ],
+      "02": [
+        [
+          "01",
+          0.9
+        ],
+        [
+          "03",
+          0.85
+        ],
+        [
+          "laukas",
+          2.2
+        ]
+      ],
+      "03": [
+        [
+          "02",
+          0.85
+        ]
+      ],
+      "04": [
+        [
+          "01",
+          0.9
+        ],
+        [
+          "laukas",
+          2.2
+        ]
+      ],
+      "05": [
+        [
+          "01",
+          0.8
+        ]
+      ],
+      "06": [
+        [
+          "01",
+          0.8
+        ]
+      ],
+      "08": [
+        [
+          "01",
+          0.9
+        ],
+        [
+          "laukas",
+          2.2
+        ]
+      ]
+    },
+    "angu_nera": [
+      "07"
+    ],
+    "vienas_planas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
   "objektas_h": {
     "konturai": [
       "02",
@@ -121,125 +315,6 @@
       "01",
       "04",
       "05"
-    ],
-    "vienas_planas": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7
-    ]
-  },
-  "objektas_g": {
-    "konturai": [],
-    "atviros_erdves": [],
-    "perimetrai_sudeti": {
-      "02": 18.25
-    },
-    "min_tusti_su_iverciu": 3,
-    "atviru_erdviu_iverciai": {},
-    "grindu_dangos": {
-      "03": "plyteles",
-      "05": "plyteles",
-      "06": "plyteles",
-      "09": "plyteles"
-    },
-    "grindu_lapai": [
-      7
-    ],
-    "dvi_dangos": [
-      "01"
-    ],
-    "dangos_neskaitomos": [
-      "01",
-      "02",
-      "04",
-      "08"
-    ],
-    "angos_sienose": {
-      "01": [
-        [
-          "02",
-          0.9
-        ],
-        [
-          "04",
-          0.9
-        ],
-        [
-          "05",
-          0.8
-        ],
-        [
-          "06",
-          0.8
-        ],
-        [
-          "08",
-          0.9
-        ],
-        [
-          "laukas",
-          2.84
-        ]
-      ],
-      "02": [
-        [
-          "01",
-          0.9
-        ],
-        [
-          "03",
-          0.85
-        ],
-        [
-          "laukas",
-          2.2
-        ]
-      ],
-      "03": [
-        [
-          "02",
-          0.85
-        ]
-      ],
-      "04": [
-        [
-          "01",
-          0.9
-        ],
-        [
-          "laukas",
-          2.2
-        ]
-      ],
-      "05": [
-        [
-          "01",
-          0.8
-        ]
-      ],
-      "06": [
-        [
-          "01",
-          0.8
-        ]
-      ],
-      "08": [
-        [
-          "01",
-          0.9
-        ],
-        [
-          "laukas",
-          2.2
-        ]
-      ]
-    },
-    "angu_nera": [
-      "07"
     ],
     "vienas_planas": [
       1,
