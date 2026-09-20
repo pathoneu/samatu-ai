@@ -10,6 +10,7 @@ like pdfplumber's frame, so a test can predict where things land.
 from __future__ import annotations
 
 import io
+import math
 from dataclasses import dataclass, field
 
 from pathlib import Path
@@ -84,7 +85,17 @@ def build_plan(sheets: list[Sheet]) -> bytes:
             ax, ay = _pt(x0, y0, sheet)
             bx, by = _pt(x1, y1, sheet)
             c.line(ax, ay, bx, by)                       # the hairline the string is backed by
-            if abs(bx - ax) >= abs(by - ay):             # horizontal: text just above the line
+            if min(abs(bx - ax), abs(by - ay)) > 0.12 * max(abs(bx - ax), abs(by - ay)):
+                # a SLANTED wall's length: written along its own dimension line, the way CAD does it
+                angle = math.degrees(math.atan2(by - ay, bx - ax))
+                if angle > 90 or angle <= -90:
+                    angle += 180 if angle <= -90 else -180   # text never reads upside down
+                c.saveState()
+                c.translate((ax + bx) / 2, (ay + by) / 2)
+                c.rotate(angle)
+                c.drawCentredString(0, 1.5, text)
+                c.restoreState()
+            elif abs(bx - ax) >= abs(by - ay):           # horizontal: text just above the line
                 c.drawCentredString((ax + bx) / 2, (ay + by) / 2 + 1.5, text)
             else:                                        # vertical: text rotated, just left of the line
                 c.saveState()

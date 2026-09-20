@@ -27,7 +27,9 @@ write a number twice — `saltinis = "priesinga_siena"` says whose it is.
 Short pieces nobody dimensioned (< SHORT_EDGE_M — a 0,15 m step in the
 outline) have no number to read: they are counted from the outline, up to
 SHORT_SHARE of the perimeter, and the sum says how much (`is_konturo_m`).
-Slanted walls are not read yet (the string reader is horizontal/vertical).
+A SLANTED wall is stated by the one string written along a slanted dimension
+line parallel to it, ends opposite the wall's corners (objektas_h 2026-09-21:
+„2060" along the bedroom's slanted wall).
 
 Writes on the room: `_sienos` [{edge_pct, ilgis_m|None, saltinis "eilute" |
 "priesinga_siena" | "konturas" | None, eilutes [{text, value_m, page, line_pct —
@@ -55,7 +57,8 @@ from .sheet_alignment import base_page, to_base
 NEAR_M = 1.2                # a wall's string is written at most this far from it
 END_TOL_M = 0.12            # …and its row starts and ends this close to the wall's corners
 TIER_PT = 0.8               # strings of one row share a dimension line
-AXIS_DEG = 3.0              # a wall this close to horizontal/vertical can carry a readable string
+AXIS_DEG = 3.0              # a wall this close to horizontal/vertical carries a horizontal/vertical string
+SLANT_PARALLEL_DEG = 4.0    # …a slanted one carries the string whose dimension line runs this parallel to it
 SHORT_EDGE_M = 0.4
 SHORT_SHARE = 0.05
 CONTROL_TOL = 0.03
@@ -145,6 +148,55 @@ def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
     return by_base
 
 
+def _slanted_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[dict]]:
+    """Strings written along a SLANTED dimension line (plan_dimensions, `orientation == "s"`), their line's
+    two ends mapped onto the plan group's base page."""
+    by_base: dict[int, list[dict]] = {}
+    for d in dims:
+        line = d.get("line")
+        if d.get("orientation") != "s" or d.get("span_source") != "line" or not line or len(line) != 2:
+            continue
+        p = int(d["page"])
+        t = (alignment.get("transform") or {}).get(p) or {"k": 1.0, "dx": 0.0, "dy": 0.0}
+        ends = [(t["k"] * float(x) + t["dx"], t["k"] * float(y) + t["dy"]) for x, y in line]
+        W, H = float(d.get("page_width") or 0), float(d.get("page_height") or 0)
+        line_pct = [[round(float(x) / W, 5), round(float(y) / H, 5)] for x, y in line] if W > 0 and H > 0 else None
+        by_base.setdefault(base_page(alignment, p), []).append(
+            {"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "a": ends[0], "b": ends[1], "line_pct": line_pct})
+    return by_base
+
+
+def _slanted_row(strings: Sequence[dict], edge, near: float, tol: float, inside: Polygon | None, length_m: float) -> list[dict] | None:
+    """The ONE string that states a slanted wall: written along a line parallel to the wall, within `near` of
+    it, whose ends stand opposite the wall's two corners, and whose value is the wall's own length. The room's
+    side of the wall is preferred, then the nearest."""
+    (ax, ay), (bx, by) = edge
+    length = math.hypot(bx - ax, by - ay)
+    if length <= 0:
+        return None
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    found = []
+    for s in strings:
+        (px, py), (qx, qy) = s["a"], s["b"]
+        sl = math.hypot(qx - px, qy - py)
+        if sl <= 0:
+            continue
+        tilt = abs(((math.degrees(math.atan2(qy - py, qx - px)) - math.degrees(math.atan2(uy, ux))) + 90) % 180 - 90)
+        if tilt > SLANT_PARALLEL_DEG:
+            continue
+        along = sorted(((px - ax) * ux + (py - ay) * uy, (qx - ax) * ux + (qy - ay) * uy))
+        across = abs(((px + qx) / 2 - ax) * uy - ((py + qy) / 2 - ay) * ux)
+        if across > near or abs(along[0]) > tol or abs(along[1] - length) > tol:
+            continue
+        if abs(s["value_m"] - length_m) > max(WALL_TOL * length_m, WALL_TOL_M):
+            continue
+        own = inside is None or inside.contains(Point((px + qx) / 2, (py + qy) / 2))
+        found.append((not own, across, s))
+    if not found:
+        return None
+    return [min(found, key=lambda f: (f[0], f[1]))[2]]
+
+
 def _page_size(dims: Sequence[dict], page: int) -> tuple[float, float]:
     for d in dims:
         if int(d.get("page", 0)) == page and d.get("page_width") and d.get("page_height"):
@@ -191,6 +243,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                    page_sizes: dict[int, tuple[float, float]] | None = None) -> dict:
     summary: dict[str, list[str]] = {"stated": [], "blank": [], "skipped": []}
     by_base = _strings_on_base(dims, alignment)
+    slanted_by_base = _slanted_on_base(dims, alignment)
     for room in rooms:
         nr = str(room.get("nr") or "")
         if room.get("perimetras_saltinis") in KEEP and room.get("perimetras_m"):
@@ -224,7 +277,10 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         for edge in edges:
             horiz, e0, e1, epos = _edge_frame(edge)
             control = round(math.dist(*edge) * m_per_pt, 3)
-            row = None if horiz is None else _stating_row(by_base.get(base, []), horiz, e0, e1, epos, near, tol, inside, control)
+            if horiz is None:                                  # a slanted wall: the string written along its own slanted line
+                row = _slanted_row(slanted_by_base.get(base, []), edge, near, tol, inside, control)
+            else:
+                row = _stating_row(by_base.get(base, []), horiz, e0, e1, epos, near, tol, inside, control)
             sienos.append({"edge_pct": [[round(edge[0][0] / W, 5), round(edge[0][1] / H, 5)],
                                         [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
                            "ilgis_m": round(sum(s["value_m"] for s in row), 3) if row else None,
@@ -274,8 +330,8 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         elif missing:
             reason = f"{len(missing)} iš {len(sienos)} sienų be matmens"
             if slanted:
-                reason += f" ({len(slanted)} įstriža — įstrižų matmenų dar neskaitau)" if len(slanted) == 1 else \
-                          f" ({len(slanted)} įstrižos — įstrižų matmenų dar neskaitau)"
+                reason += f" ({len(slanted)} įstriža — jos ilgis plane neužrašytas)" if len(slanted) == 1 else \
+                          f" ({len(slanted)} įstrižos — jų ilgiai plane neužrašyti)"
         elif not control_total or abs(total - control_total) / control_total > CONTROL_TOL:
             reason = (f"matmenų suma {total:.2f} m nesutampa su kontūru {control_total:.2f} m").replace(".", ",")
         else:

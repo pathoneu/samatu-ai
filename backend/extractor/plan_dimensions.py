@@ -270,9 +270,155 @@ def attach_dimension_lines(pdf_bytes: bytes, dims: list[dict]) -> int:
     return n
 
 
+# ── slanted walls: the number written ALONG a slanted dimension line ─────────
+# objektas_h (2026-09-21): „2060" at 34° along the bedroom's slanted wall, „1526" at 44° along the fireplace
+# corner — each on its own hairline, 0,8 pt under the text. The readers above know four text directions;
+# a slanted run falls between them and was never read, so such a room could not be summed.
+
+SLANT_MIN_DEG = 6.0         # text this far from every quarter turn is written along a slanted line
+SLANT_PARALLEL_DEG = 4.0    # …and its dimension line runs this parallel to it
+SLANT_CHAR_GAP = 1.6        # characters of one run are no further apart than this many character heights
+
+
+def _slanted_runs_unlocked(pdf_bytes: bytes, wanted: set[int]) -> dict[int, dict]:
+    """{page: {"W", "H", "runs": [{text, pts — character centres in the DISPLAY frame}]}} for digit runs
+    written at a slant. The frame is settled the way `_page_lines_pdfium_unlocked` settles it."""
+    import math
+
+    import pypdfium2 as pdfium
+    import pypdfium2.raw as C
+
+    from .pdf_vectors import _to_display
+
+    out: dict[int, dict] = {}
+    doc = pdfium.PdfDocument(pdf_bytes)
+    try:
+        for idx in range(len(doc)):
+            pn = idx + 1
+            if pn not in wanted:
+                continue
+            page = doc[idx]
+            tp = None
+            try:
+                Ws, Hs = (float(v) for v in page.get_size())
+                rotation = int(page.get_rotation() or 0) % 360
+                tp = page.get_textpage()
+                found: list[tuple[str, float, tuple[float, float, float, float]]] = []
+                xmax = ymax = 0.0
+                for i in range(tp.count_chars()):
+                    t = tp.get_text_range(i, 1)
+                    if not t or len(t) != 1:
+                        found.append(("", 0.0, (0.0, 0.0, 0.0, 0.0)))     # keeps runs from bridging a gap in the stream
+                        continue
+                    box = tuple(float(v) for v in tp.get_charbox(i, loose=True))
+                    xmax, ymax = max(xmax, box[2]), max(ymax, box[3])
+                    found.append((t, math.degrees(C.FPDFText_GetCharAngle(tp, i)), box))
+                W, H = Ws, Hs
+                if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
+                    W, H = Hs, Ws
+                Wd, Hd = (H, W) if rotation in (90, 270) else (W, H)
+                runs: list[dict] = []
+                cur: dict | None = None
+                for t, angle, (l, b, r, tt) in found:
+                    off = min(angle % 90, 90 - angle % 90)
+                    if t not in _NUM_CHARS or off <= SLANT_MIN_DEG:
+                        cur = None
+                        continue
+                    centre = _to_display((l + r) / 2, (b + tt) / 2, W, H, (rotation // 90) % 4)
+                    size = max(1.0, min(r - l, tt - b) if min(r - l, tt - b) > 0 else max(r - l, tt - b))
+                    if cur is not None and abs(cur["angle"] - angle) <= 2.0 and math.dist(cur["pts"][-1], centre) <= SLANT_CHAR_GAP * max(size, cur["size"]) + 2.0:
+                        cur["text"] += t
+                        cur["pts"].append(centre)
+                        continue
+                    cur = {"text": t, "angle": angle, "size": size, "pts": [centre]}
+                    runs.append(cur)
+                runs = [r_ for r_ in runs if len(r_["pts"]) >= 3]
+                if runs:
+                    out[pn] = {"W": Wd, "H": Hd, "runs": runs}
+            except Exception:  # noqa: BLE001 — a page without a text layer has no slanted strings
+                continue
+            finally:
+                try:
+                    if tp is not None:
+                        tp.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                page.close()
+    finally:
+        doc.close()
+    return out
+
+
+def _slanted_dimensions(pdf_bytes: bytes, scale_by_page: dict[int, float]) -> list[dict]:
+    """Slanted strings, each WITH its dimension line — a stroked segment parallel to the run, under it, whose
+    length at the sheet's scale is the string's value. No such line ⇒ not a dimension (same rule as the
+    horizontal and vertical strings). Only sheets that already have a scale are read."""
+    import math
+
+    from .pdf_vectors import page_paths
+    from .pdfium_guard import PDFIUM_LOCK
+
+    if not scale_by_page:
+        return []
+    try:
+        with PDFIUM_LOCK:
+            pages = _slanted_runs_unlocked(pdf_bytes, set(scale_by_page))
+    except Exception:  # noqa: BLE001 — without pypdfium2 nothing slanted is read
+        return []
+    out: list[dict] = []
+    for pn, info in pages.items():
+        scale = float(scale_by_page[pn])
+        runs = []
+        for run in info["runs"]:
+            value = _value_m(run["text"])
+            if value is not None:
+                runs.append((run, value))
+        if not runs:
+            continue
+        segments = []
+        for path in page_paths(pdf_bytes, pn, strokes=True):
+            if not path.get("stroke") or float(path.get("width") or 0) > LINE_THICK_PT:
+                continue
+            for sub in path.get("subpaths") or []:
+                for a, b in zip(sub, sub[1:]):
+                    length = math.dist(a, b)
+                    if length >= LINE_MIN_PT:
+                        segments.append((a, b, length))
+        for run, value in runs:
+            (x0, y0), (x1, y1) = run["pts"][0], run["pts"][-1]
+            direction = math.degrees(math.atan2(y1 - y0, x1 - x0))
+            cx = sum(pt[0] for pt in run["pts"]) / len(run["pts"])
+            cy = sum(pt[1] for pt in run["pts"]) / len(run["pts"])
+            best = None
+            for a, b, length in segments:
+                tilt = abs(((math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) - direction) + 90) % 180 - 90)
+                if tilt > SLANT_PARALLEL_DEG or abs(length * scale - value) / value > SCALE_TOL:
+                    continue
+                ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+                along = (cx - a[0]) * ux + (cy - a[1]) * uy
+                across = abs((cx - a[0]) * uy - (cy - a[1]) * ux)
+                if across > LINE_NEAR_PT or not (-2.0 <= along <= length + 2.0):
+                    continue
+                if best is None or across < best[0]:
+                    best = (across, a, b)
+            if best is None:
+                continue
+            xs = [pt[0] for pt in run["pts"]]
+            ys = [pt[1] for pt in run["pts"]]
+            out.append({"page": pn, "text": run["text"], "value_m": round(value, 3),
+                        "bbox": [round(min(xs) - 2, 2), round(min(ys) - 2, 2), round(max(xs) + 2, 2), round(max(ys) + 2, 2)],
+                        "page_width": info["W"], "page_height": info["H"], "orientation": "s",
+                        "line": [[round(best[1][0], 2), round(best[1][1], 2)], [round(best[2][0], 2), round(best[2][1], 2)]],
+                        "span_source": "line", "scale_m_per_pt": round(scale, 6), "mastelis": _mastelis(scale)})
+    return out
+
+
 def read_dimension_strings(pdf_bytes: bytes, pages: Iterable[int] | None = None) -> list[dict]:
     """Every dimension string on the given (1-based) pages, in reading order,
-    backed by its dimension line where the vector layer has one."""
+    backed by its dimension line where the vector layer has one. Strings written
+    along a SLANTED line come last in their page's scale (`orientation == "s"`,
+    `line` = the dimension line's two ends in the display frame — they have no
+    `span` / `line_pos`, so the rectangle pairing above never sees them)."""
     out: list[dict] = []
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
@@ -280,6 +426,14 @@ def read_dimension_strings(pdf_bytes: bytes, pages: Iterable[int] | None = None)
         except Exception:  # noqa: BLE001 — a broken page is not a lane failure
             continue
     attach_dimension_lines(pdf_bytes, out)
+    scale_by_page: dict[int, float] = {}
+    for d in out:
+        if d.get("scale_m_per_pt"):
+            scale_by_page.setdefault(int(d["page"]), float(d["scale_m_per_pt"]))
+    try:
+        out.extend(_slanted_dimensions(pdf_bytes, scale_by_page))
+    except Exception:  # noqa: BLE001 — never at the cost of the strings already read
+        pass
     out.sort(key=lambda d: (d["page"], d["bbox"][1], d["bbox"][0]))
     return out
 
