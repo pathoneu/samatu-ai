@@ -1,0 +1,142 @@
+"""/api/projects/{project_id}/free-reread — the geometry lane for a project that
+is already stored. No Vision call, no cost.
+
+The lane (extractor/geometry_lane.py: vector outlines, perimeters ADDED from
+the strings written on the plan, floor coverings off the floor plan) ran only
+inside a full extraction, so a project read before it existed kept its guessed
+perimeters and box outlines, and the one free way to refresh it was a
+localhost dev script. The lane needs nothing but the stored PDF and the stored
+rooms.
+
+GET  → may this project be read again for free, and is there anything newer
+       to read (`geometry_lane.LANE_VERSION` against `_meta.geometrija.versija`)?
+       Cheap: a storage existence check, no PDF parsing.
+POST → the lane on a COPY of the project; answers with its rooms and meta.
+
+The server SAVES NOTHING. What a re-read may and may not replace — rooms he
+verified, numbers he typed, outlines he corrected, prices on his rows — is
+decided in one place (frontend/src/lib/mergeReextract.js), and the rows are
+rebuilt through the same /recompute-interior path every room edit takes. A
+second write path here would be a second set of rules about his work.
+"""
+from __future__ import annotations
+
+import copy
+import logging
+import threading
+
+from fastapi import APIRouter, HTTPException, Request
+
+import auth as _auth
+import db as _db
+from extractor.geometry_lane import LANE_VERSION, apply_geometry
+
+log = logging.getLogger("samatu.free_reread")
+
+router = APIRouter(prefix="/api/projects", tags=["free-reread"])
+
+NO_PDF = "Šio projekto brėžinio saugykloje nėra — perskaityti iš naujo galima tik įkėlus PDF."
+
+# One read per project at a time: the lane holds the process-wide PDFium lock
+# for seconds on a heavy drawing, and two answers for one project would race
+# each other into the browser's merge.
+_running: set[str] = set()
+_running_lock = threading.Lock()
+
+
+def _safe_project_id(project_id: str) -> str:
+    if not project_id or not all(c.isalnum() or c in ("-", "_") for c in project_id):
+        raise HTTPException(status_code=400, detail="Netinkamas projekto ID")
+    return project_id
+
+
+def _project_for(request: Request, project_id: str) -> dict:
+    _safe_project_id(project_id)
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    project = _db.get_project(project_id, user_id=user_filter)
+    if not project:
+        raise HTTPException(status_code=404, detail="Projektas nerastas")
+    return project
+
+
+def _stored_version(project: dict) -> int | None:
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    geo = meta.get("geometrija") if isinstance(meta.get("geometrija"), dict) else {}
+    try:
+        return int(geo["versija"]) if geo.get("versija") is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _has_pdf(project_id: str) -> bool:
+    from storage import get_storage, pdf_key
+    try:
+        return bool(get_storage().exists(pdf_key(project_id)))
+    except Exception as exc:  # noqa: BLE001 — a storage hiccup means „not now", not a 500
+        log.warning("free-reread storage check failed for %s: %r", project_id, exc)
+        return False
+
+
+@router.get("/{project_id}/free-reread")
+def api_free_reread_status(request: Request, project_id: str):
+    project = _project_for(request, project_id)
+    available = _has_pdf(project_id)
+    stored = _stored_version(project)
+    return {
+        "available": available,
+        "needed": bool(available and (stored is None or stored < LANE_VERSION)),
+        "versija": LANE_VERSION,
+        "projekto_versija": stored,
+        "reason": None if available else NO_PDF,
+    }
+
+
+# Plain `def`: PDF parsing and geometry, 100 % blocking — the threadpool's job.
+@router.post("/{project_id}/free-reread")
+def api_free_reread(request: Request, project_id: str):
+    project = _project_for(request, project_id)
+    from main import _check_rate_limit, _client_key
+    _check_rate_limit(_client_key(request), "free_reread")
+
+    with _running_lock:
+        if project_id in _running:
+            raise HTTPException(status_code=409, detail="Šis projektas jau skaitomas — palaukite, kol baigs.")
+        _running.add(project_id)
+    try:
+        from storage import get_storage, pdf_key
+        try:
+            pdf_bytes = get_storage().get(pdf_key(project_id))
+        except Exception as exc:  # noqa: BLE001 — an R2 hiccup is a 502, not a 500
+            log.warning("free-reread pdf fetch failed for %s: %r", project_id, exc)
+            raise HTTPException(status_code=502, detail="Nepavyko pasiekti brėžinio saugyklos")
+        if not pdf_bytes:
+            raise HTTPException(status_code=404, detail=NO_PDF)
+
+        parsed = copy.deepcopy(project)
+        try:
+            out = apply_geometry(parsed, pdf_bytes)
+        except Exception as exc:  # noqa: BLE001 — the lane never raises; if it ever does, nothing changes
+            log.error("free-reread lane raised for %s: %r", project_id, exc)
+            return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
+                    "_meta": project.get("_meta") or {}, "santrauka": None}
+        if out.get("status") == "failed":
+            return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
+                    "_meta": project.get("_meta") or {}, "santrauka": None}
+        floors = out.get("grindu_dangos") or {}
+        return {
+            "status": "ok",
+            "lane": out.get("status"),
+            "patalpos": parsed.get("patalpos") or [],
+            "_meta": parsed.get("_meta") or {},
+            "santrauka": {
+                "konturai": len(out.get("konturai") or []),
+                "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),
+                "perimetrai_tusti": len(out.get("perimetrai_tusti") or []),
+                "grindu_dangos": len(floors.get("perskaityta") or {}),
+                "sekundes": out.get("seconds"),
+            },
+        }
+    finally:
+        with _running_lock:
+            _running.discard(project_id)

@@ -53,6 +53,13 @@ def _nr(room: dict) -> str:
     return str(room.get("nr") or "").strip()
 
 
+# What the lane reads, as a number a stored project can be compared against
+# (api/free_reread.py offers a free re-read when the project's is lower):
+# 1 — outlines + summed perimeters; 2 — positions for the check sheet (line_pct,
+# sutapdinimas); 3 — floor coverings off the floor plan. RAISE it when the lane
+# starts reading something a stored project would gain from.
+LANE_VERSION = 3
+
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
 
@@ -140,7 +147,8 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
 
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
     t0 = time.time()
-    meta: dict = {"vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
+    meta: dict = {"versija": LANE_VERSION,
+                  "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
                   "perimetrai_sudeti": [], "perimetrai_tusti": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"

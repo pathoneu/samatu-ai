@@ -401,6 +401,7 @@ from api.samata_templates import router as samata_templates_router
 # that room contributes, and the PNG crop of the drawing behind each fact.
 from api.room_facts import router as room_facts_router
 from api.evidence import router as evidence_router
+from api.free_reread import router as free_reread_router
 
 load_dotenv()
 
@@ -721,6 +722,7 @@ app.include_router(price_lists_router)
 app.include_router(samata_templates_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
+app.include_router(free_reread_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
