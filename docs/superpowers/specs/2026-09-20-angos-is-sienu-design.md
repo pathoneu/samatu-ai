@@ -41,3 +41,20 @@ Išmatuota 2026-09-20 ant vietinių `demo-objektas_h` / `demo-objektas_g`:
 TDD ant sintetinio plano (`two_rooms`: 0,9 m durys tarp patalpų, 0,9 m durys į lauką); tikrų brėžinių vartai
 (H: 06 → [03, laukas], 07 → [03], 10 → [09]; G: 03 → [02], 05 → [01], 06 → [01]); faktų testai; frontend
 units; naršyklė (H 06: geltona eilutė → „Pridėti duris" → pasekmės juosta → „Atšaukti"); eval nepaliestas.
+
+## Pataisos vykdant (2026-09-20)
+- **Ne tik vektoriniai kontūrai.** `_angos_sienose` gauna kiekviena patalpa su PATIKIMU kontūru (vektorinis,
+  rastrinės juostos `sienu_konturas`, žmogaus `corrected`/`manual`): G brėžinyje visi kontūrai rastriniai, o
+  sienų masyvas tas pats. Skaitomas VIENAS plano lapas (tas, kuriame daugiausia dar neskaitytų patalpų kontūrų),
+  ant jo per `sutapdinimas` užklojami visi to plano patikimi kontūrai; rezultatas grąžinamas į pačios patalpos
+  kontūro lapo koordinates (`_angos_sienose.page` = kontūro lapas) — Patikra piešia kontūrą ir angas kartu.
+- **Kas už angos.** Taškas priklauso kontūrui, kuriame guli GILIAUSIAI; jei nė viename — artimiausiam per
+  `FOREIGN_OUTLINE_TOL_PT` (svetimas kontūras stovi keli taškai nuo sienos). Dvi angos pusės yra ta pati patalpa
+  tik kai abi tikrai jos viduje; kitaip artimesnė pusė pasilieka patalpą, kita ieškoma be jos (6 cm pertvara
+  1:100 yra plonesnė už toleranciją).
+- **Faktas lygina tik BENDRĄ skaičių** (įėjimo durys — irgi anga į lauką). Sienose daugiau → geltona eilutė;
+  sienose mažiau → be pavojaus signalo (sienos rodo ne viską: G 09 durų masyve nėra). Pasiūlymai — tik kai
+  kitaip suprasti negalima (0 durų ir yra anga į patalpą; 0 langų ir yra anga į lauką).
+- **Žinomos ribos.** G fikstūros 5 ir 6 lapai su kitais nesusitapdina (sienų sutapimas 0,89 ir 0,24 — planas
+  6 lape pastumtas, o sienų dėžė kita), todėl ten kaimynas lieka „gretima patalpa"; atviros erdvės nariai ir
+  patalpos be kontūro angų neturi. Tai — „geometrijos ribų" darbo dalis, ne šio.
