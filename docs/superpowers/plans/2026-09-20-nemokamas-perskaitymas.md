@@ -35,3 +35,20 @@ knows `grindu_danga`), `frontend/src/components/project/FreeRereadBanner.jsx` (n
 - [ ] Local project from `backend/data/demo-objektas_h-snapshot-20260919.json` under a new id with the same
   PDF; banner → click → outlines/perimeters/floors + diff banner; second visit: no banner; console clean.
 - [ ] Backend full suite, frontend units, eslint; execution log; memory; commit. No push.
+
+---
+
+## Execution log — 2026-09-20
+
+| task | commit | what was checked |
+|---|---|---|
+| 1 endpoint + lane version | `2ebcbd1` | 13 API tests: status (no PDF / older lane / current lane), the read returns the lane's rooms and SAVES NOTHING, owner filter (404 for a stranger, 401 anonymous), one read per project at a time (409, released afterwards), a lane that raises changes nothing |
+| 2 merge + banner | `7c1dee8` | `mergeFreeReread` unit tests (a verified room and a typed perimeter stay; outline, perimeter and floor covering land elsewhere; rows, prices, assumptions and the rest of `_meta` untouched; a failed lane lands nothing). Browser, on a local copy of the H demo made from the 2026-09-19 snapshot (no `_meta.geometrija`, all perimeters guessed, all outlines boxes): banner → one click → „Tikslūs kontūrai: 8 patalp.; sienų ilgiai sudėti iš matmenų: 4; grindų danga iš grindų plano: 11"; the room's sheet says „perimetras 10,60 m → 12,17 m; grindų danga — → plytelės"; the project page lists all 11 rooms' changes; on the next visit the offer is gone; every API call 200 |
+
+Gates: backend **3613 passed, 3 skipped**; frontend **732/732**; eslint 0 errors. The eval is not touched (no
+quantity logic changed — the lane and the recompute are the ones already gated).
+
+Notes for production: the GET costs one storage existence check per project/Patikra page open (an R2 HEAD);
+the POST holds the process-wide PDFium lock for the lane's seconds (0,8 s on H, ~4,5 s on G, ~7 s on the
+65-sheet project). `geometry_lane.LANE_VERSION` must be RAISED whenever the lane starts reading something a
+stored project would gain from — that is what re-offers the free read.
