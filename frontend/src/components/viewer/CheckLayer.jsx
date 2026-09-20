@@ -9,6 +9,8 @@
  *    wall opposite; grey: a short piece from the outline; red dashed: the plan
  *    writes no length for it;
  *  • the dimension STRINGS that were added, marked on the sheet they are on;
+ *  • the OPENINGS the wall solid shows in the room's walls — a violet bar across
+ *    each gap; its width appears while the door-and-window fact is looked at;
  *  • the rectangle a fact was read from, solid while that fact is active;
  *  • the room's printed number, ringed, when the room has no outline of its own.
  *
@@ -24,6 +26,7 @@ const STATE = {
   missing: { stroke: '#dc2626', dash: '7 5' },
 };
 const ROOM = '#1d4ed8';
+const OPENING = '#7c3aed';
 const CHIP_FONT = 11;
 
 function chipWidth(label) {
@@ -103,6 +106,40 @@ export default function CheckLayer({ data, renderedSize }) {
               fontFamily="'IBM Plex Mono', ui-monospace, monospace" fontWeight={600} fill={st.stroke}
             >
               {w.label}
+            </text>
+          </g>
+        );
+      })}
+
+      {(data.openings || []).map((g, i) => (
+        <g key={`o${i}`} data-check-opening>
+          <line x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)} stroke="#ffffff" strokeOpacity={0.9} strokeWidth={9} strokeLinecap="round" />
+          <line
+            x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)}
+            stroke={OPENING} strokeWidth={g.active ? 6 : 4.5} strokeLinecap="round" strokeOpacity={g.active ? 1 : 0.8}
+          />
+        </g>
+      ))}
+      {(data.openings || []).filter((g) => g.active && g.label).map((g, i) => {
+        // the chip stands OUTSIDE the room, clear of the wall's own length chip
+        const mx = (X(g.a) + X(g.b)) / 2;
+        const my = (Y(g.a) + Y(g.b)) / 2;
+        const ring = data.outline?.length >= 3 ? data.outline : null;
+        const cx = ring ? ring.reduce((sum, p) => sum + X(p), 0) / ring.length : mx;
+        const cy = ring ? ring.reduce((sum, p) => sum + Y(p), 0) / ring.length : my;
+        const len = Math.hypot(X(g.b) - X(g.a), Y(g.b) - Y(g.a)) || 1;
+        let nx = -(Y(g.b) - Y(g.a)) / len;
+        let ny = (X(g.b) - X(g.a)) / len;
+        if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
+        const cw = chipWidth(g.label);
+        return (
+          <g key={`oc${i}`} transform={`translate(${(mx + nx * 22).toFixed(1)}, ${(my + ny * 22).toFixed(1)})`}>
+            <rect x={-cw / 2} y={-9} width={cw} height={18} rx={2} fill={OPENING} stroke="#ffffff" strokeWidth={1.2} />
+            <text
+              x={0} y={4} textAnchor="middle" fontSize={CHIP_FONT}
+              fontFamily="'IBM Plex Mono', ui-monospace, monospace" fontWeight={600} fill="#ffffff"
+            >
+              {g.label}
             </text>
           </g>
         );

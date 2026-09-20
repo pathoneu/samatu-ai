@@ -133,6 +133,7 @@ export default function RoomDrawingPane({
 
   const states = new Set(Object.values(overlay.pages).flatMap((p) => p.walls.map((w) => w.state)));
   const hasStrings = Object.values(overlay.pages).some((p) => p.strings.length > 0);
+  const hasOpenings = Object.values(overlay.pages).some((p) => p.openings.length > 0);
   const space = Object.values(overlay.pages).find((p) => p.openSpace)?.openSpace || null;
   const others = space ? space.nariai.filter((n) => n !== roomKey) : [];
   const reason = cleanUserText(overlay.outlineReason || '');
@@ -190,7 +191,7 @@ export default function RoomDrawingPane({
             : t('project.roomSheet.drawNoOutlinePlain')}
         </p>
       )}
-      {states.size > 0 && (
+      {(states.size > 0 || hasOpenings) && (
         <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
           <li className="font-semibold uppercase tracking-wide">{t('project.roomSheet.legendWallsTitle')}</li>
           {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, colour, dash, key]) => (
@@ -207,6 +208,14 @@ export default function RoomDrawingPane({
                 <line x1="1" y1="4" x2="21" y2="4" stroke="#15803d" strokeOpacity="0.55" strokeWidth="6" strokeLinecap="round" />
               </svg>
               {t('project.roomSheet.legendStrings')}
+            </li>
+          )}
+          {hasOpenings && (
+            <li className="flex items-center gap-1.5">
+              <svg width="22" height="8" aria-hidden="true">
+                <line x1="2" y1="4" x2="20" y2="4" stroke="#7c3aed" strokeWidth="4.5" strokeLinecap="round" />
+              </svg>
+              {t('project.roomSheet.legendOpenings')}
             </li>
           )}
         </ul>

@@ -504,6 +504,34 @@ export function roomTotals(room) {
   return out;
 }
 
+/** What „+ Durys" / „+ Langas" add when nothing says otherwise — the sizes the engine assumes too. */
+export const STANDARD_OPENINGS = {
+  duris: { tipas: 'duris', plotis_mm: 900, aukstis_mm: 2100 },
+  langas: { tipas: 'langas', plotis_mm: 1200, aukstis_mm: 1500 },
+};
+
+/**
+ * `elementai` with one opening ADDED — the door the reader missed (2026-09-20:
+ * the stepper could only move rows that already existed, so a room Vision found
+ * no door in could not be given one). `opening` is a suggestion from the walls
+ * (`fact.suggestions[]`: tipas, plotis_mm, aukstis_mm, i) or a standard size.
+ * Same kind and size as an existing row → that row counts one more.
+ */
+export function addOpening(elementai, opening) {
+  const list = Array.isArray(elementai) ? elementai : [];
+  const tipas = String(opening?.tipas ?? '');
+  const w = Math.round(Number(opening?.plotis_mm));
+  const h = Math.round(Number(opening?.aukstis_mm));
+  if (!['duris', 'langas'].includes(tipas) || !(w > 0) || !(h > 0)) return list;
+  const twin = list.findIndex((el) => sameOpening(el, { tipas, plotis_mm: w, aukstis_mm: h }));
+  if (twin >= 0) {
+    return list.map((el, i) => (i === twin ? { ...el, kiekis: (Number(el.kiekis) || 0) + 1 } : el));
+  }
+  const added = { tipas, kiekis: 1, plotis_mm: w, aukstis_mm: h, _dydis_user: true };
+  if (opening?.i != null && String(opening.i) !== '') added._is_sienu_angos = String(opening.i);
+  return [...list, added];
+}
+
 /** The room patch for openings he corrected on the sheet, marked as his. */
 export function openingsPatch(elementai, now = new Date().toISOString()) {
   return { elementai, _angos_user_at: now };

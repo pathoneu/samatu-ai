@@ -99,7 +99,7 @@ function validPolygon(poly) {
 
 /**
  * Everything the viewer draws for this room, per page, plus where to look.
- *   pages[p] = { outline, openSpace, walls, strings, marks, marker }
+ *   pages[p] = { outline, openSpace, walls, strings, openings, marks, marker }
  *   roomFocus = { page, rect }   — „Į patalpą"
  *   factFocus = { page, rect } | null   — the active fact's own place
  */
@@ -109,7 +109,7 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   const list = Array.isArray(facts) ? facts : [];
   const pageOf = (p) => {
     const key = Number(p);
-    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], marks: [], marker: null };
+    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], openings: [], marks: [], marker: null };
     return out.pages[key];
   };
 
@@ -121,6 +121,14 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   const walls = outline && Array.isArray(perim?.walls) ? perim.walls : [];
   out.outlineReason = !outline && perim?.outline_reason ? String(perim.outline_reason) : null;
 
+  // the openings the wall solid shows in this room's walls (room_facts `_fact_angos`): a short line
+  // across each gap, on the wall's axis, with the gap's width — evidence for the door-and-window fact
+  const angos = list.find((f) => f?.key === 'angos') || null;
+  const gapsPage = num(angos?.openings?.page);
+  const gaps = (gapsPage != null && Array.isArray(angos?.openings?.items) ? angos.openings.items : [])
+    .filter((g) => Array.isArray(g?.line_pct) && g.line_pct.length === 2
+      && g.line_pct.every((pt) => Array.isArray(pt) && num(pt[0]) != null && num(pt[1]) != null));
+
   if (outlinePage != null) {
     // the sheets this room is drawn on: its own, and every sheet one of its numbers is written on
     const sheets = new Set([outlinePage]);
@@ -129,6 +137,14 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
       const page = pageOf(sheet);
       const lay = (pt) => mapPct(pt, outlinePage, sheet, sutapdinimas);
       if (outline) page.outline = outline.map(lay);
+      if (outline) {
+        page.openings = gaps.map((g) => ({
+          a: mapPct(g.line_pct[0].map(Number), gapsPage, sheet, sutapdinimas),
+          b: mapPct(g.line_pct[1].map(Number), gapsPage, sheet, sutapdinimas),
+          label: num(g.plotis_m) != null ? ltNumber(Number(g.plotis_m), 2) : '',
+          outside: Boolean(g.lauko), to: String(g.i ?? ''), active: activeFactKey === 'angos',
+        }));
+      }
       page.walls = walls.map((w) => ({
         a: lay(w.edge_pct[0]), b: lay(w.edge_pct[1]), state: wallState(w), label: wallLabel(w),
       }));

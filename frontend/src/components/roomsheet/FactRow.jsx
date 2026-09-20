@@ -17,7 +17,7 @@ import { Check, MapPin, Minus, Pencil, Plus } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { cleanUserText } from '@/lib/userText';
-import { factNeedsInput, factTone, isWholeSheet, prefillValue, FACT_LABEL_KEY } from '@/lib/roomSheet';
+import { factNeedsInput, factTone, isWholeSheet, prefillValue, FACT_LABEL_KEY, STANDARD_OPENINGS } from '@/lib/roomSheet';
 import EvidenceCrop from './EvidenceCrop';
 
 
@@ -74,7 +74,7 @@ function SizeEditor({ detail, busy, onSave, t }) {
 
 export default function FactRow({
   fact, room, busy = false, verified = false,
-  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onShowOnDrawing = null,
+  onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onAddOpening, onShowOnDrawing = null,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -217,6 +217,47 @@ export default function FactRow({
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Adding an opening (2026-09-20): the stepper moves only rows that exist, so a room the
+            reader found no door in could not be given one. First what the WALLS show — one click
+            each — then a plain door or window of the standard size. */}
+        {fact?.key === 'angos' && editing && kind === 'count' && (
+          <div className="mt-2" data-testid="opening-add">
+            {Array.isArray(fact.suggestions) && fact.suggestions.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {fact.suggestions.map((sug, i) => (
+                  <button
+                    key={`${sug.tipas}-${sug.i}-${sug.plotis_mm}-${i}`}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onAddOpening?.(sug)}
+                    className={`${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-left text-white disabled:opacity-50`}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {cleanUserText(sug.label || '')}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {[['duris', 'addDoor'], ['langas', 'addWindow']].map(([tipas, key]) => (
+                <button
+                  key={tipas}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onAddOpening?.(STANDARD_OPENINGS[tipas])}
+                  className={`${BTN} border-border bg-card hover:bg-muted disabled:opacity-50`}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {t(`project.roomSheet.${key}`)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+              {t('project.roomSheet.openingsAddConsequence')}
+            </p>
+          </div>
         )}
 
         {/* Number editor — aukštis, plotas, perimetras. */}

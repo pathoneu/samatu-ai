@@ -40,7 +40,7 @@ import {
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
-  adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
+  addOpening, adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
   consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
   userEditPatch,
@@ -288,6 +288,15 @@ export default function RoomSheet() {
   const adjustOpening = useCallback((detail, delta) => run(async () => {
     pilot('opening_adjust', { kind: 'opening', id: String(detail?.tipas ?? '') });
     const elementai = adjustOpeningCount(room?.elementai, detail, delta);
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
+      { fromInterior: true, factKey: factKeyForField('elementai') });
+  }), [run, project, room, roomNr, land, pilot]);
+
+  // A door or window the reader missed — one the walls show, or a standard one („+ Durys").
+  const addRoomOpening = useCallback((opening) => run(async () => {
+    pilot('opening_add', { kind: 'opening', id: String(opening?.tipas ?? '') });
+    const elementai = addOpening(room?.elementai, opening);
+    if (elementai === room?.elementai || elementai.length === 0) return;
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true, factKey: factKeyForField('elementai') });
   }), [run, project, room, roomNr, land, pilot]);
@@ -577,6 +586,7 @@ export default function RoomSheet() {
                     onSaveChoice={saveChoice}
                     onAdjustOpening={adjustOpening}
                     onSaveOpeningSize={saveOpeningSize}
+                    onAddOpening={addRoomOpening}
                     onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
                   />
                   {lastFix?.factKey === fact.key && (

@@ -155,3 +155,37 @@ test('how far the view must still move for a place on the page to sit in its mid
   assert.deepEqual(centreDelta(null, view, [0, 0, 1, 1]), { dx: 0, dy: 0 });
   assert.deepEqual(centreDelta({ ...page, width: 0 }, view, [0, 0, 1, 1]), { dx: 0, dy: 0 });
 });
+
+// ── the openings the walls show (2026-09-20) ────────────────────────────────
+const angos = {
+  key: 'angos', value: 1, status: 'assumed',
+  source: { kind: 'sienu_angos', page: 1, rect_pct: [0.37, 0.22, 0.49, 0.41] },
+  openings: { page: 1, items: [
+    { line_pct: [[0.46, 0.3], [0.46, 0.33]], plotis_m: 0.77, i: '03', lauko: false },
+    { line_pct: [[0.41, 0.25], [0.44, 0.25]], plotis_m: 1.37, i: 'laukas', lauko: true },
+  ] },
+};
+
+test('the openings in the walls are drawn on every sheet the room is drawn on, with their width', () => {
+  const o = buildCheckOverlay({ room, facts: [perimetras, angos], sutapdinimas: SUT, activeFactKey: null });
+  assert.deepEqual(o.pages[1].openings.map((g) => [g.label, g.outside, g.to]), [['0,77', false, '03'], ['1,37', true, 'laukas']]);
+  assert.deepEqual(o.pages[1].openings[0].a, [0.46, 0.3]);
+  // …laid onto the wall-painting sheet exactly like the outline
+  near(o.pages[6].openings[0].a[1], 0.3 - 0.0024);
+  near(o.pages[6].openings[0].b[1], 0.33 - 0.0024);
+  assert.equal(o.pages[1].openings.every((g) => g.active === false), true);
+});
+
+test('the openings stand out while the door-and-window fact is the one being looked at', () => {
+  const o = buildCheckOverlay({ room, facts: [perimetras, angos], sutapdinimas: SUT, activeFactKey: 'angos' });
+  assert.equal(o.pages[1].openings.every((g) => g.active === true), true);
+  assert.deepEqual(o.factFocus.page, 1);
+});
+
+test('a fact without wall openings draws none, and a broken one is skipped', () => {
+  const none = buildCheckOverlay({ room, facts: [perimetras, { ...angos, openings: null }], sutapdinimas: SUT });
+  assert.deepEqual(none.pages[1].openings, []);
+  const broken = { ...angos, openings: { page: 1, items: [{ line_pct: [[0.4, 'x']], plotis_m: 0.8 }, angos.openings.items[0]] } };
+  const o = buildCheckOverlay({ room, facts: [perimetras, broken], sutapdinimas: SUT });
+  assert.equal(o.pages[1].openings.length, 1);
+});

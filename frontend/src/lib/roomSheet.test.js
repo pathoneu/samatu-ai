@@ -759,3 +759,28 @@ test('undoing a fix puts the project back exactly — including keys the fix add
   assert.ok(!('_reread_diff' in patch) || patch._reread_diff == null);
   assert.deepEqual(undoPatch(null, current), {});
 });
+
+// ── adding an opening the reader missed (2026-09-20) ────────────────────────
+test('an opening the walls show is added as one more element, with the size that was offered', async () => {
+  const { addOpening } = await import('./roomSheet.js');
+  const before = [{ tipas: 'langas', kiekis: 1, plotis_mm: 1200, aukstis_mm: 1500 }, { tipas: 'led_nisa', kiekis: 2 }];
+  const after = addOpening(before, { tipas: 'duris', plotis_mm: 800, aukstis_mm: 2100, i: '03', plotis_m: 0.77 });
+  assert.equal(after.length, 3);
+  assert.deepEqual(after[2], { tipas: 'duris', kiekis: 1, plotis_mm: 800, aukstis_mm: 2100, _dydis_user: true, _is_sienu_angos: '03' });
+  assert.deepEqual(before.length, 2, 'the room is not mutated');
+});
+
+test('a second opening of the same kind and size is one more of the same row', async () => {
+  const { addOpening } = await import('./roomSheet.js');
+  const before = [{ tipas: 'duris', kiekis: 1, plotis_mm: 800, aukstis_mm: 2100, _dydis_user: true }];
+  const after = addOpening(before, { tipas: 'duris', plotis_mm: 800, aukstis_mm: 2100 });
+  assert.deepEqual(after, [{ tipas: 'duris', kiekis: 2, plotis_mm: 800, aukstis_mm: 2100, _dydis_user: true }]);
+});
+
+test('a plain „+ Durys" / „+ Langas" adds the standard size, and nonsense adds nothing', async () => {
+  const { addOpening, STANDARD_OPENINGS } = await import('./roomSheet.js');
+  assert.deepEqual(addOpening([], STANDARD_OPENINGS.duris), [{ tipas: 'duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2100, _dydis_user: true }]);
+  assert.deepEqual(addOpening(null, STANDARD_OPENINGS.langas), [{ tipas: 'langas', kiekis: 1, plotis_mm: 1200, aukstis_mm: 1500, _dydis_user: true }]);
+  assert.deepEqual(addOpening([], { tipas: 'led_nisa', plotis_mm: 100, aukstis_mm: 100 }), []);
+  assert.deepEqual(addOpening([], { tipas: 'duris', plotis_mm: 0, aukstis_mm: 2100 }), []);
+});
