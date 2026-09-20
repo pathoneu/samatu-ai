@@ -402,6 +402,7 @@ from api.samata_templates import router as samata_templates_router
 from api.room_facts import router as room_facts_router
 from api.evidence import router as evidence_router
 from api.free_reread import router as free_reread_router
+from api.room_outline import router as room_outline_router
 
 load_dotenv()
 
@@ -723,6 +724,7 @@ app.include_router(samata_templates_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
 app.include_router(free_reread_router)
+app.include_router(room_outline_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────

@@ -75,9 +75,9 @@ FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
 
 
 def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None:
-    """`_angos_sienose` for every room with a trusted outline. A room traced from the vector walls
-    already has it; an outline from the raster lane or from a person gets the same reading
-    (extractor/vector_rooms.wall_openings). A room without such an outline loses a stale record.
+    """`_angos_sienose` for every room with a trusted outline — traced from the vector walls, from the
+    raster lane or from a person (extractor/vector_rooms.wall_openings). A room without such an outline
+    loses a stale record.
 
     ONE sheet of a plan is read — the one most of the rooms still to do are outlined on — and EVERY
     trusted outline of that plan is laid onto it: the room beyond a door is named only when its outline
@@ -94,8 +94,10 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
             r.pop("_angos_sienose", None)
             continue
         outlined[_nr(r)] = (page, poly)
-        if not (str(r.get("polygon_source")) == VECTOR_SOURCE and isinstance(r.get("_angos_sienose"), dict)):
-            todo.add(_nr(r))                                   # (a traced room's were read on the very same solid)
+        # Every outlined room is read on every run, a traced one too: what lies beyond its door depends on
+        # which NEIGHBOURS have an outline today — a room a person pointed at a minute ago turns the
+        # neighbour's „gretima patalpa" into its number.
+        todo.add(_nr(r))
     transform = alignment.get("transform") or {}
     group_of = {p: i for i, g in enumerate(alignment.get("groups") or []) for p in g if p in transform}
     plans: dict[object, dict[int, int]] = {}                   # a plan (sheets lying over each other) → sheet → rooms to do
