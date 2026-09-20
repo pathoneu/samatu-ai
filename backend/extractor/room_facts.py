@@ -751,7 +751,7 @@ def _kept_out_by_choice(room: dict, family: str) -> bool:
     """The contractor's own choice keeps this room — or this family in it —
     out of the sąmata. Its quantities are zeroed by `scope.mark_rooms`; its
     READING is not, and the check sheet must keep showing the reading
-    („dažoma 20 %, plytelės 80 %"), not the zero („nedažomos")."""
+    („dažoma 4,25 m², plytelės 18,15 m²"), not the zero („nedažomos")."""
     if room.get("_neskaiciuoti"):
         return True
     return family in (room.get("_neskaiciuoti_sritys") or [])
@@ -760,50 +760,70 @@ def _kept_out_by_choice(room: dict, family: str) -> bool:
 _KEPT_OUT_SENTENCE = "Į sąmatą neįtraukta jūsų pasirinkimu — rodau, ką perskaičiau."
 
 
-def _walls_description(room: dict) -> str:
-    """What this room's walls get — and it MUST agree with the sąmata.
+def _m2(v: float) -> str:
+    return f"{lt_num(v)} m²"
 
-    The billed truth is `walls_paintable_m2`: when it is zero the ledger
-    excludes the room from every wall line, so the check sheet may not print
-    „dažoma" beside it. A finish share the reader saw is shown on top of that,
-    never instead of it.
+
+# Finishes the reader can see on the walls but the engine bills no area for:
+# named, so he knows they were seen, without a number nobody computed.
+_UNBILLED_FINISHES = ("tapetai_share", "plokste_share", "veidrodis_share",
+                      "molio_tinkas_share", "kita_danga_share")
+
+
+def _walls_description(room: dict) -> str:
+    """What this room's walls get — in the m² the sąmata bills for it.
+
+    Until 2026-09-20 this was a list of shares („dažoma 92 %, plytelės 8 %"),
+    and a bare „dažoma" for a bathroom whose tiles were read by their height —
+    beside a sąmata that billed 21,5 m² of tiles for it. A share of an unnamed
+    whole is nothing a contractor can check; the two areas are the very numbers
+    in his estimate (`walls_paintable_m2`, `plyteles_sienos_m2`), so the sheet
+    and the sąmata cannot disagree. A room kept out by choice shows what the
+    choice took off (`scope.excluded_quantity`), not the zero.
     """
-    if room.get("_walls_full_tile"):
-        return "plytelės"
-    paintable = _f(room.get("walls_paintable_m2"))
-    factor = _f(room.get("_walls_paint_factor"))
-    if _kept_out_by_choice(room, "apdaila"):
-        # the zero is the choice, not the drawing
-        paintable = None
-    unpainted = ((paintable is not None and paintable <= 0)
-                 or (factor is not None and factor <= 0))
+    from .scope import excluded_quantity
+    paint = excluded_quantity(room, "walls_paintable_m2")
+    tiles = excluded_quantity(room, "plyteles_sienos_m2")
     breakdown = room.get("sienu_apdailos_breakdown")
+    shares = breakdown if isinstance(breakdown, dict) else {}
+    others = [_FINISH_LT[k] for k in _UNBILLED_FINISHES if (_f(shares.get(k)) or 0.0) >= 0.01]
+
+    if room.get("_walls_full_tile"):
+        return ", ".join([f"plytelės {_m2(tiles)}" if tiles > 0 else "plytelės"] + others)
+
+    if _kept_out_by_choice(room, "apdaila") and paint <= 0 and tiles <= 0:
+        # an older blob: the choice zeroed the areas and nothing remembered
+        # them — the READING is still not „nedažomos"
+        names = [lt for key, lt in _FINISH_LT.items() if (_f(shares.get(key)) or 0.0) >= 0.01]
+        return ", ".join(names) if names else "dažoma"
+
+    computed = room.get("walls_paintable_m2") is not None or room.get("_walls_paint_factor") is not None
+    factor = _f(room.get("_walls_paint_factor"))
+    unpainted = computed and (paint <= 0 or (factor is not None and factor <= 0))
     parts: list[str] = []
-    if isinstance(breakdown, dict):
-        for key, lt in _FINISH_LT.items():
-            share = _f(breakdown.get(key)) or 0.0
-            if share >= 0.01:
-                parts.append(f"{lt} {share * 100:.0f} %")
     if unpainted:
-        return ("nedažomos (" + ", ".join(parts) + ")") if parts else "nedažomos"
-    if parts:
-        return ", ".join(parts)
-    tile_h = _f(room.get("plyteliu_aukstis_m")) or 0.0
-    if tile_h > 0:
-        return f"dažoma, plytelės iki {lt_num(tile_h)} m"
-    return "dažoma"
+        parts.append("nedažomos")
+    elif paint > 0:
+        parts.append(f"dažoma {_m2(paint)}")
+    else:
+        parts.append("dažoma")                    # never recomputed: no area to state yet
+    if tiles > 0:
+        parts.append(f"plytelės {_m2(tiles)}")
+    return ", ".join(parts + others)
 
 
 def _ceiling_description(room: dict) -> str:
+    from .scope import excluded_quantity
+    area = excluded_quantity(room, "ceiling_paintable_m2")
     src = (room.get("_ceiling_paint_source") or "").strip().lower()
     if room.get("_stretch_ceiling") or (room.get("lubu_tipas") or "") == "itempiamos":
-        return "įtempiamos"
+        return f"įtempiamos {_m2(area)}" if area > 0 else "įtempiamos"
     if src in ("override_off", "unfinished_room_standard"):
         return "nedažomos"
     paint = _f(room.get("ceiling_paintable_m2"))
     if paint is not None and paint <= 0 and not _kept_out_by_choice(room, "apdaila"):
         return "nedažomos"
-    return "dažomos"
+    return f"dažomos {_m2(area)}" if area > 0 else "dažomos"
 
 
 def _fact_apdaila(project: dict, room: dict,

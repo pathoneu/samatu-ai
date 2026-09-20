@@ -6,7 +6,7 @@
 3. Tile, floor and waterproofing lines carry their rooms, so a bathroom's
    check sheet lists its tiles, not only its paint.
 4. A room (or family) kept out by choice still shows what was READ:
-   „dažoma 20 %, plytelės 80 %", „plytelės" — not „nedažomos / betonas".
+   „dažoma 4,25 m², plytelės 18,15 m²", „plytelės" — not „nedažomos / betonas".
 5. The ceiling materials follow the BILLED ceiling (anchor), not the room sum.
 """
 

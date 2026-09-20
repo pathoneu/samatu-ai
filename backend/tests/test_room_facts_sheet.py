@@ -324,7 +324,9 @@ def test_a_read_breakdown_is_not_called_a_paskirtis_default():
     f = _fact(build_room_facts(project, "1"), "apdaila")
     assert f["status"] == "read"
     assert f["source"]["kind"] == "apdailos_lentele"
-    assert "dažoma 70 %" in f["value"] and "plytelės 30 %" in f["value"]
+    # …and what the walls get is stated in m², never as a share (2026-09-20,
+    # tests/test_room_facts_apdaila_m2.py)
+    assert "dažoma 30,00 m²" in f["value"] and "%" not in f["value"]
 
 
 # ── openings ────────────────────────────────────────────────────────────────
