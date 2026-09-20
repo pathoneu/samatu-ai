@@ -188,3 +188,91 @@ def test_a_wider_opening_is_bridged_only_for_rooms_the_narrow_limit_left_open():
     # …and a room the narrow limit already solved keeps that outline
     solved = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
     assert solved["rooms"]["01"]["durys_m"] == 1.25
+
+
+# ── the openings the wall solid shows (2026-09-20) ───────────────────────────
+# The door-and-window fact was the one fact with no evidence on the drawing („brėžinys jų vietos
+# nenurodo"), while the solid the outlines are traced from already knows every gap in every wall.
+
+def _opening_to(room: dict, other: str) -> dict:
+    hits = [a for a in room["angos"] if a["i"] == other]
+    assert len(hits) == 1, room["angos"]
+    return hits[0]
+
+
+def test_a_rooms_openings_say_how_wide_they_are_and_where_they_lead():
+    out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
+    one, two = out["rooms"]["01"], out["rooms"]["02"]
+    assert [a["i"] for a in one["angos"]] == ["02"]
+    assert sorted(a["i"] for a in two["angos"]) == ["01", "laukas"]
+    door = _opening_to(one, "02")
+    assert abs(door["plotis_m"] - 0.9) <= 0.03 and abs(door["storis_m"] - 0.2) <= 0.03
+    assert abs(_opening_to(two, "laukas")["plotis_m"] - 0.9) <= 0.03
+    # the same door, seen from the other room, is the same place
+    assert _opening_to(two, "01")["line_pct"] == door["line_pct"]
+
+
+def test_an_openings_line_crosses_the_gap_on_the_walls_axis():
+    """The partition is 0,2 m thick at x = 4,2…4,4 m, its door at y = 1,0…1,9 m."""
+    out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 12.0, "02": 9.0}, SCALE)
+    (x0, y0), (x1, y1) = _opening_to(out["rooms"]["01"], "02")["line_pct"]
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    assert abs(x0 - fx(4.3)) < 0.002 and abs(x1 - fx(4.3)) < 0.002
+    assert sorted([round(y0, 3), round(y1, 3)]) == sorted([round(fy(1.0), 3), round(fy(1.9), 3)])
+
+
+def test_an_opening_inside_one_room_is_not_an_opening_of_it():
+    """Two parts the table counts as ONE room are joined through their opening — that gap is inside the room."""
+    walls = _box(0, 0, 4, 3, gaps=(("right", 1.0, 2.15),)) + _box(4.2, 0, 6.2, 3, gaps=(("left", 1.0, 2.15),))
+    out = vr.trace_vector_rooms(build_plan([Sheet(walls=walls)]), 1, {"01": _at(2, 1.5)}, {"01": 18.2}, SCALE)
+    assert out["rooms"]["01"]["sujungta"] == 2
+    assert out["rooms"]["01"]["angos"] == []
+
+
+def test_an_opening_to_a_space_without_an_outline_of_its_own_says_so():
+    """The neighbour exists (an interior face) but has no room standing in it — not the outside."""
+    out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, {"01": _at(2.2, 1.5)}, {"01": 12.0}, SCALE)
+    assert [a["i"] for a in out["rooms"]["01"]["angos"]] == ["vidus"]
+
+
+def test_openings_for_an_outline_that_came_from_elsewhere():
+    """A raster-traced or hand-corrected outline sits a little off the wall face; its openings are still read."""
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    inset = 0.06                                              # metres inside the wall face, all round
+    one = [[fx(0.2 + inset), fy(0.2 + inset)], [fx(4.2 - inset), fy(0.2 + inset)], [fx(4.2 - inset), fy(3.2 - inset)], [fx(0.2 + inset), fy(3.2 - inset)]]
+    two = [[fx(4.4 + inset), fy(0.2 + inset)], [fx(7.4 - inset), fy(0.2 + inset)], [fx(7.4 - inset), fy(3.2 - inset)], [fx(4.4 + inset), fy(3.2 - inset)]]
+    out = vr.wall_openings(build_plan([two_rooms()]), 1, {"01": one, "02": two}, SCALE)
+    assert [a["i"] for a in out["01"]] == ["02"]
+    assert sorted(a["i"] for a in out["02"]) == ["01", "laukas"]
+    assert vr.wall_openings(build_plan([Sheet(walls=[])]), 1, {"01": one}, SCALE) == {}
+    assert vr.wall_openings(build_plan([two_rooms()]), 1, {}, SCALE) == {}
+
+
+def test_an_opening_in_a_thin_partition_still_leads_somewhere_else():
+    """A 6 cm partition at 1:100 is thinner than the tolerance a foreign outline is looked up with: the
+    far side of its door is "near" the very room the door belongs to. Two sides of one opening are the
+    same room only when both truly lie INSIDE it; otherwise the nearer side keeps the room."""
+    walls = [(-0.2, -0.2, 7.2, 0.0), (-0.2, 3.0, 7.2, 3.2), (-0.2, 0.0, 0.0, 3.0), (7.0, 0.0, 7.2, 3.0),
+             (4.0, 0.0, 4.06, 1.0), (4.0, 1.9, 4.06, 3.0)]
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    one = [[fx(0.0), fy(0.0)], [fx(4.0), fy(0.0)], [fx(4.0), fy(3.0)], [fx(0.0), fy(3.0)]]
+    out = vr.wall_openings(build_plan([Sheet(walls=walls)]), 1, {"01": one}, SCALE)
+    assert [(a["i"], a["plotis_m"]) for a in out["01"]] == [("vidus", 0.9)]
+    two = [[fx(4.06), fy(0.0)], [fx(7.0), fy(0.0)], [fx(7.0), fy(3.0)], [fx(4.06), fy(3.0)]]
+    both = vr.wall_openings(build_plan([Sheet(walls=walls)]), 1, {"01": one, "02": two}, SCALE)
+    assert [a["i"] for a in both["01"]] == ["02"] and [a["i"] for a in both["02"]] == ["01"]
+
+
+def test_an_outline_that_reaches_over_the_wall_does_not_take_the_neighbours_side():
+    """A hand-drawn outline often runs along the wall's far face. The side of the door that lies inside
+    BOTH outlines belongs to the one it lies deeper in."""
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    one = [[fx(0.2), fy(0.2)], [fx(4.45), fy(0.2)], [fx(4.45), fy(3.2)], [fx(0.2), fy(3.2)]]     # over the partition, 5 cm into 02
+    two = [[fx(4.4), fy(0.2)], [fx(7.4), fy(0.2)], [fx(7.4), fy(3.2)], [fx(4.4), fy(3.2)]]
+    out = vr.wall_openings(build_plan([two_rooms()]), 1, {"01": one, "02": two}, SCALE)
+    assert [a["i"] for a in out["01"]] == ["02"]
+    assert sorted(a["i"] for a in out["02"]) == ["01", "laukas"]

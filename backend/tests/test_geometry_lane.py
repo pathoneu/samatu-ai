@@ -279,3 +279,61 @@ def test_without_a_floor_sheet_nothing_about_floors_is_written():
     gl.apply_geometry(parsed, _two_sheets())
     assert all("grindu_danga" not in r for r in parsed["patalpos"])
     assert parsed["_meta"]["geometrija"]["grindu_dangos"] == {"lapai": [], "perskaityta": {}, "dvi_dangos": []}
+
+
+# ── the openings the wall solid shows (2026-09-20) ───────────────────────────
+
+def test_a_traced_room_carries_the_openings_in_its_walls():
+    parsed = _parsed()
+    gl.apply_geometry(parsed, _two_sheets())
+    r1, r2 = parsed["patalpos"]
+    assert r1["_angos_sienose"]["page"] == 1
+    assert [(a["i"], a["plotis_m"]) for a in r1["_angos_sienose"]["angos"]] == [("02", 0.9)]
+    assert sorted(a["i"] for a in r2["_angos_sienose"]["angos"]) == ["01", "laukas"]
+
+
+def test_an_outline_someone_corrected_gets_its_openings_too():
+    corrected = [[(60 + x * 28.3465) / 595.2756, (80 + y * 28.3465) / 841.8898] for x, y in ((0.25, 0.25), (4.15, 0.25), (4.15, 3.15), (0.25, 3.15))]
+    parsed = _parsed(polygon_pct=corrected, polygon_source="corrected")
+    gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert r1["polygon_source"] == "corrected"
+    assert [a["i"] for a in r1["_angos_sienose"]["angos"]] == ["02"]
+
+
+def test_a_room_without_an_outline_has_no_openings_and_a_stale_record_is_dropped():
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.showPage()
+    c.showPage()
+    c.save()
+    parsed = _parsed(_angos_sienose={"page": 1, "angos": [{"i": "02", "plotis_m": 0.9}]})
+    gl.apply_geometry(parsed, buf.getvalue())
+    assert "_angos_sienose" not in parsed["patalpos"][0]
+
+
+def test_a_neighbour_outlined_on_another_sheet_of_the_plan_is_still_named():
+    """objektas_g: the raster lane left every room's outline on a different sheet of the same plan, so
+    each room's openings led to a space „without an outline". Every trusted outline of the plan is laid
+    onto the sheet that is read; what is written back is in the room's OWN outline's frame."""
+    a = two_rooms()
+    a.dims = []
+    b = two_rooms()
+    b.badges = []
+    b.offset_m = (0.5, 0.3)                                      # the same plan, drawn elsewhere on its sheet
+    fx = lambda m: (60 + (m + 0.5) * 28.3465) / 595.2756       # noqa: E731
+    fy = lambda m: (80 + (m + 0.3) * 28.3465) / 841.8898       # noqa: E731
+    corrected = [[fx(x), fy(y)] for x, y in ((0.2, 0.2), (4.2, 0.2), (4.2, 3.2), (0.2, 3.2))]
+    parsed = _parsed(polygon_pct=corrected, polygon_source="corrected", puslapio_nr=2)
+    gl.apply_geometry(parsed, build_plan([a, b]))
+    r1, r2 = parsed["patalpos"]
+    assert r2["polygon_source"] == "vektoriniai_konturai" and r2["_konturas"]["page"] == 1
+    assert r1["_angos_sienose"]["page"] == 2
+    (door,) = r1["_angos_sienose"]["angos"]
+    assert door["i"] == "02" and door["plotis_m"] == 0.9
+    (x0, y0), (x1, y1) = door["line_pct"]
+    assert abs(x0 - fx(4.3)) < 0.002 and abs(x1 - fx(4.3)) < 0.002
+    assert sorted([round(y0, 3), round(y1, 3)]) == sorted([round(fy(1.0), 3), round(fy(1.9), 3)])
+    assert parsed["_meta"]["geometrija"]["angos_sienose"] == ["01", "02"]

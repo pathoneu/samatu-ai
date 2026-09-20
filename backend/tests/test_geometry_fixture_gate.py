@@ -80,4 +80,15 @@ def test_geometry_gate(slug):
         assert ev["page"] in want["grindu_lapai"] and ev["tekstas"] and len(ev["rect_pct"]) == 4
     assert set(want["dvi_dangos"]) <= set(floors["dvi_dangos"])
     assert not [nr for nr in want["dangos_neskaitomos"] if rooms[nr].get("grindu_danga")]
+    # the openings the wall solid shows in each outlined room's walls (2026-09-20): where they lead and
+    # how wide they are, each one placeable on the sheet the room's own outline is drawn on
+    for nr, openings in want["angos_sienose"].items():
+        rec = rooms[nr]["_angos_sienose"]
+        assert rec["page"] == int((rooms[nr].get("_konturas") or {}).get("page") or rooms[nr]["puslapio_nr"]), nr
+        for leads_to, width in openings:
+            assert [a for a in rec["angos"] if a["i"] == leads_to and abs(a["plotis_m"] - width) <= 0.03], (nr, leads_to, rec["angos"])
+        for a in rec["angos"]:
+            assert all(0 < v < 1 for pt in a["line_pct"] for v in pt) and 0.05 <= a["storis_m"] <= 0.75, (nr, a)
+    assert set(want["angos_sienose"]) <= set(out["angos_sienose"])
+    assert not [nr for nr in want["angu_nera"] if "_angos_sienose" in rooms[nr]]
     assert out["seconds"] < 20

@@ -61,6 +61,8 @@ SIMPLIFY_PT = 1.5
 MAX_FILL_SHARE = 0.2        # a fill covering more of the page than this is a background, not a wall
 MIN_WALLS = 3
 STRONG = ("zenkliukas", "plotas_uzrasas")
+SIDE_PROBE_PT = 1.0            # how far outside an opening's free side the space it leads to is looked up
+FOREIGN_OUTLINE_TOL_PT = 3.0   # an outline traced from a raster or drawn by hand sits this far off the wall face
 UNCLOSED = "sienos neuždaro patalpos (vieta ne uždaroje erdvėje)"
 SOURCE = "vektoriniai_konturai"
 
@@ -117,12 +119,19 @@ def _side_is_free(solid, p, q, outward) -> bool:
 
 
 def _bridges(solid, edges: Sequence[dict], m_per_pt: float, door_max_m: float) -> list[Polygon]:
+    return [r["poly"] for r in _bridge_records(solid, edges, m_per_pt, door_max_m)]
+
+
+def _bridge_records(solid, edges: Sequence[dict], m_per_pt: float, door_max_m: float) -> list[dict]:
+    """Every opening in the walls: {poly — the strip that closes it, plotis_m — the gap between the
+    two wall ends, storis_m — how thick the wall is there, line — the gap crossed on the wall's axis,
+    sides — a point just outside each of the strip's two FREE sides (the spaces the opening joins)}."""
     if not edges:
         return []
     tree = STRtree([LineString([e["a"], e["b"]]) for e in edges])
     reach = LONG_MAX_M / m_per_pt
     cos_anti = -math.cos(math.radians(ANTIPARALLEL_DEG))
-    out: list[Polygon] = []
+    out: list[dict] = []
     for i, e in enumerate(edges):
         nx, ny = e["n"]
         ux, uy = e["u"]
@@ -161,7 +170,12 @@ def _bridges(solid, edges: Sequence[dict], m_per_pt: float, door_max_m: float) -
                 continue                                       # something stands in the gap
             if not (_side_is_free(solid, p2, p3, (ux, uy)) and _side_is_free(solid, p4, p1, (-ux, -uy))):
                 continue                                       # closed on a side: a recess, not an opening
-            out.append(strip)
+            mid = lambda a, b: ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)      # noqa: E731
+            s1, s2 = mid(p2, p3), mid(p4, p1)
+            out.append({"poly": strip, "plotis_m": round(gap_m, 2), "storis_m": round(overlap_m, 2),
+                        "line": (mid(p1, p2), mid(p4, p3)),
+                        "sides": ((s1[0] + ux * SIDE_PROBE_PT, s1[1] + uy * SIDE_PROBE_PT),
+                                  (s2[0] - ux * SIDE_PROBE_PT, s2[1] - uy * SIDE_PROBE_PT))})
     return out
 
 
@@ -335,7 +349,8 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
 
 def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], table_areas: dict[str, float],
                        m_per_pt: float, page_size: tuple[float, float] | None = None) -> dict:
-    """{rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa, sujungta, durys_m, page}},
+    """{rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa, sujungta, durys_m, page,
+                     angos: [{plotis_m, storis_m, line_pct, i}]}},
         reasons: {nr: str},
         groups: [{nariai, polygon_pct, plotas_m2, perimetras_m, lenteles_suma_m2, page}]}
 
@@ -365,4 +380,94 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
                                                   table_areas, m_per_pt, W, H, page, door_m, solved)
         rooms.update(found)
         solved.update(polygons)
+    for nr, angos in _openings(solid, edges, solved, m_per_pt, W, H).items():
+        if nr in rooms:
+            rooms[nr]["angos"] = angos
+    for nr in rooms:
+        rooms[nr].setdefault("angos", [])
     return {"rooms": rooms, "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms}, "groups": groups}
+
+
+def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[Sequence[float]]], m_per_pt: float,
+                  page_size: tuple[float, float] | None = None) -> dict[str, list[dict]]:
+    """The openings in the walls of rooms whose outline came from ELSEWHERE (the raster outline lane, a
+    person's correction): {nr: [{plotis_m, storis_m, line_pct, i}]}. Same reading as for a traced room;
+    such an outline is a few points off the wall face, so the space beyond an opening is looked up with
+    that much tolerance. No vector walls on the sheet → {}."""
+    if page_size is None:
+        W, H, _ = page_geometry(pdf_bytes, page)
+    else:
+        W, H = page_size
+    if not outlines_pct or W <= 0 or H <= 0 or not m_per_pt:
+        return {}
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    if solid is None or n_walls < MIN_WALLS:
+        return {}
+    polys: dict[str, Polygon] = {}
+    for nr, ring in outlines_pct.items():
+        try:
+            poly = Polygon([(float(x) * W, float(y) * H) for x, y in ring])
+        except (TypeError, ValueError):
+            continue
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.geom_type == "Polygon" and poly.area > 0:
+            polys[str(nr)] = poly
+    found = _openings(solid, _edges(solid), polys, m_per_pt, W, H, tol_pt=FOREIGN_OUTLINE_TOL_PT)
+    return {nr: found.get(nr, []) for nr in polys}
+
+
+def _openings(solid, edges: Sequence[dict], solved: dict[str, Polygon], m_per_pt: float, W: float, H: float,
+              tol_pt: float = 0.3) -> dict[str, list[dict]]:
+    """The openings in each outlined room's walls: {nr: [{plotis_m, storis_m, line_pct, i}]}, `i` = the
+    room on the other side, "vidus" (a space inside the walls with no outline of its own) or "laukas".
+
+    Read once, with the widest door limit, for every room solved in any pass. An opening joins the two
+    spaces just outside its strip's free sides; when both truly lie inside the SAME room (two parts the
+    table counts as one, joined through that gap) it is not an opening of the room. `tol_pt` is how far
+    off the wall face an outline may sit and still own the space beside it."""
+    if not solved:
+        return {}
+    records = _bridge_records(solid, edges, m_per_pt, DOOR_SWEEP_M[-1])
+    if not records:
+        return {}
+    faces = _faces(solid, [r["poly"] for r in records])
+    order = sorted(solved)
+
+    def where(pt, skip: str | None = None) -> tuple[str, float]:
+        """(the space this point is in, how far outside that room's outline it lies). The outline it lies
+        DEEPEST in wins; failing that, the nearest one within the tolerance."""
+        p = Point(pt)
+        inside = [(-solved[nr].exterior.distance(p), nr) for nr in order if nr != skip and solved[nr].contains(p)]
+        if inside:
+            return min(inside)[1], 0.0
+        near = [(solved[nr].distance(p), nr) for nr in order if nr != skip]
+        near = [hit for hit in near if hit[0] <= tol_pt]
+        if near:
+            d, nr = min(near)
+            return nr, d
+        return ("vidus" if any(f.contains(p) for f in faces) else "laukas"), 0.0
+
+    out: dict[str, list[dict]] = {}
+    for r in records:
+        (a, da), (b, db) = where(r["sides"][0]), where(r["sides"][1])
+        if a == b and a in solved and (da > 0 or db > 0):
+            # One opening joins two DIFFERENT spaces unless both of its sides truly lie inside the room.
+            # A thin partition puts the far side within the tolerance of the near room: the nearer side
+            # keeps the room, the other is looked up again without it.
+            if da <= db:
+                b, db = where(r["sides"][1], skip=a)
+            else:
+                a, da = where(r["sides"][0], skip=b)
+        if a == b:
+            continue
+        (x0, y0), (x1, y1) = r["line"]
+        line = [[round(x0 / W, 5), round(y0 / H, 5)], [round(x1 / W, 5), round(y1 / H, 5)]]
+        line.sort()                                            # one order, whichever room reports it
+        for here, there in ((a, b), (b, a)):
+            if here in solved:
+                out.setdefault(here, []).append({"plotis_m": r["plotis_m"], "storis_m": r["storis_m"],
+                                                 "line_pct": line, "i": there})
+    for angos in out.values():
+        angos.sort(key=lambda o: (o["i"] in ("vidus", "laukas"), o["i"], o["line_pct"]))
+    return out

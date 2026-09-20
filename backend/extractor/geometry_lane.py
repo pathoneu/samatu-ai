@@ -27,6 +27,13 @@ extractor/floor_coverings.py): `grindu_danga` + `grindu_danga_saltinis =
 plotas_m2, rect_pct}; `_grindu_dangos_dvi` when the sheet writes two kinds of covering in
 one room. His own choice (`user_override`) is never touched.
 
+A room with a trusted outline (traced here, by the raster lane, or corrected by
+a person) also carries `_angos_sienose` {page, angos: [{plotis_m, storis_m,
+line_pct, i}]} — the openings the wall solid shows in its walls, in the frame
+of the room's own outline (`i` = the room beyond, "vidus" for a space without
+an outline, or "laukas"): evidence for the door-and-window fact, never a
+quantity on their own.
+
 `_meta.geometrija` says how many rooms came from where. Never raises.
 """
 from __future__ import annotations
@@ -41,7 +48,7 @@ from .plan_area_annotations import plan_pages_from_classification
 from .plan_dimensions import read_dimension_strings
 from .room_locator import locate_rooms
 from .sheet_alignment import align_sheets, from_base, to_base
-from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, trace_vector_rooms
+from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, trace_vector_rooms, wall_openings
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
 OPEN_PLAN_ESTIMATE = "atviros_erdves_ivertis"
@@ -56,12 +63,77 @@ def _nr(room: dict) -> str:
 # What the lane reads, as a number a stored project can be compared against
 # (api/free_reread.py offers a free re-read when the project's is lower):
 # 1 — outlines + summed perimeters; 2 — positions for the check sheet (line_pct,
-# sutapdinimas); 3 — floor coverings off the floor plan. RAISE it when the lane
-# starts reading something a stored project would gain from.
-LANE_VERSION = 3
+# sutapdinimas); 3 — floor coverings off the floor plan; 4 — the openings in each
+# outlined room's walls. RAISE it when the lane starts reading something a
+# stored project would gain from.
+LANE_VERSION = 4
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
+
+
+def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None:
+    """`_angos_sienose` for every room with a trusted outline. A room traced from the vector walls
+    already has it; an outline from the raster lane or from a person gets the same reading
+    (extractor/vector_rooms.wall_openings). A room without such an outline loses a stale record.
+
+    ONE sheet of a plan is read — the one most of the rooms still to do are outlined on — and EVERY
+    trusted outline of that plan is laid onto it: the room beyond a door is named only when its outline
+    is there (objektas_g: the raster lane left each room's outline on a different sheet of the same
+    plan, and every neighbour read as a space „without an outline"). What is written is in the frame of
+    the room's OWN outline, so the check sheet draws outline and openings together."""
+    outlined: dict[str, tuple[int, list]] = {}
+    todo: set[str] = set()
+    for r in rooms:
+        poly = r.get("polygon_pct")
+        page = int((r.get("_konturas") or {}).get("page") or r.get("puslapio_nr") or 0)
+        trusted = str(r.get("polygon_source") or "") in KEEP_POLYGONS and isinstance(poly, list) and len(poly) >= 3
+        if not (trusted and page in scale and page in sizes):
+            r.pop("_angos_sienose", None)
+            continue
+        outlined[_nr(r)] = (page, poly)
+        if not (str(r.get("polygon_source")) == VECTOR_SOURCE and isinstance(r.get("_angos_sienose"), dict)):
+            todo.add(_nr(r))                                   # (a traced room's were read on the very same solid)
+    transform = alignment.get("transform") or {}
+    group_of = {p: i for i, g in enumerate(alignment.get("groups") or []) for p in g if p in transform}
+    plans: dict[object, dict[int, int]] = {}                   # a plan (sheets lying over each other) → sheet → rooms to do
+    for nr in todo:
+        page = outlined[nr][0]
+        votes = plans.setdefault(group_of.get(page, ("lapas", page)), {})
+        votes[page] = votes.get(page, 0) + 1
+    found: dict[str, dict] = {}
+    for plan, votes in plans.items():
+        fp = max(sorted(votes), key=lambda p: votes[p])
+        W, H = sizes[fp]
+
+        def lay(page: int, x: float, y: float, back: bool = False):
+            """A point of `page` (page fractions) on the sheet that is read — or, `back`, the other way."""
+            if page == fp:
+                return x, y
+            src, dst = (fp, page) if back else (page, fp)
+            bx, by = to_base(alignment, src, x * sizes[src][0], y * sizes[src][1])
+            qx, qy = from_base(alignment, dst, bx, by)
+            return qx / sizes[dst][0], qy / sizes[dst][1]
+
+        same_plan = {nr: (page, ring) for nr, (page, ring) in outlined.items()
+                     if page == fp or (page in group_of and group_of[page] == plan)}
+        context = {nr: [lay(page, float(x), float(y)) for x, y in ring] for nr, (page, ring) in same_plan.items()}
+        got = wall_openings(pdf_bytes, fp, context, scale[fp], (W, H))
+        for nr in todo & set(got):
+            page = same_plan[nr][0]
+            angos = []
+            for a in got[nr]:
+                line = sorted([round(v, 5) for v in lay(page, float(x), float(y), back=True)] for x, y in a["line_pct"])
+                angos.append({**a, "line_pct": line})
+            found[nr] = {"page": page, "angos": angos}
+    for r in rooms:
+        nr = _nr(r)
+        if nr in todo:
+            if nr in found:
+                r["_angos_sienose"] = found[nr]
+            else:
+                r.pop("_angos_sienose", None)
+    meta["angos_sienose"] = sorted(_nr(r) for r in rooms if isinstance(r.get("_angos_sienose"), dict))
 
 
 def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta) -> None:
@@ -149,7 +221,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
-                  "perimetrai_sudeti": [], "perimetrai_tusti": [],
+                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"
     try:
@@ -247,6 +319,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                                       "plotas_nesutampa": hit["plotas_nesutampa"], "sujungta": hit["sujungta"],
                                       "durys_m": hit["durys_m"], "saltinis": VECTOR_SOURCE}
                     r.pop("_konturo_priezastis", None)
+                    # the openings the wall solid shows in this room's walls — evidence for the
+                    # door-and-window fact, never a quantity on their own (2026-09-20)
+                    r["_angos_sienose"] = {"page": page, "angos": hit.get("angos") or []}
                     meta["konturai"].append(nr)
                 elif nr in res["reasons"]:
                     r["_konturo_priezastis"] = res["reasons"][nr]
@@ -307,6 +382,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 old = before.get(nr)
                 if old is not None and str(r.get("perimetras_saltinis") or "") not in [s for s in STATED_PERIMETERS if s != "matmenu_eilutes"]:
                     r.setdefault("_perimetras_pries_geometrija", old)
+        _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta)
         _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
         if meta["konturai"] or done["stated"] or meta["grindu_dangos"]["perskaityta"]:
             status = "applied"
