@@ -11,6 +11,7 @@ import {
   summarizeRipple, termRows, CROP_MIN_H_PCT, CROP_MIN_W_PCT, paddedCropRect,
   pageToCropPct, polygonToCropPct, adjustOpeningCount, countOpenings, factMarks,
   openingsPatch, userEditPatch, setOpeningSize, roomTotals, factsStayOnScreen,
+  consequenceOf, factKeyForField, undoPatch,
   firstPageOfType, setSymbolCount, stampVerified, symbolPageTypes,
   symbolRows,
   authorFigureRows, bboxToRectPct,
@@ -713,4 +714,48 @@ test('after a fix the facts stay on screen while they are re-read — the sheet 
   assert.equal(factsStayOnScreen(null, '01', true), false, 'nothing to keep yet');
   assert.equal(factsStayOnScreen(facts, '01', false), true, 'loaded');
   assert.equal(factsStayOnScreen(null, '01', false), true, 'loaded and empty is still the loaded state');
+});
+
+test('a fix is shown under the fact it was made on — which fact a saved field belongs to', () => {
+  assert.equal(factKeyForField('plotas_m2'), 'plotas');
+  assert.equal(factKeyForField('perimetras_m'), 'perimetras');
+  assert.equal(factKeyForField('lubu_auksciai'), 'aukstis');
+  assert.equal(factKeyForField('walls_paint_override'), 'apdaila');
+  assert.equal(factKeyForField('grindu_danga'), 'grindys');
+  assert.equal(factKeyForField('paskirtis'), 'grindys');
+  assert.equal(factKeyForField('elementai'), 'angos');
+  assert.equal(factKeyForField('kazkas'), null);
+});
+
+test('what a fix changed in the sąmata: rows that appeared or vanished first, then the biggest moves, three at most', () => {
+  const row = (aprasymas, mato_vnt) => ({ aprasymas, mato_vnt });
+  const diff = {
+    count: 5,
+    changed: [
+      { kind: 'changed', row: row('Grindjuosčių montavimas', 'm'), before: 100, after: 96 },
+      { kind: 'added', row: row('Grindų plytelių klijavimas', 'm²'), before: null, after: 4.48 },
+      { kind: 'changed', row: row('Plytelių klijai', 'kg'), before: 10, after: 32.4 },
+      { kind: 'removed', row: row('Parketo klojimas', 'm²'), before: 4.48, after: null },
+      { kind: 'changed', row: row('Išlyginamasis mišinys', 'm²'), before: 50, after: 50.001 },
+    ],
+  };
+  const c = consequenceOf(diff, 3);
+  assert.equal(c.count, 5);
+  assert.deepEqual(c.lines.map((l) => l.label), ['Grindų plytelių klijavimas', 'Parketo klojimas', 'Plytelių klijai']);
+  assert.deepEqual(c.lines[0], { label: 'Grindų plytelių klijavimas', before: null, after: 4.48, unit: 'm²', kind: 'added' });
+  assert.deepEqual(c.lines[1], { label: 'Parketo klojimas', before: 4.48, after: null, unit: 'm²', kind: 'removed' });
+  assert.equal(c.more, 2);
+  assert.deepEqual(consequenceOf({ count: 0, changed: [] }), { count: 0, lines: [], more: 0 });
+  assert.deepEqual(consequenceOf(null), { count: 0, lines: [], more: 0 });
+});
+
+test('undoing a fix puts the project back exactly — including keys the fix added', () => {
+  const prev = { id: 'p', patalpos: [{ nr: '1', plotas_m2: 12 }], darbu_sarasas: [{ id: 'a', kiekis: 1 }], _overrides: { x: 1 } };
+  const current = { ...prev, patalpos: [{ nr: '1', plotas_m2: 13 }], _apimtis: { patalpos_ne: [] }, _reread_diff: undefined };
+  const patch = undoPatch(prev, current);
+  assert.deepEqual(patch.patalpos, prev.patalpos);
+  assert.deepEqual(patch.darbu_sarasas, prev.darbu_sarasas);
+  assert.equal(patch._apimtis, null, 'a top-level key the fix added is cleared');
+  assert.ok(!('_reread_diff' in patch) || patch._reread_diff == null);
+  assert.deepEqual(undoPatch(null, current), {});
 });

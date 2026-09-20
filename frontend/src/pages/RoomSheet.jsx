@@ -42,7 +42,8 @@ import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
   adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
-  factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, userEditPatch,
+  consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
+  userEditPatch,
 } from '@/lib/roomSheet';
 import {
   fetchRoomFacts, overrideRoomQuantity, patchRoom, recomputeUntouched, saveAssumptionEdit, saveRoomEdit, roomsOf,
@@ -50,6 +51,7 @@ import {
 import RoomSheetStrip from '@/components/roomsheet/RoomSheetStrip';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FactRow from '@/components/roomsheet/FactRow';
+import FixConsequence from '@/components/roomsheet/FixConsequence';
 import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
 import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
@@ -95,6 +97,9 @@ export default function RoomSheet() {
   // „Rodyti brėžinyje" on a fact: the drawing pane jumps to that fact's own place
   // ({key, nonce} — the nonce lets the same fact be asked for twice).
   const [focusRequest, setFocusRequest] = useState(null);
+  // The last fix made on this room: which fact, what it moved in the sąmata, and the
+  // project as it was before — shown under that fact with „Atšaukti pataisymą".
+  const [lastFix, setLastFix] = useState(null);
   const reqRef = useRef(0);
 
   const stage = params.get('etapas') === 'bendri' ? 'general' : 'rooms';
@@ -138,6 +143,7 @@ export default function RoomSheet() {
     loadFacts();
     setSeen(new Set());
     setRipple(null);
+    setLastFix(null);
     setHighlightCorners(false);
   }, [loadFacts]);
 
@@ -164,7 +170,7 @@ export default function RoomSheet() {
    * `patalpos` and `v8_rooms`. Writing one and not the other would leave this
    * walk (which reads `v8_rooms` first) showing the pre-edit room forever.
    */
-  const land = useCallback((result, { fromInterior = false, scopeChange = false } = {}) => {
+  const land = useCallback((result, { fromInterior = false, scopeChange = false, factKey = null } = {}) => {
     const prior = project?.darbu_sarasas || [];
     const notes = [];
     const rebuilt = result.rooms || result.v8_rooms || result.patalpos;
@@ -190,7 +196,15 @@ export default function RoomSheet() {
       };
     setProject(next);
     updateProject(project.id, next);
-    setRipple(rippleText(diffDarbuSarasas(prior, next.darbu_sarasas || []), t));
+    const diff = diffDarbuSarasas(prior, next.darbu_sarasas || []);
+    if (factKey) {
+      // a FACT was fixed: what it moved is shown under that fact, with the way back
+      setLastFix({ factKey, consequence: consequenceOf(diff, 3), prevProject: project });
+      setRipple(null);
+    } else {
+      setLastFix(null);
+      setRipple(rippleText(diff, t));
+    }
     // The facts endpoint reads the STORED blob, and `updateProject` writes on a
     // debounce. Refetching straight away raced the write and redrew the card
     // with the pre-edit numbers while the ripple underneath announced the new
@@ -223,13 +237,13 @@ export default function RoomSheet() {
     pilot('fact_number', { kind: 'fact', id: field });
     if (field === 'lubu_auksciai') {
       const next = { ...((project?._overrides || {}).lubu_auksciai || {}), [String(roomNr)]: value };
-      await land(await saveAssumptionEdit(project, 'lubu_auksciai', next));
+      await land(await saveAssumptionEdit(project, 'lubu_auksciai', next), { factKey: factKeyForField(field) });
       return;
     }
     // plotas_m2 / perimetras_m live on the room, so they go the room-edit way —
     // marked as his, so the sheet says so and a re-read keeps them.
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(field, value))),
-      { fromInterior: true });
+      { fromInterior: true, factKey: factKeyForField(field) });
   }), [run, project, roomNr, land, pilot]);
 
   // „Ką skaičiuoti" (apimtis): the whole project object changes, then every
@@ -260,21 +274,21 @@ export default function RoomSheet() {
         ...((project?._overrides || {}).walls_paint_override || {}),
         [String(roomNr)]: Number(value),
       };
-      await land(await saveAssumptionEdit(project, 'walls_paint_override', next));
+      await land(await saveAssumptionEdit(project, 'walls_paint_override', next), { factKey: factKeyForField(field) });
       return;
     }
     // `grindu_danga` (the covering itself) or `paskirtis` (older blobs' floor fact) —
     // both live on the room and are marked as his by `userEditPatch`.
     const roomField = field === 'grindu_danga' ? 'grindu_danga' : 'paskirtis';
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(roomField, value))),
-      { fromInterior: true });
+      { fromInterior: true, factKey: factKeyForField(roomField) });
   }), [run, project, roomNr, land, pilot]);
 
   const adjustOpening = useCallback((detail, delta) => run(async () => {
     pilot('opening_adjust', { kind: 'opening', id: String(detail?.tipas ?? '') });
     const elementai = adjustOpeningCount(room?.elementai, detail, delta);
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
-      { fromInterior: true });
+      { fromInterior: true, factKey: factKeyForField('elementai') });
   }), [run, project, room, roomNr, land, pilot]);
 
   // The size he knows replaces the standard one the reader assumed.
@@ -282,8 +296,24 @@ export default function RoomSheet() {
     pilot('opening_size', { kind: 'opening', id: String(detail?.tipas ?? '') });
     const elementai = setOpeningSize(room?.elementai, detail, size);
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
-      { fromInterior: true });
+      { fromInterior: true, factKey: factKeyForField('elementai') });
   }), [run, project, room, roomNr, land, pilot]);
+
+  // „Atšaukti pataisymą": the project goes back to exactly what it was before the last
+  // fix — the stored object, not a recomputation of it (lib/roomSheet.undoPatch).
+  const undoLastFix = useCallback(() => run(async () => {
+    if (!lastFix?.prevProject) return;
+    pilot('fact_undo', { kind: 'fact', id: lastFix.factKey });
+    const back = undoPatch(lastFix.prevProject, project);
+    const restored = { ...project, ...back };
+    Object.keys(back).forEach((k) => { if (back[k] === null) delete restored[k]; });
+    setProject(restored);
+    updateProject(project.id, back);
+    setLastFix(null);
+    setRipple(null);
+    await flushProjectSaves().then(loadFacts, loadFacts);
+    toast.success(t('project.roomSheet.fixUndone'));
+  }), [run, lastFix, project, pilot, loadFacts, t]);
 
   const totals = useMemo(() => roomTotals(room), [room]);
 
@@ -543,6 +573,9 @@ export default function RoomSheet() {
                     onSaveOpeningSize={saveOpeningSize}
                     onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
                   />
+                  {lastFix?.factKey === fact.key && (
+                    <FixConsequence consequence={lastFix.consequence} busy={busy} onUndo={undoLastFix} />
+                  )}
                 </div>
               ))}
 

@@ -765,3 +765,62 @@ export function factsStayOnScreen(facts, roomNr, loading) {
   const shown = facts?.room?.nr;
   return shown != null && roomNr != null && String(shown).trim() === String(roomNr).trim();
 }
+
+const FACT_OF_FIELD = {
+  plotas_m2: 'plotas',
+  perimetras_m: 'perimetras',
+  lubu_auksciai: 'aukstis',
+  walls_paint_override: 'apdaila',
+  grindu_danga: 'grindys',
+  paskirtis: 'grindys',
+  elementai: 'angos',
+};
+
+/** The fact a saved field belongs to — where the fix's consequence is shown. */
+export function factKeyForField(field) {
+  return FACT_OF_FIELD[field] || null;
+}
+
+/**
+ * What one fix changed in the sąmata, for the strip under the fixed fact:
+ * `{count, lines: [{label, before, after, unit, kind}], more}`. Rows that
+ * appeared or vanished come first (a floor covering swapped is „Parketo
+ * klojimas" gone and „Plytelių klijavimas" new), then the biggest RELATIVE
+ * moves — kilograms and square metres do not compare by size. `max` lines at
+ * most; the rest is a count.
+ */
+export function consequenceOf(diff, max = 3) {
+  const changed = Array.isArray(diff?.changed) ? diff.changed : [];
+  const scored = changed.map((c, i) => {
+    const before = c?.before == null ? null : qtyOf(c.before);
+    const after = c?.after == null ? null : qtyOf(c.after);
+    const delta = (after ?? 0) - (before ?? 0);
+    const base = Math.max(Math.abs(before ?? 0), Math.abs(after ?? 0));
+    const edge = c?.kind === 'added' || c?.kind === 'removed';
+    return {
+      i, edge, relative: base > 0 ? Math.abs(delta) / base : 0, moved: Math.abs(delta) >= 0.005,
+      line: {
+        label: String(c?.row?.aprasymas || ''), before, after,
+        unit: String(c?.row?.mato_vnt || c?.row?.unit || ''), kind: c?.kind || 'changed',
+      },
+    };
+  }).filter((x) => x.moved && x.line.label);
+  scored.sort((a, b) => (Number(b.edge) - Number(a.edge)) || (b.relative - a.relative) || (a.i - b.i));
+  const lines = scored.slice(0, Math.max(0, max)).map((x) => x.line);
+  const count = Number(diff?.count) || 0;
+  return { count, lines, more: Math.max(0, Math.max(count, scored.length) - lines.length) };
+}
+
+/**
+ * The patch that puts the project back to what it was before a fix: the whole
+ * previous project, plus `null` for every top-level key the fix ADDED (a patch
+ * that merely omits a key would leave it behind).
+ */
+export function undoPatch(prev, current) {
+  if (!prev || typeof prev !== 'object') return {};
+  const patch = { ...prev };
+  for (const key of Object.keys(current || {})) {
+    if (!(key in prev) && current[key] !== undefined) patch[key] = null;
+  }
+  return patch;
+}

@@ -104,7 +104,7 @@ export default function RoomDrawingPane({
     if (!roomKey || !overlay.roomFocus || focusedFor.current === roomKey) return;
     focusedFor.current = roomKey;
     go(overlay.roomFocus);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `go` is recreated every render — the room and its focus are what this waits for
   }, [roomKey, overlay.roomFocus]);
 
   // „Rodyti brėžinyje" on a fact → its own place, else the room.
@@ -113,7 +113,7 @@ export default function RoomDrawingPane({
     if (!focusRequest?.key) return;
     const o = buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey: focusRequest.key });
     go(o.factFocus || o.roomFocus);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // a request is its nonce — the same fact asked for twice is two requests
   }, [requestNonce]);
 
   if (isMobile || pdfState === 'failed') {

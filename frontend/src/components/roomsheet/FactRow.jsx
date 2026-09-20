@@ -124,8 +124,17 @@ export default function FactRow({
       />
 
       <div className="min-w-0">
-        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
+          {/* His own value — typed, chosen, accepted or drawn by him (room_facts `_is_yours`). */}
+          {fact?.yours && (
+            <span
+              className="rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-1.5 py-px text-[11px] font-semibold normal-case tracking-normal text-[hsl(var(--accent-2))]"
+              data-testid="fact-yours"
+            >
+              {t('project.roomSheet.yoursBadge')}
+            </span>
+          )}
         </p>
         <p className={`font-mono text-[16px] font-semibold leading-snug
           ${attention ? 'text-[hsl(var(--conf-med))]' : 'text-foreground'}`}
