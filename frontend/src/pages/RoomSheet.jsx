@@ -35,16 +35,15 @@ import { fetchOutlineAt, fetchSplitSpace } from '@/lib/roomOutlineApi';
 import { nextSplitClick, outlineFailureKey, roomsWithOutline, roomsWithSplit, splitFailureKey } from '@/lib/roomOutline';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
-import {
-  flushProjectSaves, getProject, markRoomVerified, refreshProjectFromBackend,
+import { getProject, markRoomVerified, refreshProjectFromBackend,
   updateProject,
 } from '@/lib/projectStore';
-import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
+import { useProjectFixes } from '@/lib/useProjectFixes';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
   addOpening, adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, heightsForRooms, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
-  alreadyInUse, consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
+  alreadyInUse, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified,
   userEditPatch,
 } from '@/lib/roomSheet';
 import {
@@ -82,8 +81,6 @@ export default function RoomSheet() {
   const [facts, setFacts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [ripple, setRipple] = useState(null);
   const [seen, setSeen] = useState(() => new Set());
   const [overridden, setOverridden] = useState(() => new Set());
   const [highlightCorners, setHighlightCorners] = useState(false);
@@ -100,9 +97,6 @@ export default function RoomSheet() {
   // „Rodyti brėžinyje" on a fact: the drawing pane jumps to that fact's own place
   // ({key, nonce} — the nonce lets the same fact be asked for twice).
   const [focusRequest, setFocusRequest] = useState(null);
-  // The last fix made on this room: which fact, what it moved in the sąmata, and the
-  // project as it was before — shown under that fact with „Atšaukti pataisymą".
-  const [lastFix, setLastFix] = useState(null);
   // Waiting for clicks on the drawing: `'outline'` („Parodyti patalpą", one click) or `'split'`
   // („Padalinti erdvę", two clicks — `splitFirst` is the first of them).
   const [picking, setPickingMode] = useState(false);
@@ -147,15 +141,6 @@ export default function RoomSheet() {
       });
   }, [id, roomNr]);
 
-  useEffect(() => {
-    loadFacts();
-    setSeen(new Set());
-    setRipple(null);
-    setLastFix(null);
-    setPicking(false);
-    setHighlightCorners(false);
-  }, [loadFacts]);
-
   const goToRoom = useCallback((nr) => {
     const next = new URLSearchParams(params);
     next.set('kambarys', String(nr));
@@ -171,76 +156,32 @@ export default function RoomSheet() {
 
   // ── Saving ────────────────────────────────────────────────────────────────
 
-  /**
-   * Land a recompute result on the project. Mirrors InteriorProject's own merge
-   * — `mergeDarbuSarasasEdits` is the only thing standing between an edit and a
-   * pile of deleted priced rows — with one addition: `/api/recompute-quantities`
-   * returns the rebuilt rooms under `rooms` only, so they are written to BOTH
-   * `patalpos` and `v8_rooms`. Writing one and not the other would leave this
-   * walk (which reads `v8_rooms` first) showing the pre-edit room forever.
-   */
-  const land = useCallback((result, { fromInterior = false, scopeChange = false, factKey = null, sameValue = false } = {}) => {
-    const prior = project?.darbu_sarasas || [];
-    const notes = [];
-    const rebuilt = result.rooms || result.v8_rooms || result.patalpos;
-    const next = fromInterior
-      ? {
-        ...project,
-        ...result,
-        name: project.name,
-        company_name: project.company_name,
-        vat_rate: project.vat_rate,
-        // a scope choice removes rows on purpose — do not carry them back as orphans
-        darbu_sarasas: mergeDarbuSarasasEdits(result.darbu_sarasas, prior, notes, undefined, { scopeChange }),
-      }
-      : {
-        ...project,
-        patalpos: rebuilt || project.patalpos,
-        v8_rooms: rebuilt || project.v8_rooms,
-        pozicijos: result.pozicijos || project.pozicijos,
-        darbu_sarasas: mergeDarbuSarasasEdits(
-          result.darbu_sarasas, prior, notes,
-          (result._merge_notes || []).filter((n) => n.reason === 'relabeled')),
-        _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
-      };
-    setProject(next);
-    updateProject(project.id, next);
-    const diff = diffDarbuSarasas(prior, next.darbu_sarasas || []);
-    if (factKey) {
-      // a FACT was fixed: what it moved is shown under that fact, with the way back
-      setLastFix({ factKey, consequence: consequenceOf(diff, 3, { sameValue }), prevProject: project });
-      setRipple(null);
-    } else {
-      setLastFix(null);
-      setRipple(rippleText(diff, t));
-    }
-    // The facts endpoint reads the STORED blob, and `updateProject` writes on a
-    // debounce. Refetching straight away raced the write and redrew the card
-    // with the pre-edit numbers while the ripple underneath announced the new
-    // ones — measured in the browser: the height was already 3,10 server-side
-    // and the card still read „iki 3m". Flush first, then re-read.
-    return flushProjectSaves().then(loadFacts, loadFacts);
-  }, [project, t, loadFacts]);
-
-  const run = useCallback(async (work) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await work();
-    } catch (err) {
-      console.error('[roomSheet] save failed:', err);
-      toast.error(t('project.roomSheet.saveError', { msg: err.message }));
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, t]);
-
   // Pilot telemetry (council verdict 5): what gets accepted, what gets fixed.
   useEffect(() => {
     pilotSession(id);
     return () => { releasePilotSession(id); };
   }, [id]);
   const pilot = useCallback((type, target = {}) => recordPilot(id, type, { room: roomNr, ...target }), [id, roomNr]);
+
+  // One landing for every fix — shared with the question list (lib/useProjectFixes): the recompute result
+  // merged into the project, what it moved shown under the fixed fact, and „Atšaukti pataisymą".
+  const {
+    busy, run, land, undoLastFix, lastFix, setLastFix, ripple, setRipple,
+  } = useProjectFixes({
+    project, setProject, t, afterLand: loadFacts,
+    onUndo: (fix) => pilot('fact_undo', { kind: 'fact', id: fix.factKey }),
+  });
+
+  // A new room: its facts are read, and nothing of the previous room's session state carries over.
+  useEffect(() => {
+    loadFacts();
+    setSeen(new Set());
+    setRipple(null);
+    setLastFix(null);
+    setPicking(false);
+    setHighlightCorners(false);
+    // the setters are stable; this runs when the ROOM changes (loadFacts is keyed on it)
+  }, [loadFacts]);
 
   // `alsoRooms`: the other rooms that ask the same question (fact.same_question) — one answer, one
   // recompute, one consequence strip, one undo for all of them.
@@ -358,22 +299,6 @@ export default function RoomSheet() {
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, openingsPatch(elementai))),
       { fromInterior: true, factKey: factKeyForField('elementai') });
   }), [run, project, room, roomNr, land, pilot]);
-
-  // „Atšaukti pataisymą": the project goes back to exactly what it was before the last
-  // fix — the stored object, not a recomputation of it (lib/roomSheet.undoPatch).
-  const undoLastFix = useCallback(() => run(async () => {
-    if (!lastFix?.prevProject) return;
-    pilot('fact_undo', { kind: 'fact', id: lastFix.factKey });
-    const back = undoPatch(lastFix.prevProject, project);
-    const restored = { ...project, ...back };
-    Object.keys(back).forEach((k) => { if (back[k] === null) delete restored[k]; });
-    setProject(restored);
-    updateProject(project.id, back);
-    setLastFix(null);
-    setRipple(null);
-    await flushProjectSaves().then(loadFacts, loadFacts);
-    toast.success(t('project.roomSheet.fixUndone'));
-  }), [run, lastFix, project, pilot, loadFacts, t]);
 
   const totals = useMemo(() => roomTotals(room), [room]);
 
