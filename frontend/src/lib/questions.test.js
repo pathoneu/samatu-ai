@@ -7,7 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  answerSummary, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf, wallsAnswer,
+  answerSummary, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf, questionAfterAnswer,
+  wallsAnswer,
 } from './questions.js';
 
 const Q = (id, extra = {}) => ({ id, kind: id.split(':')[0], items: [], manual: [], ...extra });
@@ -40,7 +41,7 @@ test('one height goes to every room that asked, a room typed separately keeps it
   const project = { _overrides: { lubu_auksciai: { '09': 3.1 } }, patalpos: [{ nr: '01', lubu_aukstis_m: 2.82 }] };
   const all = heightAnswer(project, heightItems, 2.75);
   assert.deepEqual(all.table, { '09': 3.1, '01': 2.75, '02': 2.75, '03': 2.75 });
-  assert.deepEqual(all.rooms, ['01', '02', '03']);
+  assert.deepEqual(all.touched, ['01', '02', '03']);
   const some = heightAnswer(project, heightItems, 2.75, { '03': 2.5 });
   assert.deepEqual(some.table, { '09': 3.1, '01': 2.75, '02': 2.75, '03': 2.5 });
   assert.equal(project._overrides.lubu_auksciai['01'], undefined, 'the project is not mutated');
@@ -135,10 +136,24 @@ test('openings: the ticked ones are added to their rooms — two in one room bot
 
 test('what was answered is said in one plain sentence', () => {
   const t = (key, params) => `${key}|${JSON.stringify(params || {})}`;
-  assert.match(answerSummary({ kind: 'aukstis' }, { rooms: ['01', '02'], value: 2.82 }, t), /answeredHeight/);
-  assert.match(answerSummary({ kind: 'aukstis' }, { rooms: ['01', '02'], value: 2.82 }, t), /"count":2/);
+  assert.match(answerSummary({ kind: 'aukstis' }, { touched: ['01', '02'], value: 2.82 }, t), /answeredHeight/);
+  assert.match(answerSummary({ kind: 'aukstis' }, { touched: ['01', '02'], value: 2.82 }, t), /"count":2/);
   assert.match(answerSummary({ kind: 'perimetras' }, { touched: ['03'] }, t), /answeredNumbers/);
+  // the rooms array an answer SENDS is never what is said (it printed „[object Object]" eleven times)
+  const said = answerSummary({ kind: 'perimetras' }, { touched: ['03', '07'], rooms: [{ nr: '03' }, { nr: '07' }, { nr: '09' }] }, t);
+  assert.match(said, /"count":2/);
+  assert.match(said, /"rooms":"03, 07"/);
   assert.match(answerSummary({ kind: 'angos' }, { added: 3, touched: ['02', '07'] }, t), /answeredOpenings.*"count":3/);
   assert.match(answerSummary({ kind: 'erdve' }, { touched: ['04', '05'] }, t), /answeredSplit/);
   assert.match(answerSummary({ kind: 'konturas' }, { touched: ['01'] }, t), /answeredOutline/);
+});
+
+test('after an answer he stands on the question that slid into its place — or stays, when it still has rooms to show', () => {
+  const before = [Q('aukstis'), Q('konturas'), Q('perimetras'), Q('angos')];
+  const after = before.filter((q) => q.id !== 'konturas');
+  assert.equal(questionAfterAnswer(after, new Set(), 'konturas', 1).id, 'perimetras');
+  assert.equal(questionAfterAnswer(before, new Set(), 'konturas', 1).id, 'konturas', 'two rooms to point at: one done, one left');
+  assert.equal(questionAfterAnswer(after, new Set(['perimetras', 'angos']), 'konturas', 1).id, 'aukstis', 'wraps to what is open');
+  assert.equal(questionAfterAnswer([], new Set(), 'angos', 3), null);
+  assert.equal(questionAfterAnswer(after, new Set(['aukstis', 'perimetras', 'angos']), 'konturas', 1), null);
 });

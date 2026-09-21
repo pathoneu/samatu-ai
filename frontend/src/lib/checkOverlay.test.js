@@ -215,3 +215,44 @@ test('a wall made of strings and a door nobody wrote shows every part in order',
   assert.equal(wallLabel(pier), '(0,12) + 0.800');
   assert.equal(wallLabel({ saltinis: 'eilute', eilutes: [{ text: '3665' }], dalys: [] }), '3665');
 });
+
+// ── the boundary the PROGRAM proposes for a shared space, shown BEFORE it is accepted (2026-09-21) ──
+test('a proposed boundary is drawn on its sheet: both outlines and the line, without touching what was read', async () => {
+  const { buildCheckOverlay } = await import('./checkOverlay.js');
+  const room = { nr: '04', page: 1, marker_pct: [0.3, 0.5] };
+  const facts = [{ key: 'perimetras', outline: { page: 1, polygon_pct: null, open_space: { nariai: ['04', '05'], page: 1, polygon_pct: [[0.1, 0.1], [0.7, 0.1], [0.7, 0.5], [0.1, 0.5]] } }, walls: [] }];
+  const proposal = {
+    page: 1, line_pct: [[0.4, 0.1], [0.4, 0.5]],
+    rooms: { '04': [[0.1, 0.1], [0.4, 0.1], [0.4, 0.5], [0.1, 0.5]], '05': [[0.4, 0.1], [0.7, 0.1], [0.7, 0.5], [0.4, 0.5]] },
+  };
+  const o = buildCheckOverlay({ room, facts, proposal });
+  assert.deepEqual(o.pages[1].proposal.line, [[0.4, 0.1], [0.4, 0.5]]);
+  assert.deepEqual(o.pages[1].proposal.outlines.map((x) => x.nr), ['04', '05']);
+  assert.equal(o.pages[1].proposal.outlines[0].points.length, 4);
+  assert.ok(o.pages[1].openSpace, 'the shared space stays drawn under it');
+  // nothing to show → nothing drawn
+  assert.equal(buildCheckOverlay({ room, facts }).pages[1].proposal, null);
+  assert.equal(buildCheckOverlay({ room, facts, proposal: { page: 1, line_pct: null, rooms: {} } }).pages[1].proposal, null);
+});
+
+// ── a fact whose evidence is on ANOTHER sheet and has no place of its own there (2026-09-21) ──────
+test('a fact read on another sheet of the same plan is looked at where the ROOM lies on that sheet', async () => {
+  const { buildCheckOverlay } = await import('./checkOverlay.js');
+  const room = { nr: '01', page: 4 };
+  const outline = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.5], [0.2, 0.5]];
+  const facts = [
+    { key: 'perimetras', outline: { page: 4, polygon_pct: outline }, walls: [] },
+    { key: 'grindys', source: { page: 7, rect_pct: null } },           // „Grindų plane (7 psl.)…" — a sheet, no box
+  ];
+  const sutapdinimas = { 4: { base: 2, k: 1, kx: 1, ky: 1, dx_pct: 0, dy_pct: 0 }, 7: { base: 2, k: 1, kx: 1, ky: 1, dx_pct: 0.1, dy_pct: -0.05 } };
+  const o = buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey: 'grindys' });
+  assert.equal(o.factFocus.page, 7);
+  const [x0, y0, x1, y1] = o.factFocus.rect;
+  assert.ok(x0 < 0.1 && x1 > 0.3 && y0 < 0.25 && y1 > 0.55, 'the room\'s box, shifted onto sheet 7');
+  // sheets that are NOT one plan: the whole sheet, never a box from another frame
+  const apart = buildCheckOverlay({ room, facts, sutapdinimas: { 4: sutapdinimas[4] }, activeFactKey: 'grindys' });
+  assert.deepEqual(apart.factFocus, { page: 7, rect: [0, 0, 1, 1] });
+  // a fact on the room's own sheet without a box keeps the room's focus (nothing changes)
+  const own = buildCheckOverlay({ room, facts: [facts[0], { key: 'grindys', source: { page: 4, rect_pct: null } }], sutapdinimas, activeFactKey: 'grindys' });
+  assert.equal(own.factFocus, null);
+});

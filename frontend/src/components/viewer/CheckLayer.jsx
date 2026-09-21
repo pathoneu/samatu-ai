@@ -12,6 +12,8 @@
  *  • the IMAGINARY boundary a person drew through a space two rooms share — dashed
  *    in the room's blue: an edge of the outline, not a wall; and the points he has
  *    clicked so far while showing a room or dividing a space;
+ *  • the boundary the program PROPOSES for a shared space, before it is accepted: both
+ *    rooms' outlines with their numbers and the dashed line between them;
  *  • the OPENINGS the wall solid shows in the room's walls — a violet bar across
  *    each gap with its width beside it, ALWAYS (2026-09-21: the width used to appear
  *    only while the door-and-window fact was hovered — the founder never found it);
@@ -118,6 +120,34 @@ export default function CheckLayer({ data, renderedSize }) {
           />
         );
       })}
+      {/* the boundary the program PROPOSES for a shared space — shown before it is accepted: both rooms' outlines,
+          their numbers, and the dashed line between them */}
+      {data.proposal && (
+        <g data-check-proposal>
+          {data.proposal.outlines.map((o) => {
+            const cx = o.points.reduce((sum, pt) => sum + X(pt), 0) / o.points.length;
+            const cy = o.points.reduce((sum, pt) => sum + Y(pt), 0) / o.points.length;
+            return (
+              <g key={`pr${o.nr}`}>
+                <polygon points={poly(o.points)} fill={ROOM} fillOpacity={0.1} stroke={ROOM} strokeWidth={2} strokeLinejoin="round" />
+                <g transform={`translate(${cx.toFixed(1)}, ${cy.toFixed(1)})`}>
+                  <rect x={-16} y={-11} width={32} height={22} rx={2} fill={ROOM} />
+                  <text x={0} y={5} textAnchor="middle" fontSize={13} fontFamily="'IBM Plex Mono', ui-monospace, monospace" fontWeight={600} fill="#ffffff">{o.nr}</text>
+                </g>
+              </g>
+            );
+          })}
+          <line
+            x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
+            stroke="#ffffff" strokeWidth={7} strokeLinecap="round"
+          />
+          <line
+            x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
+            stroke={ROOM} strokeWidth={3.5} strokeDasharray="10 7" strokeLinecap="round"
+          />
+        </g>
+      )}
+
       {(data.imaginary || []).map((seg, i) => (
         <line
           key={`im${i}`} data-check-imaginary

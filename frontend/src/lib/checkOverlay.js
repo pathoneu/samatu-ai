@@ -110,17 +110,17 @@ function validPolygon(poly) {
 
 /**
  * Everything the viewer draws for this room, per page, plus where to look.
- *   pages[p] = { outline, openSpace, walls, strings, openings, imaginary, pickPoints, marks, marker }
+ *   pages[p] = { outline, openSpace, walls, strings, openings, imaginary, pickPoints, marks, marker, proposal }
  *   roomFocus = { page, rect }   — „Į patalpą"
  *   factFocus = { page, rect } | null   — the active fact's own place
  */
-export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFactKey = null, pickPoints = null } = {}) {
+export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFactKey = null, pickPoints = null, proposal = null } = {}) {
   const out = { pages: {}, roomFocus: null, factFocus: null, outlineReason: null };
   if (!room) return out;
   const list = Array.isArray(facts) ? facts : [];
   const pageOf = (p) => {
     const key = Number(p);
-    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], openings: [], imaginary: [], pickPoints: [], marks: [], marker: null };
+    if (!out.pages[key]) out.pages[key] = { outline: null, openSpace: null, walls: [], strings: [], openings: [], imaginary: [], pickPoints: [], marks: [], marker: null, proposal: null };
     return out.pages[key];
   };
 
@@ -184,6 +184,14 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
     pageOf(pt.page).pickPoints.push({ x: Number(pt.x_pct), y: Number(pt.y_pct) });
   }
 
+  // the boundary the PROGRAM proposes for a shared space (api split-proposal), shown before it is accepted:
+  // both rooms' outlines and the line between them
+  const line = Array.isArray(proposal?.line_pct) && proposal.line_pct.length === 2 ? proposal.line_pct : null;
+  const proposed = Object.entries(proposal?.rooms || {}).filter(([, pts]) => validPolygon(pts));
+  if (line && proposed.length && num(proposal?.page) != null) {
+    pageOf(proposal.page).proposal = { line, outlines: proposed.map(([nr, points]) => ({ nr: String(nr), points })) };
+  }
+
   // the room's printed number: the only mark a room without its own outline has
   const marker = Array.isArray(room.marker_pct) && num(room.marker_pct[0]) != null && num(room.marker_pct[1]) != null
     ? { x: Number(room.marker_pct[0]), y: Number(room.marker_pct[1]), nr: String(room.nr ?? '') } : null;
@@ -211,6 +219,21 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
     || (Array.isArray(room.region_pct) ? room.region_pct : null);
   const focusPage = outline ? outlinePage : (shared ? (num(space.page) ?? outlinePage) : num(room.page));
   if (focusShape && focusPage != null) out.roomFocus = { page: Number(focusPage), rect: focusRectFor(focusShape) };
+
+  // The active fact was read on ANOTHER sheet and has no box of its own there (a floor covering „pagal grindų
+  // planą, 7 psl."): look where the ROOM lies on that sheet — sheets of one plan lie over each other — and at
+  // the whole sheet when they do not.
+  const active = list.find((f) => f?.key === activeFactKey);
+  const activePage = num(active?.source?.page);
+  if (active && !out.factFocus && activePage != null && out.roomFocus && activePage !== out.roomFocus.page) {
+    const same = entry(sutapdinimas, out.roomFocus.page)?.base === entry(sutapdinimas, activePage)?.base
+      && entry(sutapdinimas, activePage) != null;
+    const pts = Array.isArray(focusShape[0]) ? focusShape : [[focusShape[0], focusShape[1]], [focusShape[2], focusShape[3]]];
+    out.factFocus = {
+      page: activePage,
+      rect: same ? focusRectFor(pts.map((pt) => mapPct(pt, out.roomFocus.page, activePage, sutapdinimas))) : [0, 0, 1, 1],
+    };
+  }
   return out;
 }
 

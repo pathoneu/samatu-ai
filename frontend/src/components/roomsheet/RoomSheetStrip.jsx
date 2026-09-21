@@ -8,7 +8,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ListChecks } from 'lucide-react';
 
 const NAV = 'inline-flex min-h-[44px] items-center gap-1 rounded-[2px] border '
   + 'border-white/25 px-3 text-[14px] font-semibold text-white/90 '
@@ -16,12 +16,19 @@ const NAV = 'inline-flex min-h-[44px] items-center gap-1 rounded-[2px] border '
   + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60';
 
 export default function RoomSheetStrip({
-  title, progress, index, total, onPrev, onNext, hasPrev, hasNext,
+  title, progress, index, total, onPrev, onNext, hasPrev, hasNext, onQuestions = null,
 }) {
   const { t } = useTranslation();
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-[hsl(var(--primary))] px-4 py-2.5 text-white">
+      {/* Patikra opens on the question list (2026-09-21); this sheet is the look into one room — the way back */}
+      {onQuestions && (
+        <button type="button" onClick={onQuestions} className={NAV} data-testid="back-to-questions">
+          <ListChecks className="h-4 w-4" aria-hidden="true" />
+          {t('project.questions.backToQuestions')}
+        </button>
+      )}
       <h1 className="text-[17px] font-semibold">{title}</h1>
 
       <div className="flex min-w-[240px] flex-1 items-center gap-3">

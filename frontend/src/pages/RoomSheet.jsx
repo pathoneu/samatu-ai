@@ -394,6 +394,7 @@ export default function RoomSheet() {
     return (
       <div className="flex min-h-full flex-col bg-background">
         <RoomSheetStrip
+          onQuestions={() => navigate(`/project/${id}/patikra`)}
           title={t('project.roomSheet.generalTitle')}
           progress={progress}
           index={rooms.length}
@@ -454,6 +455,7 @@ export default function RoomSheet() {
         setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
       />
       <RoomSheetStrip
+        onQuestions={() => navigate(`/project/${id}/patikra`)}
         title={roomTitle(room) || String(roomNr)}
         progress={progress}
         index={idx + 1}

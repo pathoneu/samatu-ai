@@ -29,6 +29,19 @@ export function nextOpenQuestion(questions, skipped, afterId = null) {
   return list.slice(at + 1).find(open) || list.slice(0, Math.max(at, 0) + 1).find(open) || null;
 }
 
+/**
+ * Where to stand after an answer. The list was rebuilt: the answered question is usually GONE — then the one that
+ * slid into its place is next (he moves down the list), else the first still open. A question that is still
+ * there (more rooms to point at) stays in front of him.
+ */
+export function questionAfterAnswer(questions, skipped, answeredId, answeredIndex = 0) {
+  const list = Array.isArray(questions) ? questions : [];
+  const open = (q) => !skipped?.has?.(q.id);
+  const same = list.find((q) => q.id === answeredId);
+  if (same && open(same)) return same;
+  return list.slice(Math.max(0, answeredIndex)).find(open) || list.find(open) || null;
+}
+
 /** Counts for the header: still open, skipped (and still there), answered in this sitting. */
 export function progressOf(questions, skipped, answeredCount = 0) {
   const list = Array.isArray(questions) ? questions : [];
@@ -50,7 +63,7 @@ export function heightAnswer(project, items, value, perRoom = null) {
   for (const item of list) table = { ...table, [nrOf(item)]: valueFor(nrOf(item)) };
   return {
     table,
-    rooms: list.map(nrOf),
+    touched: list.map(nrOf),
     value: Number(value),
     sameValue: list.every((i) => alreadyInUse(project, [nrOf(i)], 'lubu_auksciai', valueFor(nrOf(i)))),
   };
@@ -142,7 +155,8 @@ const SUMMARY_KEY = {
 /** What was just answered, in one plain sentence for the strip above the next question. */
 export function answerSummary(question, answer, t) {
   const key = SUMMARY_KEY[question?.kind] || 'answeredNumbers';
-  const rooms = answer?.rooms?.length ? answer.rooms : (answer?.touched || []);
+  // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
+  const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
   return t(`project.questions.${key}`, {
     count: question?.kind === 'angos' ? Number(answer?.added) || 0 : rooms.length,
     rooms: rooms.join(', '),

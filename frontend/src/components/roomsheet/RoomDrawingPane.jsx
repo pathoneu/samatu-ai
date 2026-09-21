@@ -50,6 +50,8 @@ class ViewerBoundary extends Component {
 
 export default function RoomDrawingPane({
   project, projectId, room, facts = [], activeFactKey = null, focusRequest = null, fallback, pick = null,
+  // the question list drives the pick mode itself and shows a PROPOSED boundary before it is accepted
+  proposal = null, hidePickButtons = false,
 }) {
   const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -86,8 +88,8 @@ export default function RoomDrawingPane({
   const sutapdinimas = project?._meta?.geometrija?.sutapdinimas || null;
   const pickFirst = pick?.first || null;
   const overlay = useMemo(
-    () => buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey, pickPoints: pickFirst ? [pickFirst] : null }),
-    [room, facts, sutapdinimas, activeFactKey, pickFirst],
+    () => buildCheckOverlay({ room, facts, sutapdinimas, activeFactKey, pickPoints: pickFirst ? [pickFirst] : null, proposal }),
+    [room, facts, sutapdinimas, activeFactKey, pickFirst, proposal],
   );
   const check = useMemo(() => ({ pages: overlay.pages }), [overlay.pages]);
   const laneScales = useMemo(() => pageScalesFromLane(laneMastelisOf(project)), [project]);
@@ -162,7 +164,7 @@ export default function RoomDrawingPane({
             {t('project.roomSheet.drawWholeSheet')}
           </button>
           {/* „Parodyti patalpą": one click inside the room → its outline along the walls (lib/roomOutline). */}
-          {pick && (
+          {pick && !hidePickButtons && (
             <button
               type="button"
               className={`${BTN} ${pick.active && pick.mode !== 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
@@ -176,7 +178,7 @@ export default function RoomDrawingPane({
             </button>
           )}
           {/* „Padalinti erdvę": two rooms no wall separates — one line he draws gives each its own outline. */}
-          {pick && space && (
+          {pick && space && !hidePickButtons && (
             <button
               type="button"
               className={`${BTN} ${pick.active && pick.mode === 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
