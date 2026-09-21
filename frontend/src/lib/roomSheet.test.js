@@ -795,3 +795,34 @@ test('a height typed once is written for every room that asked for it, and nobod
   assert.deepEqual(heightsForRooms(project, ['01', '01', null, ''], 2.7), { '05': 3.1, '01': 2.7 });
   assert.equal(project._overrides.lubu_auksciai['01'], undefined, 'the project is not mutated');
 });
+
+// ── „kodėl sąmatos eilutė nepasikeitė?" (founder, 2026-09-21) ───────────────
+test('an answer equal to the number the rows were already built from is recognised, so the strip can say why nothing moved', async () => {
+  const { alreadyInUse } = await import('./roomSheet.js');
+  const project = {
+    patalpos: [
+      { nr: '01', lubu_aukstis_m: 2.82, perimetras_m: 21.23 },
+      { nr: '02', lubu_aukstis_m: 2.82 },
+      { nr: '03', lubu_aukstis_m: 3.1 },
+    ],
+  };
+  assert.equal(alreadyInUse(project, ['01', '02'], 'lubu_auksciai', 2.82), true);
+  assert.equal(alreadyInUse(project, ['01', '03'], 'lubu_auksciai', 2.82), false, 'one of the rooms was computed with another height');
+  assert.equal(alreadyInUse(project, ['01'], 'lubu_auksciai', 2.8), false);
+  assert.equal(alreadyInUse(project, ['01'], 'perimetras_m', 21.23), true, 'accepting the estimate the rows already use');
+  assert.equal(alreadyInUse(project, ['01'], 'perimetras_m', 20), false);
+  assert.equal(alreadyInUse(project, ['09'], 'perimetras_m', 20), false, 'an unknown room is never „the same"');
+  assert.equal(alreadyInUse(project, [], 'lubu_auksciai', 2.82), false);
+  assert.equal(alreadyInUse(project, ['02'], 'perimetras_m', 0), false, 'a room with no number yet');
+  // the rebuilt rooms win over the stored ones, as everywhere on the sheet
+  const rebuilt = { ...project, v8_rooms: [{ nr: '01', lubu_aukstis_m: 2.6 }] };
+  assert.equal(alreadyInUse(rebuilt, ['01'], 'lubu_auksciai', 2.6), true);
+});
+
+test('the consequence of a fix that moved nothing carries the reason when the answer was already in use', () => {
+  assert.deepEqual(consequenceOf({ count: 0, changed: [] }, 3, { sameValue: true }), { count: 0, lines: [], more: 0, sameValue: true });
+  // rows moved → the reason is beside the point
+  const moved = consequenceOf({ count: 1, changed: [{ kind: 'changed', before: 10, after: 12, row: { aprasymas: 'Sienų dažymas', mato_vnt: 'm²' } }] }, 3, { sameValue: true });
+  assert.equal(moved.sameValue, undefined);
+  assert.equal(moved.count, 1);
+});

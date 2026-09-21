@@ -13,14 +13,22 @@
  *    in the room's blue: an edge of the outline, not a wall; and the points he has
  *    clicked so far while showing a room or dividing a space;
  *  • the OPENINGS the wall solid shows in the room's walls — a violet bar across
- *    each gap; its width appears while the door-and-window fact is looked at;
+ *    each gap with its width beside it, ALWAYS (2026-09-21: the width used to appear
+ *    only while the door-and-window fact was hovered — the founder never found it);
+ *    the bar thickens while that fact is looked at;
  *  • the rectangle a fact was read from, solid while that fact is active;
  *  • the room's printed number, ringed, when the room has no outline of its own.
+ *
+ * While a boundary is being drawn (ONE point clicked, the second awaited) the line from
+ * that point to the pointer is shown live — he sees the boundary before he sets it
+ * (2026-09-21, founder: „nėra instrukcijų, tik tu ir aš jas žinom").
  *
  * Colours are on-drawing SEMANTIC colours (they must read on any sheet), not
  * theme tokens — same rule as the measure and zone layers. Coordinates are
  * display-space page fractions; PageOverlayHost's wrapper handles /Rotate.
  */
+
+import { useEffect, useRef, useState } from 'react';
 
 const STATE = {
   read: { stroke: '#15803d', dash: null },
@@ -39,6 +47,21 @@ function chipWidth(label) {
 export default function CheckLayer({ data, renderedSize }) {
   const width = renderedSize?.width;
   const height = renderedSize?.height;
+  const svgRef = useRef(null);
+  const [pointer, setPointer] = useState(null);
+  const drawing = (data?.pickPoints || []).length === 1;      // a boundary's first end is set
+  useEffect(() => {
+    if (!drawing || !width || !height) { setPointer(null); return undefined; }
+    const onMove = (e) => {
+      // screen → this SVG's own frame; the inverse CTM also undoes the page wrapper's /Rotate
+      const ctm = svgRef.current?.getScreenCTM?.();
+      if (!ctm) return;
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+      setPointer(p.x >= 0 && p.y >= 0 && p.x <= width && p.y <= height ? { x: p.x, y: p.y } : null);
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [drawing, width, height]);
   if (!data || !width || !height) return null;
   const X = (p) => p[0] * width;
   const Y = (p) => p[1] * height;
@@ -46,6 +69,7 @@ export default function CheckLayer({ data, renderedSize }) {
 
   return (
     <svg
+      ref={svgRef}
       width={width}
       height={height}
       style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
@@ -94,6 +118,24 @@ export default function CheckLayer({ data, renderedSize }) {
           />
         );
       })}
+      {(data.imaginary || []).map((seg, i) => (
+        <line
+          key={`im${i}`} data-check-imaginary
+          x1={X(seg.a)} y1={Y(seg.a)} x2={X(seg.b)} y2={Y(seg.b)}
+          stroke={ROOM} strokeWidth={2.5} strokeDasharray="9 6" strokeLinecap="round"
+        />
+      ))}
+
+      {(data.openings || []).map((g, i) => (
+        <g key={`o${i}`} data-check-opening>
+          <line x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)} stroke="#ffffff" strokeOpacity={0.9} strokeWidth={9} strokeLinecap="round" />
+          <line
+            x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)}
+            stroke={OPENING} strokeWidth={g.active ? 6 : 4.5} strokeLinecap="round" strokeOpacity={g.active ? 1 : 0.8}
+          />
+        </g>
+      ))}
+      {/* wall lengths go ON TOP of the opening bars: a bar runs along the same wall and used to cut the number in half */}
       {(data.walls || []).map((w, i) => {
         const st = STATE[w.state] || STATE.missing;
         const cx = (X(w.a) + X(w.b)) / 2;
@@ -114,24 +156,7 @@ export default function CheckLayer({ data, renderedSize }) {
         );
       })}
 
-      {(data.imaginary || []).map((seg, i) => (
-        <line
-          key={`im${i}`} data-check-imaginary
-          x1={X(seg.a)} y1={Y(seg.a)} x2={X(seg.b)} y2={Y(seg.b)}
-          stroke={ROOM} strokeWidth={2.5} strokeDasharray="9 6" strokeLinecap="round"
-        />
-      ))}
-
-      {(data.openings || []).map((g, i) => (
-        <g key={`o${i}`} data-check-opening>
-          <line x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)} stroke="#ffffff" strokeOpacity={0.9} strokeWidth={9} strokeLinecap="round" />
-          <line
-            x1={X(g.a)} y1={Y(g.a)} x2={X(g.b)} y2={Y(g.b)}
-            stroke={OPENING} strokeWidth={g.active ? 6 : 4.5} strokeLinecap="round" strokeOpacity={g.active ? 1 : 0.8}
-          />
-        </g>
-      ))}
-      {(data.openings || []).filter((g) => g.active && g.label).map((g, i) => {
+      {(data.openings || []).filter((g) => g.label).map((g, i) => {
         // the chip stands OUTSIDE the room, clear of the wall's own length chip
         const mx = (X(g.a) + X(g.b)) / 2;
         const my = (Y(g.a) + Y(g.b)) / 2;
@@ -143,8 +168,11 @@ export default function CheckLayer({ data, renderedSize }) {
         let ny = (X(g.b) - X(g.a)) / len;
         if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
         const cw = chipWidth(g.label);
+        // far enough out that it clears the wall's own chip whichever way the wall runs: chips are
+        // wide and low, so beside a VERTICAL wall the two would overlap at the old fixed 22 px
+        const off = Math.abs(nx) * (20 + cw / 2) + Math.abs(ny) * 18 + 4;
         return (
-          <g key={`oc${i}`} transform={`translate(${(mx + nx * 22).toFixed(1)}, ${(my + ny * 22).toFixed(1)})`}>
+          <g key={`oc${i}`} transform={`translate(${(mx + nx * off).toFixed(1)}, ${(my + ny * off).toFixed(1)})`}>
             <rect x={-cw / 2} y={-9} width={cw} height={18} rx={2} fill={OPENING} stroke="#ffffff" strokeWidth={1.2} />
             <text
               x={0} y={4} textAnchor="middle" fontSize={CHIP_FONT}
@@ -167,6 +195,24 @@ export default function CheckLayer({ data, renderedSize }) {
           />
         );
       })}
+
+      {drawing && pointer && (() => {
+        // the boundary as it will be cut: through both points, carried on past them towards the walls
+        const ax = data.pickPoints[0].x * width;
+        const ay = data.pickPoints[0].y * height;
+        const len = Math.hypot(pointer.x - ax, pointer.y - ay);
+        if (len < 4) return null;
+        const ux = (pointer.x - ax) / len;
+        const uy = (pointer.y - ay) / len;
+        return (
+          <g data-check-pick-line>
+            <line x1={ax - ux * 70} y1={ay - uy * 70} x2={pointer.x + ux * 70} y2={pointer.y + uy * 70}
+              stroke={ROOM} strokeOpacity={0.35} strokeWidth={2} strokeDasharray="4 6" strokeLinecap="round" />
+            <line x1={ax} y1={ay} x2={pointer.x} y2={pointer.y}
+              stroke={ROOM} strokeWidth={2.5} strokeDasharray="9 6" strokeLinecap="round" />
+          </g>
+        );
+      })()}
 
       {(data.pickPoints || []).map((pt, i) => (
         <g key={`pk${i}`} transform={`translate(${(pt.x * width).toFixed(1)}, ${(pt.y * height).toFixed(1)})`} data-check-pick>

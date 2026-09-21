@@ -831,7 +831,7 @@ export function factKeyForField(field) {
  * moves — kilograms and square metres do not compare by size. `max` lines at
  * most; the rest is a count.
  */
-export function consequenceOf(diff, max = 3) {
+export function consequenceOf(diff, max = 3, { sameValue = false } = {}) {
   const changed = Array.isArray(diff?.changed) ? diff.changed : [];
   const scored = changed.map((c, i) => {
     const before = c?.before == null ? null : qtyOf(c.before);
@@ -850,7 +850,31 @@ export function consequenceOf(diff, max = 3) {
   scored.sort((a, b) => (Number(b.edge) - Number(a.edge)) || (b.relative - a.relative) || (a.i - b.i));
   const lines = scored.slice(0, Math.max(0, max)).map((x) => x.line);
   const count = Number(diff?.count) || 0;
-  return { count, lines, more: Math.max(0, Math.max(count, scored.length) - lines.length) };
+  const out = { count, lines, more: Math.max(0, Math.max(count, scored.length) - lines.length) };
+  // nothing moved BECAUSE the answer is the number the rows were already built from — the strip says so
+  if (sameValue && count === 0 && lines.length === 0) out.sameValue = true;
+  return out;
+}
+
+const IN_USE_KEY = { lubu_auksciai: 'lubu_aukstis_m', perimetras_m: 'perimetras_m', plotas_m2: 'plotas_m2' };
+
+/**
+ * Is `value` the number the rows were ALREADY built from, for every one of `roomNrs`?
+ * (Founder, 2026-09-21: he typed the height the program had assumed and read „Sąmatos
+ * eilutės nepasikeitė" — true, and unexplained. Accepting an estimate is the same case:
+ * the rows were computed from that estimate all along.)
+ */
+export function alreadyInUse(project, roomNrs, field, value) {
+  const key = IN_USE_KEY[field];
+  const want = Number(value);
+  const nrs = (Array.isArray(roomNrs) ? roomNrs : []).filter((nr) => nr != null && String(nr) !== '').map(String);
+  if (!key || !Number.isFinite(want) || want <= 0 || nrs.length === 0) return false;
+  const rooms = project?.v8_rooms?.length ? project.v8_rooms : (project?.patalpos || []);
+  return nrs.every((nr) => {
+    const room = rooms.find((r) => String(r?.nr ?? '') === nr);
+    const used = Number(room?.[key]);
+    return Boolean(room) && Number.isFinite(used) && Math.abs(used - want) < 0.005;
+  });
 }
 
 /**

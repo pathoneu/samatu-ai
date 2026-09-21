@@ -44,7 +44,7 @@ import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import {
   addOpening, adjustOpeningCount, canOverrideWholeRow, cornersFromPolygon, heightsForRooms, openingsPatch, orderFacts,
   progressSummary, rippleText, roomIndex, roomTitle, roomTotals, roomsInDrawingOrder,
-  consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
+  alreadyInUse, consequenceOf, factKeyForField, factsStayOnScreen, setOpeningSize, setSymbolCount, stampVerified, undoPatch,
   userEditPatch,
 } from '@/lib/roomSheet';
 import {
@@ -179,7 +179,7 @@ export default function RoomSheet() {
    * `patalpos` and `v8_rooms`. Writing one and not the other would leave this
    * walk (which reads `v8_rooms` first) showing the pre-edit room forever.
    */
-  const land = useCallback((result, { fromInterior = false, scopeChange = false, factKey = null } = {}) => {
+  const land = useCallback((result, { fromInterior = false, scopeChange = false, factKey = null, sameValue = false } = {}) => {
     const prior = project?.darbu_sarasas || [];
     const notes = [];
     const rebuilt = result.rooms || result.v8_rooms || result.patalpos;
@@ -208,7 +208,7 @@ export default function RoomSheet() {
     const diff = diffDarbuSarasas(prior, next.darbu_sarasas || []);
     if (factKey) {
       // a FACT was fixed: what it moved is shown under that fact, with the way back
-      setLastFix({ factKey, consequence: consequenceOf(diff, 3), prevProject: project });
+      setLastFix({ factKey, consequence: consequenceOf(diff, 3, { sameValue }), prevProject: project });
       setRipple(null);
     } else {
       setLastFix(null);
@@ -246,15 +246,18 @@ export default function RoomSheet() {
   // recompute, one consequence strip, one undo for all of them.
   const saveNumber = useCallback((field, value, alsoRooms = null) => run(async () => {
     pilot(alsoRooms?.length ? 'fact_number_all' : 'fact_number', { kind: 'fact', id: field });
+    // the answer may be the very number the rows were built from (the assumed height, the estimate
+    // he accepts) — then nothing moves, and the strip says WHY instead of a bare „nepasikeitė"
+    const sameValue = alreadyInUse(project, [roomNr, ...(alsoRooms || [])], field, value);
     if (field === 'lubu_auksciai') {
       const next = heightsForRooms(project, [roomNr, ...(alsoRooms || [])], value);
-      await land(await saveAssumptionEdit(project, 'lubu_auksciai', next), { factKey: factKeyForField(field) });
+      await land(await saveAssumptionEdit(project, 'lubu_auksciai', next), { factKey: factKeyForField(field), sameValue });
       return;
     }
     // plotas_m2 / perimetras_m live on the room, so they go the room-edit way —
     // marked as his, so the sheet says so and a re-read keeps them.
     await land(await saveRoomEdit(project, patchRoom(project, roomNr, userEditPatch(field, value))),
-      { fromInterior: true, factKey: factKeyForField(field) });
+      { fromInterior: true, factKey: factKeyForField(field), sameValue });
   }), [run, project, roomNr, land, pilot]);
 
   // „Ką skaičiuoti" (apimtis): the whole project object changes, then every

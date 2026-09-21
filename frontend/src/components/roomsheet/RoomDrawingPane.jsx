@@ -192,23 +192,46 @@ export default function RoomDrawingPane({
         </div>
       </div>
 
+      {/* What to do NOW, where his eyes are — right on top of the drawing, in the one loud colour of the
+          page. (2026-09-21, founder: „nėra instrukcijų, tik tu ir aš jas žinom" — the hint used to be a
+          pale line of small text.) */}
       {pick?.active && (
         <div
-          className="flex flex-wrap items-center justify-between gap-2 rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-3 py-2 text-[14px]"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] bg-[hsl(var(--accent-2))] px-4 py-3 text-white shadow-sm"
           role="status"
           data-testid="outline-pick-banner"
         >
-          <p className="flex items-center gap-2 font-semibold text-foreground">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             {pick.busy
-              ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              : <MousePointerClick className="h-4 w-4" aria-hidden="true" />}
-            {pick.busy
-              ? t('project.roomSheet.outlineReading')
+              ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
               : pick.mode === 'split'
-                ? t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') })
-                : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
-          </p>
-          <button type="button" className={BTN} disabled={pick.busy} onClick={() => pick.onCancel?.()}>
+                ? (
+                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-[13px] font-bold text-[hsl(var(--accent-2))]">
+                    {pick.first ? '2 / 2' : '1 / 2'}
+                  </span>
+                )
+                : <MousePointerClick className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />}
+            <div className="min-w-0">
+              <p className="text-[16px] font-semibold leading-snug">
+                {pick.busy
+                  ? t('project.roomSheet.outlineReading')
+                  : pick.mode === 'split'
+                    ? t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') })
+                    : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
+              </p>
+              {!pick.busy && (
+                <p className="mt-0.5 text-[14px] leading-snug text-white/85">
+                  {t(pick.mode === 'split' ? 'project.roomSheet.splitHintWhy' : 'project.roomSheet.outlinePickWhy')}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-[2px] border border-white/60 px-3 text-[14px] font-semibold text-white hover:bg-white/10 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            disabled={pick.busy}
+            onClick={() => pick.onCancel?.()}
+          >
             <X className="h-4 w-4" aria-hidden="true" />
             {t('project.roomSheet.cancel')}
           </button>

@@ -34,7 +34,7 @@ export default function FixConsequence({ consequence, busy = false, onUndo }) {
         <p className="font-semibold text-foreground">
           {count > 0
             ? t('project.roomSheet.fixChanged', { count, rowsWord })
-            : t('project.roomSheet.fixNoRows')}
+            : t(consequence.sameValue ? 'project.roomSheet.fixSameValue' : 'project.roomSheet.fixNoRows')}
         </p>
         <button
           type="button"
