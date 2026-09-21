@@ -36,3 +36,12 @@ export async function fetchOutlineAt(projectId, roomNr, point, { signal } = {}) 
 export async function fetchSplitSpace(projectId, roomNr, request, { signal } = {}) {
   return post(projectId, roomNr, 'split-space', request, signal);
 }
+
+/**
+ * The boundary the PROGRAM proposes for the space this room shares (2026-09-21) — the very answer a drawn
+ * line gives, plus `line_pct` / `page` / `pagal`: `{status: 'ok', rooms, kitu_angos, line_pct, page, pagal}`
+ * | `{status: 'no_proposal'|'not_shared'|'too_many'|'no_walls'}`.
+ */
+export async function fetchSplitProposal(projectId, roomNr, { signal } = {}) {
+  return post(projectId, roomNr, 'split-proposal', {}, signal);
+}
