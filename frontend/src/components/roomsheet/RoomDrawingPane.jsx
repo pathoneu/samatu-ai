@@ -226,6 +226,12 @@ export default function RoomDrawingPane({
                   {t(pick.mode === 'split' ? 'project.roomSheet.splitHintWhy' : 'project.roomSheet.outlinePickWhy')}
                 </p>
               )}
+              {/* why the last click did not work — said HERE, at the drawing he is looking at, not in a corner toast */}
+              {!pick.busy && pick.notice && (
+                <p className="mt-1.5 rounded-[2px] bg-white px-2 py-1 text-[14px] font-semibold leading-snug text-[hsl(var(--conf-low))]" role="alert" data-testid="pick-notice">
+                  {pick.notice}
+                </p>
+              )}
             </div>
           </div>
           <button

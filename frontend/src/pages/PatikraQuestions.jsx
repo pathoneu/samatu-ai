@@ -20,7 +20,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { ArrowRight, Check, CircleHelp, Loader2, MinusCircle, PenLine } from 'lucide-react';
 
 import { getProject, refreshProjectFromBackend } from '@/lib/projectStore';
@@ -76,6 +75,7 @@ export default function PatikraQuestions() {
   const [proposal, setProposal] = useState(null);              // null | 'loading' | the api answer
   const [drawing, setDrawing] = useState(false);
   const [splitFirst, setSplitFirst] = useState(null);
+  const [pickNotice, setPickNotice] = useState(null);         // why the last click on the drawing did not work
 
   const skippedRef = useRef(skipped);
   skippedRef.current = skipped;
@@ -171,6 +171,8 @@ export default function PatikraQuestions() {
   }, [id, focusNr, current?.answer, factsNonce]);
 
   // ── a shared space: ask the program for its boundary as soon as the question is in front of him ────
+  useEffect(() => { setPickNotice(null); }, [currentId, focusNr]);
+
   useEffect(() => {
     setDrawing(false);
     setSplitFirst(null);
@@ -223,9 +225,10 @@ export default function PatikraQuestions() {
     const rooms = roomsWithOutline(project, nr, found);
     if (!rooms) {
       const { key, params } = outlineFailureKey(found);
-      toast.error(t(`project.roomSheet.${key}`, params));
+      setPickNotice(t(`project.roomSheet.${key}`, params));
       return;
     }
+    setPickNotice(null);
     pilot('question_answer', { kind: 'question', id: current.kind });
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
@@ -238,9 +241,10 @@ export default function PatikraQuestions() {
     const rooms = roomsWithSplit(project, found);
     if (!rooms) {
       const { key, params } = splitFailureKey(found);
-      toast.error(t(`project.roomSheet.${key}`, params));
+      setPickNotice(t(`project.roomSheet.${key}`, params));
       return;
     }
+    setPickNotice(null);
     pilot('question_answer', { kind: 'question', id: 'erdve' });
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
@@ -281,9 +285,9 @@ export default function PatikraQuestions() {
   const showDrawing = Boolean(current && WITH_DRAWING.has(current.answer) && roomFacts?.room && String(roomFacts.room.nr) === String(focusNr));
   const proposed = proposal && proposal !== 'loading' && proposal.status === 'ok' ? proposal : null;
   const pick = current?.answer === 'outline'
-    ? { active: Boolean(outlineItem), mode: 'outline', first: null, busy, onStart: () => {}, onCancel: () => setOutlineSkips((s) => new Set(s).add(outlineItem?.room_nr)), onPoint: pickOutline }
+    ? { active: Boolean(outlineItem), mode: 'outline', first: null, busy, notice: pickNotice, onStart: () => {}, onCancel: () => setOutlineSkips((s) => new Set(s).add(outlineItem?.room_nr)), onPoint: pickOutline }
     : current?.answer === 'split' && drawing
-      ? { active: true, mode: 'split', first: splitFirst, busy, onStart: () => {}, onCancel: () => { setSplitFirst(null); if (proposed) setDrawing(false); }, onPoint: pickSplit }
+      ? { active: true, mode: 'split', first: splitFirst, busy, notice: pickNotice, onStart: () => {}, onCancel: () => { setSplitFirst(null); if (proposed) setDrawing(false); }, onPoint: pickSplit }
       : null;
 
   return (
