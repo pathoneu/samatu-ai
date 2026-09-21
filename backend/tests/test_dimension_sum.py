@@ -310,6 +310,35 @@ def test_an_edge_on_the_imaginary_boundary_is_neither_summed_nor_missed():
     assert len(room["_sienos"]) == 3 and room["_perimetras_suma"]["sutampa"] is True
 
 
+def test_a_boundary_that_starts_where_a_wall_face_ends_leaves_that_face_a_wall():
+    """A PROPOSED boundary runs through a wall end on purpose (vector_rooms.propose_split): along the stub's
+    face first, through open space after it. Face and boundary lie on ONE straight line, so the outline has
+    a corner with no turn between them — dropped as „not a corner", the two became one edge that was neither
+    the boundary nor a wall anybody wrote a length for (objektas_h: 21,96 m instead of 17,95)."""
+    from extractor import dimension_sum as ds
+    from extractor.plan_dimensions import read_dimension_strings
+    from extractor.sheet_alignment import align_sheets
+    from tests.synthetic_plan import PT_PER_M, build_plan, two_rooms
+    sheet = two_rooms()
+    o = 0.15
+    # room 1's right side: the partition's upper piece (0,2…1,0 m) is a real wall with „800" written on it;
+    # below it the space is open — the imaginary boundary (the „3000" along the whole side is gone)
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and abs(d[1] - (4.2 - o)) < 1e-6)]
+    sheet.dims += [("800", 4.2 - o, 0.2, 4.2 - o, 1.0)]
+    pdf = build_plan([sheet])
+    fx = lambda m: (60 + m * PT_PER_M) / 595.2756            # noqa: E731
+    fy = lambda m: (80 + m * PT_PER_M) / 841.8898            # noqa: E731
+    ring = [[fx(0.2), fy(0.2)], [fx(4.2), fy(0.2)], [fx(4.2), fy(1.0)], [fx(4.2), fy(3.2)], [fx(0.2), fy(3.2)]]
+    room = {"nr": "01", "puslapio_nr": 1, "polygon_pct": ring, "polygon_source": "corrected",
+            "_konturas": {"page": 1, "menamos": [[[fx(4.2), fy(1.0)], [fx(4.2), fy(3.2)]]]}}
+    dims = read_dimension_strings(pdf, pages=None)
+    scale = {1: next(d["scale_m_per_pt"] for d in dims if d.get("scale_m_per_pt"))}
+    out = ds.sum_perimeters([room], dims, align_sheets(pdf, [1]), scale)
+    assert out["stated"] == ["01"], room.get("_perimetras_priezastis")
+    assert room["perimetras_m"] == 11.8                                         # 4 + 0,8 + 4 + 3 — the 2,2 m of boundary is no wall
+    assert len(room["_sienos"]) == 4 and room["_perimetras_suma"]["sutampa"] is True
+
+
 # ── a wall whose DOOR the plan does not write (2026-09-21) ────────────────────
 # objektas_h, bedroom 09: the bottom wall carries „660" and „1538" — the wall pieces either side of the door
 # to the bathroom — and nothing over the 1,40 m door itself; the wall is 3,60 m. The designer never writes a

@@ -411,3 +411,61 @@ def test_the_space_is_the_one_whose_area_agrees_with_the_two_rooms():
     out = vr.split_space(build_plan([sheet]), 1, _pct(4.3, 0.1), _pct(4.3, 3.3), _seats(), {"01": 12.3, "02": 9.3}, SCALE)
     assert out["status"] == "ok"
     assert abs(out["rooms"]["02"]["plotas_m2"] - 3.1 * 3.0) < 0.4                  # not 9,3 + the 9 m² of room 3
+
+
+# ── the boundary the PROGRAM proposes for such a space (2026-09-21) ───────────────────────────────────
+# Founder, after dividing a real kitchen and living room himself: „pasidaro apibrėžimas, bet nėra
+# instrukcijų — tik tu ir aš jas žinom". Nobody can know where a boundary with no wall „should" be; what is
+# known is the two areas the table gives. So the program proposes the line and the person says „Tinka".
+
+def test_the_proposed_boundary_divides_the_space_by_the_tables_areas():
+    out = vr.propose_split(build_plan([_open_plan()]), 1, _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert out["status"] == "ok" and out["pagal"] == "plotai" and set(out["rooms"]) == {"01", "02"}
+    one, two = out["rooms"]["01"], out["rooms"]["02"]
+    assert abs(one["plotas_m2"] / two["plotas_m2"] - 12.0 / 9.0) < 0.03          # 7,2 × 3 m shared in the table's ratio
+    assert one["paklaida"] < 0.05 and two["paklaida"] < 0.05
+    (x0, y0), (x1, y1) = out["line_pct"]
+    assert abs(x0 - x1) < 1e-4 and abs(y0 - y1) > 0.05                            # the numbers stand side by side → an upright line
+    assert len(one["menamos"]) == 1 and len(two["menamos"]) == 1                  # …which is never a wall
+    assert abs(one["perimetras_m"] + two["perimetras_m"] - (7.2 * 2 + 3.0 * 2)) < 0.3
+
+
+def test_a_wall_end_between_the_two_numbers_is_the_natural_boundary():
+    sheet = _open_plan()
+    sheet.walls = sheet.walls + [(4.2, 0.2, 4.4, 1.0)]                            # a stub of the old partition hangs from the top wall
+    out = vr.propose_split(build_plan([sheet]), 1, _seats(), {"01": 12.0, "02": 9.0}, SCALE)
+    assert out["status"] == "ok" and out["pagal"] == "kampas"
+    x = out["line_pct"][0][0] * 595.2756
+    faces = [60 + 4.2 * PT_PER_M, 60 + 4.4 * PT_PER_M]
+    assert min(abs(x - f) for f in faces) < 1.5                                   # along one face of the stub
+    assert all(r["paklaida"] <= 0.08 for r in out["rooms"].values())
+    # The line runs ALONG the stub's face for 0,8 m and only then through open space. The face stays a real
+    # wall of the room beside it: what is imaginary is the 2,2 m below the stub — for both rooms alike — and
+    # no wall is lost (objektas_h, measured: the face was dropped from both rooms, 36,77 m of 37,77).
+    for room in out["rooms"].values():
+        (p, q), = room["menamos"]
+        assert abs(abs(p[1] - q[1]) * 841.8898 / PT_PER_M - 2.2) < 0.1
+    walls = sum(r["perimetras_m"] for r in out["rooms"].values())
+    assert abs(walls - (2 * (7.2 + 3.0) + 2 * 0.8)) < 0.25
+
+
+def test_rooms_one_above_the_other_get_a_level_boundary():
+    walls = _box(0, 0, 3, 7.2)
+    seats = {"01": _pct(1.5, 2.0), "02": _pct(1.5, 5.6)}
+    out = vr.propose_split(build_plan([Sheet(walls=walls)]), 1, seats, {"01": 12.0, "02": 9.0}, SCALE)
+    assert out["status"] == "ok"
+    (x0, y0), (x1, y1) = out["line_pct"]
+    assert abs(y0 - y1) < 1e-4 and abs(x0 - x1) > 0.05
+    assert abs(out["rooms"]["01"]["plotas_m2"] / out["rooms"]["02"]["plotas_m2"] - 12.0 / 9.0) < 0.03
+
+
+def test_no_table_areas_means_an_even_split_and_nothing_to_propose_is_said():
+    out = vr.propose_split(build_plan([_open_plan()]), 1, _seats(), {}, SCALE)
+    assert out["status"] == "ok"
+    assert abs(out["rooms"]["01"]["plotas_m2"] - out["rooms"]["02"]["plotas_m2"]) < 0.4
+    assert vr.propose_split(build_plan([two_rooms()]), 1, _seats(), {}, SCALE) == {"status": "not_shared"}
+    three = {**_seats(), "03": _pct(3.6, 2.6)}
+    assert vr.propose_split(build_plan([_open_plan()]), 1, three, {}, SCALE) == {"status": "too_many"}
+    assert vr.propose_split(build_plan([Sheet(walls=[])]), 1, _seats(), {}, SCALE) == {"status": "no_walls"}
+    level = {"01": _pct(2.2, 1.5), "02": _pct(2.2, 1.5)}                          # both numbers in one place: no line separates them
+    assert vr.propose_split(build_plan([_open_plan()]), 1, level, {"01": 12.0, "02": 9.0}, SCALE) == {"status": "no_proposal"}

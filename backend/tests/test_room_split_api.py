@@ -148,3 +148,37 @@ def test_a_divided_room_whose_walls_could_not_all_be_added_still_says_whose_boun
     assert blank["sentence"].endswith("Bendrą erdvę su patalpa 05 padalijote patys — riba tarp jų menama (sienos ten nėra), "
                                       "į perimetrą neįskaičiuota.")
     assert f["sentence"].count("padalijote patys") == 1
+
+
+# ── `…/split-proposal`: the boundary the PROGRAM proposes (2026-09-21) — „programa siūlo, jūs patvirtinate" ──
+
+def test_the_program_proposes_the_boundary_and_answers_like_a_drawn_line(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    before = copy.deepcopy(db.get_project("p1"))
+    r = TestClient(app).post("/api/projects/p1/rooms/01/split-proposal")
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["status"] == "ok" and set(out["rooms"]) == {"01", "02"} and out["page"] == 1
+    (x0, y0), (x1, y1) = out["line_pct"]
+    assert abs(x0 - x1) < 1e-4 and y0 != y1                                       # an upright line between the two numbers
+    one, two = out["rooms"]["01"], out["rooms"]["02"]
+    # the very answer a drawn line gives: both rooms' geometry keys, the boundary never a wall
+    for room in (one, two):
+        assert room["polygon_source"] == "corrected" and room["_konturas"]["saltinis"] == "padalinta"
+        assert len(room["_konturas"]["menamos"]) == 1 and room["_atvira_erdve"] is None
+        assert "plotas_m2" not in room and "pavadinimas" not in room
+    # …divided in the table's ratio (12,3 : 9,3)
+    ratio = one["_konturas"]["plotas_m2"] / two["_konturas"]["plotas_m2"]
+    assert abs(ratio - 12.3 / 9.3) < 0.04
+    assert db.get_project("p1") == before                                         # nothing was saved
+
+
+def test_a_proposal_for_rooms_a_wall_already_separates_says_so(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    db.upsert_project("p1", _blob())
+    storage.get_storage().put(storage.pdf_key("p1"), build_plan([two_rooms()]))
+    r = TestClient(app).post("/api/projects/p1/rooms/01/split-proposal")
+    assert r.status_code == 200 and r.json() == {"status": "not_shared"}
+    assert TestClient(app).post("/api/projects/p1/rooms/77/split-proposal").status_code == 404
+    assert TestClient(app).post("/api/projects/nope/rooms/01/split-proposal").status_code == 404

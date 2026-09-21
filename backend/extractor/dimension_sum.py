@@ -94,8 +94,11 @@ def _on_segment(edge, seg, tol: float) -> bool:
     return True
 
 
-def _corners(poly_pct: Sequence[Sequence[float]], W: float, H: float) -> list[tuple[float, float]]:
-    """The outline's corners: vertices with a real turn at them."""
+def _corners(poly_pct: Sequence[Sequence[float]], W: float, H: float,
+             also: Sequence[tuple[float, float]] = ()) -> list[tuple[float, float]]:
+    """The outline's corners: vertices with a real turn at them — and the vertices at `also` (page points),
+    turn or not: the end of an imaginary boundary that continues a wall face in one straight line is where a
+    WALL ends, though the outline does not turn there."""
     pts = [(float(x) * W, float(y) * H) for x, y in poly_pct]
     n = len(pts)
     if n < 3:
@@ -106,7 +109,7 @@ def _corners(poly_pct: Sequence[Sequence[float]], W: float, H: float) -> list[tu
         ang1 = math.atan2(b[1] - a[1], b[0] - a[0])
         ang2 = math.atan2(c[1] - b[1], c[0] - b[0])
         turn = abs((math.degrees(ang2 - ang1) + 180) % 360 - 180)
-        if turn >= CORNER_DEG:
+        if turn >= CORNER_DEG or any(math.dist(b, q) <= IMAGINARY_TOL_PT for q in also):
             keep.append(b)
     return keep if len(keep) >= 3 else pts
 
@@ -317,7 +320,8 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
             continue
         W, H = (page_sizes or {}).get(page) or _page_size(dims, page)
         # the outline lives on `page`; strings are in the base page's frame
-        corners = [to_base(alignment, page, *c) for c in _corners(poly_pct, W, H)]
+        boundary_ends = [(float(pt[0]) * W, float(pt[1]) * H) for seg in (kont.get("menamos") or []) for pt in seg]
+        corners = [to_base(alignment, page, *c) for c in _corners(poly_pct, W, H, boundary_ends)]
         edges = [(corners[i], corners[(i + 1) % len(corners)]) for i in range(len(corners))] if len(corners) >= 3 else []
         inside = Polygon(corners) if len(corners) >= 3 else None
         if inside is not None and not inside.is_valid:

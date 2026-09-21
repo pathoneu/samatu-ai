@@ -13,6 +13,10 @@ room, usually the biggest rooms of a flat: one line a person draws divides the s
 (vector_rooms.split_space); both rooms get their own outlines, and the boundary between them is
 marked `menamos` — never a wall, never in a perimeter.
 
+`…/split-proposal` (2026-09-21) PROPOSES that line (vector_rooms.propose_split: through a wall end between
+the two rooms when the table's areas agree with it, else where the areas stand in the table's ratio) and
+answers exactly as a drawn line does — „programa siūlo, jūs patvirtinate": a person only says „Tinka".
+
 The server SAVES NOTHING (same rule as api/free_reread.py): it answers with the room's geometry
 keys — a key that is `null` is to be removed — and with the neighbours' wall openings, which now
 lead to a NAMED room. The sheet patches the room and recomputes on the one path every other edit
@@ -31,7 +35,7 @@ from api.free_reread import NO_PDF, _project_for
 from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry
 from extractor.pdf_vectors import page_geometry
 from extractor.plan_dimensions import read_dimension_strings
-from extractor.vector_rooms import STRONG, outline_at, split_space
+from extractor.vector_rooms import STRONG, outline_at, propose_split, split_space
 
 log = logging.getLogger("samatu.room_outline")
 
@@ -176,39 +180,36 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
     }
 
 
-@router.post("/{project_id}/rooms/{room_nr}/split-space")
-def api_room_split_space(request: Request, project_id: str, room_nr: str, body: SplitSpace):
-    """Two rooms no wall separates, divided by ONE line through `a` and `b` (vector_rooms.split_space). Both
-    rooms come back with their own outlines — the boundary marked `menamos`, never a wall — and their walls
-    read again. Saves nothing."""
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+def _shared_space(rooms: list[dict], room: dict, lay) -> tuple[str | None, list[str], dict[str, tuple[float, float]]]:
+    """(status | None, the two members, where their numbers stand on the sheet being divided)."""
     space = room.get("_atvira_erdve")
     members = [str(n) for n in (space.get("nariai") or [])] if isinstance(space, dict) else []
     if len(members) < 2:
-        return {"status": "not_shared"}
+        return "not_shared", members, {}
     if len(members) > 2:
-        return {"status": "too_many"}
-    lay = _laid_onto(body.page, geo.get("sutapdinimas") or {})
+        return "too_many", members, {}
     by_nr = {_nr(r): r for r in rooms}
     seats: dict[str, tuple[float, float]] = {}
     for nr in members:
         v = (by_nr.get(nr) or {}).get("_vieta")
         pt = lay(int(v["page"]), float(v["cx"]), float(v["cy"])) if isinstance(v, dict) and v.get("saltinis") in STRONG else None
         if pt is None:
-            return {"status": "not_shared"}
+            return "not_shared", members, {}
         seats[nr] = pt
-    hit = split_space(pdf_bytes, body.page, (body.a.x_pct, body.a.y_pct), (body.b.x_pct, body.b.y_pct), seats,
-                      {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H))
-    if hit["status"] != "ok":
-        return hit
+    return None, members, seats
 
+
+def _divided(parsed: dict, pdf_bytes: bytes, dims, rooms: list[dict], members: list[str], page: int, hit: dict) -> dict:
+    """Both rooms take their side of the boundary (`hit` — vector_rooms' answer), their walls are read again,
+    and only their geometry keys go back. The boundary is `menamos`: never a wall. Saves nothing."""
+    by_nr = {_nr(r): r for r in rooms}
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     for nr in members:
         r, part = by_nr[nr], hit["rooms"][nr]
         r["polygon_pct"] = part["polygon_pct"]
         r["polygon_source"] = "corrected"
         r["polygon_corrected_at"] = now
-        r["_konturas"] = {"page": body.page, "plotas_m2": part["plotas_m2"], "perimetras_m": part["perimetras_m"],
+        r["_konturas"] = {"page": page, "plotas_m2": part["plotas_m2"], "perimetras_m": part["perimetras_m"],
                           "plotas_uzrasas_m2": r.get("plotas_m2"), "paklaida": part["paklaida"], "plotas_nesutampa": False,
                           "menamos": part["menamos"], "su": [m for m in members if m != nr], "saltinis": DIVIDED}
         for stale in ("_konturo_priezastis", "_atvira_erdve", "_angos_sienose"):
@@ -217,10 +218,50 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
             for stale in _ESTIMATE_KEYS:
                 r.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
-
     return {
         "status": "ok",
         "rooms": {nr: {k: by_nr[nr].get(k) for k in GEOMETRY_ROOM_KEYS} for nr in members},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if _nr(r) not in members and isinstance(r.get("_angos_sienose"), dict)},
     }
+
+
+@router.post("/{project_id}/rooms/{room_nr}/split-space")
+def api_room_split_space(request: Request, project_id: str, room_nr: str, body: SplitSpace):
+    """Two rooms no wall separates, divided by ONE line through `a` and `b` (vector_rooms.split_space). Both
+    rooms come back with their own outlines — the boundary marked `menamos`, never a wall — and their walls
+    read again. Saves nothing."""
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    status, members, seats = _shared_space(rooms, room, _laid_onto(body.page, geo.get("sutapdinimas") or {}))
+    if status:
+        return {"status": status}
+    by_nr = {_nr(r): r for r in rooms}
+    hit = split_space(pdf_bytes, body.page, (body.a.x_pct, body.a.y_pct), (body.b.x_pct, body.b.y_pct), seats,
+                      {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H))
+    if hit["status"] != "ok":
+        return hit
+    return _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit)
+
+
+@router.post("/{project_id}/rooms/{room_nr}/split-proposal")
+def api_room_split_proposal(request: Request, project_id: str, room_nr: str):
+    """The boundary the PROGRAM proposes for the space this room shares (vector_rooms.propose_split) — so
+    that a person only says „Tinka" (2026-09-21). The answer is the very one a drawn line gives, plus
+    `line_pct` (the boundary, for showing it BEFORE it is accepted), `page` and `pagal`. Saves nothing: the
+    sheet applies the answer on the path every other edit takes, or asks for a line drawn by hand."""
+    stored = _project_for(request, project_id)
+    mine = next((r for r in (stored.get("patalpos") or []) if isinstance(r, dict) and _nr(r) == str(room_nr).strip()), None)
+    if mine is None:
+        raise HTTPException(status_code=404, detail="Patalpa nerasta")
+    space = mine.get("_atvira_erdve") if isinstance(mine.get("_atvira_erdve"), dict) else {}
+    page = int(space.get("page") or (mine.get("_vieta") or {}).get("page") or mine.get("puslapio_nr") or 1)
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, page, "room_outline")
+    status, members, seats = _shared_space(rooms, room, _laid_onto(page, geo.get("sutapdinimas") or {}))
+    if status:
+        return {"status": status}
+    by_nr = {_nr(r): r for r in rooms}
+    hit = propose_split(pdf_bytes, page, seats, {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H))
+    if hit["status"] != "ok":
+        return {"status": hit["status"]}
+    return {**_divided(parsed, pdf_bytes, dims, rooms, members, page, hit),
+            "line_pct": hit["line_pct"], "pagal": hit["pagal"], "page": page}
