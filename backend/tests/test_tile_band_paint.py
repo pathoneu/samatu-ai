@@ -75,7 +75,10 @@ def test_kitchen_splashback_leaves_the_paint_base_too():
     band = out["plyteles_sienos_m2"]                # paskirtis default splashback
     assert band > 0
     openings = DOOR + 1.8
-    in_band = openings * 1.0 * (0.6 / TILE_BAND_DOOR_H_M)
+    # 2026-09-23: the kitchen band runs along the counter (3,0 m of a 12 m perimeter — its share of the walls)
+    share = 3.0 / 12.0
+    assert band == pytest.approx(share * 12.0 * 0.6, abs=0.02)
+    in_band = openings * share * (0.6 / TILE_BAND_DOOR_H_M)
     assert out["walls_paintable_m2"] == pytest.approx(
         12.0 * 2.7 - openings - (band - in_band), abs=0.05)
 

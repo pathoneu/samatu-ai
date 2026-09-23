@@ -97,6 +97,8 @@ export async function saveRoomEdit(project, nextRooms) {
       archetipas: project?.archetipas,
       bendras_plotas_m2: nextRooms.reduce((s, r) => s + (Number(r?.plotas_m2) || 0), 0),
       _ceiling_anchor: project?._ceiling_anchor,
+      _door_types: project?._door_types,
+      _symbol_legend: project?._symbol_legend,
       context: buildRecomputeContext(project),
     }),
   });

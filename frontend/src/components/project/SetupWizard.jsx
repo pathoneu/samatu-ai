@@ -27,6 +27,7 @@ export const DEFAULT_PREFS = {
 
   // Virtuvė
   kitchen_backsplash_height_m: 0.6,
+  kitchen_counter_length_m: 3.0,       // the band runs along the counter, not round the room (2026-09-23)
 
   // Drabužinės / sandėliukai
   drabuzine_painted: true,             // industries: PAINTED (Easy Takeoffs)

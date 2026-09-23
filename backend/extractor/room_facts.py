@@ -1090,14 +1090,51 @@ def _suggestion(tipas: str, opening: dict) -> dict:
             "line_pct": opening["line_pct"]}
 
 
-def _against_the_walls(per_type: dict[str, int], openings: list[dict]) -> tuple[str, bool, list[dict]]:
+def _listed_beyond(project: dict, room: dict, openings: list[dict]) -> set[int]:
+    """The openings (by index) whose door is already in the list of the room BEYOND them (2026-09-23): a
+    door between the corridor and a bedroom stands in one of the two lists — proposing it again from the
+    other side doubled the reveals and the frameless-door row on objektas_h (70 → 100 m after six adds).
+    A neighbour's interior door of the opening's width (±16 cm) claims it, each door once."""
+    out: set[int] = set()
+    by_nr = {str(r.get("nr") or "").strip(): r for r in (project.get("patalpos") or []) if isinstance(r, dict)}
+    mine = str(room.get("nr") or "").strip()
+    claimed: dict[tuple[str, int], int] = {}
+    for idx, o in enumerate(openings):
+        other = by_nr.get(str(o.get("i") or ""))
+        if other is None or str(o.get("i")) == mine:
+            continue
+        for j, el in enumerate(other.get("elementai") or []):
+            if not isinstance(el, dict) or (el.get("tipas") or "") not in _DOOR_TIPAI or el.get("_exterior"):
+                continue
+            leads = str(el.get("_is_sienu_angos") or "").strip()
+            if leads and leads != mine:
+                continue                                       # that door leads somewhere else
+            w = _f(el.get("plotis_mm"))
+            if w and abs(w / 1000.0 - float(o["plotis_m"])) > 0.16:
+                continue
+            units = int(_f(el.get("kiekis")) or 1)
+            if claimed.get((str(o.get("i")), j), 0) >= units:
+                continue
+            claimed[(str(o.get("i")), j)] = claimed.get((str(o.get("i")), j), 0) + 1
+            out.add(idx)
+            break
+    return out
+
+
+def _against_the_walls(per_type: dict[str, int], openings: list[dict], listed_beyond: set[int] | None = None
+                       ) -> tuple[str, bool, list[dict]]:
     """(what to say about the walls' openings, does the list look short, what one click could add).
 
     Only the total is compared — an entrance door is an opening to the outside, so doors and windows
     cannot be matched side by side. The walls never show everything (a window behind a sill fill, a
     glazed wall), so FEWER openings in the walls is said without alarm; MORE means the list is short.
     An add is offered only where nothing else could be meant: no door counted and an opening to another
-    room, no window counted and an opening to the outside."""
+    room, no window counted and an opening to the outside. An opening whose door the room beyond already
+    lists (`listed_beyond`) is neither short nor offered — it is said to be there."""
+    beyond = set(listed_beyond or ())
+    said_beyond = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for k, o in enumerate(openings) if k in beyond)
+    openings = [o for k, o in enumerate(openings) if k not in beyond]
+    tail_beyond = f" Durys {said_beyond} įrašytos prie tos patalpos." if said_beyond else ""
     n = len(openings)
     listed = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in openings)
     doors = sum(v for t, v in per_type.items() if t in _DOOR_TIPAI)
@@ -1105,11 +1142,13 @@ def _against_the_walls(per_type: dict[str, int], openings: list[dict]) -> tuple[
     counted = doors + windows                                   # a roof window is not in a wall
     inside = [o for o in openings if not o["lauko"]]
     outside = [o for o in openings if o["lauko"]]
+    if n == 0 and said_beyond:
+        return f"Sienose angos: {said_beyond} — durys įrašytos prie tos patalpos.", False, []
     if n == counted:
-        return f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje.", False, []
+        return f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje.{tail_beyond}", False, []
     if n < counted:
         return (f"Sienose matyti {n} {_anga_word(n)}: {listed}; kitų angų sienos nerodo — "
-                f"patikrinkite patalpoje."), False, []
+                f"patikrinkite patalpoje.{tail_beyond}"), False, []
     suggestions = []
     gaps = []
     if doors == 0 and inside:
@@ -1123,7 +1162,7 @@ def _against_the_walls(per_type: dict[str, int], openings: list[dict]) -> tuple[
                 f"Patikrinkite brėžinyje ir pridėkite."), True, suggestions
     tail = (". ".join(gaps) + " — patikrinkite brėžinyje ir pridėkite." if gaps
             else "Patikrinkite brėžinyje, ar sąraše netrūksta durų ar lango.")
-    return f"Sienose angų daugiau — {n}: {listed}. {tail}", True, suggestions
+    return f"Sienose angų daugiau — {n}: {listed}. {tail}{tail_beyond}", True, suggestions
 
 
 def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
@@ -1156,7 +1195,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
     walls_page, openings = _wall_openings(room)
     if openings:
         # the sheet the room's outline is drawn on: there the openings can be marked
-        walls_said, short, suggestions = _against_the_walls(per_type, openings)
+        walls_said, short, suggestions = _against_the_walls(per_type, openings, _listed_beyond(project, room, openings))
         shown = {"openings": {"page": walls_page, "items": openings}, "suggestions": suggestions}
         where = (walls_page, _outline_rect_pct(room))
     else:
@@ -1165,6 +1204,10 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
         where = (room.get("puslapio_nr"), region)
 
     if not details:
+        # 2026-09-23: nothing listed here, but every opening the walls show is a door the room BEYOND lists —
+        # that door is counted there (universal_rules.mark_shared_doors); this room has nothing to add
+        if openings and not short and not suggestions and "įrašytos prie tos patalpos" in (walls_said or ""):
+            return _fact("angos", 0, "vnt.", "read", "sienu_angos", where[0], where[1], walls_said, editable, details=[], **shown)
         return _fact("angos", 0, "vnt.", "missing", "sienu_angos" if openings else "nera",
                      where[0], where[1],
                      walls_said or "Durų ir langų šioje patalpoje neradau — jei jų yra, įrašykite.",

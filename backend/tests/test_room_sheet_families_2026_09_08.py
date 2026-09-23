@@ -49,12 +49,14 @@ def _rooms(h01=2.7):
     ]
 
 
-def _recompute(client, rooms=None, apimtis=None, anchor=None):
+def _recompute(client, rooms=None, apimtis=None, anchor=None, legend=None):
     body = {"patalpos": rooms or _rooms(), "rules_override": {}, "context": {}}
     if apimtis is not None:
         body["rules_override"]["apimtis"] = apimtis
     if anchor is not None:
         body["_ceiling_anchor"] = anchor
+    if legend is not None:
+        body["_symbol_legend"] = legend                      # 2026-09-23: a cornice needs the drawing to name one
     r = client.post("/recompute-interior", json=body)
     assert r.status_code == 200, r.text
     return r.json()
@@ -209,7 +211,7 @@ def test_the_living_room_sheet_lists_its_cornice_reveals_and_gkp(client):
     rooms = _rooms()
     rooms[0]["elementai"].append({"tipas": "pasleptos_duris", "plotis_mm": 900, "aukstis_mm": 2400, "kiekis": 1})
     rooms[0]["elementai"].append({"tipas": "nisa_LED", "ilgis_m": 3.5, "kiekis": 1})
-    out = _recompute(client, rooms)
+    out = _recompute(client, rooms, legend={"text_layer_ok": True, "karnizas": {"defined": True, "pages": [1], "samples": []}})
     q01, _ = room_facts.room_quantities(out, "01")
     labels = {q["aprasymas"] for q in q01}
     for want in ("Lubų karnizo sumontavimas", "Angokraščių glaistymas-dažymas",

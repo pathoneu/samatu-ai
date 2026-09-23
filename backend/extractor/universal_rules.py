@@ -308,7 +308,8 @@ ROOM_TYPE_RULES = {
     "gyvenamoji":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
     "miegamoji":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
     "valgomasis":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "virtuve":     {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0.6, "tile_floor": True},   # backsplash 0.6m
+    "virtuve":     {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0.6, "tile_floor": True,    # backsplash 0.6m…
+                    "kitchen_counter_length_m": 3.0},                                                                        # …along the counter, not the whole room (2026-09-23)
     "vonia":       {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
     "wc":          {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
     "san":         {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
@@ -388,6 +389,7 @@ def default_paint_prefs() -> dict:
     return {
         "bathroom_tile_height_m": float(ROOM_TYPE_RULES["vonia"]["tile_walls_to_m"]),
         "kitchen_backsplash_height_m": float(ROOM_TYPE_RULES["virtuve"]["tile_walls_to_m"]),
+        "kitchen_counter_length_m": float(ROOM_TYPE_RULES["virtuve"]["kitchen_counter_length_m"]),
         "drabuzine_painted": bool(ROOM_TYPE_RULES["drabuzine"]["walls_paint"]),
         "rubine_painted": bool(ROOM_TYPE_RULES["rubine"]["walls_paint"]),
         "sandeliukas_painted": bool(ROOM_TYPE_RULES["sandeliukas"]["walls_paint"]),
@@ -453,6 +455,14 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     kitchen_h = prefs.get("kitchen_backsplash_height_m")
     if kitchen_h is not None and "virtuve" in rules:
         rules["virtuve"]["tile_walls_to_m"] = float(kitchen_h)
+    # The backsplash runs along the COUNTER (2026-09-23) — a band around the whole room's perimeter billed
+    # 10–13 m² of tile in a 20 m open-plan kitchen where 2 m² exist; the counter length is his to set.
+    counter = prefs.get("kitchen_counter_length_m")
+    if counter is not None and "virtuve" in rules:
+        try:
+            rules["virtuve"]["kitchen_counter_length_m"] = max(0.0, float(counter))
+        except (TypeError, ValueError):
+            pass
 
     paint_map = {
         "drabuzine_painted": ("drabuzine",),
@@ -857,6 +867,228 @@ def _opening_should_deduct(area_m2: float, standard: str) -> bool:
 
 
 _DOOR_KINDS = ("duris", "pasleptos_duris")
+
+# ── Doors listed from both sides, the frameless-door assumption, cornice evidence (2026-09-23) ──────
+# Measured across the six contractor sąmatas (docs/superpowers/research/2026-09-23-eiluciu-paklaidos.md):
+#  • an interior door stands in TWO rooms' `elementai` (Vision lists the corridor's doors and the bedroom's
+#    door — the same opening; the check sheet's „add the opening the walls show" added the corridor's doors
+#    a second time from the other side) — the per-opening rows (reveals, frameless-door preparation) doubled;
+#  • his „Durų angų paruošimas beapvadinėms durims" row was −55 % on all four projects that bill it, because
+#    only the doors the DRAWING tags as hidden counted, and „Angokraščių apdirbimas" had been fitted to one
+#    project (all doors, no exterior windows) — in his practice reveals are the windows and the exterior
+#    doors, a framed interior door is covered by its architraves, a frameless one is prepared on its own row;
+#  • a ceiling cornice was billed on every project (perimeter of every living room) and appears on none.
+SHARED_DOOR_KEY = "_bendra_su"          # this door element is the same opening as one listed in room <nr>; counted THERE
+SHARED_DOOR_N_KEY = "_bendra_su_n"      # …how many of its `kiekis` units
+FRAMELESS_DEFAULT_KEY = "_beapvadines_vidaus"   # room flag: untagged interior doors are frameless (project-level assumption)
+KARNIZAS_KEY = "_karnizas"              # room flag: the drawing mentions a cornice (symbol_legend) — else none is billed
+DOOR_WIDTH_TOL_M = 0.16
+STANDARD_DOOR_W_M = 0.9
+STANDARD_DOOR_H_M = 2.1
+STANDARD_WINDOW_W_M = 1.2
+STANDARD_WINDOW_H_M = 1.5
+
+
+def _nr_key(nr: str) -> tuple:
+    """Natural order of room numbers: „03" < „10" < „101"; anything else after, as text."""
+    s = str(nr or "").strip()
+    return (0, int(s)) if s.isdigit() else (1, s)
+
+
+def _is_interior_door(el) -> bool:
+    return isinstance(el, dict) and (el.get("tipas") or "").lower() in _DOOR_KINDS and not el.get("_exterior")
+
+
+def _el_width_m(el) -> float | None:
+    try:
+        w = float(el.get("plotis_mm") or 0) / 1000.0
+    except (TypeError, ValueError):
+        return None
+    return w if w > 0 else None
+
+
+def _el_units(el) -> int:
+    try:
+        return max(0, int(el.get("kiekis") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def door_units_counted(el) -> int:
+    """How many of this door element's units this room COUNTS for the per-opening rows — its `kiekis` less
+    the units the same opening is counted under in the neighbouring room (`mark_shared_doors`)."""
+    try:
+        shared = int(el.get(SHARED_DOOR_N_KEY) or 0)
+    except (TypeError, ValueError):
+        shared = 0
+    return max(0, _el_units(el) - shared)
+
+
+def _widths_match(a: float | None, b: float | None) -> bool:
+    return a is None or b is None or abs(a - b) <= DOOR_WIDTH_TOL_M
+
+
+def _neighbours_of(room: dict, el: dict, width: float | None, by_nr: dict) -> list[tuple[str, tuple | None]]:
+    """Which rooms this interior door could lead to, each with the wall OPENING that says so: the one the door
+    was added from (tagged — no opening index, one door per opening by construction), else the wall openings
+    of that width leading to another room (geometry lane, `_angos_sienose`) — an opening backs ONE pair."""
+    tagged = str(el.get("_is_sienu_angos") or "").strip()
+    if tagged in by_nr:
+        return [(tagged, None)]
+    if tagged:                                                 # „vidus" / „laukas" — a space no room owns
+        return []
+    out: list[tuple[float, str, tuple]] = []
+    rec = room.get("_angos_sienose") if isinstance(room.get("_angos_sienose"), dict) else {}
+    for k, a in enumerate(rec.get("angos") or []):
+        if not isinstance(a, dict):
+            continue
+        i = str(a.get("i") or "").strip()
+        try:
+            w = float(a.get("plotis_m") or 0)
+        except (TypeError, ValueError):
+            continue
+        if i in by_nr and w > 0 and _widths_match(width, w):
+            out.append((abs((width or w) - w), i, (str(room.get("nr") or "").strip(), i, k)))
+    return [(i, key) for _, i, key in sorted(out)]
+
+
+def mark_shared_doors(rooms: list[dict]) -> int:
+    """Mark interior doors that TWO rooms list as one opening. Idempotent: clears its own marks first.
+
+    A pair is an interior door in room A and one in room B such that A's door leads to B (the opening it was
+    added from, or a wall opening of that width leading to B) and B's door leads back to A or has the same
+    width. Each `kiekis` unit pairs at most once. The unit is COUNTED in the room with the lower number
+    (natural order) and marked on the other's element (`_bendra_su`, `_bendra_su_n`); per-room wall areas
+    still take the opening off both rooms' walls — only the per-opening rows read the marks
+    (`door_units_counted`). Returns the number of units paired."""
+    rooms = [r for r in rooms if isinstance(r, dict)]
+    by_nr = {str(r.get("nr") or "").strip(): r for r in rooms if str(r.get("nr") or "").strip()}
+    for r in rooms:
+        for el in r.get("elementai") or []:
+            if isinstance(el, dict):
+                el.pop(SHARED_DOOR_KEY, None)
+                el.pop(SHARED_DOOR_N_KEY, None)
+    free: dict[tuple[str, int], int] = {}
+
+    def left(nr: str, i: int, el: dict) -> int:
+        return free.setdefault((nr, i), _el_units(el))
+
+    def partner(b: dict, b_nr: str, a_nr: str, width: float | None, tipas: str) -> int | None:
+        best = None
+        for j, f in enumerate(b.get("elementai") or []):
+            if not _is_interior_door(f) or left(b_nr, j, f) <= 0:
+                continue
+            tagged = str(f.get("_is_sienu_angos") or "").strip()
+            if tagged and tagged != a_nr:
+                continue                                       # it leads somewhere else
+            fw = _el_width_m(f)
+            if not _widths_match(width, fw):
+                continue
+            # the door that leads back here first, then the same kind (a hidden door is not a framed one),
+            # then the closest width
+            rank = (0 if tagged == a_nr else 1, 0 if (f.get("tipas") or "").lower() == tipas else 1,
+                    abs((width or 0) - (fw or width or 0)))
+            if best is None or rank < best[0]:
+                best = (rank, j)
+        return None if best is None else best[1]
+
+    used_openings: set[tuple] = set()                          # a wall opening backs one pair, from either side
+    pairs = 0
+    for a in sorted(rooms, key=lambda r: _nr_key(str(r.get("nr") or ""))):
+        a_nr = str(a.get("nr") or "").strip()
+        for i, el in enumerate(a.get("elementai") or []):
+            if not _is_interior_door(el) or not a_nr:
+                continue
+            width = _el_width_m(el)
+            tipas = (el.get("tipas") or "").lower()
+            while left(a_nr, i, el) > 0:
+                found = False
+                for b_nr, key in _neighbours_of(a, el, width, by_nr):
+                    if b_nr == a_nr or (key is not None and key in used_openings):
+                        continue
+                    b = by_nr[b_nr]
+                    j = partner(b, b_nr, a_nr, width, tipas)
+                    if j is None:
+                        continue
+                    keep_a = _nr_key(a_nr) <= _nr_key(b_nr)
+                    marked, owner = ((b["elementai"][j], a_nr) if keep_a else (el, b_nr))
+                    marked[SHARED_DOOR_KEY] = owner
+                    marked[SHARED_DOOR_N_KEY] = int(marked.get(SHARED_DOOR_N_KEY) or 0) + 1
+                    free[(a_nr, i)] = left(a_nr, i, el) - 1
+                    free[(b_nr, j)] = left(b_nr, j, b["elementai"][j]) - 1
+                    if key is not None:
+                        used_openings.add(key)
+                        # the same opening seen from the other room's wall list is spent too
+                        used_openings.add(_mirror_opening(b, b_nr, a_nr, width))
+                    pairs += 1
+                    found = True
+                    break
+                if not found:
+                    break
+    return pairs
+
+
+def _mirror_opening(b: dict, b_nr: str, a_nr: str, width: float | None) -> tuple:
+    """The wall opening in room B's list that leads back to A with this width — the same physical opening as
+    the one just used from A's side."""
+    rec = b.get("_angos_sienose") if isinstance(b.get("_angos_sienose"), dict) else {}
+    best = None
+    for k, o in enumerate(rec.get("angos") or []):
+        if not isinstance(o, dict) or str(o.get("i") or "").strip() != a_nr:
+            continue
+        try:
+            w = float(o.get("plotis_m") or 0)
+        except (TypeError, ValueError):
+            continue
+        if _widths_match(width, w):
+            d = abs((width or w) - w)
+            if best is None or d < best[0]:
+                best = (d, (b_nr, a_nr, k))
+    return best[1] if best else (b_nr, a_nr, -1)
+
+
+def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None) -> dict:
+    """Whether the interior doors nobody tagged are frameless (beapvadinės): his choice
+    (`_overrides.vidaus_durys_beapvadines`) when he made one; otherwise inferred from the drawing — a project
+    whose plan or door schedule shows ANY hidden/frameless door is a designer working with frameless doors.
+    Written on every room as `_beapvadines_vidaus`; returned with its source for the assumptions panel."""
+    chosen = (overrides or {}).get("vidaus_durys_beapvadines") if isinstance(overrides, dict) else None
+    if chosen is not None:
+        value, source = bool(chosen), "jusu"
+    else:
+        tagged = any((el.get("tipas") or "").lower() == "pasleptos_duris"
+                     for r in rooms if isinstance(r, dict) for el in (r.get("elementai") or []) if isinstance(el, dict))
+        try:
+            read = int((door_types or {}).get("count") or 0) > 0
+        except (TypeError, ValueError):
+            read = False
+        value, source = bool(tagged or read), ("brezinys" if (tagged or read) else "nera_pozymiu")
+    for r in rooms:
+        if isinstance(r, dict):
+            r[FRAMELESS_DEFAULT_KEY] = value
+    return {"value": value, "source": source}
+
+
+def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None,
+                           legend: dict | None = None) -> dict:
+    """The project-level pass every calc path runs BEFORE `calc_room_quantities` (extraction, the assumptions
+    recompute, the room-sheet recompute): doors listed from both sides are paired, the frameless-door
+    assumption is settled, and the cornice gets its evidence flag. Never raises."""
+    out = {"shared_doors": 0, "frameless": {"value": False, "source": "nera_pozymiu"}, "karnizas": False}
+    try:
+        out["shared_doors"] = mark_shared_doors(rooms)
+    except Exception:  # noqa: BLE001 — a malformed element must not sink a recompute
+        pass
+    try:
+        out["frameless"] = settle_frameless_default(rooms, overrides, door_types)
+    except Exception:  # noqa: BLE001
+        pass
+    karnizas = bool(((legend or {}).get("karnizas") or {}).get("defined")) if isinstance(legend, dict) else False
+    for r in rooms:
+        if isinstance(r, dict):
+            r[KARNIZAS_KEY] = karnizas
+    out["karnizas"] = karnizas
+    return out
 _STANDARD_DOOR_M = (0.9, 2.1)   # the LT interior door opening when a room's elementai carry no size
 
 
@@ -1058,6 +1290,37 @@ def elevation_says_no_tile(room: dict) -> bool:
 TILE_BAND_DOOR_H_M = 2.1
 
 
+_WINDOW_SILL_M = 0.9          # where a window starts above the floor when the drawing does not say
+
+
+def _openings_in_tile_band_m2(room: dict, band_h_m: float, tile_share: float) -> float:
+    """The part of this room's openings that lies INSIDE the tiled band — no tile goes there (2026-09-23;
+    measured: three bathrooms' tile on objektas_g were 13 % over the contractor's for exactly their doors).
+    Doors: the width up to the band's height; windows: the width over the band above the sill. Every
+    opening this room's walls have is taken (a door counts on both sides of its wall — each side's tile
+    loses it); `tile_share` is the chance the opening sits on a tiled wall, as in the paint base."""
+    if not band_h_m or band_h_m <= 0 or not tile_share or tile_share <= 0:
+        return 0.0
+    total = 0.0
+    for el in room.get("elementai") or []:
+        if not isinstance(el, dict):
+            continue
+        tipas = (el.get("tipas") or "").lower()
+        try:
+            w = float(el.get("plotis_mm") or 0) / 1000.0
+            h = float(el.get("aukstis_mm") or 0) / 1000.0
+            k = max(0, int(el.get("kiekis") or 1))
+        except (TypeError, ValueError):
+            continue
+        if tipas in _DOOR_KINDS:
+            if w <= 0 or h <= 0:
+                w, h = STANDARD_DOOR_W_M, STANDARD_DOOR_H_M
+            total += k * w * min(h, band_h_m)
+        elif tipas in ("langas", "stoglangis") and w > 0 and h > 0 and tipas != "stoglangis":
+            total += k * w * max(0.0, min(band_h_m, _WINDOW_SILL_M + h) - _WINDOW_SILL_M)
+    return round(total * max(0.0, min(1.0, float(tile_share))), 4)
+
+
 def _tile_zone_in_paint_base(tile_zone_m2: float, band_h_m: float,
                              tile_share: float, openings_deducted_m2: float) -> float:
     """How much TILED wall to take out of the glaistymas/dažymas base.
@@ -1091,7 +1354,7 @@ def _tile_zone_in_paint_base(tile_zone_m2: float, band_h_m: float,
 
 
 def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
-                           wall_area_available_m2: float = 0.0) -> dict:
+                           wall_area_available_m2: float = 0.0, perimeter_m: float = 0.0) -> dict:
     """SINGLE SOURCE OF TRUTH for "how much of this room's wall is tiled".
 
     Resolves, in documented priority order, from every evidence source the
@@ -1213,6 +1476,16 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         out["share"] = 1.0
         out["height_m"] = default_tile_h
         out["missing"] = True
+        # 2026-09-23: a kitchen's backsplash band runs along the COUNTER, not round the room — measured on
+        # three projects the perimeter-wide band billed 4–13 m² of tile nobody lays. The counter length is
+        # an assumption (Prielaidos `kitchen_counter_length_m`, default 3,0 m) and is said as one.
+        counter = float(rt_rules.get("kitchen_counter_length_m") or 0)
+        if paskirtis == "virtuve" and default_tile_h <= 1.0 and counter > 0 and perimeter_m > 0:
+            out["share"] = max(0.0, min(1.0, counter / perimeter_m))
+            out["assumption"] = (
+                f"Virtuvės plytelių juosta {default_tile_h:.2f} m aukščio palei {counter:.1f} m stalviršio — "
+                f"prielaida (brėžinys stalviršio ilgio neduoda). Pakeiskite Prielaidų skydelyje.")
+            return out
         # NOTE the default band (0.6–2.4 m) is deliberately BELOW a typical
         # ceiling, so `is_full_tile` stays False: without evidence we do not
         # zero a room's paint. The assumption is disclosed instead — but only
@@ -1447,7 +1720,7 @@ def calc_room_quantities(room: dict,
     if not rt_rules.get("deduct_openings", True):
         doors_deduction = 0.0          # apimtis: „sienų plotas be angų" — see the openings block above
     wall_area_available = max(0.0, walls_gross - doors_deduction)
-    tile_read = resolve_wall_tile_read(room, rt_rules, H, wall_area_available)
+    tile_read = resolve_wall_tile_read(room, rt_rules, H, wall_area_available, perimeter_m=perim)
     is_full_tile = tile_read["is_full_tile"]
     # Disclosure notes collected while resolving the wall finish. They ride on
     # the room dict so lt_rules.apply_lt_sanity can surface them to the user
@@ -1879,6 +2152,11 @@ def calc_room_quantities(room: dict,
         plyteles_grindys = 0
 
     # Plytelės sienose
+    # 2026-09-23: the band's openings are not tiled. The elevation branches carry exact areas and a
+    # full-tile room's figure is already the wall net of its openings; the band branches (a read height,
+    # the room-type default, an apdailos share) were `share × perimeter × height` with the doors inside.
+    if tile_walls_area > 0 and not is_full_tile and tile_read.get("source") in ("apdailos", "vision_height", "paskirtis_default"):
+        tile_walls_area = max(0.0, tile_walls_area - _openings_in_tile_band_m2(room, float(tile_read.get("height_m") or 0), float(tile_read.get("share") or 0)))
     plyteles_sienos = tile_walls_area
 
     # Kampai (LT samata convention — refined 2026-05-31).
@@ -1982,24 +2260,41 @@ def calc_room_quantities(room: dict,
     # right reveal length.
     #
     # Result on Objektas A (rule-explorer #1): 89.51 m vs truth 89.39 m → +0.13%.
+    # 2026-09-23 (six contractor sąmatas, docs/superpowers/research/2026-09-23-eiluciu-paklaidos.md): the
+    # reveals a finisher paints are the WINDOWS (on the room's side — the facade side is facade work) and
+    # the EXTERIOR doors; a framed interior door is covered by its architraves, and a frameless one is
+    # prepared on its own row (`pasleptu_duru_staktu_m` below). The pre-2026-09-23 rule — every door, no
+    # exterior window — had been fitted to one project's sąmata. A door two rooms list counts once
+    # (`door_units_counted`).
     angokrasciu_m = 0.0
+    pasleptu_duru_staktu_m = 0.0
+    pasleptu_duru_n = 0
+    frameless_default = bool(room.get(FRAMELESS_DEFAULT_KEY))
     for el in room.get("elementai") or []:
+        if not isinstance(el, dict):
+            continue
         tipas = (el.get("tipas") or "").lower()
-        kiekis = int(el.get("kiekis") or 1)
+        is_exterior = bool(el.get("_exterior"))
         w_mm = float(el.get("plotis_mm") or 0)
         h_mm = float(el.get("aukstis_mm") or 0)
-        if w_mm <= 0 or h_mm <= 0:
-            continue
-        w_m = w_mm / 1000.0
-        h_m = h_mm / 1000.0
-        is_exterior = bool(el.get("_exterior"))
         if tipas in ("duris", "pasleptos_duris"):
-            # All doors: W + 2H (frame inside the room regardless of exterior flag)
-            angokrasciu_m += kiekis * (w_m + 2 * h_m)
-        elif tipas in ("langas", "stoglangis"):
-            if not is_exterior:
+            kiekis = door_units_counted(el)
+            if kiekis <= 0:
+                continue
+            w_m = w_mm / 1000.0 if w_mm > 0 else STANDARD_DOOR_W_M
+            h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_DOOR_H_M
+            if is_exterior:
                 angokrasciu_m += kiekis * (w_m + 2 * h_m)
-            # else: 0 (counted under fasado darbai, not interior)
+            elif tipas == "pasleptos_duris" or frameless_default:
+                pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
+                pasleptu_duru_n += kiekis
+        elif tipas in ("langas", "stoglangis"):
+            # a window without a readable size still has a reveal — the standard one, and confidence.py
+            # flags the row for the room whose opening sizes were not read
+            kiekis = int(el.get("kiekis") or 1)
+            w_m = w_mm / 1000.0 if w_mm > 0 else STANDARD_WINDOW_W_M
+            h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_WINDOW_H_M
+            angokrasciu_m += kiekis * (w_m + 2 * h_m)
 
     # Grindjuostės (perimetras − durų pločiai, vonia/wc neturi)
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
@@ -2106,6 +2401,9 @@ def calc_room_quantities(room: dict,
             pusiniai_m if count_partition_corners else 0.0, 2),
         "kampai_perimetras_m": round(perim if walls_paint_factor > 0 else 0.0, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
+        "pasleptu_duru_staktu_m": round(pasleptu_duru_staktu_m, 2),
+        "pasleptu_duru_kompl": pasleptu_duru_n,
+        "_pasleptu_duru_pagal": "prielaida" if frameless_default else "zymejimas",
         "plyteles_sienos_m2": round(plyteles_sienos, 2),
         "plyteles_grindys_m2": round(plyteles_grindys, 2),
         "pvc_grindys_m2": round(pvc_grindys, 2),

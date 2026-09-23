@@ -964,6 +964,8 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           // this path rebuilt the ceiling off the per-room sum (dropping the
           // eksplikacijos anchor) and lost the door/fixture/tile lines.
           _ceiling_anchor: project._ceiling_anchor,
+          _door_types: project._door_types,
+          _symbol_legend: project._symbol_legend,
           context: buildRecomputeContext(project),
         }),
       });

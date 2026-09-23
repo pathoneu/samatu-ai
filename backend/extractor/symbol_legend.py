@@ -61,6 +61,8 @@ _DIFFUSER_LABEL_RE = re.compile(r"(?<!\w)dif[uū]zori(?:us|ai)(?!\w)",
 # nothing, so the scanner reports `text_layer_ok=False` and callers must not
 # gate on it.
 MIN_TEXT_CHARS = 200
+# „karnizas", „karnizai", „karnizo …" — a cornice named anywhere in the drawing's text
+_KARNIZAS_RE = re.compile(r"\bkarniz", re.IGNORECASE)
 
 
 def scan_symbol_legend(pdf_bytes: bytes) -> dict:
@@ -85,10 +87,14 @@ def scan_symbol_legend(pdf_bytes: bytes) -> dict:
         "text_layer_ok": False,
         "chars": 0,
         "difuzoriai": {"defined": False, "pages": [], "samples": []},
+        # 2026-09-23: a ceiling cornice is billed only when the drawing names one (vision_call._calc_lubu_karnizas_m)
+        "karnizas": {"defined": False, "pages": [], "samples": []},
     }
     total_chars = 0
     pages: list[int] = []
     samples: list[str] = []
+    k_pages: list[int] = []
+    k_samples: list[str] = []
     try:
         # Shared parse (pdf_page_cache) instead of a tenth pdfplumber.open().
         # Same text, same fail-open contract — an unreadable document yields
@@ -103,6 +109,13 @@ def scan_symbol_legend(pdf_bytes: bytes) -> dict:
                     lo = max(0, m.start() - 60)
                     hi = min(len(text), m.end() + 60)
                     samples.append(" ".join(text[lo:hi].split()))
+            k = _KARNIZAS_RE.search(text)
+            if k:
+                k_pages.append(idx)
+                if len(k_samples) < 3:
+                    lo = max(0, k.start() - 60)
+                    hi = min(len(text), k.end() + 60)
+                    k_samples.append(" ".join(text[lo:hi].split()))
     except Exception:
         return result
 
@@ -113,6 +126,7 @@ def scan_symbol_legend(pdf_bytes: bytes) -> dict:
         "pages": pages,
         "samples": samples,
     }
+    result["karnizas"] = {"defined": bool(k_pages), "pages": k_pages, "samples": k_samples}
     return result
 
 

@@ -209,27 +209,42 @@ def hidroizoliacija_m2(
     return round(total, 3), warnings
 
 
-def hidden_door_count(openings: Iterable) -> int:
-    return sum(
-        int(_get(op, "count") or _get(op, "kiekis") or 1)
-        for op in openings or []
-        if _opening_type(op) == "hidden_door"
-    )
+def _frameless_units(op, frameless_default: bool) -> int:
+    """How many units of this opening are frameless interior doors this room COUNTS: the doors the drawing
+    tags as hidden, plus untagged interior doors when the project-level assumption says so — less the units
+    the same opening is counted under in the neighbouring room (universal_rules.mark_shared_doors)."""
+    t = _opening_type(op)
+    if t == "hidden_door" or (frameless_default and t == "door" and not _get(op, "_exterior")):
+        count = int(_get(op, "count") or _get(op, "kiekis") or 1)
+        try:
+            shared = int(_get(op, "_bendra_su_n") or 0)
+        except (TypeError, ValueError):
+            shared = 0
+        return max(0, count - shared)
+    return 0
 
 
-def hidden_door_frame_lm(openings: Iterable) -> float:
+def hidden_door_count(openings: Iterable, frameless_default: bool = False) -> int:
+    return sum(_frameless_units(op, frameless_default) for op in openings or [])
+
+
+def hidden_door_frame_lm(openings: Iterable, frameless_default: bool = False) -> float:
     """Linear metres of paslėptų durų staktos (3-sided per komplektas).
 
     Pre-2026-05-10 this field was always 0 because no detector populated it.
     Vision now classifies `type='hidden_door'` when the schedule labels durys
     as "paslėpta" / "nematoma stakta" — see `prompts/floor_plan.py`.
+    2026-09-23: `frameless_default` — the project's untagged interior doors are
+    frameless too (universal_rules.settle_frameless_default); a door two rooms
+    list counts once.
     """
     total = 0.0
     for op in openings or []:
-        if _opening_type(op) != "hidden_door":
+        units = _frameless_units(op, frameless_default)
+        if units <= 0:
             continue
-        w, h, count = _opening_dims(op)
-        total += count * (2 * h + w)
+        w, h, _ = _opening_dims(op)
+        total += units * (2 * h + w)
     return round(total, 3)
 
 

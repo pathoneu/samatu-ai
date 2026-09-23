@@ -127,7 +127,7 @@ def test_openings_the_walls_show_become_one_checklist_and_the_rest_is_named_for_
         _quiet("02", pavadinimas="Katilinė", elementai=[], _angos_sienose=walls, polygon_source="vektoriniai_konturai",
                polygon_pct=[[0.1, 0.1], [0.3, 0.1], [0.3, 0.3], [0.1, 0.3]]),
         _quiet("09", pavadinimas="Miegamasis", elementai=[]),                              # nothing counted, walls show nothing
-        _quiet("03"),
+        _quiet("03", elementai=[{"tipas": "duris", "kiekis": 1, "plotis_mm": 1400, "aukstis_mm": 2100}]),   # 03's own door is another opening
     ]
     out = build_questions({"patalpos": rooms})
     q = _q(out, "angos")
@@ -136,6 +136,22 @@ def test_openings_the_walls_show_become_one_checklist_and_the_rest_is_named_for_
     assert q["items"][0]["label"] and q["items"][0]["line_pct"]
     assert [m["room_nr"] for m in q["manual"]] == ["09"] and q["manual"][0]["sentence"]
     assert q["title"] == "Sienose matau 1 angą, kurios nėra durų ir langų sąraše"
+
+
+def test_an_opening_whose_door_the_room_beyond_lists_is_not_proposed_again():
+    """2026-09-23: a door between two rooms stands in ONE list — proposing it from the other side doubled the
+    reveals and the frameless-door row on objektas_h (70 → 100 m after six adds)."""
+    walls = {"page": 1, "angos": [{"plotis_m": 0.8, "storis_m": 0.1, "i": "03", "line_pct": [[0.2, 0.2], [0.2, 0.25]]}]}
+    rooms = [
+        _quiet("02", pavadinimas="Katilinė", elementai=[], _angos_sienose=walls, polygon_source="vektoriniai_konturai",
+               polygon_pct=[[0.1, 0.1], [0.3, 0.1], [0.3, 0.3], [0.1, 0.3]]),
+        _quiet("03"),                                                                        # lists a 0,9 m door: the same opening
+    ]
+    out = build_questions({"patalpos": rooms})
+    assert not [q for q in out["questions"] if q["kind"] == "angos"]
+    from extractor.room_facts import build_room_facts
+    f = next(x for x in build_room_facts({"patalpos": rooms}, "02")["facts"] if x["key"] == "angos")
+    assert "įrašytos prie tos patalpos" in f["sentence"] and f["suggestions"] == []
 
 
 def test_doors_and_windows_nobody_can_add_with_one_click_still_ask_for_a_look():

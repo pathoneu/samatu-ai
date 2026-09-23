@@ -26,6 +26,7 @@ from .prompt import (
 )
 from models_config import model_for
 from . import ledger as _ledger
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -1284,13 +1285,20 @@ _KARNIZAS_PASKIRTYS = {
 }
 
 
-def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "") -> float:
+def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "", evidence: bool | None = None) -> float:
     """Lubų karnizas (cornice). CLAUDE.md §1.4: perimetras + 5% atliekų,
     durys NEATIMAMOS (priešingai nei grindjuostės).
 
     BET tik gyvenamosioms patalpoms su dekoratyvinėm lubom — ne vonioms,
     garažams, ne katilinei. Praktinis LT samatininko convention'as.
+
+    2026-09-23: and only when the DRAWING mentions a cornice (`evidence`, from
+    symbol_legend's `karnizas` scan, carried on the room as `_karnizas`) — all six
+    contractor sąmatas in the corpus bill none, a GKP ceiling meets the wall in a
+    shadow gap. `None` (a caller that knows nothing) keeps the old behaviour.
     """
+    if evidence is False:
+        return 0.0
     if not paskirtis:
         return 0.0
     if normalize_paskirtis(paskirtis) not in _KARNIZAS_PASKIRTYS:
@@ -1368,11 +1376,16 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
     """
     from .universal_rules import (
         calc_room_quantities, translate_user_prefs_to_room_rules,
-        classify_room_name, ROOM_TYPE_RULES,
+        classify_room_name, prepare_rooms_for_calc, ROOM_TYPE_RULES,
     )
 
     rules = translate_user_prefs_to_room_rules(rules_override or {})
     rooms = parsed.get("patalpos") or []
+    # 2026-09-23: the project-level pass — doors two rooms list paired, the frameless-door assumption
+    # settled, cornice evidence — before any room is computed (the same pass the recomputes run)
+    parsed["_paruosimas"] = prepare_rooms_for_calc(
+        rooms, overrides={**(parsed.get("_overrides") or {}), **(rules_override or {})},
+        door_types=parsed.get("_door_types"), legend=parsed.get("_symbol_legend"))
     # Derive the išklotinė coverage signal BEFORE the per-room math: it is an
     # INPUT to resolve_wall_tile_read (evidence that a room has no tiled wall),
     # and it is re-derived from `_wall_elevations` on every recompute so cached
@@ -1511,7 +1524,7 @@ def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) ->
     # 4.4 Lubų karnizas (cornice) — perim + 5%, no door deduct,
     # only for living-quality rooms (not vonia/garažas/utility)
     room["lubu_karnizo_m"] = _calc_lubu_karnizas_m(
-        perim, room.get("paskirtis", ""))
+        perim, room.get("paskirtis", ""), evidence=room.get(KARNIZAS_KEY))
 
     # 4.5 LED nišų metrai
     room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
@@ -3063,14 +3076,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             return float(bd.get("plyteles_share") or 0) >= 0.6
 
         def _hidden_door_reveal(r: dict) -> float:
-            m = 0.0
-            for el in (r.get("elementai") or []):
-                if (el.get("tipas") or "").lower() == "pasleptos_duris":
-                    W = (el.get("plotis_mm") or 0) / 1000
-                    H = (el.get("aukstis_mm") or 0) / 1000
-                    if W > 0 and H > 0:
-                        m += (2 * H + W) * int(el.get("kiekis") or 1)
-            return m
+            # 2026-09-23: the room's own figure (calc_room_quantities) — tagged hidden doors, the untagged
+            # interior doors when the project assumption says they are frameless, a shared door once
+            return float(r.get("pasleptu_duru_staktu_m") or 0)
 
         def _tile_plinth(r: dict) -> float:
             if float(r.get("plyteles_grindys_m2") or 0) <= 0 or _pask(r) in WET:
@@ -3099,9 +3107,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
         rules: list[tuple[str, object, str, str, object]] = [
             ("Sienų lyginimas Knauf Rotband", None, "m2", "Dalis dažomų sienų", lambda r: _pask(r) is not None),
-            ("Angokraščių glaistymas-dažymas", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink duris ir vidinius langus", None),
-            ("Angokraščių apdirbimas GKP (struktūra)", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink duris ir vidinius langus", None),
-            ("Durų angų paruošimas beapvadinėms durims", _hidden_door_reveal, "m", "Paslėptos (beapvadinės) durys", None),
+            ("Angokraščių glaistymas-dažymas", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink langus ir lauko duris", None),
+            ("Angokraščių apdirbimas GKP (struktūra)", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink langus ir lauko duris", None),
+            ("Durų angų paruošimas beapvadinėms durims", _hidden_door_reveal, "m", "Beapvadinės durys — anga paruošiama (2 × aukštis + plotis)", None),
             ("Lubų karnizo sumontavimas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
             ("Lubų karnizo dažymas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
             ("Nišų formavimas GKP konstrukcijoje", _field("nisu_metrai"), "m", "LED nišos lubose", None),
@@ -3406,20 +3414,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # NO is_exterior check and over-quoted +54.8% on BOTH the SK_GD glaistymas and
     # SK_GKP apdirbimas lines (138.42 vs field 78.05 on Objektas A; contractor 89.39).
     angokrasciai_m = _sum("angokrasciu_gkp_m")
-    pasleptu_duru_staktu_m = 0.0
-    n_pasleptu_tagged = 0
-    reveal_sum = 0.0  # sum of (2H+W) over the glyph-tagged frameless doors
-    for r in rooms:
-        for el in (r.get("elementai") or []):
-            if (el.get("tipas") or "").lower() == "pasleptos_duris":
-                W = (el.get("plotis_mm") or 0) / 1000
-                H = (el.get("aukstis_mm") or 0) / 1000
-                if W > 0 and H > 0:
-                    k = int(el.get("kiekis") or 1)
-                    pasleptu_duru_staktu_m += (2 * H + W) * k
-                    n_pasleptu_tagged += k
-                    reveal_sum += (2 * H + W) * k
-    pasleptu_duru_staktu_m = round(pasleptu_duru_staktu_m, 2)
+    # 2026-09-23: the frameless-door preparation is the rooms' own figure (calc_room_quantities: the doors
+    # the drawing tags as hidden, plus every untagged interior door when the project-level assumption says
+    # the designer works with frameless doors; a door two rooms list counts once)
+    pasleptu_duru_staktu_m = round(_sum("pasleptu_duru_staktu_m"), 2)
+    n_pasleptu_tagged = int(sum(int(r.get("pasleptu_duru_kompl") or 0) for r in rooms))
+    reveal_sum = pasleptu_duru_staktu_m
+    _frameless_assumed = any(bool(r.get(FRAMELESS_DEFAULT_KEY)) for r in rooms)
 
     # 2026-06-14: frameless-door RECONCILIATION (council 5/5 + research). The
     # glyph pass under-tags frameless doors (Objektas A 2 of ~8) because frame type
@@ -3431,7 +3432,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _dt = parsed.get("_door_types") or {}
     _door_conf = None
     _door_reason = None
-    if _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged:
+    if not _frameless_assumed and _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged:
         avg_reveal = (reveal_sum / n_pasleptu_tagged) if n_pasleptu_tagged > 0 else 5.1
         pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
         _door_conf = _dt.get("confidence")
@@ -3456,6 +3457,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_GD, "aprasymas": "Durų angų paruošimas beapvadinėms durims",
             "vnt": "m", "kiekis": pasleptu_duru_staktu_m, "saltinis": SAL,
         }
+        if _frameless_assumed:
+            _door_line["_assumption"] = ("Vidaus durys laikomos beapvadinėmis — projekte yra paslėptų (beapvadinių) "
+                                         "durų, todėl ir nepažymėtos vidaus durys skaičiuojamos taip pat. Jei dalis durų "
+                                         "su apvadais, pakeiskite Prielaidose (vidaus durys beapvadinės: ne).")
         if _door_conf:  # text-reconciled — carry the flag + reason
             _door_line["confidence"] = _door_conf
             if _door_reason:

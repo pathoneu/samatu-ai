@@ -102,7 +102,11 @@ def test_angokrasciai_flags_unread_opening_dims():
 
 def test_angokrasciai_no_unread_flag_when_dims_present():
     # All openings have dims → no unread-dims reason on the reveal line.
-    out = _parsed([_room()])
+    # (2026-09-23: the reveal line is the windows' and the exterior doors' — a hidden door is prepared on its own row)
+    out = _parsed([_room(elementai=[
+        {"tipas": "pasleptos_duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2400},
+        {"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500},
+    ])])
     ang = _find(out, "angokrašči")
     assert "be nuskaitytų matmenų" not in (ang.get("_confidence_reason") or "")
 

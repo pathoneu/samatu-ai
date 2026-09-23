@@ -415,8 +415,9 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
             room["angokrasciai_m2"] = opening_reveal_area_m2(
                 openings, wall_thickness_m=wall_thickness, window_sides=window_sides,
             )
-            room["pasleptu_duru_kompl"] = hidden_door_count(openings)
-            room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings)
+            _frameless = bool(room.get("_beapvadines_vidaus"))
+            room["pasleptu_duru_kompl"] = hidden_door_count(openings, frameless_default=_frameless)
+            room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings, frameless_default=_frameless)
         except Exception as exc:  # noqa: BLE001
             # Don't block the recompute on a helper hiccup — but record it.
             _degrade(degradations, nr, "angokrasciai", "recompute_failed",
@@ -1116,6 +1117,15 @@ def recompute(
     # what was silently ignored (2026-07-27 audit findings 2/3/4).
     degradations: list = []
     rooms = _apply_assumption_edits(list(req.rooms), assumptions, degradations)
+    # 2026-09-23: the same project-level pass the extraction runs — doors two rooms list paired, the
+    # frameless-door assumption settled (his Prielaidos choice first), cornice evidence
+    try:
+        from extractor.universal_rules import prepare_rooms_for_calc
+        _ctx = req.context if isinstance(req.context, dict) else {}
+        prepare_rooms_for_calc(rooms, overrides={**(_ctx.get("_overrides") or {}), **assumptions},
+                               door_types=_ctx.get("_door_types"), legend=_ctx.get("_symbol_legend"))
+    except Exception as exc:  # noqa: BLE001 — degrade, never 500
+        _degrade(degradations, None, "paruosimas", "prepare_failed", error=str(exc)[:120])
 
     # 4. Apply gesture edits (Sprint 2)
     rooms, pozicijos = _apply_gesture_edits(rooms, list(req.pozicijos), req.edits)

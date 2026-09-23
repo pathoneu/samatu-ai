@@ -6458,6 +6458,12 @@ class RecomputePayload(BaseModel):
     # — 60.0 m² reverted to the per-room 58.5 and the provenance line saying
     # where the number came from vanished with it. (F4, 2026-09-02 review.)
     ceiling_anchor: dict | None = Field(default=None, alias="_ceiling_anchor")
+    # The drawing's door-type reading and symbol-legend scan (2026-09-23): the project-level pass
+    # (universal_rules.prepare_rooms_for_calc) settles the frameless-door assumption and the cornice
+    # evidence from them, the same way the extraction did — without them a room-sheet recompute would
+    # decide differently from the first run.
+    door_types: dict | None = Field(default=None, alias="_door_types")
+    symbol_legend: dict | None = Field(default=None, alias="_symbol_legend")
     # The drawing's stated painted-wall area (sienų apdailos plano legenda),
     # same contract as the ceiling anchor (2026-09-13).
     walls_anchor: dict | None = Field(default=None, alias="_walls_anchor")
@@ -6500,6 +6506,14 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # ALWAYS: with no scope this clears a stale `_neskaiciuoti` mark, so a room
     # switched back on comes back (the mark rides on the stored room dicts).
     _scope.mark_rooms(payload.patalpos, apimtis)
+    # 2026-09-23: the project-level pass every calc path shares (doors two rooms list paired, the
+    # frameless-door assumption, cornice evidence) — before any room is recomputed
+    try:
+        from extractor.universal_rules import prepare_rooms_for_calc
+        prepare_rooms_for_calc(payload.patalpos, overrides=payload.rules_override or {},
+                               door_types=payload.door_types, legend=payload.symbol_legend)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[recompute-interior] prepare_rooms_for_calc failed: %s", exc)
 
     # Per-room overrides (e.g. force koridorius floor=tile)
     per_room = payload.per_room_overrides or {}
