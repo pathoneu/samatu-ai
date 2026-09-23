@@ -890,6 +890,17 @@ SCHEDULE_CODE_KEY = "_ziniarascio_kodas"
 SCHEDULE_UNITS_KEY = "_ziniarascio_n"   # …how many of its units the schedule lists
 BEYOND_SCHEDULE_KEY = "_be_ziniarascio" # door element: an interior door the schedule does not have — no per-opening row
 _ENTRANCE_NAMES = ("tambūr", "tambur", "įėjim", "iejim", "prieškambar", "prieskambar")
+# doors and windows stood in the wall openings the geometry lane read (reconcile_openings_with_walls)
+PASSAGE_KEY = "_praejimas"              # door element: its opening is a passage between living spaces — no frame
+UNBACKED_KEY = "_be_angos"              # door element: the walls read show no opening for it
+OPENING_INDEX_KEY = "_anga_ks"          # element: indices (in `_angos_sienose.angos`) of the openings its units stand in
+OPENING_SIDE_KEY = "_anga_i"            # element: where that opening leads (room nr / „vidus" / „laukas")
+WIDTH_SOURCE_KEY = "_plotis_pagal"      # element: „sienos" when the width is the wall opening's
+ADDED_FROM_WALLS_KEY = "_pridėta_pagal_sienas"  # door element the walls pass added to a room that had none
+WALL_WIDTH_TOL_M = 0.25                 # a Vision-read size against the wall's gap
+PASSAGE_MIN_W_M = 1.3                   # wider than a door
+DOOR_LIKE_W_M = (0.7, 1.3)              # an opening to the outside this wide with no window left is a door
+_PASSAGE_ROOMS = {"gyvenamoji", "virtuve", "valgomasis", "koridorius", "holas", "tamburas", "kabinetas", "laiptai"}
 DOOR_WIDTH_TOL_M = 0.16
 FRAMELESS_MAX_W_M = 1.3                 # wider than this an interior „door" is a passage or a double leaf, not a frame
 STANDARD_DOOR_W_M = 0.9
@@ -941,7 +952,8 @@ def _neighbours_of(room: dict, el: dict, width: float | None, by_nr: dict) -> li
     """Which rooms this interior door could lead to, each with the wall OPENING that says so: the one the door
     was added from (tagged — no opening index, one door per opening by construction), else the wall openings
     of that width leading to another room (geometry lane, `_angos_sienose`) — an opening backs ONE pair."""
-    tagged = str(el.get("_is_sienu_angos") or "").strip()
+    # the opening it was added from, or the one the walls pass stood it in (reconcile_openings_with_walls)
+    tagged = str(el.get("_is_sienu_angos") or el.get(OPENING_SIDE_KEY) or "").strip()
     if tagged in by_nr:
         return [(tagged, None)]
     if tagged:                                                 # „vidus" / „laukas" — a space no room owns
@@ -987,7 +999,7 @@ def mark_shared_doors(rooms: list[dict]) -> int:
         for j, f in enumerate(b.get("elementai") or []):
             if not _is_interior_door(f) or left(b_nr, j, f) <= 0:
                 continue
-            tagged = str(f.get("_is_sienu_angos") or "").strip()
+            tagged = str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "").strip()
             if tagged and tagged != a_nr:
                 continue                                       # it leads somewhere else
             fw = _el_width_m(f)
@@ -1078,6 +1090,230 @@ def _closest_opening(widths: list[float], width: float | None) -> int | None:
     return None if best is None else best[1]
 
 
+def _openings_of(room: dict) -> list[dict] | None:
+    """The wall openings the geometry lane read for this room, or None when its walls were not read."""
+    rec = room.get("_angos_sienose") if isinstance(room.get("_angos_sienose"), dict) else None
+    if rec is None or not isinstance(rec.get("angos"), list):
+        return None
+    out = []
+    for k, a in enumerate(rec["angos"]):
+        if not isinstance(a, dict):
+            continue
+        try:
+            w = float(a.get("plotis_m") or 0)
+        except (TypeError, ValueError):
+            continue
+        if w > 0:
+            out.append({"k": k, "i": str(a.get("i") or "vidus").strip(), "w": w})
+    return out
+
+
+def _is_passage(width: float, i: str, room: dict, by_nr: dict) -> bool:
+    """An opening wider than a door between two living spaces (or into a space without an outline) is a
+    PASSAGE — no door frame stands in it. Into a bathroom, a bedroom, a wardrobe a wide opening still gets
+    a door (double leaves), so those keep it a door."""
+    if width <= PASSAGE_MIN_W_M or i == "laukas":
+        return False
+    if i == "vidus":
+        return True
+    other = by_nr.get(i)
+    here = normalize_paskirtis(str(room.get("paskirtis") or ""))
+    there = normalize_paskirtis(str(other.get("paskirtis") or "")) if isinstance(other, dict) else ""
+    return here in _PASSAGE_ROOMS and there in _PASSAGE_ROOMS
+
+
+def _to_outside(i: str, by_nr: dict) -> bool:
+    """„laukas", or a garage: what stands in an opening into a garage is a door to the outside for the finisher
+    (an exterior-type leaf, its reveals done, no frameless frame) — objektas_a: the laundry's door from the
+    garage was billed as a frameless interior one."""
+    if i == "laukas":
+        return True
+    other = by_nr.get(i)
+    return isinstance(other, dict) and normalize_paskirtis(str(other.get("paskirtis") or "")) in ("garazas",)
+
+
+def _closest_free(free: dict, width: float | None, want, tol: float, prefer_widest: bool = False):
+    """The free opening this unit takes: `want(o)` says which openings are eligible; a sized unit takes the
+    closest within `tol`, an unsized one the first (or the widest) eligible. Returns the opening or None."""
+    cands = [o for o in free.values() if want(o)]
+    if not cands:
+        return None
+    if width is None:
+        return max(cands, key=lambda o: o["w"]) if prefer_widest else cands[0]
+    best = min(cands, key=lambda o: abs(o["w"] - width))
+    return best if abs(best["w"] - width) <= tol else None
+
+
+def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
+    """The wall openings the geometry lane read (`_angos_sienose`: width, where they lead, „laukas") are the
+    exact list of holes in a room's walls; the doors and windows Vision counted are a list with guessed
+    widths. This pass stands each counted unit in an opening (2026-09-23, the founder: „durys 1,40 pločio
+    nebus tikrai" — and H's terrace and garage doors billed as frameless interior ones):
+
+      · a unit added from an opening (`_is_sienu_angos`) stands in that opening;
+      · a window stands in an opening to the outside (its width, else the widest);
+      · a door stands in the closest opening to another room; a door in an opening wider than a door
+        between two living spaces is a PASSAGE (`_praejimas`: no frame, no reveal row); a door with no
+        opening to a room left takes an opening to the outside of door width — it is EXTERIOR;
+      · a door no opening backs is `_be_angos` — kept (the walls do miss an opening now and then) but
+        counted for no per-opening row and named for a look.
+
+    A matched unit takes the WALL's width (`_plotis_pagal = "sienos"`; a size he typed stays) and records
+    its opening (`_anga_ks`, `_anga_i`), so pairing across rooms is exact. Elements of several units whose
+    units meet different fates are split. Idempotent. Rooms whose walls were not read are untouched."""
+    rooms = [r for r in rooms if isinstance(r, dict)]
+    by_nr = {str(r.get("nr") or "").strip(): r for r in rooms if str(r.get("nr") or "").strip()}
+    out = {"rooms": 0, "matched": 0, "widths": 0, "exterior": 0, "passages": 0, "unbacked": 0, "added": 0}
+    for r in rooms:
+        els = [e for e in (r.get("elementai") or []) if isinstance(e, dict)]
+        for e in els:
+            for key in (PASSAGE_KEY, UNBACKED_KEY, OPENING_INDEX_KEY, OPENING_SIDE_KEY):
+                e.pop(key, None)
+            if e.pop(EXTERIOR_MARKED_KEY, None):
+                e.pop(EXTERIOR_KEY, None)
+        openings = _openings_of(r)
+        if openings is None:
+            continue
+        out["rooms"] += 1
+        free = {o["k"]: o for o in openings}
+        fates: dict[int, list[dict]] = {}                      # element index → one fate per unit
+
+        def take(o: dict, idx: int, kind: str) -> None:
+            free.pop(o["k"], None)
+            fates.setdefault(idx, []).append({"kind": kind, "k": o["k"], "i": o["i"], "w": o["w"]})
+
+        doors = [(idx, e) for idx, e in enumerate(els) if (e.get("tipas") or "").lower() in _DOOR_KINDS]
+        windows = [(idx, e) for idx, e in enumerate(els) if (e.get("tipas") or "").lower() == "langas"]
+        # 1. units added from an opening stand in it
+        for idx, e in doors + windows:
+            tag = str(e.get("_is_sienu_angos") or "").strip()
+            if not tag:
+                continue
+            for _ in range(_el_units(e)):
+                o = _closest_free(free, _el_width_m(e), lambda o, t=tag: o["i"] == t, tol=9.9)
+                if o is None:
+                    break
+                kind = ("exterior" if _to_outside(tag, by_nr)
+                        else ("passage" if _is_passage(o["w"], o["i"], r, by_nr) else "interior"))
+                take(o, idx, kind)
+        # 2. windows with a readable size take the opening to the outside of that size
+        for idx, e in windows:
+            if e.get("_is_sienu_angos") or _el_width_m(e) is None:
+                continue
+            for _ in range(_el_units(e) - len(fates.get(idx, []))):
+                o = _closest_free(free, _el_width_m(e), lambda o: o["i"] == "laukas", tol=WALL_WIDTH_TOL_M)
+                if o is None:
+                    break
+                take(o, idx, "window")
+        # 3. doors Vision already called exterior take the closest opening to the outside left — an entrance
+        #    with a sidelight or a glazed terrace wall is far wider than the leaf Vision measured
+        for idx, e in doors:
+            if not e.get(EXTERIOR_KEY) or e.get("_is_sienu_angos"):
+                continue
+            for _ in range(_el_units(e) - len(fates.get(idx, []))):
+                o = _closest_free(free, _el_width_m(e), lambda o: o["i"] == "laukas", tol=9.9)
+                if o is None:
+                    break
+                take(o, idx, "exterior")
+        # 3b. windows without a size take the widest opening to the outside left
+        for idx, e in windows:
+            if e.get("_is_sienu_angos") or _el_width_m(e) is not None:
+                continue
+            for _ in range(_el_units(e) - len(fates.get(idx, []))):
+                o = _closest_free(free, None, lambda o: o["i"] == "laukas", tol=WALL_WIDTH_TOL_M, prefer_widest=True)
+                if o is None:
+                    break
+                take(o, idx, "window")
+        # 4. doors: the closest opening to another room (a wide one between living spaces is a passage);
+        #    else an opening to the outside of door width — exterior; else no opening backs it
+        for idx, e in doors:
+            if e.get("_is_sienu_angos"):
+                continue
+            for _ in range(_el_units(e) - len(fates.get(idx, []))):
+                if e.get(EXTERIOR_KEY):
+                    fates.setdefault(idx, []).append({"kind": "none"})
+                    continue
+                w = _el_width_m(e)
+                o = _closest_free(free, w, lambda o: o["i"] != "laukas" and o["w"] <= PASSAGE_MIN_W_M, tol=WALL_WIDTH_TOL_M)
+                if o is None:
+                    o = _closest_free(free, w, lambda o: o["i"] != "laukas", tol=WALL_WIDTH_TOL_M)
+                if o is not None:
+                    take(o, idx, "exterior" if _to_outside(o["i"], by_nr)
+                         else ("passage" if _is_passage(o["w"], o["i"], r, by_nr) else "interior"))
+                    continue
+                o = _closest_free(free, w, lambda o: o["i"] == "laukas" and DOOR_LIKE_W_M[0] <= o["w"] <= DOOR_LIKE_W_M[1],
+                                  tol=WALL_WIDTH_TOL_M)
+                if o is not None:
+                    take(o, idx, "exterior")
+                    continue
+                fates.setdefault(idx, []).append({"kind": "none"})
+        # 4b. a room with NO door counted at all gets one from its walls: a floor plan has no room without a
+        #     door, and an opening of door width to another room is exactly where it is (H: two bathrooms and
+        #     a wardrobe Vision listed no door for; the walls show their openings). Only where the room
+        #     beyond lists no door standing in that opening; added as an element tagged with the opening, so
+        #     the next run stands it there again and the person sees it on the room sheet.
+        if not doors:
+            nr_here = str(r.get("nr") or "").strip()
+            for o in sorted(free.values(), key=lambda o: o["k"]):
+                if o["i"] in ("laukas", "vidus") or o["i"] not in by_nr or _is_passage(o["w"], o["i"], r, by_nr):
+                    continue
+                other = by_nr[o["i"]]
+                if any(isinstance(f, dict) and (f.get("tipas") or "").lower() in _DOOR_KINDS
+                       and str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                       for f in other.get("elementai") or []):
+                    continue
+                added = {"tipas": "duris", "kiekis": 1, "plotis_mm": int(round(o["w"] * 100)) * 10,
+                         "aukstis_mm": int(STANDARD_DOOR_H_M * 1000), "_is_sienu_angos": o["i"],
+                         ADDED_FROM_WALLS_KEY: True}
+                r.setdefault("elementai", []).append(added)
+                els.append(added)
+                idx = len(els) - 1
+                take(o, idx, "exterior" if _to_outside(o["i"], by_nr) else "interior")
+                out["added"] = out.get("added", 0) + 1
+        # 5. apply — split an element whose units met different fates
+        for idx in sorted(fates, reverse=True):
+            e = els[idx]
+            groups: dict[tuple, list[dict]] = {}
+            for f in fates[idx]:
+                key = (f["kind"], f.get("i"), round(f.get("w") or 0, 1))
+                groups.setdefault(key, []).append(f)
+            pieces = list(groups.values())
+            targets = [e]
+            if len(pieces) > 1:
+                pos = r["elementai"].index(e)
+                for extra in pieces[1:]:
+                    piece = dict(e)
+                    piece.pop(SHARED_DOOR_KEY, None)
+                    piece.pop(SHARED_DOOR_N_KEY, None)
+                    r["elementai"].insert(pos + 1, piece)
+                    targets.append(piece)
+            for piece, group in zip(targets, pieces):
+                piece["kiekis"] = len(group)
+                kind = group[0]["kind"]
+                if kind == "none":
+                    piece[UNBACKED_KEY] = True
+                    out["unbacked"] += len(group)
+                    continue
+                piece[OPENING_INDEX_KEY] = [g["k"] for g in group]
+                piece[OPENING_SIDE_KEY] = group[0]["i"]
+                out["matched"] += len(group)
+                if kind == "exterior":
+                    piece[EXTERIOR_KEY] = True
+                    piece[EXTERIOR_MARKED_KEY] = True
+                    out["exterior"] += len(group)
+                elif kind == "passage":
+                    piece[PASSAGE_KEY] = True
+                    out["passages"] += len(group)
+                if not piece.get("_dydis_user"):
+                    wall_mm = int(round(group[0]["w"] * 100)) * 10
+                    if int(piece.get("plotis_mm") or 0) != wall_mm:
+                        piece["_plotis_vision_mm"] = piece.get("plotis_mm")
+                        piece["plotis_mm"] = wall_mm
+                        out["widths"] += 1
+                    piece[WIDTH_SOURCE_KEY] = "sienos"
+    return out
+
+
 def mark_exterior_doors(rooms: list[dict]) -> int:
     """Mark the doors that lead OUTSIDE (`_exterior`) — the ones a frameless-door row never counts and the
     reveals always do. The Vision recount's own flag stays. A door whose wall opening the geometry lane read
@@ -1088,8 +1324,8 @@ def mark_exterior_doors(rooms: list[dict]) -> int:
     Returns the number of units marked here."""
     n = 0
     for r in rooms:
-        if not isinstance(r, dict):
-            continue
+        if not isinstance(r, dict) or r.get("_angos_sienose_suderinta"):
+            continue                                           # reconcile_openings_with_walls stood the doors already
         els = [e for e in (r.get("elementai") or []) if isinstance(e, dict)]
         for e in els:
             if e.pop(EXTERIOR_MARKED_KEY, None):
@@ -1282,10 +1518,18 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
     are paired, the frameless-door assumption is settled, the list is reconciled with the drawing's door
     schedule, and the cornice gets its evidence flag. Never raises."""
     out = {"shared_doors": 0, "exterior_doors": 0, "frameless": {"value": False, "source": "nera_pozymiu", "sakinys": ""},
-           "ziniarastis": {"units": 0, "matched": 0, "beyond": 0}, "karnizas": False}
+           "ziniarastis": {"units": 0, "matched": 0, "beyond": 0}, "karnizas": False,
+           "angos": {"rooms": 0, "matched": 0, "widths": 0, "exterior": 0, "passages": 0, "unbacked": 0, "added": 0}}
+    try:
+        out["angos"] = reconcile_openings_with_walls(rooms)
+        for r in rooms:
+            if isinstance(r, dict):
+                r["_angos_sienose_suderinta"] = _openings_of(r) is not None
+    except Exception:  # noqa: BLE001 — a malformed element must not sink a recompute
+        pass
     try:
         out["exterior_doors"] = mark_exterior_doors(rooms)
-    except Exception:  # noqa: BLE001 — a malformed element must not sink a recompute
+    except Exception:  # noqa: BLE001
         pass
     try:
         out["shared_doors"] = mark_shared_doors(rooms)
@@ -2503,9 +2747,9 @@ def calc_room_quantities(room: dict,
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_DOOR_H_M
             if is_exterior:
                 angokrasciu_m += kiekis * (w_m + 2 * h_m)
-            elif el.get(BEYOND_SCHEDULE_KEY):
-                pass                                           # the drawing's door schedule has no such door
-            elif w_m > FRAMELESS_MAX_W_M and not el.get(SCHEDULE_TYPE_KEY):
+            elif el.get(BEYOND_SCHEDULE_KEY) or el.get(PASSAGE_KEY) or el.get(UNBACKED_KEY):
+                pass                                           # no such door in the schedule / a passage / no opening in the walls
+            elif w_m > FRAMELESS_MAX_W_M and not el.get(SCHEDULE_TYPE_KEY) and not el.get(OPENING_SIDE_KEY):
                 # a „door" this wide inside a flat is an open passage or a double leaf, not a frameless
                 # door frame — the founder, 2026-09-23: „durys 1,40 pločio nebus tikrai" (objektas_h: a
                 # 2,0 m opening between the corridor and the kitchen was read as a hidden door)

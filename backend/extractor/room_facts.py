@@ -1106,11 +1106,13 @@ def _listed_beyond(project: dict, room: dict, openings: list[dict]) -> set[int]:
         for j, el in enumerate(other.get("elementai") or []):
             if not isinstance(el, dict) or (el.get("tipas") or "") not in _DOOR_TIPAI or el.get("_exterior"):
                 continue
-            leads = str(el.get("_is_sienu_angos") or "").strip()
+            leads = str(el.get("_is_sienu_angos") or el.get("_anga_i") or "").strip()
             if leads and leads != mine:
                 continue                                       # that door leads somewhere else
+            # a door stood toward this room (the walls pass, or added from the opening) claims by its side
+            # alone — a width he typed on it (800 in a 1,40 opening) is his business, not a second door
             w = _f(el.get("plotis_mm"))
-            if w and abs(w / 1000.0 - float(o["plotis_m"])) > 0.16:
+            if leads != mine and w and abs(w / 1000.0 - float(o["plotis_m"])) > 0.16:
                 continue
             units = int(_f(el.get("kiekis")) or 1)
             if claimed.get((str(o.get("i")), j), 0) >= units:
@@ -1119,6 +1121,64 @@ def _listed_beyond(project: dict, room: dict, openings: list[dict]) -> set[int]:
             out.add(idx)
             break
     return out
+
+
+def _stood_in_walls(elems: list[dict]) -> dict | None:
+    """What the walls pass (universal_rules.reconcile_openings_with_walls) recorded on this room's elements:
+    the openings its units stand in, the passages, the doors no opening backs — or None for a room the
+    pass has not seen (an older blob), which keeps the count-only cross-check below."""
+    if not any(e.get("_anga_ks") or e.get("_be_angos") or e.get("_praejimas") for e in elems):
+        return None
+    consumed: set[int] = set()
+    passages: set[int] = set()
+    unbacked = 0
+    for e in elems:
+        ks = [int(k) for k in (e.get("_anga_ks") or []) if isinstance(k, (int, float))]
+        consumed.update(ks)
+        if e.get("_praejimas"):
+            passages.update(ks)
+        if e.get("_be_angos") and (e.get("tipas") or "") in _DOOR_TIPAI:
+            unbacked += int(_f(e.get("kiekis")) or 1)
+    return {"consumed": consumed, "passages": passages, "unbacked": unbacked}
+
+
+def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stood: dict,
+                             is_passage=None) -> tuple[str, bool, list[dict]]:
+    """(what to say, does the list need a look, what one click could add) — for a room whose counted doors
+    and windows the walls pass has stood in the openings: an opening nobody stands in is offered (a door to a
+    room, a window to the outside, a passage is named), a door no opening backs is named for a look."""
+    beyond = set(listed_beyond or ())
+    consumed = set(stood.get("consumed") or ())
+    passages = set(stood.get("passages") or ())
+    unbacked = int(stood.get("unbacked") or 0)
+    n = len(openings)
+    listed = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in openings)
+    said_beyond = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for k, o in enumerate(openings) if k in beyond and k not in consumed)
+    tail_beyond = f" Durys {said_beyond} įrašytos prie tos patalpos." if said_beyond else ""
+    open_rest = [(k, o) for k, o in enumerate(openings) if k not in consumed and k not in beyond]
+    suggestions, named = [], []
+    for k, o in open_rest:
+        if o["lauko"]:
+            if o["plotis_m"] >= 0.5:
+                suggestions.append(_suggestion("langas", o))
+        elif is_passage and is_passage(o["plotis_m"], o["i"]):
+            named.append(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m) — praėjimas be durų")
+        else:
+            suggestions.append(_suggestion("duris", o))
+    parts = [f"Sienose {n} {_anga_word(n)}: {listed}."]
+    if passages:
+        parts.append("Praėjimai be durų: " + ", ".join(
+            f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for k, o in enumerate(openings) if k in passages) + ".")
+    if suggestions:
+        m = len(suggestions)
+        parts.append(f"{m} {'angoje niekas nestovi' if m == 1 else 'angose niekas nestovi'} — patikrinkite brėžinyje ir pridėkite.")
+    if named:
+        parts.append("Be durų: " + "; ".join(named) + ".")
+    if unbacked:
+        parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — patikrinkite patalpoje.")
+    if not suggestions and not unbacked and not named:
+        parts = [f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje."]
+    return " ".join(parts) + tail_beyond, bool(suggestions or unbacked), suggestions
 
 
 def _against_the_walls(per_type: dict[str, int], openings: list[dict], listed_beyond: set[int] | None = None
@@ -1190,12 +1250,26 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
             "aukstis_mm": _f(e.get("aukstis_mm")),
             "is_zinyno": bool(e.get("_schedule_anchored")),
             "_dydis_user": bool(e.get("_dydis_user")),
+            # 2026-09-23: the walls pass (universal_rules.reconcile_openings_with_walls) — the width is the
+            # wall opening's, the door was added because the room had none, the door stands in no opening
+            "plotis_pagal_sienas": e.get("_plotis_pagal") == "sienos",
+            "pridėta_pagal_sienas": bool(e.get("_pridėta_pagal_sienas")),
+            "be_angos": bool(e.get("_be_angos")),
+            "praejimas": bool(e.get("_praejimas")),
         })
     editable = {"field": "elementai", "kind": "count"}
     walls_page, openings = _wall_openings(room)
     if openings:
         # the sheet the room's outline is drawn on: there the openings can be marked
-        walls_said, short, suggestions = _against_the_walls(per_type, openings, _listed_beyond(project, room, openings))
+        stood = _stood_in_walls(elems)
+        if stood is not None:
+            from .universal_rules import _is_passage
+            by_nr = {str(r.get("nr") or "").strip(): r for r in (project.get("patalpos") or []) if isinstance(r, dict)}
+            walls_said, short, suggestions = _against_the_walls_stood(
+                openings, _listed_beyond(project, room, openings), stood,
+                is_passage=lambda w, i: _is_passage(w, i, room, by_nr))
+        else:
+            walls_said, short, suggestions = _against_the_walls(per_type, openings, _listed_beyond(project, room, openings))
         shown = {"openings": {"page": walls_page, "items": openings}, "suggestions": suggestions}
         where = (walls_page, _outline_rect_pct(room))
     else:

@@ -226,7 +226,15 @@ export default function FactRow({
                     ? t('project.roomSheet.openingsFromSchedule')
                     : d._dydis_user
                       ? t('project.roomSheet.openingsSizeYours')
-                      : t('project.roomSheet.openingsAssumed')}
+                      : d.be_angos
+                        ? t('project.roomSheet.openingNoWallOpening')
+                        : d.praejimas
+                          ? t('project.roomSheet.openingPassage')
+                          : d.pridėta_pagal_sienas
+                            ? t('project.roomSheet.openingAddedFromWalls')
+                            : d.plotis_pagal_sienas
+                              ? t('project.roomSheet.openingWidthFromWalls')
+                              : t('project.roomSheet.openingsAssumed')}
                 </span>
                 {editing && kind === 'count' && !d.is_zinyno && (
                   <SizeEditor detail={d} busy={busy} onSave={onSaveOpeningSize} t={t} />

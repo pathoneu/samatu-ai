@@ -146,3 +146,39 @@ klausiama, ne spėjama.** Faktų žemėlapis pagal tai, iš kur dabar ateina ska
 - Stumdomos durys (B pastaba 18): jo eilutė jų neįtraukia — taip ir skaičiuojame (žiniaraščio tipas
   „stumdomos" — be angos eilutės).
 - Lauko durų angokraščiai — dabar visada; A dėl to +7 % (buvo −4 %).
+
+## 6. Padaryta tą patį vakarą: angos iš sienų (4 skyriaus 1 punktas)
+
+Steigėjo „dirbk toliau" → pirmas žingsnis pastatytas ir išmatuotas (`universal_rules.reconcile_openings_with_walls`,
+projektinio paruošimo pradžia, prieš durų porą ir prielaidą):
+
+- **kiekvienos suskaičiuotos durys ir langas pastatomi į sienų angą**: iš angos pridėtos — į savo; langai — į angą
+  į lauką savo pločio (be dydžio — į plačiausią); Vision lauko durys — į artimiausią angą į lauką (įėjimas su
+  šoniniu stiklu, terasos stiklo siena); durys — į artimiausią angą į kitą patalpą (±25 cm), plati anga tarp
+  gyvenamųjų erdvių — **praėjimas** (`_praejimas`, be staktos ir angokraščių), likusios durys — į durų pločio angą
+  į lauką (**lauko**), o durys be angos — `_be_angos` (paliekamos, bet be angos eilučių, įvardytos patikrai);
+- **plotis iš sienų** (`_plotis_pagal = "sienos"`, jo įrašytas dydis lieka), angos indeksas ir pusė
+  (`_anga_ks`, `_anga_i`) — porą tarp patalpų daro tiksliai; **garažas = laukas** (skalbyklos durys iš garažo —
+  lauko, ne beapvadinės);
+- **patalpa be durų gauna duris iš sienų**: plane nėra patalpos be durų, o durų pločio anga į kitą patalpą yra
+  būtent ten (H: du san. mazgai ir drabužinė, kuriems Vision durų nesurašė) — pridedama su žyma
+  `_pridėta_pagal_sienas`, matoma patalpos lape;
+- patalpos lapo sakinys: „Sienose N angų: … Praėjimai be durų: … K angose niekas nestovi — pridėkite. M durys
+  sąraše, kurioms angos sienose nematau — patikrinkite", vieno paspaudimo siūlymai tik už neužimtas angas;
+  kaimyno durys, pastatytos į angą šios patalpos link, angą užima nepriklausomai nuo įrašyto pločio.
+
+**Išmatuota** (eilučių lentelė, prieš šį vakarą → po):
+
+| | A | D | H | B |
+|---|---|---|---|---|
+| Beapvadinių eilutė | +34 % → **+8,5 %** | +47 % → **0 %** | +31 % → **−10,5 %** | +27 % (be sienų) |
+| Angokraščiai | −4 % → **+0,7 %** | −6 % | −25 % → −27 % | +5 % |
+
+Korpusas: jo eilutės ±10 % 26,9 → **28,4 %**, pagal € 36,3 → **38,5 %**; A 39,6 → 43,4 % ir 51,9 → 59,6 %.
+H trys durys, kurių Vision nesurašė (08, 10 iš miegamojo pusės, 02), dabar dvi pridėtos iš sienų, trečia —
+klausime; trys koridoriaus durys be angos nebeskaičiuojamos. Tikrinta realiuose A, G, H (sekimas per patalpas)
+ir naršyklėje H demo: klausimas „Sienose matau 4 angas…" siūlo būtent neužimtas angas, koridorius sako
+„2 durys sąraše, kurioms angos sienose nematau".
+
+Liko: B/C/D be vektorinių sienų (ten viskas kaip buvo); H angokraščiai −27 % — langai, kurių Vision nesurašė
+(dabar siūlomi klausime); antras ir trečias 4 skyriaus punktai (skaitymo lentelė, vektoriniai simboliai).

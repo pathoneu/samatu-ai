@@ -216,7 +216,7 @@ def _frameless_units(op, frameless_default: bool, chosen_framed: bool = False) -
     `chosen_framed`: he said the interior doors are framed — the plan's hidden-door symbols do not count
     either (only a door the drawing's schedule names frameless does)."""
     t = _opening_type(op)
-    if _get(op, "_exterior") or _get(op, "_be_ziniarascio"):
+    if _get(op, "_exterior") or _get(op, "_be_ziniarascio") or _get(op, "_praejimas") or _get(op, "_be_angos"):
         return 0
     scheduled = _get(op, "_duru_tipas")                        # the drawing's door schedule names the frame
     if scheduled:
@@ -224,7 +224,7 @@ def _frameless_units(op, frameless_default: bool, chosen_framed: bool = False) -
     else:
         w_m, _h, _n = _opening_dims(op)
         # wider than 1,3 m an interior „door" is a passage or a double leaf (universal_rules.FRAMELESS_MAX_W_M)
-        frameless = ((t == "hidden_door" and not chosen_framed) or (frameless_default and t == "door")) and w_m <= 1.3
+        frameless = ((t == "hidden_door" and not chosen_framed) or (frameless_default and t == "door")) and (w_m <= 1.3 or bool(_get(op, "_anga_i")))
     if frameless and t in ("hidden_door", "door"):
         count = int(_get(op, "count") or _get(op, "kiekis") or 1)
         try:
