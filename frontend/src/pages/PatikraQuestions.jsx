@@ -365,7 +365,7 @@ export default function PatikraQuestions() {
           {loadState === 'ready' && data && (
             <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-[hsl(var(--ink-2))]">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--accent-2))]" aria-hidden="true" />
-              {t('project.questions.readNote', { read: data.read, total: data.read + data.asked, rooms: data.rooms })}
+              {t('project.questions.readNote', { read: data.read, total: data.read + data.asked, count: data.rooms })}
             </p>
           )}
         </nav>
