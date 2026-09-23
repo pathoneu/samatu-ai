@@ -88,6 +88,19 @@ def _ask_aukstis(rows: list[tuple[dict, dict]], everyone: list[tuple[dict, dict]
     return _q("aukstis", "number_all", "Kokio aukščio lubos?", why, items, unit="m", proposed=proposed)
 
 
+def _proposal_sentence(nr: str, cand: dict) -> str:
+    """2026-09-23 (objektas_h tambūras): what the walls close around the number is shown and offered — with
+    the reason the program did not take it itself, and the two ways round it."""
+    area, table, perim = _f(cand.get("plotas_m2")), _f(cand.get("plotas_uzrasas_m2")), _f(cand.get("perimetras_m"))
+    pct = ""
+    if area is not None and table:
+        pct = f" ({'+' if area >= table else '−'}{lt_num(abs(area - table) / table * 100, 0)} %)"
+    walls = f" (sienų {lt_num(perim)} m)" if perim else ""
+    return (f"Prie numerio {nr} sienos uždaro {lt_num(area)} m²{walls}, lentelėje {lt_num(table)} m²{pct} — todėl "
+            "kontūro pats nepriėmiau. Jei tai visa patalpa — „Tinka“. Jei patalpa didesnė, spustelėkite kitoje jos "
+            "vietoje brėžinyje. Arba įrašykite sienų ilgį ranka.")
+
+
 def _ask_konturas(rows: list[tuple[dict, dict]]) -> dict | None:
     items = []
     for r, f in rows:
@@ -95,8 +108,15 @@ def _ask_konturas(rows: list[tuple[dict, dict]]) -> dict | None:
         # shared space would only find the shared space again: that is the `erdve` question)
         if f["key"] != "perimetras" or f.get("outline") is not None or not f.get("outline_reason"):
             continue
-        items.append(_item(r, f, proposed=None, reason=str(f["outline_reason"]),
-                           page=(r.get("_vieta") or {}).get("page") or r.get("puslapio_nr")))
+        extra: dict[str, Any] = {"proposed": None, "reason": str(f["outline_reason"]),
+                                 "page": (r.get("_vieta") or {}).get("page") or r.get("puslapio_nr"),
+                                 # the number the rows are computed with today — the field „Sienų ilgis ranka" opens on it
+                                 "perimetras_dabar": _f(r.get("perimetras_m"))}
+        cand = f.get("outline_proposal")
+        if isinstance(cand, dict) and cand.get("polygon_pct"):
+            extra["proposed_outline"] = cand
+            extra["sentence"] = _proposal_sentence(_nr(r), cand)
+        items.append(_item(r, f, **extra))
     if not items:
         return None
     n = len(items)
@@ -176,7 +196,7 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
         anga = "angą, kurios" if n % 10 == 1 and n % 100 != 11 else "angas, kurių" if n % 10 in range(2, 10) and n % 100 not in range(12, 20) else "angų, kurių"
         title = f"Sienose matau {n} {anga} nėra durų ir langų sąraše"
         why = ("Plotį paėmiau iš sienų brėžinio, aukštį — standartinį (durys 2,10 m, langas 1,50 m). "
-               "Nuimkite varnelę, jei tai ne durys ir ne langas.")
+               "Plotį, aukštį ir rūšį galite pataisyti čia pat; nuimkite varnelę, jei tai ne durys ir ne langas.")
     else:
         m = len(manual)
         title = f"Durys ir langai: patikrinkite {m} {_rooms_word(m)}"

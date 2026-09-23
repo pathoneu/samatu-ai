@@ -233,6 +233,15 @@ test('a proposed boundary is drawn on its sheet: both outlines and the line, wit
   // nothing to show → nothing drawn
   assert.equal(buildCheckOverlay({ room, facts }).pages[1].proposal, null);
   assert.equal(buildCheckOverlay({ room, facts, proposal: { page: 1, line_pct: null, rooms: {} } }).pages[1].proposal, null);
+  // a proposed OUTLINE (the face the walls close around a room's number, 2026-09-23): one outline, no line
+  const one = buildCheckOverlay({ room, facts, proposal: { page: 1, line_pct: null, rooms: { '01': [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]] } } });
+  assert.equal(one.pages[1].proposal.line, null);
+  assert.deepEqual(one.pages[1].proposal.outlines.map((x) => x.nr), ['01']);
+  // …and the drawing opens on it when the room has no outline of its own
+  const bare = buildCheckOverlay({ room: { ...room, nr: '01', polygon_pct: null, outline: null }, facts: [],
+    proposal: { page: 1, line_pct: null, rooms: { '01': [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]] } } });
+  assert.equal(bare.roomFocus.page, 1);
+  assert.ok(bare.roomFocus.rect[0] <= 0.39 && bare.roomFocus.rect[2] >= 0.46 && bare.roomFocus.rect[2] - bare.roomFocus.rect[0] < 0.4, JSON.stringify(bare.roomFocus));
 });
 
 // ── a fact whose evidence is on ANOTHER sheet and has no place of its own there (2026-09-21) ──────

@@ -18,7 +18,7 @@ import { displayRotationFor, rotatePctPoint } from './viewerEngine/pageRotation.
 
 /** Mirror of backend `GEOMETRY_ROOM_KEYS` — what a room's geometry is made of. */
 export const GEOMETRY_ROOM_KEYS = [
-  'polygon_pct', 'polygon_source', 'polygon_corrected_at', '_konturas', '_konturo_priezastis', '_atvira_erdve',
+  'polygon_pct', 'polygon_source', 'polygon_corrected_at', '_konturas', '_konturo_priezastis', '_konturo_siulymas', '_atvira_erdve',
   'perimetras_m', 'perimetras_saltinis', '_sienos', '_perimetras_suma', '_perimetras_priezastis',
   '_perimetras_ivertis_m', '_perimetras_ivertis_saltinis', '_perimetras_pries_geometrija',
   '_angos_sienose', 'grindu_danga', 'grindu_danga_saltinis', '_grindu_danga', '_grindu_dangos_dvi',

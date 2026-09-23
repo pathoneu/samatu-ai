@@ -42,7 +42,7 @@ import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
 import {
-  ChoicesBody, NumberAllBody, NumbersBody, OpeningsBody, Q_PLAIN, Q_PRIMARY,
+  ChoicesBody, NumberAllBody, NumbersBody, OpeningsBody, OutlineBody, Q_PLAIN, Q_PRIMARY,
 } from '@/components/questions/QuestionBodies';
 
 // which of the room's facts a question is about — what the drawing lights up
@@ -200,6 +200,14 @@ export default function PatikraQuestions() {
     await land(result, { ...landOptions, factKey: question.id, sameValue: Boolean(built.sameValue), summary });
   }), [run, pilot, questions, land, t]);
 
+  // the way without a click: the wall length typed by hand goes down the perimeter's own write path
+  const typeOutlineLength = useCallback((value) => {
+    if (!current || !outlineItem) return;
+    const nr = outlineItem.room_nr;
+    const built = numbersAnswer(project, [{ room_nr: nr, field: 'perimetras_m', proposed: null }], { [nr]: value });
+    answer(current, built && { ...built, typed: true, value: Number(value) }, (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+  }, [current, outlineItem, project, answer]);
+
   const onBodyAnswer = (payload) => {
     const q = current;
     if (!q) return;
@@ -213,15 +221,14 @@ export default function PatikraQuestions() {
     } else if (q.answer === 'choices') {
       answer(q, floorAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
     } else if (q.answer === 'openings') {
-      answer(q, openingsAnswer(project, q.items, payload.picked), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+      answer(q, openingsAnswer(project, q.items, payload.picked, payload.edits), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
     }
   };
 
   // „Parodyti patalpą": one click inside the room → its wall-exact outline, walls read again
-  const pickOutline = useCallback((point) => run(async () => {
-    if (!point || !current || !outlineItem) return;
-    const nr = outlineItem.room_nr;
-    const found = await fetchOutlineAt(id, nr, point);
+  // an outline the server found for a click (or for „Tinka" on the proposed one) lands on the project — or, when
+  // the click may not become an outline, the reason is said at the drawing
+  const landOutline = useCallback(async (nr, found, { accepted = false } = {}) => {
     const rooms = roomsWithOutline(project, nr, found);
     if (!rooms) {
       const { key, params } = outlineFailureKey(found);
@@ -233,9 +240,22 @@ export default function PatikraQuestions() {
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
     await land(await saveRoomEdit(project, rooms), {
-      fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: [nr] }, t),
+      fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: [nr], accepted }, t),
     });
-  }), [run, current, outlineItem, id, project, questions, land, pilot, t]);
+  }, [project, current, questions, land, pilot, t]);
+
+  const pickOutline = useCallback((point) => run(async () => {
+    if (!point || !current || !outlineItem) return;
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point));
+  }), [run, current, outlineItem, id, landOutline]);
+
+  // „Tinka" on the outline the program proposed (2026-09-23): the same click, at a point inside that outline
+  const acceptOutline = useCallback(() => run(async () => {
+    const cand = outlineItem?.proposed_outline;
+    if (!current || !outlineItem || !Array.isArray(cand?.taskas_pct)) return;
+    const point = { page: cand.page, x_pct: cand.taskas_pct[0], y_pct: cand.taskas_pct[1] };
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { pritarta: true }), { accepted: true });
+  }), [run, current, outlineItem, id, landOutline]);
 
   const landSplit = useCallback(async (found) => {
     const rooms = roomsWithSplit(project, found);
@@ -285,7 +305,14 @@ export default function PatikraQuestions() {
   const showDrawing = Boolean(current && WITH_DRAWING.has(current.answer) && roomFacts?.room && String(roomFacts.room.nr) === String(focusNr));
   const proposed = proposal && proposal !== 'loading' && proposal.status === 'ok' ? proposal : null;
   const pick = current?.answer === 'outline'
-    ? { active: Boolean(outlineItem), mode: 'outline', first: null, busy, notice: pickNotice, onStart: () => {}, onCancel: () => setOutlineSkips((s) => new Set(s).add(outlineItem?.room_nr)), onPoint: pickOutline }
+    ? {
+      active: Boolean(outlineItem), mode: 'outline', first: null, busy, notice: pickNotice,
+      // with a proposal on the drawing the banner says so — „Tinka" is on the left, a click elsewhere replaces it
+      text: outlineItem?.proposed_outline
+        ? { hint: t('project.roomSheet.outlinePickHintProposal', { room: outlineItem.room_nr }), why: t('project.roomSheet.outlinePickWhyProposal') }
+        : null,
+      onStart: () => {}, onCancel: () => setOutlineSkips((s) => new Set(s).add(outlineItem?.room_nr)), onPoint: pickOutline,
+    }
     : current?.answer === 'split' && drawing
       ? { active: true, mode: 'split', first: splitFirst, busy, notice: pickNotice, onStart: () => {}, onCancel: () => { setSplitFirst(null); if (proposed) setDrawing(false); }, onPoint: pickSplit }
       : null;
@@ -422,22 +449,7 @@ export default function PatikraQuestions() {
                   {current.answer === 'openings' && <OpeningsBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onOpenRoom={openRoom} />}
 
                   {current.answer === 'outline' && (
-                    <div className="flex flex-col gap-2">
-                      {outlineItem ? (
-                        <>
-                          <p className="text-[15px] font-semibold">
-                            {current.items.length > 1 && `${current.items.indexOf(outlineItem) + 1} / ${current.items.length} · `}
-                            <span className="font-mono text-muted-foreground">{outlineItem.room_nr}</span> {outlineItem.room_name}
-                          </p>
-                          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
-                            {t('project.questions.outlineReason', { reason: cleanUserText(outlineItem.reason || '').replace(/\.$/, '') })}
-                          </p>
-                          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineHow')}</p>
-                        </>
-                      ) : (
-                        <p className="text-[15px] text-[hsl(var(--ink-2))]">{t('project.questions.outlineAllSkipped')}</p>
-                      )}
-                    </div>
+                    <OutlineBody question={current} item={outlineItem} busy={busy} onAccept={acceptOutline} onTypeLength={typeOutlineLength} />
                   )}
 
                   {current.answer === 'split' && (
@@ -509,7 +521,9 @@ export default function PatikraQuestions() {
                       hidePickButtons
                       proposal={current.answer === 'split' && proposed && !drawing
                         ? { page: proposed.page, line_pct: proposed.line_pct, rooms: Object.fromEntries(Object.entries(proposed.rooms || {}).map(([nr, r]) => [nr, r.polygon_pct])) }
-                        : null}
+                        : current.answer === 'outline' && outlineItem?.proposed_outline
+                          ? { page: outlineItem.proposed_outline.page, line_pct: null, rooms: { [outlineItem.room_nr]: outlineItem.proposed_outline.polygon_pct } }
+                          : null}
                       fallback={{ room: roomFacts.room, projectId: id, highlightCorners: false, facts: factList, wholeSheet: true, onToggleWhole: () => {}, activeFactKey: FACT_OF[current.kind] || null }}
                     />
                   ) : (

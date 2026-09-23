@@ -12,6 +12,7 @@
  */
 
 import { addOpening, alreadyInUse, heightsForRooms, openingsPatch, userEditPatch } from './roomSheet.js';
+import { ltNumber } from './ledger.js';
 
 const nrOf = (item) => String(item?.room_nr ?? '');
 const roomsOf = (project) => (project?.v8_rooms?.length ? project.v8_rooms : (project?.patalpos || []));
@@ -122,10 +123,22 @@ export function wallsAnswer(project, items, values = {}) {
 
 /**
  * The openings he left ticked (`picked[i]` — all of them when nothing was unticked), added to their rooms the
- * way „+ Durys" adds one on the room sheet. → `{rooms, touched, added}` for `saveRoomEdit`, or null.
+ * way „+ Durys" adds one on the room sheet. `edits[i]` (2026-09-23, the founder: „durys 1,40 pločio nebus
+ * tikrai") — the width, height or kind he corrected on that opening, in mm and 'duris' | 'langas'; anything
+ * else in it is ignored. → `{rooms, touched, added, edited}` for `saveRoomEdit`, or null.
  */
-export function openingsAnswer(project, items, picked) {
-  const list = Array.isArray(items) ? items : [];
+export function openingsAnswer(project, items, picked, edits = {}) {
+  let edited = 0;
+  const list = (Array.isArray(items) ? items : []).map((item, i) => {
+    const e = edits && typeof edits === 'object' ? edits[i] : null;
+    if (!e || typeof e !== 'object') return item;
+    const next = { ...item };
+    if (validAmount(e.plotis_mm)) next.plotis_mm = Math.round(Number(e.plotis_mm));
+    if (validAmount(e.aukstis_mm)) next.aukstis_mm = Math.round(Number(e.aukstis_mm));
+    if (e.tipas === 'duris' || e.tipas === 'langas') next.tipas = e.tipas;
+    if (next.plotis_mm !== item.plotis_mm || next.aukstis_mm !== item.aukstis_mm || next.tipas !== item.tipas) edited += 1;
+    return next;
+  });
   const byRoom = {};
   let added = 0;
   list.forEach((item, i) => {
@@ -144,7 +157,7 @@ export function openingsAnswer(project, items, picked) {
     patches[String(room.nr)] = openingsPatch(elementai);
   }
   const touched = Object.keys(patches);
-  return touched.length ? { rooms: patchedRooms(project, patches), touched, added } : null;
+  return touched.length ? { rooms: patchedRooms(project, patches), touched, added, edited } : null;
 }
 
 const SUMMARY_KEY = {
@@ -154,12 +167,18 @@ const SUMMARY_KEY = {
 
 /** What was just answered, in one plain sentence for the strip above the next question. */
 export function answerSummary(question, answer, t) {
-  const key = SUMMARY_KEY[question?.kind] || 'answeredNumbers';
+  let key = SUMMARY_KEY[question?.kind] || 'answeredNumbers';
+  // the outline question has two more ways to be answered (2026-09-23): „Tinka" on the outline the program
+  // proposed, and a wall length typed by hand instead of any click
+  if (question?.kind === 'konturas' && answer?.accepted) key = 'answeredOutlineAccepted';
+  if (question?.kind === 'konturas' && answer?.typed) key = 'answeredPerimeterTyped';
   // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
   const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
+  const value = Number.isFinite(Number(answer?.value)) && answer?.value !== '' && answer?.value != null
+    ? ltNumber(Number(answer.value), 2) : answer?.value;
   return t(`project.questions.${key}`, {
     count: question?.kind === 'angos' ? Number(answer?.added) || 0 : rooms.length,
     rooms: rooms.join(', '),
-    value: answer?.value,
+    value,
   });
 }

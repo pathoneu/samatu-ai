@@ -102,6 +102,7 @@ def test_a_room_the_walls_gave_no_outline_is_pointed_at_and_a_shared_space_is_di
     k = _q(out, "konturas")
     assert k["answer"] == "outline" and [i["room_nr"] for i in k["items"]] == ["01"]     # 04/05 share a space: a click finds it again
     assert "nesutampa su lentele" in k["items"][0]["reason"] and k["items"][0]["page"] == 1
+    assert k["items"][0]["perimetras_dabar"] == 14.0 and "proposed_outline" not in k["items"][0]
 
     e = _q(out, "erdve:04+05")
     assert (e["kind"], e["answer"]) == ("erdve", "split")
@@ -207,3 +208,21 @@ def test_a_room_whose_perimeter_he_typed_himself_is_not_asked_to_be_pointed_at()
     rooms = [_quiet("01", _konturo_priezastis="nesutampa su lentele", polygon_source="synthesized_from_bbox",
                     perimetras_m=9.4, perimetras_saltinis="user_override")]
     assert build_questions({"patalpos": rooms, "_meta": {"geometrija": {"lapai": [1]}}})["questions"] == []
+
+
+def test_a_room_with_a_proposed_outline_is_offered_it_with_the_reason_and_the_ways_round():
+    """objektas_h tambūras, 2026-09-23: „paspaudus du kartus ant tambūro … neaišku, kaip čia pažymėti"."""
+    room = _quiet("01", pavadinimas="Tambūras", plotas_m2=4.48, perimetras_m=8.6, polygon_source="synthesized_from_bbox",
+                  _konturo_priezastis="sienos prie numerio uždaro 2,86 m², lentelėje 4,48 m²",
+                  _vieta={"page": 1, "cx": 0.43, "cy": 0.43, "saltinis": "zenkliukas"},
+                  _konturo_siulymas={"page": 1, "polygon_pct": [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]], "plotas_m2": 2.86,
+                                     "perimetras_m": 6.77, "paklaida": 0.3616, "taskas_pct": [0.42, 0.41]})
+    out = build_questions({"patalpos": [room], "_meta": {"geometrija": {"lapai": [1]}}})
+    k = _q(out, "konturas")
+    item = k["items"][0]
+    assert item["proposed_outline"]["polygon_pct"] == [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]]
+    assert item["proposed_outline"]["taskas_pct"] == [0.42, 0.41] and item["proposed_outline"]["page"] == 1
+    assert item["sentence"] == ("Prie numerio 01 sienos uždaro 2,86 m² (sienų 6,77 m), lentelėje 4,48 m² (−36 %) — todėl kontūro "
+                                "pats nepriėmiau. Jei tai visa patalpa — „Tinka“. Jei patalpa didesnė, spustelėkite kitoje jos "
+                                "vietoje brėžinyje. Arba įrašykite sienų ilgį ranka.")
+    assert item["perimetras_dabar"] == 8.6

@@ -134,6 +134,23 @@ test('openings: the ticked ones are added to their rooms — two in one room bot
   assert.equal(openingsAnswer(project, items, undefined).added, 4, 'nothing unticked → every proposal');
 });
 
+test('openings: a width, a height or the kind he corrected goes into the room instead of the proposal', () => {
+  const project = { patalpos: [{ nr: '08', elementai: [] }, { nr: '06', elementai: [] }] };
+  const items = [door('08', 1400, '09'), door('06', 800, '03')];
+  const out = openingsAnswer(project, items, [true, true], { 0: { plotis_mm: 900, aukstis_mm: 2100 }, 1: { tipas: 'langas', aukstis_mm: 1500 } });
+  const r08 = out.rooms.find((r) => r.nr === '08').elementai[0];
+  assert.equal(r08.plotis_mm, 900, 'the 1,40 m „door" became 0,90 m');
+  assert.equal(r08.tipas, 'duris');
+  const r06 = out.rooms.find((r) => r.nr === '06').elementai[0];
+  assert.deepEqual([r06.tipas, r06.plotis_mm, r06.aukstis_mm], ['langas', 800, 1500]);
+  assert.equal(out.edited, 2);
+  assert.equal(items[0].plotis_mm, 1400, 'the proposals themselves are not mutated');
+  // rubbish in an edit is ignored, an unticked one is not added even if edited
+  const same = openingsAnswer(project, items, [true, false], { 0: { plotis_mm: -5, tipas: 'arka' }, 1: { plotis_mm: 700 } });
+  assert.equal(same.rooms.find((r) => r.nr === '08').elementai[0].plotis_mm, 1400);
+  assert.equal(same.added, 1);
+});
+
 test('what was answered is said in one plain sentence', () => {
   const t = (key, params) => `${key}|${JSON.stringify(params || {})}`;
   assert.match(answerSummary({ kind: 'aukstis' }, { touched: ['01', '02'], value: 2.82 }, t), /answeredHeight/);
@@ -146,6 +163,14 @@ test('what was answered is said in one plain sentence', () => {
   assert.match(answerSummary({ kind: 'angos' }, { added: 3, touched: ['02', '07'] }, t), /answeredOpenings.*"count":3/);
   assert.match(answerSummary({ kind: 'erdve' }, { touched: ['04', '05'] }, t), /answeredSplit/);
   assert.match(answerSummary({ kind: 'konturas' }, { touched: ['01'] }, t), /answeredOutline/);
+});
+
+test('the outline question has two more answers with their own sentence: the proposal accepted, a length typed', () => {
+  const t = (key, p) => `${key}|${p.rooms}|${p.value ?? ''}`;
+  const q = { kind: 'konturas' };
+  assert.equal(answerSummary(q, { touched: ['01'] }, t), 'project.questions.answeredOutline|01|');
+  assert.equal(answerSummary(q, { touched: ['01'], accepted: true }, t), 'project.questions.answeredOutlineAccepted|01|');
+  assert.equal(answerSummary(q, { touched: ['01'], typed: true, value: 8.6 }, t), 'project.questions.answeredPerimeterTyped|01|8,60');
 });
 
 test('after an answer he stands on the question that slid into its place — or stays, when it still has rooms to show', () => {

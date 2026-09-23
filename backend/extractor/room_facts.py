@@ -438,6 +438,16 @@ def _perimeter_drawing(room: dict) -> dict:
     out = {"outline": outline, "walls": walls}
     if outline is None and room.get("_konturo_priezastis"):
         out["outline_reason"] = str(room["_konturo_priezastis"])
+    cand = room.get("_konturo_siulymas")
+    if not (outline and outline.get("polygon_pct")) and isinstance(cand, dict) and normalize_polygon(cand.get("polygon_pct")):
+        # 2026-09-23: what the walls close around the room's number when the table disagrees — PROPOSED on the
+        # drawing (the question list: „Tinka" takes it, a click elsewhere replaces it), never asserted
+        out["outline_proposal"] = {"page": cand.get("page") or page, "polygon_pct": normalize_polygon(cand["polygon_pct"]),
+                                   "plotas_m2": _f(cand.get("plotas_m2")), "perimetras_m": _f(cand.get("perimetras_m")),
+                                   "paklaida": _f(cand.get("paklaida")),
+                                   "plotas_uzrasas_m2": _f(cand.get("plotas_uzrasas_m2")) or _f(room.get("plotas_m2")),
+                                   "taskas_pct": [_f(cand["taskas_pct"][0]), _f(cand["taskas_pct"][1])]
+                                   if isinstance(cand.get("taskas_pct"), (list, tuple)) and len(cand["taskas_pct"]) == 2 else None}
     return out
 
 
@@ -508,6 +518,13 @@ def _fact_perimetras(project: dict, room: dict,
                      f"lentelėje užrašyta {lt_num(_f(kont.get('plotas_uzrasas_m2')))} m².")
         else:
             whose = " Patalpą brėžinyje parodėte patys."
+    elif kont.get("saltinis") == "pasiulyta":
+        # 2026-09-23: the face the walls close around the number, proposed because the table disagreed — he said „Tinka"
+        dev = _f(kont.get("paklaida"))
+        whose = " Kontūrą pasiūliau pagal sienas prie patalpos numerio — patvirtinote."
+        if dev is not None and dev > 0.08 and _f(kont.get("plotas_m2")) and _f(kont.get("plotas_uzrasas_m2")):
+            whose += (f" Kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², lentelėje užrašyta "
+                      f"{lt_num(_f(kont.get('plotas_uzrasas_m2')))} m² — plotui imamas užrašas, kontūras tik sienoms.")
     elif kont.get("saltinis") == "padalinta":
         # 2026-09-21: one side of a line he drew through a space two rooms share (api/room_outline.py)
         others = ", ".join(str(n) for n in (kont.get("su") or []))

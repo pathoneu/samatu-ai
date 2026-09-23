@@ -129,7 +129,10 @@ export default function CheckLayer({ data, renderedSize }) {
             const cy = o.points.reduce((sum, pt) => sum + Y(pt), 0) / o.points.length;
             return (
               <g key={`pr${o.nr}`}>
-                <polygon points={poly(o.points)} fill={ROOM} fillOpacity={0.1} stroke={ROOM} strokeWidth={2} strokeLinejoin="round" />
+                <polygon
+                  points={poly(o.points)} fill={ROOM} fillOpacity={0.1} stroke={ROOM} strokeWidth={data.proposal.line ? 2 : 3}
+                  strokeLinejoin="round" strokeDasharray={data.proposal.line ? undefined : '9 6'}
+                />
                 <g transform={`translate(${cx.toFixed(1)}, ${cy.toFixed(1)})`}>
                   <rect x={-16} y={-11} width={32} height={22} rx={2} fill={ROOM} />
                   <text x={0} y={5} textAnchor="middle" fontSize={13} fontFamily="'IBM Plex Mono', ui-monospace, monospace" fontWeight={600} fill="#ffffff">{o.nr}</text>
@@ -137,14 +140,18 @@ export default function CheckLayer({ data, renderedSize }) {
               </g>
             );
           })}
-          <line
-            x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
-            stroke="#ffffff" strokeWidth={7} strokeLinecap="round"
-          />
-          <line
-            x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
-            stroke={ROOM} strokeWidth={3.5} strokeDasharray="10 7" strokeLinecap="round"
-          />
+          {data.proposal.line && (
+            <>
+              <line
+                x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
+                stroke="#ffffff" strokeWidth={7} strokeLinecap="round"
+              />
+              <line
+                x1={X(data.proposal.line[0])} y1={Y(data.proposal.line[0])} x2={X(data.proposal.line[1])} y2={Y(data.proposal.line[1])}
+                stroke={ROOM} strokeWidth={3.5} strokeDasharray="10 7" strokeLinecap="round"
+              />
+            </>
+          )}
         </g>
       )}
 

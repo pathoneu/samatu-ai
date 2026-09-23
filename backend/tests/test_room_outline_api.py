@@ -61,9 +61,9 @@ def _store(project_id="p1", *, user_id=None, blob=None, pdf=True):
         storage.get_storage().put(storage.pdf_key(project_id), _plan())
 
 
-def _click(client, x_m, y_m, nr="01", page=1, project_id="p1"):
+def _click(client, x_m, y_m, nr="01", page=1, project_id="p1", **more):
     x, y = _pct(x_m, y_m)
-    return client.post(f"/api/projects/{project_id}/rooms/{nr}/outline-at", json={"page": page, "x_pct": x, "y_pct": y})
+    return client.post(f"/api/projects/{project_id}/rooms/{nr}/outline-at", json={"page": page, "x_pct": x, "y_pct": y, **more})
 
 
 def test_one_click_outlines_the_room_and_reads_its_walls(tmp_path, monkeypatch):
@@ -89,6 +89,18 @@ def test_one_click_outlines_the_room_and_reads_its_walls(tmp_path, monkeypatch):
     # …and nothing was saved
     after = db.get_project("p1")
     assert after["patalpos"] == before["patalpos"] and after.get("_meta") == before.get("_meta")
+
+
+def test_tinka_on_a_proposed_outline_is_the_same_click_and_says_whose_it_is(tmp_path, monkeypatch):
+    """2026-09-23: the lane proposes the face the walls close when the table disagrees; „Tinka" sends the point
+    inside it with `pritarta` — the outline is his, the sentence says the program offered it, the proposal goes."""
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob(_konturo_siulymas={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]], "plotas_m2": 12.0,
+                                   "perimetras_m": 14.0, "paklaida": 0.3, "taskas_pct": [0.15, 0.13]})
+    _store(blob=blob)
+    room = _click(TestClient(app), 2.0, 2.5, pritarta=True).json()["room"]
+    assert room["polygon_source"] == "corrected" and room["_konturas"]["saltinis"] == "pasiulyta"
+    assert room["_konturo_siulymas"] is None and room["perimetras_m"] == 14.0
 
 
 def test_a_perimeter_he_typed_stays_his(tmp_path, monkeypatch):
@@ -165,3 +177,11 @@ def test_an_outline_he_pointed_at_is_said_and_its_area_is_compared_with_the_tabl
     assert agrees["sentence"].endswith("Patalpą brėžinyje parodėte patys.")
     traced = _perimeter_fact(saltinis="vektoriniai_konturai", paklaida=0.3616)
     assert "parodėte" not in traced["sentence"]
+
+
+def test_an_accepted_proposal_is_said_to_be_the_programs_offer_that_he_confirmed():
+    f = _perimeter_fact(saltinis="pasiulyta", paklaida=0.3616)
+    assert f["status"] == "read"
+    assert f["sentence"].endswith("Kontūrą pasiūliau pagal sienas prie patalpos numerio — patvirtinote. Kontūro plotas 2,86 m², "
+                                  "lentelėje užrašyta 4,48 m² — plotui imamas užrašas, kontūras tik sienoms.")
+    assert _perimeter_fact(saltinis="pasiulyta", paklaida=0.02)["sentence"].endswith("prie patalpos numerio — patvirtinote.")

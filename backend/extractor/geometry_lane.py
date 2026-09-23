@@ -266,6 +266,7 @@ def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, 
                               "su": [o for o in members if o != m], "saltinis": DIVIDED_BY_LANE,
                               "pagal": cut["pagal"], "riba_pct": cut["line_pct"]}
             r.pop("_konturo_priezastis", None)
+            r.pop("_konturo_siulymas", None)
             if str(r.get("perimetras_saltinis") or "") == OPEN_PLAN_ESTIMATE:
                 # the share by floor area written a moment ago — this side's own walls are read below
                 # (sum_perimeters: the strings along them, else the outline's length as an estimate with its reason)
@@ -281,7 +282,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
-                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "ribos": [], "ribos_nepasiulytos": [],
+                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"
     try:
@@ -382,10 +383,19 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     # the openings the wall solid shows in this room's walls — evidence for the
                     # door-and-window fact, never a quantity on their own (2026-09-20)
                     r["_angos_sienose"] = {"page": page, "angos": hit.get("angos") or []}
+                    r.pop("_konturo_siulymas", None)
                     meta["konturai"].append(nr)
                 elif nr in res["reasons"]:
                     r["_konturo_priezastis"] = res["reasons"][nr]
                     meta["konturu_priezastys"][nr] = res["reasons"][nr]
+                    # 2026-09-23: the face the walls close around the number, when its area is too far from the
+                    # table's to take on its own — kept as a PROPOSAL for the question list („Tinka" takes it)
+                    cand = (res.get("siulymai") or {}).get(nr)
+                    if cand:
+                        r["_konturo_siulymas"] = {**cand, "plotas_uzrasas_m2": areas.get(nr)}
+                        meta["konturu_siulymai"].append(nr)
+                    else:
+                        r.pop("_konturo_siulymas", None)
             for g in res["groups"]:
                 meta["atviros_erdves"].append(g["nariai"])
                 members = [r for r in rooms if _nr(r) in g["nariai"]]
@@ -415,6 +425,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     meta["perimetrai_tusti"].append(_nr(r))
             _divide_shared_spaces(rooms, res["groups"], todo, everyone, areas, pdf_bytes, page, scale[page], (W, H), meta)
 
+        for r in rooms:                                        # a room with a trusted outline needs no proposal
+            if str(r.get("polygon_source") or "") in KEEP_POLYGONS:
+                r.pop("_konturo_siulymas", None)
         outlined = any(str(r.get("polygon_source") or "") in KEEP_POLYGONS for r in rooms)
         if outlined and not everything:
             alignment = lay_over(sheets)

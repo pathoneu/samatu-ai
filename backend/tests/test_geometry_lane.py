@@ -372,3 +372,21 @@ def test_a_two_room_open_plan_is_divided_by_the_lane_itself_and_the_boundary_is_
     assert set(out["konturai"]) >= {"01", "02"} and not ({"01", "02"} & set(out["perimetrai_tusti"]) - set(out["perimetrai_sudeti"]) & set()) 
     assert out["atviros_erdves"] == [["01", "02"]]
     assert gl.LANE_VERSION >= 8
+
+
+def test_a_room_whose_walls_close_a_different_area_than_the_table_gets_a_proposed_outline():
+    """objektas_h tambūras, 2026-09-23: 2,86 m² around the number, 4,48 in the table — no outline, but what
+    the walls close is kept on the room as a proposal (the question list shows it; „Tinka" takes it)."""
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    parsed["patalpos"][1]["plotas_m2"] = 30.0                     # far from the 9 m² drawn
+    out = gl.apply_geometry(parsed, build_plan([two_rooms()]))
+    r2 = parsed["patalpos"][1]
+    assert "_konturas" not in r2 and r2["_konturo_priezastis"] == "sienos prie numerio uždaro 9,00 m², lentelėje 30,00 m²"
+    cand = r2["_konturo_siulymas"]
+    assert cand["page"] == 1 and abs(cand["plotas_m2"] - 9.0) < 0.2 and cand["plotas_uzrasas_m2"] == 30.0
+    assert len(cand["polygon_pct"]) >= 4 and len(cand["taskas_pct"]) == 2 and out["konturu_siulymai"] == ["02"]
+    # the table agrees the next time (a corrected table, a re-read): the proposal goes, the outline comes
+    parsed["patalpos"][1]["plotas_m2"] = 9.0
+    gl.apply_geometry(parsed, build_plan([two_rooms()]))
+    assert "_konturo_siulymas" not in parsed["patalpos"][1] and parsed["patalpos"][1]["_konturas"]["plotas_nesutampa"] is False

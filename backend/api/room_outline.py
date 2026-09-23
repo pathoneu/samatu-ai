@@ -42,13 +42,14 @@ log = logging.getLogger("samatu.room_outline")
 router = APIRouter(prefix="/api/projects", tags=["room-outline"])
 
 POINTED_AT = "parodyta"           # `_konturas.saltinis` of an outline a person pointed at
+ACCEPTED_PROPOSAL = "pasiulyta"   # …of the face the lane PROPOSED (its area off the table's) that a person accepted (2026-09-23)
 DIVIDED = "padalinta"             # …of an outline that is one side of a line a person drew through a shared space
 _ESTIMATE_KEYS = ("perimetras_saltinis", "_perimetras_priezastis", "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis")
 
 # What a room's geometry is made of — everything else of the room (its name, its area, the
 # quantities built from it) is never sent back, so a click can never overwrite it.
 GEOMETRY_ROOM_KEYS = (
-    "polygon_pct", "polygon_source", "polygon_corrected_at", "_konturas", "_konturo_priezastis", "_atvira_erdve",
+    "polygon_pct", "polygon_source", "polygon_corrected_at", "_konturas", "_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve",
     "perimetras_m", "perimetras_saltinis", "_sienos", "_perimetras_suma", "_perimetras_priezastis",
     "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis", "_perimetras_pries_geometrija",
     "_angos_sienose", "grindu_danga", "grindu_danga_saltinis", "_grindu_danga", "_grindu_dangos_dvi",
@@ -59,6 +60,7 @@ class OutlineAt(BaseModel):
     page: int = Field(ge=1)
     x_pct: float = Field(ge=0.0, le=1.0)
     y_pct: float = Field(ge=0.0, le=1.0)
+    pritarta: bool = False            # the point is inside the outline the lane proposed and he said „Tinka"
 
 
 class PagePoint(BaseModel):
@@ -163,8 +165,8 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
     room["_konturas"] = {"page": body.page, "plotas_m2": hit["plotas_m2"], "perimetras_m": hit["perimetras_m"],
                          "plotas_uzrasas_m2": room.get("plotas_m2"), "paklaida": hit["paklaida"],
                          "plotas_nesutampa": False, "sujungta": hit["sujungta"], "durys_m": hit["durys_m"],
-                         "saltinis": POINTED_AT}
-    for stale in ("_konturo_priezastis", "_atvira_erdve", "_angos_sienose"):
+                         "saltinis": ACCEPTED_PROPOSAL if body.pritarta else POINTED_AT}
+    for stale in ("_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve", "_angos_sienose"):
         room.pop(stale, None)
     if str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis"):
         # an ESTIMATE made without this outline — the walls are read afresh
@@ -212,7 +214,7 @@ def _divided(parsed: dict, pdf_bytes: bytes, dims, rooms: list[dict], members: l
         r["_konturas"] = {"page": page, "plotas_m2": part["plotas_m2"], "perimetras_m": part["perimetras_m"],
                           "plotas_uzrasas_m2": r.get("plotas_m2"), "paklaida": part["paklaida"], "plotas_nesutampa": False,
                           "menamos": part["menamos"], "su": [m for m in members if m != nr], "saltinis": DIVIDED}
-        for stale in ("_konturo_priezastis", "_atvira_erdve", "_angos_sienose"):
+        for stale in ("_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve", "_angos_sienose"):
             r.pop(stale, None)
         if str(r.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis"):
             for stale in _ESTIMATE_KEYS:

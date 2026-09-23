@@ -219,11 +219,11 @@ export default function RoomDrawingPane({
                   ? t('project.roomSheet.outlineReading')
                   : pick.mode === 'split'
                     ? t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') })
-                    : t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' })}
+                    : (pick.text?.hint || t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' }))}
               </p>
               {!pick.busy && (
                 <p className="mt-0.5 text-[14px] leading-snug text-white/85">
-                  {t(pick.mode === 'split' ? 'project.roomSheet.splitHintWhy' : 'project.roomSheet.outlinePickWhy')}
+                  {pick.text?.why || t(pick.mode === 'split' ? 'project.roomSheet.splitHintWhy' : 'project.roomSheet.outlinePickWhy')}
                 </p>
               )}
               {/* why the last click did not work — said HERE, at the drawing he is looking at, not in a corner toast */}

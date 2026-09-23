@@ -5,7 +5,10 @@
  *   number_all — one number for every room that asked (the ceiling height), a field per room on request;
  *   numbers    — a list of rooms, each with the program's number in a field (perimeters, areas);
  *   choices    — a list of rooms, each with the program's choice pressed (floor covering, painted or not);
- *   openings   — the openings the walls show and the list lacks, ticked — untick what is not a door.
+ *   openings   — the openings the walls show and the list lacks, ticked — untick what is not a door;
+ *   outline    — a room to point at on the drawing: the outline the program PROPOSES when the walls close a
+ *                different area than the table gives (2026-09-23, objektas_h tambūras), „Tinka" or a click
+ *                elsewhere — and always the way without a click, the wall length typed by hand.
  *
  * „Programa siūlo — jūs patvirtinate": every body opens filled in with the proposal, so the usual action is the
  * one big button. All of them report through `onAnswer(payload)`; the page turns the payload into the project
@@ -28,6 +31,12 @@ export const Q_PLAIN = `${Q_BTN} border-border bg-card hover:bg-muted`;
 
 const INPUT = 'h-11 w-28 rounded-[2px] border border-border bg-card px-2 text-right font-mono text-[16px] '
   + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const SMALL_INPUT = 'h-10 w-20 rounded-[2px] border border-border bg-card px-2 text-right font-mono text-[15px] '
+  + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const SELECT = 'h-10 rounded-[2px] border border-border bg-card px-2 text-[15px] '
+  + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+// an interior door this wide or this narrow is unusual — said beside the opening, he decides (2026-09-23)
+const DOOR_WIDTH_M = { min: 0.6, max: 1.2 };
 
 const lt = (v) => (v == null || v === '' ? '' : ltNumber(Number(v), 2));
 const roomLabel = (item) => [item.room_nr, item.room_name].filter(Boolean).join(' ');
@@ -52,6 +61,67 @@ function Row({ item, focused, onFocus, children, note, stacked = false }) {
       </div>
       {focused && note && <p className="px-3 pb-2 text-[13px] leading-snug text-[hsl(var(--ink-2))]">{note}</p>}
     </li>
+  );
+}
+
+/**
+ * A room to point at on the drawing. With a proposal: the sentence says what the walls close around the room's
+ * number and why the program did not take it itself; „Tinka" takes it, a click elsewhere replaces it. Always:
+ * the wall length typed by hand — the answer when no click can find the room.
+ */
+export function OutlineBody({ question, item, busy, onAccept, onTypeLength }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(() => lt(item?.perimetras_dabar));
+  useEffect(() => { setDraft(lt(item?.perimetras_dabar)); }, [item?.room_nr, item?.perimetras_dabar]);
+  if (!item) return <p className="text-[15px] text-[hsl(var(--ink-2))]">{t('project.questions.outlineAllSkipped')}</p>;
+  const value = parseLtNumber(draft);
+  const valid = isValidAmount(value);
+  const proposal = item.proposed_outline;
+  const commit = () => { if (valid) onTypeLength?.(value); };
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[15px] font-semibold">
+        {question.items.length > 1 && `${question.items.indexOf(item) + 1} / ${question.items.length} · `}
+        <span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}
+      </p>
+      {proposal ? (
+        <>
+          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]" data-testid="outline-proposal-sentence">
+            {cleanUserText(item.sentence || '')}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={onAccept}>
+              <Check className="h-4 w-4" aria-hidden="true" />
+              {t('project.questions.outlineAccept', { area: ltNumber(Number(proposal.plotas_m2), 2) })}
+            </button>
+            <span className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineElsewhere')}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+            {t('project.questions.outlineReason', { reason: cleanUserText(item.reason || '').replace(/\.$/, '') })}
+          </p>
+          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineHow')}</p>
+        </>
+      )}
+      <div className="border-t border-border pt-3">
+        <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineTypeLength')}</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <label className="text-[15px] text-[hsl(var(--ink-2))]" htmlFor="q-outline-length">{t('project.questions.outlineLengthLabel')}</label>
+          <input
+            id="q-outline-length" value={draft} inputMode="decimal" className={INPUT}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+          />
+          <button type="button" className={Q_PLAIN} disabled={busy || !valid} onClick={commit} data-testid="outline-type-length">
+            {t('project.questions.save')}
+          </button>
+        </div>
+        {!valid && draft !== '' && <p className="mt-1 text-[13px] text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -226,41 +296,101 @@ export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer }) {
 export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpenRoom }) {
   const { t } = useTranslation();
   const [off, setOff] = useState(() => new Set());
-  useEffect(() => { setOff(new Set()); }, [question.id, question.items.length]);
+  const [edits, setEdits] = useState({});                       // index → {plotis, aukstis, tipas} as he typed them
+  useEffect(() => { setOff(new Set()); setEdits({}); }, [question.id, question.items.length]);
   const count = question.items.length - off.size;
+  const draftOf = (item, i) => ({
+    plotis: edits[i]?.plotis ?? ltNumber(Number(item.plotis_mm) / 1000, 2),
+    aukstis: edits[i]?.aukstis ?? ltNumber(Number(item.aukstis_mm) / 1000, 2),
+    tipas: edits[i]?.tipas ?? (item.tipas === 'langas' ? 'langas' : 'duris'),
+  });
+  const setEdit = (i, patch) => setEdits((cur) => ({ ...cur, [i]: { ...(cur[i] || {}), ...patch } }));
+  const toggle = (i, item) => { onFocus?.(item.room_nr); setOff((cur) => { const next = new Set(cur); if (next.has(i)) next.delete(i); else next.add(i); return next; }); };
+  const commit = () => {
+    const out = {};
+    question.items.forEach((item, i) => {
+      const d = draftOf(item, i);
+      const w = parseLtNumber(d.plotis);
+      const h = parseLtNumber(d.aukstis);
+      out[i] = {
+        plotis_mm: isValidAmount(w) ? Math.round(w * 1000) : item.plotis_mm,
+        aukstis_mm: isValidAmount(h) ? Math.round(h * 1000) : item.aukstis_mm,
+        tipas: d.tipas,
+      };
+    });
+    onAnswer({ picked: question.items.map((_, i) => !off.has(i)), edits: out });
+  };
 
   return (
     <div className="flex flex-col gap-3">
       {question.items.length > 0 && (
         <>
           <ul className="rounded-[2px] border border-border">
-            {question.items.map((item, i) => (
-              <li
-                key={`${item.room_nr}-${item.i}-${item.plotis_mm}-${i}`}
-                className={`border-t border-border first:border-t-0 ${focusNr === item.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
-              >
-                <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5">
-                  <input
-                    type="checkbox" className="mt-1 h-5 w-5 accent-[hsl(var(--accent-2))]" checked={!off.has(i)}
-                    onChange={() => { onFocus?.(item.room_nr); setOff((cur) => { const next = new Set(cur); if (next.has(i)) next.delete(i); else next.add(i); return next; }); }}
-                  />
-                  <span className="min-w-0 text-[15px] leading-snug">
-                    <span className="font-semibold"><span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}</span>
-                    <span className="block text-[14px] text-[hsl(var(--ink-2))]">
-                      {t(item.tipas === 'langas' ? 'project.questions.openingWindow' : 'project.questions.openingDoor', {
-                        width: ltNumber(Number(item.plotis_mm) / 1000, 2), height: ltNumber(Number(item.aukstis_mm) / 1000, 2),
-                      })}
-                      {String(item.label || '').includes('—') ? ` — ${cleanUserText(String(item.label).split('—').slice(1).join('—').trim())}` : ''}
-                    </span>
-                  </span>
-                </label>
-              </li>
-            ))}
+            {question.items.map((item, i) => {
+              const d = draftOf(item, i);
+              const w = parseLtNumber(d.plotis);
+              const leads = String(item.label || '').includes('—') ? cleanUserText(String(item.label).split('—').slice(1).join('—').trim()) : '';
+              const odd = d.tipas === 'duris' && item.i !== 'laukas' && isValidAmount(w) && (w > DOOR_WIDTH_M.max || w < DOOR_WIDTH_M.min);
+              const badNumber = (d.plotis !== '' && !isValidAmount(w)) || (d.aukstis !== '' && !isValidAmount(parseLtNumber(d.aukstis)));
+              return (
+                <li
+                  key={`${item.room_nr}-${item.i}-${item.plotis_mm}-${i}`}
+                  className={`border-t border-border first:border-t-0 ${focusNr === item.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
+                  data-testid={`opening-item-${item.room_nr}-${i}`}
+                >
+                  <div className="flex items-start gap-3 px-3 py-2.5">
+                    <input
+                      type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--accent-2))]" checked={!off.has(i)}
+                      aria-label={`${roomLabel(item)} — ${t('project.questions.openingTicked')}`}
+                      onChange={() => toggle(i, item)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button" onClick={() => onFocus?.(item.room_nr)}
+                        className="text-left text-[15px] font-semibold leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}
+                        {leads && <span className="font-normal text-[hsl(var(--ink-2))]"> — {leads}</span>}
+                      </button>
+                      {/* the width the walls show and the standard height — both his to correct, and the kind
+                          (2026-09-23: „durys 1,40 pločio nebus tikrai … turi būti galimybė pataisyti") */}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-[hsl(var(--ink-2))]">
+                        <select
+                          value={d.tipas} className={SELECT} aria-label={`${roomLabel(item)} — ${t('project.questions.openingKind')}`}
+                          onChange={(e) => setEdit(i, { tipas: e.target.value })}
+                        >
+                          <option value="duris">{t('project.questions.kindDoor')}</option>
+                          <option value="langas">{t('project.questions.kindWindow')}</option>
+                        </select>
+                        <input
+                          value={d.plotis} inputMode="decimal" className={SMALL_INPUT}
+                          aria-label={`${roomLabel(item)} — ${t('project.questions.openingWidth')}`}
+                          onFocus={(e) => e.target.select()} onChange={(e) => setEdit(i, { plotis: e.target.value })}
+                        />
+                        <span aria-hidden="true">×</span>
+                        <input
+                          value={d.aukstis} inputMode="decimal" className={SMALL_INPUT}
+                          aria-label={`${roomLabel(item)} — ${t('project.questions.openingHeight')}`}
+                          onFocus={(e) => e.target.select()} onChange={(e) => setEdit(i, { aukstis: e.target.value })}
+                        />
+                        <span>m</span>
+                      </div>
+                      {odd && !off.has(i) && (
+                        <p className="mt-1 text-[13px] leading-snug text-[hsl(var(--conf-low))]" data-testid="opening-width-odd">
+                          {t('project.questions.openingWidthOdd', { width: d.plotis })}
+                        </p>
+                      )}
+                      {badNumber && <p className="mt-1 text-[13px] leading-snug text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
           <div>
             <button
               type="button" className={Q_PRIMARY} disabled={busy || count === 0} data-testid="question-accept"
-              onClick={() => onAnswer({ picked: question.items.map((_, i) => !off.has(i)) })}
+              onClick={commit}
             >
               <Check className="h-4 w-4" aria-hidden="true" />
               {t('project.questions.addPicked', { count })}

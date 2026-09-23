@@ -259,6 +259,7 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
     polygons: dict[str, Polygon] = {}
     reasons: dict[str, str] = {}
     groups: list[dict] = []
+    proposals: dict[str, dict] = {}                            # a face refused for its area — offered, not asserted
 
     def grow(nr: str, start: list[int]) -> tuple[Polygon, int] | None:
         """The room's polygon: its face(s), plus neighbouring faces that have
@@ -304,10 +305,19 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
         poly, n_parts = grown
         area = poly.area * m2
         err = abs(area - want) / want if want > 0 else None
-        if err is not None and err > tol:
-            reasons[nr] = f"nesutampa su lentele: kontūras {_lt(area)} m², lentelė {_lt(want)} m²"
-            return
         outline = poly.simplify(SIMPLIFY_PT, preserve_topology=True)
+        if err is not None and err > tol:
+            # 2026-09-23: what the walls close around the number is still the best thing the program has — it
+            # is PROPOSED (the question list shows it, „Tinka" takes it), and the reason says walls vs table
+            # instead of „nesutampa" (the founder: „kodėl jie išvis yra bandomi perskaičiuoti?" — they are not:
+            # the table's area is used; the outline is for the walls)
+            reasons[nr] = f"sienos prie numerio uždaro {_lt(area)} m², lentelėje {_lt(want)} m²"
+            inside = poly.representative_point()
+            proposals[nr] = {"polygon_pct": _to_pct(poly, W, H), "plotas_m2": round(area, 2),
+                             "perimetras_m": round(outline.exterior.length * m_per_pt, 2), "paklaida": round(err, 4),
+                             "sujungta": n_parts, "durys_m": door_m, "page": page,
+                             "taskas_pct": [round(inside.x / W, 5), round(inside.y / H, 5)]}
+            return
         rooms[nr] = {"polygon_pct": _to_pct(poly, W, H), "plotas_m2": round(area, 2),
                      "perimetras_m": round(outline.exterior.length * m_per_pt, 2),
                      "paklaida": round(err, 4) if err is not None else None,
@@ -353,7 +363,7 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
     for nr in pts:
         if nr not in rooms and nr not in reasons and nr not in solved:
             reasons[nr] = UNCLOSED
-    return rooms, polygons, reasons, groups
+    return rooms, polygons, reasons, groups, proposals
 
 
 def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], table_areas: dict[str, float],
@@ -361,7 +371,11 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
     """{rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa, sujungta, durys_m, page,
                      angos: [{plotis_m, storis_m, line_pct, i}]}},
         reasons: {nr: str},
-        groups: [{nariai, polygon_pct, plotas_m2, perimetras_m, lenteles_suma_m2, page}]}
+        groups: [{nariai, polygon_pct, plotas_m2, perimetras_m, lenteles_suma_m2, page}],
+        siulymai: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, sujungta, durys_m, page, taskas_pct}}}
+    `siulymai` (2026-09-23): the face the walls close around a room's number when its area is too far from the
+    table's to be taken on its own — proposed to the person instead of refused in silence (the smallest
+    disagreement over the door limits).
 
     Door limits are swept narrow to wide (one limit does not fit every
     drawing): a room solved at a narrower limit keeps that outline; the wider
@@ -374,7 +388,7 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
         W, H = page_size
     solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
     if solid is None or n_walls < MIN_WALLS:
-        return {"rooms": {}, "reasons": {nr: "nėra vektorinių sienų" for nr in here}, "groups": []}
+        return {"rooms": {}, "reasons": {nr: "nėra vektorinių sienų" for nr in here}, "groups": [], "siulymai": {}}
     pts = {nr: Point(float(loc["cx"]) * W, float(loc["cy"]) * H) for nr, loc in here.items()}
     strong = {nr for nr, loc in here.items() if loc.get("saltinis") in STRONG}
     edges = _edges(solid)
@@ -382,19 +396,24 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
     solved: dict[str, Polygon] = {}
     reasons: dict[str, str] = {}
     groups: list[dict] = []
+    siulymai: dict[str, dict] = {}
     for door_m in DOOR_SWEEP_M:
         if len(rooms) == len(pts):
             break
-        found, polygons, reasons, groups = _match(solid, _bridges(solid, edges, m_per_pt, door_m), pts, strong,
-                                                  table_areas, m_per_pt, W, H, page, door_m, solved)
+        found, polygons, reasons, groups, offered = _match(solid, _bridges(solid, edges, m_per_pt, door_m), pts, strong,
+                                                           table_areas, m_per_pt, W, H, page, door_m, solved)
         rooms.update(found)
         solved.update(polygons)
+        for nr, cand in offered.items():
+            if nr not in rooms and (nr not in siulymai or cand["paklaida"] < siulymai[nr]["paklaida"]):
+                siulymai[nr] = cand
     for nr, angos in _openings(solid, edges, solved, m_per_pt, W, H).items():
         if nr in rooms:
             rooms[nr]["angos"] = angos
     for nr in rooms:
         rooms[nr].setdefault("angos", [])
-    return {"rooms": rooms, "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms}, "groups": groups}
+    return {"rooms": rooms, "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms}, "groups": groups,
+            "siulymai": {nr: cand for nr, cand in siulymai.items() if nr not in rooms}}
 
 
 def _outlines(outlines_pct: dict[str, Sequence[Sequence[float]]] | None, W: float, H: float) -> dict[str, Polygon]:
@@ -456,8 +475,8 @@ def outline_at(pdf_bytes: bytes, page: int, x_pct: float, y_pct: float, table_ar
         bridges = _bridges(solid, edges, m_per_pt, door_m)
 
         def face(area: float):
-            found, polygons, _, _ = _match(solid, bridges, {_CLICK: point, **seats}, {_CLICK}, {_CLICK: area},
-                                           m_per_pt, W, H, page, door_m, others, strong_tol=math.inf)
+            found, polygons, _, _, _ = _match(solid, bridges, {_CLICK: point, **seats}, {_CLICK}, {_CLICK: area},
+                                              m_per_pt, W, H, page, door_m, others, strong_tol=math.inf)
             return (found[_CLICK], polygons[_CLICK]) if _CLICK in found else None
 
         got = face(want)

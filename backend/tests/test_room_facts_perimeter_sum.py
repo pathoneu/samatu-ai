@@ -208,3 +208,18 @@ def test_a_boundary_the_lane_proposed_is_said_to_be_the_programs_and_changeable(
     assert p["outline"]["riba"] == "programos"                     # the sheet keeps „Padalinti erdvę" for a redraw
     room["_konturas"]["pagal"] = "plotai"
     assert "ten, kur plotai pasidalija lentelės santykiu" in _perimetras(room)["sentence"]
+
+
+def test_what_the_walls_close_around_the_number_is_proposed_when_the_table_disagrees():
+    """objektas_h tambūras (2026-09-23): no outline — but the 2,86 m² the walls close is offered on the drawing."""
+    room = {"nr": "01", "pavadinimas": "Tambūras", "plotas_m2": 4.48, "puslapio_nr": 1, "lubu_aukstis_m": 2.7, "perimetras_m": 8.6,
+            "polygon_pct": OUTLINE, "polygon_source": "synthesized_from_bbox",
+            "_konturo_priezastis": "sienos prie numerio uždaro 2,86 m², lentelėje 4,48 m²",
+            "_konturo_siulymas": {"page": 1, "polygon_pct": [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]], "plotas_m2": 2.86,
+                                  "perimetras_m": 6.77, "paklaida": 0.3616, "sujungta": 1, "durys_m": 1.6, "taskas_pct": [0.42, 0.41]}}
+    p = _perimetras(room)
+    assert p["outline"] is None and p["outline_reason"].startswith("sienos prie numerio")
+    assert p["outline_proposal"] == {"page": 1, "polygon_pct": [[0.39, 0.39], [0.46, 0.39], [0.46, 0.44], [0.39, 0.44]], "plotas_m2": 2.86,
+                                     "perimetras_m": 6.77, "paklaida": 0.3616, "plotas_uzrasas_m2": 4.48, "taskas_pct": [0.42, 0.41]}
+    room["polygon_source"] = "corrected"                         # once he has an outline, nothing is proposed
+    assert "outline_proposal" not in _perimetras(room)

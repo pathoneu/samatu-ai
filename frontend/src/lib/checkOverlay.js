@@ -184,11 +184,12 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
     pageOf(pt.page).pickPoints.push({ x: Number(pt.x_pct), y: Number(pt.y_pct) });
   }
 
-  // the boundary the PROGRAM proposes for a shared space (api split-proposal), shown before it is accepted:
-  // both rooms' outlines and the line between them
+  // what the PROGRAM proposes, shown before it is accepted: for a shared space (api split-proposal) both rooms'
+  // outlines and the line between them; for a room whose walls close a different area than the table gives
+  // (2026-09-23, `_konturo_siulymas`) just that outline — no line
   const line = Array.isArray(proposal?.line_pct) && proposal.line_pct.length === 2 ? proposal.line_pct : null;
   const proposed = Object.entries(proposal?.rooms || {}).filter(([, pts]) => validPolygon(pts));
-  if (line && proposed.length && num(proposal?.page) != null) {
+  if (proposed.length && num(proposal?.page) != null) {
     pageOf(proposal.page).proposal = { line, outlines: proposed.map(([nr, points]) => ({ nr: String(nr), points })) };
   }
 
@@ -214,10 +215,14 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
     if (f.key === activeFactKey && !whole) out.factFocus = { page: Number(src.page), rect: focusRectFor(rect, 0.02) };
   }
 
-  const focusShape = outline || shared
+  // a room with no outline of its own but a PROPOSED one (2026-09-23): the drawing opens on the proposal
+  const proposalShape = !outline && !shared && proposed.length && num(proposal?.page) != null
+    ? (proposed.find(([nr]) => String(nr) === String(room.nr ?? ''))?.[1] || (proposed.length === 1 ? proposed[0][1] : null))
+    : null;
+  const focusShape = outline || shared || proposalShape
     || (marker ? [[marker.x - MARKER_NEIGHBOURHOOD, marker.y - MARKER_NEIGHBOURHOOD], [marker.x + MARKER_NEIGHBOURHOOD, marker.y + MARKER_NEIGHBOURHOOD]] : null)
     || (Array.isArray(room.region_pct) ? room.region_pct : null);
-  const focusPage = outline ? outlinePage : (shared ? (num(space.page) ?? outlinePage) : num(room.page));
+  const focusPage = outline ? outlinePage : (shared ? (num(space.page) ?? outlinePage) : (proposalShape ? num(proposal.page) : num(room.page)));
   if (focusShape && focusPage != null) out.roomFocus = { page: Number(focusPage), rect: focusRectFor(focusShape) };
 
   // The active fact was read on ANOTHER sheet and has no box of its own there (a floor covering „pagal grindų

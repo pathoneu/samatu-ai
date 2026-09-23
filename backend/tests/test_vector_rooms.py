@@ -45,10 +45,18 @@ def test_walls_exported_as_triangles_trace_the_same_rooms():
     assert abs(out["rooms"]["01"]["plotas_m2"] - 12.0) / 12.0 <= 0.02
 
 
-def test_the_outside_is_not_a_room_and_a_far_off_area_is_refused():
+def test_the_outside_is_not_a_room_and_a_far_off_area_is_refused_but_proposed():
+    """2026-09-23 (objektas_h tambūras: the walls close 2,86 m² around the number, the table says 4,48): the face
+    is not taken as the room — but it is PROPOSED, with the reason said as walls vs table, so that a person can
+    say „Tinka" instead of guessing where to click."""
     out = vr.trace_vector_rooms(build_plan([two_rooms()]), 1, _locations(), {"01": 30.0, "02": 9.0}, SCALE)
-    assert "01" not in out["rooms"] and out["reasons"]["01"].startswith("nesutampa su lentele")
-    assert "02" in out["rooms"]
+    assert "01" not in out["rooms"] and out["reasons"]["01"] == "sienos prie numerio uždaro 12,00 m², lentelėje 30,00 m²"
+    assert "02" in out["rooms"] and "02" not in out["siulymai"]
+    cand = out["siulymai"]["01"]
+    assert abs(cand["plotas_m2"] - 12.0) / 12.0 <= 0.02 and abs(cand["perimetras_m"] - 14.0) <= 0.3 and cand["page"] == 1
+    assert 0.59 < cand["paklaida"] < 0.61 and len(cand["polygon_pct"]) >= 4
+    from shapely.geometry import Point, Polygon
+    assert Polygon(cand["polygon_pct"]).contains(Point(cand["taskas_pct"]))     # „Tinka" clicks here for him
 
 
 def test_a_table_that_is_a_little_off_keeps_the_outline_and_says_so():

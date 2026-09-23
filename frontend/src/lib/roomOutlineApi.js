@@ -28,8 +28,10 @@ async function post(projectId, roomNr, action, payload, signal) {
 }
 
 /** `{status: 'ok', room, kitu_angos}` | `{status: 'taken'|'open'|'outside'|'no_walls', …}` */
-export async function fetchOutlineAt(projectId, roomNr, point, { signal } = {}) {
-  return post(projectId, roomNr, 'outline-at', { page: point.page, x_pct: point.x_pct, y_pct: point.y_pct }, signal);
+export async function fetchOutlineAt(projectId, roomNr, point, { signal, pritarta = false } = {}) {
+  // `pritarta`: the point is inside the outline the program PROPOSED and he said „Tinka" (2026-09-23)
+  return post(projectId, roomNr, 'outline-at',
+    { page: point.page, x_pct: point.x_pct, y_pct: point.y_pct, ...(pritarta ? { pritarta: true } : {}) }, signal);
 }
 
 /** `{status: 'ok', rooms: {nr: geometry}, kitu_angos}` | `{status: 'bad_line'|'not_shared'|'too_many'|'no_walls'}` */
