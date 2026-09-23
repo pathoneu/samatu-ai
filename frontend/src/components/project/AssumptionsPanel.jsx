@@ -556,6 +556,44 @@ export default function AssumptionsPanel({
             </div>
           </Row>
 
+          {/* Vidaus durys: beapvadinės ar su apvadais (2026-09-23). The drawing's text (a door schedule, a
+              note, the openings annotated for frameless doors, the door products on a finish board) decides
+              it when it says anything; the plan's symbols alone only propose. His choice here wins over all
+              of it — the same `_overrides.vidaus_durys_beapvadines` the Patikra question writes. */}
+          <Row
+            label={t('project.assumptions.framelessDoors')}
+            note={[t('project.assumptions.framelessDoorsNote'), rawData?._paruosimas?.frameless?.sakinys].filter(Boolean).join(' ')}
+          >
+            <div className="flex gap-1">
+              {[['true', t('project.assumptions.framelessYes')],
+                ['false', t('project.assumptions.framelessNo')]].map(([val, lbl]) => {
+                const current = safeAssumptions.vidaus_durys_beapvadines ?? rawData?._paruosimas?.frameless?.value ?? false;
+                const on = String(Boolean(current)) === val;
+                return (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      const v = val === 'true';
+                      setField('vidaus_durys_beapvadines', v);
+                      handleRecompute('vidaus_durys_beapvadines', v);
+                    }}
+                    title={t(`project.assumptions.framelessTitles.${val}`)}
+                    aria-pressed={on}
+                    data-assumption={`vidaus_durys_beapvadines:${val}`}
+                    className={`rounded border font-medium transition-colors ${
+                      on
+                        ? 'bg-primary/10 text-foreground border-primary'
+                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
+                    }`}
+                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+
           {/* Sienos storis */}
           <Row
             label={t('project.assumptions.wallThickness')}

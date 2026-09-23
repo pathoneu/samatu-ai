@@ -182,3 +182,19 @@ ir naršyklėje H demo: klausimas „Sienose matau 4 angas…" siūlo būtent ne
 
 Liko: B/C/D be vektorinių sienų (ten viskas kaip buvo); H angokraščiai −27 % — langai, kurių Vision nesurašė
 (dabar siūlomi klausime); antras ir trečias 4 skyriaus punktai (skaitymo lentelė, vektoriniai simboliai).
+
+## 7. Tą patį vakarą, toliau: Prielaidų jungiklis ir kas rasta bandant vektorinius simbolius
+
+- **Prielaidose** atsirado „Vidaus durys — beapvadinės ar su apvadais" (Beapvadinės / Su apvadais) su įrodymo
+  sakiniu iš paruošimo; tas pats `_overrides.vidaus_durys_beapvadines`, kurį rašo Patikros klausimas.
+  Naršyklėje H demo: „Su apvadais" → eilutė dingsta iš darbų sąrašo, „Beapvadinės" → grįžta.
+- Bandant jungiklį rastas **kartojimo defektas**: tos pačios užklausos antras paruošimas (main.py ir
+  `_recompute_per_room_via_python` abu jį paleidžia) nuimdavo Vision pažymėtų lauko durų vėliavą, o durys su
+  sienų pločiu (1,6 m) nebeatitiko nė vienos angos ir tapdavo „be angos". Pataisyta: perėjimas žymi kaip savo
+  tik tą lauko vėliavą, kurią pats uždėjo; durys su dydžiu, lygiu angai į lauką, į ją ir stoja.
+- **Vektoriniai simboliai** (4 skyriaus 3 punktas) — apžvalga H apšvietimo plane: lapas vektorinis (7 256
+  kreivės, 3 940 linijos), simboliai piešti keliais po 1–4 primityvus, dydis plane 1,2–3,7 pt (A4, 1:115), o
+  legendoje — ~7 pt, t. y. kita skalė. Paprastas grupavimas pagal artumą davė 385 grupes ir 269 skirtingus
+  parašus: primityvų matmenys svyruoja per 0,1–0,2 pt, todėl „vienodo parašo" skaičiavimas neveikia be
+  tolerantiško parašo ir mastelio normalizavimo (legenda ↔ planas). Tai atskiras tyrimo darbas; paliekamas
+  sąraše su šiais faktais.

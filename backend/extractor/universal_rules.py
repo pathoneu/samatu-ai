@@ -1241,8 +1241,11 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                     take(o, idx, "exterior" if _to_outside(o["i"], by_nr)
                          else ("passage" if _is_passage(o["w"], o["i"], r, by_nr) else "interior"))
                     continue
-                o = _closest_free(free, w, lambda o: o["i"] == "laukas" and DOOR_LIKE_W_M[0] <= o["w"] <= DOOR_LIKE_W_M[1],
-                                  tol=WALL_WIDTH_TOL_M)
+                # a sized door whose width IS an opening to the outside (a 1,6 m entrance with its sidelight
+                # measured on the earlier run) stands in it; an unsized one takes an opening of door width
+                o = (_closest_free(free, w, lambda o: o["i"] == "laukas", tol=WALL_WIDTH_TOL_M) if w is not None
+                     else _closest_free(free, None, lambda o: o["i"] == "laukas" and DOOR_LIKE_W_M[0] <= o["w"] <= DOOR_LIKE_W_M[1],
+                                        tol=WALL_WIDTH_TOL_M))
                 if o is not None:
                     take(o, idx, "exterior")
                     continue
@@ -1298,8 +1301,10 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                 piece[OPENING_SIDE_KEY] = group[0]["i"]
                 out["matched"] += len(group)
                 if kind == "exterior":
+                    # Vision's own flag stays Vision's: only a flag THIS pass added is cleared on a re-run
+                    if not piece.get(EXTERIOR_KEY):
+                        piece[EXTERIOR_MARKED_KEY] = True
                     piece[EXTERIOR_KEY] = True
-                    piece[EXTERIOR_MARKED_KEY] = True
                     out["exterior"] += len(group)
                 elif kind == "passage":
                     piece[PASSAGE_KEY] = True

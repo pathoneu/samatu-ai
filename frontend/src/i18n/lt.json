@@ -1133,6 +1133,14 @@
         "true": "Dvi eilutės kiekvienam maišytuvui: potinkinė dalis + virštinkinė dalis",
         "false": "Viena eilutė kiekvienam maišytuvui"
       },
+      "framelessDoors": "Vidaus durys — beapvadinės ar su apvadais",
+      "framelessDoorsNote": "Beapvadinėms durims skaičiuojama angų paruošimo eilutė (glaistymas, dažymas aplink staktą); su apvadais jos nereikia. Lauko durys čia neįskaitomos.",
+      "framelessYes": "Beapvadinės",
+      "framelessNo": "Su apvadais",
+      "framelessTitles": {
+        "true": "Visos vidaus durys — beapvadinės: eilutė „Durų angų paruošimas beapvadinėms durims“ skaičiuojama",
+        "false": "Visos vidaus durys — su apvadais: ta eilutė iškrenta iš sąmatos"
+      },
       "puttyLevelPlain": {
         "Q1": "Q1 — po storais tapetais",
         "Q2": "Q2 — po matiniais dažais (įprasta)",

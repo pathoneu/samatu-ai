@@ -182,3 +182,22 @@ def test_a_neighbours_door_stood_toward_this_room_claims_the_opening_whatever_wi
     assert bath["elementai"][0]["plotis_mm"] == 800 and bath["elementai"][0][ur.OPENING_SIDE_KEY] == "09"
     f = next(x for x in build_room_facts({"patalpos": [bedroom, bath, corridor]}, "09")["facts"] if x["key"] == "angos")
     assert f["suggestions"] == [] and "į patalpą 08 (1,40 m) įrašytos prie tos patalpos" in f["sentence"]
+
+
+def test_a_visions_exterior_door_keeps_its_flag_and_its_wall_width_through_a_second_run():
+    """H demo, the Prielaidos toggle: the second recompute of the same request cleared the entrance door's
+    exterior flag (set by Vision, re-marked by the pass) and the door — now 1,6 m wide from the walls —
+    matched no opening and became „be angos"."""
+    hall = _room("01", [door(1000, _exterior=True), door(800), door(900)], angos=[("03", 1.0), ("laukas", 1.6), ("vidus", 0.74)],
+                 paskirtis="tamburas")
+    for _ in range(3):
+        ur.prepare_rooms_for_calc([hall])
+        e = hall["elementai"][0]
+        assert e.get(ur.EXTERIOR_KEY) is True and e["plotis_mm"] == 1600 and not e.get(ur.UNBACKED_KEY)
+        assert e.get(ur.EXTERIOR_MARKED_KEY) is None                  # Vision's flag, not the pass's
+    # a door the pass itself called exterior (no Vision flag) is re-derived the same way each run
+    kitchen = _room("04", [window(1350), window(1360), door()], angos=[("laukas", 1.37), ("laukas", 1.36), ("laukas", 0.89)], paskirtis="virtuve")
+    for _ in range(3):
+        ur.prepare_rooms_for_calc([kitchen])
+        d = kitchen["elementai"][2]
+        assert d.get(ur.EXTERIOR_KEY) is True and d["plotis_mm"] == 890 and d.get(ur.EXTERIOR_MARKED_KEY) is True
